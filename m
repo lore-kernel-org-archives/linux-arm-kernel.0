@@ -1,75 +1,79 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 15 Feb 2018 12:56:41 +0100
-Subject: [PATCH v2] ARM64: dts: meson-axg: enable IR controller
-In-Reply-To: <20171204053858.1697-1-yixun.lan@amlogic.com>
-References: <20171204053858.1697-1-yixun.lan@amlogic.com>
-Message-ID: <faa30eb9-9872-bd78-6f25-d6425651887e@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 15 Feb 2018 13:14:52 +0100
+Subject: [RFC PATCH v2 4/6] arm64: dts: exynos: add OF graph between MHL
+ and USB connector
+In-Reply-To: <20180215103920.32017-5-a.hajda@samsung.com>
+References: <CGME20180215103927eucas1p24785b56277ed6c9fa2fd70058096b944@eucas1p2.samsung.com>
+ <20180215103920.32017-1-a.hajda@samsung.com>
+ <20180215103920.32017-5-a.hajda@samsung.com>
+Message-ID: <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2017 06:38, Yixun Lan wrote:
-> Enable IR remote controller which find in Amlogic's Meson-AXG SoC.
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> 
+On Thu, Feb 15, 2018 at 11:39 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+> OF graph describes MHL data lanes between MHL and respective USB
+> connector.
+>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
-> 
-> Changes since v1 at [1]:
->  - drop the compatbile 'amlogic,meson-gx-ir'
-> 
-> [1]
->  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005527.html
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  6 ++++++
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 14 ++++++++++++++
->  2 files changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 0864d1ff2d9b..ca676cafdbb3 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -34,3 +34,9 @@
->  	pinctrl-0 = <&i2c1_z_pins>;
->  	pinctrl-names = "default";
->  };
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 31 +++++++++++++++++++---
+>  1 file changed, 28 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> index 7e49fadee412..ef758f7337e9 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> @@ -779,9 +779,22 @@
+>                 clocks = <&pmu_system_controller 0>;
+>                 clock-names = "xtal";
+>
+> -               port {
+> -                       mhl_to_hdmi: endpoint {
+> -                               remote-endpoint = <&hdmi_to_mhl>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > +
-> +&ir {
-> +	status = "okay";
-> +	pinctrl-0 = <&remote_input_ao_pins>;
-> +	pinctrl-names = "default";
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 9bb85893c1b7..f68f709762dd 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -616,6 +616,13 @@
->  					#gpio-cells = <2>;
->  					gpio-ranges = <&pinctrl_aobus 0 0 15>;
->  				};
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               mhl_to_hdmi: endpoint {
+> +                                       remote-endpoint = <&hdmi_to_mhl>;
+> +                               };
+> +                       };
 > +
-> +				remote_input_ao_pins: remote_input_ao {
-> +					mux {
-> +						groups = "remote_input_ao";
-> +						function = "remote_input_ao";
-> +					};
-> +				};
->  			};
->  
->  			i2c_AO: i2c at 5000 {
-> @@ -664,6 +671,13 @@
->  				clock-names = "xtal", "pclk", "baud";
->  				status = "disabled";
->  			};
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               mhl_to_musb_con: endpoint {
+> +                                       remote-endpoint = <&musb_con_to_mhl>;
+> +                               };
+>                         };
+>                 };
+>         };
+> @@ -804,6 +817,18 @@
+>                                              "usb-b-connector";
+>                                 label = "micro-USB";
+>                                 type = "micro";
 > +
-> +			ir: ir at 8000 {
-> +				compatible = "amlogic,meson-gxbb-ir";
-> +				reg = <0x0 0x8000 0x0 0x20>;
-> +				interrupts = <GIC_SPI 196 IRQ_TYPE_EDGE_RISING>;
-> +				status = "disabled";
-> +			};
->  		};
->  	};
->  };
-> 
+> +                               ports {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+> +
+> +                                       port at 3 {
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+I think you might need here "reg = <3>". Doesn't it produce a warning now?
+
+BR,
+Krzysztof
+
+> +                                               musb_con_to_mhl: endpoint {
+> +                                                       remote-endpoint = <&mhl_to_musb_con>;
+> +                                               };
+> +                                       };
+> +                               };
+> +                       };
+>                         };
+>                 };
+>
+> --
+> 2.16.1
+>
