@@ -1,26 +1,111 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 15 Feb 2018 15:59:29 -0500
-Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
-References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Feb 2018 22:02:54 +0100
+Subject: [PATCH v4 02/40] KVM: arm/arm64: Move vcpu_load call after
+ kvm_vcpu_first_run_init
+In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+Message-ID: <20180215210332.8648-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, all,
+Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
+we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
+there is also no need to do vcpu_load() for things such as handling the
+immediate_exit flag.
 
-On 02/06/2018 12:56 PM, Marc Zyngier wrote:
-> ARM has recently published a SMC Calling Convention (SMCCC)
-> specification update[1] that provides an optimised calling convention
-> and optional, discoverable support for mitigating CVE-2017-5715. ARM
-> Trusted Firmware (ATF) has already gained such an implementation[2].
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c     |  4 ----
+ virt/kvm/arm/arm.c            | 22 ++++++++--------------
+ virt/kvm/arm/vgic/vgic-init.c | 11 -----------
+ 3 files changed, 8 insertions(+), 29 deletions(-)
 
-I'm probably just missing something, but does this end up reported
-somewhere conveniently user visible? In particular, if the new SMC is
-*not* provided, does the user end up easily seeing this?
-
-Jon.
-
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 70f4c30918eb..b744e6935a3f 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -852,11 +852,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return ret;
+ 
+ no_vgic:
+-	preempt_disable();
+ 	timer->enabled = 1;
+-	kvm_timer_vcpu_load(vcpu);
+-	preempt_enable();
+-
+ 	return 0;
+ }
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 53572304843b..932e61858c55 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -632,27 +632,22 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+ 		return -ENOEXEC;
+ 
+-	vcpu_load(vcpu);
+-
+ 	ret = kvm_vcpu_first_run_init(vcpu);
+ 	if (ret)
+-		goto out;
++		return ret;
+ 
+ 	if (run->exit_reason == KVM_EXIT_MMIO) {
+ 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+ 		if (ret)
+-			goto out;
+-		if (kvm_arm_handle_step_debug(vcpu, vcpu->run)) {
+-			ret = 0;
+-			goto out;
+-		}
+-
++			return ret;
++		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
++			return 0;
+ 	}
+ 
+-	if (run->immediate_exit) {
+-		ret = -EINTR;
+-		goto out;
+-	}
++	if (run->immediate_exit)
++		return -EINTR;
++
++	vcpu_load(vcpu);
+ 
+ 	kvm_sigset_activate(vcpu);
+ 
+@@ -811,7 +806,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	kvm_sigset_deactivate(vcpu);
+ 
+-out:
+ 	vcpu_put(vcpu);
+ 	return ret;
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 743ca5cb05ef..3e8209a07585 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -302,17 +302,6 @@ int vgic_init(struct kvm *kvm)
+ 
+ 	dist->initialized = true;
+ 
+-	/*
+-	 * If we're initializing GICv2 on-demand when first running the VCPU
+-	 * then we need to load the VGIC state onto the CPU.  We can detect
+-	 * this easily by checking if we are in between vcpu_load and vcpu_put
+-	 * when we just initialized the VGIC.
+-	 */
+-	preempt_disable();
+-	vcpu = kvm_arm_get_running_vcpu();
+-	if (vcpu)
+-		kvm_vgic_load(vcpu);
+-	preempt_enable();
+ out:
+ 	return ret;
+ }
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+2.14.2
