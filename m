@@ -1,32 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Feb 2018 09:20:36 -0800
-Subject: [PATCH] bus: ti-sysc: Fix checking of no-reset-on-init quirk
-Message-ID: <20180215172036.31938-1-tony@atomide.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Thu, 15 Feb 2018 18:54:48 +0100
+Subject: [PATCH] drm/sun4i: fix HSYNC and VSYNC polarity
+Message-ID: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are currently only checking for the first entry in the table while
-we should check them all. Usual no-idle-on-init is together with
-no-reset-on-init, so this has gone unnoticed.
+Differently from other Lcd signals, HSYNC and VSYNC signals
+result inverted if their bits are cleared to 0.
 
-Fixes: 566a9b05e1fa ("bus: ti-sysc: Handle module quirks based dts
-configuration")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Invert their settings of IO_POL register.
+
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 ---
- drivers/bus/ti-sysc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -630,7 +630,7 @@ static int sysc_init_dts_quirks(struct sysc *ddata)
- 	for (i = 0; i < ARRAY_SIZE(sysc_dts_quirks); i++) {
- 		prop = of_get_property(np, sysc_dts_quirks[i].name, &len);
- 		if (!prop)
--			break;
-+			continue;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 3c15cf2..aaf911a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -389,10 +389,10 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON0_BASIC3_H_SYNC(hsync));
  
- 		ddata->cfg.quirks |= sysc_dts_quirks[i].mask;
- 	}
+ 	/* Setup the polarity of the various signals */
+-	if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
++	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
+ 		val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
+ 
+-	if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
++	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+ 
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
 -- 
-2.16.1
+2.7.4
