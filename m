@@ -1,54 +1,59 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Thu, 15 Feb 2018 00:09:49 +0000
-Subject: [PATCH v5 00/20][RESEND] firmware: ARM System Control and
- Management Interface(SCMI) support
-In-Reply-To: <1518461124-17371-1-git-send-email-sudeep.holla@arm.com>
-References: <1518461124-17371-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CALW4P+LPiYSOCKW4iS6OwK9S=M3aCP+X6QNnDkycY5TYQsCb5A@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 14 Feb 2018 21:08:03 -0500
+Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
+In-Reply-To: <20180201093459.20477-2-takahiro.akashi@linaro.org>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-2-takahiro.akashi@linaro.org>
+Message-ID: <5A84EB83.7070807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 6:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi all,
+On 02/01/2018 04:34 AM, AKASHI Takahiro wrote:
+> From: Masami Hiramatsu <mhiramat@kernel.org>
 >
-> ARM System Control and Management Interface(SCMI) is more flexible and
-> easily extensible than any of the existing interfaces. Many vendors were
-> involved in the making of this formal specification and is now published[1].
+> Remove unneeded address sanity check in arch_prepare_kprobe().
+> Since do_debug_exception() is already blacklisted for kprobes, no need
+> to reject all __exception functions. Also, since generic kprobe
+> framework already ensures the address is in kernel text, no need to
+> check it is in rodata again.
 >
-> There is a strong trend in the industry to provide micro-controllers in
-> systems to abstract various power, or other system management tasks.
-> These controllers usually have similar interfaces, both in terms of the
-> functions that are provided by them, and in terms of how requests are
-> communicated to them.
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>   arch/arm64/kernel/probes/kprobes.c | 8 --------
+>   1 file changed, 8 deletions(-)
 >
-> This specification is to standardise and avoid (any further)
-> fragmentation in the design of such interface by various vendors.
+> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> index d849d9804011..3c487a389252 100644
+> --- a/arch/arm64/kernel/probes/kprobes.c
+> +++ b/arch/arm64/kernel/probes/kprobes.c
+> @@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+>   int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>   {
+>   	unsigned long probe_addr = (unsigned long)p->addr;
+> -	extern char __start_rodata[];
+> -	extern char __end_rodata[];
 >
-> This patch set is intended to get feedback on the design and structure
-> of the code. This is not complete and not fully tested due to
-> non-availability of firmware with full feature set at this time.
-
-If it's not fully tested and not complete (I read as this patch set is
-not ready to be merged), then maybe it's better to mark it as RFC?
-
-
-> It currently doesn't support notification, asynchronous/delayed response,
-> perf/power statistics region and sensor register region to name a few.
-> I have borrowed some of the ideas of message allocation/management from
-> TI SCI.
+>   	if (probe_addr & 0x3)
+>   		return -EINVAL;
+> @@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>   	/* copy instruction */
+>   	p->opcode = le32_to_cpu(*p->addr);
 >
-> Changes:
+> -	if (in_exception_text(probe_addr))
+> -		return -EINVAL;
+> -	if (probe_addr >= (unsigned long) __start_rodata &&
+> -	    probe_addr <= (unsigned long) __end_rodata)
+> -		return -EINVAL;
+> -
+>   	/* decode instruction */
+>   	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
+>   	case INSN_REJECTED:	/* insn not supported */
 >
-> v4[6]->v5:
->         - Rebased to v4.16-rc1
->         - Updated all the gathered Ack/Reviewed-by tags(which includes
->           all the drivers using SCMI protocol)
 
-You still didn't comment on all questions to previous patchset.
+I have tested this change on v4.15 using kprobes events and I find it 
+allows kprobes to be placed in exception text when they were previously 
+rejected. Is there some other recent change I need to test this with for 
+the previous behavior to be preserved?
 
-For example,
-https://www.spinics.net/lists/arm-kernel/msg626719.html
-
-
-Best regards,
-Alexey
+-dl
