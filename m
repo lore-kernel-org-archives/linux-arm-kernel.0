@@ -1,232 +1,100 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Feb 2018 18:56:01 +0000
-Subject: [PATCH 06/11] ACPI / APEI: Make the fixmap_idx per-ghes to allow
- multiple in_nmi() users
+Date: Thu, 15 Feb 2018 18:56:06 +0000
+Subject: [PATCH 11/11] arm64: acpi: Make apei_claim_sea() synchronise with
+ APEI's irq work
 In-Reply-To: <20180215185606.26736-1-james.morse@arm.com>
 References: <20180215185606.26736-1-james.morse@arm.com>
-Message-ID: <20180215185606.26736-7-james.morse@arm.com>
+Message-ID: <20180215185606.26736-12-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm64 has multiple NMI-like notifications, but GHES only has one
-in_nmi() path. The interactions between these multiple NMI-like
-notifications is, unclear.
+APEI is unable to do all of its error handling work in nmi-context, so
+it defers non-fatal work onto the irq_work queue. arch_irq_work_raise()
+sends an IPI to the calling cpu, but we can't guarantee this will be
+taken before we return.
 
-Split this single path up by moving the fixmap idx and lock into
-the struct ghes. Each notification's init function can consider
-which other notifications it masks and can share a fixmap_idx with.
-This lets us merge the two ghes_ioremap_pfn_* flavours.
+Unless we interrupted a context with irqs-masked, we can call
+irq_work_run() to do the work now. Otherwise return -EINPROGRESS to
+indicate ghes_notify_sea() found some work to do, but it hasn't
+finished yet.
 
-Two lock pointers are provided, but only one will be used by
-ghes_copy_tofrom_phys(), depending on in_nmi(). This means any
-notification that might arrive as an NMI must always be wrapped in
-nmi_enter()/nmi_exit().
-
-The double-underscore version of fix_to_virt() is used because
-the index to be mapped can't be tested against the end of the
-enum at compile time.
+With this we can take apei_claim_sea() returning '0' to mean this
+external-abort was also notification of a firmware-first RAS error,
+and that APEI has processed the CPER records.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 79 ++++++++++++++++++------------------------------
- include/acpi/ghes.h      |  5 +++
- 2 files changed, 35 insertions(+), 49 deletions(-)
+ arch/arm64/kernel/acpi.c | 19 +++++++++++++++++++
+ arch/arm64/mm/fault.c    |  9 ++++-----
+ 2 files changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 7b2504aa23b1..70ccb309a9d8 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -118,12 +118,9 @@ static DEFINE_MUTEX(ghes_list_mutex);
-  * from BIOS to Linux can be determined only in NMI, IRQ or timer
-  * handler, but general ioremap can not be used in atomic context, so
-  * the fixmap is used instead.
-- *
-- * These 2 spinlocks are used to prevent the fixmap entries from being used
-- * simultaneously.
-  */
--static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
--static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
-+static DEFINE_RAW_SPINLOCK(ghes_fixmap_lock_nmi);
-+static DEFINE_SPINLOCK(ghes_fixmap_lock_irq);
- 
- static struct gen_pool *ghes_estatus_pool;
- static unsigned long ghes_estatus_pool_size_request;
-@@ -133,38 +130,16 @@ static atomic_t ghes_estatus_cache_alloced;
- 
- static int ghes_panic_timeout __read_mostly = 30;
- 
--static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
-+static void __iomem *ghes_fixmap_pfn(int fixmap_idx, u64 pfn)
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 6a4823a3eb5e..a51a7abd98e0 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -22,6 +22,7 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irq_work.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/smp.h>
+@@ -275,10 +276,14 @@ int apei_claim_sea(struct pt_regs *regs)
  {
- 	phys_addr_t paddr;
- 	pgprot_t prot;
+ 	int err = -ENOENT;
+ 	unsigned long current_flags = arch_local_save_flags();
++	unsigned long interrupted_flags = current_flags;
  
- 	paddr = pfn << PAGE_SHIFT;
- 	prot = arch_apei_get_mem_attribute(paddr);
--	__set_fixmap(FIX_APEI_GHES_NMI, paddr, prot);
--
--	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_NMI);
--}
--
--static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
--{
--	phys_addr_t paddr;
--	pgprot_t prot;
--
--	paddr = pfn << PAGE_SHIFT;
--	prot = arch_apei_get_mem_attribute(paddr);
--	__set_fixmap(FIX_APEI_GHES_IRQ, paddr, prot);
--
--	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_IRQ);
--}
--
--static void ghes_iounmap_nmi(void)
--{
--	clear_fixmap(FIX_APEI_GHES_NMI);
--}
-+	__set_fixmap(fixmap_idx, paddr, prot);
+ 	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+ 		return err;
  
--static void ghes_iounmap_irq(void)
--{
--	clear_fixmap(FIX_APEI_GHES_IRQ);
-+	return (void __iomem *) __fix_to_virt(fixmap_idx);
- }
- 
- static int ghes_estatus_pool_init(void)
-@@ -292,8 +267,8 @@ static inline int ghes_severity(int severity)
- 	}
- }
- 
--static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
--				  int from_phys)
-+static void ghes_copy_tofrom_phys(struct ghes *ghes, void *buffer, u64 paddr,
-+				  u32 len, int from_phys)
- {
- 	void __iomem *vaddr;
- 	unsigned long flags = 0;
-@@ -303,13 +278,11 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 
- 	while (len > 0) {
- 		offset = paddr - (paddr & PAGE_MASK);
--		if (in_nmi) {
--			raw_spin_lock(&ghes_ioremap_lock_nmi);
--			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
--		} else {
--			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
--			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
--		}
-+		if (in_nmi)
-+			raw_spin_lock(ghes->nmi_fixmap_lock);
-+		else
-+			spin_lock_irqsave(ghes->fixmap_lock, flags);
-+		vaddr = ghes_fixmap_pfn(ghes->fixmap_idx, paddr >> PAGE_SHIFT);
- 		trunk = PAGE_SIZE - offset;
- 		trunk = min(trunk, len);
- 		if (from_phys)
-@@ -319,13 +292,11 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 		len -= trunk;
- 		paddr += trunk;
- 		buffer += trunk;
--		if (in_nmi) {
--			ghes_iounmap_nmi();
--			raw_spin_unlock(&ghes_ioremap_lock_nmi);
--		} else {
--			ghes_iounmap_irq();
--			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
--		}
-+		clear_fixmap(ghes->fixmap_idx);
-+		if (in_nmi)
-+			raw_spin_unlock(ghes->nmi_fixmap_lock);
-+		else
-+			spin_unlock_irqrestore(ghes->fixmap_lock, flags);
- 	}
- }
- 
-@@ -347,7 +318,7 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
- 	if (!buf_paddr)
- 		return -ENOENT;
- 
--	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
-+	ghes_copy_tofrom_phys(ghes, ghes->estatus, buf_paddr,
- 			      sizeof(*ghes->estatus), 1);
- 	if (!ghes->estatus->block_status)
- 		return -ENOENT;
-@@ -363,7 +334,7 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
- 		goto err_read_block;
- 	if (cper_estatus_check_header(ghes->estatus))
- 		goto err_read_block;
--	ghes_copy_tofrom_phys(ghes->estatus + 1,
-+	ghes_copy_tofrom_phys(ghes, ghes->estatus + 1,
- 			      buf_paddr + sizeof(*ghes->estatus),
- 			      len - sizeof(*ghes->estatus), 1);
- 	if (cper_estatus_check(ghes->estatus))
-@@ -382,7 +353,7 @@ static void ghes_clear_estatus(struct ghes *ghes)
- 	ghes->estatus->block_status = 0;
- 	if (!(ghes->flags & GHES_TO_CLEAR))
- 		return;
--	ghes_copy_tofrom_phys(ghes->estatus, ghes->buffer_paddr,
-+	ghes_copy_tofrom_phys(ghes, ghes->estatus, ghes->buffer_paddr,
- 			      sizeof(ghes->estatus->block_status), 0);
- 	ghes->flags &= ~GHES_TO_CLEAR;
- }
-@@ -995,6 +966,8 @@ int ghes_notify_sea(void)
- 
- static void ghes_sea_add(struct ghes *ghes)
- {
-+	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
-+	ghes->fixmap_idx = FIX_APEI_GHES_NMI;
- 	ghes_estatus_queue_grow_pool(ghes);
- 
- 	mutex_lock(&ghes_list_mutex);
-@@ -1041,6 +1014,8 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
- 
- static void ghes_nmi_add(struct ghes *ghes)
- {
-+	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
-+	ghes->fixmap_idx = FIX_APEI_GHES_NMI;
- 	ghes_estatus_queue_grow_pool(ghes);
- 
- 	mutex_lock(&ghes_list_mutex);
-@@ -1136,11 +1111,15 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 
- 	switch (generic->notify.type) {
- 	case ACPI_HEST_NOTIFY_POLLED:
-+		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
-+		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
- 		timer_setup(&ghes->timer, ghes_poll_func, TIMER_DEFERRABLE);
- 		ghes_add_timer(ghes);
- 		break;
- 	case ACPI_HEST_NOTIFY_EXTERNAL:
- 		/* External interrupt vector is GSI */
-+		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
-+		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
- 		rc = acpi_gsi_to_irq(generic->notify.vector, &ghes->irq);
- 		if (rc) {
- 			pr_err(GHES_PFX "Failed to map GSI to IRQ for generic hardware error source: %d\n",
-@@ -1159,6 +1138,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SCI:
- 	case ACPI_HEST_NOTIFY_GSIV:
- 	case ACPI_HEST_NOTIFY_GPIO:
-+		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
-+		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
- 		mutex_lock(&ghes_list_mutex);
- 		if (list_empty(&ghes_hed))
- 			register_acpi_hed_notifier(&ghes_notifier_hed);
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 8feb0c866ee0..74dbd164f3fe 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -29,6 +29,11 @@ struct ghes {
- 		struct timer_list timer;
- 		unsigned int irq;
- 	};
++	if (regs)
++		interrupted_flags = regs->pstate;
 +
-+	spinlock_t *fixmap_lock;
-+	raw_spinlock_t *nmi_fixmap_lock;
+ 	/*
+ 	 * APEI expects an NMI-like notification to always be called
+ 	 * in NMI context.
+@@ -287,6 +292,20 @@ int apei_claim_sea(struct pt_regs *regs)
+ 	nmi_enter();
+ 	err = ghes_notify_sea();
+ 	nmi_exit();
 +
-+	int fixmap_idx;
- };
++	/*
++	 * APEI NMI-like notifications are deferred to irq_work. Unless
++	 * we interrupted irqs-masked code, we can do that now.
++	 */
++	if (!err) {
++		if (!arch_irqs_disabled_flags(interrupted_flags)) {
++			local_daif_restore(DAIF_PROCCTX_NOIRQ);
++			irq_work_run();
++		} else {
++			err = -EINPROGRESS;
++		}
++	}
++
+ 	local_daif_restore(current_flags);
  
- struct ghes_estatus_node {
+ 	return err;
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 8cbbd9a5ec7d..e218e291a17a 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -580,11 +580,10 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 		inf->name, esr, addr);
+ 
+ 	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+-		/*
+-		 * Return value ignored as we rely on signal merging.
+-		 * Future patches will make this more robust.
+-		 */
+-	       apei_claim_sea(regs);
++		if (apei_claim_sea(regs) == 0) {
++			/* APEI claimed this as a firmware-first notification */
++			return 0;
++		}
+ 	}
+ 
+ 	info.si_signo = SIGBUS;
 -- 
 2.15.1
