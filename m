@@ -1,74 +1,96 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 15 Feb 2018 12:46:36 +0000
-Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
-In-Reply-To: <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-3-jean-philippe.brucker@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
- <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
- <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
-Message-ID: <9d440890-cb57-c890-334d-c40a6c68566e@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 15 Feb 2018 13:46:32 +0100
+Subject: [PATCH 5/8] arm64: dts: renesas: r8a77995: Add LVDS support
+In-Reply-To: <b8cc84ad-0a64-38f0-d8ac-ad9ae88c5912@ideasonboard.com>
+References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+ <1518683903-10681-6-git-send-email-kbingham@kernel.org>
+ <CAMuHMdVKczZpoXgSDOSEJZb59LAZtbWsopRaa8PtHDoZcFEMTQ@mail.gmail.com>
+ <b8cc84ad-0a64-38f0-d8ac-ad9ae88c5912@ideasonboard.com>
+Message-ID: <CAMuHMdVUQ5c3rEG7-eYCQRPK=si8OSz-o+7z8qPsSOd5y7URww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/18 10:21, joro at 8bytes.org wrote:
-> On Tue, Feb 13, 2018 at 12:57:23PM +0000, Jean-Philippe Brucker wrote:
->> * bind_device() fails if the device's group has more than one device,
->> otherwise calls __bind_device(). This prevents device drivers that are
->> oblivious to IOMMU groups from opening a backdoor.
+Hi Kieran,
+
+On Thu, Feb 15, 2018 at 1:41 PM, Kieran Bingham
+<kieran.bingham@ideasonboard.com> wrote:
+> On 15/02/18 09:07, Geert Uytterhoeven wrote:
+>> On Thu, Feb 15, 2018 at 9:38 AM, Kieran Bingham <kbingham@kernel.org> wrote:
+>>> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>>>
+>>> The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
+>>>
+>>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 >>
->> * bind_group() calls __bind_device() for all devices in group. This way
->> users that are aware of IOMMU groups can still use them safely. Note that
->> at the moment bind_group() fails as soon as it finds a device that doesn't
->> support SVA. Having all devices support SVA in a given group is
->> unrealistic and this behavior ought to be improved.
-> 
-> Yeah, so the problem on PCI is that all functions of a multi-function
-> device are put into one group. For AMD-GPUs this means that the GPU
-> (SVA-capable) will end up in the same group as the on-GPU sound
-> device (not SVA-capable).
+>> I love your patch!
+>> Yet something to improve...
+>>
+>>> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>>> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>>> @@ -773,18 +773,70 @@
+>>>                                 port at 1 {
+>>>                                         reg = <1>;
+>>>                                         du_out_lvds0: endpoint {
+>>> +                                               remote-endpoint = <&du_out_lvds0>;
+>>>                                         };
+>>>                                 };
+>>>
+>>>                                 port at 2 {
+>>>                                         reg = <2>;
+>>>                                         du_out_lvds1: endpoint {
+>>> +                                               remote-endpoint = <&du_out_lvds1>;
+>>>                                         };
+>>>                                 };
+>>>                         };
+>>>                 };
+>>>         };
+>>>
+>>> +       lvds0: lvds at feb90000 {
+>>> +               compatible = "renesas,lvds-r8a77995";
+>>> +               reg = <0 0xfeb90000 0 0x20>;
+>>> +               clocks = <&cpg CPG_MOD 727>;
+>>> +               status = "disabled";
+>>
+>> Missing resets, power-domains
+>
+> Both lvds0, and lvds1 are actually the same 'module' (just different mappings
+> within the same IP block).
+>
+> That means they will share clock, reset etc.
+>
+> Will specifying the resets cause one to affect the other unduly?
+>
+> like if one becomes un-used, will it power down? or is it refcounted, and will
+> gracefully handle both device nodes from the same device?
+>
+> I'm already fairly sure clocks is fine for this - but it's just the reset's that
+> worry me. If the reset module tries to reset lvds0 for some reason - would lvds1
+> get reset as a side effect ...
 
-As I understood it ACS also isolate functions within a device, for example
-the two PFs of my ixgbe card are in different groups. Strangely all VFs go
-in the same group, I haven't investigated why yet.
+Clocks handle sharing fine, they do refcounting.
 
-> Before this causes us big headaches I suggest to only provide the
-> bind_device() function.
+For resets, there is some sharing/exclusive support, but we don't have that
+much experience with resets as we don't use it that much yet (USB uses it).
+So for now it's mostly about "describing the hardware".
 
-Ok. I added bind_group() to make it easier for VFIO - so if one bind()
-fails in the group, iommu.c can rollback and remove the bonds already
-created. If we mandate a single device in the group for SVA, then VFIO can
-use iommu_group_for_each_dev() and ensure that the callback was only
-called once.
+Triggering a reset will indeed reset all modules using the same reset.
+The same is true for e.g. PWM.
 
-> This should be fine because for SVA we don't
-> need all types of isolation that iommu_groups provide.
-> 
-> IOMMU-groups provide two types of isolation:
-> 
-> 	1) They group devices together which the IOMMU can't distinguish
-> 	   from each other, like PCI devices behind a PCIe bridge.
-> 
-> 	2) Devices that can't be isolated from each other are also put
-> 	   into the same group. This is the case for multi-function PCIe
-> 	   devices as well as all PCIe devices behind a non-ACS bridge.
-> 	   But all these devices cann still be distinguished by the
-> 	   IOMMU.
+> Or perhaps that won't ever happen with an :
+>
+>                 power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>                 resets = <&cpg 727>;
 
-But transactions don't necessarily reach the IOMMU if devices are not
-isolated by ACS. So even if you disable all translation in the IOMMU for
-one device in the group, it may still have a view of address spaces shared
-with another device in that group.
+The power-domains property is related to power management (in this case
+clock domain only, as it's the "always-on" domain), not reset.
 
-> These two types of protection are needed to safely assign devices to
-> guests, but for bare-metal SVA all we need is type 1) isolation, and
-> not even that if we can assume that all SVA-capable devices have an
-> exclusive device-id (or stream-id).
+Gr{oetje,eeting}s,
 
-I'm not as optimistic that we won't need IOMMU groups with SVA devices for
-2) (hardware bugs, integration issues, etc). I'd be more comfortable if we
-added a sanity-check as suggested by Kevin, to ensure that SVA is
-disallowed if multiple devices are in the group.
+                        Geert
 
-Thanks,
-Jean
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
