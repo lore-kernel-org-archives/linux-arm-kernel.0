@@ -1,62 +1,65 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 15 Feb 2018 14:34:53 +0100
-Subject: [PATCH 1/5] dt-bindings: mmc: document the stm32 sdmmc bindings
+Date: Thu, 15 Feb 2018 14:34:55 +0100
+Subject: [PATCH 3/5] ARM: dts: stm32: add sdmmc support for stm32h743
 In-Reply-To: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
 References: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1518701697-14242-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1518701697-14242-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-Document the binding for stm32 sdmmc controller.
+This patch adds sdmmc support for stm32h743.
+2?SD/SDIO/MMC interfaces (up to 125 MHz)
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+ arch/arm/boot/dts/stm32h743.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
-new file mode 100644
-index 0000000..52eb1f8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
-@@ -0,0 +1,35 @@
-+* STMicroelectronics STM32 SDMMC controller
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index bbfcbac..5e85538 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -217,6 +217,19 @@
+ 			};
+ 		};
+ 
++		sdmmc2: sdmmc at 48022400 {
++			compatible = "st,stm32h7-sdmmc";
++			reg = <0x48022400 0x400>;
++			reg-names = "sdmmc";
++			interrupts = <124>;
++			clocks = <&rcc SDMMC2_CK>;
++			resets = <&rcc STM32H7_AHB2_RESET(SDMMC2)>;
++			cap-sd-highspeed;
++			cap-mmc-highspeed;
++			max-frequency = <125000000>;
++			status = "disabled";
++		};
 +
-+The highspeed MMC host controller on STM32 soc family
-+provides an interface for MMC, SD and SDIO types of memory cards.
+ 		mdma1: dma at 52000000 {
+ 			compatible = "st,stm32h7-mdma";
+ 			reg = <0x52000000 0x1000>;
+@@ -227,6 +240,19 @@
+ 			dma-requests = <32>;
+ 		};
+ 
++		sdmmc1: sdmmc at 52007000 {
++			compatible = "st,stm32h7-sdmmc";
++			reg = <0x52007000 0x1000>;
++			reg-names = "sdmmc";
++			interrupts = <49>;
++			clocks = <&rcc SDMMC1_CK>;
++			resets = <&rcc STM32H7_AHB3_RESET(SDMMC1)>;
++			cap-sd-highspeed;
++			cap-mmc-highspeed;
++			max-frequency = <125000000>;
++			status = "disabled";
++		};
 +
-+This file documents differences between the core properties described
-+by mmc.txt and the properties used by the sdmmc driver.
-+
-+Required properties:
-+ - compatible: Should be "st,stm32h7-sdmmc"
-+ - reg: mmc controller base registers
-+ - interrupts: Should contain the interrupt number
-+ - clocks: Should contain phandle for the clock feeding the controller
-+ - resets: Should contain phandle for the reset feeding the controller
-+
-+Optional property:
-+- st,dirpol: Allow to select direction polarity of external voltage
-+  transceiver (which manage data and command direction).
-+  if set: Voltage transceiver IOs are driven as output when direction signals are high,
-+  else: Voltage transceiver IOs are driven as output when direction signals are low.
-+- st,negedge: generate data & command on sdmmc clock falling edge
-+- st,pin-ckin: use sdmmc_ckin pin from an external driver to sample
-+  the receive data (example: with voltage switch transceiver).
-+
-+Example:
-+	sdmmc1: sdmmc at 52007000 {
-+		compatible = "st,stm32h7-sdmmc";
-+		reg = <0x52007000 0x1000>;
-+		interrupts = <49>;
-+		clocks = <&rcc SDMMC1_CK>;
-+		resets = <&rcc SDMMC1_R>;
-+		bus-width = <4>;
-+		cap-sd-highspeed;
-+		cap-mmc-highspeed;
-+	};
+ 		lptimer2: timer at 58002400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 2.7.4
