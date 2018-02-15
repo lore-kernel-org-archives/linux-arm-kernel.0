@@ -1,57 +1,90 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 15 Feb 2018 12:43:06 +0000
-Subject: [PATCH 01/37] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <20180215095909.r4nwqjhuijusssuy@8bytes.org>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-2-jean-philippe.brucker@arm.com>
- <20180215095909.r4nwqjhuijusssuy@8bytes.org>
-Message-ID: <69405fb7-7453-8575-e020-2ded7b2b92f5@arm.com>
+From: kieran.bingham@ideasonboard.com (Kieran Bingham)
+Date: Thu, 15 Feb 2018 12:41:05 +0000
+Subject: [PATCH 5/8] arm64: dts: renesas: r8a77995: Add LVDS support
+In-Reply-To: <CAMuHMdVKczZpoXgSDOSEJZb59LAZtbWsopRaa8PtHDoZcFEMTQ@mail.gmail.com>
+References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+ <1518683903-10681-6-git-send-email-kbingham@kernel.org>
+ <CAMuHMdVKczZpoXgSDOSEJZb59LAZtbWsopRaa8PtHDoZcFEMTQ@mail.gmail.com>
+Message-ID: <b8cc84ad-0a64-38f0-d8ac-ad9ae88c5912@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/18 09:59, Joerg Roedel wrote:
-> On Mon, Feb 12, 2018 at 06:33:16PM +0000, Jean-Philippe Brucker wrote:
->   
->> +config IOMMU_SVA
->> +	bool "Shared Virtual Addressing API for the IOMMU"
->> +	select IOMMU_API
->> +	help
->> +	  Enable process address space management for the IOMMU API. In systems
->> +	  that support it, device drivers can bind process address spaces to
->> +	  devices and share their page tables using this API.
->> +
->> +	  If unsure, say N here.
+Hi Geert,
+
+On 15/02/18 09:07, Geert Uytterhoeven wrote:
+> Hi Kieran,
 > 
-> I think this should be an option selected by IOMMU driver and not be
-> activly selectable by the user.
-
-Ok
-
->> +/**
->> + * iommu_sva_device_shutdown() - Shutdown Shared Virtual Addressing for a device
->> + * @dev: the device
->> + *
->> + * Disable SVA. The device should not be performing any DMA while this function
->> + * is running.
+> On Thu, Feb 15, 2018 at 9:38 AM, Kieran Bingham <kbingham@kernel.org> wrote:
+>> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>>
+>> The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
+>>
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 > 
-> Is this a good idea? How about devices that get hot-unplugged while
-> processes still use them and there is DMA going back and forth? This
-> function can be the point to shut down all ongoing stuff first and the
-> shutdown the device.
+> I love your patch!
+> Yet something to improve...
+> 
+>> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> @@ -773,18 +773,70 @@
+>>                                 port at 1 {
+>>                                         reg = <1>;
+>>                                         du_out_lvds0: endpoint {
+>> +                                               remote-endpoint = <&du_out_lvds0>;
+>>                                         };
+>>                                 };
+>>
+>>                                 port at 2 {
+>>                                         reg = <2>;
+>>                                         du_out_lvds1: endpoint {
+>> +                                               remote-endpoint = <&du_out_lvds1>;
+>>                                         };
+>>                                 };
+>>                         };
+>>                 };
+>>         };
+>>
+>> +       lvds0: lvds at feb90000 {
+>> +               compatible = "renesas,lvds-r8a77995";
+>> +               reg = <0 0xfeb90000 0 0x20>;
+>> +               clocks = <&cpg CPG_MOD 727>;
+>> +               status = "disabled";
+> 
+> Missing resets, power-domains
 
-To be honest I don't know how hot-unplug works. But sva_device_shutdown()
-may be called, for instance, by the device driver before the device
-disappears, so it has to know how to stop DMA before calling it. The IOMMU
-driver can't really do anything more.
+Both lvds0, and lvds1 are actually the same 'module' (just different mappings
+within the same IP block).
 
-For hot-unplug I guess that device_driver::remove() is called first,
-allowing it to stop all DMA and call sva_device_shutdown().
+That means they will share clock, reset etc.
 
-Then the IOMMU gets a BUS_NOTIFY_REMOVED_DEVICE notification and calls
-iommu_ops::remove_device(), allowing to clean up SVA structure if the
-device driver didn't call unbind_device() and sva_device_shutdown(). But
-at that point we don't have a way to cooperate with the driver to stop DMA
-anymore.
+Will specifying the resets cause one to affect the other unduly?
 
-Thanks,
-Jean
+like if one becomes un-used, will it power down? or is it refcounted, and will
+gracefully handle both device nodes from the same device?
+
+I'm already fairly sure clocks is fine for this - but it's just the reset's that
+worry me. If the reset module tries to reset lvds0 for some reason - would lvds1
+get reset as a side effect ...
+
+Or perhaps that won't ever happen with an :
+
+		power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+		resets = <&cpg 727>;
+
+Regards
+--
+Kieran
+
+
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
