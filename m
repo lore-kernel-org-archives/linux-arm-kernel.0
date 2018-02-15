@@ -1,59 +1,44 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 14 Feb 2018 21:08:03 -0500
-Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
-In-Reply-To: <20180201093459.20477-2-takahiro.akashi@linaro.org>
-References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
- <20180201093459.20477-2-takahiro.akashi@linaro.org>
-Message-ID: <5A84EB83.7070807@linaro.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 15 Feb 2018 12:58:51 +1030
+Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <CACPK8XdXOaPZ5i=qKns3=V87nhfY62PNr4kwH9xwVYxY0djo0g@mail.gmail.com>
+References: <20180205235757.246758-1-brendanhiggins@google.com>
+ <20180205235757.246758-3-brendanhiggins@google.com>
+ <CACPK8XdXOaPZ5i=qKns3=V87nhfY62PNr4kwH9xwVYxY0djo0g@mail.gmail.com>
+Message-ID: <CACPK8XeOUrrGinU_fmnmn4atYm3Bs-xSoB2MqT0Yr-LytHt78Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2018 04:34 AM, AKASHI Takahiro wrote:
-> From: Masami Hiramatsu <mhiramat@kernel.org>
+On Tue, Feb 13, 2018 at 4:52 PM, Joel Stanley <joel@jms.id.au> wrote:
+> Hi Brendan,
 >
-> Remove unneeded address sanity check in arch_prepare_kprobe().
-> Since do_debug_exception() is already blacklisted for kprobes, no need
-> to reject all __exception functions. Also, since generic kprobe
-> framework already ensures the address is in kernel text, no need to
-> check it is in rodata again.
+> On Tue, Feb 6, 2018 at 10:27 AM, Brendan Higgins
+> <brendanhiggins@google.com> wrote:
+>> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+>> specific device tree for the NPCM750 (Poleg) evaluation board.
+>>
+>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+>> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+>> Reviewed-by: Joel Stanley <joel@jms.id.au>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Tested-by: Avi Fishman <avifishman70@gmail.com>
 >
-> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->   arch/arm64/kernel/probes/kprobes.c | 8 --------
->   1 file changed, 8 deletions(-)
->
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index d849d9804011..3c487a389252 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
->   int __kprobes arch_prepare_kprobe(struct kprobe *p)
->   {
->   	unsigned long probe_addr = (unsigned long)p->addr;
-> -	extern char __start_rodata[];
-> -	extern char __end_rodata[];
->
->   	if (probe_addr & 0x3)
->   		return -EINVAL;
-> @@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->   	/* copy instruction */
->   	p->opcode = le32_to_cpu(*p->addr);
->
-> -	if (in_exception_text(probe_addr))
-> -		return -EINVAL;
-> -	if (probe_addr >= (unsigned long) __start_rodata &&
-> -	    probe_addr <= (unsigned long) __end_rodata)
-> -		return -EINVAL;
-> -
->   	/* decode instruction */
->   	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
->   	case INSN_REJECTED:	/* insn not supported */
->
+> This looks well acked, reviewed and tested. How do you plan to have
+> the ARM SoC maintainers merge your patches?
 
-I have tested this change on v4.15 using kprobes events and I find it 
-allows kprobes to be placed in exception text when they were previously 
-rejected. Is there some other recent change I need to test this with for 
-the previous behavior to be preserved?
+Following up on an IRC conversation with Brendan:
 
--dl
+The process is normally to create a git branch based on on -rc1, apply
+your patches, and send them to the ARM maintainers. You then push a
+signed tag to a repository somewhere, send a pull request (a git
+request-pull email, not a Github PR) and Arnd, Olof or one of the
+other maintainers will pull your tree some time before the next merge
+window opens.
+
+Arnd, do we have this documented somewhere for new maintainers to follow?
+
+Cheers,
+
+Joel
