@@ -1,124 +1,197 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Feb 2018 18:55:55 +0000
-Subject: [PATCH 00/11] APEI in_nmi() rework and arm64 SDEI wire-up
-Message-ID: <20180215185606.26736-1-james.morse@arm.com>
+Date: Thu, 15 Feb 2018 18:55:57 +0000
+Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's add/remove
+ and notify code
+In-Reply-To: <20180215185606.26736-1-james.morse@arm.com>
+References: <20180215185606.26736-1-james.morse@arm.com>
+Message-ID: <20180215185606.26736-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+To support asynchronous NMI-like notifications on arm64 we need to use
+the estatus-queue. These patches refactor it to allow multiple APEI
+notification types to use it.
 
-The aim of this series is to wire arm64's SDEI into APEI.
+Refactor the estatus queue's pool grow/shrink code and notification
+routine from NOTIFY_NMI's handlers. This will allow another notification
+method to use the estatus queue without duplicating this code.
 
-What's SDEI? Its ARM's "Software Delegated Exception Interface" [0]. It's
-used by firmware to tell the OS about firmware-first RAS events.
+This patch adds rcu_read_lock()/rcu_read_unlock() around the list
+list_for_each_entry_rcu() walker. These aren't strictly necessary as
+the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
+critical section.
 
-These Software exceptions can interrupt anything, so I describe them as
-NMI-like. They aren't the only NMI-like way to notify the OS about
-firmware-first RAS events, the ACPI spec also defines 'NOTFIY_SEA' and
-'NOTIFY_SEI'.
+Keep the oops_begin() call for x86, arm64 doesn't have one of these,
+and APEI is the only thing outside arch code calling this..
 
-(Acronyms: SEA, Synchronous External Abort. The CPU requested some memory,
-but the owner of that memory said no. These are always synchronous with the
-instruction that caused them. SEI, System-Error Interrupt, commonly called
-SError. This is an asynchronous external abort, the memory-owner didn't say no
-at the right point. Collectively these things are called external-aborts
-How is firmware involved? It traps these and re-injects them into the kernel
-once its written the CPER records).
+The existing ghes_estatus_pool_shrink() is folded into the new
+ghes_estatus_queue_shrink_pool() as only the queue uses it.
 
-APEI's GHES code only expects one source of NMI. If a platform implements
-more than one of these mechanisms, APEI needs to handle the interaction.
-'SEA' and 'SEI' can interact as 'SEI' is asynchronous. SDEI can interact
-with itself: its exceptions can be 'normal' or 'critical', and firmware
-could use both types for RAS. (errors using normal, 'panic-now' using
-critical).
+_in_nmi_notify_one() is separate from the rcu-list walker for a later
+caller that doesn't need to walk a list.
 
-What does this series do?
-Patches 1-3 refactor APEIs 'estatus queue' so it can be used for all
-NMI-like notifications. This defers the NMI work to irq_work, which will
-happen when we next unmask interrupts.
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ drivers/acpi/apei/ghes.c | 103 +++++++++++++++++++++++++++++++----------------
+ 1 file changed, 68 insertions(+), 35 deletions(-)
 
-Patches 4&5 move the arch and KVM code around so that NMI-like notifications
-are always called in_nmi().
-
-Patch 6 splits the 'irq or nmi?' path through ghes_copy_tofrom_phys()
-up to be per-ghes. This lets each ghes specify which other error-sources
-it can share a fixmap-slot and lock with.
-
-Patch 7 renames NOTIFY_SEA's use of NOTIFY_NMI's infrastructure, as we're
-about to have multiple NMI-like users that can't share resources.
-
-Pathes 8&9 add the SDEI helper, and notify methods for APEI.
-
-After this, adding the last firmware-first piece for arm64 is simple
-(and safe), and all our NMI-like notifications behave the same as x86's
-NOTIFY_NMI.
-
-
-All of this makes the race between memory_failure_queue() and
-ret_to_user worse, as there is now always irq_work involved.
-
-Patch 10 makes the reschedule to memory_failure() run as soon as possible.
-Patch 11 makes sure the arch code knows whether the irq_work has run by
-the time do_sea() returns. We can skip the signalling step if it has as
-APEI has done its work.
-
-
-ghes.c became clearer to me when I worked out that it has three sets of
-functions with 'estatus' in the name. One is a pool of memory that can be
-allocated-from atomically. This is grown/shrunk when new NMI users are
-allocated.
-The second is the estatus-cache, which holds recent notifications so it
-can suppress notifications we've already handled.
-The last it the estatus-queue, which holds data from NMI-like notifications
-(in pool memory) to be processed from irq_work.
-
-Testing?
-Tested with the SDEI FVP based software model and a mocked up NOTFIY_SEA using
-KVM. I've only build tested this on x86.
-
-Trees... The changes outside APEI are tiny, but there will be some changes
-to how arch/arm64/mm/fault.c generates signals, affecting do_sea() that will
-cause conflicts with patch 5.
-
-
-Thanks,
-
-James
-
-[0] http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
-
-James Morse (11):
-  ACPI / APEI: Move the estatus queue code up, and under its own ifdef
-  ACPI / APEI: Generalise the estatus queue's add/remove and notify code
-  ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
-  KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
-  arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
-  ACPI / APEI: Make the fixmap_idx per-ghes to allow multiple in_nmi()
-    users
-  ACPI / APEI: Split fixmap pages for arm64 NMI-like notifications
-  firmware: arm_sdei: Add ACPI GHES registration helper
-  ACPI / APEI: Add support for the SDEI GHES Notification type
-  mm/memory-failure: increase queued recovery work's priority
-  arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
-
- arch/arm/include/asm/kvm_ras.h       |  14 +
- arch/arm/include/asm/system_misc.h   |   5 -
- arch/arm64/include/asm/acpi.h        |   3 +
- arch/arm64/include/asm/daifflags.h   |   1 +
- arch/arm64/include/asm/fixmap.h      |   8 +-
- arch/arm64/include/asm/kvm_ras.h     |  29 ++
- arch/arm64/include/asm/system_misc.h |   2 -
- arch/arm64/kernel/acpi.c             |  49 ++++
- arch/arm64/mm/fault.c                |  30 +-
- drivers/acpi/apei/ghes.c             | 533 ++++++++++++++++++++---------------
- drivers/firmware/arm_sdei.c          |  75 +++++
- include/acpi/ghes.h                  |   5 +
- include/linux/arm_sdei.h             |   8 +
- mm/memory-failure.c                  |  11 +-
- virt/kvm/arm/mmu.c                   |   4 +-
- 15 files changed, 517 insertions(+), 260 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm_ras.h
- create mode 100644 arch/arm64/include/asm/kvm_ras.h
-
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index e42b587c509b..d3cc5bd5b496 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -749,6 +749,54 @@ static void __process_error(struct ghes *ghes)
+ #endif
+ }
+ 
++static int _in_nmi_notify_one(struct ghes *ghes)
++{
++	int sev;
++	int ret = -ENOENT;
++
++	if (ghes_read_estatus(ghes, 1)) {
++		ghes_clear_estatus(ghes);
++		return ret;
++	} else {
++		ret = 0;
++	}
++
++	sev = ghes_severity(ghes->estatus->error_severity);
++	if (sev >= GHES_SEV_PANIC) {
++#ifdef CONFIG_X86
++		oops_begin();
++#endif
++		ghes_print_queued_estatus();
++		__ghes_panic(ghes);
++	}
++
++	if (!(ghes->flags & GHES_TO_CLEAR))
++		return ret;
++
++	__process_error(ghes);
++	ghes_clear_estatus(ghes);
++
++	return ret;
++}
++
++static int ghes_estatus_queue_notified(struct list_head *rcu_list)
++{
++	int ret = -ENOENT;
++	struct ghes *ghes;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(ghes, rcu_list, list) {
++		if (!_in_nmi_notify_one(ghes))
++			ret = 0;
++	}
++	rcu_read_unlock();
++
++	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && ret == 0)
++		irq_work_queue(&ghes_proc_irq_work);
++
++	return ret;
++}
++
+ static unsigned long ghes_esource_prealloc_size(
+ 	const struct acpi_hest_generic *generic)
+ {
+@@ -764,11 +812,24 @@ static unsigned long ghes_esource_prealloc_size(
+ 	return prealloc_size;
+ }
+ 
+-static void ghes_estatus_pool_shrink(unsigned long len)
++/* After removing a queue user, we can shrink to pool */
++static void ghes_estatus_queue_shrink_pool(struct ghes *ghes)
+ {
++	unsigned long len;
++
++	len = ghes_esource_prealloc_size(ghes->generic);
+ 	ghes_estatus_pool_size_request -= PAGE_ALIGN(len);
+ }
+ 
++/* Before adding a queue user, grow the pool */
++static void ghes_estatus_queue_grow_pool(struct ghes *ghes)
++{
++	unsigned long len;
++
++	len = ghes_esource_prealloc_size(ghes->generic);
++	ghes_estatus_pool_expand(len);
++}
++
+ static void ghes_proc_in_irq(struct irq_work *irq_work)
+ {
+ 	struct llist_node *llnode, *next;
+@@ -967,48 +1028,22 @@ static LIST_HEAD(ghes_nmi);
+ 
+ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ {
+-	struct ghes *ghes;
+-	int sev, ret = NMI_DONE;
++	int ret = NMI_DONE;
+ 
+ 	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
+ 		return ret;
+ 
+-	list_for_each_entry_rcu(ghes, &ghes_nmi, list) {
+-		if (ghes_read_estatus(ghes, 1)) {
+-			ghes_clear_estatus(ghes);
+-			continue;
+-		} else {
+-			ret = NMI_HANDLED;
+-		}
+-
+-		sev = ghes_severity(ghes->estatus->error_severity);
+-		if (sev >= GHES_SEV_PANIC) {
+-			oops_begin();
+-			ghes_print_queued_estatus();
+-			__ghes_panic(ghes);
+-		}
+-
+-		if (!(ghes->flags & GHES_TO_CLEAR))
+-			continue;
+-
+-		__process_error(ghes);
+-		ghes_clear_estatus(ghes);
+-	}
++	if (!ghes_estatus_queue_notified(&ghes_nmi))
++		ret = NMI_HANDLED;
+ 
+-#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
+-	if (ret == NMI_HANDLED)
+-		irq_work_queue(&ghes_proc_irq_work);
+-#endif
+ 	atomic_dec(&ghes_in_nmi);
+ 	return ret;
+ }
+ 
+ static void ghes_nmi_add(struct ghes *ghes)
+ {
+-	unsigned long len;
++	ghes_estatus_queue_grow_pool(ghes);
+ 
+-	len = ghes_esource_prealloc_size(ghes->generic);
+-	ghes_estatus_pool_expand(len);
+ 	mutex_lock(&ghes_list_mutex);
+ 	if (list_empty(&ghes_nmi))
+ 		register_nmi_handler(NMI_LOCAL, ghes_notify_nmi, 0, "ghes");
+@@ -1018,8 +1053,6 @@ static void ghes_nmi_add(struct ghes *ghes)
+ 
+ static void ghes_nmi_remove(struct ghes *ghes)
+ {
+-	unsigned long len;
+-
+ 	mutex_lock(&ghes_list_mutex);
+ 	list_del_rcu(&ghes->list);
+ 	if (list_empty(&ghes_nmi))
+@@ -1030,8 +1063,8 @@ static void ghes_nmi_remove(struct ghes *ghes)
+ 	 * freed after NMI handler finishes.
+ 	 */
+ 	synchronize_rcu();
+-	len = ghes_esource_prealloc_size(ghes->generic);
+-	ghes_estatus_pool_shrink(len);
++
++	ghes_estatus_queue_shrink_pool(ghes);
+ }
+ 
+ #else /* CONFIG_HAVE_ACPI_APEI_NMI */
 -- 
 2.15.1
