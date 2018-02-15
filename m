@@ -1,56 +1,132 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Thu, 15 Feb 2018 13:13:39 +0000 (UTC)
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <20180215114927.GV25201@hirez.programming.kicks-ass.net>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214150739.GH2992@arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215114927.GV25201@hirez.programming.kicks-ass.net>
-Message-ID: <1626999028.22440.1518700419721.JavaMail.zimbra@efficios.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Feb 2018 13:22:56 +0000
+Subject: [PATCH v4 10/19] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
+In-Reply-To: <20180115153632.GK21403@cbox>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-11-marc.zyngier@arm.com> <20180115153632.GK21403@cbox>
+Message-ID: <af5ddd03-ddaa-0fe9-51ec-4946b5adfe1c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Feb 15, 2018, at 6:49 AM, Peter Zijlstra peterz at infradead.org wrote:
+On 15/01/18 15:36, Christoffer Dall wrote:
+> On Thu, Jan 04, 2018 at 06:43:25PM +0000, Marc Zyngier wrote:
+>> kvm_vgic_global_state is part of the read-only section, and is
+>> usually accessed using a PC-relative address generation (adrp + add).
+>>
+>> It is thus useless to use kern_hyp_va() on it, and actively problematic
+>> if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+>> no way that the compiler is going to guarantee that such access is
+>> always be PC relative.
+> 
+> nit: is always be
+> 
+>>
+>> So let's bite the bullet and provide our own accessor.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
+>>  arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
+>>  virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
+>>  3 files changed, 17 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+>> index ab20ffa8b9e7..1d42d0aa2feb 100644
+>> --- a/arch/arm/include/asm/kvm_hyp.h
+>> +++ b/arch/arm/include/asm/kvm_hyp.h
+>> @@ -26,6 +26,12 @@
+>>  
+>>  #define __hyp_text __section(.hyp.text) notrace
+>>  
+>> +#define hyp_symbol_addr(s)						\
+>> +	({								\
+>> +		typeof(s) *addr = &(s);					\
+>> +		addr;							\
+>> +	})
+>> +
+>>  #define __ACCESS_VFP(CRn)			\
+>>  	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
+>>  
+>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>> index 08d3bb66c8b7..a2d98c539023 100644
+>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>> @@ -25,6 +25,15 @@
+>>  
+>>  #define __hyp_text __section(.hyp.text) notrace
+>>  
+>> +#define hyp_symbol_addr(s)						\
+>> +	({								\
+>> +		typeof(s) *addr;					\
+>> +		asm volatile("adrp	%0, %1\n"			\
+>> +			     "add	%0, %0, :lo12:%1\n"		\
+>> +			     : "=r" (addr) : "S" (&s));			\
+> 
+> Can't we use adr_l here?
 
-> On Wed, Feb 14, 2018 at 06:53:44PM +0000, Mathieu Desnoyers wrote:
->> However, given the scenario involves multiples CPUs (one doing exit_mm(),
->> the other doing context switch), the actual order of perceived load/store
->> can be shuffled. And AFAIU nothing prevents the CPU from ordering the
->> atomic_inc() done by mmgrab(mm) _after_ the store to current->mm.
->> 
->> I wonder if we should not simply add a smp_mb__after_atomic() into
->> mmgrab() instead ? I see that e.g. futex.c does:
-> 
-> Don't think so, the futex case is really rather special and I suspect
-> this one is too. I would much rather have explicit comments rather than
-> implicit works by magic.
-> 
-> As per the rationale used for refcount_t, increments should be
-> unordered, because you ACQUIRE your object _before_ you can do the
-> increment.
-> 
-> The futex thing is simply abusing a bunch of implied barriers and
-> patching up the holes in paths that didn't already imply a barrier in
-> order to avoid having to add explicit barriers (which had measurable
-> performance issues).
-> 
-> And here we have explicit ordering outside of the reference counting
-> too, we want to ensure the reference is incremented before we modify
-> a second object.
-> 
-> This ordering is not at all related to acquiring the reference, so
-> bunding it seems odd.
+Unfortunately not. All the asm/assembler.h macros are unavailable to
+inline assembly. We could start introducing equivalent macros for that
+purpose, but that's starting to be outside of the scope of this series.
 
-I understand your point. Will's added barrier and comment is fine.
+> 
+>> +		addr;							\
+>> +	})
+>> +
+> 
+> I don't fully appreciate the semantics of this macro going by its name
+> only.  My understanding is that if you want to resolve a symbol to an
+> address which is mapped in hyp, then use this.  Is this correct?
+
+The goal of this macro is to return a symbol's address based on a
+PC-relative computation, as opposed to a loading the VA from a constant
+pool or something similar. This works well for HYP, as an absolute VA is
+guaranteed to be wrong.
+
+> 
+> If so, can we add a small comment (because I can't come up with a better
+> name).
+
+I'll add the above if that works for you.
+
+> 
+> 
+>>  #define read_sysreg_elx(r,nvh,vh)					\
+>>  	({								\
+>>  		u64 reg;						\
+>> diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+>> index d7fd46fe9efb..4573d0552af3 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+>> @@ -25,7 +25,7 @@
+>>  static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+>>  {
+>>  	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+>> -	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+>> +	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
+>>  	u32 elrsr0, elrsr1;
+>>  
+>>  	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+>> @@ -139,7 +139,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>>  		return -1;
+>>  
+>>  	rd = kvm_vcpu_dabt_get_rd(vcpu);
+>> -	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
+>> +	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
+>>  	addr += fault_ipa - vgic->vgic_cpu_base;
+>>  
+>>  	if (kvm_vcpu_dabt_iswrite(vcpu)) {
+>> -- 
+>> 2.14.2
+>>
+> Otherwise looks good.
+> 
+> Thanks,
+> -Christoffer
+> 
 
 Thanks,
 
-Mathieu
-
-
-
+	M.
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+Jazz is not dead. It just smells funny...
