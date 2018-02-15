@@ -1,390 +1,104 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Feb 2018 17:58:03 +0000
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-Message-ID: <20180215175803.6870-1-marc.zyngier@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 15 Feb 2018 17:56:23 +0000
+Subject: [PATCH v5 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <7dacf375-4645-ba34-62d1-96d9f67dbcc2@huawei.com>
+References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
+ <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
+ <5A70C536.7040208@arm.com> <5A7B4D87.9020207@arm.com>
+ <7dacf375-4645-ba34-62d1-96d9f67dbcc2@huawei.com>
+Message-ID: <5A85C9C7.9060701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although we've implemented PSCI 0.1, 0.2 and 1.0, we expose either 0.1
-or 1.0 to a guest, defaulting to the latest version of the PSCI
-implementation that is compatible with the requested version. This is
-no different from doing a firmware upgrade on KVM.
+Hi Xie XiuQi,
 
-But in order to give a chance to hypothetical badly implemented guests
-that would have a fit by discovering something other than PSCI 0.2,
-let's provide a new API that allows userspace to pick one particular
-version of the API.
+On 08/02/18 08:35, Xie XiuQi wrote:
+> I am very glad that you are trying to solve the problem, which is very helpful.
+> I agree with your proposal, and I'll test it on by box latter.
+> 
+> Indeed, we're in precess context when we are in sea handler. I was thought we
+> can't call schedule() in the exception handler before.
 
-This is implemented as a new class of "firmware" registers, where
-we expose the PSCI version. This allows the PSCI version to be
-save/restored as part of a guest migration, and also set to
-any supported version if the guest requires it.
+While testing this I've come to the conclusion that the
+memory_failure_queue_kick() approach I suggested makes arm64 behave slightly
+differently with APEI, and would need re-inventing if we support kernel-first
+too. The same race exists with memory-failure notifications signalled by SDEI,
+and to a lesser extent IRQ. So by fixing this in arch-code, we actually making
+our lives harder.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Instead, I have the patch below. This is smaller, and not arch specific. It also
+saves the arch code secretly knowing that APEI calls memory_failure_queue().
+
+I will post this as part of that series shortly...
+
+
+Thanks,
+
+James
+
+---------------%<---------------
+[PATCH] mm/memory-failure: increase queued recovery work's priority
+
+arm64 can take an NMI-like error notification when user-space steps in
+some corrupt memory. APEI's GHES code will call memory_failure_queue()
+to schedule the recovery work. We then return to user-space, possibly
+taking the fault again.
+
+Currently the arch code unconditionally signals user-space from this
+path, so we don't get stuck in this loop, but the affected process
+never benefits from memory_failure()s recovery work. To fix this we
+need to know the recovery work will run before we get back to user-space.
+
+Increase the priority of the recovery work by scheduling it on the
+system_highpri_wq, then try to bump the current task off this CPU
+so that the recover work starts immediately.
+
+Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: Xie XiuQi <xiexiuqi@huawei.com>
+CC: gengdongjiu <gengdongjiu@huawei.com>
 ---
-This is a repost of this proposal for a firmware selection API, as
-there was some discussion during the merging window. Now that the core
-variant-2 stuff is merged, we can have a go at more
-bikesheding. Please open fire!
+ mm/memory-failure.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
- Documentation/virtual/kvm/api.txt      |  9 ++++-
- Documentation/virtual/kvm/arm/psci.txt | 30 +++++++++++++++++
- arch/arm/include/asm/kvm_host.h        |  3 ++
- arch/arm/include/uapi/asm/kvm.h        |  6 ++++
- arch/arm/kvm/guest.c                   | 13 ++++++++
- arch/arm64/include/asm/kvm_host.h      |  3 ++
- arch/arm64/include/uapi/asm/kvm.h      |  6 ++++
- arch/arm64/kvm/guest.c                 | 14 +++++++-
- include/kvm/arm_psci.h                 | 16 +++++++--
- virt/kvm/arm/psci.c                    | 60 ++++++++++++++++++++++++++++++++++
- 10 files changed, 156 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/virtual/kvm/arm/psci.txt
+diff --git a/mm/memory-failure.c b/mm/memory-failure.c
+index 4b80ccee4535..14f44d841e8b 100644
+--- a/mm/memory-failure.c
++++ b/mm/memory-failure.c
+@@ -55,6 +55,7 @@
+ #include <linux/hugetlb.h>
+ #include <linux/memory_hotplug.h>
+ #include <linux/mm_inline.h>
++#include <linux/preempt.h>
+ #include <linux/kfifo.h>
+ #include <linux/ratelimit.h>
+ #include "internal.h"
+@@ -1319,6 +1320,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu,
+memory_failure_cpu);
+  */
+ void memory_failure_queue(unsigned long pfn, int flags)
+ {
++	int cpu = smp_processor_id();
+ 	struct memory_failure_cpu *mf_cpu;
+ 	unsigned long proc_flags;
+ 	struct memory_failure_entry entry = {
+@@ -1328,11 +1330,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 57d3ee9e4bde..d2b41e1608b4 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1943,6 +1943,9 @@ ARM 32-bit VFP control registers have the following id bit patterns:
- ARM 64-bit FP registers have the following id bit patterns:
-   0x4030 0000 0012 0 <regno:12>
- 
-+ARM firmware pseudo-registers have the following bit pattern:
-+  0x4030 0000 0014 <regno:16>
-+
- 
- arm64 registers are mapped using the lower 32 bits. The upper 16 of
- that is the register group type, or coprocessor number:
-@@ -1959,6 +1962,9 @@ arm64 CCSIDR registers are demultiplexed by CSSELR value:
- arm64 system registers have the following id bit patterns:
-   0x6030 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
- 
-+arm64 firmware pseudo-registers have the following bit pattern:
-+  0x6030 0000 0014 <regno:16>
-+
- 
- MIPS registers are mapped using the lower 32 bits.  The upper 16 of that is
- the register group type:
-@@ -2493,7 +2499,8 @@ Possible features:
- 	  and execute guest code when KVM_RUN is called.
- 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
--	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-+	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-+          backward compatible with v0.2) for the CPU.
- 	  Depends on KVM_CAP_ARM_PSCI_0_2.
- 	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
- 	  Depends on KVM_CAP_ARM_PMU_V3.
-diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-new file mode 100644
-index 000000000000..aafdab887b04
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/psci.txt
-@@ -0,0 +1,30 @@
-+KVM implements the PSCI (Power State Coordination Interface)
-+specification in order to provide services such as CPU on/off, reset
-+and power-off to the guest.
-+
-+The PSCI specification is regularly updated to provide new features,
-+and KVM implements these updates if they make sense from a virtualization
-+point of view.
-+
-+This means that a guest booted on two different versions of KVM can
-+observe two different "firmware" revisions. This could cause issues if
-+a given guest is tied to a particular PSCI revision (unlikely), or if
-+a migration causes a different PSCI version to be exposed out of the
-+blue to an unsuspecting guest.
-+
-+In order to remedy this situation, KVM exposes a set of "firmware
-+pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
-+interface. These registers can be saved/restored by userspace, and set
-+to a convenient value if required.
-+
-+The following register is defined:
-+
-+* KVM_REG_ARM_PSCI_VERSION:
-+
-+  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
-+    (and thus has already been initialized)
-+  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
-+    highest PSCI version implemented by KVM and compatible with v0.2)
-+  - Allows any PSCI version implemented by KVM and compatible with
-+    v0.2 to be set with SET_ONE_REG
-+  - Affects the whole VM (even if the register view is per-vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ef54013b5b9f..6c05e3b13081 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -75,6 +75,9 @@ struct kvm_arch {
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
- 	int max_vcpus;
-+
-+	/* Mandated version of PSCI */
-+	u32 psci_version;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 6edd177bb1c7..47dfc99f5cd0 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -186,6 +186,12 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_VFP_FPINST		0x1009
- #define KVM_REG_ARM_VFP_FPINST2		0x100A
- 
-+/* KVM-as-firmware specific pseudo-registers */
-+#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM | KVM_REG_SIZE_U64 | \
-+					 KVM_REG_ARM_FW | ((r) & 0xffff))
-+#define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-+
- /* Device Control API: ARM VGIC */
- #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
- #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 1e0784ebbfd6..a18f33edc471 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
-+#include <kvm/arm_psci.h>
- #include <asm/cputype.h>
- #include <linux/uaccess.h>
- #include <asm/kvm.h>
-@@ -176,6 +177,7 @@ static unsigned long num_core_regs(void)
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
- 	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
-+		+ kvm_arm_get_fw_num_regs(vcpu)
- 		+ NUM_TIMER_REGS;
+        mf_cpu = &get_cpu_var(memory_failure_cpu);
+        spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+-       if (kfifo_put(&mf_cpu->fifo, entry))
+-               schedule_work_on(smp_processor_id(), &mf_cpu->work);
+-       else
++       if (kfifo_put(&mf_cpu->fifo, entry)) {
++               queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
++               set_tsk_need_resched(current);
++               preempt_set_need_resched();
++       } else {
+                pr_err("Memory failure: buffer overflow when queuing memory
+failure at %#lx\n",
+                       pfn);
++       }
+        spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
+        put_cpu_var(memory_failure_cpu);
  }
- 
-@@ -196,6 +198,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += kvm_arm_get_fw_num_regs(vcpu);
-+
- 	ret = copy_timer_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
-@@ -214,6 +221,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_get_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return get_timer_reg(vcpu, reg);
- 
-@@ -230,6 +240,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_set_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return set_timer_reg(vcpu, reg);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index a73f63aca68e..448d3b9a58cb 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -73,6 +73,9 @@ struct kvm_arch {
- 
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
-+
-+	/* Mandated version of PSCI */
-+	u32 psci_version;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 9abbf3044654..04b3256f8e6d 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -206,6 +206,12 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
- #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
- 
-+/* KVM-as-firmware specific pseudo-registers */
-+#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
-+					 KVM_REG_ARM_FW | ((r) & 0xffff))
-+#define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-+
- /* Device Control API: ARM VGIC */
- #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
- #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 5c7f657dd207..811f04c5760e 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -25,6 +25,7 @@
- #include <linux/module.h>
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
-+#include <kvm/arm_psci.h>
- #include <asm/cputype.h>
- #include <linux/uaccess.h>
- #include <asm/kvm.h>
-@@ -205,7 +206,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
- 	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
--                + NUM_TIMER_REGS;
-+		+ kvm_arm_get_fw_num_regs(vcpu)	+ NUM_TIMER_REGS;
- }
- 
- /**
-@@ -225,6 +226,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += kvm_arm_get_fw_num_regs(vcpu);
-+
- 	ret = copy_timer_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
-@@ -243,6 +249,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_get_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return get_timer_reg(vcpu, reg);
- 
-@@ -259,6 +268,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_set_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return set_timer_reg(vcpu, reg);
- 
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index e518e4e3dfb5..4b1548129fa2 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -37,10 +37,15 @@ static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
- 	 * Our PSCI implementation stays the same across versions from
- 	 * v0.2 onward, only adding the few mandatory functions (such
- 	 * as FEATURES with 1.0) that are required by newer
--	 * revisions. It is thus safe to return the latest.
-+	 * revisions. It is thus safe to return the latest, unless
-+	 * userspace has instructed us otherwise.
- 	 */
--	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
-+		if (vcpu->kvm->arch.psci_version)
-+			return vcpu->kvm->arch.psci_version;
-+
- 		return KVM_ARM_PSCI_LATEST;
-+	}
- 
- 	return KVM_ARM_PSCI_0_1;
- }
-@@ -48,4 +53,11 @@ static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
- 
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
- 
-+struct kvm_one_reg;
-+
-+int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-+int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+
- #endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index 6919352cbf15..c4762bef13c6 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -18,6 +18,7 @@
- #include <linux/arm-smccc.h>
- #include <linux/preempt.h>
- #include <linux/kvm_host.h>
-+#include <linux/uaccess.h>
- #include <linux/wait.h>
- 
- #include <asm/cputype.h>
-@@ -427,3 +428,62 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- 	smccc_set_retval(vcpu, val, 0, 0, 0);
- 	return 1;
- }
-+
-+int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
-+{
-+	return 1;		/* PSCI version */
-+}
-+
-+int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	if (put_user(KVM_REG_ARM_PSCI_VERSION, uindices))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
-+		void __user *uaddr = (void __user *)(long)reg->addr;
-+		u64 val;
-+
-+		val = kvm_psci_version(vcpu, vcpu->kvm);
-+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
-+			return -EFAULT;
-+
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
-+		void __user *uaddr = (void __user *)(long)reg->addr;
-+		bool wants_02;
-+		u64 val;
-+
-+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
-+			return -EFAULT;
-+
-+		wants_02 = test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features);
-+
-+		switch (val) {
-+		case KVM_ARM_PSCI_0_1:
-+			if (wants_02)
-+				return -EINVAL;
-+			vcpu->kvm->arch.psci_version = val;
-+			return 0;
-+		case KVM_ARM_PSCI_0_2:
-+		case KVM_ARM_PSCI_1_0:
-+			if (!wants_02)
-+				return -EINVAL;
-+			vcpu->kvm->arch.psci_version = val;
-+			return 0;
-+		}
-+	}
-+
-+	return -EINVAL;
-+}
--- 
-2.14.2
+---------------%<---------------
