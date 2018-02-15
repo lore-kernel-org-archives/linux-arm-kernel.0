@@ -1,49 +1,25 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 15 Feb 2018 16:54:40 +0100
-Subject: [PATCH 3/3] ARM: dts: stm32: enable USB HS on stm32f769-disco
-In-Reply-To: <1518710080-18164-1-git-send-email-amelie.delaunay@st.com>
-References: <1518710080-18164-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1518710080-18164-4-git-send-email-amelie.delaunay@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 15 Feb 2018 16:56:39 +0100
+Subject: [PATCH 06/15] Documentation: devicetree: dma: Add r8a77965 dmac
+In-Reply-To: <20180215153948.puwztivx3zwtqxet@verge.net.au>
+References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1518515162-23663-7-git-send-email-jacopo+renesas@jmondi.org>
+ <20180215153948.puwztivx3zwtqxet@verge.net.au>
+Message-ID: <20180215155638.kh6hxxo4tmit3jj4@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables USB HS on stm32f749-disco in OTG (DRD) mode.
-The USB connector used will determine the role of USB OTG controller.
+On Thu, Feb 15, 2018 at 04:39:49PM +0100, Simon Horman wrote:
+> On Tue, Feb 13, 2018 at 10:45:53AM +0100, Jacopo Mondi wrote:
+> > Add documentation for r8a77965 compatible string to rcar-dmac device
+> > tree bindings documentation.
+> > 
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> 
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- arch/arm/boot/dts/stm32f769-disco.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Sorry for not noticing this the first time around.
 
-diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-index 4463ca1..427bafe 100644
---- a/arch/arm/boot/dts/stm32f769-disco.dts
-+++ b/arch/arm/boot/dts/stm32f769-disco.dts
-@@ -61,6 +61,12 @@
- 		serial0 = &usart1;
- 	};
- 
-+	usbotg_hs_phy: usb-phy {
-+		#phy-cells = <0>;
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
-+		clock-names = "main_clk";
-+	};
- };
- 
- &cec {
-@@ -78,3 +84,12 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&usbotg_hs {
-+	dr_mode = "otg";
-+	phys = <&usbotg_hs_phy>;
-+	phy-names = "usb2-phy";
-+	pinctrl-0 = <&usbotg_hs_pins_a>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
--- 
-2.7.4
+I think a better subject would be:
+
+dt-bindings: dmaengine: rcar-dmac: document R8A77964 support
