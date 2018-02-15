@@ -1,60 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 15 Feb 2018 10:07:14 +0100
-Subject: [PATCH 5/8] arm64: dts: renesas: r8a77995: Add LVDS support
-In-Reply-To: <1518683903-10681-6-git-send-email-kbingham@kernel.org>
-References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
- <1518683903-10681-6-git-send-email-kbingham@kernel.org>
-Message-ID: <CAMuHMdVKczZpoXgSDOSEJZb59LAZtbWsopRaa8PtHDoZcFEMTQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Feb 2018 10:08:38 +0100
+Subject: [PATCH v2 0/2] Fix broken bananapi m2 devicetree/regulators
+In-Reply-To: <20180214141025.22171-1-embed3d@gmail.com>
+References: <20180214141025.22171-1-embed3d@gmail.com>
+Message-ID: <20180215090838.fnenymzrejs6vhcf@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+On Wed, Feb 14, 2018 at 03:10:23PM +0100, Philipp Rossak wrote:
+> This patchseries fixes the bananapi m1 devicetree, to be able to boot again.
+> The first two patches update/improve the devicetree and the last patch adds
+> all missing regulators.
+> 
+> Regards,
+> Philipp
+> 
+> Changes since v1:
+> 	* squashed commit 1 and 3
+> 	* fix wrong mmc regulator
+> 
+> Philipp Rossak (2):
+>   arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
+>   arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
 
-On Thu, Feb 15, 2018 at 9:38 AM, Kieran Bingham <kbingham@kernel.org> wrote:
-> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
->
-> The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
->
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Applied both.
 
-I love your patch!
-Yet something to improve...
+I had to make a couple of changes though, in the commit title arm
+should be uppercase, and the fix isn't needed.
 
-> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> @@ -773,18 +773,70 @@
->                                 port at 1 {
->                                         reg = <1>;
->                                         du_out_lvds0: endpoint {
-> +                                               remote-endpoint = <&du_out_lvds0>;
->                                         };
->                                 };
->
->                                 port at 2 {
->                                         reg = <2>;
->                                         du_out_lvds1: endpoint {
-> +                                               remote-endpoint = <&du_out_lvds1>;
->                                         };
->                                 };
->                         };
->                 };
->         };
->
-> +       lvds0: lvds at feb90000 {
-> +               compatible = "renesas,lvds-r8a77995";
-> +               reg = <0 0xfeb90000 0 0x20>;
-> +               clocks = <&cpg CPG_MOD 727>;
-> +               status = "disabled";
+I also added stable in Cc, since these patches have been there for
+quite some time.
 
-Missing resets, power-domains
+Maxime
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180215/6bebb158/attachment.sig>
