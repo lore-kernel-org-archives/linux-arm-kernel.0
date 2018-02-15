@@ -1,52 +1,80 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 15 Feb 2018 14:34:57 +0100
-Subject: [PATCH 5/5] ARM: configs: stm32: add mmc and ext2/3/4 support
+Date: Thu, 15 Feb 2018 14:34:56 +0100
+Subject: [PATCH 4/5] ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
 In-Reply-To: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
 References: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1518701697-14242-6-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1518701697-14242-5-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds support of
--mmc framework and stm32 sdmmc controller
--ext2/3/4 filesystem
--LBDAF to support huge file (needed for ext4)
+This patch adds support of micro sd card connected to sdmmc1.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/stm32h743i-eval.dts    | 11 +++++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 91014ea..2573355 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -15,7 +15,6 @@ CONFIG_EMBEDDED=y
- # CONFIG_VM_EVENT_COUNTERS is not set
- # CONFIG_SLUB_DEBUG is not set
- CONFIG_MODULES=y
--# CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
-@@ -57,6 +56,8 @@ CONFIG_MFD_STMPE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_STM32_SDMMC=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-@@ -71,6 +72,7 @@ CONFIG_STM32_MDMA=y
- CONFIG_IIO=y
- CONFIG_STM32_ADC_CORE=y
- CONFIG_STM32_ADC=y
-+CONFIG_EXT3_FS=y
- # CONFIG_FILE_LOCKING is not set
- # CONFIG_DNOTIFY is not set
- # CONFIG_INOTIFY_USER is not set
+diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
+index 65c1cd0..ef17192 100644
+--- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
+@@ -164,6 +164,32 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			sdmmc1_b4_pins_a: sdmmc1-b4 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDMMC1_D0 */
++						 <STM32_PINMUX('C', 9, AF12)>, /* SDMMC1_D1 */
++						 <STM32_PINMUX('C', 10, AF12)>, /* SDMMC1_D2 */
++						 <STM32_PINMUX('C', 11, AF12)>, /* SDMMC1_D3 */
++						 <STM32_PINMUX('C', 12, AF12)>, /* SDMMC1_CK */
++						 <STM32_PINMUX('D', 2, AF12)>; /* SDMMC1_CMD */
++					slew-rate = <3>;
++					drive-push-pull;
++					bias-disable;
++				};
++			};
++
++			sdmmc1_dir_pins_a: sdmmc1-dir at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('C', 6, AF8)>, /* SDMMC1_D0DIR */
++						 <STM32_PINMUX('C', 7, AF8)>, /* SDMMC1_D123DIR */
++						 <STM32_PINMUX('B', 9, AF7)>, /* SDMMC1_CDIR */
++						 <STM32_PINMUX('B', 8, AF7)>; /* SDMMC1_CKIN */
++					slew-rate = <3>;
++					drive-push-pull;
++					bias-pull-up;
++				};
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts b/arch/arm/boot/dts/stm32h743i-eval.dts
+index c6ceda8..d564f8f 100644
+--- a/arch/arm/boot/dts/stm32h743i-eval.dts
++++ b/arch/arm/boot/dts/stm32h743i-eval.dts
+@@ -98,6 +98,17 @@
+ 	clock-frequency = <25000000>;
+ };
+ 
++&sdmmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc1_b4_pins_a &sdmmc1_dir_pins_a>;
++	broken-cd;
++	st,dirpol;
++	st,negedge;
++	st,pin-ckin;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.4
