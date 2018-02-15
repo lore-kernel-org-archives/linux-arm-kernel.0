@@ -1,49 +1,319 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Feb 2018 21:28:28 +0000
-Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-In-Reply-To: <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
-References: <20180206175621.929-1-marc.zyngier@arm.com>
- <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
-Message-ID: <86fu6254eb.wl-marc.zyngier@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Feb 2018 22:03:28 +0100
+Subject: [PATCH v4 36/40] KVM: arm/arm64: Handle VGICv2 save/restore from the
+ main VGIC code
+In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+Message-ID: <20180215210332.8648-37-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Feb 2018 20:59:29 +0000,
-Jon Masters wrote:
-> 
-> Hi Marc, all,
-> 
-> On 02/06/2018 12:56 PM, Marc Zyngier wrote:
-> > ARM has recently published a SMC Calling Convention (SMCCC)
-> > specification update[1] that provides an optimised calling convention
-> > and optional, discoverable support for mitigating CVE-2017-5715. ARM
-> > Trusted Firmware (ATF) has already gained such an implementation[2].
-> 
-> I'm probably just missing something, but does this end up reported
-> somewhere conveniently user visible? In particular, if the new SMC is
-> *not* provided, does the user end up easily seeing this?
+We can program the GICv2 hypervisor control interface logic directly
+from the core vgic code and can instead do the save/restore directly
+from the flush/sync functions, which can lead to a number of future
+optimizations.
 
-What exactly do you want to make visible to userspace?
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
 
-If you want the SMC implementation of the CVE workaround to be
-reported, it wouldn't be very useful, as the SMC instruction is not
-available at EL0. It also only covers part of the mitigation spectrum
-(we have cores that implement the mitigation using different
-mechanisms).
+Notes:
+    Changes since v1:
+     - Removed unnecessary kvm_hyp.h include
+     - Adapted the patch based on having gotten rid of storing the elrsr
+       prior to this patch.
+     - No longer change the interrupt handling of the maintenance interrupt
+       handler.  That seems to have been a leftover from an earlier version
+       of the timer patches where we were syncing the vgic state after
+       having enabled interrupts, leading to the maintenance interrupt firing.
+    
+       It may be possible to move the vgic sync function out to an
+       interrupts enabled section later on, which would require
+       re-introducing logic to disable the VGIC maintenance interrupt in the
+       maintenance interrupt handler, but we leave this for future work as
+       the immediate benefit is not clear.
 
-If what you're after is a userspace visible indication of a mitigation
-for this CVE (by whatever method available), then this is still a work
-in progress, and relies on this series[1] so that we can properly
-handle systems containing a combination of affected and non-affected
-CPUs. The plan is to expose the status as part of the sysfs interface,
-? la x86 and covering all 3 known vulnerabilities.
+ arch/arm/kvm/hyp/switch.c        |  4 ---
+ arch/arm64/include/asm/kvm_hyp.h |  2 --
+ arch/arm64/kvm/hyp/switch.c      |  4 ---
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 65 ----------------------------------------
+ virt/kvm/arm/vgic/vgic-v2.c      | 63 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c         | 19 +++++++++++-
+ virt/kvm/arm/vgic/vgic.h         |  3 ++
+ 7 files changed, 84 insertions(+), 76 deletions(-)
 
-Thanks,
-
-	M.
-
-[1] https://lkml.org/lkml/2018/2/9/579
-
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index aac025783ee8..882b9b9e0077 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -92,16 +92,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_save_state(vcpu);
+-	else
+-		__vgic_v2_save_state(vcpu);
+ }
+ 
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_restore_state(vcpu);
+-	else
+-		__vgic_v2_restore_state(vcpu);
+ }
+ 
+ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 949f2e77ae58..febe417b8b4e 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -120,8 +120,6 @@ typeof(orig) * __hyp_text fname(void)					\
+ 	return val;							\
+ }
+ 
+-void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+-void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ 
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 0e54fe2aab1c..cbafc27a617b 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -195,16 +195,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_save_state(vcpu);
+-	else
+-		__vgic_v2_save_state(vcpu);
+ }
+ 
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_restore_state(vcpu);
+-	else
+-		__vgic_v2_restore_state(vcpu);
+ }
+ 
+ static bool __hyp_text __true_value(void)
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a91b0d2b9249..0bbafdfd4adb 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -23,71 +23,6 @@
+ #include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ 
+-static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+-{
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-	u64 elrsr;
+-	int i;
+-
+-	elrsr = readl_relaxed(base + GICH_ELRSR0);
+-	if (unlikely(used_lrs > 32))
+-		elrsr |= ((u64)readl_relaxed(base + GICH_ELRSR1)) << 32;
+-
+-	for (i = 0; i < used_lrs; i++) {
+-		if (elrsr & (1UL << i))
+-			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
+-		else
+-			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+-
+-		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+-	}
+-}
+-
+-/* vcpu is already in the HYP VA space */
+-void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+-{
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-
+-	if (!base)
+-		return;
+-
+-	if (used_lrs) {
+-		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+-		save_lrs(vcpu, base);
+-		writel_relaxed(0, base + GICH_HCR);
+-	} else {
+-		cpu_if->vgic_apr = 0;
+-	}
+-}
+-
+-/* vcpu is already in the HYP VA space */
+-void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+-{
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+-	int i;
+-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-
+-	if (!base)
+-		return;
+-
+-	if (used_lrs) {
+-		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+-		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+-		for (i = 0; i < used_lrs; i++) {
+-			writel_relaxed(cpu_if->vgic_lr[i],
+-				       base + GICH_LR0 + (i * 4));
+-		}
+-	}
+-}
+-
+ #ifdef CONFIG_ARM64
+ /*
+  * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index bb305d49cfdd..1e5f3eb6973d 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -421,6 +421,69 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	return ret;
+ }
+ 
++static void save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
++{
++	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
++	u64 elrsr;
++	int i;
++
++	elrsr = readl_relaxed(base + GICH_ELRSR0);
++	if (unlikely(used_lrs > 32))
++		elrsr |= ((u64)readl_relaxed(base + GICH_ELRSR1)) << 32;
++
++	for (i = 0; i < used_lrs; i++) {
++		if (elrsr & (1UL << i))
++			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
++		else
++			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
++
++		writel_relaxed(0, base + GICH_LR0 + (i * 4));
++	}
++}
++
++void vgic_v2_save_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	void __iomem *base = vgic->vctrl_base;
++	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
++
++	if (!base)
++		return;
++
++	if (used_lrs) {
++		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
++		save_lrs(vcpu, base);
++		writel_relaxed(0, base + GICH_HCR);
++	} else {
++		cpu_if->vgic_apr = 0;
++	}
++}
++
++void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	void __iomem *base = vgic->vctrl_base;
++	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
++	int i;
++
++	if (!base)
++		return;
++
++	if (used_lrs) {
++		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
++		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
++		for (i = 0; i < used_lrs; i++) {
++			writel_relaxed(cpu_if->vgic_lr[i],
++				       base + GICH_LR0 + (i * 4));
++		}
++	}
++}
++
+ void vgic_v2_load(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index c7c5ef190afa..12e2a28f437e 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -749,11 +749,19 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 		vgic_clear_lr(vcpu, count);
+ }
+ 
++static inline void vgic_save_state(struct kvm_vcpu *vcpu)
++{
++	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++		vgic_v2_save_state(vcpu);
++}
++
+ /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 
++	vgic_save_state(vcpu);
++
+ 	WARN_ON(vgic_v4_sync_hwstate(vcpu));
+ 
+ 	/* An empty ap_list_head implies used_lrs == 0 */
+@@ -765,6 +773,12 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	vgic_prune_ap_list(vcpu);
+ }
+ 
++static inline void vgic_restore_state(struct kvm_vcpu *vcpu)
++{
++	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++		vgic_v2_restore_state(vcpu);
++}
++
+ /* Flush our emulation state into the GIC hardware before entering the guest. */
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
+@@ -780,13 +794,16 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	 * this.
+ 	 */
+ 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+-		return;
++		goto out;
+ 
+ 	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+ 
+ 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++
++out:
++	vgic_restore_state(vcpu);
+ }
+ 
+ void kvm_vgic_load(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 12c37b89f7a3..89b9547fba27 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -176,6 +176,9 @@ void vgic_v2_init_lrs(void);
+ void vgic_v2_load(struct kvm_vcpu *vcpu);
+ void vgic_v2_put(struct kvm_vcpu *vcpu);
+ 
++void vgic_v2_save_state(struct kvm_vcpu *vcpu);
++void vgic_v2_restore_state(struct kvm_vcpu *vcpu);
++
+ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+ {
+ 	if (irq->intid < VGIC_MIN_LPI)
 -- 
-Jazz is not dead, it just smell funny.
+2.14.2
