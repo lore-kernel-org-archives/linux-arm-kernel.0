@@ -1,159 +1,132 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Feb 2018 18:51:43 +0000
-Subject: [PATCH v2 3/6] perf/arm-cci: Simplify CPU hotplug
+Date: Thu, 15 Feb 2018 18:51:45 +0000
+Subject: [PATCH v2 5/6] perf/arm-cci: Clean up model discovery
 In-Reply-To: <cover.1518717258.git.robin.murphy@arm.com>
 References: <cover.1518717258.git.robin.murphy@arm.com>
-Message-ID: <82af7d1a062433f07c621b9b4a3c7c38d847a639.1518717258.git.robin.murphy@arm.com>
+Message-ID: <31604d382dc83ef6c105ccb91fbf8462d9b37406.1518717258.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Realistically, systems with multiple CCIs are unlikely to ever exist,
-and since the driver only actually supports a single instance anyway
-there's really no need to do the multi-instance hotplug state dance.
-
-Take the opportunity to simplify the hotplug-related code all over,
-addressing the context-migration TODO in the process for good measure.
+Since I am the self-appointed of_device_get_match_data() police, it's
+only right that I should clean up this driver while I'm otherwise
+touching it. This also reveals that we're passing around a struct
+platform_device in places where we only ever care about its regular
+device, so straighten that out in the process.
 
 Acked-by: Punit Agrawal <punit.agrawal@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/perf/arm-cci.c | 56 +++++++++++++++++---------------------------------
- 1 file changed, 19 insertions(+), 37 deletions(-)
+ drivers/perf/arm-cci.c | 40 ++++++++++++++++------------------------
+ 1 file changed, 16 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-index d5f8c750fd41..242623fbce1f 100644
+index 242623fbce1f..336f1455cf96 100644
 --- a/drivers/perf/arm-cci.c
 +++ b/drivers/perf/arm-cci.c
-@@ -90,6 +90,7 @@ static struct cci_pmu_model cci_pmu_models[];
- struct cci_pmu {
- 	void __iomem *base;
- 	struct pmu pmu;
-+	int cpu;
- 	int nr_irqs;
- 	int *irqs;
- 	unsigned long active_irqs;
-@@ -99,12 +100,12 @@ struct cci_pmu {
- 	int num_cntrs;
- 	atomic_t active_events;
- 	struct mutex reserve_mutex;
--	struct hlist_node node;
--	cpumask_t cpus;
- };
- 
- #define to_cci_pmu(c)	(container_of(c, struct cci_pmu, pmu))
- 
-+static struct cci_pmu *g_cci_pmu;
-+
- enum cci_models {
- #ifdef CONFIG_ARM_CCI400_PMU
- 	CCI400_R0,
-@@ -1325,7 +1326,6 @@ static int cci_pmu_event_init(struct perf_event *event)
- 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
- 	atomic_t *active_events = &cci_pmu->active_events;
- 	int err = 0;
--	int cpu;
- 
- 	if (event->attr.type != event->pmu->type)
- 		return -ENOENT;
-@@ -1352,10 +1352,9 @@ static int cci_pmu_event_init(struct perf_event *event)
- 	 * the event being installed into its context, so the PMU's CPU can't
- 	 * change under our feet.
- 	 */
--	cpu = cpumask_first(&cci_pmu->cpus);
--	if (event->cpu < 0 || cpu < 0)
-+	if (event->cpu < 0)
- 		return -EINVAL;
--	event->cpu = cpu;
-+	event->cpu = cci_pmu->cpu;
- 
- 	event->destroy = hw_perf_event_destroy;
- 	if (!atomic_inc_not_zero(active_events)) {
-@@ -1382,11 +1381,7 @@ static ssize_t pmu_cpumask_attr_show(struct device *dev,
- 	struct pmu *pmu = dev_get_drvdata(dev);
- 	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
- 
--	int n = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
--			  cpumask_pr_args(&cci_pmu->cpus));
--	buf[n++] = '\n';
--	buf[n] = '\0';
--	return n;
-+	return cpumap_print_to_pagebuf(true, buf, cpumask_of(cci_pmu->cpu));
+@@ -8,6 +8,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/perf_event.h>
+@@ -371,14 +372,14 @@ static int probe_cci400_revision(void)
+ 		return CCI400_R1;
  }
  
- static struct device_attribute pmu_cpumask_attr =
-@@ -1455,21 +1450,19 @@ static int cci_pmu_init(struct cci_pmu *cci_pmu, struct platform_device *pdev)
- 	return perf_pmu_register(&cci_pmu->pmu, name, -1);
- }
- 
--static int cci_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
-+static int cci_pmu_offline_cpu(unsigned int cpu)
+-static const struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
++static const struct cci_pmu_model *probe_cci_model(void)
  {
--	struct cci_pmu *cci_pmu = hlist_entry_safe(node, struct cci_pmu, node);
--	unsigned int target;
-+	int target;
- 
--	if (!cpumask_test_and_clear_cpu(cpu, &cci_pmu->cpus))
-+	if (!g_cci_pmu || cpu != g_cci_pmu->cpu)
- 		return 0;
-+
- 	target = cpumask_any_but(cpu_online_mask, cpu);
- 	if (target >= nr_cpu_ids)
- 		return 0;
--	/*
--	 * TODO: migrate context once core races on event->ctx have
--	 * been fixed.
--	 */
--	cpumask_set_cpu(target, &cci_pmu->cpus);
-+
-+	perf_pmu_migrate_context(&g_cci_pmu->pmu, cpu, target);
-+	g_cci_pmu->cpu = target;
- 	return 0;
+ 	if (platform_has_secure_cci_access())
+ 		return &cci_pmu_models[probe_cci400_revision()];
+ 	return NULL;
  }
- 
-@@ -1706,7 +1699,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 	raw_spin_lock_init(&cci_pmu->hw_events.pmu_lock);
- 	mutex_init(&cci_pmu->reserve_mutex);
- 	atomic_set(&cci_pmu->active_events, 0);
--	cpumask_set_cpu(get_cpu(), &cci_pmu->cpus);
-+	cci_pmu->cpu = get_cpu();
- 
- 	ret = cci_pmu_init(cci_pmu, pdev);
- 	if (ret) {
-@@ -1714,9 +1707,11 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CCI_ONLINE,
--					 &cci_pmu->node);
-+	cpuhp_setup_state_nocalls(CPUHP_AP_PERF_ARM_CCI_ONLINE,
-+				  "perf/arm/cci:online", NULL,
-+				  cci_pmu_offline_cpu);
- 	put_cpu();
-+	g_cci_pmu = cci_pmu;
- 	pr_info("ARM %s PMU driver probed", cci_pmu->model->name);
- 	return 0;
+ #else	/* !CONFIG_ARM_CCI400_PMU */
+-static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
++static inline struct cci_pmu_model *probe_cci_model(void)
+ {
+ 	return NULL;
  }
-@@ -1729,19 +1724,6 @@ static struct platform_driver cci_pmu_driver = {
- 	.probe = cci_pmu_probe,
+@@ -1589,20 +1590,6 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
+ 	{},
  };
  
--static int __init cci_platform_init(void)
+-static inline const struct cci_pmu_model *get_cci_model(struct platform_device *pdev)
 -{
--	int ret;
+-	const struct of_device_id *match = of_match_node(arm_cci_pmu_matches,
+-							pdev->dev.of_node);
+-	if (!match)
+-		return NULL;
+-	if (match->data)
+-		return match->data;
 -
--	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CCI_ONLINE,
--				      "perf/arm/cci:online", NULL,
--				      cci_pmu_offline_cpu);
--	if (ret)
--		return ret;
--
--	return platform_driver_register(&cci_pmu_driver);
+-	dev_warn(&pdev->dev, "DEPRECATED compatible property,"
+-			 "requires secure access to CCI registers");
+-	return probe_cci_model(pdev);
 -}
 -
--device_initcall(cci_platform_init);
-+builtin_platform_driver(cci_pmu_driver);
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("ARM CCI PMU support");
+ static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
+ {
+ 	int i;
+@@ -1614,7 +1601,7 @@ static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
+ 	return false;
+ }
+ 
+-static struct cci_pmu *cci_pmu_alloc(struct platform_device *pdev)
++static struct cci_pmu *cci_pmu_alloc(struct device *dev)
+ {
+ 	struct cci_pmu *cci_pmu;
+ 	const struct cci_pmu_model *model;
+@@ -1624,28 +1611,33 @@ static struct cci_pmu *cci_pmu_alloc(struct platform_device *pdev)
+ 	 * them explicitly on an error, as it would end up in driver
+ 	 * detach.
+ 	 */
+-	model = get_cci_model(pdev);
++	model = of_device_get_match_data(dev);
+ 	if (!model) {
+-		dev_warn(&pdev->dev, "CCI PMU version not supported\n");
++		dev_warn(dev,
++			 "DEPRECATED compatible property, requires secure access to CCI registers");
++		model = probe_cci_model();
++	}
++	if (!model) {
++		dev_warn(dev, "CCI PMU version not supported\n");
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	cci_pmu = devm_kzalloc(&pdev->dev, sizeof(*cci_pmu), GFP_KERNEL);
++	cci_pmu = devm_kzalloc(dev, sizeof(*cci_pmu), GFP_KERNEL);
+ 	if (!cci_pmu)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	cci_pmu->model = model;
+-	cci_pmu->irqs = devm_kcalloc(&pdev->dev, CCI_PMU_MAX_HW_CNTRS(model),
++	cci_pmu->irqs = devm_kcalloc(dev, CCI_PMU_MAX_HW_CNTRS(model),
+ 					sizeof(*cci_pmu->irqs), GFP_KERNEL);
+ 	if (!cci_pmu->irqs)
+ 		return ERR_PTR(-ENOMEM);
+-	cci_pmu->hw_events.events = devm_kcalloc(&pdev->dev,
++	cci_pmu->hw_events.events = devm_kcalloc(dev,
+ 					     CCI_PMU_MAX_HW_CNTRS(model),
+ 					     sizeof(*cci_pmu->hw_events.events),
+ 					     GFP_KERNEL);
+ 	if (!cci_pmu->hw_events.events)
+ 		return ERR_PTR(-ENOMEM);
+-	cci_pmu->hw_events.used_mask = devm_kcalloc(&pdev->dev,
++	cci_pmu->hw_events.used_mask = devm_kcalloc(dev,
+ 						BITS_TO_LONGS(CCI_PMU_MAX_HW_CNTRS(model)),
+ 						sizeof(*cci_pmu->hw_events.used_mask),
+ 						GFP_KERNEL);
+@@ -1661,7 +1653,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
+ 	struct cci_pmu *cci_pmu;
+ 	int i, ret, irq;
+ 
+-	cci_pmu = cci_pmu_alloc(pdev);
++	cci_pmu = cci_pmu_alloc(&pdev->dev);
+ 	if (IS_ERR(cci_pmu))
+ 		return PTR_ERR(cci_pmu);
+ 
 -- 
 2.16.1.dirty
