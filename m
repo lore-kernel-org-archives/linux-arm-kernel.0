@@ -1,34 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Feb 2018 10:10:11 +0100
-Subject: [PATCH] MAINTAINERS: update email address for Maxime Ripard
-In-Reply-To: <CAGb2v642YXFe==vf4AUkvcC5JJxehG4Np_J5=tSLbJaXUuwVkw@mail.gmail.com>
-References: <20180202123510.8699-1-maxime.ripard@bootlin.com>
- <CAGb2v642YXFe==vf4AUkvcC5JJxehG4Np_J5=tSLbJaXUuwVkw@mail.gmail.com>
-Message-ID: <20180215091011.67lbcid6njexb3d7@flea.home>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 15 Feb 2018 10:29:52 +0100
+Subject: [PATCH 1/3] ARM: dts: rockchip: phycore: Remove 1.8 GHz operation
+ point
+In-Reply-To: <a8de3d85-c4e6-eed6-d2e3-6d9b7318a9c2@phytec.de>
+References: <1518515074-22526-1-git-send-email-d.schultz@phytec.de>
+ <7871181.EPqc8gR4GV@diego> <a8de3d85-c4e6-eed6-d2e3-6d9b7318a9c2@phytec.de>
+Message-ID: <2724471.chboOZt3hh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 05:57:25PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Feb 2, 2018 at 8:35 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > Free Electrons is now Bootlin, change my email address accordingly.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hi Daniel,
+
+Am Mittwoch, 14. Februar 2018, 16:32:44 CET schrieb Daniel Schultz:
+> On 02/14/2018 09:07 AM, Heiko St?bner wrote:
+> > Am Dienstag, 13. Februar 2018, 10:44:32 CET schrieb Daniel Schultz:
+> >> Rockchip recommends to run the CPU cores only with operations points of
+> >> 1.6 GHz or lower.
+> >> 
+> >> Removed the cpu0 node with too high operation points and use the default
+> >> values instead.
+> >> 
+> >> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
+> > 
+> > applied all 3 for 4.17
 > 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Thanks! I think I should have mentioned this earlier, but can you please add
+> ARM: dts: rockchip: phycore: Remove 1.8 GHz operation point
+> to the stable tree v4.14?
 
-Arnd and Olof seems to be busy, and we'll have some fixes so I ended
-up merging it.
+I've moved that patch to the fixes branch and added the necessary
+Fixes and cc-stable tags, so it should eventually reach stable kernels
+as well.
 
-Maxime
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180215/be5f5da3/attachment.sig>
+Heiko
