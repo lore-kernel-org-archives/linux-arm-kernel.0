@@ -1,42 +1,59 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Feb 2018 11:26:17 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.16 (#1)
-Message-ID: <87wozemtva.fsf@bootlin.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 15 Feb 2018 11:13:00 +0100
+Subject: [PATCH] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
+In-Reply-To: <CAMuHMdU4_wVcKwjB1ZQzfgp8vCDs92F1o+v4UyZ0bsRDfJD1vQ@mail.gmail.com>
+References: <20180213232812.31408-1-marek.vasut+renesas@gmail.com>
+ <20180214055800.od5yhgo753522yah@katana>
+ <CAMuHMdU3opUTcOY-UeH4ArB+50_drPhGSoxP-m85p9V36fvTHg@mail.gmail.com>
+ <ae3206a3-4735-87c8-9688-3acdbf06cc36@gmail.com>
+ <CAMuHMdU4_wVcKwjB1ZQzfgp8vCDs92F1o+v4UyZ0bsRDfJD1vQ@mail.gmail.com>
+Message-ID: <15de7079-f43e-1e76-2a99-7232498b077a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/15/2018 11:08 AM, Geert Uytterhoeven wrote:
+> Hi Marek,
+> 
+> On Thu, Feb 15, 2018 at 10:44 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> On 02/14/2018 09:09 AM, Geert Uytterhoeven wrote:
+>>> On Wed, Feb 14, 2018 at 6:58 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>>>>> - * The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
+>>>>> - * da9210 regulators.  Both regulators have their interrupt request lines tied
+>>>>> - * to the same interrupt pin (IRQ2) on the SoC.
+>>>>> + * The r8a7790/lager,stout and r8a7791/koelsch development boards have da9063
+>>>>> + * and da9210 regulators.  Both regulators have their interrupt request lines
+>>>>> + * tied to the same interrupt pin (IRQ2) on the SoC.
+>>>>
+>>>> I think listing the boards here doesn't scale well. Gose is already
+>>>> missing. How about rephrasing the paragraph to something like "Some Gen2
+>>>> development boards have..."?
+>>>
+>>> +1
+>>>
+>>>>>   *
+>>>>>   * After cold boot or da9063-induced restart, both the da9063 and da9210 seem
+>>>>>   * to assert their interrupt request lines.  Hence as soon as one driver
+>>>>> @@ -118,6 +118,7 @@ static int __init rcar_gen2_regulator_quirk(void)
+>>>>>
+>>>>>       if (!of_machine_is_compatible("renesas,koelsch") &&
+>>>>>           !of_machine_is_compatible("renesas,lager") &&
+>>>>> +         !of_machine_is_compatible("renesas,stout") &&
+>>>>>           !of_machine_is_compatible("renesas,gose"))
+>>>>>               return -ENODEV;
+>>>
+>>> Have we reached critical mass to start using array-based matching with
+>>> of_device_compatible_match()?
+>>
+>> We're matching on machine , not device , here . I guess our device node
+>> would be / ?
+> 
+> Correct, cfr. the implementation of of_machine_is_compatible().
+> 
+> BTW, several PPC platforms use of_device_compatible_match(of_root, ...),
+> but I believe of_root is not guaranteed to be set up.
 
-Here is the first pull request for fixes for mvebu for v4.16.
+OK, subsequent patch then. Added to TODO.
 
-Gregory
-
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.16-1
-
-for you to fetch changes up to 8aa36a8dcde3183d84db7b0d622ffddcebb61077:
-
-  ARM: mvebu: Fix broken PL310_ERRATA_753970 selects (2018-02-13 16:39:51 +0100)
-
-----------------------------------------------------------------
-mvebu fixes for 4.16 (part 1)
-
-- Updating my emails address (from free-electrons to bootlin)
-- Adding back the selection of the PL310 Errata fix for the Cortex A9
-  based Armada SoCs (Armada 375 and 38x)
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      MAINTAINERS: update email address for Gregory CLEMENT
-
-Ulf Magnusson (1):
-      ARM: mvebu: Fix broken PL310_ERRATA_753970 selects
-
- MAINTAINERS                 | 4 ++--
- arch/arm/mach-mvebu/Kconfig | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+-- 
+Best regards,
+Marek Vasut
