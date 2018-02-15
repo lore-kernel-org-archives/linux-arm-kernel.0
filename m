@@ -1,61 +1,84 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 15 Feb 2018 14:49:49 +0200
-Subject: [PATCH 3/5] clk: ti: add generic support for clock latching
+Date: Thu, 15 Feb 2018 14:49:48 +0200
+Subject: [PATCH 2/5] clk: ti: add support for register read-modify-write
+ low-level operation
 In-Reply-To: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
 References: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1518698991-10099-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1518698991-10099-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain clocks require latching to be done, so that the actual
-settings get updated on the HW that generates the clock signal.
-One example of such a clock is the dra76x GMAC DPLL H14 output,
-which requires its divider settings to be latched when updated.
+Useful for changing few bits on a register, this makes sure for example
+that the operation is done atomically in case of syscon.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk.c   | 14 ++++++++++++++
- drivers/clk/ti/clock.h |  2 ++
- 2 files changed, 16 insertions(+)
+ drivers/clk/ti/clk.c   | 24 ++++++++++++++++++++++++
+ include/linux/clk/ti.h |  2 ++
+ 2 files changed, 26 insertions(+)
 
 diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index 4efa2c9..7d22e1a 100644
+index f4d6802..4efa2c9 100644
 --- a/drivers/clk/ti/clk.c
 +++ b/drivers/clk/ti/clk.c
-@@ -275,6 +275,20 @@ int ti_clk_get_reg_addr(struct device_node *node, int index,
- 	return 0;
+@@ -55,6 +55,29 @@ static void clk_memmap_writel(u32 val, const struct clk_omap_reg *reg)
+ 		writel_relaxed(val, io->mem + reg->offset);
  }
  
-+void ti_clk_latch(struct clk_omap_reg *reg, s8 shift)
++static void _clk_rmw(u32 val, u32 mask, void __iomem *ptr)
 +{
-+	u32 latch;
++	u32 v;
 +
-+	if (shift < 0)
-+		return;
-+
-+	latch = 1 << shift;
-+
-+	ti_clk_ll_ops->clk_rmw(latch, latch, reg);
-+	ti_clk_ll_ops->clk_rmw(0, latch, reg);
-+	ti_clk_ll_ops->clk_readl(reg); /* OCP barrier */
++	v = readl_relaxed(ptr);
++	v &= ~mask;
++	v |= val;
++	writel_relaxed(v, ptr);
 +}
 +
- /**
-  * omap2_clk_provider_init - init master clock provider
-  * @parent: master node
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index d9b43bf..2f8af8f 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -194,6 +194,8 @@ struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
- int ti_clk_add_alias(struct device *dev, struct clk *clk, const char *con);
- void ti_clk_add_aliases(void);
- 
-+void ti_clk_latch(struct clk_omap_reg *reg, s8 shift);
++static void clk_memmap_rmw(u32 val, u32 mask, const struct clk_omap_reg *reg)
++{
++	struct clk_iomap *io = clk_memmaps[reg->index];
 +
- struct clk_hw *ti_clk_build_component_mux(struct ti_clk_mux *setup);
++	if (reg->ptr) {
++		_clk_rmw(val, mask, reg->ptr);
++	} else if (io->regmap) {
++		regmap_update_bits(io->regmap, reg->offset, mask, val);
++	} else {
++		_clk_rmw(val, mask, io->mem + reg->offset);
++	}
++}
++
+ static u32 clk_memmap_readl(const struct clk_omap_reg *reg)
+ {
+ 	u32 val;
+@@ -89,6 +112,7 @@ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops)
+ 	ti_clk_ll_ops = ops;
+ 	ops->clk_readl = clk_memmap_readl;
+ 	ops->clk_writel = clk_memmap_writel;
++	ops->clk_rmw = clk_memmap_rmw;
  
- int ti_clk_parse_divider_data(int *div_table, int num_dividers, int max_div,
+ 	return 0;
+ }
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index d18da83..9e86114 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -211,6 +211,7 @@ enum {
+  * struct ti_clk_ll_ops - low-level ops for clocks
+  * @clk_readl: pointer to register read function
+  * @clk_writel: pointer to register write function
++ * @clk_rmw: pointer to register read-modify-write function
+  * @clkdm_clk_enable: pointer to clockdomain enable function
+  * @clkdm_clk_disable: pointer to clockdomain disable function
+  * @clkdm_lookup: pointer to clockdomain lookup function
+@@ -226,6 +227,7 @@ enum {
+ struct ti_clk_ll_ops {
+ 	u32	(*clk_readl)(const struct clk_omap_reg *reg);
+ 	void	(*clk_writel)(u32 val, const struct clk_omap_reg *reg);
++	void	(*clk_rmw)(u32 val, u32 mask, const struct clk_omap_reg *reg);
+ 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm, struct clk *clk);
+ 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm,
+ 				     struct clk *clk);
 -- 
 1.9.1
 
