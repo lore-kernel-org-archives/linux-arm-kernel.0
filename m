@@ -1,122 +1,86 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Feb 2018 22:03:17 +0100
-Subject: [PATCH v4 25/40] KVM: arm64: Introduce framework for accessing
- deferred sysregs
+Date: Thu, 15 Feb 2018 22:03:14 +0100
+Subject: [PATCH v4 22/40] KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2
+ on VHE systems
 In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
 References: <20180215210332.8648-1-christoffer.dall@linaro.org>
-Message-ID: <20180215210332.8648-26-christoffer.dall@linaro.org>
+Message-ID: <20180215210332.8648-23-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to defer saving and restoring some groups of system
-registers to vcpu_put and vcpu_load on supported systems.  This means
-that we need some infrastructure to access system registes which
-supports either accessing the memory backing of the register or directly
-accessing the system registers, depending on the state of the system
-when we access the register.
+On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we can
+return to the host in EL1 in the same state and location where we issued a
+hypercall to EL2, but on VHE ELR_EL2 and SPSR_EL2 are not useful because we
+never enter a guest as a result of an exception entry that would be directly
+handled by KVM. The kernel entry code already saves ELR_EL1/SPSR_EL1 on
+exception entry, which is enough.  Therefore, factor out these registers into
+separate save/restore functions, making it easy to exclude them from the VHE
+world-switch path later on.
 
-We do this by defining read/write accessor functions, which can handle
-both "immediate" and "deferrable" system registers.  Immediate registers
-are always saved/restored in the world-switch path, but deferrable
-registers are only saved/restored in vcpu_put/vcpu_load when supported
-and sysregs_loaded_on_cpu will be set in that case.
-
-Note that we don't use the deferred mechanism yet in this patch, but only
-introduce infrastructure.  This is to improve convenience of review in
-the subsequent patches where it is clear which registers become
-deferred.
-
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
+ arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Notes:
-    Changes since v3:
-     - Changed to a switch-statement based approach to improve
-       readability.
-    
-    Changes since v2:
-     - New patch (deferred register handling has been reworked)
-
- arch/arm64/include/asm/kvm_host.h |  8 ++++++--
- arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 68398bf7882f..b463b5e28959 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
- 
- 	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
- 	u64 vsesr_el2;
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index d35b3aa680ab..906606dc4e2c 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -71,6 +71,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+ 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
++}
 +
-+	/* True when deferrable sysregs are loaded on the physical CPU,
-+	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-+	bool sysregs_loaded_on_cpu;
- };
++static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+ 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
  
- #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-@@ -296,8 +300,8 @@ struct kvm_vcpu_arch {
-  */
- #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
- 
--#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
--#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
-+u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
-+void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
- 
- /*
-  * CP14 and CP15 live in the same array, as they are backed by the
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index a05d2c01c786..b3c3f014aa61 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -35,6 +35,7 @@
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/kvm_mmu.h>
- #include <asm/perf_event.h>
- #include <asm/sysreg.h>
-@@ -76,6 +77,38 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
- 	return false;
+@@ -83,6 +87,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
  }
  
-+u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-+{
-+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-+		goto immediate_read;
-+
-+	/*
-+	 * All system registers listed in the switch are not saved on every
-+	 * exit from the guest but are only saved on vcpu_put.
-+	 */
-+	switch (reg) {
-+	}
-+
-+immediate_read:
-+	return __vcpu_sys_reg(vcpu, reg);
-+}
-+
-+void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-+{
-+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-+		goto immediate_write;
-+
-+	/*
-+	 * All system registers listed in the switch are not restored on every
-+	 * entry to the guest but are only restored on vcpu_load.
-+	 */
-+	switch (reg) {
-+	}
-+
-+immediate_write:
-+	 __vcpu_sys_reg(vcpu, reg) = val;
-+}
-+
- /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
- static u32 cache_levels;
+ void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -96,6 +101,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
+ }
  
+ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+@@ -140,6 +146,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+ 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+ 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
++}
++
++static void __hyp_text
++__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
+ 
+@@ -152,6 +163,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -165,6 +177,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
 -- 
 2.14.2
