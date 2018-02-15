@@ -1,37 +1,51 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 15 Feb 2018 19:32:57 +0100
-Subject: [PATCH v3 3/3] ARM: dts: exynos: Add support for HDMI audio on
- exynos5433-tm2
-In-Reply-To: <20180212163147.11561-3-s.nawrocki@samsung.com>
-References: <20180212163147.11561-1-s.nawrocki@samsung.com>
- <CGME20180212163212epcas2p15a43c33e24b6c800544637ca0b030cb6@epcas2p1.samsung.com>
- <20180212163147.11561-3-s.nawrocki@samsung.com>
-Message-ID: <20180215183257.lvtyzixgzwfcl7fq@kozik-lap>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 15 Feb 2018 18:51:40 +0000
+Subject: [PATCH v2 0/6] Arm interconnect PMU driver tidyup
+Message-ID: <cover.1518717258.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 05:31:47PM +0100, Sylwester Nawrocki wrote:
-> This patch updates the sound node of the exynos5433-tm2 board
-> and adds clock tree configuration in order to support HDMI sound.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Changes since v2:
->  - nodes sorted alphabetically, changed the assigned clock
->    frequencies.
-> 
-> Changes since v1:
->  - dropped unnecessary assigned-clock* properties for AUD PLL
->    in cmu_top node,
->  - changed default AUD PLL frequency so it is within recommended
->    252...400 MHz range.
-> ---
->  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 52 ++++++++++++++++++++--
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  1 +
->  2 files changed, 49 insertions(+), 4 deletions(-)
-> 
+Hi arm-soc folks,
 
-Thanks, applied.
+PLease consider this series tidying up the Arm interconnect code
+in drivers/bus to separate the PMU parts out into drivers/perf
+where Will and Mark can handle future maintenance more easily.
 
-Best regards,
-Krzysztof
+FWIW, the patches are also available on a branch here:
+
+  git://linux-arm.org/linux-rm.git perf
+
+Thanks,
+Robin.
+
+---
+
+Since v1:
+ - Add acks.
+ - Extra patch to break the direct cci_ctrl_base dependency.
+
+Robin Murphy (6):
+  drivers/bus: Move Arm CCN PMU driver
+  drivers/bus: Split Arm CCI driver
+  perf/arm-cci: Simplify CPU hotplug
+  bus/arm-cci: Streamline devicetree handling a bit
+  perf/arm-cci: Clean up model discovery
+  perf/arm-cci: Untangle global cci_ctrl_base
+
+ .../bindings/{arm/ccn.txt => perf/arm-ccn.txt}     |    0
+ Documentation/{arm/CCN.txt => perf/arm-ccn.txt}    |    0
+ drivers/bus/Kconfig                                |   36 -
+ drivers/bus/Makefile                               |    2 -
+ drivers/bus/arm-cci.c                              | 1763 +-------------------
+ drivers/perf/Kconfig                               |   33 +
+ drivers/perf/Makefile                              |    2 +
+ drivers/{bus => perf}/arm-cci.c                    |  738 +-------
+ drivers/{bus => perf}/arm-ccn.c                    |    0
+ 9 files changed, 117 insertions(+), 2457 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt} (100%)
+ rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
+ copy drivers/{bus => perf}/arm-cci.c (71%)
+ rename drivers/{bus => perf}/arm-ccn.c (100%)
+
+-- 
+2.16.1.dirty
