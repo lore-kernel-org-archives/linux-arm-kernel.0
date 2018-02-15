@@ -1,120 +1,70 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 15 Feb 2018 13:24:18 +0100
-Subject: [PATCH] crypto: atmel: Delete error messages for a failed memory
- allocation in six functions
-Message-ID: <77cf1006-966d-78a9-0fdc-b53ccdd80df2@users.sourceforge.net>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Thu, 15 Feb 2018 13:29:34 +0100
+Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+In-Reply-To: <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-3-jean-philippe.brucker@arm.com>
+ <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
+ <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
+ <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
+Message-ID: <88f5a22a-6db9-f34b-916b-83cd6e683ceb@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 15 Feb 2018 11:38:30 +0100
+Am 15.02.2018 um 11:21 schrieb joro at 8bytes.org:
+> On Tue, Feb 13, 2018 at 12:57:23PM +0000, Jean-Philippe Brucker wrote:
+>> * bind_device() fails if the device's group has more than one device,
+>> otherwise calls __bind_device(). This prevents device drivers that are
+>> oblivious to IOMMU groups from opening a backdoor.
+>>
+>> * bind_group() calls __bind_device() for all devices in group. This way
+>> users that are aware of IOMMU groups can still use them safely. Note that
+>> at the moment bind_group() fails as soon as it finds a device that doesn't
+>> support SVA. Having all devices support SVA in a given group is
+>> unrealistic and this behavior ought to be improved.
+> Yeah, so the problem on PCI is that all functions of a multi-function
+> device are put into one group. For AMD-GPUs this means that the GPU
+> (SVA-capable) will end up in the same group as the on-GPU sound
+> device (not SVA-capable).
 
-Omit extra messages for a memory allocation failure in these functions.
+Yeah, but SVA only applies to rather new AMD-GPUs, which in turn can 
+only do PCIe and there the problem doesn't seems to exist any more.
 
-This issue was detected by using the Coccinelle software.
+E.g. the audio device on my Vega10 gets a separate group despite being 
+behind several bridges:
+> 0b:00.0 VGA compatible controller: Advanced Micro Devices, Inc. 
+> [AMD/ATI] Vega 10 [Radeon Vega Frontier Edition]
+> 0b:00.1 Audio device: Advanced Micro Devices, Inc. [AMD/ATI] Device aaf8
+...
+> [??? 6.362665] iommu: Adding device 0000:0b:00.0 to group 14
+> [??? 6.368468] iommu: Using direct mapping for device 0000:0b:00.0
+> [??? 6.380040] iommu: Adding device 0000:0b:00.1 to group 15
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/crypto/atmel-aes.c  | 6 +-----
- drivers/crypto/atmel-sha.c  | 9 ++-------
- drivers/crypto/atmel-tdes.c | 9 ++-------
- 3 files changed, 5 insertions(+), 19 deletions(-)
+Regards,
+Christian.
 
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 691c6465b71e..6fb24fc94b1f 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -2602,16 +2602,13 @@ static struct crypto_platform_data *atmel_aes_of_init(struct platform_device *pd
- 	}
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
--	if (!pdata) {
--		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-+	if (!pdata)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	pdata->dma_slave = devm_kzalloc(&pdev->dev,
- 					sizeof(*(pdata->dma_slave)),
- 					GFP_KERNEL);
- 	if (!pdata->dma_slave) {
--		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
- 		devm_kfree(&pdev->dev, pdata);
- 		return ERR_PTR(-ENOMEM);
- 	}
-@@ -2649,7 +2646,6 @@ static int atmel_aes_probe(struct platform_device *pdev)
- 
- 	aes_dd = devm_kzalloc(&pdev->dev, sizeof(*aes_dd), GFP_KERNEL);
- 	if (aes_dd == NULL) {
--		dev_err(dev, "unable to alloc data struct.\n");
- 		err = -ENOMEM;
- 		goto aes_dd_err;
- 	}
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index 8874aa5ca0f7..4d43081120db 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -2726,18 +2726,14 @@ static struct crypto_platform_data *atmel_sha_of_init(struct platform_device *pd
- 	}
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
--	if (!pdata) {
--		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-+	if (!pdata)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	pdata->dma_slave = devm_kzalloc(&pdev->dev,
- 					sizeof(*(pdata->dma_slave)),
- 					GFP_KERNEL);
--	if (!pdata->dma_slave) {
--		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
-+	if (!pdata->dma_slave)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	return pdata;
- }
-@@ -2758,7 +2754,6 @@ static int atmel_sha_probe(struct platform_device *pdev)
- 
- 	sha_dd = devm_kzalloc(&pdev->dev, sizeof(*sha_dd), GFP_KERNEL);
- 	if (sha_dd == NULL) {
--		dev_err(dev, "unable to alloc data struct.\n");
- 		err = -ENOMEM;
- 		goto sha_dd_err;
- 	}
-diff --git a/drivers/crypto/atmel-tdes.c b/drivers/crypto/atmel-tdes.c
-index 592124f8382b..97b0423efa7f 100644
---- a/drivers/crypto/atmel-tdes.c
-+++ b/drivers/crypto/atmel-tdes.c
-@@ -1312,18 +1312,14 @@ static struct crypto_platform_data *atmel_tdes_of_init(struct platform_device *p
- 	}
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
--	if (!pdata) {
--		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-+	if (!pdata)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	pdata->dma_slave = devm_kzalloc(&pdev->dev,
- 					sizeof(*(pdata->dma_slave)),
- 					GFP_KERNEL);
--	if (!pdata->dma_slave) {
--		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
-+	if (!pdata->dma_slave)
- 		return ERR_PTR(-ENOMEM);
--	}
- 
- 	return pdata;
- }
-@@ -1344,7 +1340,6 @@ static int atmel_tdes_probe(struct platform_device *pdev)
- 
- 	tdes_dd = devm_kmalloc(&pdev->dev, sizeof(*tdes_dd), GFP_KERNEL);
- 	if (tdes_dd == NULL) {
--		dev_err(dev, "unable to alloc data struct.\n");
- 		err = -ENOMEM;
- 		goto tdes_dd_err;
- 	}
--- 
-2.16.1
+>
+> Before this causes us big headaches I suggest to only provide the
+> bind_device() function. This should be fine because for SVA we don't
+> need all types of isolation that iommu_groups provide.
+>
+> IOMMU-groups provide two types of isolation:
+>
+> 	1) They group devices together which the IOMMU can't distinguish
+> 	   from each other, like PCI devices behind a PCIe bridge.
+>
+> 	2) Devices that can't be isolated from each other are also put
+> 	   into the same group. This is the case for multi-function PCIe
+> 	   devices as well as all PCIe devices behind a non-ACS bridge.
+> 	   But all these devices cann still be distinguished by the
+> 	   IOMMU.
+>
+> These two types of protection are needed to safely assign devices to
+> guests, but for bare-metal SVA all we need is type 1) isolation, and
+> not even that if we can assume that all SVA-capable devices have an
+> exclusive device-id (or stream-id).
+>
+>
+>
+> 	Joerg
+>
