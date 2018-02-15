@@ -1,64 +1,47 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 15 Feb 2018 11:31:43 +0530
-Subject: [PATCH v11 02/10] arm: omap: timer: Wrap the inline functions under
- OMAP2PLUS define
+Date: Thu, 15 Feb 2018 11:31:45 +0530
+Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
 In-Reply-To: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
 References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1518674511-26421-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wrap the inline functions under OMAP2PLUS/OMAP1 defines.
-This patch also inlines omap_dm_timer_get_fclk function
-for non OMAP1 Config.
+Replace architecture specific guard with clocksource guard.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Tested-by: Ladislav Michl <ladis@linux-mips.org>
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Replace architecture specific defines with clocksource
 ---
- arch/arm/plat-omap/include/plat/dmtimer.h | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ include/clocksource/timer-ti-dm.h | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 8b7d8a6..831174f 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -132,7 +132,16 @@ struct omap_dm_timer {
- int omap_dm_timer_get_irq(struct omap_dm_timer *timer);
+diff --git a/include/clocksource/timer-ti-dm.h b/include/clocksource/timer-ti-dm.h
+index 831174f..4f31095 100644
+--- a/include/clocksource/timer-ti-dm.h
++++ b/include/clocksource/timer-ti-dm.h
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/plat-omap/include/plat/dmtimer.h
+- *
+  * OMAP Dual-Mode Timers
+  *
+  * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+@@ -36,8 +34,8 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
  
- u32 omap_dm_timer_modify_idlect_mask(u32 inputmask);
-+
-+#ifndef CONFIG_ARCH_OMAP1
- struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer);
-+#else
-+static inline
-+struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
-+{
-+	return NULL;
-+}
-+#endif
+-#ifndef __ASM_ARCH_DMTIMER_H
+-#define __ASM_ARCH_DMTIMER_H
++#ifndef __CLOCKSOURCE_DMTIMER_H
++#define __CLOCKSOURCE_DMTIMER_H
  
- int omap_dm_timer_trigger(struct omap_dm_timer *timer);
- int omap_dm_timer_start(struct omap_dm_timer *timer);
-@@ -272,6 +281,12 @@ struct omap_dm_timer {
- #define OMAP_TIMER_TICK_INT_MASK_COUNT_REG				\
- 		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
- 
-+/*
-+ * The below are inlined to optimize code size for system timers. Other code
-+ * should not need these@all, see
-+ * include/linux/platform_data/pwm_omap_dmtimer.h
-+ */
-+#if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP2PLUS)
- static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
- 						int posted)
- {
-@@ -410,5 +425,5 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
- {
+ /* clock sources */
+ #define OMAP_TIMER_SRC_SYS_CLK			0x00
+@@ -426,4 +424,4 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
  	writel_relaxed(value, timer->irq_stat);
  }
--
-+#endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
- #endif /* __ASM_ARCH_DMTIMER_H */
+ #endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
+-#endif /* __ASM_ARCH_DMTIMER_H */
++#endif /* __CLOCKSOURCE_DMTIMER_H */
 -- 
 1.9.1
