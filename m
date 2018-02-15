@@ -1,78 +1,30 @@
-From: robert.walker@arm.com (Robert Walker)
-Date: Thu, 15 Feb 2018 15:22:52 -0000
-Subject: [PATCH 2/2] perf inject: Emit instruction records on ETM trace
- discontinuity
-In-Reply-To: <20180215145714.GE30974@kernel.org>
-References: <1518011845-24063-1-git-send-email-robert.walker@arm.com>
- <1518011845-24063-3-git-send-email-robert.walker@arm.com>
- <20180213222233.GA23553@xps15> <20180215145714.GE30974@kernel.org>
-Message-ID: <001901d3a670$da940cc0$8fbc2640$@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Feb 2018 15:29:31 +0000
+Subject: [RFC PATCH 1/5] arm64: fpsimd: include <linux/init.h> in fpsimd.h
+In-Reply-To: <1518708575-12284-1-git-send-email-will.deacon@arm.com>
+References: <1518708575-12284-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1518708575-12284-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+fpsimd.h uses the __init annotation, so pull in linux/init.h
 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/fpsimd.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-> -----Original Message-----
-> From: Arnaldo Carvalho de Melo [mailto:acme at kernel.org]
-> Sent: 15 February 2018 14:57
-> To: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Robert Walker <Robert.Walker@arm.com>; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> coresight at lists.linaro.org
-> Subject: Re: [PATCH 2/2] perf inject: Emit instruction records on ETM
-trace
-> discontinuity
-> 
-> Em Tue, Feb 13, 2018 at 03:22:33PM -0700, Mathieu Poirier escreveu:
-> > On Wed, Feb 07, 2018 at 01:57:25PM +0000, Robert Walker wrote:
-> > > @@ -946,20 +982,19 @@ static int cs_etm__run_decoder(struct
-> cs_etm_queue *etmq)
-> > >  		/* Run trace decoder until buffer consumed or end of trace
-> */
-> > >  		do {
-> > >  			processed = 0;
-> > > -
-> >
-> > this...
-> >
-> > >  			err = cs_etm_decoder__process_data_block(
-> > >  				etmq->decoder,
-> > >  				etmq->offset,
-> > >  				&buffer.buf[buffer_used],
-> > >  				buffer.len - buffer_used,
-> > >  				&processed);
-> > > -
-> >
-> > and this should have gone in the first patch.
-> >
-> > >  			if (err)
-> > >  				return err;
-> > >
-> > >  			etmq->offset += processed;
-> > >  			buffer_used += processed;
-> > >
-> > > +			/* Process each packet in this chunk */
-> >
-> > And probably this too.
-> >
-> > With the above changes:
-> >
-> > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> 
-> Hi Robert,
-> 
-> 	Can you please address Mathieu's comments, and if you agree with
-> them, resubmit?
-> 
-> Thanks!
-> 
-> - Arnaldo
-
-Hi Arnaldo,
-
-I've addressed Mathieu's comments and resubmitted them yesterday
-(https://lkml.org/lkml/2018/2/14/185).
-
-Regards
-
-Rob
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 8857a0f0d0f7..fc3527b985ca 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -22,6 +22,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/cache.h>
++#include <linux/init.h>
+ #include <linux/stddef.h>
+ 
+ /*
+-- 
+2.1.4
