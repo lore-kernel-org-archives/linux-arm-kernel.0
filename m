@@ -1,144 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Feb 2018 18:21:54 +0000
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <20180215164754.GW25201@hirez.programming.kicks-ass.net>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214150739.GH2992@arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215142239.GF16623@arm.com>
- <20180215164754.GW25201@hirez.programming.kicks-ass.net>
-Message-ID: <20180215182154.GD15274@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 15 Feb 2018 19:22:00 +0100 (CET)
+Subject: [PATCH 2/2] mmc: bcm2835: print some informational messages
+ during reset
+In-Reply-To: <20180214204733.7987d16c@naga.suse.cz>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <57ff1e429a7fc12300a3cca0c5e9a637beed0d3a.1518619058.git.msuchanek@suse.de>
+ <F404E9C8-AE64-4B36-AD1B-911BD3C33946@gmail.com>
+ <20180214204733.7987d16c@naga.suse.cz>
+Message-ID: <1950058855.86123.1518718920111@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 05:47:54PM +0100, Peter Zijlstra wrote:
-> On Thu, Feb 15, 2018 at 02:22:39PM +0000, Will Deacon wrote:
-> > Instead, we've come up with a more plausible sequence that can in theory
-> > happen on a single CPU:
-> > 
-> > <task foo calls exit()>
-> > 
-> > do_exit
-> > 	exit_mm
-> 
-> If this is the last task of the process, we would expect:
-> 
->   mm_count == 1
->   mm_users == 1
-> 
-> at this point.
-> 
-> > 		mmgrab(mm);			// foo's mm has count +1
-> > 		BUG_ON(mm != current->active_mm);
-> > 		task_lock(current);
-> > 		current->mm = NULL;
-> > 		task_unlock(current);
-> 
-> So the whole active_mm is basically the last 'real' mm, and its purpose
-> is to avoid switch_mm() between user tasks and kernel tasks.
-> 
-> A kernel task has !->mm. We do this by incrementing mm_count when
-> switching from user to kernel task and decrementing when switching from
-> kernel to user.
-> 
-> What exit_mm() does is change a user task into a 'kernel' task. So it
-> should increment mm_count to mirror the context switch. I suspect this
-> is what the mmgrab() in exit_mm() is for.
-> 
-> > <irq and ctxsw to kthread>
-> > 
-> > context_switch(prev=foo, next=kthread)
-> > 	mm = next->mm;
-> > 	oldmm = prev->active_mm;
-> > 
-> > 	if (!mm) {				// True for kthread
-> > 		next->active_mm = oldmm;
-> > 		mmgrab(oldmm);			// foo's mm has count +2
-> > 	}
-> > 
-> > 	if (!prev->mm) {			// True for foo
-> > 		rq->prev_mm = oldmm;
-> > 	}
-> > 
-> > 	finish_task_switch
-> > 		mm = rq->prev_mm;
-> > 		if (mm) {			// True (foo's mm)
-> > 			mmdrop(mm);		// foo's mm has count +1
-> > 		}
-> > 
-> > 	[...]
-> > 
-> > <ctxsw to task bar>
-> > 
-> > context_switch(prev=kthread, next=bar)
-> > 	mm = next->mm;
-> > 	oldmm = prev->active_mm;		// foo's mm!
-> > 
-> > 	if (!prev->mm) {			// True for kthread
-> > 		rq->prev_mm = oldmm;
-> > 	}
-> > 
-> > 	finish_task_switch
-> > 		mm = rq->prev_mm;
-> > 		if (mm) {			// True (foo's mm)
-> > 			mmdrop(mm);		// foo's mm has count +0
-> 
-> The context switch into the next user task will then decrement. At this
-> point foo no longer has a reference to its mm, except on the stack.
-> 
-> > 		}
-> > 
-> > 	[...]
-> > 
-> > <ctxsw back to task foo>
-> > 
-> > context_switch(prev=bar, next=foo)
-> > 	mm = next->mm;
-> > 	oldmm = prev->active_mm;
-> > 
-> > 	if (!mm) {				// True for foo
-> > 		next->active_mm = oldmm;	// This is bar's mm
-> > 		mmgrab(oldmm);			// bar's mm has count +1
-> > 	}
-> > 
-> > 
-> > 	[return back to exit_mm]
-> 
-> Enter mm_users, this counts the number of tasks associated with the mm.
-> We start with 1 in mm_init(), and when it drops to 0, we decrement
-> mm_count. Since we also start with mm_count == 1, this would appear
-> consistent.
-> 
->   mmput() // --mm_users == 0, which then results in:
-> 
-> > mmdrop(mm);					// foo's mm has count -1
-> 
-> In the above case, that's the very last reference to the mm, and since
-> we started out with mm_count == 1, this -1 makes 0 and we do the actual
-> free.
-> 
-> > At this point, we've got an imbalanced count on the mm and could free it
-> > prematurely as seen in the KASAN log.
-> 
-> I'm not sure I see premature. At this point mm_users==0, mm_count==0 and
-> we freed mm and there is no further use of the on-stack mm pointer and
-> foo no longer has a pointer to it in either ->mm or ->active_mm. It's
-> well and proper dead.
-> 
-> > A subsequent context-switch away from foo would therefore result in a
-> > use-after-free.
-> 
-> At the above point, foo no longer has a reference to mm, we cleared ->mm
-> early, and the context switch to bar cleared ->active_mm. The switch
-> back into foo then results with foo->active_mm == bar->mm, which is
-> fine.
+Hi Michal,
 
-Bugger, you're right. When we switch off foo after freeing the mm, we'll
-actually access it's active mm which points to bar's mm. So whilst this
-can explain part of the kasan splat, it doesn't explain the actual
-use-after-free.
+> Michal Such?nek <msuchanek@suse.de> hat am 14. Februar 2018 um 20:47 geschrieben:
+> 
+> 
+> On Wed, 14 Feb 2018 08:50:16 -0800
+> Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 
+> > On February 14, 2018 6:38:58 AM PST, Michal Suchanek
+> > <msuchanek@suse.de> wrote:
+> > >The previous patch does reset during hardware error so make the reset
+> > >progress more visible.  
+> > 
+> > Based on your previous email it looks like this can happen quite
+> > frequently so we might be spamming the kernel log with such reset
+> > messages. Turning this into a debug print would not be great either,
+> > how about a custom sysfs attribute counting the number of times a
+> > reset was done?
+> 
+> Since every such message happens when the system stalls for like half a
+> minute I don't think there will be that many until somebody notices
+> something is amiss. It might be also helpful in diagnosing if other
+> cards lock up in different way - for me the DMA shutdown is short so I
+> guess it's the mmc host that is locked up and the DMA engine is fine.
+> It might look differently on different systems, though.
 
-More head-scratching required :(
+FWIW according to your dmesg your RPi doesn't use the DMA engine:
 
-Will
+[ 5.004609] sdhost-bcm2835 3f202000.sdhost: unable to initialise DMA channel. Falling back to PIO
+[ 5.154518] sdhost-bcm2835 3f202000.sdhost: loaded - DMA disabled
+
+For me it's a chicken and egg problem if the DMA driver is build as a kernel module.
+
+Stefan
+
+> 
+> I understand that adding messages it somewhat controversial so I added
+> them in separate patch.
+> 
+> Thanks
+> 
+> Michal
