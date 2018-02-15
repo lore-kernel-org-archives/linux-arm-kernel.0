@@ -1,150 +1,80 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 15 Feb 2018 11:31:50 +0530
-Subject: [PATCH v11 09/10] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
-References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1518674511-26421-10-git-send-email-j-keerthy@ti.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Thu, 15 Feb 2018 15:47:59 +0900
+Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
+In-Reply-To: <5A84EB83.7070807@linaro.org>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-2-takahiro.akashi@linaro.org>
+ <5A84EB83.7070807@linaro.org>
+Message-ID: <20180215154759.47dd4cc8a64f0e99d9e8695f@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+Hi David,
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/pwm/pwm-omap-dmtimer.c | 68 ++++++++++++++++++++++++++----------------
- 1 file changed, 42 insertions(+), 26 deletions(-)
+On Wed, 14 Feb 2018 21:08:03 -0500
+David Long <dave.long@linaro.org> wrote:
 
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 5ad42f3..665da3c 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/dmtimer-omap.h>
- #include <linux/platform_data/pwm_omap_dmtimer.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
- 	struct pwm_chip chip;
- 	struct mutex mutex;
- 	pwm_omap_dmtimer *dm_timer;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	const struct omap_dm_timer_ops *pdata;
- 	struct platform_device *dm_timer_pdev;
- };
- 
-@@ -242,19 +243,35 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *timer;
-+	struct platform_device *timer_pdev;
- 	struct pwm_omap_dmtimer_chip *omap;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	struct dmtimer_platform_data *timer_pdata;
-+	const struct omap_dm_timer_ops *pdata;
- 	pwm_omap_dmtimer *dm_timer;
- 	u32 v;
--	int status;
-+	int ret = 0;
- 
--	pdata = dev_get_platdata(&pdev->dev);
--	if (!pdata) {
--		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
--		return -EINVAL;
-+	timer = of_parse_phandle(np, "ti,timers", 0);
-+	if (!timer)
-+		return -ENODEV;
-+
-+	timer_pdev = of_find_device_by_node(timer);
-+	if (!timer_pdev) {
-+		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
-+		ret = -ENODEV;
-+		goto put;
- 	}
- 
--	if (!pdata->request_by_node ||
-+	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-+	if (!timer_pdata) {
-+		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
-+		ret = -EINVAL;
-+		goto put;
-+	}
-+
-+	pdata = timer_pdata->timer_ops;
-+
-+	if (!pdata || !pdata->request_by_node ||
- 	    !pdata->free ||
- 	    !pdata->enable ||
- 	    !pdata->disable ||
-@@ -267,21 +284,26 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 	    !pdata->set_prescaler ||
- 	    !pdata->write_counter) {
- 		dev_err(&pdev->dev, "Incomplete dmtimer pdata structure\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto put;
- 	}
- 
--	timer = of_parse_phandle(np, "ti,timers", 0);
--	if (!timer)
--		return -ENODEV;
--
- 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
- 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto put;
- 	}
- 
- 	dm_timer = pdata->request_by_node(timer);
--	if (!dm_timer)
--		return -EPROBE_DEFER;
-+	if (!dm_timer) {
-+		ret = -EPROBE_DEFER;
-+		goto put;
-+	}
-+
-+put:
-+	of_node_put(timer);
-+	if (ret < 0)
-+		return ret;
- 
- 	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
- 	if (!omap) {
-@@ -291,13 +313,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	omap->pdata = pdata;
- 	omap->dm_timer = dm_timer;
--
--	omap->dm_timer_pdev = of_find_device_by_node(timer);
--	if (!omap->dm_timer_pdev) {
--		dev_err(&pdev->dev, "Unable to find timer pdev\n");
--		omap->pdata->free(dm_timer);
--		return -EINVAL;
--	}
-+	omap->dm_timer_pdev = timer_pdev;
- 
- 	/*
- 	 * Ensure that the timer is stopped before we allow PWM core to call
-@@ -322,11 +338,11 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	mutex_init(&omap->mutex);
- 
--	status = pwmchip_add(&omap->chip);
--	if (status < 0) {
-+	ret = pwmchip_add(&omap->chip);
-+	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to register PWM\n");
- 		omap->pdata->free(omap->dm_timer);
--		return status;
-+		return ret;
- 	}
- 
- 	platform_set_drvdata(pdev, omap);
+> On 02/01/2018 04:34 AM, AKASHI Takahiro wrote:
+> > From: Masami Hiramatsu <mhiramat@kernel.org>
+> >
+> > Remove unneeded address sanity check in arch_prepare_kprobe().
+> > Since do_debug_exception() is already blacklisted for kprobes, no need
+> > to reject all __exception functions. Also, since generic kprobe
+> > framework already ensures the address is in kernel text, no need to
+> > check it is in rodata again.
+> >
+> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> > Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > ---
+> >   arch/arm64/kernel/probes/kprobes.c | 8 --------
+> >   1 file changed, 8 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> > index d849d9804011..3c487a389252 100644
+> > --- a/arch/arm64/kernel/probes/kprobes.c
+> > +++ b/arch/arm64/kernel/probes/kprobes.c
+> > @@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+> >   int __kprobes arch_prepare_kprobe(struct kprobe *p)
+> >   {
+> >   	unsigned long probe_addr = (unsigned long)p->addr;
+> > -	extern char __start_rodata[];
+> > -	extern char __end_rodata[];
+> >
+> >   	if (probe_addr & 0x3)
+> >   		return -EINVAL;
+> > @@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+> >   	/* copy instruction */
+> >   	p->opcode = le32_to_cpu(*p->addr);
+> >
+> > -	if (in_exception_text(probe_addr))
+> > -		return -EINVAL;
+> > -	if (probe_addr >= (unsigned long) __start_rodata &&
+> > -	    probe_addr <= (unsigned long) __end_rodata)
+> > -		return -EINVAL;
+> > -
+> >   	/* decode instruction */
+> >   	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
+> >   	case INSN_REJECTED:	/* insn not supported */
+> >
+> 
+> I have tested this change on v4.15 using kprobes events and I find it 
+> allows kprobes to be placed in exception text when they were previously 
+> rejected. Is there some other recent change I need to test this with for 
+> the previous behavior to be preserved?
+
+Hmm, the latest change is to avoid retpoline thunk functions on x86. Since the
+retpoline may not be applied on aarch64, it can be ignored.
+However, I found there were still many "__kprobes" tags under arch/arm64. That
+was replaced with NOKPROBE_SYMBOL() (and nokprobe_inline for inline function).
+It should be done on arm/arm64 too because the functions marked with
+NOKPROBE_SYMBOL are listed in <debugfs>/kprobes/blacklist. 
+
+Thank you,
+
+> 
+> -dl
+> 
+
+
 -- 
-1.9.1
+Masami Hiramatsu <mhiramat@kernel.org>
