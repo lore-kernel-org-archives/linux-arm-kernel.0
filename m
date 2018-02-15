@@ -1,36 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Feb 2018 18:59:55 +0000
-Subject: [PATCH] arm64: mm: Use READ_ONCE/WRITE_ONCE when accessing page
- tables
-In-Reply-To: <1518693296-7339-1-git-send-email-will.deacon@arm.com>
-References: <1518693296-7339-1-git-send-email-will.deacon@arm.com>
-Message-ID: <01defb0c-5cb5-83b3-8094-04fcc24ab75a@arm.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 15 Feb 2018 15:59:29 -0500
+Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
+ (Spectre variant 2) mitigation
+In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
+References: <20180206175621.929-1-marc.zyngier@arm.com>
+Message-ID: <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/18 11:14, Will Deacon wrote:
-> In many cases, page tables can be accessed concurrently by either another
-> CPU (due to things like fast gup) or by the hardware page table walker
-> itself, which may set access/dirty bits. In such cases, it is important
-> to use READ_ONCE/WRITE_ONCE when accessing page table entries so that
-> entries cannot be torn, merged or subject to apparent loss of coherence
-> due to compiler transformations.
-> 
-> Whilst there are some scenarios where this cannot happen (e.g. pinned
-> kernel mappings for the linear region), the overhead of using READ_ONCE
-> /WRITE_ONCE everywhere is minimal and makes the code an awful lot easier
-> to reason about. This patch consistently uses these macros in the arch
-> code, as well as explicitly namespacing pointers to page table entries
-> from the entries themselves by using adopting a 'p' suffix for the former
-> (as is sometimes used elsewhere in the kernel source).
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Yury Norov <ynorov@caviumnetworks.com>
-> Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Marc, all,
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+On 02/06/2018 12:56 PM, Marc Zyngier wrote:
+> ARM has recently published a SMC Calling Convention (SMCCC)
+> specification update[1] that provides an optimised calling convention
+> and optional, discoverable support for mitigating CVE-2017-5715. ARM
+> Trusted Firmware (ATF) has already gained such an implementation[2].
 
-	M.
+I'm probably just missing something, but does this end up reported
+somewhere conveniently user visible? In particular, if the new SMC is
+*not* provided, does the user end up easily seeing this?
+
+Jon.
+
 -- 
-Jazz is not dead. It just smells funny...
+Computer Architect | Sent from my Fedora powered laptop
