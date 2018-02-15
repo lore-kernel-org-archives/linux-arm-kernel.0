@@ -1,48 +1,42 @@
-From: kieran.bingham@ideasonboard.com (Kieran Bingham)
-Date: Thu, 15 Feb 2018 08:45:33 +0000
-Subject: [PATCH 3/8] dt-bindings: display: renesas, lvds: Add LVDS binding
- for D3
-In-Reply-To: <1518683903-10681-4-git-send-email-kbingham@kernel.org>
-References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
- <1518683903-10681-4-git-send-email-kbingham@kernel.org>
-Message-ID: <ad5ea103-b039-7a2e-01c8-2cb16324115d@ideasonboard.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 15 Feb 2018 16:48:55 +0800
+Subject: [PATCH 0/5] hwrng: stm32 - Improvement for stm32-rng
+In-Reply-To: <20180129170521.1862-1-lionel.debieve@st.com>
+References: <20180129170521.1862-1-lionel.debieve@st.com>
+Message-ID: <20180215084855.GB5577@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/18 08:38, Kieran Bingham wrote:
-> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+On Mon, Jan 29, 2018 at 06:05:16PM +0100, Lionel Debieve wrote:
+> This set of patches add extended functionalities for stm32 rng
+> driver.
+> Patch #1 includes a reset during probe to avoid any error status
+> which can occur during bootup process and keep safe rng integrity.
 > 
-> The D3 supports two LVDS channels. Extend the binding to support them.
+> Patch #3 adds a new property to manage the clock error detection
+> feature which can be disabled on specific target.
 > 
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> ---
->  Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Patch #5 rework the timeout calculation for read value that was
+> previously defined based on loop operation and is now based on
+> timer.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt b/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> index 79860f58a7ad..0dcf488b70df 100644
-> --- a/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> +++ b/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> @@ -14,6 +14,7 @@ Required properties:
->  - compatible : Shall contain one of
->    - "renesas,lvds-r8a7795" for R8A7795 (R-Car H3) compatible LVDS encoders
->    - "renesas,lvds-r8a7796" for R8A7796 (R-Car M3-W) compatible LVDS encoders
-> +  - "renesas,lvds-r8a77995" for R8A77995 (R-Car D3) compatible LVDS encoders
-
-Hi Laurent,
-
-Are we unable to have a generic lvds-gen3 here?
-
-(Although to perhaps answer my own question I see that the D3/E3 have extra
-registers)
-
-Also "lets pretend" that I intentionally separated out the LVDS updates to the
-rcar_lvds_of_table :)
-
---
-Kieran
-
->  
->  - reg: Base address and length for the memory-mapped registers
->  - clocks: A phandle + clock-specifier pair for the functional clock
+> Lionel Debieve (5):
+>   hwrng: stm32 - add reset during probe
+>   dt-bindings: rng: add reset node for stm32
+>   hwrng: stm32 - allow disable clock error detection
+>   dt-bindings: rng: add clock detection error for stm32
+>   hwrng: stm32 - rework read timeout calculation
 > 
+>  .../devicetree/bindings/rng/st,stm32-rng.txt       |  4 ++
+>  drivers/char/hw_random/stm32-rng.c                 | 44 ++++++++++++++--------
+>  2 files changed, 32 insertions(+), 16 deletions(-)
+
+I never received patch 5.
+
+Which trees are patch 2 and 4 meant to go through?
+
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
