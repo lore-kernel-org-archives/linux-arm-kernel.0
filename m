@@ -1,35 +1,23 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Feb 2018 10:08:38 +0100
-Subject: [PATCH v2 0/2] Fix broken bananapi m2 devicetree/regulators
-In-Reply-To: <20180214141025.22171-1-embed3d@gmail.com>
-References: <20180214141025.22171-1-embed3d@gmail.com>
-Message-ID: <20180215090838.fnenymzrejs6vhcf@flea.home>
+Date: Thu, 15 Feb 2018 10:10:11 +0100
+Subject: [PATCH] MAINTAINERS: update email address for Maxime Ripard
+In-Reply-To: <CAGb2v642YXFe==vf4AUkvcC5JJxehG4Np_J5=tSLbJaXUuwVkw@mail.gmail.com>
+References: <20180202123510.8699-1-maxime.ripard@bootlin.com>
+ <CAGb2v642YXFe==vf4AUkvcC5JJxehG4Np_J5=tSLbJaXUuwVkw@mail.gmail.com>
+Message-ID: <20180215091011.67lbcid6njexb3d7@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 03:10:23PM +0100, Philipp Rossak wrote:
-> This patchseries fixes the bananapi m1 devicetree, to be able to boot again.
-> The first two patches update/improve the devicetree and the last patch adds
-> all missing regulators.
+On Tue, Feb 13, 2018 at 05:57:25PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Feb 2, 2018 at 8:35 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > Free Electrons is now Bootlin, change my email address accordingly.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > 
-> Regards,
-> Philipp
-> 
-> Changes since v1:
-> 	* squashed commit 1 and 3
-> 	* fix wrong mmc regulator
-> 
-> Philipp Rossak (2):
->   arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
->   arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied both.
-
-I had to make a couple of changes though, in the commit title arm
-should be uppercase, and the fix isn't needed.
-
-I also added stable in Cc, since these patches have been there for
-quite some time.
+Arnd and Olof seems to be busy, and we'll have some fixes so I ended
+up merging it.
 
 Maxime
 
@@ -43,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180215/6bebb158/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180215/be5f5da3/attachment.sig>
