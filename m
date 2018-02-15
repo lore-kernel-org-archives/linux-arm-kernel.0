@@ -1,42 +1,91 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 15 Feb 2018 12:23:56 +0100
-Subject: [PATCH V2] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
-In-Reply-To: <20180215104337.ewzggtcm6usdlpnt@katana>
-References: <20180215100208.24646-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdVO7sxRjj7h=ar+bA8B3Art=Yyyr66cRqC30pw3Zz+Vag@mail.gmail.com>
- <20180215101944.qtiquqqhgmg3gbrt@katana>
- <CAMuHMdXxPk=78D-hFrZvsByCEqh=+JY8C0iCdDy8FzTBPxnKDQ@mail.gmail.com>
- <20180215104337.ewzggtcm6usdlpnt@katana>
-Message-ID: <CAMuHMdWCExs8OPkkm9dnnsFGHsU-HtJbieyCh_m7EEfFBU2u0A@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 15 Feb 2018 12:33:50 +0100
+Subject: [PATCH V3] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
+Message-ID: <20180215113350.9613-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Regulator setup is suboptimal on H2 Stout too. The Stout newly has
+two DA9210 regulators, so the quirk is extended to handle another
+DA9210 at i2c address 0x70.
 
-On Thu, Feb 15, 2018 at 11:43 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
->> > It sends per device, so unless there is a device named "da9210" at
->> > addr 0x70, nothing will happen? Am I missing something?
->>
->> As soon as one of the affected devices is instantiated, it has to shut up
->> all devices. This is done by sending the whole da9xxx_msgs[] array,
->> which needs modification now we have boards with two or three devices.
->
-> Ah, I missed the "done = true;" part in remove
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+V2: - Handle another DA9210 at 0x70
+    - Drop explicit board list from the leading comment in the file
+V3: - Correct da9xxx_msgs[] array size
+    - Send messages to all three regulators on Stout only
+---
+ arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 23 +++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-Perhaps the code should be rewritten to not match board compatible values,
-but scan for da9063 and da9210 regulators, keep track of how many are found,
-and activate if more than one is found using the same interrupt?
-
-Yes, more complex code. But I have no idea how many Renesas customers
-copied this part of the board design...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+index 44438f344dc8..27fb3a5ec73e 100644
+--- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+@@ -1,9 +1,9 @@
+ /*
+  * R-Car Generation 2 da9063/da9210 regulator quirk
+  *
+- * The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
+- * da9210 regulators.  Both regulators have their interrupt request lines tied
+- * to the same interrupt pin (IRQ2) on the SoC.
++ * Certain Gen2 development boards have an da9063 and one or more da9210
++ * regulators. All of these regulators have their interrupt request lines
++ * tied to the same interrupt pin (IRQ2) on the SoC.
+  *
+  * After cold boot or da9063-induced restart, both the da9063 and da9210 seem
+  * to assert their interrupt request lines.  Hence as soon as one driver
+@@ -50,7 +50,7 @@ static void __iomem *irqc;
+ static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
+ static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
+ 
+-static struct i2c_msg da9xxx_msgs[2] = {
++static struct i2c_msg da9xxx_msgs[3] = {
+ 	{
+ 		.addr = 0x58,
+ 		.len = ARRAY_SIZE(da9063_irq_clr),
+@@ -59,6 +59,10 @@ static struct i2c_msg da9xxx_msgs[2] = {
+ 		.addr = 0x68,
+ 		.len = ARRAY_SIZE(da9210_irq_clr),
+ 		.buf = da9210_irq_clr,
++	}, {
++		.addr = 0x70,
++		.len = ARRAY_SIZE(da9210_irq_clr),
++		.buf = da9210_irq_clr,
+ 	},
+ };
+ 
+@@ -85,11 +89,15 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ 	dev_dbg(dev, "Detected %s\n", client->name);
+ 
+ 	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
+-	    (client->addr == 0x68 && !strcmp(client->name, "da9210"))) {
+-		int ret;
++	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
++	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
++		int ret, len;
++
++		/* There are two DA9210 on Stout, one on the other boards. */
++		len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
+ 
+ 		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
+-		ret = i2c_transfer(client->adapter, da9xxx_msgs, ARRAY_SIZE(da9xxx_msgs));
++		ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
+ 		if (ret != ARRAY_SIZE(da9xxx_msgs))
+ 			dev_err(&client->dev, "i2c error %d\n", ret);
+ 	}
+@@ -118,6 +126,7 @@ static int __init rcar_gen2_regulator_quirk(void)
+ 
+ 	if (!of_machine_is_compatible("renesas,koelsch") &&
+ 	    !of_machine_is_compatible("renesas,lager") &&
++	    !of_machine_is_compatible("renesas,stout") &&
+ 	    !of_machine_is_compatible("renesas,gose"))
+ 		return -ENODEV;
+ 
+-- 
+2.15.1
