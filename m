@@ -1,70 +1,167 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Thu, 15 Feb 2018 13:29:34 +0100
-Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
-In-Reply-To: <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-3-jean-philippe.brucker@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
- <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
- <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
-Message-ID: <88f5a22a-6db9-f34b-916b-83cd6e683ceb@amd.com>
+From: kieran.bingham@ideasonboard.com (Kieran Bingham)
+Date: Thu, 15 Feb 2018 12:32:51 +0000
+Subject: [PATCH 1/8] pinctrl: sh-pfc: r8a77995: Add DU support
+In-Reply-To: <1518683903-10681-2-git-send-email-kbingham@kernel.org>
+References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+ <1518683903-10681-2-git-send-email-kbingham@kernel.org>
+Message-ID: <9ac40731-eb13-4727-864d-0e3b7059b9f8@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.02.2018 um 11:21 schrieb joro at 8bytes.org:
-> On Tue, Feb 13, 2018 at 12:57:23PM +0000, Jean-Philippe Brucker wrote:
->> * bind_device() fails if the device's group has more than one device,
->> otherwise calls __bind_device(). This prevents device drivers that are
->> oblivious to IOMMU groups from opening a backdoor.
->>
->> * bind_group() calls __bind_device() for all devices in group. This way
->> users that are aware of IOMMU groups can still use them safely. Note that
->> at the moment bind_group() fails as soon as it finds a device that doesn't
->> support SVA. Having all devices support SVA in a given group is
->> unrealistic and this behavior ought to be improved.
-> Yeah, so the problem on PCI is that all functions of a multi-function
-> device are put into one group. For AMD-GPUs this means that the GPU
-> (SVA-capable) will end up in the same group as the on-GPU sound
-> device (not SVA-capable).
+This patch duplicates work performed by Ulrich.
 
-Yeah, but SVA only applies to rather new AMD-GPUs, which in turn can 
-only do PCIe and there the problem doesn't seems to exist any more.
+Please consider this patch dropped, and no need for review.
 
-E.g. the audio device on my Vega10 gets a separate group despite being 
-behind several bridges:
-> 0b:00.0 VGA compatible controller: Advanced Micro Devices, Inc. 
-> [AMD/ATI] Vega 10 [Radeon Vega Frontier Edition]
-> 0b:00.1 Audio device: Advanced Micro Devices, Inc. [AMD/ATI] Device aaf8
-...
-> [??? 6.362665] iommu: Adding device 0000:0b:00.0 to group 14
-> [??? 6.368468] iommu: Using direct mapping for device 0000:0b:00.0
-> [??? 6.380040] iommu: Adding device 0000:0b:00.1 to group 15
+(especially the obvious error in the pin-values)
 
-Regards,
-Christian.
+Oh well - it was a fun exercise to go through :-)
 
->
-> Before this causes us big headaches I suggest to only provide the
-> bind_device() function. This should be fine because for SVA we don't
-> need all types of isolation that iommu_groups provide.
->
-> IOMMU-groups provide two types of isolation:
->
-> 	1) They group devices together which the IOMMU can't distinguish
-> 	   from each other, like PCI devices behind a PCIe bridge.
->
-> 	2) Devices that can't be isolated from each other are also put
-> 	   into the same group. This is the case for multi-function PCIe
-> 	   devices as well as all PCIe devices behind a non-ACS bridge.
-> 	   But all these devices cann still be distinguished by the
-> 	   IOMMU.
->
-> These two types of protection are needed to safely assign devices to
-> guests, but for bare-metal SVA all we need is type 1) isolation, and
-> not even that if we can assume that all SVA-capable devices have an
-> exclusive device-id (or stream-id).
->
->
->
-> 	Joerg
->
+--
+Regards
+
+Kieran
+
+On 15/02/18 08:38, Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> Provide pin control support for the DU parallel RGB output signals.
+> 
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> ---
+>  drivers/pinctrl/sh-pfc/pfc-r8a77995.c | 101 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 101 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a77995.c b/drivers/pinctrl/sh-pfc/pfc-r8a77995.c
+> index a4927b78a17b..277b0d6972f7 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a77995.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a77995.c
+> @@ -1114,6 +1114,87 @@ static const unsigned int canfd1_data_mux[] = {
+>  	CANFD1_TX_MARK, CANFD1_RX_MARK,
+>  };
+>  
+> +/* - DU --------------------------------------------------------------------- */
+> +static const unsigned int du_rgb666_pins[] = {
+> +	/* R[7:2], G[7:2], B[7:2] */
+> +	RCAR_GP_PIN(1, 23), RCAR_GP_PIN(1, 22), RCAR_GP_PIN(1, 21),
+> +	RCAR_GP_PIN(1, 20), RCAR_GP_PIN(1, 19), RCAR_GP_PIN(1, 18),
+> +	RCAR_GP_PIN(1, 15), RCAR_GP_PIN(1, 14), RCAR_GP_PIN(1, 13),
+> +	RCAR_GP_PIN(1, 12), RCAR_GP_PIN(1, 11), RCAR_GP_PIN(1, 10),
+> +	RCAR_GP_PIN(1, 7),  RCAR_GP_PIN(1, 6),  RCAR_GP_PIN(1, 5),
+> +	RCAR_GP_PIN(1, 4),  RCAR_GP_PIN(1, 3),  RCAR_GP_PIN(1, 2),
+> +};
+> +static const unsigned int du_rgb666_mux[] = {
+> +	DU_DR7_MARK, DU_DR6_MARK, DU_DR5_MARK, DU_DR4_MARK,
+> +	DU_DR3_MARK, DU_DR2_MARK,
+> +	DU_DG7_MARK, DU_DG6_MARK, DU_DG5_MARK, DU_DG4_MARK,
+> +	DU_DG3_MARK, DU_DG2_MARK,
+> +	DU_DB7_MARK, DU_DB6_MARK, DU_DB5_MARK, DU_DB4_MARK,
+> +	DU_DB3_MARK, DU_DB2_MARK,
+> +};
+> +static const unsigned int du_rgb888_pins[] = {
+> +	/* R[7:0], G[7:0], B[7:0] */
+> +	RCAR_GP_PIN(1, 23), RCAR_GP_PIN(1, 22), RCAR_GP_PIN(1, 21),
+> +	RCAR_GP_PIN(1, 20), RCAR_GP_PIN(1, 19), RCAR_GP_PIN(1, 18),
+> +	RCAR_GP_PIN(1, 17), RCAR_GP_PIN(1, 16),
+> +	RCAR_GP_PIN(1, 15), RCAR_GP_PIN(1, 14), RCAR_GP_PIN(1, 13),
+> +	RCAR_GP_PIN(1, 12), RCAR_GP_PIN(1, 11), RCAR_GP_PIN(1, 10),
+> +	RCAR_GP_PIN(1, 9),  RCAR_GP_PIN(1, 8),
+> +	RCAR_GP_PIN(1, 7),  RCAR_GP_PIN(1, 6),  RCAR_GP_PIN(1, 5),
+> +	RCAR_GP_PIN(1, 4),  RCAR_GP_PIN(1, 3),  RCAR_GP_PIN(1, 2),
+> +	RCAR_GP_PIN(1, 1),  RCAR_GP_PIN(1, 0),
+> +};
+> +static const unsigned int du_rgb888_mux[] = {
+> +	DU_DR7_MARK, DU_DR6_MARK, DU_DR5_MARK, DU_DR4_MARK,
+> +	DU_DR3_MARK, DU_DR2_MARK, DU_DR1_MARK, DU_DR0_MARK,
+> +	DU_DG7_MARK, DU_DG6_MARK, DU_DG5_MARK, DU_DG4_MARK,
+> +	DU_DG3_MARK, DU_DG2_MARK, DU_DG1_MARK, DU_DG0_MARK,
+> +	DU_DB7_MARK, DU_DB6_MARK, DU_DB5_MARK, DU_DB4_MARK,
+> +	DU_DB3_MARK, DU_DB2_MARK, DU_DB1_MARK, DU_DB0_MARK,
+> +};
+> +static const unsigned int du_dotclkout0_pins[] = {
+> +	/* CLKOUT */
+> +	RCAR_GP_PIN(1, 24),
+> +};
+> +static const unsigned int du_dotclkout0_mux[] = {
+> +	DU_DOTCLKOUT0_MARK
+> +};
+> +static const unsigned int du_sync_pins[] = {
+> +	/* HSYNC, VSYNC */
+> +	RCAR_GP_PIN(1, 25), RCAR_GP_PIN(1, 26),
+> +};
+> +static const unsigned int du_sync_mux[] = {
+> +	DU_HSYNC_MARK, DU_VSYNC_MARK
+> +};
+> +static const unsigned int du_disp_pins[] = {
+> +	/* DISP */
+> +	RCAR_GP_PIN(2, 1),
+> +};
+> +static const unsigned int du_disp_mux[] = {
+> +	DU_DISP_MARK,
+> +};
+> +static const unsigned int du_dotclkin1_pins[] = {
+> +	/* DOTCLKOUT0 */
+> +	RCAR_GP_PIN(1, 28),
+> +};
+> +static const unsigned int du_dotclkin1_mux[] = {
+> +	DU_DOTCLKIN1_MARK,
+> +};
+> +static const unsigned int du_disp_cde_pins[] = {
+> +	/* DISP/CDE */
+> +	RCAR_GP_PIN(1, 28),
+> +};
+> +static const unsigned int du_disp_cde_mux[] = {
+> +	DU_DISP_CDE_MARK,
+> +};
+> +static const unsigned int du_cde_pins[] = {
+> +	/* CDE */
+> +	RCAR_GP_PIN(1, 29),
+> +};
+> +static const unsigned int du_cde_mux[] = {
+> +	DU_CDE_MARK,
+> +};
+> +
+>  /* - I2C -------------------------------------------------------------------- */
+>  static const unsigned int i2c0_pins[] = {
+>  	/* SCL, SDA */
+> @@ -1568,6 +1649,14 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+>  	SH_PFC_PIN_GROUP(can_clk),
+>  	SH_PFC_PIN_GROUP(canfd0_data),
+>  	SH_PFC_PIN_GROUP(canfd1_data),
+> +	SH_PFC_PIN_GROUP(du_rgb666),
+> +	SH_PFC_PIN_GROUP(du_rgb888),
+> +	SH_PFC_PIN_GROUP(du_dotclkout0),
+> +	SH_PFC_PIN_GROUP(du_sync),
+> +	SH_PFC_PIN_GROUP(du_disp),
+> +	SH_PFC_PIN_GROUP(du_dotclkin1),
+> +	SH_PFC_PIN_GROUP(du_disp_cde),
+> +	SH_PFC_PIN_GROUP(du_cde),
+>  	SH_PFC_PIN_GROUP(i2c0),
+>  	SH_PFC_PIN_GROUP(i2c1),
+>  	SH_PFC_PIN_GROUP(i2c2_a),
+> @@ -1664,6 +1753,17 @@ static const char * const canfd1_groups[] = {
+>  	"canfd1_data",
+>  };
+>  
+> +static const char * const du_groups[] = {
+> +	"du_rgb666",
+> +	"du_rgb888",
+> +	"du_dotclk_out_0",
+> +	"du_sync",
+> +	"du_disp",
+> +	"du_dotclk_in_1",
+> +	"du_disp_cde",
+> +	"du_cde",
+> +};
+> +
+>  static const char * const i2c0_groups[] = {
+>  	"i2c0",
+>  };
+> @@ -1779,6 +1879,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
+>  	SH_PFC_FUNCTION(can_clk),
+>  	SH_PFC_FUNCTION(canfd0),
+>  	SH_PFC_FUNCTION(canfd1),
+> +	SH_PFC_FUNCTION(du),
+>  	SH_PFC_FUNCTION(i2c0),
+>  	SH_PFC_FUNCTION(i2c1),
+>  	SH_PFC_FUNCTION(i2c2),
+> 
