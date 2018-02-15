@@ -1,192 +1,183 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Feb 2018 22:03:03 +0100
-Subject: [PATCH v4 11/40] KVM: arm64: Improve debug register save/restore flow
+Date: Thu, 15 Feb 2018 22:03:05 +0100
+Subject: [PATCH v4 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
 In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
 References: <20180215210332.8648-1-christoffer.dall@linaro.org>
-Message-ID: <20180215210332.8648-12-christoffer.dall@linaro.org>
+Message-ID: <20180215210332.8648-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having multiple calls from the world switch path to the debug
-logic, each figuring out if the dirty bit is set and if we should
-save/restore the debug registers, let's just provide two hooks to the
-debug save/restore functionality, one for switching to the guest
-context, and one for switching to the host context, and we get the
-benefit of only having to evaluate the dirty flag once on each path,
-plus we give the compiler some more room to inline some of this
-functionality.
+So far this is mostly (see below) a copy of the legacy non-VHE switch
+function, but we will start reworking these functions in separate
+directions to work on VHE and non-VHE in the most optimal way in later
+patches.
+
+The only difference after this patch between the VHE and non-VHE run
+functions is that we omit the branch-predictor variant-2 hardening for
+QC Falkor CPUs, because this workaround is specific to a series of
+non-VHE ARMv8.0 CPUs.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
+    Changes since v3:
+     - Added BUG() to 32-bit ARM VHE run function
+     - Omitted QC Falkor BP Hardening functionality from VHE-specific
+       function
+    
+    Changes since v2:
+     - Reworded commit message
+    
     Changes since v1:
-     - Remove leading underscores from local variables
+     - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
+       __kvm_vcpu_run_nvhe
+     - Removed stray whitespace line
 
- arch/arm64/include/asm/kvm_hyp.h | 10 ++-----
- arch/arm64/kvm/hyp/debug-sr.c    | 56 +++++++++++++++++++++++++++-------------
- arch/arm64/kvm/hyp/switch.c      |  6 ++---
- 3 files changed, 42 insertions(+), 30 deletions(-)
+ arch/arm/include/asm/kvm_asm.h   |  5 ++-
+ arch/arm/kvm/hyp/switch.c        |  2 +-
+ arch/arm64/include/asm/kvm_asm.h |  4 ++-
+ arch/arm64/kvm/hyp/switch.c      | 66 +++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/arm.c               |  5 ++-
+ 5 files changed, 77 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index f26f9cd70c72..aeda2a777365 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -138,14 +138,8 @@ void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 36dd2962a42d..5a953ecb0d78 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -70,7 +70,10 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
  
--void __debug_save_state(struct kvm_vcpu *vcpu,
--			struct kvm_guest_debug_arch *dbg,
--			struct kvm_cpu_context *ctxt);
--void __debug_restore_state(struct kvm_vcpu *vcpu,
--			   struct kvm_guest_debug_arch *dbg,
--			   struct kvm_cpu_context *ctxt);
--void __debug_cond_save_host_state(struct kvm_vcpu *vcpu);
--void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
-+void __debug_switch_to_guest(struct kvm_vcpu *vcpu);
-+void __debug_switch_to_host(struct kvm_vcpu *vcpu);
+ extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
  
- void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
- void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 74f71fb5e36d..3e717f66f011 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -110,16 +110,13 @@ static void __hyp_text __debug_restore_spe_nvhe(u64 pmscr_el1)
- 	write_sysreg_s(pmscr_el1, SYS_PMSCR_EL1);
+-extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++/* no VHE on 32-bit :( */
++static inline int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu) { BUG(); return 0; }
++
++extern int __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu);
+ 
+ extern void __init_stage2_translation(void);
+ 
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index e86679daddff..aac025783ee8 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -154,7 +154,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
  }
  
--void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
--				   struct kvm_guest_debug_arch *dbg,
--				   struct kvm_cpu_context *ctxt)
-+static void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-+					  struct kvm_guest_debug_arch *dbg,
-+					  struct kvm_cpu_context *ctxt)
+-int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
++int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
  {
- 	u64 aa64dfr0;
- 	int brps, wrps;
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 6b626750b0a1..0be2747a6c5f 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -58,7 +58,9 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
  
--	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
--		return;
--
- 	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
- 	brps = (aa64dfr0 >> 12) & 0xf;
- 	wrps = (aa64dfr0 >> 20) & 0xf;
-@@ -132,16 +129,13 @@ void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
- 	ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
- }
+ extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
  
--void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
--				      struct kvm_guest_debug_arch *dbg,
--				      struct kvm_cpu_context *ctxt)
-+static void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-+					     struct kvm_guest_debug_arch *dbg,
-+					     struct kvm_cpu_context *ctxt)
- {
- 	u64 aa64dfr0;
- 	int brps, wrps;
- 
--	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
--		return;
--
- 	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
- 
- 	brps = (aa64dfr0 >> 12) & 0xf;
-@@ -155,10 +149,12 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
- 	write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
- }
- 
--void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
-+void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
- {
--	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
--			   kern_hyp_va(vcpu->arch.host_cpu_context));
-+	struct kvm_cpu_context *host_ctxt;
-+	struct kvm_cpu_context *guest_ctxt;
-+	struct kvm_guest_debug_arch *host_dbg;
-+	struct kvm_guest_debug_arch *guest_dbg;
- 
- 	/*
- 	 * Non-VHE: Disable and flush SPE data generation
-@@ -166,15 +162,39 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
- 	 */
- 	if (!has_vhe())
- 		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+-extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++extern int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu);
 +
-+	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+		return;
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	guest_ctxt = &vcpu->arch.ctxt;
-+	host_dbg = &vcpu->arch.host_debug_state.regs;
-+	guest_dbg = kern_hyp_va(vcpu->arch.debug_ptr);
-+
-+	__debug_save_state(vcpu, host_dbg, host_ctxt);
-+	__debug_restore_state(vcpu, guest_dbg, guest_ctxt);
- }
++extern int __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu);
  
--void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
-+void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
- {
-+	struct kvm_cpu_context *host_ctxt;
-+	struct kvm_cpu_context *guest_ctxt;
-+	struct kvm_guest_debug_arch *host_dbg;
-+	struct kvm_guest_debug_arch *guest_dbg;
-+
- 	if (!has_vhe())
- 		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
- 
--	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
--			      kern_hyp_va(vcpu->arch.host_cpu_context));
-+	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+		return;
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	guest_ctxt = &vcpu->arch.ctxt;
-+	host_dbg = &vcpu->arch.host_debug_state.regs;
-+	guest_dbg = kern_hyp_va(vcpu->arch.debug_ptr);
-+
-+	__debug_save_state(vcpu, guest_dbg, guest_ctxt);
-+	__debug_restore_state(vcpu, host_dbg, host_ctxt);
- 
- 	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
- }
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+ extern u64 __vgic_v3_read_vmcr(void);
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index fbab9752a9f4..0c80d6a577ca 100644
+index d2c0b1ae3216..b6126af539b6 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -305,7 +305,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
- 	__sysreg_save_host_state(host_ctxt);
--	__debug_cond_save_host_state(vcpu);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu);
-@@ -319,7 +318,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	__sysreg32_restore_state(vcpu);
- 	__sysreg_restore_guest_state(guest_ctxt);
--	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-+	__debug_switch_to_guest(vcpu);
- 
- 	/* Jump in the fire! */
- again:
-@@ -414,12 +413,11 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
- 	}
- 
--	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
- 	 * system may enable SPE here and make use of the TTBRs.
- 	 */
--	__debug_cond_restore_host_state(vcpu);
-+	__debug_switch_to_host(vcpu);
- 
- 	return exit_code;
+@@ -362,7 +362,71 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 	return false;
  }
+ 
+-int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
++/* Switch to the guest for VHE systems running in EL2 */
++int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *host_ctxt;
++	struct kvm_cpu_context *guest_ctxt;
++	bool fp_enabled;
++	u64 exit_code;
++
++	vcpu = kern_hyp_va(vcpu);
++
++	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++	host_ctxt->__hyp_running_vcpu = vcpu;
++	guest_ctxt = &vcpu->arch.ctxt;
++
++	__sysreg_save_host_state(host_ctxt);
++
++	__activate_traps(vcpu);
++	__activate_vm(vcpu);
++
++	__vgic_restore_state(vcpu);
++	__timer_enable_traps(vcpu);
++
++	/*
++	 * We must restore the 32-bit state before the sysregs, thanks
++	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
++	 */
++	__sysreg32_restore_state(vcpu);
++	__sysreg_restore_guest_state(guest_ctxt);
++	__debug_switch_to_guest(vcpu);
++
++	do {
++		/* Jump in the fire! */
++		exit_code = __guest_enter(vcpu, host_ctxt);
++
++		/* And we're baaack! */
++	} while (fixup_guest_exit(vcpu, &exit_code));
++
++	fp_enabled = __fpsimd_enabled();
++
++	__sysreg_save_guest_state(guest_ctxt);
++	__sysreg32_save_state(vcpu);
++	__timer_disable_traps(vcpu);
++	__vgic_save_state(vcpu);
++
++	__deactivate_traps(vcpu);
++	__deactivate_vm(vcpu);
++
++	__sysreg_restore_host_state(host_ctxt);
++
++	if (fp_enabled) {
++		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
++		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
++	}
++
++	/*
++	 * This must come after restoring the host sysregs, since a non-VHE
++	 * system may enable SPE here and make use of the TTBRs.
++	 */
++	__debug_switch_to_host(vcpu);
++
++	return exit_code;
++}
++
++/* Switch to the guest for legacy non-VHE systems */
++int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 2062d9357971..5bd879c78951 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -736,7 +736,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (has_vhe())
+ 			kvm_arm_vhe_guest_enter();
+ 
+-		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
++		if (has_vhe())
++			ret = kvm_vcpu_run_vhe(vcpu);
++		else
++			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
+ 
+ 		if (has_vhe())
+ 			kvm_arm_vhe_guest_exit();
 -- 
 2.14.2
