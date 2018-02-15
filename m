@@ -1,42 +1,31 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 15 Feb 2018 16:48:55 +0800
-Subject: [PATCH 0/5] hwrng: stm32 - Improvement for stm32-rng
-In-Reply-To: <20180129170521.1862-1-lionel.debieve@st.com>
-References: <20180129170521.1862-1-lionel.debieve@st.com>
-Message-ID: <20180215084855.GB5577@gondor.apana.org.au>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 15 Feb 2018 11:51:58 +0300
+Subject: [PATCH v2 2/2] arm64: dts: renesas: eagle: specify EtherAVB PHY
+ IRQ
+In-Reply-To: <CAMuHMdX3XZSwvAT74fVhWw9GoxVmpdXoqR03=u0QC3FEB==X=w@mail.gmail.com>
+References: <038a791d-aa57-9c3d-eaea-09c5704ecb54@cogentembedded.com>
+ <0ccd631e-691a-2b15-7680-6e0c847a6ca2@cogentembedded.com>
+ <CAMuHMdX3XZSwvAT74fVhWw9GoxVmpdXoqR03=u0QC3FEB==X=w@mail.gmail.com>
+Message-ID: <9003179f-379d-0576-37bf-1b08700ebd41@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 06:05:16PM +0100, Lionel Debieve wrote:
-> This set of patches add extended functionalities for stm32 rng
-> driver.
-> Patch #1 includes a reset during probe to avoid any error status
-> which can occur during bootup process and keep safe rng integrity.
-> 
-> Patch #3 adds a new property to manage the clock error detection
-> feature which can be disabled on specific target.
-> 
-> Patch #5 rework the timeout calculation for read value that was
-> previously defined based on loop operation and is now based on
-> timer.
-> 
-> Lionel Debieve (5):
->   hwrng: stm32 - add reset during probe
->   dt-bindings: rng: add reset node for stm32
->   hwrng: stm32 - allow disable clock error detection
->   dt-bindings: rng: add clock detection error for stm32
->   hwrng: stm32 - rework read timeout calculation
-> 
->  .../devicetree/bindings/rng/st,stm32-rng.txt       |  4 ++
->  drivers/char/hw_random/stm32-rng.c                 | 44 ++++++++++++++--------
->  2 files changed, 32 insertions(+), 16 deletions(-)
+Hello!
 
-I never received patch 5.
+On 2/14/2018 1:02 PM, Geert Uytterhoeven wrote:
 
-Which trees are patch 2 and 4 meant to go through?
+>> Specify  EtherAVB PHY IRQ  in the Eagle board's device tree, now that we
+>> have the GPIO support (previously phylib had to resort to polling).
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> You've dropped my:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+    Sorry, I was too hasty to resubmit. :-/
+
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+
+MBR, Sergei
