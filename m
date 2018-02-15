@@ -1,61 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 15 Feb 2018 16:04:55 +0200
-Subject: [PATCH 3/8] dt-bindings: display: renesas,
- lvds: Add LVDS binding for D3
-In-Reply-To: <ad5ea103-b039-7a2e-01c8-2cb16324115d@ideasonboard.com>
-References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
- <1518683903-10681-4-git-send-email-kbingham@kernel.org>
- <ad5ea103-b039-7a2e-01c8-2cb16324115d@ideasonboard.com>
-Message-ID: <3242490.rUUU4MHlpR@avalon>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Thu, 15 Feb 2018 15:04:48 +0100
+Subject: [PATCH] ARM: sun7i: dt: Add Mali node
+In-Reply-To: <20180215135840.vt4ujoecvirpidbr@flea.lan>
+References: <1518702362-115625-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180215135840.vt4ujoecvirpidbr@flea.lan>
+Message-ID: <1dd9f126-b209-a6f6-2159-6727744a6c6e@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+Il 15/02/2018 14:58, Maxime Ripard ha scritto:
+> On Thu, Feb 15, 2018 at 02:46:02PM +0100, Giulio Benetti wrote:
+>> The A20 has an ARM Mali 400 GPU, so add binding to our DT.
+>>
+>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> 
+> The prefix should have been ARM: dts: sun7i. Fixed and applied, thanks!
+> Maxime
+> 
 
-On Thursday, 15 February 2018 10:45:33 EET Kieran Bingham wrote:
-> On 15/02/18 08:38, Kieran Bingham wrote:
-> > From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> > 
-> > The D3 supports two LVDS channels. Extend the binding to support them.
-> > 
-> > Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> > b/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt index
-> > 79860f58a7ad..0dcf488b70df 100644
-> > --- a/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> > +++ b/Documentation/devicetree/bindings/display/bridge/renesas,lvds.txt
-> > 
-> > @@ -14,6 +14,7 @@ Required properties:
-> >  - compatible : Shall contain one of
-> >    - "renesas,lvds-r8a7795" for R8A7795 (R-Car H3) compatible LVDS
-> >    encoders
-> >    - "renesas,lvds-r8a7796" for R8A7796 (R-Car M3-W) compatible LVDS
-> >    encoders
-> > +  - "renesas,lvds-r8a77995" for R8A77995 (R-Car D3) compatible LVDS
-> > encoders
-> 
-> Hi Laurent,
-> 
-> Are we unable to have a generic lvds-gen3 here?
-> 
-> (Although to perhaps answer my own question I see that the D3/E3 have extra
-> registers)
-> 
-> Also "lets pretend" that I intentionally separated out the LVDS updates to
-> the rcar_lvds_of_table :)
-
-We could for H3 and M3-W, but as you've noticed D3/E3 differ, and so does V3M.
-
-> >  - reg: Base address and length for the memory-mapped registers
-> >  - clocks: A phandle + clock-specifier pair for the functional clock
+Oh, right.
+Thank you!
 
 -- 
-Regards,
+Giulio Benetti
+R&D Manager &
+Advanced Research
 
-Laurent Pinchart
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
