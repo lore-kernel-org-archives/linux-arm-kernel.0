@@ -1,163 +1,122 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Feb 2018 22:03:09 +0100
-Subject: [PATCH v4 17/40] KVM: arm64: Move userspace system registers into
- separate function
+Date: Thu, 15 Feb 2018 22:03:17 +0100
+Subject: [PATCH v4 25/40] KVM: arm64: Introduce framework for accessing
+ deferred sysregs
 In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
 References: <20180215210332.8648-1-christoffer.dall@linaro.org>
-Message-ID: <20180215210332.8648-18-christoffer.dall@linaro.org>
+Message-ID: <20180215210332.8648-26-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a semantic difference between the EL1 registers that control
-operation of a kernel running in EL1 and EL1 registers that only control
-userspace execution in EL0.  Since we can defer saving/restoring the
-latter, move them into their own function.
+We are about to defer saving and restoring some groups of system
+registers to vcpu_put and vcpu_load on supported systems.  This means
+that we need some infrastructure to access system registes which
+supports either accessing the memory backing of the register or directly
+accessing the system registers, depending on the state of the system
+when we access the register.
 
-ACTLR_EL1 is not used by a VHE host, so we can move this register into
-the EL1 state which is not saved/restored for a VHE host.
+We do this by defining read/write accessor functions, which can handle
+both "immediate" and "deferrable" system registers.  Immediate registers
+are always saved/restored in the world-switch path, but deferrable
+registers are only saved/restored in vcpu_put/vcpu_load when supported
+and sysregs_loaded_on_cpu will be set in that case.
 
-We also take this chance to rename the function saving/restoring the
-remaining system register to make it clear this function deals with
-the EL1 system registers.
+Note that we don't use the deferred mechanism yet in this patch, but only
+introduce infrastructure.  This is to improve convenience of review in
+the subsequent patches where it is clear which registers become
+deferred.
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
     Changes since v3:
-     - Correct the comment about ACTLR_EL1 and adjust commit text.
+     - Changed to a switch-statement based approach to improve
+       readability.
     
     Changes since v2:
-     - Save restore ACTLR_EL1 as part of the EL1 registers state instead of
-       the user register state, as ACTLR_EL1 can't affect the host's execution
-       on VHE systems.
-    
-    Changes since v1:
-     - Added comment about sp_el0 to common save sysreg save/restore functions
+     - New patch (deferred register handling has been reworked)
 
- arch/arm64/kvm/hyp/sysreg-sr.c | 48 ++++++++++++++++++++++++++++++------------
- 1 file changed, 35 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  8 ++++++--
+ arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 99fc60516103..d5a5145b4e7c 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -28,24 +28,33 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-- * VHE: Host must save tpidr*_el0, actlr_el1, mdscr_el1, sp_el0,
-+ * VHE: Host must save tpidr*_el0, mdscr_el1, sp_el0,
-  * and guest must save everything.
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 68398bf7882f..b463b5e28959 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
+ 
+ 	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
+ 	u64 vsesr_el2;
++
++	/* True when deferrable sysregs are loaded on the physical CPU,
++	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
++	bool sysregs_loaded_on_cpu;
+ };
+ 
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+@@ -296,8 +300,8 @@ struct kvm_vcpu_arch {
   */
+ #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
  
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
- {
--	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
--	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
--	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
- 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+-#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
+-#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
++u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
++void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
+ 
+ /*
+  * CP14 and CP15 live in the same array, as they are backed by the
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index a05d2c01c786..b3c3f014aa61 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -35,6 +35,7 @@
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
++#include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/perf_event.h>
+ #include <asm/sysreg.h>
+@@ -76,6 +77,38 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
++u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
++{
++	if (!vcpu->arch.sysregs_loaded_on_cpu)
++		goto immediate_read;
 +
 +	/*
-+	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-+	 * therefore be saved/restored on every entry/exit to/from the guest.
++	 * All system registers listed in the switch are not saved on every
++	 * exit from the guest but are only saved on vcpu_put.
 +	 */
- 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
- }
- 
--static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-+static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
-+{
-+	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-+	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
++	switch (reg) {
++	}
++
++immediate_read:
++	return __vcpu_sys_reg(vcpu, reg);
 +}
 +
-+static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- {
- 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
- 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
- 	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-+	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
- 	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
- 	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
- 	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-@@ -73,35 +82,46 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- }
- 
- static hyp_alternate_select(__sysreg_call_save_host_state,
--			    __sysreg_save_state, __sysreg_do_nothing,
-+			    __sysreg_save_el1_state, __sysreg_do_nothing,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
- 
- void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_call_save_host_state()(ctxt);
- 	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
- }
- 
- void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_save_state(ctxt);
-+	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
- }
- 
- static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
- {
--	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
--	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
- 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
++void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
++{
++	if (!vcpu->arch.sysregs_loaded_on_cpu)
++		goto immediate_write;
 +
 +	/*
-+	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-+	 * therefore be saved/restored on every entry/exit to/from the guest.
++	 * All system registers listed in the switch are not restored on every
++	 * entry to the guest but are only restored on vcpu_load.
 +	 */
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
- }
- 
--static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-+static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
-+{
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
-+	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
++	switch (reg) {
++	}
++
++immediate_write:
++	 __vcpu_sys_reg(vcpu, reg) = val;
 +}
 +
-+static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- {
- 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
- 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
- 	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
-+	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
- 	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
- 	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
- 	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
-@@ -129,19 +149,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- }
+ /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+ static u32 cache_levels;
  
- static hyp_alternate_select(__sysreg_call_restore_host_state,
--			    __sysreg_restore_state, __sysreg_do_nothing,
-+			    __sysreg_restore_el1_state, __sysreg_do_nothing,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
- 
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_call_restore_host_state()(ctxt);
- 	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
- }
- 
- void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_restore_state(ctxt);
-+	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
- }
- 
- void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
 -- 
 2.14.2
