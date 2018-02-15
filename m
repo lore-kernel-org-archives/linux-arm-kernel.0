@@ -1,44 +1,126 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 15 Feb 2018 12:58:51 +1030
-Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <CACPK8XdXOaPZ5i=qKns3=V87nhfY62PNr4kwH9xwVYxY0djo0g@mail.gmail.com>
-References: <20180205235757.246758-1-brendanhiggins@google.com>
- <20180205235757.246758-3-brendanhiggins@google.com>
- <CACPK8XdXOaPZ5i=qKns3=V87nhfY62PNr4kwH9xwVYxY0djo0g@mail.gmail.com>
-Message-ID: <CACPK8XeOUrrGinU_fmnmn4atYm3Bs-xSoB2MqT0Yr-LytHt78Q@mail.gmail.com>
+Date: Thu, 15 Feb 2018 13:09:35 +1030
+Subject: [PATCH v10 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <20180213200959.160157-3-brendanhiggins@google.com>
+References: <20180213200959.160157-1-brendanhiggins@google.com>
+ <20180213200959.160157-3-brendanhiggins@google.com>
+Message-ID: <CACPK8XeU=6SooAka-eQTp1938CmMTDgA-dOP8Wur=+EzQ6Lpfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 4:52 PM, Joel Stanley <joel@jms.id.au> wrote:
-> Hi Brendan,
+On Wed, Feb 14, 2018 at 6:39 AM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+
+> +       ahb {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&gic>;
+> +               ranges;
+> +
+> +               clk: clock-controller at f0801000 {
+> +                       compatible = "nuvoton,npcm750-clk";
+> +                       #clock-cells = <1>;
+> +                       reg = <0xf0801000 0x1000>;
+> +                       status = "okay";
+
+Nit: The ok is redundant.
+
+> +               };
+> +
+> +               apb {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       compatible = "simple-bus";
+> +                       interrupt-parent = <&gic>;
+> +                       ranges = <0x0 0xf0000000 0x00300000>;
+> +
+> +                       timer0: timer at 8000 {
+> +                               compatible = "nuvoton,npcm750-timer";
+> +                               interrupts = <0 32 4>;
+> +                               reg = <0x8000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_TIMER>;
+> +                       };
+> +
+> +                       serial0: serial at 1000 {
+> +                               compatible = "nuvoton,npcm750-uart";
+> +                               reg = <0x1000 0x1000>;
+> +                               clocks = <&clk NPCM7XX_CLK_UART_CORE>;
+
+I really would like to see this merged, but lets get the last of these
+things sorted out first.
+
+The clocks.h that I have in the openbmc tree uses NPCM7XX_CLK_UART. Is
+what you have here line up with the latest version of the clk driver
+that Tomer posted?
+
+ https://patchwork.kernel.org/patch/10200029/
+
+His driver calls for a header called dt-bindings/clock/nuvoton,npcm7xx-clock.h.
+
+An alternative would be to defer this by using the numbers instead of
+#defines here, and omitting the header until the clock patch is
+reviewed and merged. I had a similar chicken-egg problem with the
+aspeed clk driver.
+
+> +                               interrupts = <0 2 4>;
+
+The irq header provides defines for the first and third cell. These
+could instead be:
+
+interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+
+> +                               status = "disabled";
+
+Add reg-shift = <2> to all of the uart nodes. This is required now
+that we're using the generic 8250 driver.
+
+> +                       };
+> +
+
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+> @@ -0,0 +1,35 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018 Nuvoton Technology corporation.
+> +// Copyright 2018 Google, Inc.
+> +
+> +#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
+> +#define _DT_BINDINGS_CLK_NPCM7XX_H
+> +
+> +#define NPCM7XX_CLK_PLL0       0
+> +#define NPCM7XX_CLK_PLL1       1
+> +#define NPCM7XX_CLK_PLL2       2
+> +#define NPCM7XX_CLK_GFX                3
+> +#define NPCM7XX_CLK_APB1       4
+> +#define NPCM7XX_CLK_APB2       5
+> +#define NPCM7XX_CLK_APB3       6
+> +#define NPCM7XX_CLK_APB4       7
+> +#define NPCM7XX_CLK_APB5       8
+> +#define NPCM7XX_CLK_MC         9
+> +#define NPCM7XX_CLK_CPU                10
+> +#define NPCM7XX_CLK_SPI0       11
+> +#define NPCM7XX_CLK_SPI3       12
+> +#define NPCM7XX_CLK_SPIX       13
+> +#define NPCM7XX_CLK_UART_CORE  14
+> +#define NPCM7XX_CLK_TIMER      15
+> +#define NPCM7XX_CLK_HOST_UART  16
+> +#define NPCM7XX_CLK_MMC                17
+> +#define NPCM7XX_CLK_SDHC       18
+> +#define NPCM7XX_CLK_ADC                19
+> +#define NPCM7XX_CLK_GFX_MEM    20
+> +#define NPCM7XX_CLK_USB_BRIDGE 21
+> +#define NPCM7XX_CLK_AXI                22
+> +#define NPCM7XX_CLK_AHB                23
+> +#define NPCM7XX_CLK_EMC                24
+> +#define NPCM7XX_CLK_GMAC       25
+> +
+> +#endif
+> --
+> 2.16.0.rc1.238.g530d649a79-goog
 >
-> On Tue, Feb 6, 2018 at 10:27 AM, Brendan Higgins
-> <brendanhiggins@google.com> wrote:
->> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
->> specific device tree for the NPCM750 (Poleg) evaluation board.
->>
->> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
->> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
->> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
->> Reviewed-by: Joel Stanley <joel@jms.id.au>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
->> Tested-by: Avi Fishman <avifishman70@gmail.com>
 >
-> This looks well acked, reviewed and tested. How do you plan to have
-> the ARM SoC maintainers merge your patches?
-
-Following up on an IRC conversation with Brendan:
-
-The process is normally to create a git branch based on on -rc1, apply
-your patches, and send them to the ARM maintainers. You then push a
-signed tag to a repository somewhere, send a pull request (a git
-request-pull email, not a Github PR) and Arnd, Olof or one of the
-other maintainers will pull your tree some time before the next merge
-window opens.
-
-Arnd, do we have this documented somewhere for new maintainers to follow?
-
-Cheers,
-
-Joel
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
