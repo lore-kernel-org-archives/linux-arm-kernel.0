@@ -1,20 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 18:05:02 +0100
-Subject: [PATCH V2] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
-In-Reply-To: <20180215170356.r63dmgt5umfirqlu@verge.net.au>
-References: <20180215100208.24646-1-marek.vasut+renesas@gmail.com>
- <20180215170356.r63dmgt5umfirqlu@verge.net.au>
-Message-ID: <20180215170501.iwkf7ac2iub3wqmm@verge.net.au>
+From: acme@kernel.org ('Arnaldo Carvalho de Melo')
+Date: Thu, 15 Feb 2018 14:08:42 -0300
+Subject: [PATCH 2/2] perf inject: Emit instruction records on ETM trace
+ discontinuity
+In-Reply-To: <001901d3a670$da940cc0$8fbc2640$@arm.com>
+References: <1518011845-24063-1-git-send-email-robert.walker@arm.com>
+ <1518011845-24063-3-git-send-email-robert.walker@arm.com>
+ <20180213222233.GA23553@xps15> <20180215145714.GE30974@kernel.org>
+ <001901d3a670$da940cc0$8fbc2640$@arm.com>
+Message-ID: <20180215170842.GJ30974@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 06:03:56PM +0100, Simon Horman wrote:
-> On Thu, Feb 15, 2018 at 11:02:08AM +0100, Marek Vasut wrote:
-> > Regulator setup is suboptimal on H2 Stout too. The Stout newly has
-> > two DA9210 regulators, so the quirk is extended to handle another
-> > DA9210 at i2c address 0x70.
-> 
-> It looks like this patch has received some review that needs addressing.
-> I have marked it as "Changes Requested".
+Em Thu, Feb 15, 2018 at 03:22:52PM -0000, Robert Walker escreveu:
+> > From: Arnaldo Carvalho de Melo [mailto:acme at kernel.org]
+> > 	Can you please address Mathieu's comments, and if you agree with
+> > them, resubmit?
 
-... and now I see v3 in my inbox, thanks.
+> Hi Arnaldo,
+ 
+> I've addressed Mathieu's comments and resubmitted them yesterday
+> (https://lkml.org/lkml/2018/2/14/185).
+
+Thanks, I'm processing them now,
+
+- Arnaldo
