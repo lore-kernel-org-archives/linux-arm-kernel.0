@@ -1,61 +1,100 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Feb 2018 17:33:48 +0530
-Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
- with rk3399 SoCs
-In-Reply-To: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
-References: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <56548710-6b9a-85bc-85de-221ae748d83c@ti.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Fri, 16 Feb 2018 13:09:52 +0100
+Subject: [PATCH v3 2/6] dt-bindings: phy-rockchip-typec: deprecate some
+ register properties.
+In-Reply-To: <20180216120956.19034-1-enric.balletbo@collabora.com>
+References: <20180216120956.19034-1-enric.balletbo@collabora.com>
+Message-ID: <20180216120956.19034-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As now the following register properties are in the driver, document as
+deprecated these properties and recommend to not use them on new bindings.
 
+The deprecated properties are:
 
-On Thursday 11 January 2018 08:10 AM, Caesar Wang wrote:
-> Hi Kishon,
-> 
-> Since the Shawn isn't available, I take over this series patches for now.
-> 
-> As the original bug had tracked on https://issuetracker.google.com/71561742.
-> In some cases, the mmc phy power on failed during booting up.
-> The log as below:
-> ...
-> [   2.375333] rockchip_emmc_phy_power: caldone timeout.
-> [    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
-> ...
-> [    2.489295] mmc0: mmc_select_hs400es failed, error -110
-> [    2.489302] mmc0: error -110 whilst initialising MMC card
-> ..
-> 
-> The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
-> We need give the enough margin for it.
-> 
-> Verified on url =
->         https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
-> This series patches can apply and bring up with kernel-next on rk3399 chromebook.
+- rockchip,typec-conn-dir : the register of type-c connector direction
+- rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2
+                           enable control.
+- rockchip,external-psm : the register of type-c phy external psm clock
+                          selection.
+- rockchip,pipe-status : the register of type-c phy pipe status.
 
-merged now, thanks!
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+Changes since v2:
+- Apply the nit suggested by Heiko Stuebner.
+Changes since v1:
+- This patch is new on these series and is just a documentation update
+  due patch [1/6]
 
--Kishon
-> 
-> -Caesar
-> 
-> 
-> Changes in v3:
-> - As Doug commented on both upstream and gerrit.
->   Change "5, 50" to "0, 50", and the message of print.
-> - As Doug commented on https://patchwork.kernel.org/patch/10154797,
->   Change "1, 50" to "0, 50".
-> 
-> Changes in v2:
-> - print the return valut with regmap_read_poll_timeout failing.
-> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
->   changed the note and added to print error value with
->   regmap_read_poll_timeout API.
-> 
-> Shawn Lin (2):
->   phy: rockchip-emmc: retry calpad busy trimming
->   phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
-> 
->  drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
->  1 file changed, 28 insertions(+), 32 deletions(-)
-> 
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt | 33 +++++-----------------
+ 1 file changed, 7 insertions(+), 26 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+index 6ea867e3176f..f95cd492d6fc 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -16,24 +16,6 @@ Required properties:
+ 		 "uphy", "uphy-pipe", "uphy-tcphy"
+  - extcon : extcon specifier for the Power Delivery
+ 
+-Note, there are 2 type-c phys for RK3399, and they are almost identical, except
+-these registers(description below), every register node contains 3 sections:
+-offset, enable bit, write mask bit.
+- - rockchip,typec-conn-dir : the register of type-c connector direction,
+-   for type-c phy0, it must be <0xe580 0 16>;
+-   for type-c phy1, it must be <0xe58c 0 16>;
+- - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
+-   control.
+-   for type-c phy0, it must be <0xe580 3 19>;
+-   for type-c phy1, it must be <0xe58c 3 19>;
+- - rockchip,external-psm : the register of type-c phy external psm clock
+-   selection.
+-   for type-c phy0, it must be <0xe588 14 30>;
+-   for type-c phy1, it must be <0xe594 14 30>;
+- - rockchip,pipe-status : the register of type-c phy pipe status.
+-   for type-c phy0, it must be <0xe5c0 0 0>;
+-   for type-c phy1, it must be <0xe5c0 16 16>;
+-
+ Required nodes : a sub-node is required for each port the phy provides.
+ 		 The sub-node name is used to identify dp or usb3 port,
+ 		 and shall be the following entries:
+@@ -43,6 +25,13 @@ Required nodes : a sub-node is required for each port the phy provides.
+ Required properties (port (child) node):
+ - #phy-cells : must be 0, See ./phy-bindings.txt for details.
+ 
++Deprecated properties, do not use in new device tree sources, these
++properties are determined by the compatible value:
++ - rockchip,typec-conn-dir
++ - rockchip,usb3tousb2-en
++ - rockchip,external-psm
++ - rockchip,pipe-status
++
+ Example:
+ 	tcphy0: phy at ff7c0000 {
+ 		compatible = "rockchip,rk3399-typec-phy";
+@@ -58,10 +47,6 @@ Example:
+ 			 <&cru SRST_UPHY0_PIPE_L00>,
+ 			 <&cru SRST_P_UPHY0_TCPHY>;
+ 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+-		rockchip,typec-conn-dir = <0xe580 0 16>;
+-		rockchip,usb3tousb2-en = <0xe580 3 19>;
+-		rockchip,external-psm = <0xe588 14 30>;
+-		rockchip,pipe-status = <0xe5c0 0 0>;
+ 
+ 		tcphy0_dp: dp-port {
+ 			#phy-cells = <0>;
+@@ -86,10 +71,6 @@ Example:
+ 			 <&cru SRST_UPHY1_PIPE_L00>,
+ 			 <&cru SRST_P_UPHY1_TCPHY>;
+ 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+-		rockchip,typec-conn-dir = <0xe58c 0 16>;
+-		rockchip,usb3tousb2-en = <0xe58c 3 19>;
+-		rockchip,external-psm = <0xe594 14 30>;
+-		rockchip,pipe-status = <0xe5c0 16 16>;
+ 
+ 		tcphy1_dp: dp-port {
+ 			#phy-cells = <0>;
+-- 
+2.15.1
