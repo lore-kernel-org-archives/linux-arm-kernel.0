@@ -1,21 +1,31 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 16 Feb 2018 11:27:45 -0800
-Subject: [PATCH v4 2/4] dt-bindings: qcom: Add SDM845 bindings
-In-Reply-To: <20180216060503.22006-3-rnayak@codeaurora.org>
-References: <20180216060503.22006-1-rnayak@codeaurora.org>
- <20180216060503.22006-3-rnayak@codeaurora.org>
-Message-ID: <CAD=FV=X++6aBiV9Wag8nP9R5wJymPj5SVVgESUemKBoM==Ovrw@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 16 Feb 2018 21:18:18 +0100
+Subject: [PATCH] drm/sun4i: fix HSYNC and VSYNC polarity
+In-Reply-To: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180216201818.j5gunpkkebq35b4n@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 15, 2018 at 06:54:48PM +0100, Giulio Benetti wrote:
+> Differently from other Lcd signals, HSYNC and VSYNC signals
+> result inverted if their bits are cleared to 0.
+> 
+> Invert their settings of IO_POL register.
+> 
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 
-On Thu, Feb 15, 2018 at 10:05 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
-> Add a SoC string 'sdm845' for the qualcomm SDM845 SoC
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/arm/qcom.txt | 1 +
->  1 file changed, 1 insertion(+)
+Applied, thanks!
+Maxime
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180216/9c18b0cc/attachment.sig>
