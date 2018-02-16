@@ -1,205 +1,55 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Fri, 16 Feb 2018 15:28:08 +1030
-Subject: [PATCH 6/6] ARM: dts: aspeed: Add Palmetto GPIO hogs
-In-Reply-To: <20180212074325.23436-7-joel@jms.id.au>
-References: <20180212074325.23436-1-joel@jms.id.au>
- <20180212074325.23436-7-joel@jms.id.au>
-Message-ID: <1518757088.10440.27.camel@aj.id.au>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 16 Feb 2018 10:31:03 +0530
+Subject: [PATCH v5 03/12] drm/bridge/synopsys: dw-hdmi: Enable workaround
+ for v1.32a
+In-Reply-To: <20180214200906.31509-4-jernej.skrabec@siol.net>
+References: <20180214200906.31509-1-jernej.skrabec@siol.net>
+ <20180214200906.31509-4-jernej.skrabec@siol.net>
+Message-ID: <859c9f7b-8be9-d53b-e8d5-aa04e6b5ca7b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-02-12 at 18:13 +1030, Joel Stanley wrote:
-> These hogs are for parts of the system that need to be in this state,
-> but do not yet have a driver associated with them but they must be
-> configured in order to successfully boot the host.
-> 
-> There are also some pinmux hogs, where the default mode of the IP block
-> is configured.
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Acked-by: Andrew Jeffery <andrew@aj.id.au>
 
+On Thursday 15 February 2018 01:38 AM, Jernej Skrabec wrote:
+> Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
+> magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
+> 
+> Tests show that one iteration is enough.
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
+
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 157 ++++++++++++++++++++++++++
->  1 file changed, 157 insertions(+)
+>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
+>   1 file changed, 5 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index 2a4a355a779d..bbddfe1d1cc8 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -74,6 +74,14 @@
->  	};
->  };
->  
-> +&pinctrl {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_flbusy_default &pinctrl_flwp_default
-> +
-> +			&pinctrl_vgahs_default &pinctrl_vgavs_default
-> +			&pinctrl_ddcclk_default &pinctrl_ddcdat_default>;
-> +};
-> +
->  &uart5 {
->  	status = "okay";
->  };
-> @@ -142,3 +150,152 @@
->  &ibt {
->  	status = "okay";
->  };
-> +
-> +&gpio {
-> +	pin_func_mode0 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(C, 4) GPIO_ACTIVE_HIGH>;
-> +		output-low;
-> +		line-name = "func_mode0";
-> +	};
-> +
-> +	pin_func_mode1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(C, 5)  GPIO_ACTIVE_HIGH>;
-> +		output-low;
-> +		line-name = "func_mode1";
-> +	};
-> +
-> +	pin_func_mode2 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(C, 6) GPIO_ACTIVE_HIGH>;
-> +		output-low;
-> +		line-name = "func_mode2";
-> +	};
-> +
-> +	pin_gpio_a0 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(A, 0) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "BMC_FAN_RESERVED_N";
-> +	};
-> +
-> +	pin_gpio_a1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(A, 1) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "APSS_WDT_N";
-> +	};
-> +
-> +	pin_gpio_b1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(B, 1) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "APSS_BOOT_MODE";
-> +	};
-> +
-> +	pin_gpio_b2 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(B, 2) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "APSS_RESET_N";
-> +	};
-> +
-> +	pin_gpio_b7 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(B, 7) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "SPIVID_STBY_RESET_N";
-> +	};
-> +
-> +	pin_gpio_d1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(D, 1) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "BMC_POWER_UP";
-> +	};
-> +
-> +	pin_gpio_f1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(F, 1) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "BMC_BATTERY_TEST";
-> +	};
-> +
-> +	pin_gpio_f4 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(F, 4) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "AST_HW_FAULT_N";
-> +	};
-> +
-> +	pin_gpio_f5 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(F, 5) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "AST_SYS_FAULT_N";
-> +	};
-> +
-> +	pin_gpio_f7 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(F, 7) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "BMC_FULL_SPEED_N";
-> +	};
-> +
-> +	pin_gpio_g3 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(G, 3) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "BMC_FAN_ERROR_N";
-> +	};
-> +
-> +	pin_gpio_g4 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(G, 4) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "BMC_WDT_RST1_P";
-> +	};
-> +
-> +	pin_gpio_g5 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(G, 5) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "BMC_WDT_RST2_P";
-> +	};
-> +
-> +	pin_gpio_h0 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(H, 0) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "PE_SLOT_TEST_EN_N";
-> +	};
-> +
-> +	pin_gpio_h1 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(H, 1) GPIO_ACTIVE_HIGH>;
-> +		input;
-> +		line-name = "BMC_RTCRST_N";
-> +	};
-> +
-> +	pin_gpio_h2 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(H, 2) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "SYS_PWROK_BMC";
-> +	};
-> +
-> +	pin_gpio_h6 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "SCM1_FSI0_DATA_EN";
-> +	};
-> +
-> +	pin_gpio_h7 {
-> +		gpio-hog;
-> +		gpios = <ASPEED_GPIO(H, 7) GPIO_ACTIVE_HIGH>;
-> +		output-high;
-> +		line-name = "BMC_TPM_INT_N";
-> +	};
-> +};
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180216/31d61e47/attachment.sig>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index a38db40ce990..7ca14d7325b5 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+>   	 * then write one of the FC registers several times.
+>   	 *
+>   	 * The number of iterations matters and depends on the HDMI TX revision
+> -	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
+> -	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
+> -	 * 4 and 1 iterations respectively.
+> +	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
+> +	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
+> +	 * as needing the workaround, with 4 iterations for v1.30a and 1
+> +	 * iteration for others.
+>   	 */
+>   
+>   	switch (hdmi->version) {
+> @@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+>   		count = 4;
+>   		break;
+>   	case 0x131a:
+> +	case 0x132a:
+>   		count = 1;
+>   		break;
+>   	default:
+> 
