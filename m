@@ -1,205 +1,257 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Fri, 16 Feb 2018 00:02:42 +0000 (UTC)
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214150739.GH2992@arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215142239.GF16623@arm.com>
- <20180215164754.GW25201@hirez.programming.kicks-ass.net>
- <20180215182154.GD15274@arm.com>
- <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
-Message-ID: <206116170.22740.1518739362681.JavaMail.zimbra@efficios.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Thu, 15 Feb 2018 18:40:09 -0800
+Subject: [PATCH v11 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20180216024011.189157-1-brendanhiggins@google.com>
+References: <20180216024011.189157-1-brendanhiggins@google.com>
+Message-ID: <20180216024011.189157-2-brendanhiggins@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Feb 15, 2018, at 5:08 PM, Mathieu Desnoyers mathieu.desnoyers at efficios.com wrote:
+Adds basic support for the Nuvoton NPCM750 BMC.
 
-> ----- On Feb 15, 2018, at 1:21 PM, Will Deacon will.deacon at arm.com wrote:
-> 
->> On Thu, Feb 15, 2018 at 05:47:54PM +0100, Peter Zijlstra wrote:
->>> On Thu, Feb 15, 2018 at 02:22:39PM +0000, Will Deacon wrote:
->>> > Instead, we've come up with a more plausible sequence that can in theory
->>> > happen on a single CPU:
->>> > 
->>> > <task foo calls exit()>
->>> > 
->>> > do_exit
->>> > 	exit_mm
->>> 
->>> If this is the last task of the process, we would expect:
->>> 
->>>   mm_count == 1
->>>   mm_users == 1
->>> 
->>> at this point.
->>> 
->>> > 		mmgrab(mm);			// foo's mm has count +1
->>> > 		BUG_ON(mm != current->active_mm);
->>> > 		task_lock(current);
->>> > 		current->mm = NULL;
->>> > 		task_unlock(current);
->>> 
->>> So the whole active_mm is basically the last 'real' mm, and its purpose
->>> is to avoid switch_mm() between user tasks and kernel tasks.
->>> 
->>> A kernel task has !->mm. We do this by incrementing mm_count when
->>> switching from user to kernel task and decrementing when switching from
->>> kernel to user.
->>> 
->>> What exit_mm() does is change a user task into a 'kernel' task. So it
->>> should increment mm_count to mirror the context switch. I suspect this
->>> is what the mmgrab() in exit_mm() is for.
->>> 
->>> > <irq and ctxsw to kthread>
->>> > 
->>> > context_switch(prev=foo, next=kthread)
->>> > 	mm = next->mm;
->>> > 	oldmm = prev->active_mm;
->>> > 
->>> > 	if (!mm) {				// True for kthread
->>> > 		next->active_mm = oldmm;
->>> > 		mmgrab(oldmm);			// foo's mm has count +2
->>> > 	}
->>> > 
->>> > 	if (!prev->mm) {			// True for foo
->>> > 		rq->prev_mm = oldmm;
->>> > 	}
->>> > 
->>> > 	finish_task_switch
->>> > 		mm = rq->prev_mm;
->>> > 		if (mm) {			// True (foo's mm)
->>> > 			mmdrop(mm);		// foo's mm has count +1
->>> > 		}
->>> > 
->>> > 	[...]
->>> > 
->>> > <ctxsw to task bar>
->>> > 
->>> > context_switch(prev=kthread, next=bar)
->>> > 	mm = next->mm;
->>> > 	oldmm = prev->active_mm;		// foo's mm!
->>> > 
->>> > 	if (!prev->mm) {			// True for kthread
->>> > 		rq->prev_mm = oldmm;
->>> > 	}
->>> > 
->>> > 	finish_task_switch
->>> > 		mm = rq->prev_mm;
->>> > 		if (mm) {			// True (foo's mm)
->>> > 			mmdrop(mm);		// foo's mm has count +0
->>> 
->>> The context switch into the next user task will then decrement. At this
->>> point foo no longer has a reference to its mm, except on the stack.
->>> 
->>> > 		}
->>> > 
->>> > 	[...]
->>> > 
->>> > <ctxsw back to task foo>
->>> > 
->>> > context_switch(prev=bar, next=foo)
->>> > 	mm = next->mm;
->>> > 	oldmm = prev->active_mm;
->>> > 
->>> > 	if (!mm) {				// True for foo
->>> > 		next->active_mm = oldmm;	// This is bar's mm
->>> > 		mmgrab(oldmm);			// bar's mm has count +1
->>> > 	}
->>> > 
->>> > 
->>> > 	[return back to exit_mm]
->>> 
->>> Enter mm_users, this counts the number of tasks associated with the mm.
->>> We start with 1 in mm_init(), and when it drops to 0, we decrement
->>> mm_count. Since we also start with mm_count == 1, this would appear
->>> consistent.
->>> 
->>>   mmput() // --mm_users == 0, which then results in:
->>> 
->>> > mmdrop(mm);					// foo's mm has count -1
->>> 
->>> In the above case, that's the very last reference to the mm, and since
->>> we started out with mm_count == 1, this -1 makes 0 and we do the actual
->>> free.
->>> 
->>> > At this point, we've got an imbalanced count on the mm and could free it
->>> > prematurely as seen in the KASAN log.
->>> 
->>> I'm not sure I see premature. At this point mm_users==0, mm_count==0 and
->>> we freed mm and there is no further use of the on-stack mm pointer and
->>> foo no longer has a pointer to it in either ->mm or ->active_mm. It's
->>> well and proper dead.
->>> 
->>> > A subsequent context-switch away from foo would therefore result in a
->>> > use-after-free.
->>> 
->>> At the above point, foo no longer has a reference to mm, we cleared ->mm
->>> early, and the context switch to bar cleared ->active_mm. The switch
->>> back into foo then results with foo->active_mm == bar->mm, which is
->>> fine.
->> 
->> Bugger, you're right. When we switch off foo after freeing the mm, we'll
->> actually access it's active mm which points to bar's mm. So whilst this
->> can explain part of the kasan splat, it doesn't explain the actual
->> use-after-free.
->> 
->> More head-scratching required :(
-> 
-> My current theory: do_exit() gets preempted after having set current->mm
-> to NULL, and after having issued mmput(), which brings the mm_count down
-> to 0. Unfortunately, if the scheduler switches from a userspace thread
-> to a kernel thread, context_switch() loads prev->active_mm which still
-> points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
-> in finish_task_switch().
-> 
-> If my understanding is correct, the following patch should help. The idea
-> is to keep a reference on the mm_count until after we are sure the scheduler
-> cannot schedule the task anymore. What I'm not sure is where exactly in
-> do_exit() are we sure the task cannot ever be preempted anymore ?
-> 
+Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+Tested-by: Avi Fishman <avifishman70@gmail.com>
+---
+ arch/arm/Kconfig             |  2 +
+ arch/arm/Makefile            |  1 +
+ arch/arm/mach-npcm/Kconfig   | 48 +++++++++++++++++++++
+ arch/arm/mach-npcm/Makefile  |  3 ++
+ arch/arm/mach-npcm/headsmp.S | 17 ++++++++
+ arch/arm/mach-npcm/npcm7xx.c | 20 +++++++++
+ arch/arm/mach-npcm/platsmp.c | 81 ++++++++++++++++++++++++++++++++++++
+ 7 files changed, 172 insertions(+)
+ create mode 100644 arch/arm/mach-npcm/Kconfig
+ create mode 100644 arch/arm/mach-npcm/Makefile
+ create mode 100644 arch/arm/mach-npcm/headsmp.S
+ create mode 100644 arch/arm/mach-npcm/npcm7xx.c
+ create mode 100644 arch/arm/mach-npcm/platsmp.c
 
-Actually, it's the preempt_disable() at the end of do_exit() I was looking
-for. The following patch moves the mmdrop() right after preempte_disable.
-In my previous patch, the mmdrop() after do_task_dead (which is noreturn)
-was rather dumb (leak).
-
-diff --git a/kernel/exit.c b/kernel/exit.c
-index 995453d..2804655 100644
---- a/kernel/exit.c
-+++ b/kernel/exit.c
-@@ -764,6 +764,7 @@ void __noreturn do_exit(long code)
- {
-        struct task_struct *tsk = current;
-        int group_dead;
-+       struct mm_struct *mm;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e3d53575486..6a8404cd5150 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -779,6 +779,8 @@ source "arch/arm/mach-netx/Kconfig"
  
-        profile_task_exit(tsk);
-        kcov_task_exit(tsk);
-@@ -849,6 +850,10 @@ void __noreturn do_exit(long code)
-        tsk->exit_code = code;
-        taskstats_exit(tsk, group_dead);
+ source "arch/arm/mach-nomadik/Kconfig"
  
-+       mm = current->mm;
-+       if (mm)
-+               mmgrab(mm);
++source "arch/arm/mach-npcm/Kconfig"
 +
-        exit_mm();
+ source "arch/arm/mach-nspire/Kconfig"
  
-        if (group_dead)
-@@ -913,6 +918,8 @@ void __noreturn do_exit(long code)
- 
-        check_stack_usage();
-        preempt_disable();
-+       if (mm)
-+               mmdrop(mm);
-        if (tsk->nr_dirtied)
-                __this_cpu_add(dirty_throttle_leaks, tsk->nr_dirtied);
-        exit_rcu();
-
-
+ source "arch/arm/plat-omap/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e83f5161fdd8..e4e537f27339 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -196,6 +196,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
+ machine-$(CONFIG_ARCH_MXS)		+= mxs
+ machine-$(CONFIG_ARCH_NETX)		+= netx
+ machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
++machine-$(CONFIG_ARCH_NPCM)		+= npcm
+ machine-$(CONFIG_ARCH_NSPIRE)		+= nspire
+ machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
+ machine-$(CONFIG_ARCH_OMAP1)		+= omap1
+diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+new file mode 100644
+index 000000000000..6ff9df2636be
+--- /dev/null
++++ b/arch/arm/mach-npcm/Kconfig
+@@ -0,0 +1,48 @@
++menuconfig ARCH_NPCM
++	bool "Nuvoton NPCM Architecture"
++	select ARCH_REQUIRE_GPIOLIB
++	select USE_OF
++	select PINCTRL
++	select PINCTRL_NPCM7XX
++
++if ARCH_NPCM
++
++comment "NPCM7XX CPU type"
++
++config ARCH_NPCM750
++	depends on ARCH_NPCM && ARCH_MULTI_V7
++	bool "Support for NPCM750 BMC CPU (Poleg)"
++	select CACHE_L2X0
++	select CPU_V7
++	select ARM_GIC
++	select HAVE_SMP
++	select SMP
++	select SMP_ON_UP
++	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD if SMP
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_754322
++	select ARM_ERRATA_764369
++	select ARM_ERRATA_794072
++	select PL310_ERRATA_588369
++	select PL310_ERRATA_727915
++	select USB_EHCI_ROOT_HUB_TT
++	select USB_ARCH_HAS_HCD
++	select USB_ARCH_HAS_EHCI
++	select USB_EHCI_HCD
++	select USB_ARCH_HAS_OHCI
++	select USB_OHCI_HCD
++	select USB
++	select FIQ
++	select CPU_USE_DOMAINS
++	select GENERIC_CLOCKEVENTS
++	select CLKDEV_LOOKUP
++	select COMMON_CLK if OF
++	select NPCM750_TIMER
++	select MFD_SYSCON
++	help
++	  Support for NPCM750 BMC CPU (Poleg).
++
++	  Nuvoton NPCM750 BMC based on the Cortex A9.
++
++endif
+diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+new file mode 100644
+index 000000000000..c7a1316d27c1
+--- /dev/null
++++ b/arch/arm/mach-npcm/Makefile
+@@ -0,0 +1,3 @@
++AFLAGS_headsmp.o		+= -march=armv7-a
++
++obj-$(CONFIG_ARCH_NPCM750)	+= npcm7xx.o platsmp.o headsmp.o
+diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+new file mode 100644
+index 000000000000..c083fe09a07b
+--- /dev/null
++++ b/arch/arm/mach-npcm/headsmp.S
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Nuvoton Technology corporation.
++// Copyright 2018 Google, Inc.
++
++#include <linux/linkage.h>
++#include <linux/init.h>
++#include <asm/assembler.h>
++
++/*
++ * The boot ROM does not start secondary CPUs in SVC mode, so we need to do that
++ * here.
++ */
++ENTRY(npcm7xx_secondary_startup)
++	safe_svcmode_maskall r0
++
++	b	secondary_startup
++ENDPROC(npcm7xx_secondary_startup)
+diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+new file mode 100644
+index 000000000000..5f7cd88103ef
+--- /dev/null
++++ b/arch/arm/mach-npcm/npcm7xx.c
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Nuvoton Technology corporation.
++// Copyright 2018 Google, Inc.
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++#include <asm/mach/map.h>
++#include <asm/hardware/cache-l2x0.h>
++
++static const char *const npcm7xx_dt_match[] = {
++	"nuvoton,npcm750",
++	NULL
++};
++
++DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
++	.atag_offset	= 0x100,
++	.dt_compat	= npcm7xx_dt_match,
++MACHINE_END
+diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
+new file mode 100644
+index 000000000000..21633c70fe7f
+--- /dev/null
++++ b/arch/arm/mach-npcm/platsmp.c
+@@ -0,0 +1,81 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Nuvoton Technology corporation.
++// Copyright 2018 Google, Inc.
++
++#define pr_fmt(fmt) "nuvoton,npcm7xx-smp: " fmt
++
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <asm/cacheflush.h>
++#include <asm/smp.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
++
++#define NPCM7XX_SCRPAD_REG 0x13c
++
++extern void npcm7xx_secondary_startup(void);
++
++static int npcm7xx_smp_boot_secondary(unsigned int cpu,
++				      struct task_struct *idle)
++{
++	struct device_node *gcr_np;
++	void __iomem *gcr_base;
++	int ret = 0;
++
++	gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
++	if (!gcr_np) {
++		pr_err("no gcr device node\n");
++		ret = -ENODEV;
++		goto out;
++	}
++	gcr_base = of_iomap(gcr_np, 0);
++	if (!gcr_base) {
++		pr_err("could not iomap gcr");
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	/* give boot ROM kernel start address. */
++	iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
++		  NPCM7XX_SCRPAD_REG);
++	/* make sure the previous write is seen by all observers. */
++	dsb_sev();
++
++	iounmap(gcr_base);
++out:
++	return ret;
++}
++
++static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
++{
++	struct device_node *scu_np;
++	void __iomem *scu_base;
++
++	scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++	if (!scu_np) {
++		pr_err("no scu device node\n");
++		return;
++	}
++	scu_base = of_iomap(scu_np, 0);
++	if (!scu_base) {
++		pr_err("could not iomap scu");
++		return;
++	}
++
++	scu_enable(scu_base);
++
++	iounmap(scu_base);
++}
++
++static struct smp_operations npcm7xx_smp_ops __initdata = {
++	.smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
++	.smp_boot_secondary = npcm7xx_smp_boot_secondary,
++};
++
++CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm750-smp", &npcm7xx_smp_ops);
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+2.16.1.291.g4437f3f132-goog
