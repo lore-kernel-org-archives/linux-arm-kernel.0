@@ -1,79 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Feb 2018 21:32:54 +0300
-Subject: [PATCH v2 3/5] arm64: dts: renesas: r8a77980: add EtherAVB support
-In-Reply-To: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
-References: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
-Message-ID: <e857aaca-0328-2bd2-5bbf-b6badb5a4b1e@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Feb 2018 18:33:20 +0000
+Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
+In-Reply-To: <1037744516.23063.1518801477666.JavaMail.zimbra@efficios.com>
+References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
+ <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
+ <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
+ <20180215142239.GF16623@arm.com>
+ <20180215164754.GW25201@hirez.programming.kicks-ass.net>
+ <20180215182154.GD15274@arm.com>
+ <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
+ <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
+ <1037744516.23063.1518801477666.JavaMail.zimbra@efficios.com>
+Message-ID: <20180216183320.rw7trsakkdtzv5vd@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A77980 part of the EtherAVB device node.
+On Fri, Feb 16, 2018 at 05:17:57PM +0000, Mathieu Desnoyers wrote:
+> ----- On Feb 16, 2018, at 11:53 AM, Mark Rutland mark.rutland at arm.com wrote:
+> > I suspect we have a bogus mmdrop or mmput elsewhere, and do_exit() and
+> > finish_task_switch() aren't to blame.
+> 
+> Currently reviewing: fs/proc/base.c: __set_oom_adj()
+> 
+>         /*
+>          * Make sure we will check other processes sharing the mm if this is
+>          * not vfrok which wants its own oom_score_adj.
+>          * pin the mm so it doesn't go away and get reused after task_unlock
+>          */
+>         if (!task->vfork_done) {
+>                 struct task_struct *p = find_lock_task_mm(task);
+> 
+>                 if (p) {
+>                         if (atomic_read(&p->mm->mm_users) > 1) {
+>                                 mm = p->mm;
+>                                 mmgrab(mm);
+>                         }
+>                         task_unlock(p);
+>                 }
+>         }
+> 
+> Considering that mmput() done by exit_mm() is done outside of the
+> task_lock critical section, I wonder how the mm_users load is
+> synchronized ?
 
-Based on the original (and large) patch by Vladimir Barinov.
+That looks suspicious, but I don't think it can result in this
+particular problem.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+In find_lock_task_mm() we get the task lock, and check mm != NULL, which
+means that mm->mm_count >= 1 (thanks to the implicit reference
+context_switch()+finish_task_switch() manage). While we hold the task
+lock, task->mm can't change beneath our feet, and hence that reference
+can't be dropped by finish_task_switch().
 
----
-Changes in version 2:
-- removed the 2nd address/size tuple from the "reg" property;
-- changed the "phy-mode" property to the RGMII by default.
+Thus, immediately after the mmgrab(), we know mm->mm_count >= 2. That
+shouldn't drop below 1 until the subsequent mmdrop(), even after we drop
+the task lock, unless there's a misplaced mmdrop() elsewhere. Locally,
+mmgrab() and mmdrop() are balanced.
 
- arch/arm64/boot/dts/renesas/r8a77980.dtsi |   44 ++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+However, if mm_users can be incremented behind our back, we might skip
+updating the oom adjustments for other users of the mm.
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -164,6 +164,50 @@
- 			status = "disabled";
- 		};
- 
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a77980",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 812>;
-+			phy-mode = "rgmii";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		scif0: serial at e6e60000 {
- 			compatible = "renesas,scif-r8a77980",
- 				     "renesas,rcar-gen3-scif",
+Thanks,
+Mark.
