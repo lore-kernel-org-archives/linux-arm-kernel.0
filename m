@@ -1,65 +1,50 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri, 16 Feb 2018 13:09:56 +0100
-Subject: [PATCH v3 6/6] drm/rockchip: cdn-dp: remove the DP phy switch
-In-Reply-To: <20180216120956.19034-1-enric.balletbo@collabora.com>
-References: <20180216120956.19034-1-enric.balletbo@collabora.com>
-Message-ID: <20180216120956.19034-6-enric.balletbo@collabora.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 16 Feb 2018 13:27:44 +0100
+Subject: [PATCH v2 1/1] clk: npcm7xx: add clock controler. fixed clock at
+ DT
+In-Reply-To: <1518701454-22697-2-git-send-email-tali.perry1@gmail.com>
+References: <1518701454-22697-1-git-send-email-tali.perry1@gmail.com>
+ <1518701454-22697-2-git-send-email-tali.perry1@gmail.com>
+Message-ID: <CAOFm3uHCkv893H_y-fJthNiW0=wO23ddCkZKBdfeiOOF0GAE_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Zhong <zyw@rock-chips.com>
+Tali,
 
-There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-only one PHY can connect to DP controller at one time, the other should
-be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-set this bit means enable PHY 1, clear this bit means enable PHY 0.
+On Thu, Feb 15, 2018 at 2:30 PM, Tali Perry <tali.perry1@gmail.com> wrote:
+> --- /dev/null
+> +++ b/drivers/clk/clk-npcm7xx.c
+> @@ -0,0 +1,759 @@
+> +/*
+> + * Nuvoton NPCM7xx Clock Generator
+> + * All the clocks are initialized by the bootloader, so this driver allow only
+> + * reading of current settings directly from the hardware.
+> + *
+> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + * Released under the GPLv2 only.
+> + */
 
-If the board has 2 Type-C ports, the DP driver get the phy id from
-devm_of_phy_get_by_index, and then control this switch according to
-this id. But some others board only has one Type-C port, it may be PHY 0
-or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
-this switch to PHY driver, the PHY driver can distinguish between PHY 0
-and PHY 1, and then write the correct register bit.
+Thank you for using the SPDX tags! but this can be streamlined a bit per [1]
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-Changes since v2:
-- None.
-Changes since v1:
-- This patch is new on these series and is related to [5/6] so I
-  included to this series. Like [5/6] the patch was send some time ago
-  [1] but got stuck, so it's also and attempt to revive it.
+The correct way would come out as this: (note the tag placement and
+comment style and the removal of the now redundant unstructured
+notice)
 
-[1] https://lkml.org/lkml/2017/2/10/74
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Nuvoton NPCM7xx Clock Generator
+> + * All the clocks are initialized by the bootloader, so this driver allow only
+> + * reading of current settings directly from the hardware.
+> + *
+> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
+> + */
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 7 -------
- 1 file changed, 7 deletions(-)
+And yes you may be surprised by the use of C++ style comment for
+this... This has been discussed on list and is what Linus prefers.
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index ec999d9f15f6..c6fbdcd87c16 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -43,8 +43,6 @@
- #define GRF_SOC_CON9		0x6224
- #define DP_SEL_VOP_LIT		BIT(12)
- #define GRF_SOC_CON26		0x6268
--#define UPHY_SEL_BIT		3
--#define UPHY_SEL_MASK		BIT(19)
- #define DPTX_HPD_SEL		(3 << 12)
- #define DPTX_HPD_DEL		(2 << 12)
- #define DPTX_HPD_SEL_MASK	(3 << 28)
-@@ -394,11 +392,6 @@ static int cdn_dp_enable_phy(struct cdn_dp_device *dp, struct cdn_dp_port *port)
- 	union extcon_property_value property;
- 	int ret;
- 
--	ret = cdn_dp_grf_write(dp, GRF_SOC_CON26,
--			       (port->id << UPHY_SEL_BIT) | UPHY_SEL_MASK);
--	if (ret)
--		return ret;
--
- 	if (!port->phy_enabled) {
- 		ret = phy_power_on(port->phy);
- 		if (ret) {
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
 -- 
-2.15.1
+Cordially
+Philippe Ombredanne
