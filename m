@@ -1,66 +1,22 @@
-From: monnier@IRO.UMontreal.CA (Stefan Monnier)
-Date: Fri, 16 Feb 2018 15:52:09 -0500
-Subject: [PATCH] ARM: dts: sun7i: Enable HDMI support on the Orange Pi mini
-Message-ID: <jwvr2pk8xrb.fsf-monnier+diro@gnu.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 16 Feb 2018 21:43:13 +0100
+Subject: [PATCH v2 1/8] dt-bindings: add binding for Rockchip hdmi phy
+ using an Innosilicon IP
+In-Reply-To: <20180216204158.29839-2-heiko@sntech.de>
+References: <20180216204158.29839-1-heiko@sntech.de>
+ <20180216204158.29839-2-heiko@sntech.de>
+Message-ID: <2059555.IeSDZBhkcd@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Monnier <monnier@iro.umontreal.ca>
+Am Freitag, 16. Februar 2018, 21:41:51 CET schrieb Heiko Stuebner:
+> From: Zheng Yang <zhengyang@rock-chips.com>
+> 
+> The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
+> 
+> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Enable the display pipeline and HDMI output for the Orange Pi mini
+Forgot to add that the v1 binding already got a review as
 
-Signed-off-by: Stefan Monnier <monnier@iro.umontreal.ca>
----
- arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-index 7af4c8fc1865..ce02ab532bc8 100644
---- a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-@@ -61,6 +61,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -98,6 +109,10 @@
- 	status = "okay";
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -119,6 +134,16 @@
- 	};
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
+Reviewed-by: Rob Herring <robh@kernel.org>
