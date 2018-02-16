@@ -1,55 +1,153 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Feb 2018 21:38:31 +0300
-Subject: [PATCH v2 5/5] arm64: dts: renesas: condor: add EtherAVB support
-In-Reply-To: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
-References: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
-Message-ID: <5ca8941c-9273-733e-28bd-e76a82e94908@cogentembedded.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Feb 2018 18:39:30 +0000
+Subject: [RFC PATCH 0.9/2] arm64: fpsimd: Expose CPU / FPSIMD state
+ association helpers
+In-Reply-To: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
+References: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Condor board dependent part of the EtherAVB device node.
+Oops, forgot to post this patch that goes before patch 1 in the series.
 
-Based  on the original (and large) patch by Vladimir Barinov.
+--8<--
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Expose an interface for associating an FPSIMD context with a CPU and
+checking the association, for use by KVM.
 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
-Changes in version 2:
-- added the "renesas,no-ether-link" property;
-- overrode the "phy-mode" property.
+ arch/arm64/include/asm/fpsimd.h |  5 +++++
+ arch/arm64/kernel/fpsimd.c      | 42 +++++++++++++++++++++++++++++------------
+ 2 files changed, 35 insertions(+), 12 deletions(-)
 
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 8857a0f..f4ce4d6 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -23,6 +23,7 @@
  
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &avb;
- 	};
+ #include <linux/cache.h>
+ #include <linux/stddef.h>
++#include <linux/types.h>
  
- 	chosen {
-@@ -28,6 +29,18 @@
- 	};
- };
+ /*
+  * FP/SIMD storage area has:
+@@ -62,6 +63,8 @@ struct fpsimd_state {
  
-+&avb {
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&phy0>;
-+	renesas,no-ether-link;
-+	status = "okay";
+ struct task_struct;
+ 
++extern bool fpsimd_foreign_fpstate(struct fpsimd_state const *state);
 +
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <1500>;
-+		reg = <0>;
-+	};
-+};
+ extern void fpsimd_save_state(struct fpsimd_state *state);
+ extern void fpsimd_load_state(struct fpsimd_state *state);
+ 
+@@ -76,6 +79,8 @@ extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
+ extern void fpsimd_flush_task_state(struct task_struct *target);
+ extern void sve_flush_cpu_state(void);
+ 
++extern void fpsimd_bind_state_to_cpu(struct fpsimd_state *state);
 +
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
+ /* Maximum VL that SVE VL-agnostic software can transparently support */
+ #define SVE_VL_ARCH_MAX 0x100
+ 
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index e7226c4..138efaf 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -38,6 +38,7 @@
+ #include <linux/signal.h>
+ #include <linux/slab.h>
+ #include <linux/sysctl.h>
++#include <linux/types.h>
+ 
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+@@ -121,6 +122,14 @@ struct fpsimd_last_state_struct {
+ 
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+ 
++bool fpsimd_foreign_fpstate(struct fpsimd_state const *st)
++{
++	WARN_ON(!in_softirq() && !irqs_disabled());
++
++	return st->cpu != smp_processor_id() ||
++		st != __this_cpu_read(fpsimd_last_state.st);
++}
++
+ /* Default VL for tasks that don't set it explicitly: */
+ static int sve_default_vl = -1;
+ 
+@@ -908,13 +917,10 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+ 		 * upon the next return to userland.
+ 		 */
+-		struct fpsimd_state *st = &next->thread.fpsimd_state;
+-
+-		if (__this_cpu_read(fpsimd_last_state.st) == st
+-		    && st->cpu == smp_processor_id())
+-			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+-		else
++		if (fpsimd_foreign_fpstate(&current->thread.fpsimd_state))
+ 			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
++		else
++			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+ 	}
+ }
+ 
+@@ -996,19 +1002,31 @@ void fpsimd_signal_preserve_current_state(void)
+ 		sve_to_fpsimd(current);
+ }
+ 
++static void __fpsimd_bind_to_cpu(struct fpsimd_last_state_struct *last,
++				 struct fpsimd_state *st)
++{
++	WARN_ON(!in_softirq() || !irqs_disabled());
++
++	last->st = st;
++	st->cpu = smp_processor_id();
++}
++
++void fpsimd_bind_state_to_cpu(struct fpsimd_state *st)
++{
++	__fpsimd_bind_to_cpu(this_cpu_ptr(&fpsimd_last_state), st);
++}
++
+ /*
+  * Associate current's FPSIMD context with this cpu
+  * Preemption must be disabled when calling this function.
+  */
+-static void fpsimd_bind_to_cpu(void)
++static void fpsimd_bind_task_to_cpu(void)
+ {
+ 	struct fpsimd_last_state_struct *last =
+ 		this_cpu_ptr(&fpsimd_last_state);
+-	struct fpsimd_state *st = &current->thread.fpsimd_state;
+ 
+-	last->st = st;
++	__fpsimd_bind_to_cpu(last, &current->thread.fpsimd_state);
+ 	last->sve_in_use = test_thread_flag(TIF_SVE);
+-	st->cpu = smp_processor_id();
+ }
+ 
+ /*
+@@ -1025,7 +1043,7 @@ void fpsimd_restore_current_state(void)
+ 
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		task_fpsimd_load();
+-		fpsimd_bind_to_cpu();
++		fpsimd_bind_task_to_cpu();
+ 	}
+ 
+ 	local_bh_enable();
+@@ -1050,7 +1068,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+ 	task_fpsimd_load();
+ 
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
+-		fpsimd_bind_to_cpu();
++		fpsimd_bind_task_to_cpu();
+ 
+ 	local_bh_enable();
+ }
+-- 
+2.1.4
