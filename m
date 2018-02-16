@@ -1,45 +1,49 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Fri, 16 Feb 2018 14:47:58 +1100 (AEDT)
-Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
-In-Reply-To: <20180214.171558.1617880686804101923.davem@davemloft.net>
-References: <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
- <20180213.095820.761578588685460710.davem@davemloft.net>
- <alpine.LNX.2.21.1802150857480.8@nippy.intranet>
- <20180214.171558.1617880686804101923.davem@davemloft.net>
-Message-ID: <alpine.LNX.2.21.1802161203480.8@nippy.intranet>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 15 Feb 2018 22:17:05 -0600
+Subject: [PATCH] mfd: tps65218: Reorder tps65218_regulator_id enum
+Message-ID: <20180216041705.6340-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Feb 2018, David Miller wrote:
+Commit 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
+changes the probe function of drivers/regulator/tps65218-regulator.c so
+that it iterates through all available regulators and assumes that the
+regulator IDs are sequential and match the order present in the enum
+tps65218_regulator_id. However, for some reason the much older commit
+c0ea88b890d6 ("regulator: tps65218: add support for LS3 current
+regulator") updated all arrays with LS3 at the end but added it second
+to last for the enum.
 
-> > Have you considered that implementing the ethtool hooks in the core 
-> > driver might allow removal of all 8390 driver 'msg_enable' module 
-> > parameters and msglevel ethtool hooks added by c45f812f0280, excepting 
-> > those in the core driver? But even if we did that, it seems to me that 
-> > we still need this patch.
-> 
-> No, because the module parameter lets you set the default msg level at 
-> the time the driver loads, so you can control messages printed very 
-> early on before it is practical to invoke ethtool and set the msg level.
-> 
-> This is why most drivers have this module parameter, and implement
-> such a scheme.
+Because of this long standing mismatch in order between the
+tps65218_regulator_id enum and the regulator_desc array in the tps65218
+regulator driver, the new probe function causes the strobe values to be
+associated with the wrong regulator ID. This causes LDO1 to fail to
+suspend in tps65218_pmic_set_suspend_disable due to not having anything
+probes for its strobe value. Fix the order in the enum so the probe
+function works as the update intended.
 
-Among the 8390 drivers, so far only ne2k-pci implements that scheme.
+Fixes: 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ include/linux/mfd/tps65218.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This patch implements that scheme for ax88796 and etherh as well, by 
-making better use of the msg_enable module parameter in lib8390.c.
-
-The axnet_cs and pcnet_cs modules lack the msglevel ethtool ops and the 
-msg_enable module parameters.
-
-The remaining nine modules lack just the ethtool ops. If you like I will 
-write additional patches to implement the missing ethtool ops or module 
-parameters or both (?)
-
-This small patch already addresses the use-case in which the end-user 
-needs to enable (for example) probe messages for some or all 8390 drivers.
-
-Thoughts?
-
+diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
+index f069c518c0ed..c204d9a79436 100644
+--- a/include/linux/mfd/tps65218.h
++++ b/include/linux/mfd/tps65218.h
+@@ -205,10 +205,10 @@ enum tps65218_regulator_id {
+ 	TPS65218_DCDC_4,
+ 	TPS65218_DCDC_5,
+ 	TPS65218_DCDC_6,
+-	/* LS's */
+-	TPS65218_LS_3,
+ 	/* LDOs */
+ 	TPS65218_LDO_1,
++	/* LS's */
++	TPS65218_LS_3,
+ };
+ 
+ #define TPS65218_MAX_REG_ID		TPS65218_LDO_1
 -- 
+2.16.1
