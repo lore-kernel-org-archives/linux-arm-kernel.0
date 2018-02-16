@@ -1,153 +1,190 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 16 Feb 2018 18:39:30 +0000
-Subject: [RFC PATCH 0.9/2] arm64: fpsimd: Expose CPU / FPSIMD state
- association helpers
-In-Reply-To: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
-References: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 16 Feb 2018 19:41:46 +0100
+Subject: [PATCH 2/6] ARM: davinci: update the nand driver names
+In-Reply-To: <20180216193307.3c4372d8@bbrezillon>
+References: <20180216164712.25898-1-brgl@bgdev.pl>
+ <20180216164712.25898-3-brgl@bgdev.pl>
+ <20180216193307.3c4372d8@bbrezillon>
+Message-ID: <20180216194146.4131dc12@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, forgot to post this patch that goes before patch 1 in the series.
+On Fri, 16 Feb 2018 19:33:07 +0100
+Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
---8<--
+> On Fri, 16 Feb 2018 17:47:08 +0100
+> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> 
+> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > 
+> > Since commit d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock
+> > lookup table") we can no longer correctly lookup the nand clock when
+> > booting in legacy mode. Said commit added a dev_id to the nand clock
+> > which must match and it doesn't correspond with the device name which
+> > is "davinci_nand" instead of "davinci-nand".
+> > 
+> > The driver name has been changed. Update the board files.  
+> 
+> Should be squashed in patch 1, otherwise your patch series is not
+> bisectable.
+> 
 
-Expose an interface for associating an FPSIMD context with a CPU and
-checking the association, for use by KVM.
+Okay, after reading the commit message a second time it seems
+bisectability is already broken anyway :-). 
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/fpsimd.h |  5 +++++
- arch/arm64/kernel/fpsimd.c      | 42 +++++++++++++++++++++++++++++------------
- 2 files changed, 35 insertions(+), 12 deletions(-)
+> > 
+> > Fixes: d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock lookup table")
+> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > ---
+> >  arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
+> >  arch/arm/mach-davinci/board-da850-evm.c     | 2 +-
+> >  arch/arm/mach-davinci/board-dm355-evm.c     | 2 +-
+> >  arch/arm/mach-davinci/board-dm355-leopard.c | 2 +-
+> >  arch/arm/mach-davinci/board-dm365-evm.c     | 2 +-
+> >  arch/arm/mach-davinci/board-dm644x-evm.c    | 2 +-
+> >  arch/arm/mach-davinci/board-dm646x-evm.c    | 2 +-
+> >  arch/arm/mach-davinci/board-mityomapl138.c  | 2 +-
+> >  arch/arm/mach-davinci/board-neuros-osd2.c   | 2 +-
+> >  arch/arm/mach-davinci/board-sffsdr.c        | 2 +-
+> >  10 files changed, 10 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> > index f673cd7a6766..f8838c7b174b 100644
+> > --- a/arch/arm/mach-davinci/board-da830-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> > @@ -348,7 +348,7 @@ static struct resource da830_evm_nand_resources[] = {
+> >  };
+> >  
+> >  static struct platform_device da830_evm_nand_device = {
+> > -	.name		= "davinci_nand",
+> > +	.name		= "davinci-nand",
+> >  	.id		= 1,
+> >  	.dev		= {
+> >  		.platform_data	= &da830_evm_nand_pdata,
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> > index d898a94f6eae..828194045a2b 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> > @@ -266,7 +266,7 @@ static struct resource da850_evm_nandflash_resource[] = {
+> >  };
+> >  
+> >  static struct platform_device da850_evm_nandflash_device = {
+> > -	.name		= "davinci_nand",
+> > +	.name		= "davinci-nand",
+> >  	.id		= 1,
+> >  	.dev		= {
+> >  		.platform_data	= &da850_evm_nandflash_data,
+> > diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> > index e457f299cd44..58ca7f56e112 100644
+> > --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> > +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> > @@ -98,7 +98,7 @@ static struct resource davinci_nand_resources[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_nand_device = {
+> > -	.name			= "davinci_nand",
+> > +	.name			= "davinci-nand",
+> >  	.id			= 0,
+> >  
+> >  	.num_resources		= ARRAY_SIZE(davinci_nand_resources),
+> > diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+> > index be997243447b..196238117f9a 100644
+> > --- a/arch/arm/mach-davinci/board-dm355-leopard.c
+> > +++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+> > @@ -93,7 +93,7 @@ static struct resource davinci_nand_resources[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_nand_device = {
+> > -	.name			= "davinci_nand",
+> > +	.name			= "davinci-nand",
+> >  	.id			= 0,
+> >  
+> >  	.num_resources		= ARRAY_SIZE(davinci_nand_resources),
+> > diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+> > index e75741fb2c1d..563d66df480b 100644
+> > --- a/arch/arm/mach-davinci/board-dm365-evm.c
+> > +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+> > @@ -159,7 +159,7 @@ static struct resource davinci_nand_resources[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_nand_device = {
+> > -	.name			= "davinci_nand",
+> > +	.name			= "davinci-nand",
+> >  	.id			= 0,
+> >  	.num_resources		= ARRAY_SIZE(davinci_nand_resources),
+> >  	.resource		= davinci_nand_resources,
+> > diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> > index 85e6fb33b1ee..e42ae2163c75 100644
+> > --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> > +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> > @@ -173,7 +173,7 @@ static struct resource davinci_evm_nandflash_resource[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_evm_nandflash_device = {
+> > -	.name		= "davinci_nand",
+> > +	.name		= "davinci-nand",
+> >  	.id		= 0,
+> >  	.dev		= {
+> >  		.platform_data	= &davinci_evm_nandflash_data,
+> > diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> > index cb0a41e83582..614dd211e6fc 100644
+> > --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> > +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> > @@ -108,7 +108,7 @@ static struct resource davinci_nand_resources[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_nand_device = {
+> > -	.name			= "davinci_nand",
+> > +	.name			= "davinci-nand",
+> >  	.id			= 0,
+> >  
+> >  	.num_resources		= ARRAY_SIZE(davinci_nand_resources),
+> > diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> > index b73ce7bae81f..bf3659a21897 100644
+> > --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> > +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> > @@ -422,7 +422,7 @@ static struct resource mityomapl138_nandflash_resource[] = {
+> >  };
+> >  
+> >  static struct platform_device mityomapl138_nandflash_device = {
+> > -	.name		= "davinci_nand",
+> > +	.name		= "davinci-nand",
+> >  	.id		= 1,
+> >  	.dev		= {
+> >  		.platform_data	= &mityomapl138_nandflash_data,
+> > diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> > index 4da210a1a110..04132494a7c9 100644
+> > --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> > +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> > @@ -107,7 +107,7 @@ static struct resource davinci_ntosd2_nandflash_resource[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_ntosd2_nandflash_device = {
+> > -	.name		= "davinci_nand",
+> > +	.name		= "davinci-nand",
+> >  	.id		= 0,
+> >  	.dev		= {
+> >  		.platform_data	= &davinci_ntosd2_nandflash_data,
+> > diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+> > index d85accf7f760..c8569c8aa6e3 100644
+> > --- a/arch/arm/mach-davinci/board-sffsdr.c
+> > +++ b/arch/arm/mach-davinci/board-sffsdr.c
+> > @@ -83,7 +83,7 @@ static struct resource davinci_sffsdr_nandflash_resource[] = {
+> >  };
+> >  
+> >  static struct platform_device davinci_sffsdr_nandflash_device = {
+> > -	.name		= "davinci_nand", /* Name of driver */
+> > +	.name		= "davinci-nand", /* Name of driver */
+> >  	.id		= 0,
+> >  	.dev		= {
+> >  		.platform_data	= &davinci_sffsdr_nandflash_data,  
+> 
+> 
+> 
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 8857a0f..f4ce4d6 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -23,6 +23,7 @@
- 
- #include <linux/cache.h>
- #include <linux/stddef.h>
-+#include <linux/types.h>
- 
- /*
-  * FP/SIMD storage area has:
-@@ -62,6 +63,8 @@ struct fpsimd_state {
- 
- struct task_struct;
- 
-+extern bool fpsimd_foreign_fpstate(struct fpsimd_state const *state);
-+
- extern void fpsimd_save_state(struct fpsimd_state *state);
- extern void fpsimd_load_state(struct fpsimd_state *state);
- 
-@@ -76,6 +79,8 @@ extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
- extern void fpsimd_flush_task_state(struct task_struct *target);
- extern void sve_flush_cpu_state(void);
- 
-+extern void fpsimd_bind_state_to_cpu(struct fpsimd_state *state);
-+
- /* Maximum VL that SVE VL-agnostic software can transparently support */
- #define SVE_VL_ARCH_MAX 0x100
- 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e7226c4..138efaf 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -38,6 +38,7 @@
- #include <linux/signal.h>
- #include <linux/slab.h>
- #include <linux/sysctl.h>
-+#include <linux/types.h>
- 
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-@@ -121,6 +122,14 @@ struct fpsimd_last_state_struct {
- 
- static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
- 
-+bool fpsimd_foreign_fpstate(struct fpsimd_state const *st)
-+{
-+	WARN_ON(!in_softirq() && !irqs_disabled());
-+
-+	return st->cpu != smp_processor_id() ||
-+		st != __this_cpu_read(fpsimd_last_state.st);
-+}
-+
- /* Default VL for tasks that don't set it explicitly: */
- static int sve_default_vl = -1;
- 
-@@ -908,13 +917,10 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
- 		 * upon the next return to userland.
- 		 */
--		struct fpsimd_state *st = &next->thread.fpsimd_state;
--
--		if (__this_cpu_read(fpsimd_last_state.st) == st
--		    && st->cpu == smp_processor_id())
--			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
--		else
-+		if (fpsimd_foreign_fpstate(&current->thread.fpsimd_state))
- 			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-+		else
-+			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 	}
- }
- 
-@@ -996,19 +1002,31 @@ void fpsimd_signal_preserve_current_state(void)
- 		sve_to_fpsimd(current);
- }
- 
-+static void __fpsimd_bind_to_cpu(struct fpsimd_last_state_struct *last,
-+				 struct fpsimd_state *st)
-+{
-+	WARN_ON(!in_softirq() || !irqs_disabled());
-+
-+	last->st = st;
-+	st->cpu = smp_processor_id();
-+}
-+
-+void fpsimd_bind_state_to_cpu(struct fpsimd_state *st)
-+{
-+	__fpsimd_bind_to_cpu(this_cpu_ptr(&fpsimd_last_state), st);
-+}
-+
- /*
-  * Associate current's FPSIMD context with this cpu
-  * Preemption must be disabled when calling this function.
-  */
--static void fpsimd_bind_to_cpu(void)
-+static void fpsimd_bind_task_to_cpu(void)
- {
- 	struct fpsimd_last_state_struct *last =
- 		this_cpu_ptr(&fpsimd_last_state);
--	struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
--	last->st = st;
-+	__fpsimd_bind_to_cpu(last, &current->thread.fpsimd_state);
- 	last->sve_in_use = test_thread_flag(TIF_SVE);
--	st->cpu = smp_processor_id();
- }
- 
- /*
-@@ -1025,7 +1043,7 @@ void fpsimd_restore_current_state(void)
- 
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		task_fpsimd_load();
--		fpsimd_bind_to_cpu();
-+		fpsimd_bind_task_to_cpu();
- 	}
- 
- 	local_bh_enable();
-@@ -1050,7 +1068,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
- 	task_fpsimd_load();
- 
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_bind_to_cpu();
-+		fpsimd_bind_task_to_cpu();
- 
- 	local_bh_enable();
- }
+
+
 -- 
-2.1.4
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
