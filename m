@@ -1,71 +1,47 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 16 Feb 2018 21:41:51 +0100
-Subject: [PATCH v2 1/8] dt-bindings: add binding for Rockchip hdmi phy using
- an Innosilicon IP
+Date: Fri, 16 Feb 2018 21:41:54 +0100
+Subject: [PATCH v2 4/8] drm/rockchip: dw_hdmi: Allow outputs that don't need
+ output switching
 In-Reply-To: <20180216204158.29839-1-heiko@sntech.de>
 References: <20180216204158.29839-1-heiko@sntech.de>
-Message-ID: <20180216204158.29839-2-heiko@sntech.de>
+Message-ID: <20180216204158.29839-5-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zheng Yang <zhengyang@rock-chips.com>
+So far we always encountered socs with 2 output crtcs needing the driver
+to tell the hdmi block which output to connect to. But there also exist
+socs with only one crtc like the rk3228, rk3328 and rk3368.
 
-The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
+So adapt the register field to simply carry a negative value to signal
+that now output-switching is necessary.
 
-Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../bindings/phy/phy-rockchip-inno-hdmi.txt        | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
-new file mode 100644
-index 000000000000..7d36fd8d5d94
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
-@@ -0,0 +1,42 @@
-+ROCKCHIP HDMI PHY WITH INNO IP BLOCK
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 3574b0ae2ad1..6dc03f1a5709 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -36,7 +36,7 @@
+  * @lcdsel_lit: reg value of selecting vop little for HDMI
+  */
+ struct rockchip_hdmi_chip_data {
+-	u32	lcdsel_grf_reg;
++	int	lcdsel_grf_reg;
+ 	u32	lcdsel_big;
+ 	u32	lcdsel_lit;
+ };
+@@ -253,6 +253,9 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+ 	u32 val;
+ 	int ret;
+ 
++	if (hdmi->chip_data->lcdsel_grf_reg < 0)
++		return;
 +
-+Required properties:
-+ - compatible : should be one of the listed compatibles:
-+	* "rockchip,rk3228-hdmi-phy",
-+	* "rockchip,rk3328-hdmi-phy";
-+ - reg : Address and length of the hdmi phy control register set
-+ - clocks : phandle + clock specifier for the phy clocks
-+ - clock-names : string, clock name, must contain "sysclk" for system
-+	  control and register configuration and "refclk" for reference
-+	  crystal oscillator clock input to PLL
-+ - #clock-cells: should be 0.
-+ - clock-output-names : shall be the name for the output clock.
-+ - interrupts : phandle + interrupt specified for the hdmiphy interrupt
-+ - #phy-cells : must be 0. See ./phy-bindings.txt for details.
-+
-+Optional properties for rk3328-hdmi-phy:
-+ - nvmem-cells = phandle + nvmem specifier for the cpu-version efuse
-+ - nvmem-cell-names : "cpu-version" to read the chip version, required
-+	  for adjustment to some frequency settings
-+
-+Example:
-+	hdmi_phy: hdmi-phy at 12030000 {
-+		compatible = "rockchip,rk3228-hdmi-phy";
-+		reg = <0x12030000 0x10000>;
-+		#phy-cells = <0>;
-+		clocks = <&cru PCLK_HDMI_PHY>, <&xin24m>;
-+		clock-names = "sysclk", "refclk";
-+		#clock-cells = <0>;
-+		clock-output-names = "hdmi_phy";
-+		status = "disabled";
-+	};
-+
-+Then the PHY can be used in other nodes such as:
-+
-+	hdmi: hdmi at 200a0000 {
-+		compatible = "rockchip,rk3228-dw-hdmi";
-+		...
-+		phys = <&hdmi_phy>;
-+		phy-names = "hdmi";
-+		...
-+	};
+ 	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
+ 	if (ret)
+ 		val = hdmi->chip_data->lcdsel_lit;
 -- 
 2.15.1
