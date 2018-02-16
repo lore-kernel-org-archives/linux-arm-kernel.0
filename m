@@ -1,27 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Feb 2018 18:28:14 +0000
-Subject: [PATCH 1/2] arm64: uaccess: Clean up types for access_ok()
-In-Reply-To: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
-References: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
-Message-ID: <20180216182813.dlwfuqkzcotctd6a@armageddon.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Feb 2018 18:29:29 +0000
+Subject: [RFC PATCH 0/2] KVM: arm64: Optime FPSIMD context handling
+Message-ID: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 16, 2018 at 05:04:22PM +0000, Robin Murphy wrote:
-> In converting __range_ok() into a static inline, I inadvertently made
-> it more type-safe, but without considering the ordering of the relevant
-> conversions. This leads to quite a lot of Sparse noise about the fact
-> that we use __chk_user_ptr() after addr has already been converted from
-> a user pointer to an unsigned long.
-> 
-> Tweak the prototype and locals so the types all make logical sense and
-> Sparse is happy (although the resulting codegen remains identical). The
-> only external site this affects is in compat syscalls where the inferred
-> "user-pointer-ness" of a register value now warrants an explicit cast.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+This series attempts to integrate KVM's FPSIMD context handling more
+closely with the host, so that we can take advantage of better
+knowledge about when the FPSIMD registers are live and whose data they
+contain.
 
-Both applied. Thanks.
+These patches are based on:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v4
+ef09bac916ae ("KVM: arm/arm64: Avoid VGICv3 save/restore on VHE with no IRQs")
+
+...and currently completely untested.
+
+They do build for defconfig at least.
+
+
+This is still a big hack and I may have missed something critical,
+so I invite people to come and poke holes it...
+
+Dave Martin (2):
+  KVM: arm64: Convert lazy FPSIMD context switch trap to C
+  KVM: arm64: Eliminate most redundant FPSIMD saves and restores
+
+ arch/arm64/include/asm/fpsimd.h      |  1 +
+ arch/arm64/include/asm/kvm_host.h    | 10 ++++++-
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 14 +++++----
+ arch/arm64/kernel/fpsimd.c           |  7 ++++-
+ arch/arm64/kvm/hyp/entry.S           | 57 ++++++++++++++----------------------
+ arch/arm64/kvm/hyp/switch.c          | 37 ++++++++++++++++++++---
+ virt/kvm/arm/arm.c                   | 50 +++++++++++++++++++++++++++++++
+ 8 files changed, 130 insertions(+), 47 deletions(-)
 
 -- 
-Catalin
+2.1.4
