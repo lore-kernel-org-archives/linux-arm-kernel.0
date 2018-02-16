@@ -1,33 +1,26 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 16 Feb 2018 10:27:50 +0100
-Subject: [PATCH] [PATCH] tty/serial: atmel: add new version check for usart
-In-Reply-To: <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
-References: <20180129113954.12011-1-jonas@orbital-systems.com>
- <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
-Message-ID: <CACQ1gAjs1VwaVdnimDcyD9ZgxC6ei6oap-d9Fma14G9V6iw19g@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Feb 2018 10:31:18 +0100
+Subject: [PATCH 1/2] arm64: dts: rockchip: Fix DWMMC clocks
+In-Reply-To: <74be71477b800f8a7b93a9e92ffeff9bf38c52ce.1518703554.git.robin.murphy@arm.com>
+References: <74be71477b800f8a7b93a9e92ffeff9bf38c52ce.1518703554.git.robin.murphy@arm.com>
+Message-ID: <4734191.1zOSGruJ4r@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-05 13:36 GMT+01:00 Nicolas Ferre <nicolas.ferre@microchip.com>:
-> On 29/01/2018 at 12:39, Jonas Danielsson wrote:
->> On our at91sam9260 based board the usart0 and usart1 ports report
->> their versions (ATMEL_US_VERSION) as 0x10302. This version is not
->> included in the current checks in the driver.
->>
->> Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->
+Am Donnerstag, 15. Februar 2018, 15:05:53 CET schrieb Robin Murphy:
+> Trying to boot an RK3328 box with an HS200-capable eMMC, I see said eMMC
+> fail to initialise as it can't run its tuning procedure, because the
+> sample clock is missing. Upon closer inspection, whilst the clock is
+> present in the DT, its name is subtly incorrect per the binding, so
+> __of_clk_get_by_name() never finds it. By inspection, the drive clock
+> suffers from a similar problem, so has never worked properly either.
+> 
+> Fix up all instances of the incorrect clock names across the 64-bit DTs.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
+added apropriate Fixes-tags and applied as fix for 4.16
 
-> It must be the AT91SAM9260 rev. B SoC, isn't it?
->
-> Thanks for your patch.
->
-> Best regards,
->   Nicolas
 
-Thanks !
-
-Richard.
+Thanks
+Heiko
