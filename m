@@ -1,173 +1,108 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 16 Feb 2018 18:39:29 +0100
-Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
-In-Reply-To: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
-Message-ID: <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
+Date: Fri, 16 Feb 2018 18:39:28 +0100
+Subject: [PATCH v3 0/8] drm/sun4i: Support more planes,
+ zpos and plane-wide alpha
+Message-ID: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers duplicate the logic to create a property to store a per-plane
-alpha.
+Hi,
 
-This is especially useful if we ever want to support extra protocols for
-Wayland like:
-https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+This serie aims at enhancing the support for our planes in the current drm
+driver on the first generation of Allwinner's display engine.
 
-Let's create a helper in order to move that to the core.
+This also introduces a few generic stuff, as well as some conversion for
+some other drivers.
 
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- Documentation/gpu/kms-properties.csv |  2 +-
- drivers/gpu/drm/drm_atomic.c         |  4 ++++-
- drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
- drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
- include/drm/drm_blend.h              |  1 +-
- include/drm/drm_plane.h              |  6 +++++-
- 6 files changed, 48 insertions(+), 1 deletion(-)
+This series basically implements three things that look orthogonal, but due
+to the way the hardware works are kind of related.
 
-diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
-index 927b65e14219..25ad3503d663 100644
---- a/Documentation/gpu/kms-properties.csv
-+++ b/Documentation/gpu/kms-properties.csv
-@@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
- ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
- ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
- ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
--rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
-+,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the plane from transparent (0) to fully opaque (MAX). If this property is set to a value different than max, and that the pixel will define an alpha component, the property will have precendance and the pixel value will be ignored. The alpha value is represented as straight alpha, ie the colors haven't been pre-adjusted for their opacity by multiplication. Therefore, the equation to get a color value for one pixel, assuming two planes A and B, will be (color_a * alpha_a + color_b * alpha_b * (MAX - alpha_a) / MAX) / (alpha_a + alpha_b * (MAX - alpha_a) / MAX)
- ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
-diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
-index 7d9ad20040a1..3defc56a1ef2 100644
---- a/drivers/gpu/drm/drm_atomic.c
-+++ b/drivers/gpu/drm/drm_atomic.c
-@@ -753,6 +753,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
- 		state->src_w = val;
- 	} else if (property == config->prop_src_h) {
- 		state->src_h = val;
-+	} else if (property == plane->alpha_property) {
-+		state->alpha = val;
- 	} else if (property == plane->rotation_property) {
- 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
- 			return -EINVAL;
-@@ -814,6 +816,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
- 		*val = state->src_w;
- 	} else if (property == config->prop_src_h) {
- 		*val = state->src_h;
-+	} else if (property == plane->alpha_property) {
-+		*val = state->alpha;
- 	} else if (property == plane->rotation_property) {
- 		*val = state->rotation;
- 	} else if (property == plane->zpos_property) {
-diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-index ae3cbfe9e01c..2b88f593aab4 100644
---- a/drivers/gpu/drm/drm_atomic_helper.c
-+++ b/drivers/gpu/drm/drm_atomic_helper.c
-@@ -3482,6 +3482,10 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
- 	if (plane->state) {
- 		plane->state->plane = plane;
- 		plane->state->rotation = DRM_MODE_ROTATE_0;
-+
-+		/* Reset the alpha value to fully opaque if it matters */
-+		if (plane->alpha_property)
-+			plane->state->alpha = plane->alpha_property->values[1];
- 	}
- }
- EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
-diff --git a/drivers/gpu/drm/drm_blend.c b/drivers/gpu/drm/drm_blend.c
-index 4c62dff14893..a5dea7cbed2c 100644
---- a/drivers/gpu/drm/drm_blend.c
-+++ b/drivers/gpu/drm/drm_blend.c
-@@ -104,6 +104,38 @@
-  */
- 
- /**
-+ * drm_plane_create_alpha_property - create a new alpha property
-+ * @plane: drm plane
-+ * @max_alpha: maximum value of alpha
-+ *
-+ * This function initializes a generic, mutable, alpha property and
-+ * enables support for it in the DRM core.
-+ *
-+ * The alpha property will be allowed to be within the bounds of 0
-+ * (transparent) to @max_alpha (opaque)
-+ *
-+ * Returns:
-+ * 0 on success, negative error code on failure.
-+ */
-+int drm_plane_create_alpha_property(struct drm_plane *plane, u16 max_alpha)
-+{
-+	struct drm_property *prop;
-+
-+	prop = drm_property_create_range(plane->dev, 0, "alpha", 0, max_alpha);
-+	if (!prop)
-+		return -ENOMEM;
-+
-+	drm_object_attach_property(&plane->base, prop, max_alpha);
-+	plane->alpha_property = prop;
-+
-+	if (plane->state)
-+		plane->state->alpha = max_alpha;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(drm_plane_create_alpha_property);
-+
-+/**
-  * drm_plane_create_rotation_property - create a new rotation property
-  * @plane: drm plane
-  * @rotation: initial value of the rotation property
-diff --git a/include/drm/drm_blend.h b/include/drm/drm_blend.h
-index 17606026590b..e5affba6ebde 100644
---- a/include/drm/drm_blend.h
-+++ b/include/drm/drm_blend.h
-@@ -36,6 +36,7 @@ static inline bool drm_rotation_90_or_270(unsigned int rotation)
- 	return rotation & (DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_270);
- }
- 
-+int drm_plane_create_alpha_property(struct drm_plane *plane, u16 alpha);
- int drm_plane_create_rotation_property(struct drm_plane *plane,
- 				       unsigned int rotation,
- 				       unsigned int supported_rotations);
-diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
-index 8185e3468a23..5a6f29524f12 100644
---- a/include/drm/drm_plane.h
-+++ b/include/drm/drm_plane.h
-@@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
-  *	plane (in 16.16)
-  * @src_w: width of visible portion of plane (in 16.16)
-  * @src_h: height of visible portion of plane (in 16.16)
-+ * @alpha: opacity of the plane
-  * @rotation: rotation of the plane
-  * @zpos: priority of the given plane on crtc (optional)
-  *	Note that multiple active planes on the same crtc can have an identical
-@@ -105,6 +106,9 @@ struct drm_plane_state {
- 	uint32_t src_x, src_y;
- 	uint32_t src_h, src_w;
- 
-+	/* Plane opacity */
-+	u8 alpha;
-+
- 	/* Plane rotation */
- 	unsigned int rotation;
- 
-@@ -481,6 +485,7 @@ enum drm_plane_type {
-  * @funcs: helper functions
-  * @properties: property tracking for this plane
-  * @type: type of plane (overlay, primary, cursor)
-+ * @alpha_property: alpha property for this plane
-  * @zpos_property: zpos property for this plane
-  * @rotation_property: rotation property for this plane
-  * @helper_private: mid-layer private data
-@@ -556,6 +561,7 @@ struct drm_plane {
- 	 */
- 	struct drm_plane_state *state;
- 
-+	struct drm_property *alpha_property;
- 	struct drm_property *zpos_property;
- 	struct drm_property *rotation_property;
- };
+The main feature is that instead of implementing 2 planes per backend, we
+are now able to use the planes that are available in hardware. This was
+unsupported before because of the way the composition works in the
+hardware.
+
+Indeed, the planes are first grouped into 2 pipes that are doing a basic
+composition, in case of overlapping planes, it just takes whatever plane
+has the highest priority (=> zpos). Then, the alpha blending is done
+between the two pipes. This was simplified so far by only using two planes,
+one for each pipe, which was allowing us to have an illusion of proper
+alpha blending. This is further complicated by the bug/feature that the
+lowest plane must not have any alpha at all, otherwise the pixel will turn
+black, no matter what the value of alpha is. This basically means that we
+can have a plane with alpha only in the second pipe.
+
+However, as we have more and more blocks being worked on, 2 planes are
+getting really limited and we need to support all 4 of them.
+
+This is mostly possible by extending our atomic_check and to make sure that
+we enforce those constraints, and assign the pipes automatically. This is
+done by looking at the number of planes using an alpha component, and we
+then end up in various scenarios:
+  - 0 plane with alpha
+    => we don't care for the pipes at all. All the planes are assigned to
+       the first pipe
+  - 1 plane with alpha
+    => we assign all the planes without alpha below the plane with alpha to
+       the first pipe, and then all the remaining planes to the second
+       pipe. The plane with alpha will be the lowest plane on that pipe,
+       which means that whatever plane is above it will have precedence,
+       but the alpha component will remain and will be used on pixels that
+       are not overlapping
+  - 2-4 planes with alpha
+    => we can't operate that way, we just reject the configuration.
+
+In addition to the formats that embed an alpha component, we also add
+support for plane-wide alpha property, and in order to tweak the
+configuration the way we want to, we also add support for configurable
+zpos.
+
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Rebased on current drm-misc-next
+  - Removed the patches already applied
+  - Split the patch implementing the automatic pipe assignment in two
+
+Changes from v1:
+  - Document the behaviour on concurrent usage of the alpha property and an
+    alpha component in the format
+  - Allowed for higher alpha values
+  - Moved the alpha value from a helper to the struct drm_format_info
+  - Collected tags
+  - Rebased on current drm-misc-next
+
+Maxime Ripard (8):
+  drm/blend: Add a generic alpha property
+  drm/atmel-hclcdc: Convert to the new generic alpha property
+  drm/rcar-du: Convert to the new generic alpha property
+  drm/sun4i: backend: Assign the pipes automatically
+  drm/sun4i: Remove the plane description structure
+  drm/sun4i: backend: Make zpos configurable
+  drm/sun4i: Add support for plane alpha
+  drm/sun4i: backend: Remove ARGB spoofing
+
+ Documentation/gpu/kms-properties.csv            |  2 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
+ drivers/gpu/drm/drm_atomic.c                    |  4 +-
+ drivers/gpu/drm/drm_atomic_helper.c             |  4 +-
+ drivers/gpu/drm/drm_blend.c                     | 32 ++++++-
+ drivers/gpu/drm/rcar-du/rcar_du_drv.h           |  1 +-
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c           |  5 +-
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c         | 15 +--
+ drivers/gpu/drm/rcar-du/rcar_du_plane.h         |  2 +-
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c           | 42 +--------
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c           | 64 ++++++++++---
+ drivers/gpu/drm/sun4i/sun4i_backend.h           |  3 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c             | 57 ++----------
+ drivers/gpu/drm/sun4i/sun4i_layer.h             |  1 +-
+ include/drm/drm_blend.h                         |  1 +-
+ include/drm/drm_plane.h                         |  6 +-
+ 18 files changed, 140 insertions(+), 203 deletions(-)
+
+base-commit: 5db520e36bca3e1e1575ab14ca7dfb23b3d68407
 -- 
 git-series 0.9.1
