@@ -1,50 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Feb 2018 17:02:42 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Fix misplaced __iomem annotations
-In-Reply-To: <af3a8a44f6693f6293de49a1c2910a57ba12e208.1518800276.git.robin.murphy@arm.com>
-References: <af3a8a44f6693f6293de49a1c2910a57ba12e208.1518800276.git.robin.murphy@arm.com>
-Message-ID: <221594bd-313d-9b62-e0b3-abe1f5adbf8a@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Feb 2018 17:04:23 +0000
+Subject: [PATCH 2/2] arm64: cputype: Silence Sparse warnings
+In-Reply-To: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
+References: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
+Message-ID: <69caa31c38c24f5914f809aa0e9607beb9698702.1518800663.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/18 16:57, Robin Murphy wrote:
-> Save 26 lines worth of Sparse complaints by fixing up this minor
-> mishap. The pointee lies in the __iomem space; the pointer does not.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 06f025fd5726..3a38b4e8685e 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -2495,7 +2495,7 @@ static int its_vpe_set_affinity(struct irq_data *d,
->  
->  static void its_vpe_schedule(struct its_vpe *vpe)
->  {
-> -	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
-> +	void __iomem *vlpi_base = gic_data_rdist_vlpi_base();
->  	u64 val;
->  
->  	/* Schedule the VPE */
-> @@ -2527,7 +2527,7 @@ static void its_vpe_schedule(struct its_vpe *vpe)
->  
->  static void its_vpe_deschedule(struct its_vpe *vpe)
->  {
-> -	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
-> +	void __iomem *vlpi_base = gic_data_rdist_vlpi_base();
->  	u32 count = 1000000;	/* 1s! */
->  	bool clean;
->  	u64 val;
-> 
+Sparse makes a fair bit of noise about our MPIDR mask being implicitly
+long - let's explicitly describe it as such rather than just relying on
+the value forcing automatic promotion.
 
-Ah! Too bad you missed the pull request by a few hours... I'll stash
-that for -rc3.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/include/asm/cputype.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index be7bd19c87ec..eda8c5f629fc 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -20,7 +20,7 @@
+ 
+ #define MPIDR_UP_BITMASK	(0x1 << 30)
+ #define MPIDR_MT_BITMASK	(0x1 << 24)
+-#define MPIDR_HWID_BITMASK	0xff00ffffff
++#define MPIDR_HWID_BITMASK	0xff00ffffffUL
+ 
+ #define MPIDR_LEVEL_BITS_SHIFT	3
+ #define MPIDR_LEVEL_BITS	(1 << MPIDR_LEVEL_BITS_SHIFT)
 -- 
-Jazz is not dead. It just smells funny...
+2.16.1.dirty
