@@ -1,105 +1,93 @@
-From: kbingham@kernel.org (Kieran Bingham)
-Date: Fri, 16 Feb 2018 12:32:35 +0000
-Subject: [PATCH v2] arm64: dts: renesas: r8a77995-draak: Enable DU
-In-Reply-To: <1518683903-10681-7-git-send-email-kbingham@kernel.org>
-References: <1518683903-10681-7-git-send-email-kbingham@kernel.org>
-Message-ID: <1518784355-17272-1-git-send-email-kbingham@kernel.org>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 16 Feb 2018 13:33:53 +0100
+Subject: [PATCH v3 6/7] arm64: tegra: Add Tegra194 chip device tree
+In-Reply-To: <20180215145206.24775-7-mperttunen@nvidia.com>
+References: <20180215145206.24775-1-mperttunen@nvidia.com>
+ <20180215145206.24775-7-mperttunen@nvidia.com>
+Message-ID: <CAOFm3uHvbut7w5eBuggNg0NnW-UvBsRjifsJxGuj3L34vCjEHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Mikko,
 
-Enable the DU, providing only the VGA output for now.
+On Thu, Feb 15, 2018 at 3:52 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+> Add the chip-level device tree, including binding headers, for the
+> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
+> are initially available, enough to boot to UART console.
+>
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>
+> Notes:
+>     v3:
+>     - added hypervisor-related apertures to GIC node
+>     - removed GPL boilerplate in favor of SPDX and harmonized
+>       copyright headers
 
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
+Thanks for this boilerplate removal! but see a few nits below.
 
-Just a v2 update to fix the PFC name, and collect Laurent's RB tag.  The
-remainder of the series will likely be postponed due to dependencies on LVDS
-changes etc.
+<snip>
 
-v2:
- - Update du_dot_clk_0 name to match Ulrich's PFC configuration.
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/tegra194-clock.h
+> @@ -0,0 +1,653 @@
+> +/*
+> + * Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
 
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 51 ++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+The proper style should be this for a .h header on the first line per [1]
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index af07da240be0..37025251078a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -27,6 +27,38 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_in: endpoint {
-+				remote-endpoint = <&adv7123_out>;
-+			};
-+		};
-+	};
-+
-+	vga-encoder {
-+		compatible = "adi,adv7123";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7123_in: endpoint {
-+					remote-endpoint = <&du_out_rgb>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				adv7123_out: endpoint {
-+					remote-endpoint = <&vga_in>;
-+				};
-+			};
-+		};
-+	};
-+
- 	memory at 48000000 {
- 		device_type = "memory";
- 		/* first 128MB is reserved for secure area. */
-@@ -46,6 +78,11 @@
- 		};
- 	};
- 
-+	du_pins: du {
-+		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
-+		function = "du";
-+	};
-+
- 	i2c0_pins: i2c0 {
- 		groups = "i2c0";
- 		function = "i2c0";
-@@ -95,6 +132,20 @@
- 	status = "okay";
- };
- 
-+&du {
-+	pinctrl-0 = <&du_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	ports {
-+		port at 0 {
-+			endpoint {
-+				remote-endpoint = <&adv7123_in>;
-+			};
-+		};
-+	};
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+> + *
+> + */
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+
+<snip>
+
+> --- /dev/null
+> +++ b/include/dt-bindings/gpio/tegra194-gpio.h
+> @@ -0,0 +1,64 @@
+> +/*
+> + * Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+> +
+
+<snip>
+
+Same as above
+
+> --- /dev/null
+> +++ b/include/dt-bindings/power/tegra194-powergate.h
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+
+<snip>
+
+Same as above
+
+> --- /dev/null
+> +++ b/include/dt-bindings/reset/tegra194-reset.h
+> @@ -0,0 +1,155 @@
+> +/*
+> + * Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+
+<snip>
+
+Same as above
 -- 
-2.7.4
+Cordially
+Philippe Ombredanne
