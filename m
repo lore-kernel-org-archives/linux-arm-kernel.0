@@ -1,50 +1,105 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 16 Feb 2018 13:27:44 +0100
-Subject: [PATCH v2 1/1] clk: npcm7xx: add clock controler. fixed clock at
- DT
-In-Reply-To: <1518701454-22697-2-git-send-email-tali.perry1@gmail.com>
-References: <1518701454-22697-1-git-send-email-tali.perry1@gmail.com>
- <1518701454-22697-2-git-send-email-tali.perry1@gmail.com>
-Message-ID: <CAOFm3uHCkv893H_y-fJthNiW0=wO23ddCkZKBdfeiOOF0GAE_Q@mail.gmail.com>
+From: kbingham@kernel.org (Kieran Bingham)
+Date: Fri, 16 Feb 2018 12:32:35 +0000
+Subject: [PATCH v2] arm64: dts: renesas: r8a77995-draak: Enable DU
+In-Reply-To: <1518683903-10681-7-git-send-email-kbingham@kernel.org>
+References: <1518683903-10681-7-git-send-email-kbingham@kernel.org>
+Message-ID: <1518784355-17272-1-git-send-email-kbingham@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tali,
+From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-On Thu, Feb 15, 2018 at 2:30 PM, Tali Perry <tali.perry1@gmail.com> wrote:
-> --- /dev/null
-> +++ b/drivers/clk/clk-npcm7xx.c
-> @@ -0,0 +1,759 @@
-> +/*
-> + * Nuvoton NPCM7xx Clock Generator
-> + * All the clocks are initialized by the bootloader, so this driver allow only
-> + * reading of current settings directly from the hardware.
-> + *
-> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + * Released under the GPLv2 only.
-> + */
+Enable the DU, providing only the VGA output for now.
 
-Thank you for using the SPDX tags! but this can be streamlined a bit per [1]
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
 
-The correct way would come out as this: (note the tag placement and
-comment style and the removal of the now redundant unstructured
-notice)
+Just a v2 update to fix the PFC name, and collect Laurent's RB tag.  The
+remainder of the series will likely be postponed due to dependencies on LVDS
+changes etc.
 
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Nuvoton NPCM7xx Clock Generator
-> + * All the clocks are initialized by the bootloader, so this driver allow only
-> + * reading of current settings directly from the hardware.
-> + *
-> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
-> + */
+v2:
+ - Update du_dot_clk_0 name to match Ulrich's PFC configuration.
 
-And yes you may be surprised by the use of C++ style comment for
-this... This has been discussed on list and is what Linus prefers.
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 51 ++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+index af07da240be0..37025251078a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+@@ -27,6 +27,38 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_in: endpoint {
++				remote-endpoint = <&adv7123_out>;
++			};
++		};
++	};
++
++	vga-encoder {
++		compatible = "adi,adv7123";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7123_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				adv7123_out: endpoint {
++					remote-endpoint = <&vga_in>;
++				};
++			};
++		};
++	};
++
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -46,6 +78,11 @@
+ 		};
+ 	};
+ 
++	du_pins: du {
++		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
++		function = "du";
++	};
++
+ 	i2c0_pins: i2c0 {
+ 		groups = "i2c0";
+ 		function = "i2c0";
+@@ -95,6 +132,20 @@
+ 	status = "okay";
+ };
+ 
++&du {
++	pinctrl-0 = <&du_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7123_in>;
++			};
++		};
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
 -- 
-Cordially
-Philippe Ombredanne
+2.7.4
