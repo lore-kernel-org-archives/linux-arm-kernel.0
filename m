@@ -1,108 +1,109 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 16 Feb 2018 18:39:33 +0100
-Subject: [PATCH v3 5/8] drm/sun4i: Remove the plane description structure
-In-Reply-To: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Fri, 16 Feb 2018 20:20:41 +0200
+Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
+In-Reply-To: <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
 References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
-Message-ID: <6b09e3698e692c3338f70a5ae1e5a580f9dd08ee.1518802627.git-series.maxime.ripard@bootlin.com>
+ <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
+Message-ID: <20180216182041.GU5453@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The plane description structure was mostly needed to differentiate the
-formats usable on the primary plane (because of its lowest position), and
-assign the pipes. Now that both are dynamically checked and assigned, we
-can remove the static definition.
+On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
+> Some drivers duplicate the logic to create a property to store a per-plane
+> alpha.
+> 
+> This is especially useful if we ever want to support extra protocols for
+> Wayland like:
+> https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+> 
+> Let's create a helper in order to move that to the core.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  Documentation/gpu/kms-properties.csv |  2 +-
+>  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
+>  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
+>  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
+>  include/drm/drm_blend.h              |  1 +-
+>  include/drm/drm_plane.h              |  6 +++++-
+>  6 files changed, 48 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
+> index 927b65e14219..25ad3503d663 100644
+> --- a/Documentation/gpu/kms-properties.csv
+> +++ b/Documentation/gpu/kms-properties.csv
+> @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
+>  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+>  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+>  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+> -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+> +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the plane from transparent (0) to fully opaque (MAX). If this property is set to a value different than max, and that the pixel will define an alpha component, the property will have precendance and the pixel value will be ignored.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_layer.c | 44 +++++-------------------------
- 1 file changed, 8 insertions(+), 36 deletions(-)
+Those semantics don't seem particularly good to me. I think we would want the
+per-pixel alpha and global alpha both to be effecive at the same time. You can
+always decide to ignore the per-pixel alpha by using a pixel format without
+alpha.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 3e3d554713cb..85cc7e9461b3 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -19,13 +19,6 @@
- #include "sun4i_layer.h"
- #include "sunxi_engine.h"
- 
--struct sun4i_plane_desc {
--	enum drm_plane_type     type;
--	u8                      pipe;
--	const uint32_t          *formats;
--	uint32_t                nformats;
--};
--
- static void sun4i_backend_layer_reset(struct drm_plane *plane)
- {
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
-@@ -133,14 +126,7 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
- 	.update_plane		= drm_atomic_helper_update_plane,
- };
- 
--static const uint32_t sun4i_backend_layer_formats_primary[] = {
--	DRM_FORMAT_ARGB8888,
--	DRM_FORMAT_RGB888,
--	DRM_FORMAT_RGB565,
--	DRM_FORMAT_XRGB8888,
--};
--
--static const uint32_t sun4i_backend_layer_formats_overlay[] = {
-+static const uint32_t sun4i_backend_layer_formats[] = {
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_ARGB4444,
- 	DRM_FORMAT_ARGB1555,
-@@ -151,24 +137,9 @@ static const uint32_t sun4i_backend_layer_formats_overlay[] = {
- 	DRM_FORMAT_XRGB8888,
- };
- 
--static const struct sun4i_plane_desc sun4i_backend_planes[] = {
--	{
--		.type = DRM_PLANE_TYPE_PRIMARY,
--		.pipe = 0,
--		.formats = sun4i_backend_layer_formats_primary,
--		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_primary),
--	},
--	{
--		.type = DRM_PLANE_TYPE_OVERLAY,
--		.pipe = 1,
--		.formats = sun4i_backend_layer_formats_overlay,
--		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_overlay),
--	},
--};
--
- static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 						struct sun4i_backend *backend,
--						const struct sun4i_plane_desc *plane)
-+						enum drm_plane_type type)
- {
- 	struct sun4i_layer *layer;
- 	int ret;
-@@ -180,8 +151,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 	/* possible crtcs are set later */
- 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
- 				       &sun4i_backend_layer_funcs,
--				       plane->formats, plane->nformats,
--				       NULL, plane->type, NULL);
-+				       sun4i_backend_layer_formats,
-+				       ARRAY_SIZE(sun4i_backend_layer_formats),
-+				       NULL, type, NULL);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't initialize layer\n");
- 		return ERR_PTR(ret);
-@@ -207,11 +179,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 	if (!planes)
- 		return ERR_PTR(-ENOMEM);
- 
--	for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
--		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
-+	for (i = 0; i < SUN4I_BACKEND_NUM_LAYERS; i++) {
-+		enum drm_plane_type type = i ? DRM_PLANE_TYPE_OVERLAY : DRM_PLANE_TYPE_PRIMARY;
- 		struct sun4i_layer *layer;
- 
--		layer = sun4i_layer_init_one(drm, backend, plane);
-+		layer = sun4i_layer_init_one(drm, backend, type);
- 		if (IS_ERR(layer)) {
- 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
- 				i ? "overlay" : "primary");
+Also, where's the userspace that wants this feature?
+
+<snip>
+> diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
+> index 8185e3468a23..5a6f29524f12 100644
+> --- a/include/drm/drm_plane.h
+> +++ b/include/drm/drm_plane.h
+> @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
+>   *	plane (in 16.16)
+>   * @src_w: width of visible portion of plane (in 16.16)
+>   * @src_h: height of visible portion of plane (in 16.16)
+> + * @alpha: opacity of the plane
+>   * @rotation: rotation of the plane
+>   * @zpos: priority of the given plane on crtc (optional)
+>   *	Note that multiple active planes on the same crtc can have an identical
+> @@ -105,6 +106,9 @@ struct drm_plane_state {
+>  	uint32_t src_x, src_y;
+>  	uint32_t src_h, src_w;
+>  
+> +	/* Plane opacity */
+> +	u8 alpha;
+
+We may want to make that u16. The general we expect 16bpc for most color
+related things, but since this is a range prop I suppose we should just
+expose the actual hardware range. But making it u16 might avoid some head
+scratching for the first person to have hardware with higher precision.
+Either that or we should make the prop creation fail if the driver asks
+for more bits than we have in the state.
+
+Oh, and you should plug this into the state dumper as well.
+
+> +
+>  	/* Plane rotation */
+>  	unsigned int rotation;
+>  
+> @@ -481,6 +485,7 @@ enum drm_plane_type {
+>   * @funcs: helper functions
+>   * @properties: property tracking for this plane
+>   * @type: type of plane (overlay, primary, cursor)
+> + * @alpha_property: alpha property for this plane
+>   * @zpos_property: zpos property for this plane
+>   * @rotation_property: rotation property for this plane
+>   * @helper_private: mid-layer private data
+> @@ -556,6 +561,7 @@ struct drm_plane {
+>  	 */
+>  	struct drm_plane_state *state;
+>  
+> +	struct drm_property *alpha_property;
+>  	struct drm_property *zpos_property;
+>  	struct drm_property *rotation_property;
+>  };
+> -- 
+> git-series 0.9.1
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 -- 
-git-series 0.9.1
+Ville Syrj?l?
+Intel OTC
