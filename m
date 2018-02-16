@@ -1,47 +1,52 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 16 Feb 2018 21:41:54 +0100
-Subject: [PATCH v2 4/8] drm/rockchip: dw_hdmi: Allow outputs that don't need
- output switching
+Date: Fri, 16 Feb 2018 21:41:57 +0100
+Subject: [PATCH v2 7/8] drm/rockchip: dw_hdmi: store rockchip_hdmi reference
+ in phy_data object
 In-Reply-To: <20180216204158.29839-1-heiko@sntech.de>
 References: <20180216204158.29839-1-heiko@sntech.de>
-Message-ID: <20180216204158.29839-5-heiko@sntech.de>
+Message-ID: <20180216204158.29839-8-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we always encountered socs with 2 output crtcs needing the driver
-to tell the hdmi block which output to connect to. But there also exist
-socs with only one crtc like the rk3228, rk3328 and rk3368.
-
-So adapt the register field to simply carry a negative value to signal
-that now output-switching is necessary.
+When using special phy handling operations we'll often need access to
+the rockchip_hdmi struct. As the chip-data that occupies the phy_data
+pointer initially gets assigned to the rockchip_hdmi struct we can not
+re-use this phy_data pointer to hold the reference to the rockchip_hdmi
+struct, similar to how meson-hdmi does it for example.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 3574b0ae2ad1..6dc03f1a5709 100644
+index 305b68d223d7..8595638d4990 100644
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -36,7 +36,7 @@
-  * @lcdsel_lit: reg value of selecting vop little for HDMI
-  */
- struct rockchip_hdmi_chip_data {
--	u32	lcdsel_grf_reg;
-+	int	lcdsel_grf_reg;
- 	u32	lcdsel_big;
- 	u32	lcdsel_lit;
- };
-@@ -253,6 +253,9 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	u32 val;
- 	int ret;
+@@ -343,7 +343,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 				 void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	const struct dw_hdmi_plat_data *plat_data;
++	struct dw_hdmi_plat_data *plat_data;
+ 	const struct of_device_id *match;
+ 	struct drm_device *drm = data;
+ 	struct drm_encoder *encoder;
+@@ -358,9 +358,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return -ENOMEM;
  
-+	if (hdmi->chip_data->lcdsel_grf_reg < 0)
-+		return;
+ 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
+-	plat_data = match->data;
++	plat_data = devm_kmemdup(&pdev->dev, match->data,
++					     sizeof(*plat_data), GFP_KERNEL);
++	if (!plat_data)
++		return -ENOMEM;
 +
- 	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
- 	if (ret)
- 		val = hdmi->chip_data->lcdsel_lit;
+ 	hdmi->dev = &pdev->dev;
+ 	hdmi->chip_data = plat_data->phy_data;
++	plat_data->phy_data = hdmi;
+ 	encoder = &hdmi->encoder;
+ 
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
 -- 
 2.15.1
