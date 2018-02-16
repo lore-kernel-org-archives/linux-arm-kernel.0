@@ -1,74 +1,62 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 16 Feb 2018 16:36:56 +0100
-Subject: [PATCH v2 0/6] crypto: engine - Permit to enqueue all async
- requests
-In-Reply-To: <20180215155100.GJ7352@gondor.apana.org.au>
-References: <20180126191534.17569-1-clabbe.montjoie@gmail.com>
- <20180215155100.GJ7352@gondor.apana.org.au>
-Message-ID: <20180216153656.GA22492@Red>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 16 Feb 2018 16:50:49 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <e5d49c13-9b8f-d597-508c-10fed5300769@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180207103905.mtyzgu73mmifyvvj@flea>
+ <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
+ <20180208204043.mqryuqhx7a6z4v3b@flea>
+ <e5d49c13-9b8f-d597-508c-10fed5300769@micronovasrl.com>
+Message-ID: <20180216155049.r2mc724nfluwrrbe@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:51:00PM +0800, Herbert Xu wrote:
-> On Fri, Jan 26, 2018 at 08:15:28PM +0100, Corentin Labbe wrote:
-> > Hello
+On Thu, Feb 15, 2018 at 07:05:56PM +0100, Giulio Benetti wrote:
+> > If so, and if remember the captures properly, the sampling would occur
+> > right before the rise, and not really around the fall.
 > > 
-> > The current crypto_engine support only ahash and ablkcipher request.
-> > My first patch which try to add skcipher was Nacked, it will add too many functions
-> > and adding other algs(aead, asymetric_key) will make the situation worst.
-> > 
-> > This patchset remove all algs specific stuff and now only process generic crypto_async_request.
-> > 
-> > The requests handler function pointer are now moved out of struct engine and
-> > are now stored directly in a crypto_engine_reqctx.
-> > 
-> > The original proposal of Herbert [1] cannot be done completly since the crypto_engine
-> > could only dequeue crypto_async_request and it is impossible to access any request_ctx
-> > without knowing the underlying request type.
-> > 
-> > So I do something near that was requested: adding crypto_engine_reqctx in TFM context.
-> > Note that the current implementation expect that crypto_engine_reqctx
-> > is the first member of the context.
-> > 
-> > The first patch is a try to document the crypto engine API.
-> > The second patch convert the crypto engine with the new way,
-> > while the following patchs convert the 4 existing users of crypto_engine.
-> > Note that this split break bisection, so probably the final commit will be all merged.
-> > 
-> > Appart from virtio, all 4 latest patch were compile tested only.
-> > But the crypto engine is tested with my new sun8i-ce driver.
-> > 
-> > Regards
-> > 
-> > [1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
-> > 
-> > Changes since V1:
-> > - renamed crypto_engine_reqctx to crypto_engine_ctx
-> > - indentation fix in function parameter
-> > - do not export crypto_transfer_request
-> > - Add aead support
-> > - crypto_finalize_request is now static
-> > 
-> > Changes since RFC:
-> > - Added a documentation patch
-> > - Added patch for stm32-cryp
-> > - Changed parameter of all crypto_engine_op functions from
-> > 	crypto_async_request to void*
-> > - Reintroduced crypto_transfer_xxx_request_to_engine functions
-> > 
-> > Corentin Labbe (6):
-> >   Documentation: crypto: document crypto engine API
-> >   crypto: engine - Permit to enqueue all async requests
-> >   crypto: omap: convert to new crypto engine API
-> >   crypto: virtio: convert to new crypto engine API
-> >   crypto: stm32-hash: convert to the new crypto engine API
-> >   crypto: stm32-cryp: convert to the new crypto engine API
+> > Would 2/3 be better here?
 > 
-> All applied.  Thanks.
+> Yes, you're right, 2/3 phase is better:
+> 
+> 1/3 phase: https://pasteboard.co/H4VehON.png
+> 2/3 phase: https://pasteboard.co/H4Veq8a.png
+> 
+> Take a look at the bit in middle(yellow) sampled by clock(blue).
+> 
+> Rising edge is almost in the middle of D0 bit.
+> 
+> > 
+> > > According to scope captures above on both A20 and A33.
+> > > Unfortunately I don't have other boards for the other SoCs to take captures.
+> > > 
+> > > What do you think?
+> > 
+> > I guess we can make that part applicable to all SoCs, we haven't seen
+> > any significant differences on those part.
+> 
+> So let's keep:
+> - As normal(rising edge) => IO_POL_REG "0x2 => 2/3 phase"
+> - As inverted(falling edge) => IO_POL_REG "0x0 => normal phase"
 
-Hello
+I was actually thinking 1/3 for rising, 2/3 for falling.
 
-As mentionned in the cover letter, all patchs (except documentation one) should be squashed.
-A kbuild robot reported a build error on cryptodev due to this.
+Maxime
 
-Regards
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180216/af2ccffd/attachment.sig>
