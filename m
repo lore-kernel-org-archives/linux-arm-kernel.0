@@ -1,25 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Feb 2018 21:25:30 +0300
-Subject: [PATCH v2 0/5] Add R8A77980/Condor board support
-Message-ID: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Feb 2018 18:28:14 +0000
+Subject: [PATCH 1/2] arm64: uaccess: Clean up types for access_ok()
+In-Reply-To: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
+References: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
+Message-ID: <20180216182813.dlwfuqkzcotctd6a@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Fri, Feb 16, 2018 at 05:04:22PM +0000, Robin Murphy wrote:
+> In converting __range_ok() into a static inline, I inadvertently made
+> it more type-safe, but without considering the ordering of the relevant
+> conversions. This leads to quite a lot of Sparse noise about the fact
+> that we use __chk_user_ptr() after addr has already been converted from
+> a user pointer to an unsigned long.
+> 
+> Tweak the prototype and locals so the types all make logical sense and
+> Sparse is happy (although the resulting codegen remains identical). The
+> only external site this affects is in compat syscalls where the inferred
+> "user-pointer-ness" of a register value now warrants an explicit cast.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
-'renesas-devel-20180216-v4.16-rc1' tag. I'm adding the device tree support
-for the R8A77980-based Condor board (note that NFS root would only work on
-the Condor boards [re]wired for booting from EtherAVB -- we haven't been
-able to get the 'sh_eth' driver working in either U-Boot or Linux so far).
-The necessary SYS-DMAC, [H]SCIF, and EtherAVB bindings updates have been
-posted, the clock driver has been reposted yesterday, and the merged patches
-have been dropped from this respin of the series...
+Both applied. Thanks.
 
-[1/5] soc: renesas: rcar-sysc: add R8A77980 support
-[2/5] arm64: dts: renesas: r8a77980: add [H]SCIF support
-[3/5] arm64: dts: renesas: r8a77980: add EtherAVB support
-[4/5] arm64: dts: renesas: initial Condor board device tree
-[5/5] arm64: dts: renesas: condor: add EtherAVB support
-
-WBR, Sergei
+-- 
+Catalin
