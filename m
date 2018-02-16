@@ -1,130 +1,54 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 16 Feb 2018 16:17:28 -0300
-Subject: [PATCH 23/41] perf cs-etm: Properly deal with cpu maps
-In-Reply-To: <20180216191746.11095-1-acme@kernel.org>
-References: <20180216191746.11095-1-acme@kernel.org>
-Message-ID: <20180216191746.11095-24-acme@kernel.org>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 16 Feb 2018 20:19:23 +0100
+Subject: [PATCH 1/6] nand: davinci: rename the platform driver
+In-Reply-To: <20180216164712.25898-2-brgl@bgdev.pl>
+References: <20180216164712.25898-1-brgl@bgdev.pl>
+ <20180216164712.25898-2-brgl@bgdev.pl>
+Message-ID: <20180216201923.16bfca7f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On Fri, 16 Feb 2018 17:47:07 +0100
+Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 
-This patch allows the CoreSight AUX info section to fit topologies where
-only a subset of all available CPUs are present, avoiding at the same
-time accessing the ETM configuration areas of CPUs that have been
-offlined.
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Commit d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock
+> lookup table") broke the nand support in board file mode for
+> da850-based boards. Instead of reverting it and breaking the DT users
+> in the process (due to clock lookup), rename the driver to match the
+> clock table before renaming the users.
+> 
+> Fixes: d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock lookup table")
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/mtd/nand/davinci_nand.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index ccc8c43abcff..4fb143bf1872 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -865,7 +865,7 @@ static struct platform_driver nand_davinci_driver = {
+>  	.probe		= nand_davinci_probe,
+>  	.remove		= nand_davinci_remove,
+>  	.driver		= {
+> -		.name	= "davinci_nand",
+> +		.name	= "davinci-nand",
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1518478737-24649-1-git-send-email-mathieu.poirier at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/arch/arm/util/cs-etm.c | 51 +++++++++++++++++++++++++++------------
- 1 file changed, 36 insertions(+), 15 deletions(-)
+Another side-effect of this change you should be aware of: by doing
+that you also break all users that were defining partitions through the
+cmdline using mtdparts=davinci_nand.0:<part-layout>.
 
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index fbfc055d3f4d..5c655ad4621e 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -298,12 +298,17 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
- {
- 	int i;
- 	int etmv3 = 0, etmv4 = 0;
--	const struct cpu_map *cpus = evlist->cpus;
-+	struct cpu_map *event_cpus = evlist->cpus;
-+	struct cpu_map *online_cpus = cpu_map__new(NULL);
- 
- 	/* cpu map is not empty, we have specific CPUs to work with */
--	if (!cpu_map__empty(cpus)) {
--		for (i = 0; i < cpu_map__nr(cpus); i++) {
--			if (cs_etm_is_etmv4(itr, cpus->map[i]))
-+	if (!cpu_map__empty(event_cpus)) {
-+		for (i = 0; i < cpu__max_cpu(); i++) {
-+			if (!cpu_map__has(event_cpus, i) ||
-+			    !cpu_map__has(online_cpus, i))
-+				continue;
-+
-+			if (cs_etm_is_etmv4(itr, i))
- 				etmv4++;
- 			else
- 				etmv3++;
-@@ -311,6 +316,9 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
- 	} else {
- 		/* get configuration for all CPUs in the system */
- 		for (i = 0; i < cpu__max_cpu(); i++) {
-+			if (!cpu_map__has(online_cpus, i))
-+				continue;
-+
- 			if (cs_etm_is_etmv4(itr, i))
- 				etmv4++;
- 			else
-@@ -318,6 +326,8 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
- 		}
- 	}
- 
-+	cpu_map__put(online_cpus);
-+
- 	return (CS_ETM_HEADER_SIZE +
- 	       (etmv4 * CS_ETMV4_PRIV_SIZE) +
- 	       (etmv3 * CS_ETMV3_PRIV_SIZE));
-@@ -447,7 +457,9 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
- 	int i;
- 	u32 offset;
- 	u64 nr_cpu, type;
--	const struct cpu_map *cpus = session->evlist->cpus;
-+	struct cpu_map *cpu_map;
-+	struct cpu_map *event_cpus = session->evlist->cpus;
-+	struct cpu_map *online_cpus = cpu_map__new(NULL);
- 	struct cs_etm_recording *ptr =
- 			container_of(itr, struct cs_etm_recording, itr);
- 	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
-@@ -458,8 +470,21 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
- 	if (!session->evlist->nr_mmaps)
- 		return -EINVAL;
- 
--	/* If the cpu_map is empty all CPUs are involved */
--	nr_cpu = cpu_map__empty(cpus) ? cpu__max_cpu() : cpu_map__nr(cpus);
-+	/* If the cpu_map is empty all online CPUs are involved */
-+	if (cpu_map__empty(event_cpus)) {
-+		cpu_map = online_cpus;
-+	} else {
-+		/* Make sure all specified CPUs are online */
-+		for (i = 0; i < cpu_map__nr(event_cpus); i++) {
-+			if (cpu_map__has(event_cpus, i) &&
-+			    !cpu_map__has(online_cpus, i))
-+				return -EINVAL;
-+		}
-+
-+		cpu_map = event_cpus;
-+	}
-+
-+	nr_cpu = cpu_map__nr(cpu_map);
- 	/* Get PMU type as dynamically assigned by the core */
- 	type = cs_etm_pmu->type;
- 
-@@ -472,15 +497,11 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
- 
- 	offset = CS_ETM_SNAPSHOT + 1;
- 
--	/* cpu map is not empty, we have specific CPUs to work with */
--	if (!cpu_map__empty(cpus)) {
--		for (i = 0; i < cpu_map__nr(cpus) && offset < priv_size; i++)
--			cs_etm_get_metadata(cpus->map[i], &offset, itr, info);
--	} else {
--		/* get configuration for all CPUs in the system */
--		for (i = 0; i < cpu__max_cpu(); i++)
-+	for (i = 0; i < cpu__max_cpu() && offset < priv_size; i++)
-+		if (cpu_map__has(cpu_map, i))
- 			cs_etm_get_metadata(i, &offset, itr, info);
--	}
-+
-+	cpu_map__put(online_cpus);
- 
- 	return 0;
- }
+Not sure this is a good idea ;-).
+
+>  		.of_match_table = of_match_ptr(davinci_nand_of_match),
+>  	},
+>  };
+
+
+
 -- 
-2.14.3
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
