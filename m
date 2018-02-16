@@ -1,319 +1,45 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 15 Feb 2018 18:40:10 -0800
-Subject: [PATCH v11 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <20180216024011.189157-1-brendanhiggins@google.com>
-References: <20180216024011.189157-1-brendanhiggins@google.com>
-Message-ID: <20180216024011.189157-3-brendanhiggins@google.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Fri, 16 Feb 2018 14:47:58 +1100 (AEDT)
+Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
+In-Reply-To: <20180214.171558.1617880686804101923.davem@davemloft.net>
+References: <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
+ <20180213.095820.761578588685460710.davem@davemloft.net>
+ <alpine.LNX.2.21.1802150857480.8@nippy.intranet>
+ <20180214.171558.1617880686804101923.davem@davemloft.net>
+Message-ID: <alpine.LNX.2.21.1802161203480.8@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+On Wed, 14 Feb 2018, David Miller wrote:
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Reviewed-by: Joel Stanley <joel@jms.id.au>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
-Tested-by: Joel Stanley <joel@jms.id.au>
----
- .../arm/cpu-enable-method/nuvoton,npcm750-smp |  42 +++++
- .../devicetree/bindings/arm/npcm/npcm.txt     |   6 +
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts     |  35 ++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi        | 165 ++++++++++++++++++
- 5 files changed, 250 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> > Have you considered that implementing the ethtool hooks in the core 
+> > driver might allow removal of all 8390 driver 'msg_enable' module 
+> > parameters and msglevel ethtool hooks added by c45f812f0280, excepting 
+> > those in the core driver? But even if we did that, it seems to me that 
+> > we still need this patch.
+> 
+> No, because the module parameter lets you set the default msg level at 
+> the time the driver loads, so you can control messages printed very 
+> early on before it is practical to invoke ethtool and set the msg level.
+> 
+> This is why most drivers have this module parameter, and implement
+> such a scheme.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
-new file mode 100644
-index 000000000000..8e043301e28e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
-@@ -0,0 +1,42 @@
-+=========================================================
-+Secondary CPU enable-method "nuvoton,npcm750-smp" binding
-+=========================================================
-+
-+To apply to all CPUs, a single "nuvoton,npcm750-smp" enable method should be
-+defined in the "cpus" node.
-+
-+Enable method name:	"nuvoton,npcm750-smp"
-+Compatible machines:	"nuvoton,npcm750"
-+Compatible CPUs:	"arm,cortex-a9"
-+Related properties:	(none)
-+
-+Note:
-+This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
-+"nuvoton,npcm750-gcr".
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm750-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..2d87d9ecea85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..eeab5dac50ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -304,6 +304,8 @@ dtb-$(CONFIG_ARCH_LPC18XX) += \
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	lpc3250-ea3250.dtb \
- 	lpc3250-phy3250.dtb
-+dtb-$(CONFIG_ARCH_NPCM750) += \
-+	nuvoton-npcm750-evb.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
- 	meson6-atv1200.dtb
- dtb-$(CONFIG_MACH_MESON8) += \
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..cabde3d5be8a
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,35 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology corporation.
-+// Copyright 2018 Google, Inc.
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+};
-+
-+&serial0 {
-+	status = "okay";
-+};
-+
-+&serial1 {
-+	status = "okay";
-+};
-+
-+&serial2 {
-+	status = "okay";
-+};
-+
-+&serial3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..839e45cfd695
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,165 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology corporation.
-+// Copyright 2018 Google, Inc.
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm750-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 10>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 10>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	/* external clock signal rg1refck, supplied by the phy */
-+	clk-rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	/* external clock signal rg2refck, supplied by the phy */
-+	clk-rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	clk-xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0x0 0xf0000000 0x00900000>;
-+
-+		gcr: gcr at 800000 {
-+			compatible = "nuvoton,npcm750-gcr", "syscon",
-+				"simple-mfd";
-+			reg = <0x800000 0x1000>;
-+		};
-+
-+		scu: scu at 3fe000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0x3fe000 0x1000>;
-+		};
-+
-+		l2: cache-controller at 3fc000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x3fc000 0x1000>;
-+			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			cache-unified;
-+			cache-level = <2>;
-+			clocks = <&clk 22>;
-+			arm,shared-override;
-+		};
-+
-+		gic: interrupt-controller at 3ff000 {
-+			compatible = "arm,cortex-a9-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x3ff000 0x1000>,
-+			    <0x3fe100 0x100>;
-+		};
-+
-+		timer at 3fe600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x3fe600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&clk 15>;
-+		};
-+	};
-+
-+	ahb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		clk: clock-controller at f0801000 {
-+			compatible = "nuvoton,npcm750-clk";
-+			#clock-cells = <1>;
-+			reg = <0xf0801000 0x1000>;
-+		};
-+
-+		apb {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			interrupt-parent = <&gic>;
-+			ranges = <0x0 0xf0000000 0x00300000>;
-+
-+			timer0: timer at 8000 {
-+				compatible = "nuvoton,npcm750-timer";
-+				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0x8000 0x1000>;
-+				clocks = <&clk 15>;
-+			};
-+
-+			serial0: serial at 1000 {
-+				compatible = "ns16550a";
-+				reg = <0x1000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial1: serial at 2000 {
-+				compatible = "ns16550a";
-+				reg = <0x2000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial2: serial at 3000 {
-+				compatible = "ns16550a";
-+				reg = <0x3000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial3: serial at 4000 {
-+				compatible = "ns16550a";
-+				reg = <0x4000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
+Among the 8390 drivers, so far only ne2k-pci implements that scheme.
+
+This patch implements that scheme for ax88796 and etherh as well, by 
+making better use of the msg_enable module parameter in lib8390.c.
+
+The axnet_cs and pcnet_cs modules lack the msglevel ethtool ops and the 
+msg_enable module parameters.
+
+The remaining nine modules lack just the ethtool ops. If you like I will 
+write additional patches to implement the missing ethtool ops or module 
+parameters or both (?)
+
+This small patch already addresses the use-case in which the end-user 
+needs to enable (for example) probe messages for some or all 8390 drivers.
+
+Thoughts?
+
 -- 
-2.16.1.291.g4437f3f132-goog
