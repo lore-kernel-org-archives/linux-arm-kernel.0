@@ -1,245 +1,217 @@
 From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Fri, 16 Feb 2018 12:23:05 +0100
-Subject: [PATCH 1/7 RESEND] arm64: move arm uprobes code to be reused by arm64
+Date: Fri, 16 Feb 2018 12:23:08 +0100
+Subject: [PATCH 4/7 RESEND] arm64: change arm64 probes handler prototype
 In-Reply-To: <1518780191-31094-1-git-send-email-m.slodczyk2@partner.samsung.com>
 References: <1518780191-31094-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180216112320eucas1p157eae5e9830028e944f23cad1c81c6eb@eucas1p1.samsung.com>
-Message-ID: <1518780191-31094-2-git-send-email-m.slodczyk2@partner.samsung.com>
+ <CGME20180216112323eucas1p1fd0302348ff3c5f47f0aa8ef52b39401@eucas1p1.samsung.com>
+Message-ID: <1518780191-31094-5-git-send-email-m.slodczyk2@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move ARM32 uprobes code from arch/arm/probes/ to a more common location -
-lib/probes/arm/. This code will be used by ARM64 code when uprobing 32-bit
-applications.
+A probes_handler_t() handler function prototype differ between ARM32 and ARM64
+arch subtrees. Make ARM64 prototype the same as ARM32 prototype and adjust the
+ARM64 code to work with the new prototype.
 
 Signed-off-by: Maciej Slodczyk <m.slodczyk2@partner.samsung.com>
 ---
- arch/arm/probes/Makefile                                  | 8 ++++----
- arch/arm/probes/kprobes/actions-arm.c                     | 2 +-
- arch/arm/probes/kprobes/checkers-arm.c                    | 4 ++--
- arch/arm/probes/kprobes/checkers-common.c                 | 4 ++--
- arch/arm/probes/kprobes/checkers-thumb.c                  | 2 +-
- arch/arm/probes/kprobes/checkers.h                        | 2 +-
- arch/arm/probes/kprobes/core.c                            | 2 +-
- arch/arm/probes/kprobes/core.h                            | 2 +-
- arch/arm/probes/uprobes/Makefile                          | 2 +-
- arch/arm/probes/uprobes/core.c                            | 4 ++--
- lib/Makefile                                              | 2 ++
- lib/probes/Makefile                                       | 1 +
- lib/probes/arm/Makefile                                   | 6 ++++++
- {arch/arm/probes/uprobes => lib/probes/arm}/actions-arm.c | 4 ++--
- {arch/arm/probes => lib/probes/arm}/decode-arm.c          | 0
- {arch/arm/probes => lib/probes/arm}/decode-arm.h          | 0
- {arch/arm/probes => lib/probes/arm}/decode.c              | 0
- {arch/arm/probes => lib/probes/arm}/decode.h              | 0
- 18 files changed, 27 insertions(+), 18 deletions(-)
- create mode 100644 lib/probes/Makefile
- create mode 100644 lib/probes/arm/Makefile
- rename {arch/arm/probes/uprobes => lib/probes/arm}/actions-arm.c (99%)
- rename {arch/arm/probes => lib/probes/arm}/decode-arm.c (100%)
- rename {arch/arm/probes => lib/probes/arm}/decode-arm.h (100%)
- rename {arch/arm/probes => lib/probes/arm}/decode.c (100%)
- rename {arch/arm/probes => lib/probes/arm}/decode.h (100%)
+ arch/arm64/include/asm/probes.h          |  6 +++++-
+ arch/arm64/kernel/probes/kprobes.c       |  2 +-
+ arch/arm64/kernel/probes/simulate-insn.c | 32 ++++++++++++++++++++++++--------
+ arch/arm64/kernel/probes/simulate-insn.h | 24 ++++++++++++++++--------
+ arch/arm64/kernel/probes/uprobes.c       |  3 +--
+ 5 files changed, 47 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/probes/Makefile b/arch/arm/probes/Makefile
-index 8b0ea5a..9e22de6 100644
---- a/arch/arm/probes/Makefile
-+++ b/arch/arm/probes/Makefile
-@@ -1,8 +1,8 @@
- # SPDX-License-Identifier: GPL-2.0
--obj-$(CONFIG_UPROBES)		+= decode.o decode-arm.o uprobes/
--obj-$(CONFIG_KPROBES)		+= decode.o kprobes/
-+subdir-ccflags-y := -I$(srctree)/lib/probes/arm/
+diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+index 6a5b289..1747e9a 100644
+--- a/arch/arm64/include/asm/probes.h
++++ b/arch/arm64/include/asm/probes.h
+@@ -16,7 +16,11 @@
+ #define _ARM_PROBES_H
+ 
+ typedef u32 probe_opcode_t;
+-typedef void (probes_handler_t) (u32 opcode, long addr, struct pt_regs *);
++struct arch_probe_insn;
 +
-+obj-$(CONFIG_UPROBES)		+= uprobes/
-+obj-$(CONFIG_KPROBES)		+= kprobes/
- ifdef CONFIG_THUMB2_KERNEL
- obj-$(CONFIG_KPROBES)		+= decode-thumb.o
--else
--obj-$(CONFIG_KPROBES)		+= decode-arm.o
- endif
-diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
-index b9056d6..fb1179e 100644
---- a/arch/arm/probes/kprobes/actions-arm.c
-+++ b/arch/arm/probes/kprobes/actions-arm.c
-@@ -62,7 +62,7 @@
- #include <linux/kprobes.h>
- #include <linux/ptrace.h>
++typedef void (probes_handler_t) (u32 opcode,
++			   struct arch_probe_insn *api,
++			   struct pt_regs *);
  
--#include "../decode-arm.h"
-+#include "decode-arm.h"
- #include "core.h"
- #include "checkers.h"
+ /* architecture specific copy of original instruction */
+ struct arch_probe_insn {
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index d849d98..fc9f67c 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -69,7 +69,7 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+ 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
  
-diff --git a/arch/arm/probes/kprobes/checkers-arm.c b/arch/arm/probes/kprobes/checkers-arm.c
-index 7b98173..29520a2 100644
---- a/arch/arm/probes/kprobes/checkers-arm.c
-+++ b/arch/arm/probes/kprobes/checkers-arm.c
-@@ -14,8 +14,8 @@
+ 	if (p->ainsn.api.handler)
+-		p->ainsn.api.handler((u32)p->opcode, (long)p->addr, regs);
++		p->ainsn.api.handler((u32)p->opcode, &p->ainsn.api, regs);
+ 
+ 	/* single step simulated, now go for post processing */
+ 	post_kprobe_handler(kcb, regs);
+diff --git a/arch/arm64/kernel/probes/simulate-insn.c b/arch/arm64/kernel/probes/simulate-insn.c
+index be05868..22dc7a7 100644
+--- a/arch/arm64/kernel/probes/simulate-insn.c
++++ b/arch/arm64/kernel/probes/simulate-insn.c
+@@ -92,9 +92,11 @@ static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
+  * instruction simulation functions
   */
+ void __kprobes
+-simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
++simulate_adr_adrp(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	long imm, xn, val;
++	long addr = instruction_pointer(regs);
  
- #include <linux/kernel.h>
--#include "../decode.h"
--#include "../decode-arm.h"
-+#include "decode.h"
-+#include "decode-arm.h"
- #include "checkers.h"
+ 	xn = opcode & 0x1f;
+ 	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
+@@ -110,9 +112,11 @@ simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
- static enum probes_insn __kprobes arm_check_stack(probes_opcode_t insn,
-diff --git a/arch/arm/probes/kprobes/checkers-common.c b/arch/arm/probes/kprobes/checkers-common.c
-index 971119c..afc3a38 100644
---- a/arch/arm/probes/kprobes/checkers-common.c
-+++ b/arch/arm/probes/kprobes/checkers-common.c
-@@ -14,8 +14,8 @@
-  */
+ void __kprobes
+-simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
++simulate_b_bl(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	int disp = bbl_displacement(opcode);
++	long addr = instruction_pointer(regs);
  
- #include <linux/kernel.h>
--#include "../decode.h"
--#include "../decode-arm.h"
-+#include "decode.h"
-+#include "decode-arm.h"
- #include "checkers.h"
+ 	/* Link register is x30 */
+ 	if (opcode & (1 << 31))
+@@ -122,9 +126,11 @@ simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
- enum probes_insn checker_stack_use_none(probes_opcode_t insn,
-diff --git a/arch/arm/probes/kprobes/checkers-thumb.c b/arch/arm/probes/kprobes/checkers-thumb.c
-index d608e3b..847f1ee 100644
---- a/arch/arm/probes/kprobes/checkers-thumb.c
-+++ b/arch/arm/probes/kprobes/checkers-thumb.c
-@@ -14,7 +14,7 @@
-  */
+ void __kprobes
+-simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
++simulate_b_cond(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	int disp = 4;
++	long addr = instruction_pointer(regs);
  
- #include <linux/kernel.h>
--#include "../decode.h"
-+#include "decode.h"
- #include "../decode-thumb.h"
- #include "checkers.h"
+ 	if (aarch32_opcode_cond_checks[opcode & 0xf](regs->pstate & 0xffffffff))
+ 		disp = bcond_displacement(opcode);
+@@ -133,9 +139,11 @@ simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
-diff --git a/arch/arm/probes/kprobes/checkers.h b/arch/arm/probes/kprobes/checkers.h
-index cf6c9e7..9bbab0d 100644
---- a/arch/arm/probes/kprobes/checkers.h
-+++ b/arch/arm/probes/kprobes/checkers.h
-@@ -17,7 +17,7 @@
+ void __kprobes
+-simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
++simulate_br_blr_ret(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	int xn = (opcode >> 5) & 0x1f;
++	long addr = instruction_pointer(regs);
  
- #include <linux/kernel.h>
- #include <linux/types.h>
--#include "../decode.h"
-+#include "decode.h"
+ 	/* update pc first in case we're doing a "blr lr" */
+ 	instruction_pointer_set(regs, get_x_reg(regs, xn));
+@@ -146,9 +154,11 @@ simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
- extern probes_check_t checker_stack_use_none;
- extern probes_check_t checker_stack_use_unknown;
-diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
-index 52d1cd1..50c3fcb 100644
---- a/arch/arm/probes/kprobes/core.c
-+++ b/arch/arm/probes/kprobes/core.c
-@@ -33,7 +33,7 @@
- #include <linux/bug.h>
- #include <asm/patch.h>
+ void __kprobes
+-simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
++simulate_cbz_cbnz(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	int disp = 4;
++	long addr = instruction_pointer(regs);
  
--#include "../decode-arm.h"
-+#include "decode-arm.h"
- #include "../decode-thumb.h"
- #include "core.h"
+ 	if (opcode & (1 << 24)) {
+ 		if (check_cbnz(opcode, regs))
+@@ -161,9 +171,11 @@ simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
-diff --git a/arch/arm/probes/kprobes/core.h b/arch/arm/probes/kprobes/core.h
-index ec5d1f2..4da60f0 100644
---- a/arch/arm/probes/kprobes/core.h
-+++ b/arch/arm/probes/kprobes/core.h
-@@ -20,7 +20,7 @@
- #define _ARM_KERNEL_KPROBES_H
+ void __kprobes
+-simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
++simulate_tbz_tbnz(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	int disp = 4;
++	long addr = instruction_pointer(regs);
  
- #include <asm/kprobes.h>
--#include "../decode.h"
-+#include "decode.h"
+ 	if (opcode & (1 << 24)) {
+ 		if (check_tbnz(opcode, regs))
+@@ -176,11 +188,13 @@ simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
- /*
-  * These undefined instructions must be unique and
-diff --git a/arch/arm/probes/uprobes/Makefile b/arch/arm/probes/uprobes/Makefile
-index e1dc3d0..0d05ba9 100644
---- a/arch/arm/probes/uprobes/Makefile
-+++ b/arch/arm/probes/uprobes/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_UPROBES)		+= core.o actions-arm.o
-+obj-$(CONFIG_UPROBES)		+= core.o
-diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
-index d1329f1..8681026 100644
---- a/arch/arm/probes/uprobes/core.c
-+++ b/arch/arm/probes/uprobes/core.c
-@@ -17,8 +17,8 @@
- #include <asm/opcodes.h>
- #include <asm/traps.h>
+ void __kprobes
+-simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
++simulate_ldr_literal(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	u64 *load_addr;
+ 	int xn = opcode & 0x1f;
+ 	int disp;
++	long addr = instruction_pointer(regs);
  
--#include "../decode.h"
--#include "../decode-arm.h"
-+#include "decode.h"
-+#include "decode-arm.h"
- #include "core.h"
+ 	disp = ldr_displacement(opcode);
+ 	load_addr = (u64 *) (addr + disp);
+@@ -194,11 +208,13 @@ simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
+ }
  
- #define UPROBE_TRAP_NR	UINT_MAX
-diff --git a/lib/Makefile b/lib/Makefile
-index d11c48e..694886a 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -124,6 +124,8 @@ obj-$(CONFIG_ZSTD_COMPRESS) += zstd/
- obj-$(CONFIG_ZSTD_DECOMPRESS) += zstd/
- obj-$(CONFIG_XZ_DEC) += xz/
- obj-$(CONFIG_RAID6_PQ) += raid6/
-+obj-$(CONFIG_UPROBES) += probes/
-+obj-$(CONFIG_KPROBES) += probes/
+ void __kprobes
+-simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs)
++simulate_ldrsw_literal(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs)
+ {
+ 	s32 *load_addr;
+ 	int xn = opcode & 0x1f;
+ 	int disp;
++	long addr = instruction_pointer(regs);
  
- lib-$(CONFIG_DECOMPRESS_GZIP) += decompress_inflate.o
- lib-$(CONFIG_DECOMPRESS_BZIP2) += decompress_bunzip2.o
-diff --git a/lib/probes/Makefile b/lib/probes/Makefile
-new file mode 100644
-index 0000000..534a2b7
---- /dev/null
-+++ b/lib/probes/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARM)		+= arm/
-diff --git a/lib/probes/arm/Makefile b/lib/probes/arm/Makefile
-new file mode 100644
-index 0000000..1c97b8f
---- /dev/null
-+++ b/lib/probes/arm/Makefile
-@@ -0,0 +1,6 @@
-+ccflags-y += -I$(srctree)/arch/arm/probes/uprobes/
-+obj-$(CONFIG_UPROBES)		+= decode.o decode-arm.o actions-arm.o
-+obj-$(CONFIG_KPROBES)		+= decode.o
-+ifndef CONFIG_THUMB2_KERNEL
-+obj-$(CONFIG_KPROBES)		+= decode-arm.o
-+endif
-diff --git a/arch/arm/probes/uprobes/actions-arm.c b/lib/probes/arm/actions-arm.c
-similarity index 99%
-rename from arch/arm/probes/uprobes/actions-arm.c
-rename to lib/probes/arm/actions-arm.c
-index 76eb449..a25795a 100644
---- a/arch/arm/probes/uprobes/actions-arm.c
-+++ b/lib/probes/arm/actions-arm.c
-@@ -13,8 +13,8 @@
- #include <linux/uprobes.h>
- #include <linux/module.h>
+ 	disp = ldr_displacement(opcode);
+ 	load_addr = (s32 *) (addr + disp);
+diff --git a/arch/arm64/kernel/probes/simulate-insn.h b/arch/arm64/kernel/probes/simulate-insn.h
+index 050bde6..31b3840 100644
+--- a/arch/arm64/kernel/probes/simulate-insn.h
++++ b/arch/arm64/kernel/probes/simulate-insn.h
+@@ -16,13 +16,21 @@
+ #ifndef _ARM_KERNEL_KPROBES_SIMULATE_INSN_H
+ #define _ARM_KERNEL_KPROBES_SIMULATE_INSN_H
  
--#include "../decode.h"
--#include "../decode-arm.h"
-+#include "decode.h"
-+#include "decode-arm.h"
- #include "core.h"
+-void simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs);
+-void simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs);
++void simulate_adr_adrp(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_b_bl(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_b_cond(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_br_blr_ret(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_cbz_cbnz(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_tbz_tbnz(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_ldr_literal(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
++void simulate_ldrsw_literal(u32 opcode, struct arch_probe_insn *api,
++		struct pt_regs *regs);
  
- static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
-diff --git a/arch/arm/probes/decode-arm.c b/lib/probes/arm/decode-arm.c
-similarity index 100%
-rename from arch/arm/probes/decode-arm.c
-rename to lib/probes/arm/decode-arm.c
-diff --git a/arch/arm/probes/decode-arm.h b/lib/probes/arm/decode-arm.h
-similarity index 100%
-rename from arch/arm/probes/decode-arm.h
-rename to lib/probes/arm/decode-arm.h
-diff --git a/arch/arm/probes/decode.c b/lib/probes/arm/decode.c
-similarity index 100%
-rename from arch/arm/probes/decode.c
-rename to lib/probes/arm/decode.c
-diff --git a/arch/arm/probes/decode.h b/lib/probes/arm/decode.h
-similarity index 100%
-rename from arch/arm/probes/decode.h
-rename to lib/probes/arm/decode.h
+ #endif /* _ARM_KERNEL_KPROBES_SIMULATE_INSN_H */
+diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
+index 636ca01..a83642c 100644
+--- a/arch/arm64/kernel/probes/uprobes.c
++++ b/arch/arm64/kernel/probes/uprobes.c
+@@ -112,10 +112,9 @@ bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
+ 		return false;
+ 
+ 	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
+-	addr = instruction_pointer(regs);
+ 
+ 	if (auprobe->api.handler)
+-		auprobe->api.handler(insn, addr, regs);
++		auprobe->api.handler(insn, &auprobe->api, regs);
+ 
+ 	return true;
+ }
 -- 
 2.7.4
