@@ -1,33 +1,83 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 16 Feb 2018 17:04:23 +0000
-Subject: [PATCH 2/2] arm64: cputype: Silence Sparse warnings
-In-Reply-To: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
-References: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
-Message-ID: <69caa31c38c24f5914f809aa0e9607beb9698702.1518800663.git.robin.murphy@arm.com>
+Date: Fri, 16 Feb 2018 17:04:22 +0000
+Subject: [PATCH 1/2] arm64: uaccess: Clean up types for access_ok()
+Message-ID: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sparse makes a fair bit of noise about our MPIDR mask being implicitly
-long - let's explicitly describe it as such rather than just relying on
-the value forcing automatic promotion.
+In converting __range_ok() into a static inline, I inadvertently made
+it more type-safe, but without considering the ordering of the relevant
+conversions. This leads to quite a lot of Sparse noise about the fact
+that we use __chk_user_ptr() after addr has already been converted from
+a user pointer to an unsigned long.
+
+Tweak the prototype and locals so the types all make logical sense and
+Sparse is happy (although the resulting codegen remains identical). The
+only external site this affects is in compat syscalls where the inferred
+"user-pointer-ness" of a register value now warrants an explicit cast.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/include/asm/cputype.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/uaccess.h | 12 ++++++------
+ arch/arm64/kernel/sys_compat.c   |  2 +-
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index be7bd19c87ec..eda8c5f629fc 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -20,7 +20,7 @@
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 543e11f0f657..e66b0fca99c2 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -72,15 +72,15 @@ static inline void set_fs(mm_segment_t fs)
+  * This is equivalent to the following test:
+  * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
+  */
+-static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
++static inline unsigned long __range_ok(const void __user *addr, unsigned long size)
+ {
+-	unsigned long limit = current_thread_info()->addr_limit;
++	unsigned long ret, limit = current_thread_info()->addr_limit;
  
- #define MPIDR_UP_BITMASK	(0x1 << 30)
- #define MPIDR_MT_BITMASK	(0x1 << 24)
--#define MPIDR_HWID_BITMASK	0xff00ffffff
-+#define MPIDR_HWID_BITMASK	0xff00ffffffUL
+ 	__chk_user_ptr(addr);
+ 	asm volatile(
+ 	// A + B <= C + 1 for all A,B,C, in four easy steps:
+ 	// 1: X = A + B; X' = X % 2^64
+-	"	adds	%0, %0, %2\n"
++	"	adds	%0, %3, %2\n"
+ 	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
+ 	"	csel	%1, xzr, %1, hi\n"
+ 	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
+@@ -92,9 +92,9 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
+ 	//    testing X' - C == 0, subject to the previous adjustments.
+ 	"	sbcs	xzr, %0, %1\n"
+ 	"	cset	%0, ls\n"
+-	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
++	: "=&r" (ret), "+r" (limit) : "Ir" (size), "0" (addr) : "cc");
  
- #define MPIDR_LEVEL_BITS_SHIFT	3
- #define MPIDR_LEVEL_BITS	(1 << MPIDR_LEVEL_BITS_SHIFT)
+-	return addr;
++	return ret;
+ }
+ 
+ /*
+@@ -104,7 +104,7 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
+  */
+ #define untagged_addr(addr)		sign_extend64(addr, 55)
+ 
+-#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
++#define access_ok(type, addr, size)	__range_ok(addr, size)
+ #define user_addr_max			get_fs
+ 
+ #define _ASM_EXTABLE(from, to)						\
+diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
+index 8b8bbd3eaa52..a382b2a1b84e 100644
+--- a/arch/arm64/kernel/sys_compat.c
++++ b/arch/arm64/kernel/sys_compat.c
+@@ -57,7 +57,7 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
+ 	if (end < start || flags)
+ 		return -EINVAL;
+ 
+-	if (!access_ok(VERIFY_READ, start, end - start))
++	if (!access_ok(VERIFY_READ, (const void __user *)start, end - start))
+ 		return -EFAULT;
+ 
+ 	return __do_compat_cache_op(start, end);
 -- 
 2.16.1.dirty
