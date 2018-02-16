@@ -1,108 +1,146 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 16 Feb 2018 18:39:28 +0100
-Subject: [PATCH v3 0/8] drm/sun4i: Support more planes,
- zpos and plane-wide alpha
-Message-ID: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+Date: Fri, 16 Feb 2018 18:39:32 +0100
+Subject: [PATCH v3 4/8] drm/sun4i: backend: Assign the pipes automatically
+In-Reply-To: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+Message-ID: <e9caf21d831438d36a3ccc7cef229c9a7ea7f69f.1518802627.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since we now have a way to enforce the zpos, check for the number of alpha
+planes, the only missing part is to assign our pipe automatically instead
+of hardcoding it.
 
-This serie aims at enhancing the support for our planes in the current drm
-driver on the first generation of Allwinner's display engine.
+The algorithm is quite simple, but requires two iterations over the list of
+planes.
 
-This also introduces a few generic stuff, as well as some conversion for
-some other drivers.
+In the first one (which is the same one that we've had to check for alpha,
+the frontend usage, and so on), we order the planes by their zpos.
 
-This series basically implements three things that look orthogonal, but due
-to the way the hardware works are kind of related.
+We can then do a second iteration over that array by ascending zpos
+starting with the pipe 0. When and if we encounter our alpha plane, we put
+it and all the other subsequent planes in the second pipe.
 
-The main feature is that instead of implementing 2 planes per backend, we
-are now able to use the planes that are available in hardware. This was
-unsupported before because of the way the composition works in the
-hardware.
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 40 ++++++++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 +----
+ drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
+ 3 files changed, 39 insertions(+), 8 deletions(-)
 
-Indeed, the planes are first grouped into 2 pipes that are doing a basic
-composition, in case of overlapping planes, it just takes whatever plane
-has the highest priority (=> zpos). Then, the alpha blending is done
-between the two pipes. This was simplified so far by only using two planes,
-one for each pipe, which was allowing us to have an illusion of proper
-alpha blending. This is further complicated by the bug/feature that the
-lowest plane must not have any alpha at all, otherwise the pixel will turn
-black, no matter what the value of alpha is. This basically means that we
-can have a plane with alpha only in the second pipe.
-
-However, as we have more and more blocks being worked on, 2 planes are
-getting really limited and we need to support all 4 of them.
-
-This is mostly possible by extending our atomic_check and to make sure that
-we enforce those constraints, and assign the pipes automatically. This is
-done by looking at the number of planes using an alpha component, and we
-then end up in various scenarios:
-  - 0 plane with alpha
-    => we don't care for the pipes at all. All the planes are assigned to
-       the first pipe
-  - 1 plane with alpha
-    => we assign all the planes without alpha below the plane with alpha to
-       the first pipe, and then all the remaining planes to the second
-       pipe. The plane with alpha will be the lowest plane on that pipe,
-       which means that whatever plane is above it will have precedence,
-       but the alpha component will remain and will be used on pixels that
-       are not overlapping
-  - 2-4 planes with alpha
-    => we can't operate that way, we just reject the configuration.
-
-In addition to the formats that embed an alpha component, we also add
-support for plane-wide alpha property, and in order to tweak the
-configuration the way we want to, we also add support for configurable
-zpos.
-
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  - Rebased on current drm-misc-next
-  - Removed the patches already applied
-  - Split the patch implementing the automatic pipe assignment in two
-
-Changes from v1:
-  - Document the behaviour on concurrent usage of the alpha property and an
-    alpha component in the format
-  - Allowed for higher alpha values
-  - Moved the alpha value from a helper to the struct drm_format_info
-  - Collected tags
-  - Rebased on current drm-misc-next
-
-Maxime Ripard (8):
-  drm/blend: Add a generic alpha property
-  drm/atmel-hclcdc: Convert to the new generic alpha property
-  drm/rcar-du: Convert to the new generic alpha property
-  drm/sun4i: backend: Assign the pipes automatically
-  drm/sun4i: Remove the plane description structure
-  drm/sun4i: backend: Make zpos configurable
-  drm/sun4i: Add support for plane alpha
-  drm/sun4i: backend: Remove ARGB spoofing
-
- Documentation/gpu/kms-properties.csv            |  2 +-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
- drivers/gpu/drm/drm_atomic.c                    |  4 +-
- drivers/gpu/drm/drm_atomic_helper.c             |  4 +-
- drivers/gpu/drm/drm_blend.c                     | 32 ++++++-
- drivers/gpu/drm/rcar-du/rcar_du_drv.h           |  1 +-
- drivers/gpu/drm/rcar-du/rcar_du_kms.c           |  5 +-
- drivers/gpu/drm/rcar-du/rcar_du_plane.c         | 15 +--
- drivers/gpu/drm/rcar-du/rcar_du_plane.h         |  2 +-
- drivers/gpu/drm/rcar-du/rcar_du_vsp.c           | 42 +--------
- drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |  2 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c           | 64 ++++++++++---
- drivers/gpu/drm/sun4i/sun4i_backend.h           |  3 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c             | 57 ++----------
- drivers/gpu/drm/sun4i/sun4i_layer.h             |  1 +-
- include/drm/drm_blend.h                         |  1 +-
- include/drm/drm_plane.h                         |  6 +-
- 18 files changed, 140 insertions(+), 203 deletions(-)
-
-base-commit: 5db520e36bca3e1e1575ab14ca7dfb23b3d68407
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 245b189fc4d8..f387420bda8d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -275,12 +275,16 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+ 				    struct drm_plane *plane)
+ {
+ 	struct drm_plane_state *state = plane->state;
++	struct sun4i_layer_state *p_state = state_to_sun4i_layer_state(state);
+ 	unsigned int priority = state->normalized_zpos;
++	unsigned int pipe = p_state->pipe;
+ 
+-	DRM_DEBUG_DRIVER("Setting layer %d's priority to %d\n", layer, priority);
+-
++	DRM_DEBUG_DRIVER("Setting layer %d's priority to %d and pipe %d\n",
++			 layer, priority, pipe);
+ 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(p_state->pipe) |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
+ 
+ 	return 0;
+@@ -325,12 +329,15 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 				      struct drm_crtc_state *crtc_state)
+ {
++	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+ 	struct drm_atomic_state *state = crtc_state->state;
+ 	struct drm_device *drm = state->dev;
+ 	struct drm_plane *plane;
+ 	unsigned int num_planes = 0;
+ 	unsigned int num_alpha_planes = 0;
+ 	unsigned int num_frontend_planes = 0;
++	unsigned int current_pipe = 0;
++	unsigned int i;
+ 
+ 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
+ 
+@@ -361,9 +368,19 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		if (fb->format->has_alpha)
+ 			num_alpha_planes++;
+ 
++		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
++				 plane_state->normalized_zpos);
++
++		/* Sort our planes by Zpos */
++		plane_states[plane_state->normalized_zpos] = plane_state;
++
+ 		num_planes++;
+ 	}
+ 
++	/* All our planes were disabled, bail out */
++	if (!num_planes)
++		return 0;
++
+ 	/*
+ 	 * The hardware is a bit unusual here.
+ 	 *
+@@ -400,6 +417,25 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		return -EINVAL;
+ 	}
+ 
++	/* We can't have an alpha plane at the lowest position */
++	if (plane_states[0]->fb->format->has_alpha)
++		return -EINVAL;
++
++	for (i = 1; i < num_planes; i++) {
++		struct drm_plane_state *p_state = plane_states[i];
++		struct drm_framebuffer *fb = p_state->fb;
++		struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
++
++		/*
++		 * The only alpha position is the lowest plane of the
++		 * second pipe.
++		 */
++		if (fb->format->has_alpha)
++			current_pipe++;
++
++		s_state->pipe = current_pipe;
++	}
++
+ 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
+ 		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
+ 		return -EINVAL;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 19be798e4fac..3e3d554713cb 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -220,12 +220,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 
+ 		drm_plane_create_zpos_immutable_property(&layer->plane, i);
+ 
+-		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+-				 i ? "overlay" : "primary", plane->pipe);
+-		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+-
+ 		layer->id = i;
+ 		planes[i] = &layer->plane;
+ 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 75b4868ba87c..36b20265bd31 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -24,6 +24,7 @@ struct sun4i_layer {
+ 
+ struct sun4i_layer_state {
+ 	struct drm_plane_state	state;
++	unsigned int		pipe;
+ 	bool			uses_frontend;
+ };
+ 
 -- 
 git-series 0.9.1
