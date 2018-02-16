@@ -1,31 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 16 Feb 2018 21:18:18 +0100
-Subject: [PATCH] drm/sun4i: fix HSYNC and VSYNC polarity
-In-Reply-To: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1518717288-123578-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20180216201818.j5gunpkkebq35b4n@flea.lan>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 16 Feb 2018 21:41:56 +0100
+Subject: [PATCH v2 6/8] drm/rockchip: dw_hdmi: allow including external phys
+In-Reply-To: <20180216204158.29839-1-heiko@sntech.de>
+References: <20180216204158.29839-1-heiko@sntech.de>
+Message-ID: <20180216204158.29839-7-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 06:54:48PM +0100, Giulio Benetti wrote:
-> Differently from other Lcd signals, HSYNC and VSYNC signals
-> result inverted if their bits are cleared to 0.
-> 
-> Invert their settings of IO_POL register.
-> 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Some variants of the dw-hdmi on Rockchip socs use a separate phy block
+accessed via the generic phy framework, so allow them to be included
+if such a phy reference is found.
 
-Applied, thanks!
-Maxime
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 6dc03f1a5709..305b68d223d7 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -11,6 +11,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/phy/phy.h>
+ #include <linux/regmap.h>
+ 
+ #include <drm/drm_of.h>
+@@ -49,6 +50,7 @@ struct rockchip_hdmi {
+ 	struct clk *vpll_clk;
+ 	struct clk *grf_clk;
+ 	struct dw_hdmi *hdmi;
++	struct phy *phy;
+ };
+ 
+ #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+@@ -377,6 +379,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
+ 
++	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
++	if (IS_ERR(hdmi->phy)) {
++		ret = PTR_ERR(hdmi->phy);
++		if (ret != -EPROBE_DEFER)
++			DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
++		return ret;
++	}
++
+ 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
+ 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
+ 			 DRM_MODE_ENCODER_TMDS, NULL);
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180216/9c18b0cc/attachment.sig>
+2.15.1
