@@ -1,62 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Feb 2018 16:53:30 +0000
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214150739.GH2992@arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215142239.GF16623@arm.com>
- <20180215164754.GW25201@hirez.programming.kicks-ass.net>
- <20180215182154.GD15274@arm.com>
- <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
-Message-ID: <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Feb 2018 16:57:56 +0000
+Subject: [PATCH] irqchip/gic-v3-its: Fix misplaced __iomem annotations
+Message-ID: <af3a8a44f6693f6293de49a1c2910a57ba12e208.1518800276.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Save 26 lines worth of Sparse complaints by fixing up this minor
+mishap. The pointee lies in the __iomem space; the pointer does not.
 
-On Thu, Feb 15, 2018 at 10:08:56PM +0000, Mathieu Desnoyers wrote:
-> My current theory: do_exit() gets preempted after having set current->mm
-> to NULL, and after having issued mmput(), which brings the mm_count down
-> to 0.
->
-> Unfortunately, if the scheduler switches from a userspace thread
-> to a kernel thread, context_switch() loads prev->active_mm which still
-> points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
-> in finish_task_switch().
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-For this to happen, we need to get to the mmput() in exit_mm() with:
-
-  mm->mm_count == 1
-  mm->mm_users == 1
-  mm == active_mm
-
-... but AFAICT, this cannot happen.
-
-If there's no context_switch between clearing current->mm and the
-mmput(), then mm->mm_count >= 2, thanks to the prior mmgrab() and the
-active_mm reference (in mm_count) that context_switch+finish_task_switch
-manage.
-
-If there is a context_switch between the two, then AFAICT, either:
-
-a) The task re-inherits its old mm as active_mm, and mm_count >= 2. In
-   context_switch we mmgrab() the active_mm to inherit it, and in
-   finish_task_switch() we drop the oldmm, balancing the mmgrab() with
-   an mmput().
-
-   e.g we go task -> kernel_task -> task
-
-b) At some point, another user task is scheduled, and we switch to its
-   mm. We don't mmgrab() the active_mm, but we mmdrop() the oldmm, which
-   means mm_count >= 1. Since we witched to a new mm, if we switch back
-   to the first task, it cannot have its own mm as active_mm.
-
-   e.g. we go task -> other_task -> task
-
-I suspect we have a bogus mmdrop or mmput elsewhere, and do_exit() and
-finish_task_switch() aren't to blame.
-
-Thanks,
-Mark.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 06f025fd5726..3a38b4e8685e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -2495,7 +2495,7 @@ static int its_vpe_set_affinity(struct irq_data *d,
+ 
+ static void its_vpe_schedule(struct its_vpe *vpe)
+ {
+-	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
++	void __iomem *vlpi_base = gic_data_rdist_vlpi_base();
+ 	u64 val;
+ 
+ 	/* Schedule the VPE */
+@@ -2527,7 +2527,7 @@ static void its_vpe_schedule(struct its_vpe *vpe)
+ 
+ static void its_vpe_deschedule(struct its_vpe *vpe)
+ {
+-	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
++	void __iomem *vlpi_base = gic_data_rdist_vlpi_base();
+ 	u32 count = 1000000;	/* 1s! */
+ 	bool clean;
+ 	u64 val;
+-- 
+2.16.1.dirty
