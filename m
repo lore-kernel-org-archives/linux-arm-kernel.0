@@ -1,245 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 16 Feb 2018 20:59:17 +0800
-Subject: [PATCH v3] rtc: ac100: Fix ac100 determine rate bug
-In-Reply-To: <0af79515-ed4f-a4c6-6358-2053e8fd1745@gmail.com>
-References: <20180214135612.21356-1-embed3d@gmail.com>
- <20180215141154.monvwx25awwetqrc@flea.lan>
- <00ece3d8-52ac-c51d-1867-97f7fd84dadf@gmail.com>
- <CAGb2v67fP4-xxAAPWAa0+YtWY3xvQX=5XX7koq-h8USvT+YA-A@mail.gmail.com>
- <0af79515-ed4f-a4c6-6358-2053e8fd1745@gmail.com>
-Message-ID: <CAGb2v65ST6VuoOZ+=+RYMjA+u+cSv9T=9BraQChL4mfw7YikxA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Feb 2018 14:05:22 +0100
+Subject: [PATCH 0/4] Move DP phy switch to PHY driver
+In-Reply-To: <a9eac594-33d5-6171-51ca-66204008fc1f@ti.com>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <a9eac594-33d5-6171-51ca-66204008fc1f@ti.com>
+Message-ID: <1752563.I66u68YxnT@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 16, 2018 at 8:49 PM, Philipp Rossak <embed3d@gmail.com> wrote:
->
->
-> On 16.02.2018 05:10, Chen-Yu Tsai wrote:
->>
->> On Fri, Feb 16, 2018 at 1:53 AM, Philipp Rossak <embed3d@gmail.com> wrote:
->>>
->>>
->>>
->>> On 15.02.2018 15:11, Maxime Ripard wrote:
->>>>
->>>>
->>>> On Wed, Feb 14, 2018 at 02:56:12PM +0100, Philipp Rossak wrote:
->>>>>
->>>>>
->>>>> This patch fixes a bug, that prevents the Allwinner A83T and the A80
->>>>> from a successful boot.
->>>>>
->>>>> The bug is there since v4.16-rc1 and appeared after the clk branch was
->>>>> merged.
->>>>
->>>>
->>>>
->>>> Out of curiosity, which patch has introduced this? I couldn't find any
->>>> obvious match.
->>>>
->>>
->>> I wasn't also n
->>
->>
->> To be honest, I'm not sure why this is hitting you and not me.
->> I have both A83T boards that have assigned-clock-rates set for
->> the ac100 clock outputs for WiFi. I have them running 4.16-rc1
->> and have not seen this. The device tree patches that add these
->> are in 4.15.
->>
->
-> Now it is getting curious ... .
-> I already mentioned that bug in the sunxi-irc and someone else was hitting
-> that problem also...
-> I tested it also with the same toolchain you are using (gcc 7.3.0-1 Debian),
-> but that didn't made any difference.
->
-> I don't think that issue is related with the Hardware, but to be on the save
-> side: Which Hardware version of the BPI-M3 do you have? I have version 1.2.
->
-> Can someone else can confirm this bug?
+Hi Kishon,
 
-So I might have remembered wrong, as I just realized I have your
-patch in my a83t branches. I don't hit this on the A80, which also
-has the AC100, but doesn't use assigned-clock-rates in the device
-tree.
+Am Freitag, 16. Februar 2018, 12:04:42 CET schrieb Kishon Vijay Abraham I:
+> On Friday 10 February 2017 01:14 PM, Chris Zhong wrote:
+> > There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
+> > only one PHY can connect to DP controller at one time, the other should
+> > be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
+> > set this bit means enable PHY 1, clear this bit means enable PHY 0.
+> > 
+> > If the board has 2 Type-C ports, the DP driver get the phy id from
+> > devm_of_phy_get_by_index, and then control this switch according to
+> > this id. But some others board only has one Type-C port, it may be PHY 0
+> > or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
+> > this switch to PHY driver, the PHY driver can distinguish between PHY 0
+> > and PHY 1, and then write the correct register bit.
+> 
+> Changed subject of "Documentation: bindings: add uphy-dp-sel for Rockchip
+> USB Type-C PHY" as suggested by Rob, rebased "phy: rockchip-typec: support
+> DP phy switch" to the latest kernel and merged.
 
-Could you try rolling back to 4.15 and see if you still hit it?
+I'm not sure how far along you are with your merging, but you might want to 
+revert this one.
 
->
->
->>>
->>>>> You can find the shortend trace below:
->>>>>
->>>>> Unable to handle kernel NULL pointer dereference at virtual address
->>>>> 00000000
->>>>> pgd = (ptrval)
->>>>> [00000000] *pgd=00000000
->>>>> Internal error: Oops: 5 [#1] SMP ARM
->>>>> Modules linked in:
->>>>> CPU: 0 PID: 49 Comm: kworker/0:1 Not tainted 4.15.0-10190-gb89e32ccd1be
->>>>> #2
->>>>> Hardware name: Allwinner sun8i Family
->>>>> Workqueue: events deferred_probe_work_func
->>>>> PC is at clk_hw_get_rate+0x0/0x34
->>>>> LR is at ac100_clkout_determine_rate+0x48/0x19c
->>>>>
->>>>> [ ... ]
->>>>>
->>>>> (clk_hw_get_rate) from (ac100_clkout_determine_rate+0x48/0x19c)
->>>>> (ac100_clkout_determine_rate) from
->>>>> (clk_core_set_rate_nolock+0x3c/0x1a0)
->>>>> (clk_core_set_rate_nolock) from (clk_set_rate+0x30/0x88)
->>>>> (clk_set_rate) from (of_clk_set_defaults+0x200/0x364)
->>>>> (of_clk_set_defaults) from (platform_drv_probe+0x18/0xb0)
->>>>>
->>>>> To fix that bug, we first check if the return of the
->>>>> clk_hw_get_parent_by_index is non zero. If it is zero we skip that
->>>>> clock parent.
->>>>>
->>>>> The BUG report could be found here: https://lkml.org/lkml/2018/2/10/198
->>>>>
->>>>> Fixes: 04940631b8d2 ("rtc: ac100: Add clk output support")
->>>>>
->>>>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->>>>> ---
->>>>>
->>>>> Changes in v3:
->>>>>          * add information when the bug appeared
->>>>>          * make the comment more clear
->>>>> Changes in v2:
->>>>>          * add tag Fixes: ... to commit message
->>>>>          * add comment to if statement why we are doing this check
->>>>>
->>>>>    drivers/rtc/rtc-ac100.c | 19 ++++++++++++++++++-
->>>>>    1 file changed, 18 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/rtc/rtc-ac100.c b/drivers/rtc/rtc-ac100.c
->>>>> index 8ff9dc3fe5bf..2412aa2e8399 100644
->>>>> --- a/drivers/rtc/rtc-ac100.c
->>>>> +++ b/drivers/rtc/rtc-ac100.c
->>>>> @@ -183,7 +183,24 @@ static int ac100_clkout_determine_rate(struct
->>>>> clk_hw
->>>>> *hw,
->>>>>          for (i = 0; i < num_parents; i++) {
->>>>>                  struct clk_hw *parent = clk_hw_get_parent_by_index(hw,
->>>>> i);
->>>>> -               unsigned long tmp, prate = clk_hw_get_rate(parent);
->>>>> +               unsigned long tmp, prate;
->>>>> +
->>>>> +               /*
->>>>> +                * The clock has two parents, one is a fixed clock
->>>>> which
->>>>> is
->>>>> +                * internally registered by the ac100 driver. The other
->>>>> parent
->>>>> +                * is a clock from the codec side of the chip, which we
->>>>> +                * properly declare and reference in the devicetree and
->>>>> is
->>>>> +                * not implemented in any driver right now.
->>>>> +                * If the clock core looks for the parent of that
->>>>> second
->>>>> +                * missing clock, it can't one that is registered and
->>>>> +                * returns NULL.
->>>>> +                * Thus we need to check if the parent exists before
->>>>> +                * we get the parent rate.
->>>>> +                */
->>>>> +               if (!parent)
->>>>> +                       continue;
->>>>
->>>>
->>>>
->>>> I'm sorry, but I still don't get it. When you register that clock, you
->>>> will give it two parents. Why would that change during the life of the
->>>> clock?
->>>>
->>>> This really looks like a workaround rather than an actual fix.
->>>>
->>>> Maxime
->>>>
->>> I agree this is more a workaround!
->>> A proper solution/fix would be to define the devicetree correct like
->>> this:
->>>
->>> diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->>> b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->>> index 6550bf0e594b..6f56d429f17e 100644
->>> --- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->>> +++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->>> @@ -175,11 +175,18 @@
->>>                          compatible = "x-powers,ac100-rtc";
->>>                          interrupt-parent = <&r_intc>;
->>>                          interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>> -                       clocks = <&ac100_codec>;
->>> +                       clocks = <&ac100_rtc_32k>;
->>>                          #clock-cells = <1>;
->>>                          clock-output-names = "cko1_rtc",
->>>                                               "cko2_rtc",
->>>                                               "cko3_rtc";
->>> +
->>> +                       ac100_rtc_32k: rtc-32k-oscillator {
->>> +                               compatible = "fixed-clock";
->>> +                               #clock-cells = <0>;
->>> +                               clock-frequency  = <32768>;
->>> +                               clock-output-names = "ac100-rtc-32k";
->>> +                       };
->>>                  };
->>>          };
->>>   };
->>>
->>> What do you think about that solution?
->>
->>
->> That's not quite right either. As I mentioned before, the
->> RTC block has two clock inputs, one 4MHz signal from the
->> codec block, and one 32.768 kHz signal from an external
->> crystal. The original device tree binding describes the
->> first one, and the 32.768 kHz clock was registered by
->> the RTC driver internally.
->>
->> If you're going to add the crystal clock, you still need
->> to keep the codec one. Note that this does not fix what
->> Maxime is asking you. I've already provided an explanation:
->>
->> The clock core allows registering clocks with not-yet-existing
->> clock parents. Parents are matches by string names. If no
->> clock by that name is registered yet, the clock core simply
->> orphans the new clock if the unregistered parent is its
->> current parent or simply ignores that parent if its not the
->> current parent. This is entirely valid and is what we are
->> counting on here, as we haven't implemented the codec-side
->> driver.
->>
->> Note we also sort of depend on this behavior for sunxi-ng
->> clocks, where in some cases we get circular dependencies
->> between clock blocks.
->>
->> BTW, since this is mostly related to the clk subsystem,
->> please CC the clk maintainers as well.
->>
->
-> Ok, I added also now the clk mailing list and maintainers.
-> As reference this here is the boot log [1].
->
-> Im not sure if this in relation to this bug:
-> But, already with the 4.15 kernel I get from time to time some oops during
-> runtime on the a31s (bpi-m2) and all are clock related and causes a crash of
-> the system.
+In your inbox you should find more recent threads about the type-c phy
+where Rob strongly suggested moving the whole grf registers out of the
+dt and into the driver.
 
-Are you referring to the A31 CLK_OUT bug? That is an entirely separate
-bug in the A31/A31s CCU driver. The bug was there from the beginning,
-but did not cause a crash as the incompatible data structures had lined
-up in a way that the embedded data structure that was used by the incorrect
-clk ops was actually compatible. This changed with 4.16-rc1, as a new field
-was added to some of the clock types, breaking the alignment. I made some
-changes but have yet to write the commit log for it. Also I don't have any
-A31/A31s boards to test it on right now. I can send you the patch later.
+Enric Balletbo did just that and posted a series (including the dp-move)
+yesterday (refined in a v2 from today).
 
-ChenYu
+Alternatively Enric could rebase his series on top of that recent change.
 
->
-> Philipp
->
->
->
-> [1]: https://pastebin.com/5c7hxjsS
+
+Heiko
