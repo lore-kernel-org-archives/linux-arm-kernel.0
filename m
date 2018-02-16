@@ -1,56 +1,57 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 16 Feb 2018 10:10:06 +0530
-Subject: [PATCH] mfd: tps65218: Reorder tps65218_regulator_id enum
-In-Reply-To: <20180216041705.6340-1-d-gerlach@ti.com>
-References: <20180216041705.6340-1-d-gerlach@ti.com>
-Message-ID: <31b8b1af-c1b3-0a1d-fc94-f4c334bf2208@ti.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri, 16 Feb 2018 15:21:56 +1030
+Subject: [PATCH 3/6] ARM: dts: aspeed-g5: Update LPC node
+In-Reply-To: <20180212074325.23436-4-joel@jms.id.au>
+References: <20180212074325.23436-1-joel@jms.id.au>
+ <20180212074325.23436-4-joel@jms.id.au>
+Message-ID: <1518756716.10440.25.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Friday 16 February 2018 09:47 AM, Dave Gerlach wrote:
-> Commit 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
-> changes the probe function of drivers/regulator/tps65218-regulator.c so
-> that it iterates through all available regulators and assumes that the
-> regulator IDs are sequential and match the order present in the enum
-> tps65218_regulator_id. However, for some reason the much older commit
-> c0ea88b890d6 ("regulator: tps65218: add support for LS3 current
-> regulator") updated all arrays with LS3 at the end but added it second
-> to last for the enum.
+On Mon, 2018-02-12 at 18:13 +1030, Joel Stanley wrote:
+> This addresses some differences between the G5 and G4 LPC nodes that
+> make them hard to compare. There is no functional change.
 > 
-> Because of this long standing mismatch in order between the
-> tps65218_regulator_id enum and the regulator_desc array in the tps65218
-> regulator driver, the new probe function causes the strobe values to be
-> associated with the wrong regulator ID. This causes LDO1 to fail to
-> suspend in tps65218_pmic_set_suspend_disable due to not having anything
-> probes for its strobe value. Fix the order in the enum so the probe
-> function works as the update intended.
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Reviewed-by: Keerthy <j-keerthy@ti.com>
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
-> 
-> Fixes: 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
->  include/linux/mfd/tps65218.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/aspeed-g5.dtsi | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
 > 
-> diff --git a/include/linux/mfd/tps65218.h b/include/linux/mfd/tps65218.h
-> index f069c518c0ed..c204d9a79436 100644
-> --- a/include/linux/mfd/tps65218.h
-> +++ b/include/linux/mfd/tps65218.h
-> @@ -205,10 +205,10 @@ enum tps65218_regulator_id {
->  	TPS65218_DCDC_4,
->  	TPS65218_DCDC_5,
->  	TPS65218_DCDC_6,
-> -	/* LS's */
-> -	TPS65218_LS_3,
->  	/* LDOs */
->  	TPS65218_LDO_1,
-> +	/* LS's */
-> +	TPS65218_LS_3,
->  };
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index 18185484a224..e0b6803f6845 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -264,7 +264,7 @@
 >  
->  #define TPS65218_MAX_REG_ID		TPS65218_LDO_1
-> 
+>  				#address-cells = <1>;
+>  				#size-cells = <1>;
+> -				ranges = <0 0x1e789000 0x1000>;
+> +				ranges = <0x0 0x1e789000 0x1000>;
+>  
+>  				lpc_bmc: lpc-bmc at 0 {
+>  					compatible = "aspeed,ast2500-lpc-bmc";
+> @@ -274,12 +274,11 @@
+>  				lpc_host: lpc-host at 80 {
+>  					compatible = "aspeed,ast2500-lpc-host", "simple-mfd", "syscon";
+>  					reg = <0x80 0x1e0>;
+> +					reg-io-width = <4>;
+>  
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					ranges = <0 0x80 0x1e0>;
+> -
+> -					reg-io-width = <4>;
+> +					ranges = <0x0 0x80 0x1e0>;
+>  
+>  					lpc_ctrl: lpc-ctrl at 0 {
+>  						compatible = "aspeed,ast2500-lpc-ctrl";
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180216/9d534d0f/attachment.sig>
