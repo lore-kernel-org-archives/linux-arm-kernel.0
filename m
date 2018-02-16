@@ -1,20 +1,28 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 16 Feb 2018 14:16:38 +0100
-Subject: [PATCH 0/2] RTC support on STM32H743
-Message-ID: <1518787000-10675-1-git-send-email-amelie.delaunay@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 Feb 2018 14:35:29 +0100
+Subject: [PATCH v3 3/5] arm64: dts: renesas: r8a7795-es1: Fix register
+ mappings on VSPs
+In-Reply-To: <2009459.7Q8ChOu4tJ@avalon>
+References: <1518602108-1724-1-git-send-email-kbingham@kernel.org>
+ <1518602108-1724-4-git-send-email-kbingham@kernel.org>
+ <2009459.7Q8ChOu4tJ@avalon>
+Message-ID: <20180216133528.nlf6srnitp66xeey@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add support for RTC on STM32H743 and enables it on stm32h743i-eval.
-Tested on stm32-next.
+On Wed, Feb 14, 2018 at 12:08:56PM +0200, Laurent Pinchart wrote:
+> Hi Kieran,
+> 
+> Thank you for the patch.
+> 
+> On Wednesday, 14 February 2018 11:55:06 EET Kieran Bingham wrote:
+> > From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> > 
+> > The VSPD includes a CLUT on RPF2. Ensure that the register space is
+> > mapped correctly to support this.
+> > 
+> > Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Amelie Delaunay (2):
-  ARM: dts: stm32: add RTC support on STM32H743
-  ARM: dts: stm32: enable RTC on stm32h743i-eval
-
- arch/arm/boot/dts/stm32h743.dtsi      | 15 +++++++++++++++
- arch/arm/boot/dts/stm32h743i-eval.dts |  4 ++++
- 2 files changed, 19 insertions(+)
-
--- 
-2.7.4
+Thanks, applied.
