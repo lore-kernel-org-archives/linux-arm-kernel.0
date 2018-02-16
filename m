@@ -1,83 +1,93 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 16 Feb 2018 17:04:22 +0000
-Subject: [PATCH 1/2] arm64: uaccess: Clean up types for access_ok()
-Message-ID: <6efdc36edd90ab33506c03fb58946fab1bbddf26.1518800663.git.robin.murphy@arm.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Fri, 16 Feb 2018 17:17:57 +0000 (UTC)
+Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
+In-Reply-To: <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
+References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
+ <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
+ <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
+ <20180215142239.GF16623@arm.com>
+ <20180215164754.GW25201@hirez.programming.kicks-ass.net>
+ <20180215182154.GD15274@arm.com>
+ <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
+ <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
+Message-ID: <1037744516.23063.1518801477666.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In converting __range_ok() into a static inline, I inadvertently made
-it more type-safe, but without considering the ordering of the relevant
-conversions. This leads to quite a lot of Sparse noise about the fact
-that we use __chk_user_ptr() after addr has already been converted from
-a user pointer to an unsigned long.
+----- On Feb 16, 2018, at 11:53 AM, Mark Rutland mark.rutland at arm.com wrote:
 
-Tweak the prototype and locals so the types all make logical sense and
-Sparse is happy (although the resulting codegen remains identical). The
-only external site this affects is in compat syscalls where the inferred
-"user-pointer-ness" of a register value now warrants an explicit cast.
+> Hi,
+> 
+> On Thu, Feb 15, 2018 at 10:08:56PM +0000, Mathieu Desnoyers wrote:
+>> My current theory: do_exit() gets preempted after having set current->mm
+>> to NULL, and after having issued mmput(), which brings the mm_count down
+>> to 0.
+>>
+>> Unfortunately, if the scheduler switches from a userspace thread
+>> to a kernel thread, context_switch() loads prev->active_mm which still
+>> points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
+>> in finish_task_switch().
+> 
+> For this to happen, we need to get to the mmput() in exit_mm() with:
+> 
+>  mm->mm_count == 1
+>  mm->mm_users == 1
+>  mm == active_mm
+> 
+> ... but AFAICT, this cannot happen.
+> 
+> If there's no context_switch between clearing current->mm and the
+> mmput(), then mm->mm_count >= 2, thanks to the prior mmgrab() and the
+> active_mm reference (in mm_count) that context_switch+finish_task_switch
+> manage.
+> 
+> If there is a context_switch between the two, then AFAICT, either:
+> 
+> a) The task re-inherits its old mm as active_mm, and mm_count >= 2. In
+>   context_switch we mmgrab() the active_mm to inherit it, and in
+>   finish_task_switch() we drop the oldmm, balancing the mmgrab() with
+>   an mmput().
+> 
+>   e.g we go task -> kernel_task -> task
+> 
+> b) At some point, another user task is scheduled, and we switch to its
+>   mm. We don't mmgrab() the active_mm, but we mmdrop() the oldmm, which
+>   means mm_count >= 1. Since we witched to a new mm, if we switch back
+>   to the first task, it cannot have its own mm as active_mm.
+> 
+>   e.g. we go task -> other_task -> task
+> 
+> I suspect we have a bogus mmdrop or mmput elsewhere, and do_exit() and
+> finish_task_switch() aren't to blame.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 12 ++++++------
- arch/arm64/kernel/sys_compat.c   |  2 +-
- 2 files changed, 7 insertions(+), 7 deletions(-)
+Currently reviewing: fs/proc/base.c: __set_oom_adj()
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 543e11f0f657..e66b0fca99c2 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -72,15 +72,15 @@ static inline void set_fs(mm_segment_t fs)
-  * This is equivalent to the following test:
-  * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
-  */
--static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
-+static inline unsigned long __range_ok(const void __user *addr, unsigned long size)
- {
--	unsigned long limit = current_thread_info()->addr_limit;
-+	unsigned long ret, limit = current_thread_info()->addr_limit;
- 
- 	__chk_user_ptr(addr);
- 	asm volatile(
- 	// A + B <= C + 1 for all A,B,C, in four easy steps:
- 	// 1: X = A + B; X' = X % 2^64
--	"	adds	%0, %0, %2\n"
-+	"	adds	%0, %3, %2\n"
- 	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
- 	"	csel	%1, xzr, %1, hi\n"
- 	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
-@@ -92,9 +92,9 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
- 	//    testing X' - C == 0, subject to the previous adjustments.
- 	"	sbcs	xzr, %0, %1\n"
- 	"	cset	%0, ls\n"
--	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
-+	: "=&r" (ret), "+r" (limit) : "Ir" (size), "0" (addr) : "cc");
- 
--	return addr;
-+	return ret;
- }
- 
- /*
-@@ -104,7 +104,7 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
-  */
- #define untagged_addr(addr)		sign_extend64(addr, 55)
- 
--#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
-+#define access_ok(type, addr, size)	__range_ok(addr, size)
- #define user_addr_max			get_fs
- 
- #define _ASM_EXTABLE(from, to)						\
-diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-index 8b8bbd3eaa52..a382b2a1b84e 100644
---- a/arch/arm64/kernel/sys_compat.c
-+++ b/arch/arm64/kernel/sys_compat.c
-@@ -57,7 +57,7 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
- 	if (end < start || flags)
- 		return -EINVAL;
- 
--	if (!access_ok(VERIFY_READ, start, end - start))
-+	if (!access_ok(VERIFY_READ, (const void __user *)start, end - start))
- 		return -EFAULT;
- 
- 	return __do_compat_cache_op(start, end);
+        /*
+         * Make sure we will check other processes sharing the mm if this is
+         * not vfrok which wants its own oom_score_adj.
+         * pin the mm so it doesn't go away and get reused after task_unlock
+         */
+        if (!task->vfork_done) {
+                struct task_struct *p = find_lock_task_mm(task);
+
+                if (p) {
+                        if (atomic_read(&p->mm->mm_users) > 1) {
+                                mm = p->mm;
+                                mmgrab(mm);
+                        }
+                        task_unlock(p);
+                }
+        }
+
+Considering that mmput() done by exit_mm() is done outside of the
+task_lock critical section, I wonder how the mm_users load is
+synchronized ?
+
+Thanks,
+
+Mathieu
+
 -- 
-2.16.1.dirty
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
