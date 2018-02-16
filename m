@@ -1,125 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Feb 2018 09:33:39 +0000
-Subject: [PATCH v4 10/19] KVM: arm/arm64: Do not use kern_hyp_va() with
- kvm_vgic_global_state
-In-Reply-To: <20180216090543.GC10440@cbox>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-11-marc.zyngier@arm.com> <20180115153632.GK21403@cbox>
- <af5ddd03-ddaa-0fe9-51ec-4946b5adfe1c@arm.com> <20180216090543.GC10440@cbox>
-Message-ID: <3b5ec8d7-01b0-86ce-f709-185821e68d47@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 Feb 2018 10:36:23 +0100
+Subject: [PATCH 05/15] ARM64: dts: Add R-Car Salvator-x M3-N support
+In-Reply-To: <1518515162-23663-6-git-send-email-jacopo+renesas@jmondi.org>
+References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1518515162-23663-6-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdXQQqRTir-3wgorh_QX060K_CyQNStA46Ph+hnrikqCaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/18 09:05, Christoffer Dall wrote:
-> On Thu, Feb 15, 2018 at 01:22:56PM +0000, Marc Zyngier wrote:
->> On 15/01/18 15:36, Christoffer Dall wrote:
->>> On Thu, Jan 04, 2018 at 06:43:25PM +0000, Marc Zyngier wrote:
->>>> kvm_vgic_global_state is part of the read-only section, and is
->>>> usually accessed using a PC-relative address generation (adrp + add).
->>>>
->>>> It is thus useless to use kern_hyp_va() on it, and actively problematic
->>>> if kern_hyp_va() becomes non-idempotent. On the other hand, there is
->>>> no way that the compiler is going to guarantee that such access is
->>>> always be PC relative.
->>>
->>> nit: is always be
->>>
->>>>
->>>> So let's bite the bullet and provide our own accessor.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
->>>>  arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
->>>>  virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
->>>>  3 files changed, 17 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
->>>> index ab20ffa8b9e7..1d42d0aa2feb 100644
->>>> --- a/arch/arm/include/asm/kvm_hyp.h
->>>> +++ b/arch/arm/include/asm/kvm_hyp.h
->>>> @@ -26,6 +26,12 @@
->>>>  
->>>>  #define __hyp_text __section(.hyp.text) notrace
->>>>  
->>>> +#define hyp_symbol_addr(s)						\
->>>> +	({								\
->>>> +		typeof(s) *addr = &(s);					\
->>>> +		addr;							\
->>>> +	})
->>>> +
->>>>  #define __ACCESS_VFP(CRn)			\
->>>>  	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
->>>>  
->>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
->>>> index 08d3bb66c8b7..a2d98c539023 100644
->>>> --- a/arch/arm64/include/asm/kvm_hyp.h
->>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
->>>> @@ -25,6 +25,15 @@
->>>>  
->>>>  #define __hyp_text __section(.hyp.text) notrace
->>>>  
->>>> +#define hyp_symbol_addr(s)						\
->>>> +	({								\
->>>> +		typeof(s) *addr;					\
->>>> +		asm volatile("adrp	%0, %1\n"			\
->>>> +			     "add	%0, %0, :lo12:%1\n"		\
->>>> +			     : "=r" (addr) : "S" (&s));			\
->>>
->>> Can't we use adr_l here?
->>
->> Unfortunately not. All the asm/assembler.h macros are unavailable to
->> inline assembly. We could start introducing equivalent macros for that
->> purpose, but that's starting to be outside of the scope of this series.
->>
-> 
-> Absolutely.  Forget I asked.
-> 
->>>
->>>> +		addr;							\
->>>> +	})
->>>> +
->>>
->>> I don't fully appreciate the semantics of this macro going by its name
->>> only.  My understanding is that if you want to resolve a symbol to an
->>> address which is mapped in hyp, then use this.  Is this correct?
->>
->> The goal of this macro is to return a symbol's address based on a
->> PC-relative computation, as opposed to a loading the VA from a constant
->> pool or something similar. This works well for HYP, as an absolute VA is
->> guaranteed to be wrong.
->>
->>>
->>> If so, can we add a small comment (because I can't come up with a better
->>> name).
->>
->> I'll add the above if that works for you.
->>
-> 
-> Yes it does.  The only thing that remains a bit unclear is what the
-> difference between this and kern_hyp_va is, and when you'd choose to use
-> one over the other.  Perhaps we need a single place which documents our
-> primitives and tells us what to use when.  At least, I'm for sure not
-> going to be able to figure this out later on.
+Hi Jacopo,
 
-Let me try to explain that:
+On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
+<jacopo+renesas@jmondi.org> wrote:
+> Add initial support for R-Car M3-N Salvator-x and r8a77965 SoC in
+> device tree with cpg-mssr, reset and clock nodes.
+>
+> Add place-holder device nodes for all nodes referred by
+> "salvator-common.dtsi"
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-The two primitives work on different "objects". kern_hyp_va() works on
-an address. If what you have is a pointer, then kern_hyp_va is your
-friend. On the contrary, if what you have is a symbol instead of the
-address of that object (and thus not something we obtain by reading a
-variable), then hyp_symbol_addr is probably what you need.
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 
-Of course, a symbol can also be a variable, which makes things a bit
-harder. The asm constraint are such as compilation will break if you try
-to treat a local variable as a symbol (the 'S' constraint is defined as
-"An absolute symbolic address or a label reference", and the '&s' makes
-it pretty hard to fool).
+> +               gic: interrupt-controller at f1010000 {
+> +                       compatible = "arm,gic-400";
+> +                       #interrupt-cells = <3>;
+> +                       #address-cells = <0>;
+> +                       interrupt-controller;
+> +                       reg = <0x0 0xf1010000 0 0x1000>,
+> +                             <0x0 0xf1020000 0 0x20000>,
+> +                             <0x0 0xf1040000 0 0x20000>,
+> +                             <0x0 0xf1060000 0 0x20000>;
+> +                       interrupts = <GIC_PPI 9
+> +                                       (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
 
-I've tried to make it make it foolproof, but who knows... ;-)
+Given you have 2 CPU cores, it should say GIC_CPU_MASK_SIMPLE(2).
 
-Hope this helps,
+> +                       clocks = <&cpg CPG_MOD 408>;
+> +                       clock-names = "clk";
+> +                       power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+> +                       resets = <&cpg 408>;
+> +               };
+> +
+> +               timer {
+> +                       compatible = "arm,armv8-timer";
+> +                       interrupts = <GIC_PPI 13
+> +                                       (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                    <GIC_PPI 14
+> +                                       (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                    <GIC_PPI 11
+> +                                       (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                    <GIC_PPI 10
+> +                                       (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This one is correct.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
