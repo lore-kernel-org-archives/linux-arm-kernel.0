@@ -1,43 +1,62 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Feb 2018 16:43:19 +0530
-Subject: [RESEND] phy: sun4i-usb: add support for R40 USB PHY
-In-Reply-To: <993f82ad-befe-05fb-351d-8fd31d8bc132@ti.com>
-References: <20180103084944.3145-1-icenowy@aosc.io>
- <20180115150656.bibc4draok4i4oae@lemon.iwr.uni-heidelberg.de>
- <CAGb2v64DuqTv49CfOMhovdikc9iUGCfLRSmJ+FEeF5ct+-YzEw@mail.gmail.com>
- <993f82ad-befe-05fb-351d-8fd31d8bc132@ti.com>
-Message-ID: <e5bcd7dd-1545-189f-82b1-efb77422b936@ti.com>
+Date: Fri, 16 Feb 2018 16:50:42 +0530
+Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
+ when driving VBUS
+In-Reply-To: <20180119144512.dqqbywavhwsyma2f@flea.lan>
+References: <20180119092541.7508-1-wens@csie.org>
+ <20180119144512.dqqbywavhwsyma2f@flea.lan>
+Message-ID: <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Friday 19 January 2018 01:43 PM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Friday 19 January 2018 11:55 AM, Chen-Yu Tsai wrote:
->> Hi Kishon,
+On Friday 19 January 2018 08:15 PM, Maxime Ripard wrote:
+> On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
+>> The AXP223 PMIC, like the AXP221, does not generate VBUS change
+>> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
+>> on the board.
 >>
->> On Mon, Jan 15, 2018 at 11:06 PM, Hermann Lauer
->> <Hermann.Lauer@iwr.uni-heidelberg.de> wrote:
->>> On Wed, Jan 03, 2018 at 04:49:44PM +0800, Icenowy Zheng wrote:
->>>> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
->>>>
->>>> Add support for it.
->>>>
->>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>
->>> You may add
->>>
->>> Tested-by: Hermann.Lauer at iwr.uni-heidelberg.de
+>> This was not noticed until recently, as most A23/A33 boards use
+>> a GPIO pin that does not support interrupts for OTG ID detection.
+>> This forces the driver to use polling. However the A33-OlinuXino
+>> uses a pin that does support interrupts, so the driver uses them.
+>> However the VBUS interrupt never fires, and the driver never gets
+>> to update the VBUS status. This results in musb timing out waiting
+>> for VBUS to rise.
 >>
->> Gentle ping for this patch to be included in 4.16
+>> This was worked around for the AXP221 by resorting to polling
+>> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
+>> missing Vbus det interrupts on A31"). This patch adds the A23 and
+>> A33 to the list of SoCs that need the workaround.
+>>
+>> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
+>> 		      sun8i-a33 SoC")
+>> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
+>> 		      sun8i-a23 SoC")
+>> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
+>> 		Use of_match_node to get model specific config data
+>> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
+>> 		Fix optional gpios failing probe
+>> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
+>> 		Fix irq free conditions to match request conditions
+>> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
+>> 		Add workaround for missing Vbus det interrupts on A31
+>> Cc: <stable@vger.kernel.org> # 4.3.x
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>
+>> This list might get longer if the newer AXP8xx PMICs also have this
+>> behavior. We could switch to a boolean in the per-compatible data,
+>> or just always use polling. The yet-merged R40 support will have this
+>> issue as well, as the R40 is paired with the AXP221. But for now,
+>> I'd like to have something that is easier to backport to stable, so
+>> we can at least fix this for the A23 and A33.
+>>
+>> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
 > 
-> Sent the pull request for 4.16 to Greg on Jan 2nd. So this can't be included in
-> 4.16. Sorry.
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-merged now, thanks!
+merged, thanks!
 
 -Kishon
