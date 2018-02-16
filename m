@@ -1,145 +1,245 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 16 Feb 2018 18:39:32 +0100
-Subject: [PATCH v3 4/8] drm/sun4i: backend: Assign the pipes automatically
+Date: Fri, 16 Feb 2018 18:39:31 +0100
+Subject: [PATCH v3 3/8] drm/rcar-du: Convert to the new generic alpha property
 In-Reply-To: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
 References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
-Message-ID: <e9caf21d831438d36a3ccc7cef229c9a7ea7f69f.1518802627.git-series.maxime.ripard@bootlin.com>
+Message-ID: <28d383bb463931e12dd80ef498399177b9545c61.1518802627.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now have a way to enforce the zpos, check for the number of alpha
-planes, the only missing part is to assign our pipe automatically instead
-of hardcoding it.
+Now that we have support for per-plane alpha in the core, let's use it.
 
-The algorithm is quite simple, but requires two iterations over the list of
-planes.
-
-In the first one (which is the same one that we've had to check for alpha,
-the frontend usage, and so on), we order the planes by their zpos.
-
-We can then do a second iteration over that array by ascending zpos
-starting with the pipe 0. When and if we encounter our alpha plane, we put
-it and all the other subsequent planes in the second pipe.
-
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 40 ++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 +----
- drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
- 3 files changed, 39 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/rcar-du/rcar_du_drv.h   |  1 +-
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c   |  5 +---
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c | 15 +++------
+ drivers/gpu/drm/rcar-du/rcar_du_plane.h |  2 +-
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c   | 42 ++------------------------
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.h   |  2 +-
+ 6 files changed, 9 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 245b189fc4d8..f387420bda8d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -275,12 +275,16 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
- 				    struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
-+	struct sun4i_layer_state *p_state = state_to_sun4i_layer_state(state);
- 	unsigned int priority = state->normalized_zpos;
-+	unsigned int pipe = p_state->pipe;
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.h b/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+index f400fde65a0c..dad87d449ef7 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_drv.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+@@ -90,7 +90,6 @@ struct rcar_du_device {
+ 	struct rcar_du_vsp vsps[RCAR_DU_MAX_VSPS];
  
--	DRM_DEBUG_DRIVER("Setting layer %d's priority to %d\n", layer, priority);
+ 	struct {
+-		struct drm_property *alpha;
+ 		struct drm_property *colorkey;
+ 	} props;
+ 
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+index 566d1a948c8f..e1b5a7b460cc 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+@@ -417,11 +417,6 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
+ 
+ static int rcar_du_properties_init(struct rcar_du_device *rcdu)
+ {
+-	rcdu->props.alpha =
+-		drm_property_create_range(rcdu->ddev, 0, "alpha", 0, 255);
+-	if (rcdu->props.alpha == NULL)
+-		return -ENOMEM;
 -
-+	DRM_DEBUG_DRIVER("Setting layer %d's priority to %d and pipe %d\n",
-+			 layer, priority, pipe);
- 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK |
- 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(p_state->pipe) |
- 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
- 
- 	return 0;
-@@ -325,12 +329,15 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
- static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 				      struct drm_crtc_state *crtc_state)
- {
-+	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
- 	struct drm_atomic_state *state = crtc_state->state;
- 	struct drm_device *drm = state->dev;
- 	struct drm_plane *plane;
- 	unsigned int num_planes = 0;
- 	unsigned int num_alpha_planes = 0;
- 	unsigned int num_frontend_planes = 0;
-+	unsigned int current_pipe = 0;
-+	unsigned int i;
- 
- 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
- 
-@@ -361,9 +368,19 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		if (fb->format->has_alpha)
- 			num_alpha_planes++;
- 
-+		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
-+				 plane_state->normalized_zpos);
-+
-+		/* Sort our planes by Zpos */
-+		plane_states[plane_state->normalized_zpos] = plane_state;
-+
- 		num_planes++;
- 	}
- 
-+	/* All our planes were disabled, bail out */
-+	if (!num_planes)
-+		return 0;
-+
  	/*
- 	 * The hardware is a bit unusual here.
- 	 *
-@@ -400,6 +417,25 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 	 * The color key is expressed as an RGB888 triplet stored in a 32-bit
+ 	 * integer in XRGB8888 format. Bit 24 is used as a flag to disable (0)
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+index 5687a94d4cb1..136c3b464d81 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+@@ -423,7 +423,7 @@ static void rcar_du_plane_setup_mode(struct rcar_du_group *rgrp,
+ 		rcar_du_plane_write(rgrp, index, PnALPHAR, PnALPHAR_ABIT_0);
+ 	else
+ 		rcar_du_plane_write(rgrp, index, PnALPHAR,
+-				    PnALPHAR_ABIT_X | state->alpha);
++				    PnALPHAR_ABIT_X | state->state.alpha);
+ 
+ 	pnmr = PnMR_BM_MD | state->format->pnmr;
+ 
+@@ -697,11 +697,11 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
+ 
+ 	state->hwindex = -1;
+ 	state->source = RCAR_DU_PLANE_MEMORY;
+-	state->alpha = 255;
+ 	state->colorkey = RCAR_DU_COLORKEY_NONE;
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+ 
+ 	plane->state = &state->state;
++	plane->state->alpha = 255;
+ 	plane->state->plane = plane;
+ }
+ 
+@@ -713,9 +713,7 @@ static int rcar_du_plane_atomic_set_property(struct drm_plane *plane,
+ 	struct rcar_du_plane_state *rstate = to_rcar_plane_state(state);
+ 	struct rcar_du_device *rcdu = to_rcar_plane(plane)->group->dev;
+ 
+-	if (property == rcdu->props.alpha)
+-		rstate->alpha = val;
+-	else if (property == rcdu->props.colorkey)
++	if (property == rcdu->props.colorkey)
+ 		rstate->colorkey = val;
+ 	else
  		return -EINVAL;
+@@ -731,9 +729,7 @@ static int rcar_du_plane_atomic_get_property(struct drm_plane *plane,
+ 		container_of(state, const struct rcar_du_plane_state, state);
+ 	struct rcar_du_device *rcdu = to_rcar_plane(plane)->group->dev;
+ 
+-	if (property == rcdu->props.alpha)
+-		*val = rstate->alpha;
+-	else if (property == rcdu->props.colorkey)
++	if (property == rcdu->props.colorkey)
+ 		*val = rstate->colorkey;
+ 	else
+ 		return -EINVAL;
+@@ -802,10 +798,9 @@ int rcar_du_planes_init(struct rcar_du_group *rgrp)
+ 			continue;
+ 
+ 		drm_object_attach_property(&plane->plane.base,
+-					   rcdu->props.alpha, 255);
+-		drm_object_attach_property(&plane->plane.base,
+ 					   rcdu->props.colorkey,
+ 					   RCAR_DU_COLORKEY_NONE);
++		drm_plane_create_alpha_property(&plane->plane, 255);
+ 		drm_plane_create_zpos_property(&plane->plane, 1, 1, 7);
  	}
  
-+	/* We can't have an alpha plane at the lowest position */
-+	if (plane_states[0]->fb->format->has_alpha)
-+		return -EINVAL;
-+
-+	for (i = 1; i < num_planes; i++) {
-+		struct drm_plane_state *p_state = plane_states[i];
-+		struct drm_framebuffer *fb = p_state->fb;
-+		struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
-+
-+		/*
-+		 * The only alpha position is the lowest plane of the
-+		 * second pipe.
-+		 */
-+		if (fb->format->has_alpha)
-+			current_pipe++;
-+
-+		s_state->pipe = current_pipe;
-+	}
-+
- 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
- 		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
- 		return -EINVAL;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 19be798e4fac..3e3d554713cb 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -220,12 +220,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.h b/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+index 890321b4665d..5c19c69e4691 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_plane.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+@@ -50,7 +50,6 @@ static inline struct rcar_du_plane *to_rcar_plane(struct drm_plane *plane)
+  * @state: base DRM plane state
+  * @format: information about the pixel format used by the plane
+  * @hwindex: 0-based hardware plane index, -1 means unused
+- * @alpha: value of the plane alpha property
+  * @colorkey: value of the plane colorkey property
+  */
+ struct rcar_du_plane_state {
+@@ -60,7 +59,6 @@ struct rcar_du_plane_state {
+ 	int hwindex;
+ 	enum rcar_du_plane_source source;
  
- 		drm_plane_create_zpos_immutable_property(&layer->plane, i);
+-	unsigned int alpha;
+ 	unsigned int colorkey;
+ };
  
--		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
--				 i ? "overlay" : "primary", plane->pipe);
--		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
--				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
--				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
--
- 		layer->id = i;
- 		planes[i] = &layer->plane;
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+index 2c260c33840b..bda551c01a43 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+@@ -54,6 +54,7 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
  	};
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 75b4868ba87c..36b20265bd31 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -24,6 +24,7 @@ struct sun4i_layer {
+ 	struct rcar_du_plane_state state = {
+ 		.state = {
++			.alpha = 255,
+ 			.crtc = &crtc->crtc,
+ 			.dst.x1 = 0,
+ 			.dst.y1 = 0,
+@@ -67,7 +68,6 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
+ 		},
+ 		.format = rcar_du_format_info(DRM_FORMAT_ARGB8888),
+ 		.source = RCAR_DU_PLANE_VSPD1,
+-		.alpha = 255,
+ 		.colorkey = 0,
+ 	};
  
- struct sun4i_layer_state {
- 	struct drm_plane_state	state;
-+	unsigned int		pipe;
- 	bool			uses_frontend;
+@@ -173,7 +173,7 @@ static void rcar_du_vsp_plane_setup(struct rcar_du_vsp_plane *plane)
+ 	struct vsp1_du_atomic_config cfg = {
+ 		.pixelformat = 0,
+ 		.pitch = fb->pitches[0],
+-		.alpha = state->alpha,
++		.alpha = state->state.alpha,
+ 		.zpos = state->state.zpos,
+ 	};
+ 	unsigned int i;
+@@ -335,44 +335,13 @@ static void rcar_du_vsp_plane_reset(struct drm_plane *plane)
+ 	if (state == NULL)
+ 		return;
+ 
+-	state->alpha = 255;
++	state->state.alpha = 255;
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+ 
+ 	plane->state = &state->state;
+ 	plane->state->plane = plane;
+ }
+ 
+-static int rcar_du_vsp_plane_atomic_set_property(struct drm_plane *plane,
+-	struct drm_plane_state *state, struct drm_property *property,
+-	uint64_t val)
+-{
+-	struct rcar_du_vsp_plane_state *rstate = to_rcar_vsp_plane_state(state);
+-	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+-
+-	if (property == rcdu->props.alpha)
+-		rstate->alpha = val;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-static int rcar_du_vsp_plane_atomic_get_property(struct drm_plane *plane,
+-	const struct drm_plane_state *state, struct drm_property *property,
+-	uint64_t *val)
+-{
+-	const struct rcar_du_vsp_plane_state *rstate =
+-		container_of(state, const struct rcar_du_vsp_plane_state, state);
+-	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+-
+-	if (property == rcdu->props.alpha)
+-		*val = rstate->alpha;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+ 	.update_plane = drm_atomic_helper_update_plane,
+ 	.disable_plane = drm_atomic_helper_disable_plane,
+@@ -380,8 +349,6 @@ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+ 	.destroy = drm_plane_cleanup,
+ 	.atomic_duplicate_state = rcar_du_vsp_plane_atomic_duplicate_state,
+ 	.atomic_destroy_state = rcar_du_vsp_plane_atomic_destroy_state,
+-	.atomic_set_property = rcar_du_vsp_plane_atomic_set_property,
+-	.atomic_get_property = rcar_du_vsp_plane_atomic_get_property,
+ };
+ 
+ int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct device_node *np,
+@@ -438,8 +405,7 @@ int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct device_node *np,
+ 		if (type == DRM_PLANE_TYPE_PRIMARY)
+ 			continue;
+ 
+-		drm_object_attach_property(&plane->plane.base,
+-					   rcdu->props.alpha, 255);
++		drm_plane_create_alpha_property(&plane->plane, 255);
+ 		drm_plane_create_zpos_property(&plane->plane, 1, 1,
+ 					       vsp->num_planes - 1);
+ 	}
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+index f876c512163c..8b19914761e4 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+@@ -44,7 +44,6 @@ static inline struct rcar_du_vsp_plane *to_rcar_vsp_plane(struct drm_plane *p)
+  * @state: base DRM plane state
+  * @format: information about the pixel format used by the plane
+  * @sg_tables: scatter-gather tables for the frame buffer memory
+- * @alpha: value of the plane alpha property
+  * @zpos: value of the plane zpos property
+  */
+ struct rcar_du_vsp_plane_state {
+@@ -53,7 +52,6 @@ struct rcar_du_vsp_plane_state {
+ 	const struct rcar_du_format_info *format;
+ 	struct sg_table sg_tables[3];
+ 
+-	unsigned int alpha;
+ 	unsigned int zpos;
  };
  
 -- 
