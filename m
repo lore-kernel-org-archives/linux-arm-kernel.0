@@ -1,54 +1,183 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 16 Feb 2018 20:19:23 +0100
-Subject: [PATCH 1/6] nand: davinci: rename the platform driver
-In-Reply-To: <20180216164712.25898-2-brgl@bgdev.pl>
-References: <20180216164712.25898-1-brgl@bgdev.pl>
- <20180216164712.25898-2-brgl@bgdev.pl>
-Message-ID: <20180216201923.16bfca7f@bbrezillon>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Fri, 16 Feb 2018 16:17:33 -0300
+Subject: [PATCH 28/41] perf inject: Emit instruction records on ETM trace
+ discontinuity
+In-Reply-To: <20180216191746.11095-1-acme@kernel.org>
+References: <20180216191746.11095-1-acme@kernel.org>
+Message-ID: <20180216191746.11095-29-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Feb 2018 17:47:07 +0100
-Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+From: Robert Walker <robert.walker@arm.com>
 
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Commit d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock
-> lookup table") broke the nand support in board file mode for
-> da850-based boards. Instead of reverting it and breaking the DT users
-> in the process (due to clock lookup), rename the driver to match the
-> clock table before renaming the users.
-> 
-> Fixes: d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock lookup table")
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  drivers/mtd/nand/davinci_nand.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-> index ccc8c43abcff..4fb143bf1872 100644
-> --- a/drivers/mtd/nand/davinci_nand.c
-> +++ b/drivers/mtd/nand/davinci_nand.c
-> @@ -865,7 +865,7 @@ static struct platform_driver nand_davinci_driver = {
->  	.probe		= nand_davinci_probe,
->  	.remove		= nand_davinci_remove,
->  	.driver		= {
-> -		.name	= "davinci_nand",
-> +		.name	= "davinci-nand",
+There may be discontinuities in the ETM trace stream due to overflows or
+ETM configuration for selective trace.  This patch emits an instruction
+sample with the pending branch stack when a TRACE ON packet occurs
+indicating a discontinuity in the trace data.
 
-Another side-effect of this change you should be aware of: by doing
-that you also break all users that were defining partitions through the
-cmdline using mtdparts=davinci_nand.0:<part-layout>.
+A new packet type CS_ETM_TRACE_ON is added, which is emitted by the low
+level decoder when a TRACE ON occurs.  The higher level decoder flushes
+the branch stack when this packet is emitted.
 
-Not sure this is a good idea ;-).
+Signed-off-by: Robert Walker <robert.walker@arm.com>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: coresight at lists.linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1518607481-4059-3-git-send-email-robert.walker at arm.com
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  9 +++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
+ tools/perf/util/cs-etm.c                        | 80 ++++++++++++++++++-------
+ 3 files changed, 67 insertions(+), 23 deletions(-)
 
->  		.of_match_table = of_match_ptr(davinci_nand_of_match),
->  	},
->  };
-
-
-
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 8ff69dfd725a..640af88331b4 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -328,7 +328,14 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+ 	}
+ 
+ 	return ret;
++}
+ 
++static ocsd_datapath_resp_t
++cs_etm_decoder__buffer_trace_on(struct cs_etm_decoder *decoder,
++				const uint8_t trace_chan_id)
++{
++	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
++					     CS_ETM_TRACE_ON);
+ }
+ 
+ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+@@ -347,6 +354,8 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+ 		decoder->trace_on = false;
+ 		break;
+ 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
++		resp = cs_etm_decoder__buffer_trace_on(decoder,
++						       trace_chan_id);
+ 		decoder->trace_on = true;
+ 		break;
+ 	case OCSD_GEN_TRC_ELEM_INSTR_RANGE:
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index a4fdd285b145..743f5f444304 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -24,6 +24,7 @@ struct cs_etm_buffer {
+ 
+ enum cs_etm_sample_type {
+ 	CS_ETM_RANGE = 1 << 0,
++	CS_ETM_TRACE_ON = 1 << 1,
+ };
+ 
+ struct cs_etm_packet {
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 6e595d96c04d..1b0d422373be 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -867,6 +867,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 	 */
+ 	if (etm->synth_opts.last_branch &&
+ 	    etmq->prev_packet &&
++	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+ 	    etmq->prev_packet->last_instr_taken_branch)
+ 		cs_etm__update_last_branch_rb(etmq);
+ 
+@@ -920,6 +921,40 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 	return 0;
+ }
+ 
++static int cs_etm__flush(struct cs_etm_queue *etmq)
++{
++	int err = 0;
++	struct cs_etm_packet *tmp;
++
++	if (etmq->etm->synth_opts.last_branch &&
++	    etmq->prev_packet &&
++	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
++		/*
++		 * Generate a last branch event for the branches left in the
++		 * circular buffer at the end of the trace.
++		 *
++		 * Use the address of the end of the last reported execution
++		 * range
++		 */
++		u64 addr = cs_etm__last_executed_instr(etmq->prev_packet);
++
++		err = cs_etm__synth_instruction_sample(
++			etmq, addr,
++			etmq->period_instructions);
++		etmq->period_instructions = 0;
++
++		/*
++		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
++		 * the next incoming packet.
++		 */
++		tmp = etmq->packet;
++		etmq->packet = etmq->prev_packet;
++		etmq->prev_packet = tmp;
++	}
++
++	return err;
++}
++
+ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ {
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+@@ -971,32 +1006,31 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 					 */
+ 					break;
+ 
+-				/*
+-				 * If the packet contains an instruction
+-				 * range, generate instruction sequence
+-				 * events.
+-				 */
+-				if (etmq->packet->sample_type & CS_ETM_RANGE)
+-					err = cs_etm__sample(etmq);
++				switch (etmq->packet->sample_type) {
++				case CS_ETM_RANGE:
++					/*
++					 * If the packet contains an instruction
++					 * range, generate instruction sequence
++					 * events.
++					 */
++					cs_etm__sample(etmq);
++					break;
++				case CS_ETM_TRACE_ON:
++					/*
++					 * Discontinuity in trace, flush
++					 * previous branch stack
++					 */
++					cs_etm__flush(etmq);
++					break;
++				default:
++					break;
++				}
+ 			}
+ 		} while (buffer.len > buffer_used);
+ 
+-		/*
+-		 * Generate a last branch event for the branches left in
+-		 * the circular buffer at the end of the trace.
+-		 */
+-		if (etm->sample_instructions &&
+-		    etmq->etm->synth_opts.last_branch) {
+-			struct branch_stack *bs = etmq->last_branch_rb;
+-			struct branch_entry *be =
+-				&bs->entries[etmq->last_branch_pos];
+-
+-			err = cs_etm__synth_instruction_sample(
+-				etmq, be->to, etmq->period_instructions);
+-			if (err)
+-				return err;
+-		}
+-
++		if (err == 0)
++			/* Flush any remaining branch stack entries */
++			err = cs_etm__flush(etmq);
+ 	}
+ 
+ 	return err;
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.14.3
