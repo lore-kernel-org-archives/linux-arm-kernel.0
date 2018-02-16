@@ -1,41 +1,117 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 16 Feb 2018 09:11:27 +0100
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <206116170.22740.1518739362681.JavaMail.zimbra@efficios.com>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214150739.GH2992@arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215142239.GF16623@arm.com>
- <20180215164754.GW25201@hirez.programming.kicks-ass.net>
- <20180215182154.GD15274@arm.com>
- <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
- <206116170.22740.1518739362681.JavaMail.zimbra@efficios.com>
-Message-ID: <20180216081127.GE25181@hirez.programming.kicks-ass.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 16 Feb 2018 09:13:27 +0100
+Subject: [PATCH] KVM: arm: Enable emulation of the physical timer
+In-Reply-To: <1518518476-26645-1-git-send-email-j.fanguede@virtualopensystems.com>
+References: <1518518476-26645-1-git-send-email-j.fanguede@virtualopensystems.com>
+Message-ID: <20180216081327.GA10440@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 13, 2018 at 11:41:16AM +0100, J?r?my Fangu?de wrote:
+> Set the handlers to emulate read and write operations for CNTP_CTL,
+> CNTP_CVAL and CNTP_TVAL registers in such a way that VMs can use the
+> physical timer.
+> 
+> Signed-off-by: J?r?my Fangu?de <j.fanguede@virtualopensystems.com>
+> ---
+> 
+> This patch is the equivalent of this one: [1], but for arm 32bits
+> instead of ARMv8 aarch32.
+> 
+> [1] https://patchwork.kernel.org/patch/10207019/
+> 
 
-Please trim..
+Thanks, both queued.
 
-On Fri, Feb 16, 2018 at 12:02:42AM +0000, Mathieu Desnoyers wrote:
-> > My current theory: do_exit() gets preempted after having set current->mm
-> > to NULL, and after having issued mmput(), which brings the mm_count down
-> > to 0.
+-Christoffer
 
-No it doesn't..
-
-remember, the last thread of a process enters with:
-
-  mm_count == 1 && mm_users == 1
-
-exit_mm() then does mmgrab():
-
-  mm_count == 2 && mm_users == 1
-
-we then do mmput(), which results in:
-
-  mm_count == 1 && mm_users == 0
-
-That last mm_count is for ->active_mm, and will be dropped once we
-schedule to a next user task.
+> ---
+>  arch/arm/kvm/coproc.c | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 6d1d2e2..3a02e76 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -270,6 +270,60 @@ static bool access_gic_sre(struct kvm_vcpu *vcpu,
+>  	return true;
+>  }
+>  
+> +static bool access_cntp_tval(struct kvm_vcpu *vcpu,
+> +			     const struct coproc_params *p,
+> +			     const struct coproc_reg *r)
+> +{
+> +	u64 now = kvm_phys_timer_read();
+> +	u64 val;
+> +
+> +	if (p->is_write) {
+> +		val = *vcpu_reg(vcpu, p->Rt1);
+> +		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val + now);
+> +	} else {
+> +		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
+> +		*vcpu_reg(vcpu, p->Rt1) = val - now;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+> +static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
+> +			    const struct coproc_params *p,
+> +			    const struct coproc_reg *r)
+> +{
+> +	u32 val;
+> +
+> +	if (p->is_write) {
+> +		val = *vcpu_reg(vcpu, p->Rt1);
+> +		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, val);
+> +	} else {
+> +		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
+> +		*vcpu_reg(vcpu, p->Rt1) = val;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+> +static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+> +			     const struct coproc_params *p,
+> +			     const struct coproc_reg *r)
+> +{
+> +	u64 val;
+> +
+> +	if (p->is_write) {
+> +		val = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
+> +		val |= *vcpu_reg(vcpu, p->Rt1);
+> +		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val);
+> +	} else {
+> +		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
+> +		*vcpu_reg(vcpu, p->Rt1) = val;
+> +		*vcpu_reg(vcpu, p->Rt2) = val >> 32;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /*
+>   * We could trap ID_DFR0 and tell the guest we don't support performance
+>   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+> @@ -423,10 +477,17 @@ static const struct coproc_reg cp15_regs[] = {
+>  	{ CRn(13), CRm( 0), Op1( 0), Op2( 4), is32,
+>  			NULL, reset_unknown, c13_TID_PRIV },
+>  
+> +	/* CNTP */
+> +	{ CRm64(14), Op1( 2), is64, access_cntp_cval},
+> +
+>  	/* CNTKCTL: swapped by interrupt.S. */
+>  	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
+>  			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
+>  
+> +	/* CNTP */
+> +	{ CRn(14), CRm( 2), Op1( 0), Op2( 0), is32, access_cntp_tval },
+> +	{ CRn(14), CRm( 2), Op1( 0), Op2( 1), is32, access_cntp_ctl },
+> +
+>  	/* The Configuration Base Address Register. */
+>  	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
+>  };
+> -- 
+> 2.7.4
+> 
