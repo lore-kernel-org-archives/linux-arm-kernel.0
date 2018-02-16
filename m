@@ -1,44 +1,113 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 16 Feb 2018 16:17:27 -0300
-Subject: [PATCH 22/41] perf auxtrace arm: Fixing uninitialised variable
+Date: Fri, 16 Feb 2018 16:17:26 -0300
+Subject: [PATCH 21/41] perf tools: Use target->per_thread and
+ target->system_wide flags
 In-Reply-To: <20180216191746.11095-1-acme@kernel.org>
 References: <20180216191746.11095-1-acme@kernel.org>
-Message-ID: <20180216191746.11095-23-acme@kernel.org>
+Message-ID: <20180216191746.11095-22-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+From: Jin Yao <yao.jin@linux.intel.com>
 
-When working natively on arm64 the compiler gets pesky and complains
-that variable 'i' is uninitialised, something that breaks the
-compilation.  Here no further checks are needed since variable
-'found_spe' can only be true if variable 'i' has been initialised as
-part of the for loop.
+Mathieu Poirier reports issue in commit ("73c0ca1eee3d perf thread_map:
+Enumerate all threads from /proc") that it has negative impact on 'perf
+record --per-thread'. It has the effect of creating a kernel event for
+each thread in the system for 'perf record --per-thread'.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Mathieu Poirier's patch ("perf util: Do not reuse target->per_thread flag")
+can fix this issue by creating a new target->all_threads flag.
+
+This patch is based on Mathieu Poirier's patch but it doesn't use a new
+target->all_threads flag. This patch just uses 'target->per_thread &&
+target->system_wide' as a condition to check for all threads case.
+
+Signed-off-by: Jin Yao <yao.jin@linux.intel.com>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jin Yao <yao.jin@linux.intel.com>
 Cc: Namhyung Kim <namhyung@kernel.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1518467557-18505-4-git-send-email-mathieu.poirier at linaro.org
+Fixes: 73c0ca1eee3d ("perf thread_map: Enumerate all threads from /proc")
+Link: http://lkml.kernel.org/r/1518467557-18505-3-git-send-email-mathieu.poirier at linaro.org
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+[Fixed checkpatch warning about line over 80 characters]
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- tools/perf/arch/arm/util/auxtrace.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ tools/perf/util/evlist.c     | 21 ++++++++++++++++++++-
+ tools/perf/util/thread_map.c |  4 ++--
+ tools/perf/util/thread_map.h |  2 +-
+ 3 files changed, 23 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
-index 2323581b157d..fa639e3e52ac 100644
---- a/tools/perf/arch/arm/util/auxtrace.c
-+++ b/tools/perf/arch/arm/util/auxtrace.c
-@@ -68,7 +68,7 @@ struct auxtrace_record
- 	bool found_spe = false;
- 	static struct perf_pmu **arm_spe_pmus = NULL;
- 	static int nr_spes = 0;
--	int i;
-+	int i = 0;
+diff --git a/tools/perf/util/evlist.c b/tools/perf/util/evlist.c
+index e5fc14e53c05..7b7d535396f7 100644
+--- a/tools/perf/util/evlist.c
++++ b/tools/perf/util/evlist.c
+@@ -1086,11 +1086,30 @@ int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages)
  
- 	if (!evlist)
- 		return NULL;
+ int perf_evlist__create_maps(struct perf_evlist *evlist, struct target *target)
+ {
++	bool all_threads = (target->per_thread && target->system_wide);
+ 	struct cpu_map *cpus;
+ 	struct thread_map *threads;
+ 
++	/*
++	 * If specify '-a' and '--per-thread' to perf record, perf record
++	 * will override '--per-thread'. target->per_thread = false and
++	 * target->system_wide = true.
++	 *
++	 * If specify '--per-thread' only to perf record,
++	 * target->per_thread = true and target->system_wide = false.
++	 *
++	 * So target->per_thread && target->system_wide is false.
++	 * For perf record, thread_map__new_str doesn't call
++	 * thread_map__new_all_cpus. That will keep perf record's
++	 * current behavior.
++	 *
++	 * For perf stat, it allows the case that target->per_thread and
++	 * target->system_wide are all true. It means to collect system-wide
++	 * per-thread data. thread_map__new_str will call
++	 * thread_map__new_all_cpus to enumerate all threads.
++	 */
+ 	threads = thread_map__new_str(target->pid, target->tid, target->uid,
+-				      target->per_thread);
++				      all_threads);
+ 
+ 	if (!threads)
+ 		return -1;
+diff --git a/tools/perf/util/thread_map.c b/tools/perf/util/thread_map.c
+index 3e1038f6491c..729dad8f412d 100644
+--- a/tools/perf/util/thread_map.c
++++ b/tools/perf/util/thread_map.c
+@@ -323,7 +323,7 @@ struct thread_map *thread_map__new_by_tid_str(const char *tid_str)
+ }
+ 
+ struct thread_map *thread_map__new_str(const char *pid, const char *tid,
+-				       uid_t uid, bool per_thread)
++				       uid_t uid, bool all_threads)
+ {
+ 	if (pid)
+ 		return thread_map__new_by_pid_str(pid);
+@@ -331,7 +331,7 @@ struct thread_map *thread_map__new_str(const char *pid, const char *tid,
+ 	if (!tid && uid != UINT_MAX)
+ 		return thread_map__new_by_uid(uid);
+ 
+-	if (per_thread)
++	if (all_threads)
+ 		return thread_map__new_all_cpus();
+ 
+ 	return thread_map__new_by_tid_str(tid);
+diff --git a/tools/perf/util/thread_map.h b/tools/perf/util/thread_map.h
+index 0a806b99e73c..5ec91cfd1869 100644
+--- a/tools/perf/util/thread_map.h
++++ b/tools/perf/util/thread_map.h
+@@ -31,7 +31,7 @@ struct thread_map *thread_map__get(struct thread_map *map);
+ void thread_map__put(struct thread_map *map);
+ 
+ struct thread_map *thread_map__new_str(const char *pid,
+-		const char *tid, uid_t uid, bool per_thread);
++		const char *tid, uid_t uid, bool all_threads);
+ 
+ struct thread_map *thread_map__new_by_tid_str(const char *tid_str);
+ 
 -- 
 2.14.3
