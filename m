@@ -1,50 +1,21 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 16 Feb 2018 23:38:17 +0100
-Subject: [PATCH 3/3] arm64: dts: rockchip: enable display nodes on
- rk3328-rock64
-In-Reply-To: <20180216223817.2821-1-heiko@sntech.de>
-References: <20180216223817.2821-1-heiko@sntech.de>
-Message-ID: <20180216223817.2821-4-heiko@sntech.de>
+Date: Fri, 16 Feb 2018 23:38:14 +0100
+Subject: [PATCH 0/3] rk3328 and rock64 display support
+Message-ID: <20180216223817.2821-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable necessary nodes to get output on the hdmi port of the board.
+Companion series for the display modifications adding the necessary
+devicetree stuff for display support on the rk3328-rock64.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Heiko Stuebner (3):
+  arm64: dts: rockchip: add Innosilicon hdmi phy node to rk3328
+  arm64: dts: rockchip: add rk3328 display nodes
+  arm64: dts: rockchip: enable display nodes on rk3328-rock64
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-index 5c43a61d3178..ca48be13dee7 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-@@ -145,6 +145,14 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmiphy {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	status = "okay";
- 
-@@ -341,3 +349,11 @@
- 	dr_mode = "host";
- 	status = "okay";
- };
-+
-+&vop {
-+	status = "okay";
-+};
-+
-+&vop_mmu {
-+	status = "okay";
-+};
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 16 ++++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi       | 70 ++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+
 -- 
 2.15.1
