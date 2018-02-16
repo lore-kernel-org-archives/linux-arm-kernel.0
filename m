@@ -1,93 +1,187 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Fri, 16 Feb 2018 17:17:57 +0000 (UTC)
-Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
-In-Reply-To: <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
-References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
- <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
- <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
- <20180215142239.GF16623@arm.com>
- <20180215164754.GW25201@hirez.programming.kicks-ass.net>
- <20180215182154.GD15274@arm.com>
- <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
- <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
-Message-ID: <1037744516.23063.1518801477666.JavaMail.zimbra@efficios.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 16 Feb 2018 18:35:53 +0100
+Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
+In-Reply-To: <CAK8P3a1DbjovHF3QX9OuPA1q4XAEj1KackgKqGvceDWL3f1cJg@mail.gmail.com>
+References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
+ <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
+ <20170609154652.GG2244@mai>
+ <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
+ <CALAqxLXtLc16zT9AFaHXbbQp-Vf3GNOJ1nb7PoUJgj22rh=X-w@mail.gmail.com>
+ <CAK8P3a0L6QNAJf6DB876DFHf7aGcD=uwxOUB36LKr-AX67VYAA@mail.gmail.com>
+ <20170612093853.GB2261@mai>
+ <CAK8P3a1DbjovHF3QX9OuPA1q4XAEj1KackgKqGvceDWL3f1cJg@mail.gmail.com>
+Message-ID: <a5050f68-3adb-6973-9164-1bb43272cbd0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Feb 16, 2018, at 11:53 AM, Mark Rutland mark.rutland at arm.com wrote:
-
-> Hi,
-> 
-> On Thu, Feb 15, 2018 at 10:08:56PM +0000, Mathieu Desnoyers wrote:
->> My current theory: do_exit() gets preempted after having set current->mm
->> to NULL, and after having issued mmput(), which brings the mm_count down
->> to 0.
+On 12/06/2017 23:12, Arnd Bergmann wrote:
+> On Mon, Jun 12, 2017 at 11:38 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On Fri, Jun 09, 2017 at 10:48:13PM +0200, Arnd Bergmann wrote:
+>>> On Fri, Jun 9, 2017 at 10:15 PM, John Stultz <john.stultz@linaro.org> wrote:
+>>>> On Fri, Jun 9, 2017 at 1:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>> On Fri, Jun 9, 2017 at 5:46 PM, Daniel Lezcano
+>>>>> <daniel.lezcano@linaro.org> wrote:
+>>>>>
+>>>>> Yes, but I'm not sure this is the right patch either. We tend to not
+>>>>> use 'select' for user-visible drivers, and most hisilicon platforms
+>>>>> won't need this driver.
+>>>>>
+>>>>> I think it would be more consistent to add this to the defconfig
+>>>>> and regard it as a user error when the driver is disabled on a
+>>>>> machine that needs it.
+>>>>
+>>>> Maybe the select is not exactly in the right place, but I don't really
+>>>> feel like a pmic on an SoC is a "user-visible driver". I deal with the
+>>>> board often and when the new dependency was made on the clk, I would
+>>>> have never have found it on my own w/o Ulf and Daniel pointing out
+>>>> what I needed to enable.
+>>>
+>>> What I meant is that the Kconfig option is user-visible. On a very high
+>>> level, this is a result of arch/arm64/Kconfig.platforms listing only
+>>> very broad categories of SoCs, in many cases only the manufacturers
+>>> of very different chip families, which then control the visibility of the
+>>> individual Kconfig items for things like pinctrl or clk.
+>>>
+>>> I now see that MFD_HI655X_PMIC is the top-level driver that you
+>>> have to select before enabling COMMON_CLK_HI655X, so the
+>>> patch is actually broken unless it actually selects both.
+>>>
+>>> How about simply adding a 'default MFD_HI655X_PMIC' to
+>>> COMMON_CLK_HI655X to enable it unless it is explicitly
+>>> turned off?
 >>
->> Unfortunately, if the scheduler switches from a userspace thread
->> to a kernel thread, context_switch() loads prev->active_mm which still
->> points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
->> in finish_task_switch().
+>> Actually, I share John's opinion.
+>>
+>> Ideally when we choose a platform, all the relevants devices configuration
+>> options should be selected automatically from a single topmost node of a tree
+>> (platform selection) to all the nodes corresponding to the devices, leaving the
+>> user to select one simple option without knowledge of the SoC hardware
+>> internals.
+>>
+>> If the user is expert in the platform and knows exactly what he does, then he
+>> can select an _EXPERT_ like option and be able to disable some drivers.
+>>
+>> It is how I tend to write the Kconfig options, so the 'default MFD_HI655X_PMIC'
+>> is confusing for me. Wouldn't make sense to select COMMON_CLK_HI655X when
+>> MFD_HI655X_PMIC is enabled?
 > 
-> For this to happen, we need to get to the mmput() in exit_mm() with:
+> I don't think it's that easy. When you do that, MFD_HI655X_PMIC gains
+> a dependency on COMMON_CLK and will again cause a warning on
+> machines that disable that during compile testing.
 > 
->  mm->mm_count == 1
->  mm->mm_users == 1
->  mm == active_mm
+> Using 'select' for user-selectable options generally leads to problems,
+> and you are better off avoiding it. If you want to make the symbol impossible
+> to turn off for non-EXPERT configurations, you can write it like
 > 
-> ... but AFAICT, this cannot happen.
+> config COMMON_CLK_HI655X
+>         tristate "Clock driver for Hi655x" if EXPERT
+>         depends on (MFD_HI655X_PMIC || COMPILE_TEST)
+>         depends on REGMAP
+>         default MFD_HI655X_PMIC
 > 
-> If there's no context_switch between clearing current->mm and the
-> mmput(), then mm->mm_count >= 2, thanks to the prior mmgrab() and the
-> active_mm reference (in mm_count) that context_switch+finish_task_switch
-> manage.
-> 
-> If there is a context_switch between the two, then AFAICT, either:
-> 
-> a) The task re-inherits its old mm as active_mm, and mm_count >= 2. In
->   context_switch we mmgrab() the active_mm to inherit it, and in
->   finish_task_switch() we drop the oldmm, balancing the mmgrab() with
->   an mmput().
-> 
->   e.g we go task -> kernel_task -> task
-> 
-> b) At some point, another user task is scheduled, and we switch to its
->   mm. We don't mmgrab() the active_mm, but we mmdrop() the oldmm, which
->   means mm_count >= 1. Since we witched to a new mm, if we switch back
->   to the first task, it cannot have its own mm as active_mm.
-> 
->   e.g. we go task -> other_task -> task
-> 
-> I suspect we have a bogus mmdrop or mmput elsewhere, and do_exit() and
-> finish_task_switch() aren't to blame.
+> That way the option is completely hidden for non-EXPERT,
+> but still has the right default otherwise, and the dependencies
+> are tracked right for compile-testing.
 
-Currently reviewing: fs/proc/base.c: __set_oom_adj()
+What about the options:
 
-        /*
-         * Make sure we will check other processes sharing the mm if this is
-         * not vfrok which wants its own oom_score_adj.
-         * pin the mm so it doesn't go away and get reused after task_unlock
-         */
-        if (!task->vfork_done) {
-                struct task_struct *p = find_lock_task_mm(task);
+CONFIG_HI3660_MBOX
+CONFIG_HI6220_MBOX
 
-                if (p) {
-                        if (atomic_read(&p->mm->mm_users) > 1) {
-                                mm = p->mm;
-                                mmgrab(mm);
-                        }
-                        task_unlock(p);
-                }
-        }
+CONFIG_STUB_CLK_HI6220
+CONFIG_STUB_CLK_HI3660
 
-Considering that mmput() done by exit_mm() is done outside of the
-task_lock critical section, I wonder how the mm_users load is
-synchronized ?
+?
 
-Thanks,
+Would make sense to do something like:
 
-Mathieu
+
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index b9546ab..3a07dfe 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -517,7 +517,6 @@ CONFIG_COMMON_CLK_CS2000_CP=y
+ CONFIG_COMMON_CLK_S2MPS11=y
+ CONFIG_CLK_QORIQ=y
+ CONFIG_COMMON_CLK_PWM=y
+-CONFIG_STUB_CLK_HI3660=y
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_QCOM_CLK_SMD_RPM=y
+ CONFIG_IPQ_GCC_8074=y
+@@ -529,8 +528,6 @@ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_ARM_MHU=y
+ CONFIG_PLATFORM_MHU=y
+ CONFIG_BCM2835_MBOX=y
+-CONFIG_HI3660_MBOX=y
+-CONFIG_HI6220_MBOX=y
+ CONFIG_ROCKCHIP_IOMMU=y
+ CONFIG_ARM_SMMU=y
+ CONFIG_ARM_SMMU_V3=y
+diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+index 1bd4355..becdb1d 100644
+--- a/drivers/clk/hisilicon/Kconfig
++++ b/drivers/clk/hisilicon/Kconfig
+@@ -44,14 +44,17 @@ config RESET_HISI
+ 	  Build reset controller driver for HiSilicon device chipsets.
+
+ config STUB_CLK_HI6220
+-	bool "Hi6220 Stub Clock Driver"
+-	depends on COMMON_CLK_HI6220 && MAILBOX
+-	default ARCH_HISI
++	bool "Hi6220 Stub Clock Driver" if EXPERT
++	depends on (COMMON_CLK_HI6220 || COMPILE_TEST)
++	depends on MAILBOX
++	default COMMON_CLK_HI6220
+ 	help
+ 	  Build the Hisilicon Hi6220 stub clock driver.
+
+ config STUB_CLK_HI3660
+-	bool "Hi3660 Stub Clock Driver"
+-	depends on COMMON_CLK_HI3660 && MAILBOX
++	bool "Hi3660 Stub Clock Driver" if EXPERT
++	depends on (COMMON_CLK_HI3660 || COMPILE_TEST)
++	depends on MAILBOX
++	default COMMON_CLK_HI3660
+ 	help
+ 	  Build the Hisilicon Hi3660 stub clock driver.
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index de8390d4..8d1726c 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -109,16 +109,19 @@ config TI_MESSAGE_MANAGER
+ 	  platform has support for the hardware block.
+
+ config HI3660_MBOX
+-	tristate "Hi3660 Mailbox"
+-	depends on ARCH_HISI && OF
++	tristate "Hi3660 Mailbox" if EXPERT
++	depends on (ARCH_HISI || COMPILE_TEST)
++	depends on OF
++	default ARCH_HISI
+ 	help
+ 	  An implementation of the hi3660 mailbox. It is used to send message
+ 	  between application processors and other processors/MCU/DSP. Select
+ 	  Y here if you want to use Hi3660 mailbox controller.
+
+ config HI6220_MBOX
+-	tristate "Hi6220 Mailbox"
+-	depends on ARCH_HISI
++	tristate "Hi6220 Mailbox" if EXPERT
++	depends on (ARCH_HISI || COMPILE_TEST)
++	default ARCH_HISI
+ 	help
+ 	  An implementation of the hi6220 mailbox. It is used to send message
+ 	  between application processors and MCU. Say Y here if you want to
+
+
+
 
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
