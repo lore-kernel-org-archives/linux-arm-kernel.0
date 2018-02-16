@@ -1,153 +1,62 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 16 Feb 2018 17:47:12 +0100
-Subject: [PATCH 6/6] ARM: davinci: use aemif platform driver in legacy mode
- for da850-evm
-In-Reply-To: <20180216164712.25898-1-brgl@bgdev.pl>
-References: <20180216164712.25898-1-brgl@bgdev.pl>
-Message-ID: <20180216164712.25898-7-brgl@bgdev.pl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Feb 2018 16:53:30 +0000
+Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
+In-Reply-To: <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
+References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
+ <20180214150739.GH2992@arm.com>
+ <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
+ <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
+ <20180215142239.GF16623@arm.com>
+ <20180215164754.GW25201@hirez.programming.kicks-ass.net>
+ <20180215182154.GD15274@arm.com>
+ <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
+Message-ID: <20180216165330.65rjxjw7qwkei2ob@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi,
 
-We now support board files in aemif. Use the platform driver instead
-of the handcrafted API in da850-evm.
+On Thu, Feb 15, 2018 at 10:08:56PM +0000, Mathieu Desnoyers wrote:
+> My current theory: do_exit() gets preempted after having set current->mm
+> to NULL, and after having issued mmput(), which brings the mm_count down
+> to 0.
+>
+> Unfortunately, if the scheduler switches from a userspace thread
+> to a kernel thread, context_switch() loads prev->active_mm which still
+> points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
+> in finish_task_switch().
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-da850-evm.c | 93 ++++++++++++++++++---------------
- 1 file changed, 51 insertions(+), 42 deletions(-)
+For this to happen, we need to get to the mmput() in exit_mm() with:
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 828194045a2b..88e1d00a1f56 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -33,6 +33,7 @@
- #include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/mtd-davinci-aemif.h>
-+#include <linux/platform_data/ti-aemif.h>
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/uio_pruss.h>
- #include <linux/regulator/machine.h>
-@@ -185,16 +186,6 @@ static struct resource da850_evm_norflash_resource[] = {
- 	},
- };
- 
--static struct platform_device da850_evm_norflash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--		.platform_data  = &da850_evm_norflash_data,
--	},
--	.num_resources	= 1,
--	.resource	= da850_evm_norflash_resource,
--};
--
- /* DA850/OMAP-L138 EVM includes a 512 MByte large-page NAND flash
-  * (128K blocks). It may be used instead of the (default) SPI flash
-  * to boot, using TI's tools to install the secondary boot loader
-@@ -265,37 +256,58 @@ static struct resource da850_evm_nandflash_resource[] = {
- 	},
- };
- 
--static struct platform_device da850_evm_nandflash_device = {
--	.name		= "davinci-nand",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &da850_evm_nandflash_data,
--	},
--	.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
--	.resource	= da850_evm_nandflash_resource,
-+static struct resource da850_evm_aemif_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	}
- };
- 
--static struct platform_device *da850_evm_devices[] = {
--	&da850_evm_nandflash_device,
--	&da850_evm_norflash_device,
-+static struct aemif_abus_data da850_evm_aemif_abus_data[] = {
-+	{
-+		.cs	= 3,
-+	}
- };
- 
--#define DA8XX_AEMIF_CE2CFG_OFFSET	0x10
--#define DA8XX_AEMIF_ASIZE_16BIT		0x1
--
--static void __init da850_evm_init_nor(void)
--{
--	void __iomem *aemif_addr;
--
--	aemif_addr = ioremap(DA8XX_AEMIF_CTL_BASE, SZ_32K);
-+static struct platform_device da850_evm_aemif_devices[] = {
-+	{
-+		.name		= "davinci-nand",
-+		.id		= 1,
-+		.dev		= {
-+			.platform_data	= &da850_evm_nandflash_data,
-+		},
-+		.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
-+		.resource	= da850_evm_nandflash_resource,
-+	},
-+	{
-+		.name		= "physmap-flash",
-+		.id		= 0,
-+		.dev		= {
-+			.platform_data  = &da850_evm_norflash_data,
-+		},
-+		.num_resources	= 1,
-+		.resource	= da850_evm_norflash_resource,
-+	}
-+};
- 
--	/* Configure data bus width of CS2 to 16 bit */
--	writel(readl(aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET) |
--		DA8XX_AEMIF_ASIZE_16BIT,
--		aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET);
-+static struct aemif_platform_data da850_evm_aemif_pdata = {
-+	.cs_offset = 2,
-+	.abus_data = da850_evm_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(da850_evm_aemif_abus_data),
-+	.sub_devices = da850_evm_aemif_devices,
-+	.num_sub_devices = ARRAY_SIZE(da850_evm_aemif_devices),
-+};
- 
--	iounmap(aemif_addr);
--}
-+static struct platform_device da850_evm_aemif_device = {
-+	.name		= "ti-aemif",
-+	.dev = {
-+		.platform_data	= &da850_evm_aemif_pdata,
-+	},
-+	.resource	= da850_evm_aemif_resource,
-+	.num_resources	= ARRAY_SIZE(da850_evm_aemif_resource),
-+	.id		= -1,
-+};
- 
- static const short da850_evm_nand_pins[] = {
- 	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
-@@ -338,13 +350,10 @@ static inline void da850_evm_setup_nor_nand(void)
- 			pr_warn("%s: NOR mux setup failed: %d\n",
- 				__func__, ret);
- 
--		da850_evm_init_nor();
--
--		platform_add_devices(da850_evm_devices,
--					ARRAY_SIZE(da850_evm_devices));
--
--		if (davinci_aemif_setup(&da850_evm_nandflash_device))
--			pr_warn("%s: Cannot configure AEMIF.\n", __func__);
-+		ret = platform_device_register(&da850_evm_aemif_device);
-+		if (ret)
-+			pr_warn("%s: registering aemif failed: %d\n",
-+				__func__, ret);
- 	}
- }
- 
--- 
-2.16.1
+  mm->mm_count == 1
+  mm->mm_users == 1
+  mm == active_mm
+
+... but AFAICT, this cannot happen.
+
+If there's no context_switch between clearing current->mm and the
+mmput(), then mm->mm_count >= 2, thanks to the prior mmgrab() and the
+active_mm reference (in mm_count) that context_switch+finish_task_switch
+manage.
+
+If there is a context_switch between the two, then AFAICT, either:
+
+a) The task re-inherits its old mm as active_mm, and mm_count >= 2. In
+   context_switch we mmgrab() the active_mm to inherit it, and in
+   finish_task_switch() we drop the oldmm, balancing the mmgrab() with
+   an mmput().
+
+   e.g we go task -> kernel_task -> task
+
+b) At some point, another user task is scheduled, and we switch to its
+   mm. We don't mmgrab() the active_mm, but we mmdrop() the oldmm, which
+   means mm_count >= 1. Since we witched to a new mm, if we switch back
+   to the first task, it cannot have its own mm as active_mm.
+
+   e.g. we go task -> other_task -> task
+
+I suspect we have a bogus mmdrop or mmput elsewhere, and do_exit() and
+finish_task_switch() aren't to blame.
+
+Thanks,
+Mark.
