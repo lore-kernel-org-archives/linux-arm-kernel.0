@@ -1,43 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 17 Feb 2018 00:22:32 +0800
-Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
- tables at kdump
-In-Reply-To: <20180201090449.19514-1-takahiro.akashi@linaro.org>
-References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
-Message-ID: <201802170034.BMcAEki2%fengguang.wu@intel.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 16 Feb 2018 17:47:06 +0100
+Subject: [PATCH 0/6] ARM: davinci: remove the mach-specific aemif driver -
+ part 1
+Message-ID: <20180216164712.25898-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Thank you for the patch! Yet something to improve:
+Hi Sekhar,
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.16-rc1 next-20180216]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+while waiting for David's updated series I prepared the first part of
+changes required to remove duplicate aemif support from mach-davinci.
 
-url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/arm64-acpi-efi-fix-alignment-fault-in-accessing-ACPI-tables-at-kdump/20180203-174725
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I actually noticed that one of my previous changes from 2017 broke nand
+in legacy mode - the clock lookup no longer works. This series addresses
+it as well.
 
-All errors (new ones prefixed by >>):
+The first two patches fix the issue introduced in commit d8e22fb4ccac
+("ARM: da850: add the nand dev_id to the clock lookup table").
 
-   arch/arm64/kernel/acpi.o: In function `__acpi_get_mem_attribute':
->> acpi.c:(.text+0x60): undefined reference to `efi_mem_attributes'
+Next two add support for board files to the aemif driver.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58514 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180217/5ce7c145/attachment-0001.gz>
+Last two add nand support to da850-lcdk in legacy mode and make
+da850-evm use the platform driver instead of the mach-specific one.
+
+If this series gets accepted, I'll prepere a follow-up moving all
+other boards to the new platform driver.
+
+Bartosz Golaszewski (6):
+  nand: davinci: rename the platform driver
+  ARM: davinci: update the nand driver names
+  memory: aemif: don't rely on kbuild for driver's name
+  memory: aemif: add support for board files
+  ARM: davinci: add aemif & nand support to da850-lcdk in legacy mode
+  ARM: davinci: use aemif platform driver in legacy mode for da850-evm
+
+ arch/arm/mach-davinci/board-da830-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-da850-evm.c     |  93 +++++++++++---------
+ arch/arm/mach-davinci/board-dm355-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c |   2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    |   2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    |   2 +-
+ arch/arm/mach-davinci/board-mityomapl138.c  |   2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c   |   2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/board-sffsdr.c        |   2 +-
+ drivers/memory/ti-aemif.c                   |  59 ++++++++-----
+ drivers/mtd/nand/davinci_nand.c             |   2 +-
+ include/linux/platform_data/ti-aemif.h      |   9 ++
+ 14 files changed, 240 insertions(+), 73 deletions(-)
+
+-- 
+2.16.1
