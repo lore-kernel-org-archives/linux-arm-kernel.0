@@ -1,62 +1,107 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 16 Feb 2018 10:03:45 +0100
-Subject: [PATCH 02/15] clk: renesas: cpg-msr: Add support for R-Car M3-N
-In-Reply-To: <20180215153110.zq2zosepbxmpa3kb@verge.net.au>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-3-git-send-email-jacopo+renesas@jmondi.org>
- <20180215153110.zq2zosepbxmpa3kb@verge.net.au>
-Message-ID: <CAMuHMdUJ8p99MF4sh5OGHbKc-Pz-fhpTx=gr1UvhYLTWHn53DA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 16 Feb 2018 10:05:43 +0100
+Subject: [PATCH v4 10/19] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
+In-Reply-To: <af5ddd03-ddaa-0fe9-51ec-4946b5adfe1c@arm.com>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-11-marc.zyngier@arm.com>
+ <20180115153632.GK21403@cbox>
+ <af5ddd03-ddaa-0fe9-51ec-4946b5adfe1c@arm.com>
+Message-ID: <20180216090543.GC10440@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thu, Feb 15, 2018 at 01:22:56PM +0000, Marc Zyngier wrote:
+> On 15/01/18 15:36, Christoffer Dall wrote:
+> > On Thu, Jan 04, 2018 at 06:43:25PM +0000, Marc Zyngier wrote:
+> >> kvm_vgic_global_state is part of the read-only section, and is
+> >> usually accessed using a PC-relative address generation (adrp + add).
+> >>
+> >> It is thus useless to use kern_hyp_va() on it, and actively problematic
+> >> if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+> >> no way that the compiler is going to guarantee that such access is
+> >> always be PC relative.
+> > 
+> > nit: is always be
+> > 
+> >>
+> >> So let's bite the bullet and provide our own accessor.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
+> >>  arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
+> >>  virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
+> >>  3 files changed, 17 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+> >> index ab20ffa8b9e7..1d42d0aa2feb 100644
+> >> --- a/arch/arm/include/asm/kvm_hyp.h
+> >> +++ b/arch/arm/include/asm/kvm_hyp.h
+> >> @@ -26,6 +26,12 @@
+> >>  
+> >>  #define __hyp_text __section(.hyp.text) notrace
+> >>  
+> >> +#define hyp_symbol_addr(s)						\
+> >> +	({								\
+> >> +		typeof(s) *addr = &(s);					\
+> >> +		addr;							\
+> >> +	})
+> >> +
+> >>  #define __ACCESS_VFP(CRn)			\
+> >>  	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
+> >>  
+> >> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> >> index 08d3bb66c8b7..a2d98c539023 100644
+> >> --- a/arch/arm64/include/asm/kvm_hyp.h
+> >> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> >> @@ -25,6 +25,15 @@
+> >>  
+> >>  #define __hyp_text __section(.hyp.text) notrace
+> >>  
+> >> +#define hyp_symbol_addr(s)						\
+> >> +	({								\
+> >> +		typeof(s) *addr;					\
+> >> +		asm volatile("adrp	%0, %1\n"			\
+> >> +			     "add	%0, %0, :lo12:%1\n"		\
+> >> +			     : "=r" (addr) : "S" (&s));			\
+> > 
+> > Can't we use adr_l here?
+> 
+> Unfortunately not. All the asm/assembler.h macros are unavailable to
+> inline assembly. We could start introducing equivalent macros for that
+> purpose, but that's starting to be outside of the scope of this series.
+> 
 
-On Thu, Feb 15, 2018 at 4:31 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Feb 13, 2018 at 10:45:49AM +0100, Jacopo Mondi wrote:
->> Initial support for R-Car M3-N (r8a77965), including core and module
->> clocks.
->>
->> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->> ---
->>  .../devicetree/bindings/clock/renesas,cpg-mssr.txt |   1 +
->>  drivers/clk/renesas/Kconfig                        |   5 +
->>  drivers/clk/renesas/Makefile                       |   1 +
->>  drivers/clk/renesas/r8a77965-cpg-mssr.c            | 333 +++++++++++++++++++++
->>  drivers/clk/renesas/renesas-cpg-mssr.c             |   6 +
->>  drivers/clk/renesas/renesas-cpg-mssr.h             |   1 +
->>  include/dt-bindings/clock/r8a77965-cpg-mssr.h      |  62 ++++
->>  7 files changed, 409 insertions(+)
->>  create mode 100644 drivers/clk/renesas/r8a77965-cpg-mssr.c
->>  create mode 100644 include/dt-bindings/clock/r8a77965-cpg-mssr.h
->>
->> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
->> index f1890d0..246ab63 100644
->> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
->> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
->> @@ -22,6 +22,7 @@ Required Properties:
->>        - "renesas,r8a7794-cpg-mssr" for the r8a7794 SoC (R-Car E2)
->>        - "renesas,r8a7795-cpg-mssr" for the r8a7795 SoC (R-Car H3)
->>        - "renesas,r8a7796-cpg-mssr" for the r8a7796 SoC (R-Car M3-W)
->> +      - "renesas,r8a77965-cpg-mssr" for the r8a77965 SoC (R-Car M3-N)
->>        - "renesas,r8a77970-cpg-mssr" for the r8a77970 SoC (R-Car V3M)
->>        - "renesas,r8a77995-cpg-mssr" for the r8a77995 SoC (R-Car D3)
->>
->
-> Its up to Geert, but would it be better if the bindings documentation
-> and driver changes where in separate patches?
+Absolutely.  Forget I asked.
 
-I don't care that much anymore.
-It used to be a good idea when the bindings header went in separately,
-as it was a dependency for both driver and DTS. But now we use hardcoded
-constants in the first version of the DTS, so it doesn't matter anymore.
+> > 
+> >> +		addr;							\
+> >> +	})
+> >> +
+> > 
+> > I don't fully appreciate the semantics of this macro going by its name
+> > only.  My understanding is that if you want to resolve a symbol to an
+> > address which is mapped in hyp, then use this.  Is this correct?
+> 
+> The goal of this macro is to return a symbol's address based on a
+> PC-relative computation, as opposed to a loading the VA from a constant
+> pool or something similar. This works well for HYP, as an absolute VA is
+> guaranteed to be wrong.
+> 
+> > 
+> > If so, can we add a small comment (because I can't come up with a better
+> > name).
+> 
+> I'll add the above if that works for you.
+> 
 
-Gr{oetje,eeting}s,
+Yes it does.  The only thing that remains a bit unclear is what the
+difference between this and kern_hyp_va is, and when you'd choose to use
+one over the other.  Perhaps we need a single place which documents our
+primitives and tells us what to use when.  At least, I'm for sure not
+going to be able to figure this out later on.
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-Christoffer
