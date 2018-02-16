@@ -1,132 +1,31 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 16 Feb 2018 11:35:03 +0530
-Subject: [PATCH v4 4/4] arm64: dts: sdm845: Add serial console support
-In-Reply-To: <20180216060503.22006-1-rnayak@codeaurora.org>
-References: <20180216060503.22006-1-rnayak@codeaurora.org>
-Message-ID: <20180216060503.22006-5-rnayak@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 16 Feb 2018 08:03:59 +0100
+Subject: [PATCH v5 05/12] drm/bridge/synopsys: dw-hdmi: don't clobber
+ drvdata
+In-Reply-To: <20180214200906.31509-6-jernej.skrabec@siol.net>
+References: <20180214200906.31509-1-jernej.skrabec@siol.net>
+ <20180214200906.31509-6-jernej.skrabec@siol.net>
+Message-ID: <5806685.TbOkgmbs60@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the qup uart node and geni se instance needed to
-support the serial console on the MTP.
+Am Mittwoch, 14. Februar 2018, 21:08:59 CET schrieb Jernej Skrabec:
+> dw_hdmi shouldn't set drvdata since some drivers might need to store
+> it's own data there. Rework dw_hdmi in a way to return struct dw_hdmi
+> instead to store it in drvdata. This way drivers are responsible to
+> store and pass structure when needed.
+> 
+> Idea was taken from the following commit:
+> 8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata")
+> 
+> Cc: p.zabel at pengutronix.de
+> Cc: narmstrong at baylibre.com
+> Cc: Laurent.pinchart at ideasonboard.com
+> Cc: hjc at rock-chips.com
+> Cc: heiko at sntech.de
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 39 +++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/sdm845.dtsi    | 39 +++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-index 979ab49913f1..2a1ed55b703e 100644
---- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-+++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-@@ -12,4 +12,43 @@
- / {
- 	model = "Qualcomm Technologies, Inc. SDM845 MTP";
- 	compatible = "qcom,sdm845-mtp";
-+
-+	aliases {
-+		serial0 = &qup_uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0";
-+	};
-+};
-+
-+&soc {
-+	geni-se at ac0000 {
-+		serial at a84000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	pinctrl at 3400000 {
-+		qup-uart2-default {
-+			pinconf_tx {
-+				pins = "gpio4";
-+				drive-strength = <2>;
-+				bias-disable;
-+			};
-+
-+			pinconf_rx {
-+				pins = "gpio5";
-+				drive-strength = <2>;
-+				bias-pull-up;
-+			};
-+		};
-+
-+		qup-uart2-sleep {
-+			pinconf {
-+				pins = "gpio4", "gpio5";
-+				bias-pull-down;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index c46e726af621..7b5c16eb63b7 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -6,6 +6,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/qcom,gcc-sdm845.h>
- 
- / {
- 	interrupt-parent = <&intc>;
-@@ -195,6 +196,20 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+
-+			qup_uart2_default: qup-uart2-default {
-+				pinmux {
-+					function = "qup9";
-+					pins = "gpio4", "gpio5";
-+				};
-+			};
-+
-+			qup_uart2_sleep: qup-uart2-sleep {
-+				pinmux {
-+					function = "gpio";
-+					pins = "gpio4", "gpio5";
-+				};
-+			};
- 		};
- 
- 		timer at 17c90000 {
-@@ -273,5 +288,29 @@
- 			#interrupt-cells = <4>;
- 			cell-index = <0>;
- 		};
-+
-+		geni-se at ac0000 {
-+			compatible = "qcom,geni-se-qup";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			reg = <0xac0000 0x6000>;
-+			clocks = <&gcc GCC_QUPV3_WRAP_1_M_AHB_CLK>,
-+				 <&gcc GCC_QUPV3_WRAP_1_S_AHB_CLK>;
-+			clock-names = "m-ahb", "s-ahb";
-+
-+			qup_uart2: serial at a84000 {
-+				compatible = "qcom,geni-debug-uart";
-+				reg = <0xa84000 0x4000>;
-+				reg-names = "se-phys";
-+				clock-names = "se-clk";
-+				clocks = <&gcc GCC_QUPV3_WRAP1_S1_CLK>;
-+				pinctrl-names = "default", "sleep";
-+				pinctrl-0 = <&qup_uart2_default>;
-+				pinctrl-1 = <&qup_uart2_sleep>;
-+				interrupts = <GIC_SPI 354 IRQ_TYPE_NONE>;
-+				status = "disabled";
-+			};
-+		};
- 	};
- };
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+For the Rockchip-part
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
