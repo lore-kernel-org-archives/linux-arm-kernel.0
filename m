@@ -1,133 +1,61 @@
-From: kieran.bingham@ideasonboard.com (Kieran Bingham)
-Date: Fri, 16 Feb 2018 11:51:51 +0000
-Subject: [PATCH 7/8] arm64: dts: renesas: r8a77995-draak: Add HDMI Out
- through ADV7511
-In-Reply-To: <2517305.jdPBFiRQEk@avalon>
-References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
- <1518683903-10681-8-git-send-email-kbingham@kernel.org>
- <2517305.jdPBFiRQEk@avalon>
-Message-ID: <95b1fa2c-8302-e264-2f00-eba5ac34bcd3@ideasonboard.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 16 Feb 2018 17:33:48 +0530
+Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
+ with rk3399 SoCs
+In-Reply-To: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
+References: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <56548710-6b9a-85bc-85de-221ae748d83c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
 
-On 15/02/18 14:16, Laurent Pinchart wrote:
-> Hi Kieran,
+
+On Thursday 11 January 2018 08:10 AM, Caesar Wang wrote:
+> Hi Kishon,
 > 
-> Thank you for the patch.
+> Since the Shawn isn't available, I take over this series patches for now.
 > 
-> On Thursday, 15 February 2018 10:38:22 EET Kieran Bingham wrote:
->> From: Kieran Bingham <kieran.bingham@ideasonboard.com>
->>
->> Provide a device node for the ADV7511 as found on the Draak D3 platform.
->>
->> The ADV7511 is connected to the DU through a parallel mux chip, and is
->> configurable in hardware whether it is connected to LVDS0 or LVDS1.
->>
->> Connect through to LVDS0 as a default implementation.
+> As the original bug had tracked on https://issuetracker.google.com/71561742.
+> In some cases, the mmc phy power on failed during booting up.
+> The log as below:
+> ...
+> [   2.375333] rockchip_emmc_phy_power: caldone timeout.
+> [    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
+> ...
+> [    2.489295] mmc0: mmc_select_hs400es failed, error -110
+> [    2.489302] mmc0: error -110 whilst initialising MMC card
+> ..
 > 
-> You need to model the LVDS decoder in DT too. I know that no driver and no DT 
-> bindings are available at the moment, and I'm aware that this patch enables 
-> the HDMI output on the Draak board, but I don't think it's upstreamable as-is.
-
-Ok, understood. - I'll drop this patch for now until we can schedule time to
-dedicate to looking into this.
-
-I'm sure the archive's will hold on to this patch for us as a starting point :-)
-
---
-Regards
-
-Kieran
-
+> The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
+> We need give the enough margin for it.
 > 
->> Signed-off-by: Kieran Bingham <kieran.bingham@ideasonboard.com>
->> ---
->>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 56 +++++++++++++++++++++++
->>  1 file changed, 56 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
->> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index
->> 668e246dfc5d..df0c7773cb7d 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
->> @@ -27,6 +27,17 @@
->>  		stdout-path = "serial0:115200n8";
->>  	};
->>
->> +	hdmi-out {
->> +		compatible = "hdmi-connector";
->> +		type = "a";
->> +
->> +		port {
->> +			hdmi_con_out: endpoint {
->> +				remote-endpoint = <&adv7511_out>;
->> +			};
->> +		};
->> +	};
->> +
->>  	vga {
->>  		compatible = "vga-connector";
->>
->> @@ -124,6 +135,39 @@
->>  		reg = <0x50>;
->>  		pagesize = <8>;
->>  	};
->> +
->> +	hdmi at 39 {
->> +		compatible = "adi,adv7511w";
->> +		reg = <0x39>, <0x3f>, <0x38>, <0x3c>;
->> +		reg-names = "main", "edid", "packet", "cec";
->> +		interrupt-parent = <&gpio1>;
->> +		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
->> +
->> +		adi,input-depth = <8>;
->> +		adi,input-colorspace = "rgb";
->> +		adi,input-clock = "1x";
->> +		adi,input-style = <1>;
->> +		adi,input-justification = "evenly";
->> +
->> +		ports {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			port at 0 {
->> +				reg = <0>;
->> +				adv7511_in: endpoint {
->> +					remote-endpoint = <&lvds0_out>;
->> +				};
->> +			};
->> +
->> +			port at 1 {
->> +				reg = <1>;
->> +				adv7511_out: endpoint {
->> +					remote-endpoint = <&hdmi_con_out>;
->> +				};
->> +			};
->> +		};
->> +	};
->>  };
->>
->>  &i2c1 {
->> @@ -146,6 +190,18 @@
->>  	};
->>  };
->>
->> +&lvds0 {
->> +	status = "okay";
->> +
->> +	ports {
->> +		port at 1 {
->> +			endpoint {
->> +				remote-endpoint = <&adv7511_in>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->>  &ehci0 {
->>  	status = "okay";
->>  };
+> Verified on url =
+>         https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+> This series patches can apply and bring up with kernel-next on rk3399 chromebook.
+
+merged now, thanks!
+
+-Kishon
 > 
+> -Caesar
+> 
+> 
+> Changes in v3:
+> - As Doug commented on both upstream and gerrit.
+>   Change "5, 50" to "0, 50", and the message of print.
+> - As Doug commented on https://patchwork.kernel.org/patch/10154797,
+>   Change "1, 50" to "0, 50".
+> 
+> Changes in v2:
+> - print the return valut with regmap_read_poll_timeout failing.
+> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
+>   changed the note and added to print error value with
+>   regmap_read_poll_timeout API.
+> 
+> Shawn Lin (2):
+>   phy: rockchip-emmc: retry calpad busy trimming
+>   phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
+> 
+>  drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
+>  1 file changed, 28 insertions(+), 32 deletions(-)
 > 
