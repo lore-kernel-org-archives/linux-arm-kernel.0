@@ -1,45 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 17 Feb 2018 13:41:43 -0200
-Subject: [RFC] ARM: dts: imx28-tx28: Pass the memory unit name
-Message-ID: <1518882103-17137-1-git-send-email-festevam@gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Sun, 18 Feb 2018 03:08:31 +0800
+Subject: [PATCH v5 3/3] dmaengine: mediatek: update MAINTAINERS entry with
+ MediaTek DMA driver
+In-Reply-To: <cover.1518857746.git.sean.wang@mediatek.com>
+References: <cover.1518857746.git.sean.wang@mediatek.com>
+Message-ID: <4ebffd841fc3b2093fb35c3d10b8b167a9e42bcc.1518857747.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-Pass the memory unit name in order to fix the following
-dtc warning with W=1:
+I work for MediaTek and maintain SoC targeting to home gateway and
+also will keep extending and testing the function.
 
-arch/arm/boot/dts/imx28-tx28.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
-Hi,
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Currently the only dtc warnings observed with W=1 are the ones:
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-
-If this solution can be accepted I can clean all the other i.MX dts files.
-
-Please advise.
-
- arch/arm/boot/dts/imx28-tx28.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 8a4f5bc..bbdf004 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -65,8 +65,8 @@
- 		usbotg = &usb0;
- 	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3bdc260..d3c33d7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8785,6 +8785,15 @@ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
+ F:	drivers/media/rc/mtk-cir.c
  
--	memory {
--		reg = <0 0>; /* will be filled in by U-Boot */
-+	memory at 40000000 {
-+		reg = <0x40000000 0>; /* will be filled in by U-Boot */
- 	};
- 
- 	onewire {
++MEDIATEK DMA DRIVER
++M:	Sean Wang <sean.wang@mediatek.com>
++L:	dmaengine at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/dma/mtk-*
++F:	drivers/dma/mediatek/
++
+ MEDIATEK PMIC LED DRIVER
+ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
 -- 
 2.7.4
