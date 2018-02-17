@@ -1,29 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 17 Feb 2018 22:19:27 +0100
-Subject: setterm -blank force no longer works after switch to omapdrm
-Message-ID: <20180217211927.GC9640@amd>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sat, 17 Feb 2018 22:19:50 +0100
+Subject: [PATCH 00/10] Add Actions Semi S900 pinctrl and gpio support
+In-Reply-To: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
+References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <72e49775-3a3e-0b47-61e9-079d4be6c9d9@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Am 17.02.2018 um 21:44 schrieb Manivannan Sadhasivam:
+> This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
+> Pinctrl and gpio subsystems share the common set of register range but
+> implemented as individual drivers for making it less complex.
+> 
+> Pinmux functions are only accessible for pin groups while pinconf
+> parameters are available for both pin groups and individual pins.
+> 
+> gpio-line-names has been added for the Bubblegum-96 board matching the
+> 96Boards CE specification v1.0.
+> 
+> Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
+> 
+> This patchset depends on the clock driver which is still under review:
+> https://lkml.org/lkml/2018/2/9/831
 
-I used to have use omap fb driver, and blanking worked as expected. It
-no longer works with omap drm driver. (Tested on v4.16-rc1, but I
-believe it is broken in older versions, too.)
+What this forgets to point out is that I had authored pinctrl and gpio
+drivers for S500, with preparations for S700 and S900, derived from my
+to-be-submitted pinctrl/gpio drivers for RTD1295, while this one was
+developed independently by Mani for S900. Our intention is to align them
+as part of patch review and redo S500 on top of the result.
 
-Can you test it on your hw? Any ideas what could be wrong?
+Regards,
+Andreas
 
-xset dpms force on/off works as expected.
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180217/c4f3ddc6/attachment.sig>
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
