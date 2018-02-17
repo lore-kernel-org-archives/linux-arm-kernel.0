@@ -1,36 +1,39 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sun, 18 Feb 2018 02:14:29 +0530
-Subject: [PATCH 06/10] arm64: dts: actions: Add S900 gpio nodes
+Date: Sun, 18 Feb 2018 02:14:33 +0530
+Subject: [PATCH 10/10] MAINTAINERS: Add Actions Semi S900 pinctrl and gpio
+ entries
 In-Reply-To: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
 References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180217204433.3095-7-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180217204433.3095-11-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio nodes for Actions Semi S900 SoC.
+Add S900 pinctrl and gpio entries under ARCH_ACTIONS
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s900.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ MAINTAINERS | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
-index 0156483f0f4d..e359509ad9d3 100644
---- a/arch/arm64/boot/dts/actions/s900.dtsi
-+++ b/arch/arm64/boot/dts/actions/s900.dtsi
-@@ -180,6 +180,13 @@
- 			clocks = <&cmu CLK_GPIO>;
- 		};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 96b8b6531196..b718be5af680 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1126,11 +1126,15 @@ F:	arch/arm/boot/dts/owl-*
+ F:	arch/arm64/boot/dts/actions/
+ F:	drivers/clocksource/owl-*
+ F:	drivers/soc/actions/
++F:	drivers/pinctrl/actions/*
++F:	drivers/gpio/gpio-owl.c
+ F:	include/dt-bindings/power/owl-*
+ F:	include/linux/soc/actions/
+ F:	Documentation/devicetree/bindings/arm/actions.txt
+ F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
++F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
++F:	Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
  
-+		gpio: gpio at e01b0000 {
-+			compatible = "actions,s900-gpio";
-+			reg = <0x0 0xe01b0000 0x0 0x1000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
- 		timer: timer at e0228000 {
- 			compatible = "actions,s900-timer";
- 			reg = <0x0 0xe0228000 0x0 0x8000>;
+ ARM/ADS SPHERE MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
 -- 
 2.14.1
