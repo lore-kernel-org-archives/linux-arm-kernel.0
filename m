@@ -1,38 +1,70 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 17 Feb 2018 12:46:01 +0100
-Subject: [PATCH 1/2] ARM: shmobile: Factor out complex condition
-In-Reply-To: <20180217081857.xowqahwnzob6titp@katana>
-References: <20180217020642.21375-1-marek.vasut+renesas@gmail.com>
- <20180217081857.xowqahwnzob6titp@katana>
-Message-ID: <e22632bc-c612-de23-0ceb-4e317d41b04b@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 17 Feb 2018 21:05:04 +0800
+Subject: [PATCH] clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops
+Message-ID: <20180217130504.8668-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2018 09:18 AM, Wolfram Sang wrote:
->> -	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
->> -	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
->> -	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
->> +	if (regulator_quirk_check(client, 0, "da9063") ||
->> +	    regulator_quirk_check(client, 1, "da9210") ||
->> +	    regulator_quirk_check(client, 2, "da9210")) {
-> 
-> I am afraid I don't think this makes the code better, just different.
-> The index is as magic as the client address IMO. I was not super happy
-> with the array size depending on the detected board from a previous
-> patch already. But given the next patch which modifies the msg array
-> depending on the board, I think we really need to switch to seperate
-> message arrays per board. Everything else is too error prone and
-> unnecessarily cumbersome to understand.
-> 
-> Other opinions?
+When support for the A31/A31s CCU was first added, the clock ops for
+the CLK_OUT_* clocks was set to the wrong type. The clocks are MP-type,
+but the ops was set for div (M) clocks. This went unnoticed until now.
+This was because while they are different clocks, their data structures
+aligned in a way that ccu_div_ops would access the second ccu_div_internal
+and ccu_mux_internal structures, which were valid, if not incorrect.
 
-The code is awful, yes.
+Furthermore, the use of these CLK_OUT_* was for feeding a precise 32.768
+kHz clock signal to the WiFi chip. This was achievable by using the parent
+with the same clock rate and no divider. So the incorrect divider setting
+did not affect this usage.
 
-I wonder if we could rather find all DA0063 and DA9210 PMICs in the DT,
-check if their IRQ lines are tied together and then generate the table
-above dynamically for whatever PMICs are present in the system. Then all
-that special-casing would go away as we'd extract the information from DT.
+Commit 946797aa3f08 ("clk: sunxi-ng: Support fixed post-dividers on MP
+style clocks") added a new field to the ccu_mp structure, which broke
+the aforementioned alignment. Now the system crashes as div_ops tries
+to look up a nonexistent table.
 
+Reported-by: Philipp Rossak <embed3d@gmail.com>
+Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+Philipp, can you give this a test and report if this fixes thing?
+I don't have any A31/A31s boards online to test this.
+
+---
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+index 72b16ed1012b..3b97f60540ad 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
++++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+@@ -762,7 +762,7 @@ static struct ccu_mp out_a_clk = {
+ 		.features	= CCU_FEATURE_FIXED_PREDIV,
+ 		.hw.init	= CLK_HW_INIT_PARENTS("out-a",
+ 						      clk_out_parents,
+-						      &ccu_div_ops,
++						      &ccu_mp_ops,
+ 						      0),
+ 	},
+ };
+@@ -783,7 +783,7 @@ static struct ccu_mp out_b_clk = {
+ 		.features	= CCU_FEATURE_FIXED_PREDIV,
+ 		.hw.init	= CLK_HW_INIT_PARENTS("out-b",
+ 						      clk_out_parents,
+-						      &ccu_div_ops,
++						      &ccu_mp_ops,
+ 						      0),
+ 	},
+ };
+@@ -804,7 +804,7 @@ static struct ccu_mp out_c_clk = {
+ 		.features	= CCU_FEATURE_FIXED_PREDIV,
+ 		.hw.init	= CLK_HW_INIT_PARENTS("out-c",
+ 						      clk_out_parents,
+-						      &ccu_div_ops,
++						      &ccu_mp_ops,
+ 						      0),
+ 	},
+ };
 -- 
-Best regards,
-Marek Vasut
+2.16.1
