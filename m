@@ -1,15 +1,14 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 17 Feb 2018 03:06:42 +0100
-Subject: [PATCH 2/2] ARM: shmobile: porter: enable R-Car Gen2 regulator quirk
-In-Reply-To: <20180217020642.21375-1-marek.vasut+renesas@gmail.com>
-References: <20180217020642.21375-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20180217020642.21375-2-marek.vasut+renesas@gmail.com>
+Date: Sat, 17 Feb 2018 03:07:56 +0100
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+Message-ID: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Porter needs the regulator quirk, just like the other boards,
-the DA9063 and DA9210 IRQ line is connected to CPU IRQ2 . But
-unlike the other boards, the DA9063 is at 0x5a on Porter.
+Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+one DA9063 and one DA9210 on Porter, the only difference from
+the other boards is that DA9063 is at I2C address 0x5a rather
+than 0x58 .
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -17,29 +16,60 @@ Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7791-porter.dts | 37 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-index 862f7757ef5d..7963f0eea9e1 100644
---- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-@@ -132,11 +132,16 @@ static int __init rcar_gen2_regulator_quirk(void)
- 	u32 mon;
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index a098d66292fb..116f30f54e04 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -354,10 +354,47 @@
+ 	clock-frequency = <400000>;
+ };
  
- 	if (!of_machine_is_compatible("renesas,koelsch") &&
-+	    !of_machine_is_compatible("renesas,porter") &&
- 	    !of_machine_is_compatible("renesas,lager") &&
- 	    !of_machine_is_compatible("renesas,stout") &&
- 	    !of_machine_is_compatible("renesas,gose"))
- 		return -ENODEV;
- 
-+	/* DA9063 on M2W Porter is at 0x5a */
-+	if (of_machine_is_compatible("renesas,porter"))
-+		da9xxx_msgs[0].addr = 0x5a;
++&i2c6 {
++	status = "okay";
++	clock-frequency = <100000>;
 +
- 	irqc = ioremap(IRQC_BASE, PAGE_SIZE);
- 	if (!irqc)
- 		return -ENOMEM;
++	pmic at 5a {
++		compatible = "dlg,da9063";
++		reg = <0x5a>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++
++		rtc {
++			compatible = "dlg,da9063-rtc";
++		};
++
++		wdt {
++			compatible = "dlg,da9063-watchdog";
++		};
++	};
++
++	vdd_dvfs: regulator at 68 {
++		compatible = "dlg,da9210";
++		reg = <0x68>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
+ &sata0 {
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
++};
++
+ /* composite video input */
+ &vin0 {
+ 	status = "okay";
 -- 
 2.15.1
