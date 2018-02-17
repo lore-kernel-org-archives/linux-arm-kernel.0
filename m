@@ -1,131 +1,55 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 18 Feb 2018 03:54:48 +0800
-Subject: [PATCH v3 13/15] arm64: dts: mt7622: add usb device nodes
+Date: Sun, 18 Feb 2018 03:54:38 +0800
+Subject: [PATCH v3 03/15] arm64: dts: mt7622: add power domain controller
+ device nodes
 In-Reply-To: <cover.1518895232.git.sean.wang@mediatek.com>
 References: <cover.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <cce598c3aa18c71b8d2d9ac7e8c4529d0613803a.1518895232.git.sean.wang@mediatek.com>
+Message-ID: <eb065107cb116f17370ea0da100f8a968cc0fdc3.1518895232.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-add xhci node and usb3 phy nodes
+add power domain controller nodes
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Tested-by: Jumin Li <jumin.li@mediatek.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 28 +++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 51 ++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index 6715ffa..cc89e2e 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -52,6 +52,24 @@
- 	memory {
- 		reg = <0 0x40000000 0 0x3F000000>;
- 	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	reg_5v: regulator-5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-5V";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
- 
- &pcie {
-@@ -343,6 +361,16 @@
- 	status = "okay";
- };
- 
-+&ssusb {
-+	vusb33-supply = <&reg_3p3v>;
-+	vbus-supply = <&reg_5v>;
-+	status = "okay";
-+};
-+
-+&u3phy {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins>;
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 881bc17..bad1e99 100644
+index 73e5d62..81207e6 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -535,6 +535,57 @@
+@@ -9,6 +9,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/mt7622-clk.h>
++#include <dt-bindings/power/mt7622-power.h>
+ #include <dt-bindings/reset/mt7622-reset.h>
+ 
+ / {
+@@ -109,6 +110,20 @@
  		#reset-cells = <1>;
  	};
  
-+	ssusb: usb at 1a0c0000 {
-+		compatible = "mediatek,mt7622-xhci",
-+			     "mediatek,mtk-xhci";
-+		reg = <0 0x1a0c0000 0 0x01000>,
-+		      <0 0x1a0c4700 0 0x0100>;
-+		reg-names = "mac", "ippc";
-+		interrupts = <GIC_SPI 232 IRQ_TYPE_LEVEL_LOW>;
-+		power-domains = <&scpsys MT7622_POWER_DOMAIN_HIF1>;
-+		clocks = <&ssusbsys CLK_SSUSB_SYS_EN>,
-+			 <&ssusbsys CLK_SSUSB_REF_EN>,
-+			 <&ssusbsys CLK_SSUSB_MCU_EN>,
-+			 <&ssusbsys CLK_SSUSB_DMA_EN>;
-+		clock-names = "sys_ck", "ref_ck", "mcu_ck", "dma_ck";
-+		phys = <&u2port0 PHY_TYPE_USB2>,
-+		       <&u3port0 PHY_TYPE_USB3>,
-+		       <&u2port1 PHY_TYPE_USB2>;
-+
-+		status = "disabled";
++	scpsys: scpsys at 10006000 {
++		compatible = "mediatek,mt7622-scpsys",
++			     "syscon";
++		#power-domain-cells = <1>;
++		reg = <0 0x10006000 0 0x1000>;
++		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 166 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 167 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 168 IRQ_TYPE_LEVEL_LOW>;
++		infracfg = <&infracfg>;
++		clocks = <&topckgen CLK_TOP_HIF_SEL>;
++		clock-names = "hif_sel";
 +	};
 +
-+	u3phy: usb-phy at 1a0c4000 {
-+		compatible = "mediatek,mt7622-u3phy",
-+			     "mediatek,generic-tphy-v1";
-+		reg = <0 0x1a0c4000 0 0x700>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		status = "disabled";
-+
-+		u2port0: usb-phy at 1a0c4800 {
-+			reg = <0 0x1a0c4800 0 0x0100>;
-+			#phy-cells = <1>;
-+			clocks = <&ssusbsys CLK_SSUSB_U2_PHY_EN>;
-+			clock-names = "ref";
-+		};
-+
-+		u3port0: usb-phy at 1a0c4900 {
-+			reg = <0 0x1a0c4900 0 0x0700>;
-+			#phy-cells = <1>;
-+			clocks = <&clk25m>;
-+			clock-names = "ref";
-+		};
-+
-+		u2port1: usb-phy at 1a0c5000 {
-+			reg = <0 0x1a0c5000 0 0x0100>;
-+			#phy-cells = <1>;
-+			clocks = <&ssusbsys CLK_SSUSB_U2_PHY_1P_EN>;
-+			clock-names = "ref";
-+		};
-+	};
-+
- 	pciesys: pciesys at 1a100800 {
- 		compatible = "mediatek,mt7622-pciesys",
- 			     "syscon";
+ 	sysirq: interrupt-controller at 10200620 {
+ 		compatible = "mediatek,mt7622-sysirq",
+ 			     "mediatek,mt6577-sysirq";
 -- 
 2.7.4
