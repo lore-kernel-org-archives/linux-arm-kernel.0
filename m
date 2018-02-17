@@ -1,78 +1,55 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 18 Feb 2018 03:54:36 +0800
-Subject: [PATCH v3 01/15] dt-bindings: clock: mediatek: add missing required
- #reset-cells
+Date: Sun, 18 Feb 2018 03:54:42 +0800
+Subject: [PATCH v3 07/15] arm64: dts: mt7622: turn uart0 clock to real ones
 In-Reply-To: <cover.1518895232.git.sean.wang@mediatek.com>
 References: <cover.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <7365f2286ff2cebcfb590715cb4a15dedd089046.1518895232.git.sean.wang@mediatek.com>
+Message-ID: <adc8e8585824abbd571e9c1a32db7b2cb084995b.1518895232.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-All ethsys, pciesys and ssusbsys internally include reset controller, so
-explicitly add back these missing cell definitions to related bindings
-and examples.
+This patch also cleans up two oscillators that provide clocks for MT7623.
+Switch the uart clocks to the real ones while at it.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
-Reviewed-by: Rob Herring <robh@kernel.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt   | 1 +
- Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt  | 2 ++
- Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt | 2 ++
- 3 files changed, 5 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-index 6cc7840..8f5335b 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-@@ -9,6 +9,7 @@ Required Properties:
- 	- "mediatek,mt2701-ethsys", "syscon"
- 	- "mediatek,mt7622-ethsys", "syscon"
- - #clock-cells: Must be 1
-+- #reset-cells: Must be 1
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+index 7256879..d8a17d1 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+@@ -91,18 +91,6 @@
+ 		};
+ 	};
  
- The ethsys controller uses the common clk binding from
- Documentation/devicetree/bindings/clock/clock-bindings.txt
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
-index d5d5f12..7fe5dc6 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
-@@ -8,6 +8,7 @@ Required Properties:
- - compatible: Should be:
- 	- "mediatek,mt7622-pciesys", "syscon"
- - #clock-cells: Must be 1
-+- #reset-cells: Must be 1
- 
- The PCIESYS controller uses the common clk binding from
- Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -19,4 +20,5 @@ pciesys: pciesys at 1a100800 {
- 	compatible = "mediatek,mt7622-pciesys", "syscon";
- 	reg = <0 0x1a100800 0 0x1000>;
- 	#clock-cells = <1>;
-+	#reset-cells = <1>;
- };
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
-index 00760019..b8184da 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
-@@ -8,6 +8,7 @@ Required Properties:
- - compatible: Should be:
- 	- "mediatek,mt7622-ssusbsys", "syscon"
- - #clock-cells: Must be 1
-+- #reset-cells: Must be 1
- 
- The SSUSBSYS controller uses the common clk binding from
- Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -19,4 +20,5 @@ ssusbsys: ssusbsys at 1a000000 {
- 	compatible = "mediatek,mt7622-ssusbsys", "syscon";
- 	reg = <0 0x1a000000 0 0x1000>;
- 	#clock-cells = <1>;
-+	#reset-cells = <1>;
- };
+-	uart_clk: dummy25m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <25000000>;
+-	};
+-
+-	bus_clk: dummy280m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <280000000>;
+-	};
+-
+ 	pwrap_clk: dummy40m {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <40000000>;
+@@ -234,7 +222,8 @@
+ 			     "mediatek,mt6577-uart";
+ 		reg = <0 0x11002000 0 0x400>;
+ 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&uart_clk>, <&bus_clk>;
++		clocks = <&topckgen CLK_TOP_UART_SEL>,
++			 <&pericfg CLK_PERI_UART1_PD>;
+ 		clock-names = "baud", "bus";
+ 		status = "disabled";
+ 	};
 -- 
 2.7.4
