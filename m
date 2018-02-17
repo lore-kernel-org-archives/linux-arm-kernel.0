@@ -1,432 +1,65 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 18 Feb 2018 03:54:43 +0800
-Subject: [PATCH v3 08/15] arm64: dts: mt7622: add SoC and peripheral related
- device nodes
-In-Reply-To: <cover.1518895232.git.sean.wang@mediatek.com>
-References: <cover.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <03289db80461eed3d76646dddbb258680cfebe74.1518895232.git.sean.wang@mediatek.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sun, 18 Feb 2018 02:14:23 +0530
+Subject: [PATCH 00/10] Add Actions Semi S900 pinctrl and gpio support
+Message-ID: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
+Pinctrl and gpio subsystems share the common set of register range but
+implemented as individual drivers for making it less complex.
 
-Add watchdog, rtc, auxadc, cir, efuse, rng, uart[1-4], pwm, i2c[0-2],
-spi[0-1], btif and thermal related nodes.
+Pinmux functions are only accessible for pin groups while pinconf
+parameters are available for both pin groups and individual pins.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-Cc: Zhiyong Tao <zhiyong.tao@mediatek.com>
-Cc: Zhi Mao <zhi.mao@mediatek.com>
-Cc: Jun Gao <jun.gao@mediatek.com>
-Cc: Leilk Liu <leilk.liu@mediatek.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  54 ++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 264 +++++++++++++++++++++++++++
- 2 files changed, 318 insertions(+)
+gpio-line-names has been added for the Bubblegum-96 board matching the
+96Boards CE specification v1.0.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index b387865..ba6a79c 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -235,6 +235,34 @@
- 	};
- };
- 
-+&btif {
-+	status = "okay";
-+};
-+
-+&cir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&irrx_pins>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+	status = "okay";
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm7_pins>;
-+	status = "okay";
-+};
-+
- &pwrap {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pmic_bus_pins>;
-@@ -242,6 +270,32 @@
- 	status = "okay";
- };
- 
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spic0_pins>;
-+	status = "okay";
-+};
-+
-+&spi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spic1_pins>;
-+	status = "okay";
-+};
-+
- &uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "okay";
-+};
-+
-+&watchdog {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&watchdog_pins>;
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index d8a17d1..448cd36 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -11,6 +11,7 @@
- #include <dt-bindings/clock/mt7622-clk.h>
- #include <dt-bindings/power/mt7622-power.h>
- #include <dt-bindings/reset/mt7622-reset.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	compatible = "mediatek,mt7622";
-@@ -74,6 +75,7 @@
- 				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 			enable-method = "psci";
- 			clock-frequency = <1300000000>;
- 		};
-@@ -121,6 +123,58 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&thermal 0>;
-+
-+			trips {
-+				cpu_passive: cpu-passive {
-+					temperature = <47000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_active: cpu-active {
-+					temperature = <67000>;
-+					hysteresis = <2000>;
-+					type = "active";
-+				};
-+
-+				cpu_hot: cpu-hot {
-+					temperature = <87000>;
-+					hysteresis = <2000>;
-+					type = "hot";
-+				};
-+
-+				cpu-crit {
-+					temperature = <107000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_passive>;
-+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+
-+				map1 {
-+					trip = <&cpu_active>;
-+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+
-+				map2 {
-+					trip = <&cpu_hot>;
-+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
-@@ -176,6 +230,16 @@
- 		clock-names = "hif_sel";
- 	};
- 
-+	cir: cir at 10009000 {
-+		compatible = "mediatek,mt7622-cir";
-+		reg = <0 0x10009000 0 0x1000>;
-+		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_IRRX_PD>,
-+			 <&topckgen CLK_TOP_AXI_SEL>;
-+		clock-names = "clk", "bus";
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200620 {
- 		compatible = "mediatek,mt7622-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -185,6 +249,18 @@
- 		reg = <0 0x10200620 0 0x20>;
- 	};
- 
-+	efuse: efuse at 10206000 {
-+		compatible = "mediatek,mt7622-efuse",
-+			     "mediatek,efuse";
-+		reg = <0 0x10206000 0 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		thermal_calibration: calib at 198 {
-+			reg = <0x198 0xc>;
-+		};
-+	};
-+
- 	apmixedsys: apmixedsys at 10209000 {
- 		compatible = "mediatek,mt7622-apmixedsys",
- 			     "syscon";
-@@ -199,6 +275,14 @@
- 		#clock-cells = <1>;
- 	};
- 
-+	rng: rng at 1020f000 {
-+		compatible = "mediatek,mt7622-rng",
-+			     "mediatek,mt7623-rng";
-+		reg = <0 0x1020f000 0 0x1000>;
-+		clocks = <&infracfg CLK_INFRA_TRNG>;
-+		clock-names = "rng";
-+	};
-+
- 	pio: pinctrl at 10211000 {
- 		compatible = "mediatek,mt7622-pinctrl";
- 		reg = <0 0x10211000 0 0x1000>;
-@@ -206,6 +290,21 @@
- 		#gpio-cells = <2>;
- 	};
- 
-+	watchdog: watchdog at 10212000 {
-+		compatible = "mediatek,mt7622-wdt",
-+			     "mediatek,mt6589-wdt";
-+		reg = <0 0x10212000 0 0x800>;
-+	};
-+
-+	rtc: rtc at 10212800 {
-+		compatible = "mediatek,mt7622-rtc",
-+			     "mediatek,soc-rtc";
-+		reg = <0 0x10212800 0 0x200>;
-+		interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_RTC>;
-+		clock-names = "rtc";
-+	};
-+
- 	gic: interrupt-controller at 10300000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
-@@ -217,6 +316,14 @@
- 		      <0 0x10360000 0 0x2000>;
- 	};
- 
-+	auxadc: adc at 11001000 {
-+		compatible = "mediatek,mt7622-auxadc";
-+		reg = <0 0x11001000 0 0x1000>;
-+		clocks = <&pericfg CLK_PERI_AUXADC_PD>;
-+		clock-names = "main";
-+		#io-channel-cells = <1>;
-+	};
-+
- 	uart0: serial at 11002000 {
- 		compatible = "mediatek,mt7622-uart",
- 			     "mediatek,mt6577-uart";
-@@ -228,6 +335,163 @@
- 		status = "disabled";
- 	};
- 
-+	uart1: serial at 11003000 {
-+		compatible = "mediatek,mt7622-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11003000 0 0x400>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_UART_SEL>,
-+			 <&pericfg CLK_PERI_UART1_PD>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
-+	uart2: serial at 11004000 {
-+		compatible = "mediatek,mt7622-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11004000 0 0x400>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_UART_SEL>,
-+			 <&pericfg CLK_PERI_UART2_PD>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
-+	uart3: serial at 11005000 {
-+		compatible = "mediatek,mt7622-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11005000 0 0x400>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_UART_SEL>,
-+			 <&pericfg CLK_PERI_UART3_PD>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
-+	pwm: pwm at 11006000 {
-+		compatible = "mediatek,mt7622-pwm";
-+		reg = <0 0x11006000 0 0x1000>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_PWM_SEL>,
-+			 <&pericfg CLK_PERI_PWM_PD>,
-+			 <&pericfg CLK_PERI_PWM1_PD>,
-+			 <&pericfg CLK_PERI_PWM2_PD>,
-+			 <&pericfg CLK_PERI_PWM3_PD>,
-+			 <&pericfg CLK_PERI_PWM4_PD>,
-+			 <&pericfg CLK_PERI_PWM5_PD>,
-+			 <&pericfg CLK_PERI_PWM6_PD>;
-+		clock-names = "top", "main", "pwm1", "pwm2", "pwm3", "pwm4",
-+			      "pwm5", "pwm6";
-+		status = "disabled";
-+	};
-+
-+	i2c0: i2c at 11007000 {
-+		compatible = "mediatek,mt7622-i2c";
-+		reg = <0 0x11007000 0 0x90>,
-+		      <0 0x11000100 0 0x80>;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C0_PD>,
-+			 <&pericfg CLK_PERI_AP_DMA_PD>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 11008000 {
-+		compatible = "mediatek,mt7622-i2c";
-+		reg = <0 0x11008000 0 0x90>,
-+		      <0 0x11000180 0 0x80>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C1_PD>,
-+			 <&pericfg CLK_PERI_AP_DMA_PD>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c2: i2c at 11009000 {
-+		compatible = "mediatek,mt7622-i2c";
-+		reg = <0 0x11009000 0 0x90>,
-+		      <0 0x11000200 0 0x80>;
-+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C2_PD>,
-+			 <&pericfg CLK_PERI_AP_DMA_PD>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	spi0: spi at 1100a000 {
-+		compatible = "mediatek,mt7622-spi";
-+		reg = <0 0x1100a000 0 0x100>;
-+		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+			 <&topckgen CLK_TOP_SPI0_SEL>,
-+			 <&pericfg CLK_PERI_SPI0_PD>;
-+		clock-names = "parent-clk", "sel-clk", "spi-clk";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	thermal: thermal at 1100b000 {
-+		#thermal-sensor-cells = <1>;
-+		compatible = "mediatek,mt7622-thermal";
-+		reg = <0 0x1100b000 0 0x1000>;
-+		interrupts = <0 78 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_THERM_PD>,
-+			 <&pericfg CLK_PERI_AUXADC_PD>;
-+		clock-names = "therm", "auxadc";
-+		resets = <&pericfg MT7622_PERI_THERM_SW_RST>;
-+		reset-names = "therm";
-+		mediatek,auxadc = <&auxadc>;
-+		mediatek,apmixedsys = <&apmixedsys>;
-+		nvmem-cells = <&thermal_calibration>;
-+		nvmem-cell-names = "calibration-data";
-+	};
-+
-+	btif: serial at 1100c000 {
-+		compatible = "mediatek,mt7622-btif",
-+			     "mediatek,mtk-btif";
-+		reg = <0 0x1100c000 0 0x1000>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_BTIF_PD>;
-+		clock-names = "main";
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+		status = "disabled";
-+	};
-+
-+	spi1: spi at 11016000 {
-+		compatible = "mediatek,mt7622-spi";
-+		reg = <0 0x11016000 0 0x100>;
-+		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+			 <&topckgen CLK_TOP_SPI1_SEL>,
-+			 <&pericfg CLK_PERI_SPI1_PD>;
-+		clock-names = "parent-clk", "sel-clk", "spi-clk";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	uart4: serial at 11019000 {
-+		compatible = "mediatek,mt7622-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11019000 0 0x400>;
-+		interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_UART_SEL>,
-+			 <&pericfg CLK_PERI_UART4_PD>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
- 	ssusbsys: ssusbsys at 1a000000 {
- 		compatible = "mediatek,mt7622-ssusbsys",
- 			     "syscon";
+Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
+
+This patchset depends on the clock driver which is still under review:
+https://lkml.org/lkml/2018/2/9/831
+
+Thanks,
+Mani
+
+Manivannan Sadhasivam (10):
+  dt-bindings: pinctrl: Add bindings for Actions S900 SoC
+  arm64: dts: actions: Add pinctrl node for S900
+  arm64: actions: Enable PINCTRL in platforms Kconfig
+  pinctrl: actions: Add Actions S900 pinctrl driver
+  dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
+  arm64: dts: actions: Add S900 gpio nodes
+  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+  gpio: Add gpio driver for Actions OWL S900 SoC
+  MAINTAINERS: Add reviewer for ACTIONS platforms
+  MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
+
+ .../devicetree/bindings/gpio/actions,owl-gpio.txt  |   15 +
+ .../bindings/pinctrl/actions,s900-pinctrl.txt      |  171 ++
+ MAINTAINERS                                        |    5 +
+ arch/arm64/Kconfig.platforms                       |    1 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  175 ++
+ arch/arm64/boot/dts/actions/s900.dtsi              |   13 +
+ drivers/gpio/Kconfig                               |    8 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-owl.c                            |  258 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/actions/Kconfig                    |   12 +
+ drivers/pinctrl/actions/Makefile                   |    2 +
+ drivers/pinctrl/actions/pinctrl-owl.c              |  573 +++++
+ drivers/pinctrl/actions/pinctrl-owl.h              |  178 ++
+ drivers/pinctrl/actions/pinctrl-s900.c             | 2536 ++++++++++++++++++++
+ 16 files changed, 3950 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ create mode 100644 drivers/gpio/gpio-owl.c
+ create mode 100644 drivers/pinctrl/actions/Kconfig
+ create mode 100644 drivers/pinctrl/actions/Makefile
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.c
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.h
+ create mode 100644 drivers/pinctrl/actions/pinctrl-s900.c
+
 -- 
-2.7.4
+2.14.1
