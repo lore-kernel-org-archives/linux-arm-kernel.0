@@ -1,80 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 17 Feb 2018 14:54:16 +0100
-Subject: [PATCH] clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops
-In-Reply-To: <20180217130504.8668-1-wens@csie.org>
-References: <20180217130504.8668-1-wens@csie.org>
-Message-ID: <694c5137-0020-bb62-68c7-f9729c101462@gmail.com>
+Date: Sat, 17 Feb 2018 15:22:35 +0100
+Subject: [RFC PATCH] ARM: configs: sunxi: Set ondemand govenor as default
+Message-ID: <20180217142235.28541-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Right now the performance govenor is the default frequency govenor on
+sunxi devices. This causes some general problems.
+When the cpu is idle the cpu runs with its maximum frequency.
+This causes a higher cpu temperature in the idle state. When the cpu is
+now under load the cpu gets with that higher idle temperature now faster
+to its thermal limits.
+An other big problem of the performace govenor is the missing
+thermal throttling. Some tests with cpuburn resulted in a system crash
+when the soc reached its thermal limits since no thermal throttling
+occurred.
 
+With this patch we set the default frequency govenor to ondemand mode
+and reduce the temperature when the cpu is idle and activate the thermal
+throtteling.
 
-On 17.02.2018 14:05, Chen-Yu Tsai wrote:
-> When support for the A31/A31s CCU was first added, the clock ops for
-> the CLK_OUT_* clocks was set to the wrong type. The clocks are MP-type,
-> but the ops was set for div (M) clocks. This went unnoticed until now.
-> This was because while they are different clocks, their data structures
-> aligned in a way that ccu_div_ops would access the second ccu_div_internal
-> and ccu_mux_internal structures, which were valid, if not incorrect.
-> 
-> Furthermore, the use of these CLK_OUT_* was for feeding a precise 32.768
-> kHz clock signal to the WiFi chip. This was achievable by using the parent
-> with the same clock rate and no divider. So the incorrect divider setting
-> did not affect this usage.
-> 
-> Commit 946797aa3f08 ("clk: sunxi-ng: Support fixed post-dividers on MP
-> style clocks") added a new field to the ccu_mp structure, which broke
-> the aforementioned alignment. Now the system crashes as div_ops tries
-> to look up a nonexistent table.
-> 
-> Reported-by: Philipp Rossak <embed3d@gmail.com>
-> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Tested-by: Philipp Rossak <embed3d@gmail.com>
-> ---
-> 
-> Philipp, can you give this a test and report if this fixes thing?
-> I don't have any A31/A31s boards online to test this.
-> 
-Thanks!
-That fixes that bug!
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Philipp
-
-> ---
->   drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> index 72b16ed1012b..3b97f60540ad 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> @@ -762,7 +762,7 @@ static struct ccu_mp out_a_clk = {
->   		.features	= CCU_FEATURE_FIXED_PREDIV,
->   		.hw.init	= CLK_HW_INIT_PARENTS("out-a",
->   						      clk_out_parents,
-> -						      &ccu_div_ops,
-> +						      &ccu_mp_ops,
->   						      0),
->   	},
->   };
-> @@ -783,7 +783,7 @@ static struct ccu_mp out_b_clk = {
->   		.features	= CCU_FEATURE_FIXED_PREDIV,
->   		.hw.init	= CLK_HW_INIT_PARENTS("out-b",
->   						      clk_out_parents,
-> -						      &ccu_div_ops,
-> +						      &ccu_mp_ops,
->   						      0),
->   	},
->   };
-> @@ -804,7 +804,7 @@ static struct ccu_mp out_c_clk = {
->   		.features	= CCU_FEATURE_FIXED_PREDIV,
->   		.hw.init	= CLK_HW_INIT_PARENTS("out-c",
->   						      clk_out_parents,
-> -						      &ccu_div_ops,
-> +						      &ccu_mp_ops,
->   						      0),
->   	},
->   };
-> 
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index df433abfcb02..e5812851091c 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -14,6 +14,7 @@ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+-- 
+2.11.0
