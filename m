@@ -1,212 +1,170 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 18 Feb 2018 03:54:50 +0800
-Subject: [PATCH v3 15/15] arm64: dts: mt7622: add mmc related device nodes
+Date: Sun, 18 Feb 2018 03:54:40 +0800
+Subject: [PATCH v3 05/15] arm64: dts: mt7622: add PMIC MT6380 related nodes
 In-Reply-To: <cover.1518895232.git.sean.wang@mediatek.com>
 References: <cover.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <b03773a952b3212a510d4466e0a39dbe2554788b.1518895232.git.sean.wang@mediatek.com>
+Message-ID: <cc3611647afdb0711bd6bf23df67adea0f2a579b.1518895232.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-add mmc device nodes and proper setup for used pins
+Enable pwrap and MT6380 on mt7622-rfb1 board. Also add all mt6380
+regulator nodes in an alone file to allow similar boards using MT6380
+able to resue the configuration.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Signed-off-by: Jimin Wang <jimin.wang@mediatek.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Philippe Ombredanne <pombredanne@nexb.com>
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
 ---
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 106 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     |  20 +++++
- 2 files changed, 126 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt6380.dtsi     | 86 ++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 +++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 12 ++++
+ 3 files changed, 106 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
 
+diff --git a/arch/arm64/boot/dts/mediatek/mt6380.dtsi b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
+new file mode 100644
+index 0000000..53b335d
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
+@@ -0,0 +1,86 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * dts file for MediaTek MT6380 regulator
++ *
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Chenglin Xu <chenglin.xu@mediatek.com>
++ *	   Sean Wang <sean.wang@mediatek.com>
++ */
++
++&pwrap {
++	regulators {
++		compatible = "mediatek,mt6380-regulator";
++
++		mt6380_vcpu_reg: buck-vcore1 {
++			regulator-name = "vcore1";
++			regulator-min-microvolt = < 600000>;
++			regulator-max-microvolt = <1393750>;
++			regulator-ramp-delay = <6250>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vcore_reg: buck-vcore {
++			regulator-name = "vcore";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1393750>;
++			regulator-ramp-delay = <6250>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vrf_reg: buck-vrf {
++			regulator-name = "vrf";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1575000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vm_reg: ldo-vm {
++			regulator-name = "vm";
++			regulator-min-microvolt = <1050000>;
++			regulator-max-microvolt = <1400000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_va_reg: ldo-va {
++			regulator-name = "va";
++			regulator-min-microvolt = <2200000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vphy_reg: ldo-vphy {
++			regulator-name = "vphy";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vddr_reg: ldo-vddr {
++			regulator-name = "vddr";
++			regulator-min-microvolt = <1240000>;
++			regulator-max-microvolt = <1840000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		mt6380_vt_reg: ldo-vt {
++			regulator-name = "vt";
++			regulator-min-microvolt = <2200000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-ramp-delay = <0>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++	};
++};
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index cc89e2e..45d8655 100644
+index fc8ef78..42bd3a4 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
 +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -8,6 +8,7 @@
- 
- /dts-v1/;
+@@ -10,6 +10,7 @@
  #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
  
  #include "mt7622.dtsi"
- #include "mt6380.dtsi"
-@@ -53,6 +54,14 @@
- 		reg = <0 0x40000000 0 0x3F000000>;
- 	};
++#include "mt6380.dtsi"
  
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "fixed-3.3V";
-@@ -89,6 +98,23 @@
- 			function = "emmc", "emmc_rst";
- 			groups = "emmc";
- 		};
-+
-+		/* "NDL0","NDL1","NDL2","NDL3","NDL4","NDL5","NDL6","NDL7",
-+		 * "NRB","NCLE" pins are used as DAT0,DAT1,DAT2,DAT3,DAT4,
-+		 * DAT5,DAT6,DAT7,CMD,CLK for eMMC respectively
-+		 */
-+		conf-cmd-dat {
-+			pins = "NDL0", "NDL1", "NDL2",
-+			       "NDL3", "NDL4", "NDL5",
-+			       "NDL6", "NDL7", "NRB";
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "NCLE";
-+			bias-pull-down;
-+		};
+ / {
+ 	model = "MediaTek MT7622 RFB1 board";
+@@ -222,6 +223,13 @@
  	};
- 
- 	emmc_pins_uhs: emmc-pins-uhs {
-@@ -96,6 +122,21 @@
- 			function = "emmc";
- 			groups = "emmc";
- 		};
-+
-+		conf-cmd-dat {
-+			pins = "NDL0", "NDL1", "NDL2",
-+			       "NDL3", "NDL4", "NDL5",
-+			       "NDL6", "NDL7", "NRB";
-+			input-enable;
-+			drive-strength = <4>;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "NCLE";
-+			drive-strength = <4>;
-+			bias-pull-down;
-+		};
- 	};
- 
- 	eth_pins: eth-pins {
-@@ -194,6 +235,27 @@
- 			function = "sd";
- 			groups = "sd_0";
- 		};
-+
-+		/* "I2S2_OUT, "I2S4_IN"", "I2S3_IN", "I2S2_IN",
-+		 *  "I2S4_OUT", "I2S3_OUT" are used as DAT0, DAT1,
-+		 *  DAT2, DAT3, CMD, CLK for SD respectively.
-+		 */
-+		conf-cmd-data {
-+			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
-+			       "I2S2_IN","I2S4_OUT";
-+			input-enable;
-+			drive-strength = <8>;
-+			bias-pull-up;
-+		};
-+		conf-clk {
-+			pins = "I2S3_OUT";
-+			drive-strength = <12>;
-+			bias-pull-down;
-+		};
-+		conf-cd {
-+			pins = "TXD3";
-+			bias-pull-up;
-+		};
- 	};
- 
- 	sd0_pins_uhs: sd0-pins-uhs {
-@@ -201,6 +263,18 @@
- 			function = "sd";
- 			groups = "sd_0";
- 		};
-+
-+		conf-cmd-data {
-+			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
-+			       "I2S2_IN","I2S4_OUT";
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "I2S3_OUT";
-+			bias-pull-down;
-+		};
- 	};
- 
- 	/* Serial NAND is shared pin with SPI-NOR */
-@@ -311,6 +385,38 @@
- 	status = "okay";
  };
  
-+&mmc0 {
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&emmc_pins_default>;
-+	pinctrl-1 = <&emmc_pins_uhs>;
++&pwrap {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pmic_bus_pins>;
++
 +	status = "okay";
-+	bus-width = <8>;
-+	max-frequency = <50000000>;
-+	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_1p8v>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC30_0_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
-+	non-removable;
 +};
 +
-+&mmc1 {
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&sd0_pins_default>;
-+	pinctrl-1 = <&sd0_pins_uhs>;
-+	status = "okay";
-+	bus-width = <4>;
-+	max-frequency = <50000000>;
-+	cap-sd-highspeed;
-+	r_smpl = <1>;
-+	cd-gpios = <&pio 81 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_3p3v>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC30_1_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
-+};
-+
- &nandc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&parallel_nand_pins>;
+ &uart0 {
+ 	status = "okay";
+ };
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index ffb934b..0f1ebddd 100644
+index 8211bf7..c387c4c 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -527,6 +527,26 @@
- 		status = "disabled";
+@@ -102,6 +102,18 @@
+ 		#reset-cells = <1>;
  	};
  
-+	mmc0: mmc at 11230000 {
-+		compatible = "mediatek,mt7622-mmc";
-+		reg = <0 0x11230000 0 0x1000>;
-+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_MSDC30_0_PD>,
-+			 <&topckgen CLK_TOP_MSDC50_0_SEL>;
-+		clock-names = "source", "hclk";
++	pwrap: pwrap at 10001000 {
++		compatible = "mediatek,mt7622-pwrap";
++		reg = <0 0x10001000 0 0x250>;
++		reg-names = "pwrap";
++		clocks = <&infracfg CLK_INFRA_PMIC_PD>,<&pwrap_clk>;
++		clock-names = "spi","wrap";
++		resets = <&infracfg MT7622_INFRA_PMIC_WRAP_RST>;
++		reset-names = "pwrap";
++		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
 +		status = "disabled";
 +	};
 +
-+	mmc1: mmc at 11240000 {
-+		compatible = "mediatek,mt7622-mmc";
-+		reg = <0 0x11240000 0 0x1000>;
-+		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_MSDC30_1_PD>,
-+			 <&topckgen CLK_TOP_AXI_SEL>;
-+		clock-names = "source", "hclk";
-+		status = "disabled";
-+	};
-+
- 	ssusbsys: ssusbsys at 1a000000 {
- 		compatible = "mediatek,mt7622-ssusbsys",
+ 	pericfg: pericfg at 10002000 {
+ 		compatible = "mediatek,mt7622-pericfg",
  			     "syscon";
 -- 
 2.7.4
