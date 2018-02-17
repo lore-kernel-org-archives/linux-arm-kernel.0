@@ -1,41 +1,45 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 17 Feb 2018 15:22:35 +0100
-Subject: [RFC PATCH] ARM: configs: sunxi: Set ondemand govenor as default
-Message-ID: <20180217142235.28541-1-embed3d@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 17 Feb 2018 13:41:43 -0200
+Subject: [RFC] ARM: dts: imx28-tx28: Pass the memory unit name
+Message-ID: <1518882103-17137-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now the performance govenor is the default frequency govenor on
-sunxi devices. This causes some general problems.
-When the cpu is idle the cpu runs with its maximum frequency.
-This causes a higher cpu temperature in the idle state. When the cpu is
-now under load the cpu gets with that higher idle temperature now faster
-to its thermal limits.
-An other big problem of the performace govenor is the missing
-thermal throttling. Some tests with cpuburn resulted in a system crash
-when the soc reached its thermal limits since no thermal throttling
-occurred.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-With this patch we set the default frequency govenor to ondemand mode
-and reduce the temperature when the cpu is idle and activate the thermal
-throtteling.
+Pass the memory unit name in order to fix the following
+dtc warning with W=1:
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+arch/arm/boot/dts/imx28-tx28.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Hi,
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index df433abfcb02..e5812851091c 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -14,6 +14,7 @@ CONFIG_CMA=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_VFP=y
- CONFIG_NEON=y
+Currently the only dtc warnings observed with W=1 are the ones:
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+If this solution can be accepted I can clean all the other i.MX dts files.
+
+Please advise.
+
+ arch/arm/boot/dts/imx28-tx28.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+index 8a4f5bc..bbdf004 100644
+--- a/arch/arm/boot/dts/imx28-tx28.dts
++++ b/arch/arm/boot/dts/imx28-tx28.dts
+@@ -65,8 +65,8 @@
+ 		usbotg = &usb0;
+ 	};
+ 
+-	memory {
+-		reg = <0 0>; /* will be filled in by U-Boot */
++	memory at 40000000 {
++		reg = <0x40000000 0>; /* will be filled in by U-Boot */
+ 	};
+ 
+ 	onewire {
 -- 
-2.11.0
+2.7.4
