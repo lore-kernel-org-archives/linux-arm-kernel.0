@@ -1,34 +1,71 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sat, 17 Feb 2018 16:49:01 +0800
-Subject: [PATCH v2 1/2] dt-bindings: thermal: add binding for MT7622 SoC
-Message-ID: <c72262a17332a227aa2db39b682db50e2324821a.1518856935.git.sean.wang@mediatek.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 17 Feb 2018 09:04:05 +0000
+Subject: [GIT PULL] arm64 fixes for 4.16-rc2
+Message-ID: <20180217090404.guyuppnw4fnxyr3z@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi Linus,
 
-Add devicetree bindings for MediaTek MT7622 thermal controller
+Please pull the arm64 fixes below. The bulk of this pull request is the
+pte accessors annotation to READ/WRITE_ONCE (we tried to avoid pushing
+this during the merging window to avoid conflicts). Thanks.
 
-Changes v1 -> v2: add tag from Rob
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/thermal/mediatek-thermal.txt | 1 +
- 1 file changed, 1 insertion(+)
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-index 0d73ea5..41d6a44 100644
---- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-@@ -12,6 +12,7 @@ Required properties:
-   - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
-   - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
-   - "mediatek,mt2712-thermal" : For MT2712 family of SoCs
-+  - "mediatek,mt7622-thermal" : For MT7622 SoC
- - reg: Address range of the thermal controller
- - interrupts: IRQ for the thermal controller
- - clocks, clock-names: Clocks needed for the thermal controller. required
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to e1a50de37860b3a93a9d643b09638db5aff47650:
+
+  arm64: cputype: Silence Sparse warnings (2018-02-17 08:37:05 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Updated the page table accessors to use READ/WRITE_ONCE and prevent
+  compiler transformation that could lead to an apparent loss of
+  coherency
+
+- Enabled branch predictor hardening for the Falkor CPU
+
+- Fix interaction between kpti enabling and KASan causing the recursive
+  page table walking to take a significant time
+
+- Fix some sparse warnings
+
+----------------------------------------------------------------
+Robin Murphy (1):
+      arm64: cputype: Silence Sparse warnings
+
+Shanker Donthineni (1):
+      arm64: Add missing Falkor part number for branch predictor hardening
+
+Will Deacon (2):
+      arm64: proc: Set PTE_NG for table entries to avoid traversing them twice
+      arm64: mm: Use READ_ONCE/WRITE_ONCE when accessing page tables
+
+ arch/arm64/include/asm/cputype.h     |   2 +-
+ arch/arm64/include/asm/hugetlb.h     |   2 +-
+ arch/arm64/include/asm/kvm_mmu.h     |  26 ++--
+ arch/arm64/include/asm/mmu_context.h |   4 +-
+ arch/arm64/include/asm/pgalloc.h     |  44 +++---
+ arch/arm64/include/asm/pgtable.h     |  23 +--
+ arch/arm64/kernel/cpu_errata.c       |   9 ++
+ arch/arm64/kernel/efi.c              |   2 +-
+ arch/arm64/kernel/hibernate.c        | 148 +++++++++---------
+ arch/arm64/kvm/hyp/switch.c          |   4 +-
+ arch/arm64/mm/dump.c                 |  54 ++++---
+ arch/arm64/mm/fault.c                |  44 +++---
+ arch/arm64/mm/hugetlbpage.c          |  94 ++++++------
+ arch/arm64/mm/kasan_init.c           |  70 ++++-----
+ arch/arm64/mm/mmu.c                  | 282 ++++++++++++++++++-----------------
+ arch/arm64/mm/pageattr.c             |  32 ++--
+ arch/arm64/mm/proc.S                 |  14 +-
+ 17 files changed, 448 insertions(+), 406 deletions(-)
+
 -- 
-2.7.4
+Catalin
