@@ -1,44 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 17 Feb 2018 08:40:35 +0000
-Subject: [arm64:fixes/core 4/5]
- arch/arm64/kernel/armv8_deprecated.c:404:31: warning: passing argument 1 of
- '__range_ok' makes pointer from integer without a cast
-In-Reply-To: <201802171213.ppCdl9kU%fengguang.wu@intel.com>
-References: <201802171213.ppCdl9kU%fengguang.wu@intel.com>
-Message-ID: <20180217084035.4guuuvzoka4zdabo@armageddon.cambridge.arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sat, 17 Feb 2018 09:48:46 +0100
+Subject: [PATCH v3 2/2] dt-bindings: spi: updated usage example for
+ spi-rx/tx-bus-width properties
+In-Reply-To: <1518504675-26286-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1518504675-26286-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1518504675-26286-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20180217094846.60475e2f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 12:38:16PM +0800, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git fixes/core
-> head:   8d77124b84783bc37517edc6223d501092ab8e53
-> commit: 6e3941e8f8e106e25343f140b9d73a2bc64730a7 [4/5] arm64: uaccess: Clean up types for access_ok()
-> config: arm64-allmodconfig (attached as .config)
-> compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 6e3941e8f8e106e25343f140b9d73a2bc64730a7
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
-> 
-> All warnings (new ones prefixed by >>):
-> 
->    In file included from include/linux/uaccess.h:14:0,
->                     from arch/arm64/kernel/armv8_deprecated.c:23:
->    arch/arm64/kernel/armv8_deprecated.c: In function 'swp_handler':
-> >> arch/arm64/kernel/armv8_deprecated.c:404:31: warning: passing argument 1 of '__range_ok' makes pointer from integer without a cast [-Wint-conversion]
->      if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
->                                   ^
->    arch/arm64/include/asm/uaccess.h:107:48: note: in definition of macro 'access_ok'
->     #define access_ok(type, addr, size) __range_ok(addr, size)
->                                                    ^~~~
->    arch/arm64/include/asm/uaccess.h:75:29: note: expected 'const void *' but argument is of type 'u32 {aka unsigned int}'
->     static inline unsigned long __range_ok(const void __user *addr, unsigned long size)
->                                 ^~~~~~~~~~
+Hi Yogesh,
 
-Thanks for the report. It's an easy fix but I'm dropping this patch for
-now and wait for Robin to update. I'll re-send this patch after -rc2.
+Looks like you forgot to Cc Mark and the linux-spi ML.
+
+Regards,
+
+Boris
+
+On Tue, 13 Feb 2018 12:21:15 +0530
+Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+
+> Updated usage example by adding properties spi-rx-bus-width
+> and spi-tx-bus-width for slave node binding.
+> 
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> ---
+> Changes for v3:
+> - None
+> Changes for v2:
+> - None
+> 
+>  Documentation/devicetree/bindings/spi/spi-bus.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> index 1f6e86f..4dbe267 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> @@ -101,6 +101,8 @@ SPI example for an MPC5200 SPI bus:
+>  			compatible = "micrel,ks8995m";
+>  			spi-max-frequency = <1000000>;
+>  			reg = <0>;
+> +			spi-rx-bus-width = 4;
+> +			spi-tx-bus-width = 4;
+>  		};
+>  
+>  		codec at 1 {
+
+
 
 -- 
-Catalin
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
