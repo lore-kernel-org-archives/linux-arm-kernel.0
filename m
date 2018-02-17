@@ -1,170 +1,124 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 18 Feb 2018 03:54:40 +0800
-Subject: [PATCH v3 05/15] arm64: dts: mt7622: add PMIC MT6380 related nodes
+Date: Sun, 18 Feb 2018 03:54:41 +0800
+Subject: [PATCH v3 06/15] arm64: dts: mt7622: add cpufreq related device nodes
 In-Reply-To: <cover.1518895232.git.sean.wang@mediatek.com>
 References: <cover.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <cc3611647afdb0711bd6bf23df67adea0f2a579b.1518895232.git.sean.wang@mediatek.com>
+Message-ID: <2cf761c2a20a8ff8a9208ddf3872f10f6f3198f5.1518895232.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Enable pwrap and MT6380 on mt7622-rfb1 board. Also add all mt6380
-regulator nodes in an alone file to allow similar boards using MT6380
-able to resue the configuration.
+Add clocks, regulators and opp information into cpu nodes.
+In addition, the power supply for cpu nodes is deployed on
+mt7622-rfb1 board.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Philippe Ombredanne <pombredanne@nexb.com>
-Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/mediatek/mt6380.dtsi     | 86 ++++++++++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 +++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 12 ++++
- 3 files changed, 106 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 12 +++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 52 ++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt6380.dtsi b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
-new file mode 100644
-index 0000000..53b335d
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
-@@ -0,0 +1,86 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * dts file for MediaTek MT6380 regulator
-+ *
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Chenglin Xu <chenglin.xu@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ */
-+
-+&pwrap {
-+	regulators {
-+		compatible = "mediatek,mt6380-regulator";
-+
-+		mt6380_vcpu_reg: buck-vcore1 {
-+			regulator-name = "vcore1";
-+			regulator-min-microvolt = < 600000>;
-+			regulator-max-microvolt = <1393750>;
-+			regulator-ramp-delay = <6250>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vcore_reg: buck-vcore {
-+			regulator-name = "vcore";
-+			regulator-min-microvolt = <600000>;
-+			regulator-max-microvolt = <1393750>;
-+			regulator-ramp-delay = <6250>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vrf_reg: buck-vrf {
-+			regulator-name = "vrf";
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1575000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vm_reg: ldo-vm {
-+			regulator-name = "vm";
-+			regulator-min-microvolt = <1050000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_va_reg: ldo-va {
-+			regulator-name = "va";
-+			regulator-min-microvolt = <2200000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vphy_reg: ldo-vphy {
-+			regulator-name = "vphy";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vddr_reg: ldo-vddr {
-+			regulator-name = "vddr";
-+			regulator-min-microvolt = <1240000>;
-+			regulator-max-microvolt = <1840000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vt_reg: ldo-vt {
-+			regulator-name = "vt";
-+			regulator-min-microvolt = <2200000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+	};
-+};
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index fc8ef78..42bd3a4 100644
+index 42bd3a4..b387865 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
 +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -10,6 +10,7 @@
- #include <dt-bindings/input/input.h>
- 
- #include "mt7622.dtsi"
-+#include "mt6380.dtsi"
- 
- / {
- 	model = "MediaTek MT7622 RFB1 board";
-@@ -222,6 +223,13 @@
- 	};
- };
- 
-+&pwrap {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pmic_bus_pins>;
-+
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 8211bf7..c387c4c 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -102,6 +102,18 @@
- 		#reset-cells = <1>;
+@@ -20,6 +20,18 @@
+ 		bootargs = "console=ttyS0,115200n1";
  	};
  
-+	pwrap: pwrap at 10001000 {
-+		compatible = "mediatek,mt7622-pwrap";
-+		reg = <0 0x10001000 0 0x250>;
-+		reg-names = "pwrap";
-+		clocks = <&infracfg CLK_INFRA_PMIC_PD>,<&pwrap_clk>;
-+		clock-names = "spi","wrap";
-+		resets = <&infracfg MT7622_INFRA_PMIC_WRAP_RST>;
-+		reset-names = "pwrap";
-+		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
++	cpus {
++		cpu at 0 {
++			proc-supply = <&mt6380_vcpu_reg>;
++			sram-supply = <&mt6380_vm_reg>;
++		};
++
++		cpu at 1 {
++			proc-supply = <&mt6380_vcpu_reg>;
++			sram-supply = <&mt6380_vm_reg>;
++		};
 +	};
 +
- 	pericfg: pericfg at 10002000 {
- 		compatible = "mediatek,mt7622-pericfg",
- 			     "syscon";
+ 	gpio-keys {
+ 		compatible = "gpio-keys-polled";
+ 		poll-interval = <100>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+index c387c4c..7256879 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+@@ -18,6 +18,50 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	cpu_opp_table: opp-table {
++		compatible = "operating-points-v2";
++		opp-shared;
++		opp-300000000 {
++			opp-hz = /bits/ 64 <30000000>;
++			opp-microvolt = <950000>;
++		};
++
++		opp-437500000 {
++			opp-hz = /bits/ 64 <437500000>;
++			opp-microvolt = <1000000>;
++		};
++
++		opp-600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <1050000>;
++		};
++
++		opp-812500000 {
++			opp-hz = /bits/ 64 <812500000>;
++			opp-microvolt = <1100000>;
++		};
++
++		opp-1025000000 {
++			opp-hz = /bits/ 64 <1025000000>;
++			opp-microvolt = <1150000>;
++		};
++
++		opp-1137500000 {
++			opp-hz = /bits/ 64 <1137500000>;
++			opp-microvolt = <1200000>;
++		};
++
++		opp-1262500000 {
++			opp-hz = /bits/ 64 <1262500000>;
++			opp-microvolt = <1250000>;
++		};
++
++		opp-1350000000 {
++			opp-hz = /bits/ 64 <1350000000>;
++			opp-microvolt = <1310000>;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+@@ -26,6 +70,10 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x0>;
++			clocks = <&infracfg CLK_INFRA_MUX1_SEL>,
++				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cpu_opp_table>;
+ 			enable-method = "psci";
+ 			clock-frequency = <1300000000>;
+ 		};
+@@ -34,6 +82,10 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x1>;
++			clocks = <&infracfg CLK_INFRA_MUX1_SEL>,
++				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cpu_opp_table>;
+ 			enable-method = "psci";
+ 			clock-frequency = <1300000000>;
+ 		};
 -- 
 2.7.4
