@@ -1,88 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 18 Feb 2018 16:07:51 +0100
-Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
-In-Reply-To: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
-References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 18 Feb 2018 16:40:49 +0100
+Subject: [GIT PULL 1/2] Rockchip dts32 fixes for 4.16
+Message-ID: <2137280.MWbT8y5lbZ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Arnd, Kevin, Olof,
 
-CC Steve Twiss
+please find below and in the next mail accumulated fixes for Rockchip
+platforms on 4.16.
 
-On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
-> one DA9063 and one DA9210 on Porter, the only difference from
-> the other boards is that DA9063 is at I2C address 0x5a rather
-> than 0x58 .
->
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Please pull. Thanks
+Heiko
 
-Thanks for your patch!
 
-> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -354,10 +354,47 @@
->         clock-frequency = <400000>;
->  };
->
-> +&i2c6 {
-> +       status = "okay";
-> +       clock-frequency = <100000>;
-> +
-> +       pmic at 5a {
-> +               compatible = "dlg,da9063";
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Does it matter that this is a DA9063L ("Variant 6B")?
-Do we need a new compatible value, or can this be detected at runtime?
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-> +               reg = <0x5a>;
-> +               interrupt-parent = <&irqc0>;
-> +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-> +               interrupt-controller;
-> +
-> +               rtc {
-> +                       compatible = "dlg,da9063-rtc";
-> +               };
-> +
-> +               wdt {
-> +                       compatible = "dlg,da9063-watchdog";
-> +               };
-> +       };
-> +
-> +       vdd_dvfs: regulator at 68 {
-> +               compatible = "dlg,da9210";
-> +               reg = <0x68>;
-> +               interrupt-parent = <&irqc0>;
-> +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-> +
-> +               regulator-min-microvolt = <1000000>;
-> +               regulator-max-microvolt = <1000000>;
-> +               regulator-boot-on;
-> +               regulator-always-on;
-> +       };
-> +};
-> +
->  &sata0 {
->         status = "okay";
->  };
->
-> +&cpu0 {
-> +       cpu0-supply = <&vdd_dvfs>;
-> +};
-> +
->  /* composite video input */
->  &vin0 {
->         status = "okay";
+are available in the Git repository at:
 
-Gr{oetje,eeting}s,
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.16-rockchip-dts32fixes-1
 
-                        Geert
+for you to fetch changes up to e78c637127ee7683d606737f2e62b5da6fd7b1c3:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+  ARM: dts: rockchip: Fix DWMMC clocks (2018-02-16 10:45:16 +0100)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+----------------------------------------------------------------
+Fix wrong dwmmc tuning clocks that may make probing HS cards fail to
+probe and removal of special opps from the phycore boards that may
+run the cpu outside the soc-vendor specs.
+
+----------------------------------------------------------------
+Daniel Schultz (1):
+      ARM: dts: rockchip: Remove 1.8 GHz operation point from phycore som
+
+Robin Murphy (1):
+      ARM: dts: rockchip: Fix DWMMC clocks
+
+ arch/arm/boot/dts/rk3036.dtsi             |  4 ++--
+ arch/arm/boot/dts/rk322x.dtsi             |  6 +++---
+ arch/arm/boot/dts/rk3288-phycore-som.dtsi | 20 --------------------
+ 3 files changed, 5 insertions(+), 25 deletions(-)
