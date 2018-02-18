@@ -1,77 +1,107 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Feb 2018 17:29:06 -0600
-Subject: [PATCH 10/10] dt-bindings: thermal: Remove
- "cooling-{min|max}-level" properties
-In-Reply-To: <0ec53640f1a09e6e0d7aa1a21d1a3266c3c209c7.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
- <0ec53640f1a09e6e0d7aa1a21d1a3266c3c209c7.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <20180218232906.jkpymin3a4qxjhnc@rob-hp-laptop>
+Date: Sun, 18 Feb 2018 17:44:52 -0600
+Subject: [PATCH v2] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <20180209120034.13388-1-lorenzo.pieralisi@arm.com>
+References: <20180209120034.13388-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20180218234452.2mtv74pxfjt6fqhl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 02:28:10PM +0530, Viresh Kumar wrote:
-> The "cooling-min-level" and "cooling-max-level" properties are not
-> parsed by any part of kernel currently and the max cooling state of a
-> CPU cooling device is found by referring to the cpufreq table instead.
+On Fri, Feb 09, 2018 at 12:00:34PM +0000, Lorenzo Pieralisi wrote:
+> The current ARM DT topology description provides the operating system
+> with a topological view of the system that is based on leaf nodes
+> representing either cores or threads (in an SMT system) and a
+> hierarchical set of cluster nodes that creates a hierarchical topology
+> view of how those cores and threads are grouped.
+> 
+> As opposed to the ACPI topology description ([1], PPTT table), this
+> hierarchical representation of clusters does not allow to describe what
+> topology level actually represents the physical package boundary, which
+> is a key piece of information to be used by an operating system to
+> optimize resource allocation and scheduling.
 
-What about non-CPU devices? A fan for example.
+Don't the NUMA related bindings already provide this?
+
+The only thing I could see this being needed for is servicing (e.g. to 
+replace a bad socket).
 
 > 
-> Remove the unused bindings.
+> Define an optional, backward compatible boolean property for cluster
+> nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+> topological description a binding to define what cluster level
+> represents a physical package boundary.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+> Cc: Frank Rowand <frowand.list@gmail.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 > ---
->  Documentation/devicetree/bindings/thermal/thermal.txt | 16 +---------------
->  1 file changed, 1 insertion(+), 15 deletions(-)
+> v1->v2:
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
-> index 1719d47a5e2f..cc553f0952c5 100644
-> --- a/Documentation/devicetree/bindings/thermal/thermal.txt
-> +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
-> @@ -55,8 +55,7 @@ of heat dissipation). For example a fan's cooling states correspond to
->  the different fan speeds possible. Cooling states are referred to by
->  single unsigned integers, where larger numbers mean greater heat
->  dissipation. The precise set of cooling states associated with a device
-> -(as referred to by the cooling-min-level and cooling-max-level
-> -properties) should be defined in a particular device's binding.
-> +should be defined in a particular device's binding.
->  For more examples of cooling devices, refer to the example sections below.
+> 	- Added dual-package example
+> 	- Improved physical-package property description according to review
+> 	- Dropped RFC tag
+> 
+> v1: https://marc.info/?l=linux-arm-kernel&m=151664137216555&w=2
+> 
+>  Documentation/devicetree/bindings/arm/topology.txt | 432 +++++++++++++++++++++
+>  1 file changed, 432 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> index de9eb0486630..09b3b22e57c1 100644
+> --- a/Documentation/devicetree/bindings/arm/topology.txt
+> +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> @@ -109,6 +109,21 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+>  	The cluster node name must be "clusterN" as described in 2.1 above.
+>  	A cluster node can not be a leaf node.
 >  
->  Required properties:
-> @@ -69,15 +68,6 @@ For more examples of cooling devices, refer to the example sections below.
->  			See Cooling device maps section below for more details
->  			on how consumers refer to cooling devices.
+> +	Properties for cluster nodes:
+> +
+> +	- physical-package
+> +		Usage: optional
+> +		Value type: <empty>
+> +		Definition: if present the cluster node represents the
+> +			    boundary of a physical package, whether socketed
+> +			    or surface mounted.
+> +			    The cluster node itself and all its children nodes
+> +			    represent a single distinct physical-package unit.
+> +			    The cluster node parent and sibling cluster nodes
+> +			    (if any) must therefore be considered part of
+> +			    separate physical package units in multi
+> +			    physical-package systems.
+> +
+>  	A cluster node's child nodes must be:
 >  
-> -Optional properties:
-> -- cooling-min-level:	An integer indicating the smallest
-> -  Type: unsigned	cooling state accepted. Typically 0.
-> -  Size: one cell
-> -
-> -- cooling-max-level:	An integer indicating the largest
-> -  Type: unsigned	cooling state accepted.
-> -  Size: one cell
-> -
->  * Trip points
->  
->  The trip node is a node to describe a point in the temperature domain
-> @@ -226,8 +216,6 @@ cpus {
->  			396000  950000
->  			198000  850000
->  		>;
-> -		cooling-min-level = <0>;
-> -		cooling-max-level = <3>;
->  		#cooling-cells = <2>; /* min followed by max */
->  	};
->  	...
-> @@ -241,8 +229,6 @@ cpus {
->  	 */
->  	fan0: fan at 48 {
->  		...
-> -		cooling-min-level = <0>;
-> -		cooling-max-level = <9>;
->  		#cooling-cells = <2>; /* min followed by max */
+>  	- one or more cluster nodes; or
+> @@ -470,6 +485,423 @@ cpus {
 >  	};
 >  };
-> -- 
-> 2.15.0.194.g9af6a3dea062
-> 
+>  
+> +Example 3 (ARM 64-bit, 32-cpu system, 2 packages):
+
+Can't you expand an existing example. If you have the complex cases, you 
+can derive simple ones.
+
+> +
+> +cpus {
+> +	#size-cells = <0>;
+> +	#address-cells = <2>;
+> +
+> +	cpu-map {
+> +		cluster0 {
+> +			physical-package;
+
+Why not just make this part of the node name? .../cluster0/cluster0/... 
+isn't really the best naming IMO.
+
+> +
+> +			cluster0 {
+> +				core0 {
+> +					cpu = <&CPU0>;
+> +				};
