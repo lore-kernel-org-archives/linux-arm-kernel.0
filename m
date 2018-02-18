@@ -1,30 +1,88 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 18 Feb 2018 16:00:43 +0100
-Subject: [PATCH] soc: actions: Convert to SPDX license identifiers
-In-Reply-To: <20180121170143.29915-1-afaerber@suse.de>
-References: <20180121170143.29915-1-afaerber@suse.de>
-Message-ID: <72b34d7f-8987-0bc3-4336-c833ffb69bb3@suse.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 18 Feb 2018 16:07:51 +0100
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
+References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.01.2018 um 18:01 schrieb Andreas F?rber:
-> Replace textual license notices with SPDX-License-Identifier lines.
-> Add an SPDX-License-Identifier for the Makefile.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  drivers/soc/actions/Makefile         | 2 ++
->  drivers/soc/actions/owl-sps-helper.c | 6 +-----
->  drivers/soc/actions/owl-sps.c        | 6 +-----
->  3 files changed, 4 insertions(+), 10 deletions(-)
+Hi Marek,
 
-Applied to v4.17/drivers:
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.17/drivers
+CC Steve Twiss
 
-Regards,
-Andreas
+On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+> one DA9063 and one DA9210 on Porter, the only difference from
+> the other boards is that DA9063 is at I2C address 0x5a rather
+> than 0x58 .
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks for your patch!
+
+> --- a/arch/arm/boot/dts/r8a7791-porter.dts
+> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+> @@ -354,10 +354,47 @@
+>         clock-frequency = <400000>;
+>  };
+>
+> +&i2c6 {
+> +       status = "okay";
+> +       clock-frequency = <100000>;
+> +
+> +       pmic at 5a {
+> +               compatible = "dlg,da9063";
+
+Does it matter that this is a DA9063L ("Variant 6B")?
+Do we need a new compatible value, or can this be detected at runtime?
+
+> +               reg = <0x5a>;
+> +               interrupt-parent = <&irqc0>;
+> +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+> +               interrupt-controller;
+> +
+> +               rtc {
+> +                       compatible = "dlg,da9063-rtc";
+> +               };
+> +
+> +               wdt {
+> +                       compatible = "dlg,da9063-watchdog";
+> +               };
+> +       };
+> +
+> +       vdd_dvfs: regulator at 68 {
+> +               compatible = "dlg,da9210";
+> +               reg = <0x68>;
+> +               interrupt-parent = <&irqc0>;
+> +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +               regulator-min-microvolt = <1000000>;
+> +               regulator-max-microvolt = <1000000>;
+> +               regulator-boot-on;
+> +               regulator-always-on;
+> +       };
+> +};
+> +
+>  &sata0 {
+>         status = "okay";
+>  };
+>
+> +&cpu0 {
+> +       cpu0-supply = <&vdd_dvfs>;
+> +};
+> +
+>  /* composite video input */
+>  &vin0 {
+>         status = "okay";
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
