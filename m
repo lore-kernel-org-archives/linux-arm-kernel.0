@@ -1,97 +1,86 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 18 Feb 2018 19:45:04 +0100
-Subject: [PATCH usb-next v10 8/8] usb: core: hcd: remove support for
- initializing a single PHY
-In-Reply-To: <20180218184504.3331-1-martin.blumenstingl@googlemail.com>
-References: <20180218184504.3331-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180218184504.3331-9-martin.blumenstingl@googlemail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Sun, 18 Feb 2018 11:09:25 -0800
+Subject: [PATCH 2/3] soc: rockchip: power-domain: Use
+ of_clk_get_parent_count() instead of open coding
+In-Reply-To: <11171053.oOJPuGlHoK@phil>
+References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
+ <1516375101-29836-3-git-send-email-geert+renesas@glider.be>
+ <11171053.oOJPuGlHoK@phil>
+Message-ID: <CAEG3pNCioW_FVXj3-j4KC_yO6ZYGXQB_eanHWSb9NUE9kYsWag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new PHY wrapper in place we can now handle multiple PHYs.
-Remove the code which handles only one generic PHY as this is now
-covered (with support for multiple PHYs as well as suspend/resume
-support) by the new PHY wrapper.
+Heiko, Geert,
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/usb/core/hcd.c  | 37 -------------------------------------
- include/linux/usb/hcd.h |  1 -
- 2 files changed, 38 deletions(-)
+On Sat, Feb 10, 2018 at 8:35 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Geert,
+>
+> Am Freitag, 19. Januar 2018, 16:18:20 CET schrieb Geert Uytterhoeven:
+>> As of_clk_get_parent_count() returns zero on failure, while
+>> of_count_phandle_with_args() might return a negative error code, this
+>> also fixes the issue of possibly using a negative number in the
+>> allocation below.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  drivers/soc/rockchip/pm_domains.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+>> index 5c342167b9db7a16..9936038d38771784 100644
+>> --- a/drivers/soc/rockchip/pm_domains.c
+>> +++ b/drivers/soc/rockchip/pm_domains.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>
+> not wanting to be to nitpicky, but clk-provider.h seems that it should be
+> used from drivers exposing clocks to the system, not from clock users.
+>
+> I just remember that in the past clk maintainers tried to keep their
+> layering intact, so I've included them for clarification.
+>
+> Mike, Stephen: the power-domain driver of Rockchip socs needs
+> to toggle all clocks of domain peripherals when turning a domain
+> on or off, so has a variable list of clocks in the clocks property in dt.
+> Hence the of_count_... call which could be replaced with
+> of_clk_get_parent_count to not open-code this.
 
-diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-index 32797c25ac3b..5a92d8f7c484 100644
---- a/drivers/usb/core/hcd.c
-+++ b/drivers/usb/core/hcd.c
-@@ -2757,30 +2757,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- 		}
- 	}
- 
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->skip_phy_initialization) {
--		struct phy *phy = phy_get(hcd->self.sysdev, "usb");
--
--		if (IS_ERR(phy)) {
--			retval = PTR_ERR(phy);
--			if (retval == -EPROBE_DEFER)
--				goto err_phy;
--		} else {
--			retval = phy_init(phy);
--			if (retval) {
--				phy_put(phy);
--				goto err_phy;
--			}
--			retval = phy_power_on(phy);
--			if (retval) {
--				phy_exit(phy);
--				phy_put(phy);
--				goto err_phy;
--			}
--			hcd->phy = phy;
--			hcd->remove_phy = 1;
--		}
--	}
--
- 	if (!hcd->skip_phy_initialization) {
- 		hcd->phy_roothub = usb_phy_roothub_init(hcd->self.sysdev);
- 		if (IS_ERR(hcd->phy_roothub)) {
-@@ -2961,13 +2937,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- err_usb_phy_roothub_power_on:
- 	usb_phy_roothub_exit(hcd->phy_roothub);
- err_phy_roothub_init:
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
--err_phy:
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-@@ -3048,12 +3017,6 @@ void usb_remove_hcd(struct usb_hcd *hcd)
- 	usb_phy_roothub_power_off(hcd->phy_roothub);
- 	usb_phy_roothub_exit(hcd->phy_roothub);
- 
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
-index a042675e03ba..aef50cb2ed1b 100644
---- a/include/linux/usb/hcd.h
-+++ b/include/linux/usb/hcd.h
-@@ -103,7 +103,6 @@ struct usb_hcd {
- 	 * other external phys should be software-transparent
- 	 */
- 	struct usb_phy		*usb_phy;
--	struct phy		*phy;
- 	struct usb_phy_roothub	*phy_roothub;
- 
- 	/* Flags that need to be manipulated atomically because they can
+Moving of_clk_get_parent_count to clk.h seems reasonable to me. It's
+more of an of-specific helper than a provider-specific helper.
+
+Anyone up to submit a patch so that this one doesn't need to include
+clk-provider.h?
+
+Regards,
+Mike
+
+>
+>
+> Heiko
+>
+>>  #include <linux/regmap.h>
+>>  #include <linux/mfd/syscon.h>
+>>  #include <dt-bindings/power/rk3288-power.h>
+>> @@ -391,7 +392,7 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
+>>               return -EINVAL;
+>>       }
+>>
+>> -     clk_cnt = of_count_phandle_with_args(node, "clocks", "#clock-cells");
+>> +     clk_cnt = of_clk_get_parent_count(node);
+>>       pd = devm_kzalloc(pmu->dev,
+>>                         sizeof(*pd) + clk_cnt * sizeof(pd->clks[0]),
+>>                         GFP_KERNEL);
+>>
+>
+>
+
+
+
 -- 
-2.16.1
+Michael Turquette
+CEO
+BayLibre - At the Heart of Embedded Linux
+http://baylibre.com/
