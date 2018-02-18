@@ -1,101 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Feb 2018 17:19:38 -0600
-Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander
- driver
-In-Reply-To: <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
+Date: Sun, 18 Feb 2018 17:26:23 -0600
+Subject: [PATCH 03/10] ARM: dts: mt7623: Remove "cooling-{min|max}-level"
+ for CPU nodes
+In-Reply-To: <33d7494641d2f89c827e5e09d1143f125c33e784.1518166039.git.viresh.kumar@linaro.org>
+References: <cover.1518166039.git.viresh.kumar@linaro.org>
+ <33d7494641d2f89c827e5e09d1143f125c33e784.1518166039.git.viresh.kumar@linaro.org>
+Message-ID: <20180218232622.au3cjy7p47xabvv7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 03:27:32PM +0100, Amelie Delaunay wrote:
-> This patch adds documentation of device tree bindings for the
-> STMicroelectronics Multi-Function eXpander (MFX).
+On Fri, Feb 09, 2018 at 02:28:03PM +0530, Viresh Kumar wrote:
+> The "cooling-min-level" and "cooling-max-level" properties are not
+> parsed by any part of the kernel currently and the max cooling state of
+> a CPU cooling device is found by referring to the cpufreq table instead.
 > 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> Remove the unused properties from the CPU nodes.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  Documentation/devicetree/bindings/mfd/st-mfx.txt | 51 ++++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/st-mfx.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/st-mfx.txt b/Documentation/devicetree/bindings/mfd/st-mfx.txt
-> new file mode 100644
-> index 0000000..423d800
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/st-mfx.txt
-> @@ -0,0 +1,51 @@
-> +STMicroelectronics Multi-Function eXpander
-> +
-> +ST Multi-Function eXpander (MFX) is a slave controller using I2C for
-> +communication with the main MCU. Its main features are gpio expansion, main
-> +MCU IDD measurement (IDD is the amount of current that flows through VDD)
-> +and resistive touchscreen controller.
+>  Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 4 ----
+>  arch/arm/boot/dts/mt7623.dtsi                                  | 2 --
+>  2 files changed, 6 deletions(-)
 
-You don't have to implement all the drivers now, but please completely 
-describe the device. As is, there is no reason to have a child GPIO 
-node.
-
-> +
-> +Required properties:
-> +- compatible: must be "st,mfx"
-
-Kind of generic. Only 1 single version ever?
-
-> +- reg: I2C address of the device
-> +- interrupts: interrupt triggered by MFX_IRQ_OUT signal
-> +- interrupt-parent: interrupt controller MFX is connected to
-> +- interrupt-controller: marks the device as an interrupt controller
-> +- #interrupt-cells: should be <1>, index of the interrupt within the
-> +  controller, in accordance with the "one cell" variant of
-> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
-> +
-> +Optional nodes:
-> +
-> +* GPIO eXpander
-> +MFX provides 16 programmable GPIOs, and it is also possible to recover 8
-> +alternate GPIOs if the main functions are not used (touchscreen controller and
-> +IDD measurement not enabled).
-> +
-> +Required properties:
-> +- compatible : must be "st,mfx-gpio"
-> +- interrupt-parent : must be <&mfx>
-
-Not necessary. A parent node with 'interrupt-controller' property is the 
-interrupt's parent.
-
-> +- interrupts = must be <0>
-> +- gpio-controller: marks the device node as a GPIO controller
-> +- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
-> +  controller, the second cell is the gpio flags in accordance with
-> +  <dt-bindings/gpio/st-mfx-gpio.h>.
-
-Custom flags? Use standard flags.
-
-DT binding headers should be part of this patch.
-
-> +
-> +Example:
-> +
-> +	mfx: mfx at 42 {
-> +		compatible = "st,mfx";
-> +		reg = <0x42>;
-> +		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
-> +		interrupt-parent = <&gpioi>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +
-> +		mfxgpio: mfx_gpio {
-
-gpio {
-
-> +			compatible = "st,mfx-gpio";
-> +			interrupt-parent = <&mfx>;
-> +			interrupts = <0>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
