@@ -1,44 +1,49 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 19 Feb 2018 12:49:17 +0100
-Subject: [PATCH v2 4/8] drm/rockchip: dw_hdmi: Allow outputs that don't
- need output switching
-In-Reply-To: <f1104948-5b95-968c-edc4-7a4d5212bae0@arm.com>
-References: <20180216204158.29839-1-heiko@sntech.de>
- <20180216204158.29839-5-heiko@sntech.de>
- <f1104948-5b95-968c-edc4-7a4d5212bae0@arm.com>
-Message-ID: <1630677.YWXALm60yB@phil>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 19 Feb 2018 11:50:42 +0000
+Subject: [PATCH v5 11/20] firmware: arm_scmi: add support for polling
+ based SCMI transfers
+In-Reply-To: <CAK8P3a31CMsLUSm0rsHLdvM4sbjZ6fwocKmA1JiuCtF97vj3PQ@mail.gmail.com>
+References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
+ <1514904162-11201-12-git-send-email-sudeep.holla@arm.com>
+ <CAK8P3a31CMsLUSm0rsHLdvM4sbjZ6fwocKmA1JiuCtF97vj3PQ@mail.gmail.com>
+Message-ID: <d1acd809-48d0-5889-0eb1-e52b68445dfe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
-Am Montag, 19. Februar 2018, 12:43:11 CET schrieb Robin Murphy:
-> Hi Heiko,
+
+On 19/02/18 11:32, Arnd Bergmann wrote:
+> On Tue, Jan 2, 2018 at 3:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 > 
-> On 16/02/18 20:41, Heiko Stuebner wrote:
-> > So far we always encountered socs with 2 output crtcs needing the driver
-> > to tell the hdmi block which output to connect to. But there also exist
-> > socs with only one crtc like the rk3228, rk3328 and rk3368.
-> > 
-> > So adapt the register field to simply carry a negative value to signal
-> > that now output-switching is necessary.
+>> +#define SCMI_MAX_POLLING_TIMEOUT_NS    (100 * NSEC_PER_USEC)
+>>  /**
+>>   * scmi_do_xfer() - Do one transfer
+>>   *
+>> @@ -389,14 +406,30 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
 > 
-> Nit: s/now/no/ ? (Hooray for grammatically-correct typos which invert 
-> the entire meaning of the sentence!)
+>> +       if (xfer->hdr.poll_completion) {
+>> +               ktime_t stop, cur;
+>> +
+>> +               stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLLING_TIMEOUT_NS);
+>> +               do {
+>> +                       udelay(5);
+>> +                       cur = ktime_get();
+>> +               } while (!scmi_xfer_poll_done(info, xfer) &&
+>> +                        ktime_before(cur, stop));
+> 
+> The 5 microsecond back-off isn't that much smaller than the 100 microsecond
+> timeout, given that udelay() often waits much longer than the specified time.
+> 
+> How did you come up with those two numbers? Are you sure this is better
+> than just using a cpu_relax() instead of the udelay()?
+> 
 
-:-D
+Somehow I assumed that cpu_relax will schedule out and since this is
+called in the fast switching path, I can't do that. But now I see that
+it's just an hint and so I can use it. Sorry for missing it earlier, you
+did point this out in previous version and I retained it based on my
+wrong assumption. Thanks.
 
-> What are the necessary dependencies for these patches? I tried applying 
-> the series on 4.16-rc1 to test, but it failed at patch #6 with some 
-> missing context (I tried checking drm-next for where rockchip_hdmi::hdmi 
-> might have come from, but didn't see anything obvious)
-
-You'll need the most recent drm-misc changes [0], especially the dw-hdmi
-changes from Jernej Skrabec that touch similar areas and even included a
-similar patch to export some general phy functions, which I could drop
-from my series.
-
-
-Heiko
-
-[0] https://cgit.freedesktop.org/drm/drm-misc/log/
+-- 
+Regards,
+Sudeep
