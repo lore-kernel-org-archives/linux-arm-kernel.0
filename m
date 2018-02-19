@@ -1,47 +1,95 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon, 19 Feb 2018 16:12:52 +0100
-Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
-Message-ID: <20180219151252.29289-1-marcel@ziswiler.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Mon, 19 Feb 2018 16:16:01 +0100
+Subject: [PATCH 1/5] dt-bindings: mmc: document the stm32 sdmmc bindings
+In-Reply-To: <20180219144735.sbxa76z6aik3w453@rob-hp-laptop>
+References: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
+ <1518701697-14242-2-git-send-email-ludovic.Barre@st.com>
+ <20180219144735.sbxa76z6aik3w453@rob-hp-laptop>
+Message-ID: <12fc58db-3b21-4c83-30ce-e1b495928dbc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+hi Rob
 
-Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
-during registration") ULPI has been broken on Tegra20 leading to the
-following error message during boot:
+Ok for all changes
 
-[    1.974698] ulpi_phy_power_on: ulpi write failed
-[    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
-[    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
+BR
+Ludo
 
-Debugging through the changes and finally also consulting the TRM
-revealed that rather than the CDEV2 clock off OSC requiring such pin
-muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
-just worked by chance of that one having been enabled which Stephen's
-commit now changed when reparenting sclk away from pll_p_out4 leaving
-that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
-as the ULPI PHY clock.
+On 02/19/2018 03:47 PM, Rob Herring wrote:
+> On Thu, Feb 15, 2018 at 02:34:53PM +0100, Ludovic Barre wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
+>>
+>> Document the binding for stm32 sdmmc controller.
+>>
+>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> ---
+>>   .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     | 35 ++++++++++++++++++++++
+>>   1 file changed, 35 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+>> new file mode 100644
+>> index 0000000..52eb1f8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+>> @@ -0,0 +1,35 @@
+>> +* STMicroelectronics STM32 SDMMC controller
+>> +
+>> +The highspeed MMC host controller on STM32 soc family
+>> +provides an interface for MMC, SD and SDIO types of memory cards.
+>> +
+>> +This file documents differences between the core properties described
+>> +by mmc.txt and the properties used by the sdmmc driver.
+>> +
+>> +Required properties:
+>> + - compatible: Should be "st,stm32h7-sdmmc"
+>> + - reg: mmc controller base registers
+>> + - interrupts: Should contain the interrupt number
+>> + - clocks: Should contain phandle for the clock feeding the controller
+>> + - resets: Should contain phandle for the reset feeding the controller
+>> +
+>> +Optional property:
+>> +- st,dirpol: Allow to select direction polarity of external voltage
+> 
+> This doesn't need to be so terse. Perhaps "st,dir-output-high".
+> 
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Ok, I take "st,dir-output-high", your're right it's more descriptive :-)
 
----
+>> +  transceiver (which manage data and command direction).
+>> +  if set: Voltage transceiver IOs are driven as output when direction signals are high,
+>> +  else: Voltage transceiver IOs are driven as output when direction signals are low.
+>> +- st,negedge: generate data & command on sdmmc clock falling edge
+> 
+> st,neg-edge
+> 
+>> +- st,pin-ckin: use sdmmc_ckin pin from an external driver to sample
+>> +  the receive data (example: with voltage switch transceiver).
+> 
+> st,use-ckin
+> 
 
- arch/arm/boot/dts/tegra20.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OK
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 864a95872b8d..e05b6bb2599f 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -741,7 +741,7 @@
- 		phy_type = "ulpi";
- 		clocks = <&tegra_car TEGRA20_CLK_USB2>,
- 			 <&tegra_car TEGRA20_CLK_PLL_U>,
--			 <&tegra_car TEGRA20_CLK_CDEV2>;
-+			 <&tegra_car TEGRA20_CLK_PLL_P_OUT4>;
- 		clock-names = "reg", "pll_u", "ulpi-link";
- 		resets = <&tegra_car 58>, <&tegra_car 22>;
- 		reset-names = "usb", "utmi-pads";
--- 
-2.14.3
+>> +
+>> +Example:
+>> +	sdmmc1: sdmmc at 52007000 {
+> 
+> mmc at ...
+>
+
+OK
+
+>> +		compatible = "st,stm32h7-sdmmc";
+>> +		reg = <0x52007000 0x1000>;
+>> +		interrupts = <49>;
+>> +		clocks = <&rcc SDMMC1_CK>;
+>> +		resets = <&rcc SDMMC1_R>;
+>> +		bus-width = <4>;
+>> +		cap-sd-highspeed;
+>> +		cap-mmc-highspeed;
+>> +	};
+>> -- 
+>> 2.7.4
+>>
