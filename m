@@ -1,74 +1,82 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Mon, 19 Feb 2018 16:00:48 +0000
-Subject: [PATCH 2/6] mfd: Add ST Multi-Function eXpander core driver
-In-Reply-To: <CAOFm3uH+DLcOqiSV0z0N6JnmSk+JfTF3bfkC0_2kdFT-eDMr8A@mail.gmail.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
- <20180212120600.5cghrzz4jqvvkgz6@dell>
- <CAOFm3uH+DLcOqiSV0z0N6JnmSk+JfTF3bfkC0_2kdFT-eDMr8A@mail.gmail.com>
-Message-ID: <889cec8c-5a3a-ffc5-e6fa-aa388485e601@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 19 Feb 2018 16:29:12 +0000
+Subject: [PATCH 1/8] clk: Add clk_bulk_alloc functions
+In-Reply-To: <1519055046-2399-2-git-send-email-m.purski@samsung.com>
+References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
+ <CGME20180219154456eucas1p15f4073beaf61312238f142f217a8bb3c@eucas1p1.samsung.com>
+ <1519055046-2399-2-git-send-email-m.purski@samsung.com>
+Message-ID: <b67b5043-f5e5-826a-f0b8-f7cf722c61e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Philippe,
+Hi Maciej,
 
-I will take this into account for V2.
+On 19/02/18 15:43, Maciej Purski wrote:
+> When a driver is going to use clk_bulk_get() function, it has to
+> initialize an array of clk_bulk_data, by filling its id fields.
+> 
+> Add a new function to the core, which dynamically allocates
+> clk_bulk_data array and fills its id fields. Add clk_bulk_free()
+> function, which frees the array allocated by clk_bulk_alloc() function.
+> Add a managed version of clk_bulk_alloc().
 
-Regards,
-Amelie
+Seeing how every subsequent patch ends up with the roughly this same stanza:
 
-On 02/12/2018 03:15 PM, Philippe Ombredanne wrote:
-> Amelie,
+	x = devm_clk_bulk_alloc(dev, num, names);
+	if (IS_ERR(x)
+		return PTR_ERR(x);
+	ret = devm_clk_bulk_get(dev, x, num);
+
+I wonder if it might be better to simply implement:
+
+	int devm_clk_bulk_alloc_get(dev, &x, num, names)
+
+that does the whole lot in one go, and let drivers that want to do more 
+fiddly things continue to open-code the allocation.
+
+But perhaps that's an abstraction too far... I'm not all that familiar 
+with the lie of the land here.
+
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> ---
+>   drivers/clk/clk-bulk.c   | 16 ++++++++++++
+>   drivers/clk/clk-devres.c | 37 +++++++++++++++++++++++++---
+>   include/linux/clk.h      | 64 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 113 insertions(+), 4 deletions(-)
 > 
-> On Mon, Feb 12, 2018 at 1:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> On Thu, 08 Feb 2018, Amelie Delaunay wrote:
->>
->>> ST Multi-Function eXpander (MFX) is a slave controller using I2C
->>> for communication with the main MCU. Main features are:
->>> - 16 fast GPIOs individually configurable in input/output
->>> - 8 alternate GPIOs individually configurable in input/output
->>> - Main MCU IDD measurement
->>> - Resistive touchscreen controller
->>>
->>> Only GPIO expander (16 fast GPIOs + 8 alternate) feature is
->>> supported for the moment.
->>>
->>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> 
-> <snip>
-> 
->>> --- /dev/null
->>> +++ b/drivers/mfd/st-mfx.c
->>> @@ -0,0 +1,526 @@
->>> +/*
->>> + * STMicroelectronics Multi-Function eXpander (ST-MFX) Core Driver
->>> + *
->>> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
->>> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
->>
->> You don't need to put "for STMicroelectronics".  This was something we
->> made up when submitting from a different (!st.com) email address.
->>
->>> + * License terms: GPL V2.0.
->>> + *
->>> + * st-mfx Core Driver is free software; you can redistribute it and/or modify it
->>> + * under the terms of the GNU General Public License version 2 as published by
->>> + * the Free Software Foundation.
->>> + *
->>> + * st-mfx Core Driver is distributed in the hope that it will be useful, but
->>> + * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
->>> + * details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License along with
->>> + * st-mfx Core Driver. If not, see <http://www.gnu.org/licenses/>.
->>
->> You should be able to use the short version of the licensing
->> agreement.  Also, please grep for "SPDX".
-> 
-> You can check the doc for the (fairly new) way to remove legalese
-> boilerplate at Documentation/process/license-rules.rst or [1]
-> It helps keep the focus on the code and less on licensing!
-> 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+
+[...]
+> @@ -598,6 +645,23 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+>   
+>   #else /* !CONFIG_HAVE_CLK */
+>   
+> +static inline struct clk_bulk_data *clk_bulk_alloc(int num_clks,
+> +						   const char **clk_ids)
+> +{
+> +	return NULL;
+
+Either way, is it intentional not returning an ERR_PTR() value in this 
+case? Since NULL will pass an IS_ERR() check, it seems a bit fragile for 
+an allocation call to apparently succeed when the whole API is 
+configured out (and I believe introducing new uses of IS_ERR_OR_NULL() 
+is in general strongly discouraged.)
+
+Robin.
+
+> +}
+> +
+> +static inline struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev,
+> +							int num_clks,
+> +							const char **clk_ids)
+> +{
+> +	return NULL;
+> +}
+> +
+> +static inline void clk_bulk_free(struct clk_bulk_data *clks)
+> +{
+> +}
+> +
+>   static inline struct clk *clk_get(struct device *dev, const char *id)
+>   {
+>   	return NULL;
 > 
