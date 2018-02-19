@@ -1,82 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Feb 2018 16:29:12 +0000
-Subject: [PATCH 1/8] clk: Add clk_bulk_alloc functions
-In-Reply-To: <1519055046-2399-2-git-send-email-m.purski@samsung.com>
-References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154456eucas1p15f4073beaf61312238f142f217a8bb3c@eucas1p1.samsung.com>
- <1519055046-2399-2-git-send-email-m.purski@samsung.com>
-Message-ID: <b67b5043-f5e5-826a-f0b8-f7cf722c61e6@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 19 Feb 2018 16:30:01 +0000
+Subject: [PATCH v3 17/41] KVM: arm64: Remove noop calls to timer
+ save/restore from VHE switch
+In-Reply-To: <20180213223134.GK23189@cbox>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-18-christoffer.dall@linaro.org>
+ <20074994-caac-2be0-6eaa-83115c616756@arm.com> <20180213223134.GK23189@cbox>
+Message-ID: <591b3937-7a53-afb3-7f2f-e859d3e46601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+Hi Christoffer,
 
-On 19/02/18 15:43, Maciej Purski wrote:
-> When a driver is going to use clk_bulk_get() function, it has to
-> initialize an array of clk_bulk_data, by filling its id fields.
-> 
-> Add a new function to the core, which dynamically allocates
-> clk_bulk_data array and fills its id fields. Add clk_bulk_free()
-> function, which frees the array allocated by clk_bulk_alloc() function.
-> Add a managed version of clk_bulk_alloc().
+Sorry for the late reply.
 
-Seeing how every subsequent patch ends up with the roughly this same stanza:
+On 13/02/18 22:31, Christoffer Dall wrote:
+> On Fri, Feb 09, 2018 at 05:53:43PM +0000, Julien Grall wrote:
+>> Hi Christoffer,
+>>
+>> On 01/12/2018 12:07 PM, Christoffer Dall wrote:
+>>> The VHE switch function calls __timer_enable_traps and
+>>> __timer_disable_traps which don't do anything on VHE systems.
+>>> Therefore, simply remove these calls from the VHE switch function and
+>>> make the functions non-conditional as they are now only called from the
+>>> non-VHE switch path.
+>>>
+>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>   arch/arm64/kvm/hyp/switch.c |  2 --
+>>>   virt/kvm/arm/hyp/timer-sr.c | 44 ++++++++++++++++++++++----------------------
+>>>   2 files changed, 22 insertions(+), 24 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>>> index 9aadef6966bf..6175fcb33ed2 100644
+>>> --- a/arch/arm64/kvm/hyp/switch.c
+>>> +++ b/arch/arm64/kvm/hyp/switch.c
+>>> @@ -354,7 +354,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>>>   	__activate_vm(vcpu->kvm);
+>>>   	__vgic_restore_state(vcpu);
+>>> -	__timer_enable_traps(vcpu);
+>>>   	/*
+>>>   	 * We must restore the 32-bit state before the sysregs, thanks
+>>> @@ -373,7 +372,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>>>   	__sysreg_save_guest_state(guest_ctxt);
+>>>   	__sysreg32_save_state(vcpu);
+>>> -	__timer_disable_traps(vcpu);
+>>>   	__vgic_save_state(vcpu);
+>>>   	__deactivate_traps(vcpu);
+>>> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+>>> index f24404b3c8df..77754a62eb0c 100644
+>>> --- a/virt/kvm/arm/hyp/timer-sr.c
+>>> +++ b/virt/kvm/arm/hyp/timer-sr.c
+>>> @@ -27,34 +27,34 @@ void __hyp_text __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high)
+>>>   	write_sysreg(cntvoff, cntvoff_el2);
+>>>   }
+>>> +/*
+>>> + * Should only be called on non-VHE systems.
+>>> + * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
+>>> + */
+>>>   void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
+>>
+>> Would it be worth to suffix the function with nvhe? So it would be clear
+>> that it should not be called for VHE system?
+>>
+> Actually, I decided against this, because it's also called from the
+> 32-bit code and it looks a little strange there, and it's not like we
+> have an equivalent _vhe version.
 
-	x = devm_clk_bulk_alloc(dev, num, names);
-	if (IS_ERR(x)
-		return PTR_ERR(x);
-	ret = devm_clk_bulk_get(dev, x, num);
+The main goal was to provide a naming that would prevent someone to use 
+it in VHE case. This would have also  been inline with other patches 
+where you rename some helpers to nvhe/vhe even in arm32 code.
 
-I wonder if it might be better to simply implement:
+Anyway, I guess the reviewers will be careful enough to spot that :).
 
-	int devm_clk_bulk_alloc_get(dev, &x, num, names)
+Cheers,
 
-that does the whole lot in one go, and let drivers that want to do more 
-fiddly things continue to open-code the allocation.
-
-But perhaps that's an abstraction too far... I'm not all that familiar 
-with the lie of the land here.
-
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->   drivers/clk/clk-bulk.c   | 16 ++++++++++++
->   drivers/clk/clk-devres.c | 37 +++++++++++++++++++++++++---
->   include/linux/clk.h      | 64 ++++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 113 insertions(+), 4 deletions(-)
-> 
-
-[...]
-> @@ -598,6 +645,23 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
->   
->   #else /* !CONFIG_HAVE_CLK */
->   
-> +static inline struct clk_bulk_data *clk_bulk_alloc(int num_clks,
-> +						   const char **clk_ids)
-> +{
-> +	return NULL;
-
-Either way, is it intentional not returning an ERR_PTR() value in this 
-case? Since NULL will pass an IS_ERR() check, it seems a bit fragile for 
-an allocation call to apparently succeed when the whole API is 
-configured out (and I believe introducing new uses of IS_ERR_OR_NULL() 
-is in general strongly discouraged.)
-
-Robin.
-
-> +}
-> +
-> +static inline struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev,
-> +							int num_clks,
-> +							const char **clk_ids)
-> +{
-> +	return NULL;
-> +}
-> +
-> +static inline void clk_bulk_free(struct clk_bulk_data *clks)
-> +{
-> +}
-> +
->   static inline struct clk *clk_get(struct device *dev, const char *id)
->   {
->   	return NULL;
-> 
+-- 
+Julien Grall
