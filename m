@@ -1,64 +1,132 @@
-From: tmn505@gmail.com (Tomasz Maciej Nowak)
-Date: Mon, 19 Feb 2018 21:16:23 +0100
-Subject: [PATCH] ARM: dtc: tegra: enable front panel leds in TrimSlice
-Message-ID: <20180219201623.6987-1-tmn505@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 19 Feb 2018 22:19:42 +0200
+Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
+In-Reply-To: <20180216182041.GU5453@intel.com>
+References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+ <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
+ <20180216182041.GU5453@intel.com>
+Message-ID: <1841868.3gpkeNesVL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds device nodes for two front panel LEDs.
+Hi Ville,
 
-Signed-off-by: Tomasz Maciej Nowak <tmn505@gmail.com>
----
- arch/arm/boot/dts/tegra20-trimslice.dts | 25 ++++++++++++++++++++-----
- 1 file changed, 20 insertions(+), 5 deletions(-)
+On Friday, 16 February 2018 20:20:41 EET Ville Syrj?l? wrote:
+> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
+> > Some drivers duplicate the logic to create a property to store a per-plane
+> > alpha.
+> > 
+> > This is especially useful if we ever want to support extra protocols for
+> > Wayland like:
+> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.ht
+> > ml
+> > 
+> > Let's create a helper in order to move that to the core.
+> > 
+> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> > 
+> >  Documentation/gpu/kms-properties.csv |  2 +-
+> >  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
+> >  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
+> >  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
+> >  include/drm/drm_blend.h              |  1 +-
+> >  include/drm/drm_plane.h              |  6 +++++-
+> >  6 files changed, 48 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/gpu/kms-properties.csv
+> > b/Documentation/gpu/kms-properties.csv index 927b65e14219..25ad3503d663
+> > 100644
+> > --- a/Documentation/gpu/kms-properties.csv
+> > +++ b/Documentation/gpu/kms-properties.csv
+> > @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0,
+> > Max=1",Connector,TBD> 
+> >  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+> >  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+> >  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+> > 
+> > -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+> > +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the
+> > plane from transparent (0) to fully opaque (MAX). If this property is set
+> > to a value different than max, and that the pixel will define an alpha
+> > component, the property will have precendance and the pixel value will be
+> > ignored.
+> 
+> Those semantics don't seem particularly good to me. I think we would want
+> the per-pixel alpha and global alpha both to be effecive at the same time.
+> You can always decide to ignore the per-pixel alpha by using a pixel format
+> without alpha.
 
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index d55c6b240a30..31a8b088d386 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -200,16 +200,17 @@
- 			conf_ata {
- 				nvidia,pins = "ata", "atc", "atd", "ate",
- 					"crtp", "dap2", "dap3", "dap4", "dta",
--					"dtb", "dtc", "dtd", "dte", "gmb",
--					"gme", "i2cp", "pta", "slxc", "slxd",
--					"spdi", "spdo", "uda";
-+					"dtb", "dtc", "dtd", "gmb", "gme",
-+					"i2cp", "pta", "slxc", "slxd", "spdi",
-+					"spdo", "uda";
- 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
- 				nvidia,tristate = <TEGRA_PIN_ENABLE>;
- 			};
- 			conf_atb {
- 				nvidia,pins = "atb", "cdev1", "cdev2", "dap1",
--					"gma", "gmc", "gmd", "gpu", "gpu7",
--					"gpv", "sdio1", "slxa", "slxk", "uac";
-+					"dte", "gma", "gmc", "gmd", "gpu",
-+					"gpu7", "gpv", "sdio1", "slxa", "slxk",
-+					"uac";
- 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 			};
-@@ -402,6 +403,20 @@
- 		};
- 	};
- 
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		ds2 {
-+			label = "trimslice:green:right";
-+			gpios = <&gpio TEGRA_GPIO(D, 2) GPIO_ACTIVE_LOW>;
-+		};
-+
-+		ds3 {
-+			label = "trimslice:green:left";
-+			gpios = <&gpio TEGRA_GPIO(BB, 5) GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	poweroff {
- 		compatible = "gpio-poweroff";
- 		gpios = <&gpio TEGRA_GPIO(X, 7) GPIO_ACTIVE_LOW>;
+That makes sense to me. However, it also brings a new question: how should a 
+driver that supports either global alpha or pixel alpha but not both signal 
+that to userspace, and how should it reacts when userspace selects a format 
+with an alpha channel and set a global alpha value other than fully opaque ? 
+To make things more complex, note that some drivers support combining global 
+alpha and pixel alpha only for a subset of the formats with an alpha channel 
+(for instance for ARGB 1555 formats, but not for ARGB 8888 formats).
+
+> Also, where's the userspace that wants this feature?
+> 
+> <snip>
+> 
+> > diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
+> > index 8185e3468a23..5a6f29524f12 100644
+> > --- a/include/drm/drm_plane.h
+> > +++ b/include/drm/drm_plane.h
+> > @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
+> >   *	plane (in 16.16)
+> >   * @src_w: width of visible portion of plane (in 16.16)
+> >   * @src_h: height of visible portion of plane (in 16.16)
+> > + * @alpha: opacity of the plane
+> >   * @rotation: rotation of the plane
+> >   * @zpos: priority of the given plane on crtc (optional)
+> >   *	Note that multiple active planes on the same crtc can have an
+> >   identical
+> > @@ -105,6 +106,9 @@ struct drm_plane_state {
+> >  	uint32_t src_x, src_y;
+> >  	uint32_t src_h, src_w;
+> > 
+> > +	/* Plane opacity */
+> > +	u8 alpha;
+> 
+> We may want to make that u16. The general we expect 16bpc for most color
+> related things, but since this is a range prop I suppose we should just
+> expose the actual hardware range. But making it u16 might avoid some head
+> scratching for the first person to have hardware with higher precision.
+> Either that or we should make the prop creation fail if the driver asks
+> for more bits than we have in the state.
+
+I'm tempted to go one step further and always make the alpha property 16-bits 
+wide for new users (we can't do so for existing users as it could break 
+userspace), and let drivers convert that internally to the range they need. 
+There could however be drawbacks I don't foresee.
+
+> Oh, and you should plug this into the state dumper as well.
+> 
+> > +
+> > 
+> >  	/* Plane rotation */
+> >  	unsigned int rotation;
+> > @@ -481,6 +485,7 @@ enum drm_plane_type {
+> >   * @funcs: helper functions
+> >   * @properties: property tracking for this plane
+> >   * @type: type of plane (overlay, primary, cursor)
+> > + * @alpha_property: alpha property for this plane
+> >   * @zpos_property: zpos property for this plane
+> >   * @rotation_property: rotation property for this plane
+> >   * @helper_private: mid-layer private data
+> > @@ -556,6 +561,7 @@ struct drm_plane {
+> >  	 */
+> >  	
+> >  	struct drm_plane_state *state;
+> > +	struct drm_property *alpha_property;
+> >  	struct drm_property *zpos_property;
+> >  	struct drm_property *rotation_property;
+> >  };
+
 -- 
-2.16.2
+Regards,
+
+Laurent Pinchart
