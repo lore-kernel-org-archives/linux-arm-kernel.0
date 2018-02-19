@@ -1,53 +1,33 @@
 From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 19 Feb 2018 13:47:36 +0100
-Subject: [PATCH v4 13/13] iio: adc: axp20x_adc: remove !! in favor of ternary
- condition
+Date: Mon, 19 Feb 2018 13:47:35 +0100
+Subject: [PATCH v4 12/13] ARM: dtsi: axp81x: remove IP name from DT node name
 In-Reply-To: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
 References: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
-Message-ID: <9ec180ff4358ac6e163115aa7832a0674b6a640e.1519044068.git-series.quentin.schulz@bootlin.com>
+Message-ID: <e72308b0ce1f2c7efa25a5e879159376a41bd453.1519044068.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-!!'s behaviour isn't that obvious and sparse complained about it, so
-let's replace it with a ternary condition.
+The DT node should be named after its functionality and not after the
+IP it's defining.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/iio/adc/axp20x_adc.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/axp81x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-index a30a972..7a745cf 100644
---- a/drivers/iio/adc/axp20x_adc.c
-+++ b/drivers/iio/adc/axp20x_adc.c
-@@ -365,7 +365,7 @@ static int axp20x_adc_offset_voltage(struct iio_dev *indio_dev, int channel,
- 		return -EINVAL;
- 	}
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 1b05c7f..043c717 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -53,7 +53,7 @@
+ 		#io-channel-cells = <1>;
+ 	};
  
--	*val = !!(*val) * 700000;
-+	*val = *val ? 700000 : 0;
- 
- 	return IIO_VAL_INT;
- }
-@@ -442,15 +442,17 @@ static int axp20x_write_raw(struct iio_dev *indio_dev,
- 	if (val != 0 && val != 700000)
- 		return -EINVAL;
- 
-+	val = val ? 1 : 0;
-+
- 	switch (chan->channel) {
- 	case AXP20X_GPIO0_V:
- 		reg = AXP20X_GPIO10_IN_RANGE_GPIO0;
--		regval = AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(!!val);
-+		regval = AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(val);
- 		break;
- 
- 	case AXP20X_GPIO1_V:
- 		reg = AXP20X_GPIO10_IN_RANGE_GPIO1;
--		regval = AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(!!val);
-+		regval = AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(val);
- 		break;
- 
- 	default:
+-	axp_gpio: axp-gpio {
++	axp_gpio: gpio {
+ 		compatible = "x-powers,axp813-gpio";
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
 -- 
 git-series 0.9.1
