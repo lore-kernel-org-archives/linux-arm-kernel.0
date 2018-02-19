@@ -1,37 +1,119 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Mon, 19 Feb 2018 09:18:37 +0100
-Subject: [PATCH v3 7/7] ARM: sun8i: smp: Remove the disabling of CPU0
+Date: Mon, 19 Feb 2018 09:18:35 +0100
+Subject: [PATCH v3 5/7] arm: dts: sun8i: a83t: Add CCI-400 node
 In-Reply-To: <20180219081837.15482-1-mylene.josserand@bootlin.com>
 References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
-Message-ID: <20180219081837.15482-8-mylene.josserand@bootlin.com>
+Message-ID: <20180219081837.15482-6-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On sun8i-a63t, hotplug CPU for CPU0 is currently not working.
-Remove the possibility to disable CPU0 only for sun8i-a83t.
+Add CCI-400 node and control-port on CPUs needed by SMP bringup.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
- arch/arm/mach-sunxi/mc_smp.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 41 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index fec592bf68b4..69d5ae5b3d72 100644
---- a/arch/arm/mach-sunxi/mc_smp.c
-+++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -661,8 +661,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
- 	return !ret;
- }
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 7ae631fc04d5..e97a6d17b8d0 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -64,48 +64,56 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0>;
++			cci-control-port = <&cci_control0>;
+ 		};
  
--static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
-+static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
- {
-+	/* CPU0 hotplug handled only for sun9i */
-+	if (of_machine_is_compatible("allwinner,sun8i-a83t"))
-+		if (cpu == 0)
-+			return false;
- 	return true;
- }
- #endif
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <1>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <2>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <3>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu at 100 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0x100>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu at 101 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0x101>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu at 102 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0x102>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu at 103 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0x103>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 	};
+ 
+@@ -213,6 +221,39 @@
+ 			reg = <0x01700000 0x400>;
+ 		};
+ 
++		cci at 1790000 {
++			compatible = "arm,cci-400";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x01790000 0x10000>;
++			ranges = <0x0 0x01790000 0x10000>;
++
++			cci_control0: slave-if at 4000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x4000 0x1000>;
++			};
++
++			cci_control1: slave-if at 5000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x5000 0x1000>;
++			};
++
++			pmu at 9000 {
++				compatible = "arm,cci-400-pmu,r1";
++				reg = <0x9000 0x5000>;
++				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun8i-a83t-system-controller",
+ 				"syscon";
 -- 
 2.11.0
