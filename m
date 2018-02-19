@@ -1,44 +1,59 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 19 Feb 2018 23:10:03 +0530
-Subject: [PATCH 00/10] Add Actions Semi S900 pinctrl and gpio support
-In-Reply-To: <72e49775-3a3e-0b47-61e9-079d4be6c9d9@suse.de>
+Date: Mon, 19 Feb 2018 23:13:28 +0530
+Subject: [PATCH 06/10] arm64: dts: actions: Add S900 gpio nodes
+In-Reply-To: <fb5f904e-a262-df5b-a947-957e579ec4c9@suse.de>
 References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
- <72e49775-3a3e-0b47-61e9-079d4be6c9d9@suse.de>
-Message-ID: <20180219174003.ocijnddmftktxftb@linaro.org>
+ <20180217204433.3095-7-manivannan.sadhasivam@linaro.org>
+ <fb5f904e-a262-df5b-a947-957e579ec4c9@suse.de>
+Message-ID: <20180219174328.lcrzbj6oswvmaxmt@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 10:19:50PM +0100, Andreas F?rber wrote:
+Hi Andreas,
+
+On Sat, Feb 17, 2018 at 10:08:37PM +0100, Andreas F?rber wrote:
 > Am 17.02.2018 um 21:44 schrieb Manivannan Sadhasivam:
-> > This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
-> > Pinctrl and gpio subsystems share the common set of register range but
-> > implemented as individual drivers for making it less complex.
+> > Add gpio nodes for Actions Semi S900 SoC.
 > > 
-> > Pinmux functions are only accessible for pin groups while pinconf
-> > parameters are available for both pin groups and individual pins.
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/actions/s900.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
 > > 
-> > gpio-line-names has been added for the Bubblegum-96 board matching the
-> > 96Boards CE specification v1.0.
-> > 
-> > Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
-> > 
-> > This patchset depends on the clock driver which is still under review:
-> > https://lkml.org/lkml/2018/2/9/831
+> > diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+> > index 0156483f0f4d..e359509ad9d3 100644
+> > --- a/arch/arm64/boot/dts/actions/s900.dtsi
+> > +++ b/arch/arm64/boot/dts/actions/s900.dtsi
+> > @@ -180,6 +180,13 @@
+> >  			clocks = <&cmu CLK_GPIO>;
+> >  		};
+> >  
+> > +		gpio: gpio at e01b0000 {
+> > +			compatible = "actions,s900-gpio";
+> > +			reg = <0x0 0xe01b0000 0x0 0x1000>;
+> > +			gpio-controller;
 > 
-> What this forgets to point out is that I had authored pinctrl and gpio
-> drivers for S500, with preparations for S700 and S900, derived from my
-> to-be-submitted pinctrl/gpio drivers for RTD1295, while this one was
-> developed independently by Mani for S900. Our intention is to align them
-> as part of patch review and redo S500 on top of the result.
+> Same as the bindings example, this is lacking gpio-ranges.
 >
+Sure, will add it.
+> https://github.com/afaerber/linux/commit/f4526bbacd75d014a69e6e3ff051638589ee71a3
+> 
+> Also why have only one node? That forces the information about GPIO
+> banks into the driver rather than into the DT.
+> 
+In next revision all banks will be made as individual gpio-controllers,
+which will in turn have individual nodes. The justification was already
+provided in gpio driver patch.
 
-Sorry for not mentioning that (not intentional). So, I'll push out V2 of the
-pinctrl and gpio drivers incorporating all review comments. If that looks
-good then we can work on adding S500 support on top of it.
-
-Otherwise we can look on integrating S900 pinctrl definitions with your base
-driver. Anyway, for making it easier for comparing both drivers, are you going
-to submit yours?
+Thanks,
+Mani
+> > +			#gpio-cells = <2>;
+> > +		};
+> > +
+> >  		timer: timer at e0228000 {
+> >  			compatible = "actions,s900-timer";
+> >  			reg = <0x0 0xe0228000 0x0 0x8000>;
+> 
 > Regards,
 > Andreas
 > 
@@ -46,7 +61,3 @@ to submit yours?
 > SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
 > GF: Felix Imend?rffer, Jane Smithard, Graham Norton
 > HRB 21284 (AG N?rnberg)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
