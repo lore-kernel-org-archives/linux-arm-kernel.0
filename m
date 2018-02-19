@@ -1,68 +1,74 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 19 Feb 2018 09:16:17 +0100
-Subject: [PATCH 2/2] arm64: dts: rockchip: add a standalone version of the
- rk3399 sapphire
-In-Reply-To: <3840224.sEPfbROKII@phil>
-References: <CAAMcf8CY1m+998+GpD2wOfAZb=oZNkL2GqYu_o5piGEh76uoYw@mail.gmail.com>
- <3840224.sEPfbROKII@phil>
-Message-ID: <7102557.xWtZfjvKIZ@phil>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 19 Feb 2018 09:30:14 +0100
+Subject: [PATCH v2 4/5] arm64: dts: renesas: initial Condor board device
+ tree
+In-Reply-To: <5cf82cb1-0278-010c-165d-07dbcbe0878d@cogentembedded.com>
+References: <ae31804b-969b-9b20-16d0-50f5dea42f08@cogentembedded.com>
+ <5cf82cb1-0278-010c-165d-07dbcbe0878d@cogentembedded.com>
+Message-ID: <CAMuHMdWwjXw0SwVK704_AtkDg3C-or5bUbXPwMEvTwU5eLGrpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the sapphire board is a system-on-module and mostly used with the
-excavator baseboard, it is also possible to use it standalone without
-any base. So add a board-variant for this type.
+Hi Sergei,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- Documentation/devicetree/bindings/arm/rockchip.txt |  4 ++++
- arch/arm64/boot/dts/rockchip/Makefile              |  1 +
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dts   | 12 ++++++++++++
- 3 files changed, 17 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-sapphire.dts
+On Fri, Feb 16, 2018 at 7:35 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the initial device  tree for  the R8A77980 SoC based Condor board.
+> The board has 1 debug serial port (SCIF0); include support for it, so
+> that the serial console can work.
+>
+> Based on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> ---
+> Changes in version 2:
+> - removed the useless "status" property from the SCIF_CLK node;
+> - fixed the memory size;
+> - added Geert's tag.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 9a3e98356b1e..1c1d62d03c4f 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -185,6 +185,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
- 
-+- Rockchip RK3399 Sapphire board standalone:
-+    Required root node properties:
-+      - compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
-+
- - Rockchip RK3399 Sapphire Excavator board:
-     Required root node properties:
-       - compatible = "rockchip,rk3399-sapphire-excavator", "rockchip,rk3399";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 1e57f87f30c4..48a83f882947 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -12,4 +12,5 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire-excavator.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dts b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dts
-new file mode 100644
-index 000000000000..5a58060447cf
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dts
-@@ -0,0 +1,12 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-+ */
-+
-+/dts-v1/;
-+#include "rk3399-sapphire.dtsi"
-+
-+/ {
-+	model = "Sapphire-RK3399 Board";
-+	compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
-+};
--- 
-2.15.1
+> --- /dev/null
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> @@ -0,0 +1,45 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Device Tree Source for the Condor board
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corp.
+> + * Copyright (C) 2018 Cogent Embedded, Inc.
+> + */
+> +
+> +/dts-v1/;
+> +#include "r8a77980.dtsi"
+> +
+> +/ {
+> +       model = "Renesas Condor board based on r8a77980";
+> +       compatible = "renesas,condor", "renesas,r8a77980";
+> +
+> +       aliases {
+> +               serial0 = &scif0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory at 48000000 {
+> +               device_type = "memory";
+> +               /* first 128MB is reserved for secure area. */
+> +               reg = <0 0x48000000 0 0xb8000000>;
+
+Shouldn't the size be 0x78000000, or is there really 3 GiB of RAM?
+
+oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
