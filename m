@@ -1,48 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Feb 2018 11:13:26 +0100
-Subject: [4.9-stable 7/9] arm64: fix warning about swapper_pg_dir overflow
-In-Reply-To: <20180219101343.2922561-1-arnd@arndb.de>
-References: <20180219101343.2922561-1-arnd@arndb.de>
-Message-ID: <20180219101343.2922561-8-arnd@arndb.de>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 19 Feb 2018 10:19:35 +0000
+Subject: [PATCH] arm64: Fix compilation error while accessing
+ MPIDR_HWID_BITMASK from .S files
+In-Reply-To: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+References: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+Message-ID: <36bd758c-dd49-edef-cc1a-20f5b43f5011@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 12f043ff2b28fa64c9123b454cbe30a8a9e1967e upstream.
+On 19/02/2018 06:39, Bhupesh Sharma wrote:
+> Since commit e1a50de37860b3a93a9d643b09638db5aff47650 (arm64: cputype:
+> Silence Sparse warnings), compilation of arm64 architecture is broken
+> with the following error messages:
+>
+>   AR      arch/arm64/kernel/built-in.o
+>   arch/arm64/kernel/head.S: Assembler messages:
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: junk at end of line, first
+>   unrecognized character is `L'
+>   arch/arm64/kernel/head.S:677: Error: unexpected characters following
+>   instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
+>   arch/arm64/kernel/head.S:677: Error: unexpected characters following
+>   instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
+>
+> This patch fixes the same by using the UL() macro correctly for
+> assigning the MPIDR_HWID_BITMASK macro value.
+>
+> Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+> ---
+>  arch/arm64/include/asm/cputype.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index eda8c5f629fc..350c76a1d15b 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -20,7 +20,7 @@
+>
+>  #define MPIDR_UP_BITMASK	(0x1 << 30)
+>  #define MPIDR_MT_BITMASK	(0x1 << 24)
+> -#define MPIDR_HWID_BITMASK	0xff00ffffffUL
+> +#define MPIDR_HWID_BITMASK	UL(0xff00ffffff)
 
-With 4 levels of 16KB pages, we get this warning about the fact that we are
-copying a whole page into an array that is declared as having only two pointers
-for the top level of the page table:
+Works for me.
 
-arch/arm64/mm/mmu.c: In function 'paging_init':
-arch/arm64/mm/mmu.c:528:2: error: 'memcpy' writing 16384 bytes into a region of size 16 overflows the destination [-Werror=stringop-overflow=]
+FYI, I am using (old) gcc-linaro-4.8-2015.06-x86_64_aarch64.
 
-This is harmless since we actually reserve a whole page in the definition of the
-array that comes from, and just the extern declaration is short. The pgdir
-is initialized to zero either way, so copying the actual entries here seems
-like the best solution.
+Thanks,
+John
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-[slightly adapted to apply on 4.9]
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 05615a3fdc6f..d5cc6d73c2c4 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -479,7 +479,7 @@ void __init paging_init(void)
- 	 * To do this we need to go via a temporary pgd.
- 	 */
- 	cpu_replace_ttbr1(__va(pgd_phys));
--	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
-+	memcpy(swapper_pg_dir, pgd, PGD_SIZE);
- 	cpu_replace_ttbr1(swapper_pg_dir);
- 
- 	pgd_clear_fixmap();
--- 
-2.9.0
+>
+>  #define MPIDR_LEVEL_BITS_SHIFT	3
+>  #define MPIDR_LEVEL_BITS	(1 << MPIDR_LEVEL_BITS_SHIFT)
+>
