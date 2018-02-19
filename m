@@ -1,95 +1,104 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Mon, 19 Feb 2018 16:16:01 +0100
-Subject: [PATCH 1/5] dt-bindings: mmc: document the stm32 sdmmc bindings
-In-Reply-To: <20180219144735.sbxa76z6aik3w453@rob-hp-laptop>
-References: <1518701697-14242-1-git-send-email-ludovic.Barre@st.com>
- <1518701697-14242-2-git-send-email-ludovic.Barre@st.com>
- <20180219144735.sbxa76z6aik3w453@rob-hp-laptop>
-Message-ID: <12fc58db-3b21-4c83-30ce-e1b495928dbc@st.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 19 Feb 2018 16:19:00 +0100
+Subject: [PATCH] drm/meson: fix vsync buffer update
+In-Reply-To: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
+References: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20180219151900.GP22199@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Rob
-
-Ok for all changes
-
-BR
-Ludo
-
-On 02/19/2018 03:47 PM, Rob Herring wrote:
-> On Thu, Feb 15, 2018 at 02:34:53PM +0100, Ludovic Barre wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> Document the binding for stm32 sdmmc controller.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->>   .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     | 35 ++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
->> new file mode 100644
->> index 0000000..52eb1f8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
->> @@ -0,0 +1,35 @@
->> +* STMicroelectronics STM32 SDMMC controller
->> +
->> +The highspeed MMC host controller on STM32 soc family
->> +provides an interface for MMC, SD and SDIO types of memory cards.
->> +
->> +This file documents differences between the core properties described
->> +by mmc.txt and the properties used by the sdmmc driver.
->> +
->> +Required properties:
->> + - compatible: Should be "st,stm32h7-sdmmc"
->> + - reg: mmc controller base registers
->> + - interrupts: Should contain the interrupt number
->> + - clocks: Should contain phandle for the clock feeding the controller
->> + - resets: Should contain phandle for the reset feeding the controller
->> +
->> +Optional property:
->> +- st,dirpol: Allow to select direction polarity of external voltage
+On Thu, Feb 15, 2018 at 11:19:36AM +0100, Neil Armstrong wrote:
+> The plane buffer address/stride/height was incorrectly updated in the
+> plane_atomic_update operation instead of the vsync irq.
+> This patch delays this operation in the vsync irq along with the
+> other plane delayed setup.
 > 
-> This doesn't need to be so terse. Perhaps "st,dir-output-high".
-> 
+> This issue was masked using legacy framebuffer and X11 modesetting, but
+> is clearly visible using gbm rendering when buffer is submitted late after
+> vblank, like using software decoding and OpenGL rendering in Kodi.
+> With this patch, tearing and other artifacts disappears completely.
 
-Ok, I take "st,dir-output-high", your're right it's more descriptive :-)
+You mean the frontbuffer rendering nature of X11 with all it's tearing
+made the issue not noticeable? I'm also not clear what you mean with
+legacy framebuffer ...
 
->> +  transceiver (which manage data and command direction).
->> +  if set: Voltage transceiver IOs are driven as output when direction signals are high,
->> +  else: Voltage transceiver IOs are driven as output when direction signals are low.
->> +- st,negedge: generate data & command on sdmmc clock falling edge
-> 
-> st,neg-edge
-> 
->> +- st,pin-ckin: use sdmmc_ckin pin from an external driver to sample
->> +  the receive data (example: with voltage switch transceiver).
-> 
-> st,use-ckin
-> 
+Either way looks reasonable:
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-OK
-
->> +
->> +Example:
->> +	sdmmc1: sdmmc at 52007000 {
+> Cc: Michal Lazo <michal.lazo@gmail.com>
+> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/gpu/drm/meson/meson_crtc.c  | 6 ++++++
+>  drivers/gpu/drm/meson/meson_drv.h   | 3 +++
+>  drivers/gpu/drm/meson/meson_plane.c | 7 +++----
+>  3 files changed, 12 insertions(+), 4 deletions(-)
 > 
-> mmc at ...
->
+> diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
+> index 5155f01..0552020 100644
+> --- a/drivers/gpu/drm/meson/meson_crtc.c
+> +++ b/drivers/gpu/drm/meson/meson_crtc.c
+> @@ -36,6 +36,7 @@
+>  #include "meson_venc.h"
+>  #include "meson_vpp.h"
+>  #include "meson_viu.h"
+> +#include "meson_canvas.h"
+>  #include "meson_registers.h"
+>  
+>  /* CRTC definition */
+> @@ -192,6 +193,11 @@ void meson_crtc_irq(struct meson_drm *priv)
+>  		} else
+>  			meson_vpp_disable_interlace_vscaler_osd1(priv);
+>  
+> +		meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
+> +			   priv->viu.osd1_addr, priv->viu.osd1_stride,
+> +			   priv->viu.osd1_height, MESON_CANVAS_WRAP_NONE,
+> +			   MESON_CANVAS_BLKMODE_LINEAR);
+> +
+>  		/* Enable OSD1 */
+>  		writel_bits_relaxed(VPP_OSD1_POSTBLEND, VPP_OSD1_POSTBLEND,
+>  				    priv->io_base + _REG(VPP_MISC));
+> diff --git a/drivers/gpu/drm/meson/meson_drv.h b/drivers/gpu/drm/meson/meson_drv.h
+> index 5e8b392..8450d6ac 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.h
+> +++ b/drivers/gpu/drm/meson/meson_drv.h
+> @@ -43,6 +43,9 @@ struct meson_drm {
+>  		bool osd1_commit;
+>  		uint32_t osd1_ctrl_stat;
+>  		uint32_t osd1_blk0_cfg[5];
+> +		uint32_t osd1_addr;
+> +		uint32_t osd1_stride;
+> +		uint32_t osd1_height;
+>  	} viu;
+>  
+>  	struct {
+> diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
+> index d0a6ac8..27bd350 100644
+> --- a/drivers/gpu/drm/meson/meson_plane.c
+> +++ b/drivers/gpu/drm/meson/meson_plane.c
+> @@ -164,10 +164,9 @@ static void meson_plane_atomic_update(struct drm_plane *plane,
+>  	/* Update Canvas with buffer address */
+>  	gem = drm_fb_cma_get_gem_obj(fb, 0);
+>  
+> -	meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
+> -			   gem->paddr, fb->pitches[0],
+> -			   fb->height, MESON_CANVAS_WRAP_NONE,
+> -			   MESON_CANVAS_BLKMODE_LINEAR);
+> +	priv->viu.osd1_addr = gem->paddr;
+> +	priv->viu.osd1_stride = fb->pitches[0];
+> +	priv->viu.osd1_height = fb->height;
+>  
+>  	spin_unlock_irqrestore(&priv->drm->event_lock, flags);
+>  }
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-OK
-
->> +		compatible = "st,stm32h7-sdmmc";
->> +		reg = <0x52007000 0x1000>;
->> +		interrupts = <49>;
->> +		clocks = <&rcc SDMMC1_CK>;
->> +		resets = <&rcc SDMMC1_R>;
->> +		bus-width = <4>;
->> +		cap-sd-highspeed;
->> +		cap-mmc-highspeed;
->> +	};
->> -- 
->> 2.7.4
->>
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
