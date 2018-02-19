@@ -1,175 +1,42 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 19 Feb 2018 16:44:04 +0100
-Subject: [PATCH 6/8] drm/exynos/hdmi: Use clk bulk API
-In-Reply-To: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
-References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154501eucas1p1e16a883d2eb0c8a99bafce5d71656066@eucas1p1.samsung.com>
-Message-ID: <1519055046-2399-7-git-send-email-m.purski@samsung.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 19 Feb 2018 15:50:20 +0000
+Subject: [PATCH v4 03/40] KVM: arm64: Avoid storing the vcpu pointer on
+ the stack
+In-Reply-To: <20180215210332.8648-4-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-4-christoffer.dall@linaro.org>
+Message-ID: <d00629e8-da68-a536-dc22-b8c26e962b85@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using bulk clk functions simplifies the driver's code. Use devm_clk_bulk
-functions instead of iterating over an array of clks.
+Hi Christoffer,
 
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_hdmi.c | 97 ++++++++++--------------------------
- 1 file changed, 27 insertions(+), 70 deletions(-)
+On 15/02/18 21:02, Christoffer Dall wrote:
+> We already have the percpu area for the host cpu state, which points to
+> the VCPU, so there's no need to store the VCPU pointer on the stack on
+> every context switch.  We can be a little more clever and just use
+> tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+> context.
+> 
+> This does require us to calculate the percpu offset without including
+> the offset from the kernel mapping of the percpu array to the linear
+> mapping of the array (which is what we store in tpidr_el1), because a
+> PC-relative generated address in EL2 is already giving us the hyp alias
+> of the linear mapping of a kernel address.  We do this in
+> __cpu_init_hyp_mode() by using kvm_ksym_ref().
+> 
+> This change also requires us to have a scratch register, so we take the
+> chance to rearrange some of the el1_sync code to only look at the
+> vttbr_el2 to determine if this is a trap from the guest or an HVC from
+> the host.  We do add an extra check to call the panic code if the kernel
+> is configured with debugging enabled and we saw a trap from the host
+> which wasn't an HVC, indicating that we left some EL2 trap configured by
+> mistake.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index a4b75a4..6c208f7 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -136,8 +136,8 @@ struct hdmi_context {
- 	int				irq;
- 	struct regmap			*pmureg;
- 	struct regmap			*sysreg;
--	struct clk			**clk_gates;
--	struct clk			**clk_muxes;
-+	struct clk_bulk_data		*clk_gates;
-+	struct clk_bulk_data		*clk_muxes;
- 	struct regulator_bulk_data	regul_bulk[ARRAY_SIZE(supply)];
- 	struct regulator		*reg_hdmi_en;
- 	struct exynos_drm_clk		phy_clk;
-@@ -739,43 +739,16 @@ static int hdmiphy_reg_write_buf(struct hdmi_context *hdata,
- 	}
- }
- 
--static int hdmi_clk_enable_gates(struct hdmi_context *hdata)
--{
--	int i, ret;
--
--	for (i = 0; i < hdata->drv_data->clk_gates.count; ++i) {
--		ret = clk_prepare_enable(hdata->clk_gates[i]);
--		if (!ret)
--			continue;
--
--		dev_err(hdata->dev, "Cannot enable clock '%s', %d\n",
--			hdata->drv_data->clk_gates.data[i], ret);
--		while (i--)
--			clk_disable_unprepare(hdata->clk_gates[i]);
--		return ret;
--	}
--
--	return 0;
--}
--
--static void hdmi_clk_disable_gates(struct hdmi_context *hdata)
--{
--	int i = hdata->drv_data->clk_gates.count;
--
--	while (i--)
--		clk_disable_unprepare(hdata->clk_gates[i]);
--}
--
- static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
- {
- 	struct device *dev = hdata->dev;
- 	int ret = 0;
-+	struct clk_bulk_data *clk_muxes = hdata->clk_muxes;
- 	int i;
- 
- 	for (i = 0; i < hdata->drv_data->clk_muxes.count; i += 3) {
--		struct clk **c = &hdata->clk_muxes[i];
--
--		ret = clk_set_parent(c[2], c[to_phy]);
-+		ret = clk_set_parent(clk_muxes[i + 2].clk,
-+				     clk_muxes[i + to_phy].clk);
- 		if (!ret)
- 			continue;
- 
-@@ -1655,54 +1628,36 @@ static irqreturn_t hdmi_irq_thread(int irq, void *arg)
- 	return IRQ_HANDLED;
- }
- 
--static int hdmi_clks_get(struct hdmi_context *hdata,
--			 const struct string_array_spec *names,
--			 struct clk **clks)
-+static struct clk_bulk_data *hdmi_clks_alloc_get(struct hdmi_context *hdata,
-+					const struct string_array_spec *names)
- {
--	struct device *dev = hdata->dev;
--	int i;
--
--	for (i = 0; i < names->count; ++i) {
--		struct clk *clk = devm_clk_get(dev, names->data[i]);
--
--		if (IS_ERR(clk)) {
--			int ret = PTR_ERR(clk);
-+	struct clk_bulk_data *ptr;
-+	int ret;
- 
--			dev_err(dev, "Cannot get clock %s, %d\n",
--				names->data[i], ret);
-+	ptr = devm_clk_bulk_alloc(hdata->dev, names->count, names->data);
-+	if (IS_ERR(ptr))
-+		return ptr;
- 
--			return ret;
--		}
--
--		clks[i] = clk;
--	}
-+	ret = devm_clk_bulk_get(hdata->dev, names->count, ptr);
-+	if (ret < 0)
-+		return ERR_PTR(ret);
- 
--	return 0;
-+	return ptr;
- }
- 
- static int hdmi_clk_init(struct hdmi_context *hdata)
- {
- 	const struct hdmi_driver_data *drv_data = hdata->drv_data;
--	int count = drv_data->clk_gates.count + drv_data->clk_muxes.count;
--	struct device *dev = hdata->dev;
--	struct clk **clks;
--	int ret;
- 
--	if (!count)
--		return 0;
--
--	clks = devm_kzalloc(dev, sizeof(*clks) * count, GFP_KERNEL);
--	if (!clks)
--		return -ENOMEM;
-+	hdata->clk_muxes = hdmi_clks_alloc_get(hdata, &drv_data->clk_muxes);
-+	if (IS_ERR(hdata->clk_muxes))
-+		return PTR_ERR(hdata->clk_muxes);
- 
--	hdata->clk_gates = clks;
--	hdata->clk_muxes = clks + drv_data->clk_gates.count;
-+	hdata->clk_gates = hdmi_clks_alloc_get(hdata, &drv_data->clk_gates);
-+	if (IS_ERR(hdata->clk_gates))
-+		return PTR_ERR(hdata->clk_gates);
- 
--	ret = hdmi_clks_get(hdata, &drv_data->clk_gates, hdata->clk_gates);
--	if (ret)
--		return ret;
--
--	return hdmi_clks_get(hdata, &drv_data->clk_muxes, hdata->clk_muxes);
-+	return 0;
- }
- 
- 
-@@ -2073,7 +2028,8 @@ static int __maybe_unused exynos_hdmi_suspend(struct device *dev)
- {
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 
--	hdmi_clk_disable_gates(hdata);
-+	clk_bulk_disable_unprepare(hdata->drv_data->clk_gates.count,
-+				   hdata->clk_gates);
- 
- 	return 0;
- }
-@@ -2083,7 +2039,8 @@ static int __maybe_unused exynos_hdmi_resume(struct device *dev)
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 	int ret;
- 
--	ret = hdmi_clk_enable_gates(hdata);
-+	ret = clk_bulk_prepare_enable(hdata->drv_data->clk_gates.count,
-+				      hdata->clk_gates);
- 	if (ret < 0)
- 		return ret;
- 
+You might want to remove this paragraph as you don't seem to have rework 
+that part of the code in this version.
+
+Cheers,
+
 -- 
-2.7.4
+Julien Grall
