@@ -1,104 +1,60 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 19 Feb 2018 16:19:00 +0100
-Subject: [PATCH] drm/meson: fix vsync buffer update
-In-Reply-To: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
-References: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20180219151900.GP22199@phenom.ffwll.local>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 Feb 2018 09:36:38 -0600
+Subject: [PATCH v2 6/7] arm64: tegra: Add Tegra194 chip device tree
+In-Reply-To: <49fc21ac-4630-b90c-04fb-31740354b35b@kapsi.fi>
+References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
+ <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
+ <20180209225402.uexw7vlzwflo7zmr@rob-hp-laptop>
+ <49fc21ac-4630-b90c-04fb-31740354b35b@kapsi.fi>
+Message-ID: <CAL_JsqJXUDzrWJ+yKR7Ow6==j=k5yZgjrXehfHtDyOC0RAiGAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:19:36AM +0100, Neil Armstrong wrote:
-> The plane buffer address/stride/height was incorrectly updated in the
-> plane_atomic_update operation instead of the vsync irq.
-> This patch delays this operation in the vsync irq along with the
-> other plane delayed setup.
-> 
-> This issue was masked using legacy framebuffer and X11 modesetting, but
-> is clearly visible using gbm rendering when buffer is submitted late after
-> vblank, like using software decoding and OpenGL rendering in Kodi.
-> With this patch, tearing and other artifacts disappears completely.
+On Wed, Feb 14, 2018 at 5:56 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+> On 10.02.2018 00:54, Rob Herring wrote:
+>>
+>> On Tue, Feb 06, 2018 at 09:22:36AM +0200, Mikko Perttunen wrote:
+>>>
+>>> ...
+>>> index 000000000000..dcc6eea52684
+>>> --- /dev/null
+>>> +++ b/include/dt-bindings/clock/tegra194-clock.h
 
-You mean the frontbuffer rendering nature of X11 with all it's tearing
-made the issue not noticeable? I'm also not clear what you mean with
-legacy framebuffer ...
+>>> + */
+>>> +
+>>> +#ifndef __ABI_MACH_T194_CLOCK_H
+>>> +#define __ABI_MACH_T194_CLOCK_H
+>>> +
+>>> +/** @file */
+>>> +
+>>> +/** @brief output of mux controlled by TEGRA194_CLK_SOC_ACTMON */
+>>> +#define TEGRA194_CLK_ACTMON                    1
+>>> +/** @brief output of gate CLK_ENB_ADSP */
+>>
+>>
+>> These comments don't add much and make readability horrible.
+>
+>
+> The comments allow mapping each define to the clocks defined in the chip
+> technical reference manual.
 
-Either way looks reasonable:
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+If that's not obvious from the define name, then fix the define name.
+Looks like in most cases it is.
 
-> Cc: Michal Lazo <michal.lazo@gmail.com>
-> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/gpu/drm/meson/meson_crtc.c  | 6 ++++++
->  drivers/gpu/drm/meson/meson_drv.h   | 3 +++
->  drivers/gpu/drm/meson/meson_plane.c | 7 +++----
->  3 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
-> index 5155f01..0552020 100644
-> --- a/drivers/gpu/drm/meson/meson_crtc.c
-> +++ b/drivers/gpu/drm/meson/meson_crtc.c
-> @@ -36,6 +36,7 @@
->  #include "meson_venc.h"
->  #include "meson_vpp.h"
->  #include "meson_viu.h"
-> +#include "meson_canvas.h"
->  #include "meson_registers.h"
->  
->  /* CRTC definition */
-> @@ -192,6 +193,11 @@ void meson_crtc_irq(struct meson_drm *priv)
->  		} else
->  			meson_vpp_disable_interlace_vscaler_osd1(priv);
->  
-> +		meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
-> +			   priv->viu.osd1_addr, priv->viu.osd1_stride,
-> +			   priv->viu.osd1_height, MESON_CANVAS_WRAP_NONE,
-> +			   MESON_CANVAS_BLKMODE_LINEAR);
-> +
->  		/* Enable OSD1 */
->  		writel_bits_relaxed(VPP_OSD1_POSTBLEND, VPP_OSD1_POSTBLEND,
->  				    priv->io_base + _REG(VPP_MISC));
-> diff --git a/drivers/gpu/drm/meson/meson_drv.h b/drivers/gpu/drm/meson/meson_drv.h
-> index 5e8b392..8450d6ac 100644
-> --- a/drivers/gpu/drm/meson/meson_drv.h
-> +++ b/drivers/gpu/drm/meson/meson_drv.h
-> @@ -43,6 +43,9 @@ struct meson_drm {
->  		bool osd1_commit;
->  		uint32_t osd1_ctrl_stat;
->  		uint32_t osd1_blk0_cfg[5];
-> +		uint32_t osd1_addr;
-> +		uint32_t osd1_stride;
-> +		uint32_t osd1_height;
->  	} viu;
->  
->  	struct {
-> diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
-> index d0a6ac8..27bd350 100644
-> --- a/drivers/gpu/drm/meson/meson_plane.c
-> +++ b/drivers/gpu/drm/meson/meson_plane.c
-> @@ -164,10 +164,9 @@ static void meson_plane_atomic_update(struct drm_plane *plane,
->  	/* Update Canvas with buffer address */
->  	gem = drm_fb_cma_get_gem_obj(fb, 0);
->  
-> -	meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
-> -			   gem->paddr, fb->pitches[0],
-> -			   fb->height, MESON_CANVAS_WRAP_NONE,
-> -			   MESON_CANVAS_BLKMODE_LINEAR);
-> +	priv->viu.osd1_addr = gem->paddr;
-> +	priv->viu.osd1_stride = fb->pitches[0];
-> +	priv->viu.osd1_height = fb->height;
->  
->  	spin_unlock_irqrestore(&priv->drm->event_lock, flags);
->  }
-> -- 
-> 2.7.4
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> The file also comes as is from the firmware team
+> so I'd prefer to keep changes to a minimum.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+I can appreciate that and perhaps if this was something imported at
+some frequency then it would be worthwhile to maintain formatting. But
+this is an ABI and defined by the hardware (as opposed to BPMP
+firmware) so it generally shouldn't ever change. And bindings should
+be complete, so if you plan periodic additions to it, that's a
+separate problem.
+
+> We have done this previously
+> with the BPMP ABI and device tree binding headers for the Tegra186.
+
+Generally, we don't accept doxygen comments in the kernel tree.
+There's only a handful of cases that seem to have sneaked in.
+
+Rob
