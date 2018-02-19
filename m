@@ -1,47 +1,120 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Mon, 19 Feb 2018 12:09:54 +0530
-Subject: [PATCH] arm64: Fix compilation error while accessing
- MPIDR_HWID_BITMASK from .S files
-Message-ID: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 19 Feb 2018 18:05:40 +1030
+Subject: [PATCH] ARM: dts: aspeed: Add LPC reset controller node
+Message-ID: <20180219073540.24520-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit e1a50de37860b3a93a9d643b09638db5aff47650 (arm64: cputype:
-Silence Sparse warnings), compilation of arm64 architecture is broken
-with the following error messages:
+On both the ast2400 and ast2500 SoCs, the LPC reset controller is
+required to bring the UARTs out of reset without waiting for the LPC
+reset to be deasserted.
 
-  AR      arch/arm64/kernel/built-in.o
-  arch/arm64/kernel/head.S: Assembler messages:
-  arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
-  arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
-  arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
-  arch/arm64/kernel/head.S:677: Error: junk at end of line, first
-  unrecognized character is `L'
-  arch/arm64/kernel/head.S:677: Error: unexpected characters following
-  instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
-  arch/arm64/kernel/head.S:677: Error: unexpected characters following
-  instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
-
-This patch fixes the same by using the UL() macro correctly for
-assigning the MPIDR_HWID_BITMASK macro value.
-
-Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm64/include/asm/cputype.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Bindings and driver change is under reivew:
+  https://lkml.org/lkml/2018/2/19/12
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index eda8c5f629fc..350c76a1d15b 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -20,7 +20,7 @@
+ arch/arm/boot/dts/aspeed-g4.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 10 ++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 48c28a71ae7e..36ae23aa3b48 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -162,6 +162,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <9>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART1CLK>;
++				resets = <&lpc_reset 4>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -249,6 +250,12 @@
+ 						reg = <0x20 0x24 0x48 0x8>;
+ 					};
  
- #define MPIDR_UP_BITMASK	(0x1 << 30)
- #define MPIDR_MT_BITMASK	(0x1 << 24)
--#define MPIDR_HWID_BITMASK	0xff00ffffffUL
-+#define MPIDR_HWID_BITMASK	UL(0xff00ffffff)
++					lpc_reset: reset-controller at 18 {
++						compatible = "aspeed,ast2400-lpc-reset";
++						reg = <0x18 0x4>;
++						#reset-cells = <1>;
++					};
++
+ 					ibt: ibt at c0  {
+ 						compatible = "aspeed,ast2400-ibt-bmc";
+ 						reg = <0xc0 0x18>;
+@@ -264,6 +271,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <32>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART2CLK>;
++				resets = <&lpc_reset 5>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -274,6 +282,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <33>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART3CLK>;
++				resets = <&lpc_reset 6>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -284,6 +293,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <34>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART4CLK>;
++				resets = <&lpc_reset 7>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 8eac57c33880..17ee0fa33a14 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -205,6 +205,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <9>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART1CLK>;
++				resets = <&lpc_reset 4>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -299,6 +300,12 @@
+ 						reg = <0x20 0x24 0x48 0x8>;
+ 					};
  
- #define MPIDR_LEVEL_BITS_SHIFT	3
- #define MPIDR_LEVEL_BITS	(1 << MPIDR_LEVEL_BITS_SHIFT)
++					lpc_reset: reset-controller at 18 {
++						compatible = "aspeed,ast2500-lpc-reset";
++						reg = <0x18 0x4>;
++						#reset-cells = <1>;
++					};
++
+ 					ibt: ibt at c0 {
+ 						compatible = "aspeed,ast2500-ibt-bmc";
+ 						reg = <0xc0 0x18>;
+@@ -314,6 +321,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <32>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART2CLK>;
++				resets = <&lpc_reset 5>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -324,6 +332,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <33>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART3CLK>;
++				resets = <&lpc_reset 6>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
+@@ -334,6 +343,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <34>;
+ 				clocks = <&syscon ASPEED_CLK_GATE_UART4CLK>;
++				resets = <&lpc_reset 7>;
+ 				no-loopback-test;
+ 				status = "disabled";
+ 			};
 -- 
-2.7.4
+2.15.1
