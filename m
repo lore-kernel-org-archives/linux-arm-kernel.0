@@ -1,37 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Feb 2018 17:18:52 +0000
-Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
- CTR_EL0.IDC
-In-Reply-To: <92836754-2ab3-d5db-f0be-7ee3e10f368f@codeaurora.org>
-References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
- <20180219143820.5oxc2kendvq4bbtt@armageddon.cambridge.arm.com>
- <92836754-2ab3-d5db-f0be-7ee3e10f368f@codeaurora.org>
-Message-ID: <20180219171852.jsbzawbsyv7v5yi7@armageddon.cambridge.arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 19 Feb 2018 22:50:10 +0530
+Subject: [PATCH 08/10] gpio: Add gpio driver for Actions OWL S900 SoC
+In-Reply-To: <CAHp75Vcmtq_mpkqx4+Yr24nRQEHJZmcypbOJLukZpdXVYzizNQ@mail.gmail.com>
+References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
+ <20180217204433.3095-9-manivannan.sadhasivam@linaro.org>
+ <CAHp75Vcmtq_mpkqx4+Yr24nRQEHJZmcypbOJLukZpdXVYzizNQ@mail.gmail.com>
+Message-ID: <20180219172010.ph34dvpdhhkmemdg@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 10:35:30AM -0600, Shanker Donthineni wrote:
-> On 02/19/2018 08:38 AM, Catalin Marinas wrote:
-> > On the patch, I'd rather have an alternative framework entry for no VAU
-> > cache maint required and some ret instruction at the beginning of the
-> > cache maint function rather than jumping out of the loop somewhere
-> > inside the cache maintenance code, penalising the CPUs that do require
-> > it.
+Hi Andy,
+On Sun, Feb 18, 2018 at 04:45:09PM +0200, Andy Shevchenko wrote:
+> On Sat, Feb 17, 2018 at 10:44 PM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> > Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
+> > controlling the gpio shares the same register range with pinctrl block.
+> >
+> > GPIO registers are organized as 6 banks and each bank controls the
+> > maximum of 32 gpios.
 > 
-> Alternative framework might break things in case of CPU hotplug. I need one
-> more confirmation from you on incorporating alternative framework.     
+> > +#include <linux/init.h>
+> 
+> > +#include <linux/module.h>
+> 
+> Choose one of them.
+> 
+Will drop <linux/init.h>
+> > +       val = readl(gpio_base + GPIO_OUTEN);
+> > +       val |= BIT(offset);
+> > +       writel(val, gpio_base + GPIO_OUTEN);
+> 
+> out_en()
+> 
+> > +       val = readl(gpio_base + GPIO_OUTEN);
+> > +       val &= ~BIT(offset);
+> > +       writel(val, gpio_base + GPIO_OUTEN);
+> 
+> out_dis()
+> 
+> > +       val = readl(gpio_base + GPIO_INEN);
+> > +       val &= ~BIT(offset);
+> > +       writel(val, gpio_base + GPIO_INEN);
+> 
+> in_dis()
+> 
+> > +       val = readl(gpio_base + GPIO_OUTEN);
+> > +       val &= ~BIT(offset);
+> > +       writel(val, gpio_base + GPIO_OUTEN);
+> 
+> out_dis()
+> 
+> > +       val = readl(gpio_base + GPIO_INEN);
+> > +       val |= BIT(offset);
+> > +       writel(val, gpio_base + GPIO_INEN);
+> 
+> in_en()
+> 
+> 
+> > +       val = readl(gpio_base + GPIO_INEN);
+> > +       val &= ~BIT(pin);
+> > +       writel(val, gpio_base + GPIO_INEN);
+> 
+> in_dis()
+> 
+> > +       val = readl(gpio_base + GPIO_OUTEN);
+> > +       val |= BIT(pin);
+> > +       writel(val, gpio_base + GPIO_OUTEN);
+> 
+> out_en()
+> 
+> Find above code duplication.
+> 
+Sure. Will add a common function like owl_gpio_set_reg for setting register
+values.
+> > +static int owl_gpio_probe(struct platform_device *pdev)
+> > +{
+> 
+> > +       gpio->base = of_iomap(pdev->dev.of_node, 0);
+> > +       if (IS_ERR(gpio->base))
+> > +               return PTR_ERR(gpio->base);
+> 
+> 
+> > +       gpio->gpio.of_node = pdev->dev.of_node;
+> 
+> Isn't this done by GPIO library?
+> 
+Yes. Will drop this.
+> > +static int owl_gpio_remove(struct platform_device *pdev)
+> > +{
+> > +       return 0;
+> > +}
+> 
+> Useless stub.
+> 
+Okay.
 
-CPU hotplug can be an issue but it should be handled like other similar
-cases: if a CPU comes online late and its features are incompatible, it
-should not be brought online. The cpufeature code handles this.
+Also, in the next revision of the driver I will be making all the banks
+as its own gpio-controller as opposed to the single controller since all
+have their own interrupt domain.
 
-With Will's patch for CTR_EL0, we handle different CPU features during
-boot, defaulting to the lowest value for the IDC/DIC bits.
+For this case, MMIO can't be used because the banks have irregular number
+of gpios.
 
-I suggest you add new ARM64_HAS_* feature bits and enable them based on
-CTR_EL0.IDC and DIC. You could check for both being 1 with a single
-feature bit but I guess an implementation is allowed to have these
-different (e.g. DIC == 0 and IDC == 1).
-
--- 
-Catalin
+Thanks,
+Mani
+> -- 
+> With Best Regards,
+> Andy Shevchenko
