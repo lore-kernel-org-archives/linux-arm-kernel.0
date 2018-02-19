@@ -1,44 +1,29 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 19 Feb 2018 09:38:07 -0600
-Subject: [PATCH] KVM: arm/arm64: No need to zero CNTVOFF in
- kvm_timer_vcpu_put() for VHE
-Message-ID: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Feb 2018 15:39:35 +0000
+Subject: [PATCH v2 0/2] arm64: Unimplemented syscall kernel message
+In-Reply-To: <20180201221338.9952-1-michael.weiser@gmx.de>
+References: <20180122131851.GA28638@arm.com>
+ <20180201221338.9952-1-michael.weiser@gmx.de>
+Message-ID: <20180219153934.GA1740@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In AArch64/AArch32, the virtual counter uses a fixed virtual offset
-of zero in the following situations as per ARMv8 specifications:
+Hi Michael,
 
-1) HCR_EL2.E2H is 1, and CNTVCT_EL0/CNTVCT are read from EL2.
-2) HCR_EL2.{E2H, TGE} is {1, 1}, and either:
-   ? CNTVCT_EL0 is read from Non-secure EL0 or EL2.
-   ? CNTVCT is read from Non-secure EL0.
+On Thu, Feb 01, 2018 at 11:13:35PM +0100, Michael Weiser wrote:
+> I've dropped the message from the compat change, which makes it much
+> more straight-forward. We are still dropping the offending log message
+> from do_ni_syscall(). The second change now just mirrors the part of arm
+> behaviour in compat_arm_syscall() that raises SIGILL for (most)
+> unimplemented syscalls. Finally show_unhandled_signals is disabled by
+> default.
+> 
+> All are compile-tested as well as manually prodded with some randomly
+> chosen syscall numbers from aarch64 and arm-eabi binaries while running
+> under qemu-system-aarch64. New show_unhandled_signals defaults and
+> enabling via /proc/sys have been tested with a minimal segfaulting test
+> program.
 
-So, no need to zero CNTVOFF_EL2/CNTVOFF for VHE case.
+Thanks, I'll pick these up for 4.17.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- virt/kvm/arm/arch_timer.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 70268c0..86eca324 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -541,9 +541,11 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	 * The kernel may decide to run userspace after calling vcpu_put, so
- 	 * we reset cntvoff to 0 to ensure a consistent read between user
- 	 * accesses to the virtual counter and kernel access to the physical
--	 * counter.
-+	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
-+	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
- 	 */
--	set_cntvoff(0);
-+	if (!has_vhe())
-+		set_cntvoff(0);
- }
- 
- /*
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Will
