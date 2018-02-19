@@ -1,58 +1,105 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 19 Feb 2018 09:51:00 +0100
-Subject: [PATCH 2/2] ARM: shmobile: porter: enable R-Car Gen2 regulator
- quirk
-In-Reply-To: <CAMuHMdVu2LvxtvUYDOrW3Yhqujk4+=bN0sg-aJhxX_g0Kbpx6g@mail.gmail.com>
-References: <20180217020642.21375-1-marek.vasut+renesas@gmail.com>
- <20180217020642.21375-2-marek.vasut+renesas@gmail.com>
- <CAMuHMdVu2LvxtvUYDOrW3Yhqujk4+=bN0sg-aJhxX_g0Kbpx6g@mail.gmail.com>
-Message-ID: <3a527612-59ab-8bc5-1277-7eb41fb5b53e@gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 19 Feb 2018 10:51:20 +0200
+Subject: [PATCH v2 09/16] mmc: sdhci: Add quirk to disable HW timeout
+In-Reply-To: <20180205125029.21570-10-kishon@ti.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+ <20180205125029.21570-10-kishon@ti.com>
+Message-ID: <cda22332-ed17-9309-4989-19765744879b@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2018 09:42 AM, Geert Uytterhoeven wrote:
-> On Sat, Feb 17, 2018 at 3:06 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> Porter needs the regulator quirk, just like the other boards,
->> the DA9063 and DA9210 IRQ line is connected to CPU IRQ2 . But
->> unlike the other boards, the DA9063 is at 0x5a on Porter.
->>
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> Cc: Simon Horman <horms+renesas@verge.net.au>
->> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
->> ---
->>  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
->> index 862f7757ef5d..7963f0eea9e1 100644
->> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
->> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
->> @@ -132,11 +132,16 @@ static int __init rcar_gen2_regulator_quirk(void)
->>         u32 mon;
->>
->>         if (!of_machine_is_compatible("renesas,koelsch") &&
->> +           !of_machine_is_compatible("renesas,porter") &&
->>             !of_machine_is_compatible("renesas,lager") &&
->>             !of_machine_is_compatible("renesas,stout") &&
->>             !of_machine_is_compatible("renesas,gose"))
->>                 return -ENODEV;
->>
->> +       /* DA9063 on M2W Porter is at 0x5a */
->> +       if (of_machine_is_compatible("renesas,porter"))
->> +               da9xxx_msgs[0].addr = 0x5a;
->> +
->>         irqc = ioremap(IRQC_BASE, PAGE_SIZE);
->>         if (!irqc)
->>                 return -ENOMEM;
+On 05/02/18 14:50, Kishon Vijay Abraham I wrote:
+> Add quirk to disable HW timeout if the requested timeout is more than
+> the maximum obtainable timeout.
 > 
-> Doing the same of_machine_is_compatible() check again is an indicator that
-> you should switch to an of_device_id-based match interface...
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 12 ++++++++++++
+>  drivers/mmc/host/sdhci.h |  7 +++++++
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 070aff9c108f..1aa74b4682f3 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -735,6 +735,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+>  		    count, cmd->opcode);
+>  		count = 0xE;
+> +		if (host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
+> +			host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+> +			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+> +			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+> +			host->hw_timeout_disabled = true;
+> +		}
 
-Indeed. Also cfr my other suggestion in reply to WSA in this thread.
-Thoughts on that welcome.
+sdhci_calc_timeout() is really for calculations so please do this in
+sdhci_set_timeout() instead (i.e. change sdhci_calc_timeout() to return
+whether the timeout is too big).  Note that you need to cater for the "/*
+Unspecified timeout, assume max */" case and the
+SDHCI_QUIRK_BROKEN_TIMEOUT_VAL case.
 
--- 
-Best regards,
-Marek Vasut
+Also if SDHCI_INT_DATA_TIMEOUT is not being disabled, check here to
+re-enable it and leave sdhci_request_done() alone. i.e.
+
+	else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
+		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+	}
+
+Maybe make a separate subroutine for the update:
+
+void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
+{
+	if (enable)
+		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+	else
+		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+}
+
+
+>  	}
+>  
+>  	return count;
+> @@ -2349,6 +2355,12 @@ static bool sdhci_request_done(struct sdhci_host *host)
+>  	}
+>  
+>  	sdhci_del_timer(host, mrq);
+> +	if (sdhci_data_line_cmd(mrq->cmd) && host->hw_timeout_disabled) {
+> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+> +		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+> +		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+> +		host->hw_timeout_disabled = false;
+> +	}
+>  
+>  	/*
+>  	 * Always unmap the data buffers if they were mapped by
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index afab26fd70e6..3a967a56fcc3 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -437,6 +437,11 @@ struct sdhci_host {
+>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+>  /* Controller has CRC in 136 bit Command Response */
+>  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+> +/*
+> + * Disable HW timeout if the requested timeout is more than the maximum
+> + * obtainable timeout
+> + */
+> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
+>  
+>  	int irq;		/* Device IRQ */
+>  	void __iomem *ioaddr;	/* Mapped address */
+> @@ -522,6 +527,8 @@ struct sdhci_host {
+>  	unsigned int            ocr_avail_mmc;
+>  	u32 ocr_mask;		/* available voltages */
+>  
+> +	bool			hw_timeout_disabled;
+> +
+>  	unsigned		timing;		/* Current timing */
+>  
+>  	u32			thread_isr;
+> 
