@@ -1,61 +1,61 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 19 Feb 2018 10:03:42 +0200
-Subject: [PATCH v2 10/16] mmc: sdhci: Fix to use data_timer only for data
- line commands
-In-Reply-To: <20180205125029.21570-11-kishon@ti.com>
-References: <20180205125029.21570-1-kishon@ti.com>
- <20180205125029.21570-11-kishon@ti.com>
-Message-ID: <192a7c1e-9180-e473-8000-4a4aa806df91@intel.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Feb 2018 09:05:11 +0100
+Subject: [PATCH] ARM: sunxi: Fix multi-cluster SMP support compilation in
+ multi v6/v7 configs
+In-Reply-To: <20180217050112.14619-1-wens@csie.org>
+References: <20180217050112.14619-1-wens@csie.org>
+Message-ID: <20180219080511.wfzeokrwbyyr5l3r@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/18 14:50, Kishon Vijay Abraham I wrote:
-> commit d7422fb489eee5587d3eec ("mmc: sdhci: Separate timer timeout for
-> command and data requests") while separating timer timeout for
-> command and data requests, passed cmd->mrq to sdhci_mod_timer (cmd is an
-> argument to sdhci_send_command) and in sdhci_mod_timer used mrq->cmd
-> to check if it is a data line command. This results in using
-> data timer for commands like MMC_SET_BLOCK_COUNT (CMD23) though it is
-> not a data line command. Fix it here.
-
-I am not sure why you need this change, but it is not right actually.  There
-are 2 timers because there can be 2 mrqs and we need to delete the correct
-timer in sdhci_request_done() so it is better to make the selection based on
-the mrq not the last command.
-
+On Sat, Feb 17, 2018 at 01:01:12PM +0800, Chen-Yu Tsai wrote:
+> Various parts of the assembly code used in the multi-cluster SMP support
+> requires ARMv7-A. If the kernel config also has multi v6 support enabled,
+> Kbuild defaults to building for armv6k, which does not support some of
+> the instructions we use.
 > 
-> Fixes: commit d7422fb489eee5587d3eec ("mmc: sdhci: Separate timer timeout for
-> command and data requests")
+> Configure the Makefile such that the multi-cluster SMP code is always
+> built for ARMv7-A. This is also what mach-exynos does for their MC-SMP
+> code.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/mmc/host/sdhci.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 1aa74b4682f3..0489572d1892 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1073,10 +1073,10 @@ static void sdhci_finish_data(struct sdhci_host *host)
->  	}
->  }
->  
-> -static void sdhci_mod_timer(struct sdhci_host *host, struct mmc_request *mrq,
-> +static void sdhci_mod_timer(struct sdhci_host *host, struct mmc_command *cmd,
->  			    unsigned long timeout)
->  {
-> -	if (sdhci_data_line_cmd(mrq->cmd))
-> +	if (sdhci_data_line_cmd(cmd))
->  		mod_timer(&host->data_timer, timeout);
->  	else
->  		mod_timer(&host->timer, timeout);
-> @@ -1135,7 +1135,7 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
->  		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
->  	else
->  		timeout += 10 * HZ;
-> -	sdhci_mod_timer(host, cmd->mrq, timeout);
-> +	sdhci_mod_timer(host, cmd, timeout);
->  
->  	host->cmd = cmd;
->  	if (sdhci_data_line_cmd(cmd)) {
+> This addresses "[sunxi:sunxi/core-for-4.17 1/4] /tmp/ccSQM2rD.s:438:
+> Error: selected processor does not support `isb' in ARM mode"
+> reported by the kbuild test robot for arm-allmodconfig.
 > 
+> Should we apply it, or squash it in the original patch?
+
+I guess we can squash it. And while you're at it..
+
+> ---
+>  arch/arm/mach-sunxi/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+> index 3e741e959c7c..3c2c4384357a 100644
+> --- a/arch/arm/mach-sunxi/Makefile
+> +++ b/arch/arm/mach-sunxi/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
+>  obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o
+> +CFLAGS_mc_smp.o	+= -march=armv7-a
+
+Can you move it to the first line of the file (before the other obj-*)
+with a newline after it?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/e71cfd37/attachment.sig>
