@@ -1,129 +1,203 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 19 Feb 2018 16:44:01 +0100
-Subject: [PATCH 3/8] drm/exynos/decon: Use clk bulk API
+Date: Mon, 19 Feb 2018 16:44:02 +0100
+Subject: [PATCH 4/8] drm/exynos/dsi: Use clk bulk API
 In-Reply-To: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
 References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154458eucas1p1b4e728757e78f3d5dde5c9aa565a5d20@eucas1p1.samsung.com>
-Message-ID: <1519055046-2399-4-git-send-email-m.purski@samsung.com>
+ <CGME20180219154459eucas1p147525b88de5d34f646aa25cb8de1f1d0@eucas1p1.samsung.com>
+Message-ID: <1519055046-2399-5-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Using bulk clk functions simplifies the driver's code. Use devm_clk_bulk
 functions instead of iterating over an array of clks.
 
+In order to achieve consistency with other drivers, define clock names
+in driver's variants structures.
+
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c | 50 ++++++++-------------------
- 1 file changed, 15 insertions(+), 35 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 68 +++++++++++++++------------------
+ 1 file changed, 30 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index 1c330f2..1760fcb 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -55,7 +55,7 @@ struct decon_context {
- 	struct exynos_drm_plane_config	configs[WINDOWS_NR];
- 	void __iomem			*addr;
- 	struct regmap			*sysreg;
--	struct clk			*clks[ARRAY_SIZE(decon_clks_name)];
-+	struct clk_bulk_data		*clks;
- 	unsigned int			irq;
- 	unsigned int			irq_vsync;
- 	unsigned int			irq_lcd_sys;
-@@ -485,15 +485,13 @@ static irqreturn_t decon_te_irq_handler(int irq, void *dev_id)
- static void decon_clear_channels(struct exynos_drm_crtc *crtc)
- {
- 	struct decon_context *ctx = crtc->ctx;
--	int win, i, ret;
-+	int win, ret;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 7904ffa..46a8b5c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -209,11 +209,7 @@
+ #define DSI_XFER_TIMEOUT_MS		100
+ #define DSI_RX_FIFO_EMPTY		0x30800002
  
- 	DRM_DEBUG_KMS("%s\n", __FILE__);
- 
--	for (i = 0; i < ARRAY_SIZE(decon_clks_name); i++) {
--		ret = clk_prepare_enable(ctx->clks[i]);
--		if (ret < 0)
--			goto err;
--	}
-+	ret = clk_bulk_prepare_enable(ARRAY_SIZE(decon_clks_name), ctx->clks);
-+	if (ret < 0)
-+		return;
- 
- 	decon_shadow_protect(ctx, true);
- 	for (win = 0; win < WINDOWS_NR; win++)
-@@ -504,10 +502,6 @@ static void decon_clear_channels(struct exynos_drm_crtc *crtc)
- 
- 	/* TODO: wait for possible vsync */
- 	msleep(50);
+-#define OLD_SCLK_MIPI_CLK_NAME "pll_clk"
 -
--err:
--	while (--i >= 0)
--		clk_disable_unprepare(ctx->clks[i]);
- }
+-static char *clk_names[5] = { "bus_clk", "sclk_mipi",
+-	"phyclk_mipidphy0_bitclkdiv8", "phyclk_mipidphy0_rxclkesc0",
+-	"sclk_rgb_vclk_to_dsim0" };
++#define DSI_MAX_CLOCKS			5
  
- static enum drm_mode_status decon_mode_valid(struct exynos_drm_crtc *crtc,
-@@ -638,10 +632,8 @@ static irqreturn_t decon_irq_handler(int irq, void *dev_id)
- static int exynos5433_decon_suspend(struct device *dev)
- {
- 	struct decon_context *ctx = dev_get_drvdata(dev);
--	int i = ARRAY_SIZE(decon_clks_name);
+ enum exynos_dsi_transfer_type {
+ 	EXYNOS_DSI_TX,
+@@ -243,6 +239,7 @@ struct exynos_dsi_driver_data {
+ 	unsigned int plltmr_reg;
+ 	unsigned int has_freqband:1;
+ 	unsigned int has_clklane_stop:1;
++	const char *clock_names[DSI_MAX_CLOCKS];
+ 	unsigned int num_clks;
+ 	unsigned int max_freq;
+ 	unsigned int wait_for_reset;
+@@ -259,7 +256,7 @@ struct exynos_dsi {
  
--	while (--i >= 0)
--		clk_disable_unprepare(ctx->clks[i]);
-+	clk_bulk_disable_unprepare(ARRAY_SIZE(decon_clks_name), ctx->clks);
- 
- 	return 0;
- }
-@@ -649,19 +641,9 @@ static int exynos5433_decon_suspend(struct device *dev)
- static int exynos5433_decon_resume(struct device *dev)
- {
- 	struct decon_context *ctx = dev_get_drvdata(dev);
--	int i, ret;
--
--	for (i = 0; i < ARRAY_SIZE(decon_clks_name); i++) {
--		ret = clk_prepare_enable(ctx->clks[i]);
--		if (ret < 0)
--			goto err;
--	}
--
--	return 0;
+ 	void __iomem *reg_base;
+ 	struct phy *phy;
+-	struct clk **clks;
++	struct clk_bulk_data *clks;
+ 	struct regulator_bulk_data supplies[2];
+ 	int irq;
+ 	int te_gpio;
+@@ -453,6 +450,7 @@ static const struct exynos_dsi_driver_data exynos3_dsi_driver_data = {
+ 	.plltmr_reg = 0x50,
+ 	.has_freqband = 1,
+ 	.has_clklane_stop = 1,
++	.clock_names = {"bus_clk", "pll_clk"},
+ 	.num_clks = 2,
+ 	.max_freq = 1000,
+ 	.wait_for_reset = 1,
+@@ -465,6 +463,7 @@ static const struct exynos_dsi_driver_data exynos4_dsi_driver_data = {
+ 	.plltmr_reg = 0x50,
+ 	.has_freqband = 1,
+ 	.has_clklane_stop = 1,
++	.clock_names = {"bus_clk", "sclk_mipi"},
+ 	.num_clks = 2,
+ 	.max_freq = 1000,
+ 	.wait_for_reset = 1,
+@@ -475,6 +474,7 @@ static const struct exynos_dsi_driver_data exynos4_dsi_driver_data = {
+ static const struct exynos_dsi_driver_data exynos5_dsi_driver_data = {
+ 	.reg_ofs = exynos_reg_ofs,
+ 	.plltmr_reg = 0x58,
++	.clock_names = {"bus_clk", "pll_clk"},
+ 	.num_clks = 2,
+ 	.max_freq = 1000,
+ 	.wait_for_reset = 1,
+@@ -486,6 +486,10 @@ static const struct exynos_dsi_driver_data exynos5433_dsi_driver_data = {
+ 	.reg_ofs = exynos5433_reg_ofs,
+ 	.plltmr_reg = 0xa0,
+ 	.has_clklane_stop = 1,
++	.clock_names = {"bus_clk", "phyclk_mipidphy0_bitclkdiv8",
++			"phyclk_mipidphy0_rxclkesc0",
++			"sclk_rgb_vclk_to_dsim0",
++			"sclk_mipi"},
+ 	.num_clks = 5,
+ 	.max_freq = 1500,
+ 	.wait_for_reset = 0,
+@@ -497,6 +501,7 @@ static const struct exynos_dsi_driver_data exynos5422_dsi_driver_data = {
+ 	.reg_ofs = exynos5433_reg_ofs,
+ 	.plltmr_reg = 0xa0,
+ 	.has_clklane_stop = 1,
++	.clock_names = {"bus_clk", "pll_clk"},
+ 	.num_clks = 2,
+ 	.max_freq = 1500,
+ 	.wait_for_reset = 1,
+@@ -1711,7 +1716,7 @@ static int exynos_dsi_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+ 	struct exynos_dsi *dsi;
+-	int ret, i;
 +	int ret;
  
--err:
--	while (--i >= 0)
--		clk_disable_unprepare(ctx->clks[i]);
-+	ret = clk_bulk_prepare_enable(ARRAY_SIZE(decon_clks_name), ctx->clks);
+ 	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
+ 	if (!dsi)
+@@ -1743,26 +1748,15 @@ static int exynos_dsi_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
  
- 	return ret;
- }
-@@ -719,7 +701,6 @@ static int exynos5433_decon_probe(struct platform_device *pdev)
- 	struct decon_context *ctx;
- 	struct resource *res;
- 	int ret;
--	int i;
+-	dsi->clks = devm_kzalloc(dev,
+-			sizeof(*dsi->clks) * dsi->driver_data->num_clks,
+-			GFP_KERNEL);
+-	if (!dsi->clks)
+-		return -ENOMEM;
++	dsi->clks = devm_clk_bulk_alloc(dev, dsi->driver_data->num_clks,
++					dsi->driver_data->clock_names);
++	if (IS_ERR(dsi->clks))
++		return PTR_ERR(dsi->clks);
  
- 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
- 	if (!ctx)
-@@ -732,15 +713,14 @@ static int exynos5433_decon_probe(struct platform_device *pdev)
- 	if (ctx->out_type & IFTYPE_HDMI)
- 		ctx->first_win = 1;
- 
--	for (i = 0; i < ARRAY_SIZE(decon_clks_name); i++) {
--		struct clk *clk;
+-	for (i = 0; i < dsi->driver_data->num_clks; i++) {
+-		dsi->clks[i] = devm_clk_get(dev, clk_names[i]);
+-		if (IS_ERR(dsi->clks[i])) {
+-			if (strcmp(clk_names[i], "sclk_mipi") == 0) {
+-				strcpy(clk_names[i], OLD_SCLK_MIPI_CLK_NAME);
+-				i--;
+-				continue;
+-			}
 -
--		clk = devm_clk_get(ctx->dev, decon_clks_name[i]);
--		if (IS_ERR(clk))
--			return PTR_ERR(clk);
-+	ctx->clks = devm_clk_bulk_alloc(dev, ARRAY_SIZE(decon_clks_name),
-+					decon_clks_name);
-+	if (IS_ERR(ctx->clks))
-+		return PTR_ERR(ctx->clks);
- 
--		ctx->clks[i] = clk;
+-			dev_info(dev, "failed to get the clock: %s\n",
+-					clk_names[i]);
+-			return PTR_ERR(dsi->clks[i]);
+-		}
 -	}
-+	ret = devm_clk_bulk_get(dev, ARRAY_SIZE(decon_clks_name), ctx->clks);
++	ret = devm_clk_bulk_get(dev, dsi->driver_data->num_clks,
++				dsi->clks);
 +	if (ret < 0)
 +		return ret;
  
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	ctx->addr = devm_ioremap_resource(dev, res);
+ 	dsi->reg_base = devm_ioremap_resource(dev, res);
+@@ -1817,7 +1811,7 @@ static int __maybe_unused exynos_dsi_suspend(struct device *dev)
+ 	struct drm_encoder *encoder = dev_get_drvdata(dev);
+ 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+ 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
+-	int ret, i;
++	int ret;
+ 
+ 	usleep_range(10000, 20000);
+ 
+@@ -1833,8 +1827,7 @@ static int __maybe_unused exynos_dsi_suspend(struct device *dev)
+ 
+ 	phy_power_off(dsi->phy);
+ 
+-	for (i = driver_data->num_clks - 1; i > -1; i--)
+-		clk_disable_unprepare(dsi->clks[i]);
++	clk_bulk_disable_unprepare(driver_data->num_clks, dsi->clks);
+ 
+ 	ret = regulator_bulk_disable(ARRAY_SIZE(dsi->supplies), dsi->supplies);
+ 	if (ret < 0)
+@@ -1848,7 +1841,7 @@ static int __maybe_unused exynos_dsi_resume(struct device *dev)
+ 	struct drm_encoder *encoder = dev_get_drvdata(dev);
+ 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+ 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
+-	int ret, i;
++	int ret;
+ 
+ 	ret = regulator_bulk_enable(ARRAY_SIZE(dsi->supplies), dsi->supplies);
+ 	if (ret < 0) {
+@@ -1856,23 +1849,22 @@ static int __maybe_unused exynos_dsi_resume(struct device *dev)
+ 		return ret;
+ 	}
+ 
+-	for (i = 0; i < driver_data->num_clks; i++) {
+-		ret = clk_prepare_enable(dsi->clks[i]);
+-		if (ret < 0)
+-			goto err_clk;
+-	}
++	ret = clk_bulk_prepare_enable(driver_data->num_clks, dsi->clks);
++	if (ret < 0)
++		goto err_clk;
+ 
+ 	ret = phy_power_on(dsi->phy);
+ 	if (ret < 0) {
+ 		dev_err(dsi->dev, "cannot enable phy %d\n", ret);
+-		goto err_clk;
++		goto err_phy;
+ 	}
+ 
+ 	return 0;
+ 
++err_phy:
++	clk_bulk_disable_unprepare(driver_data->num_clks, dsi->clks);
++
+ err_clk:
+-	while (--i > -1)
+-		clk_disable_unprepare(dsi->clks[i]);
+ 	regulator_bulk_disable(ARRAY_SIZE(dsi->supplies), dsi->supplies);
+ 
+ 	return ret;
 -- 
 2.7.4
