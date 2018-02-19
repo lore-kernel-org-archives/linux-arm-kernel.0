@@ -1,33 +1,33 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 19 Feb 2018 18:14:52 +1030
-Subject: [PATCH 0/6] ARM: dts: aspeed: Enable iBT and LPC, Palmetto fixes
-In-Reply-To: <20180212074325.23436-1-joel@jms.id.au>
-References: <20180212074325.23436-1-joel@jms.id.au>
-Message-ID: <CACPK8XfSQrzXBDYOZKM5EpnRVsP+M92=UqMWvDwWSs67WdaHkQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 19 Feb 2018 09:56:44 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-hummingboard: fix USBOTG-ID pin
+Message-ID: <535f327ebffa93ee780381e6c9f9f39b7c6d1a26.1519027005.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 6:13 PM, Joel Stanley <joel@jms.id.au> wrote:
-> Hello,
->
-> These changes enable recently (and not-so-recently) upstreamed drivers
-> for the ASPEED BMC device trees.
->
-> Palmetto also has some updates that bring it close to being able to boot
-> a host with an upstream kernel.
->
-> I will merge them through the ASPEED tree once they have been reviewed.
->
-> Joel Stanley (6):
->   ARM: dts: aspeed: Add IPMI BT node
->   ARM: dts: aspeed: Enable IPMI BT node on OpenPower machines
->   ARM: dts: aspeed-g5: Update LPC node
->   ARM: dts: aspeed: Add LPC clock phandles
->   ARM: dts: palmetto: Add LEDs and GPIO keys
->   ARM: dts: aspeed: Add Palmetto GPIO hogs
+From: Jon Nettleton <jon@solid-run.com>
 
-Series merged to dt-for-4.17 in the aspeed tree. Thanks for the reviews Andrew.
+Fix the USBOTG-ID pin to the correct definition.  The top
+USB port stays in device-mode without this change.
 
-Cheers,
+Signed-off-by: Jon Nettleton <jon@solid-run.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Joel
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index 92583238ca4a..e59b1aeba1d7 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -242,7 +242,7 @@
+ 			 * Similar to pinctrl_usbotg_2, but we want it
+ 			 * pulled down for a fixed host connection.
+ 			 */
+-			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
++			fsl,pins = <MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x13059>;
+ 		};
+ 
+ 		pinctrl_hummingboard_usbotg_vbus: hummingboard-usbotg-vbus {
+-- 
+2.16.1
