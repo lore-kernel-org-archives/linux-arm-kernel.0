@@ -1,51 +1,20 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Feb 2018 09:05:11 +0100
-Subject: [PATCH] ARM: sunxi: Fix multi-cluster SMP support compilation in
- multi v6/v7 configs
-In-Reply-To: <20180217050112.14619-1-wens@csie.org>
-References: <20180217050112.14619-1-wens@csie.org>
-Message-ID: <20180219080511.wfzeokrwbyyr5l3r@flea.lan>
+Date: Mon, 19 Feb 2018 09:07:20 +0100
+Subject: [PATCH] ARM: dts: sun7i: Enable HDMI support on the Orange Pi mini
+In-Reply-To: <jwvr2pk8xrb.fsf-monnier+diro@gnu.org>
+References: <jwvr2pk8xrb.fsf-monnier+diro@gnu.org>
+Message-ID: <20180219080720.lty2fa5ntzarmefz@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 01:01:12PM +0800, Chen-Yu Tsai wrote:
-> Various parts of the assembly code used in the multi-cluster SMP support
-> requires ARMv7-A. If the kernel config also has multi v6 support enabled,
-> Kbuild defaults to building for armv6k, which does not support some of
-> the instructions we use.
+On Fri, Feb 16, 2018 at 03:52:09PM -0500, Stefan Monnier wrote:
+> From: Stefan Monnier <monnier@iro.umontreal.ca>
 > 
-> Configure the Makefile such that the multi-cluster SMP code is always
-> built for ARMv7-A. This is also what mach-exynos does for their MC-SMP
-> code.
+> Enable the display pipeline and HDMI output for the Orange Pi mini
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> This addresses "[sunxi:sunxi/core-for-4.17 1/4] /tmp/ccSQM2rD.s:438:
-> Error: selected processor does not support `isb' in ARM mode"
-> reported by the kbuild test robot for arm-allmodconfig.
-> 
-> Should we apply it, or squash it in the original patch?
+> Signed-off-by: Stefan Monnier <monnier@iro.umontreal.ca>
 
-I guess we can squash it. And while you're at it..
-
-> ---
->  arch/arm/mach-sunxi/Makefile | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> index 3e741e959c7c..3c2c4384357a 100644
-> --- a/arch/arm/mach-sunxi/Makefile
-> +++ b/arch/arm/mach-sunxi/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
->  obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o
-> +CFLAGS_mc_smp.o	+= -march=armv7-a
-
-Can you move it to the first line of the file (before the other obj-*)
-with a newline after it?
-
-Thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -58,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/e71cfd37/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/33671b37/attachment.sig>
