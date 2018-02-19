@@ -1,29 +1,19 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 19 Feb 2018 09:08:33 +0530
-Subject: [PATCH v3 06/15] arm64: dts: mt7622: add cpufreq related device
- nodes
-In-Reply-To: <2cf761c2a20a8ff8a9208ddf3872f10f6f3198f5.1518895232.git.sean.wang@mediatek.com>
-References: <cover.1518895232.git.sean.wang@mediatek.com>
- <2cf761c2a20a8ff8a9208ddf3872f10f6f3198f5.1518895232.git.sean.wang@mediatek.com>
-Message-ID: <20180219033833.GG28462@vireshk-i7>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 19 Feb 2018 06:59:21 +0100
+Subject: [PATCH 1/3] ARM: dts: rockchip: add power key for Rock2 Square
+In-Reply-To: <20180218170336.31819-1-john@metanate.com>
+References: <20180218170336.31819-1-john@metanate.com>
+Message-ID: <3732962.mbDJuNvWG5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-02-18, 03:54, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+Am Sonntag, 18. Februar 2018, 18:03:34 CET schrieb John Keeping:
+> Support the power button on Radxa Rock2 Square.
 > 
-> Add clocks, regulators and opp information into cpu nodes.
-> In addition, the power supply for cpu nodes is deployed on
-> mt7622-rfb1 board.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 12 +++++++
->  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 52 ++++++++++++++++++++++++++++
->  2 files changed, 64 insertions(+)
+> Signed-off-by: John Keeping <john@metanate.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+applied all 3 patches for 4.17
 
--- 
-viresh
+
+Thanks
+Heiko
