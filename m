@@ -1,115 +1,86 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 19 Feb 2018 14:21:52 -0600
-Subject: [PATCH v7 31/42] ARM: davinci: switch to common clock framework
+Date: Mon, 19 Feb 2018 14:22:01 -0600
+Subject: [PATCH v7 40/42] ARM: davinci: add device tree support to timer
 In-Reply-To: <1519071723-31790-1-git-send-email-david@lechnology.com>
 References: <1519071723-31790-1-git-send-email-david@lechnology.com>
-Message-ID: <1519071723-31790-32-git-send-email-david@lechnology.com>
+Message-ID: <1519071723-31790-41-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches ARCH_DAVINCI to use the common clock framework. The legacy
-clock code in arch/arm/mach-davinci/ is no longer used. New drivers in
-drivers/clk/davinci/ are used instead.
-
-A few macros had to be moved to prevent compilation errors.
+This adds device tree support to the davinci timer so that when clocks
+are moved to device tree, the timer will still work.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v7 changes:
-- s/compile/compilation and space instead of tab
-- add PM_GENERIC_DOMAINS dependencies
+- add workaround for platform devices not available in early boot
 
 v6 changes:
-- clean up indent on Common objects section
+- none
 
 
- arch/arm/Kconfig                | 5 ++++-
- arch/arm/mach-davinci/Makefile  | 4 ++--
- arch/arm/mach-davinci/clock.h   | 4 ----
- arch/arm/mach-davinci/davinci.h | 4 ++++
- arch/arm/mach-davinci/psc.h     | 2 --
- 5 files changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/Kconfig |  1 +
+ arch/arm/mach-davinci/time.c  | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7e3d535..563fade 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -608,13 +608,16 @@ config ARCH_S3C24XX
- config ARCH_DAVINCI
- 	bool "TI DaVinci"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
--	select CLKDEV_LOOKUP
-+	select COMMON_CLK
- 	select CPU_ARM926T
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
- 	select GPIOLIB
- 	select HAVE_IDE
-+	select PM_GENERIC_DOMAINS if PM
-+	select PM_GENERIC_DOMAINS_OF if PM && OF
-+	select RESET_CONTROLLER
- 	select USE_OF
- 	select ZONE_DMA
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index ba9912b..da8a039 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -59,6 +59,7 @@ config MACH_DA8XX_DT
+ 	default y
+ 	depends on ARCH_DAVINCI_DA850
+ 	select PINCTRL
++	select TIMER_OF
  	help
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 4e81780..8725d8b 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -5,8 +5,8 @@
- #
+ 	  Say y here to include support for TI DaVinci DA850 based using
+ 	  Flattened Device Tree. More information at Documentation/devicetree
+diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+index d6a78f7..590b118 100644
+--- a/arch/arm/mach-davinci/time.c
++++ b/arch/arm/mach-davinci/time.c
+@@ -17,6 +17,7 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched_clock.h>
  
- # Common objects
--obj-y 			:= time.o clock.o serial.o psc.o \
--			   usb.o common.o sram.o aemif.o
-+obj-y 					:= time.o serial.o usb.o \
-+					   common.o sram.o aemif.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index d7894d5..2d05856 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -12,10 +12,6 @@
- #ifndef __ARCH_ARM_DAVINCI_CLOCK_H
- #define __ARCH_ARM_DAVINCI_CLOCK_H
- 
--#define DAVINCI_PLL1_BASE 0x01c40800
--#define DAVINCI_PLL2_BASE 0x01c40c00
--#define MAX_PLL 2
--
- /* PLL/Reset register offsets */
- #define PLLCTL          0x100
- #define PLLCTL_PLLEN    BIT(0)
-diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index a200977..a227f80 100644
---- a/arch/arm/mach-davinci/davinci.h
-+++ b/arch/arm/mach-davinci/davinci.h
-@@ -35,6 +35,10 @@
- #include <media/davinci/vpbe.h>
- #include <media/davinci/vpbe_osd.h>
- 
-+#define DAVINCI_PLL1_BASE		0x01c40800
-+#define DAVINCI_PLL2_BASE		0x01c40c00
-+#define DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01c41000
+@@ -405,3 +406,33 @@ void __init davinci_timer_init(struct clk *timer_clk)
+ 	for (i=0; i< ARRAY_SIZE(timers); i++)
+ 		timer32_config(&timers[i]);
+ }
 +
- #define DAVINCI_SYSTEM_MODULE_BASE	0x01c40000
- #define SYSMOD_VDAC_CONFIG		0x2c
- #define SYSMOD_VIDCLKCTL		0x38
-diff --git a/arch/arm/mach-davinci/psc.h b/arch/arm/mach-davinci/psc.h
-index 8af9f09..b58707c 100644
---- a/arch/arm/mach-davinci/psc.h
-+++ b/arch/arm/mach-davinci/psc.h
-@@ -27,8 +27,6 @@
- #ifndef __ASM_ARCH_PSC_H
- #define __ASM_ARCH_PSC_H
- 
--#define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
--
- /* Power and Sleep Controller (PSC) Domains */
- #define DAVINCI_GPSC_ARMDOMAIN		0
- #define DAVINCI_GPSC_DSPDOMAIN		1
++static int __init of_davinci_timer_init(struct device_node *np)
++{
++	struct clk *clk;
++
++	clk = of_clk_get(np, 0);
++	if (IS_ERR(clk)) {
++		struct of_phandle_args clkspec;
++
++		/*
++		 * Fall back to using ref_clk if the actual clock is not
++		 * available. This currently always happens because platform
++		 * clocks (i.e PLLs and PSCs) are registered as platform
++		 * devices and therefore are not available@this point in
++		 * the boot process.
++		 */
++		clkspec.np = of_find_node_by_name(NULL, "ref_clk");
++		if (IS_ERR(clkspec.np)) {
++			pr_err("%s: No clock available for timer!\n", __func__);
++			return PTR_ERR(clkspec.np);
++		}
++		clk = of_clk_get_from_provider(&clkspec);
++		of_node_put(clkspec.np);
++	}
++
++	davinci_timer_init(clk);
++
++	return 0;
++}
++TIMER_OF_DECLARE(davinci_timer, "ti,davinci-timer", of_davinci_timer_init);
 -- 
 2.7.4
