@@ -1,70 +1,117 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Mon, 19 Feb 2018 11:34:34 +0200
-Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
-In-Reply-To: <20180216145444.GA11014@bhelgaas-glaptop.roam.corp.google.com>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
- <20180216145444.GA11014@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <87bmglb9w5.fsf@intel.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 19 Feb 2018 10:40:45 +0100
+Subject: [PATCH 1/3] drm: simple_kms_helper: Add mode_valid() callback
+ support
+In-Reply-To: <87bmgwdb71.fsf@anholt.net>
+References: <20180206121854.4407-1-linus.walleij@linaro.org>
+ <20180206121854.4407-2-linus.walleij@linaro.org>
+ <87bmgwdb71.fsf@anholt.net>
+Message-ID: <20180219094045.GJ22199@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Feb 2018, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Mon, Nov 27, 2017 at 11:57:46AM -0500, Sinan Kaya wrote:
->> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
->> where a PCI device is present. This restricts the device drivers to be
->> reused for other domain numbers.
->> 
->> Getting ready to remove pci_get_bus_and_slot() function in favor of
->> pci_get_domain_bus_and_slot().
->> 
->> Extract the domain number from drm_device and pass it into
->> pci_get_domain_bus_and_slot() function.
->> 
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->
-> I don't know what happened to this, and it didn't make it into
-> v4.16-rc1.  I applied it to pci/deprecate-get-bus-and-slot for v4.17
-> along with the patch that actually removes pci_get_bus_and_slot().
+On Sat, Feb 10, 2018 at 05:08:34PM +0000, Eric Anholt wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+> 
+> > The PL111 needs to filter valid modes based on memory bandwidth.
+> > I guess it is a pretty simple operation, so we can still claim
+> > the DRM KMS helper pipeline is simple after adding this (optional)
+> > vtable callback.
+> >
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
+> >  include/drm/drm_simple_kms_helper.h     | 15 +++++++++++++++
+> >  2 files changed, 30 insertions(+)
+> >
+> > diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
+> > index dc9fd109de14..b7840cf34808 100644
+> > --- a/drivers/gpu/drm/drm_simple_kms_helper.c
+> > +++ b/drivers/gpu/drm/drm_simple_kms_helper.c
+> > @@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
+> >  	.destroy = drm_encoder_cleanup,
+> >  };
+> >  
+> > +static enum drm_mode_status
+> > +drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
+> > +			       const struct drm_display_mode *mode)
+> > +{
+> > +	struct drm_simple_display_pipe *pipe;
+> > +
+> > +	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
+> > +	if (!pipe->funcs || !pipe->funcs->mode_valid)
+> > +		/* Anything goes */
+> > +		return MODE_OK;
+> > +
+> > +	return pipe->funcs->mode_valid(crtc, mode);
+> > +}
+> > +
+> >  static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
+> >  				     struct drm_crtc_state *state)
+> >  {
+> > @@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
+> >  }
+> >  
+> >  static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
+> > +	.mode_valid = drm_simple_kms_crtc_mode_valid,
+> >  	.atomic_check = drm_simple_kms_crtc_check,
+> >  	.atomic_enable = drm_simple_kms_crtc_enable,
+> >  	.atomic_disable = drm_simple_kms_crtc_disable,
+> > diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+> > index 6d9adbb46293..ad74cb33c539 100644
+> > --- a/include/drm/drm_simple_kms_helper.h
+> > +++ b/include/drm/drm_simple_kms_helper.h
+> > @@ -21,6 +21,21 @@ struct drm_simple_display_pipe;
+> >   *                                        display pipeline
+> >   */
+> >  struct drm_simple_display_pipe_funcs {
+> > +	/**
+> > +	 * @mode_valid:
+> > +	 *
+> > +	 * This function is called to filter out valid modes from the
+> > +	 * suggestions suggested by the bridge or display. This optional
+> > +	 * hook is passed in when initializing the pipeline.
+> > +	 *
+> > +	 * RETURNS:
+> > +	 *
+> > +	 * MODE_OK if the mode is acceptable.
+> > +	 * MODE_BAD if we need to try something else.
+> > +	 */
+> 
+> I don't see why MODE_BAD would be the only valid error return from this
+> hook.  Can we just use the same RETURNS docs as other mode_valid methods?
+> 
+> Other than that,
+> 
+> Reviewed-by: Eric Anholt <eric@anholt.net>
 
-It fell between the cracks as we couldn't apply it before getting a
-backmerge on the dependency. Sorry about that.
+Same comment (although note that except for dmesg noise we currently throw
+them away), and I agree that mode_valid makes sense for simple drivers,
+especially with all the refactoring we've done to call mode_valid both in
+the connector probe and atomic_check paths. On the respun patch (I'm
+behind on mails ...):
 
-Ack for merging through your tree.
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-Thanks,
-Jani.
+> 
+> > +	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
+> > +					   const struct drm_display_mode *mode);
+> > +
+> >  	/**
+> >  	 * @enable:
+> >  	 *
+> > -- 
+> > 2.14.3
 
 
->
->> ---
->>  drivers/gpu/drm/i915/i915_drv.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
->> index 9f45cfe..5a8cb79 100644
->> --- a/drivers/gpu/drm/i915/i915_drv.c
->> +++ b/drivers/gpu/drm/i915/i915_drv.c
->> @@ -419,7 +419,10 @@ static int i915_getparam(struct drm_device *dev, void *data,
->>  
->>  static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
->>  {
->> -	dev_priv->bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
->> +	int domain = pci_domain_nr(dev_priv->drm.pdev->bus);
->> +
->> +	dev_priv->bridge_dev =
->> +		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 0));
->>  	if (!dev_priv->bridge_dev) {
->>  		DRM_ERROR("bridge device not found\n");
->>  		return -1;
->> -- 
->> 1.9.1
->> 
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 
 -- 
-Jani Nikula, Intel Open Source Technology Center
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
