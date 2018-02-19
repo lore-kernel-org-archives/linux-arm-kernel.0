@@ -1,127 +1,74 @@
 From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Mon, 19 Feb 2018 15:59:28 +0000
-Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander
- driver
-In-Reply-To: <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
+Date: Mon, 19 Feb 2018 16:00:48 +0000
+Subject: [PATCH 2/6] mfd: Add ST Multi-Function eXpander core driver
+In-Reply-To: <CAOFm3uH+DLcOqiSV0z0N6JnmSk+JfTF3bfkC0_2kdFT-eDMr8A@mail.gmail.com>
 References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
- <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
-Message-ID: <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
+ <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
+ <20180212120600.5cghrzz4jqvvkgz6@dell>
+ <CAOFm3uH+DLcOqiSV0z0N6JnmSk+JfTF3bfkC0_2kdFT-eDMr8A@mail.gmail.com>
+Message-ID: <889cec8c-5a3a-ffc5-e6fa-aa388485e601@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thanks Philippe,
 
+I will take this into account for V2.
 
-On 02/19/2018 12:19 AM, Rob Herring wrote:
-> On Thu, Feb 08, 2018 at 03:27:32PM +0100, Amelie Delaunay wrote:
->> This patch adds documentation of device tree bindings for the
->> STMicroelectronics Multi-Function eXpander (MFX).
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> ---
->>   Documentation/devicetree/bindings/mfd/st-mfx.txt | 51 ++++++++++++++++++++++++
->>   1 file changed, 51 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/st-mfx.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/st-mfx.txt b/Documentation/devicetree/bindings/mfd/st-mfx.txt
->> new file mode 100644
->> index 0000000..423d800
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/st-mfx.txt
->> @@ -0,0 +1,51 @@
->> +STMicroelectronics Multi-Function eXpander
->> +
->> +ST Multi-Function eXpander (MFX) is a slave controller using I2C for
->> +communication with the main MCU. Its main features are gpio expansion, main
->> +MCU IDD measurement (IDD is the amount of current that flows through VDD)
->> +and resistive touchscreen controller.
-> 
-> You don't have to implement all the drivers now, but please completely
-> describe the device. As is, there is no reason to have a child GPIO
-> node.
->
-The MFD driver will be abandoned as only GPIO part is used. I'll send a 
-V2 soon.
->> +
->> +Required properties:
->> +- compatible: must be "st,mfx"
-> 
-> Kind of generic. Only 1 single version ever?
-> 
-"st-mfx" compatible will disappear in V2 (we keep only GPIO driver). MFX 
-version can be read in MFX FW_VERSION register. So do I keep 
-"st,mfx-gpio" compatible or you want to see mfx version ?
-
->> +- reg: I2C address of the device
->> +- interrupts: interrupt triggered by MFX_IRQ_OUT signal
->> +- interrupt-parent: interrupt controller MFX is connected to
->> +- interrupt-controller: marks the device as an interrupt controller
->> +- #interrupt-cells: should be <1>, index of the interrupt within the
->> +  controller, in accordance with the "one cell" variant of
->> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
->> +
->> +Optional nodes:
->> +
->> +* GPIO eXpander
->> +MFX provides 16 programmable GPIOs, and it is also possible to recover 8
->> +alternate GPIOs if the main functions are not used (touchscreen controller and
->> +IDD measurement not enabled).
->> +
->> +Required properties:
->> +- compatible : must be "st,mfx-gpio"
->> +- interrupt-parent : must be <&mfx>
-> 
-> Not necessary. A parent node with 'interrupt-controller' property is the
-> interrupt's parent.
-> 
-I will keep it in mind.
->> +- interrupts = must be <0>
->> +- gpio-controller: marks the device node as a GPIO controller
->> +- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
->> +  controller, the second cell is the gpio flags in accordance with
->> +  <dt-bindings/gpio/st-mfx-gpio.h>.
-> 
-> Custom flags? Use standard flags.
-> 
-> DT binding headers should be part of this patch.
-> 
-Custom flags because MFX GPIOs have several types:
-- Output open drain with internal pull-up resistor
-- Output open drain without internal pull-up resistor
-- Output push pull without internal pull resistor
-- Input with internal pull-up resistor
-- Input with internal pull-down resistor
-- Input floating
-- Input analog.
-Standard flags don't have pull up or down information. That's why I am 
-using custom flags, they overloads standard flags.
-I will add DT bindings header in this patch V2.
->> +
->> +Example:
->> +
->> +	mfx: mfx at 42 {
->> +		compatible = "st,mfx";
->> +		reg = <0x42>;
->> +		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
->> +		interrupt-parent = <&gpioi>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <1>;
->> +
->> +		mfxgpio: mfx_gpio {
-> 
-> gpio {
-> 
-OK. Will change it in V2.
-
-Thanks,
+Regards,
 Amelie
->> +			compatible = "st,mfx-gpio";
->> +			interrupt-parent = <&mfx>;
->> +			interrupts = <0>;
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +		};
->> +	};
->> -- 
->> 2.7.4
+
+On 02/12/2018 03:15 PM, Philippe Ombredanne wrote:
+> Amelie,
+> 
+> On Mon, Feb 12, 2018 at 1:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> On Thu, 08 Feb 2018, Amelie Delaunay wrote:
 >>
+>>> ST Multi-Function eXpander (MFX) is a slave controller using I2C
+>>> for communication with the main MCU. Main features are:
+>>> - 16 fast GPIOs individually configurable in input/output
+>>> - 8 alternate GPIOs individually configurable in input/output
+>>> - Main MCU IDD measurement
+>>> - Resistive touchscreen controller
+>>>
+>>> Only GPIO expander (16 fast GPIOs + 8 alternate) feature is
+>>> supported for the moment.
+>>>
+>>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> 
+> <snip>
+> 
+>>> --- /dev/null
+>>> +++ b/drivers/mfd/st-mfx.c
+>>> @@ -0,0 +1,526 @@
+>>> +/*
+>>> + * STMicroelectronics Multi-Function eXpander (ST-MFX) Core Driver
+>>> + *
+>>> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>>> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
+>>
+>> You don't need to put "for STMicroelectronics".  This was something we
+>> made up when submitting from a different (!st.com) email address.
+>>
+>>> + * License terms: GPL V2.0.
+>>> + *
+>>> + * st-mfx Core Driver is free software; you can redistribute it and/or modify it
+>>> + * under the terms of the GNU General Public License version 2 as published by
+>>> + * the Free Software Foundation.
+>>> + *
+>>> + * st-mfx Core Driver is distributed in the hope that it will be useful, but
+>>> + * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>>> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+>>> + * details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License along with
+>>> + * st-mfx Core Driver. If not, see <http://www.gnu.org/licenses/>.
+>>
+>> You should be able to use the short version of the licensing
+>> agreement.  Also, please grep for "SPDX".
+> 
+> You can check the doc for the (fairly new) way to remove legalese
+> boilerplate at Documentation/process/license-rules.rst or [1]
+> It helps keep the focus on the code and less on licensing!
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+> 
