@@ -1,10 +1,10 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 19 Feb 2018 16:44:05 +0100
-Subject: [PATCH 7/8] [media] exynos-gsc: Use clk bulk API
+Date: Mon, 19 Feb 2018 16:44:04 +0100
+Subject: [PATCH 6/8] drm/exynos/hdmi: Use clk bulk API
 In-Reply-To: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
 References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154502eucas1p20e8daf3edc6737817f8d62db5a2099f2@eucas1p2.samsung.com>
-Message-ID: <1519055046-2399-8-git-send-email-m.purski@samsung.com>
+ <CGME20180219154501eucas1p1e16a883d2eb0c8a99bafce5d71656066@eucas1p1.samsung.com>
+Message-ID: <1519055046-2399-7-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,138 +13,163 @@ functions instead of iterating over an array of clks.
 
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 55 ++++++++++------------------
- drivers/media/platform/exynos-gsc/gsc-core.h |  2 +-
- 2 files changed, 20 insertions(+), 37 deletions(-)
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 97 ++++++++++--------------------------
+ 1 file changed, 27 insertions(+), 70 deletions(-)
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 17854a3..fa7e993 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1149,7 +1149,6 @@ static int gsc_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	const struct gsc_driverdata *drv_data = of_device_get_match_data(dev);
- 	int ret;
--	int i;
- 
- 	gsc = devm_kzalloc(dev, sizeof(struct gsc_dev), GFP_KERNEL);
- 	if (!gsc)
-@@ -1187,25 +1186,19 @@ static int gsc_probe(struct platform_device *pdev)
- 		return -ENXIO;
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index a4b75a4..6c208f7 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -136,8 +136,8 @@ struct hdmi_context {
+ 	int				irq;
+ 	struct regmap			*pmureg;
+ 	struct regmap			*sysreg;
+-	struct clk			**clk_gates;
+-	struct clk			**clk_muxes;
++	struct clk_bulk_data		*clk_gates;
++	struct clk_bulk_data		*clk_muxes;
+ 	struct regulator_bulk_data	regul_bulk[ARRAY_SIZE(supply)];
+ 	struct regulator		*reg_hdmi_en;
+ 	struct exynos_drm_clk		phy_clk;
+@@ -739,43 +739,16 @@ static int hdmiphy_reg_write_buf(struct hdmi_context *hdata,
  	}
- 
--	for (i = 0; i < gsc->num_clocks; i++) {
--		gsc->clock[i] = devm_clk_get(dev, drv_data->clk_names[i]);
--		if (IS_ERR(gsc->clock[i])) {
--			dev_err(dev, "failed to get clock: %s\n",
--				drv_data->clk_names[i]);
--			return PTR_ERR(gsc->clock[i]);
--		}
--	}
-+	gsc->clocks = devm_clk_bulk_alloc(dev, gsc->num_clocks,
-+					  drv_data->clk_names);
-+	if (IS_ERR(gsc->clocks))
-+		return PTR_ERR(gsc->clocks);
- 
--	for (i = 0; i < gsc->num_clocks; i++) {
--		ret = clk_prepare_enable(gsc->clock[i]);
--		if (ret) {
--			dev_err(dev, "clock prepare failed for clock: %s\n",
--				drv_data->clk_names[i]);
--			while (--i >= 0)
--				clk_disable_unprepare(gsc->clock[i]);
--			return ret;
--		}
--	}
-+	ret = devm_clk_bulk_get(dev, gsc->num_clocks,
-+				gsc->clocks);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
-+	if (ret)
-+		return ret;
- 
- 	ret = devm_request_irq(dev, res->start, gsc_irq_handler,
- 				0, pdev->name, gsc);
-@@ -1239,15 +1232,14 @@ static int gsc_probe(struct platform_device *pdev)
- err_v4l2:
- 	v4l2_device_unregister(&gsc->v4l2_dev);
- err_clk:
--	for (i = gsc->num_clocks - 1; i >= 0; i--)
--		clk_disable_unprepare(gsc->clock[i]);
-+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
-+
- 	return ret;
  }
  
- static int gsc_remove(struct platform_device *pdev)
+-static int hdmi_clk_enable_gates(struct hdmi_context *hdata)
+-{
+-	int i, ret;
+-
+-	for (i = 0; i < hdata->drv_data->clk_gates.count; ++i) {
+-		ret = clk_prepare_enable(hdata->clk_gates[i]);
+-		if (!ret)
+-			continue;
+-
+-		dev_err(hdata->dev, "Cannot enable clock '%s', %d\n",
+-			hdata->drv_data->clk_gates.data[i], ret);
+-		while (i--)
+-			clk_disable_unprepare(hdata->clk_gates[i]);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+-static void hdmi_clk_disable_gates(struct hdmi_context *hdata)
+-{
+-	int i = hdata->drv_data->clk_gates.count;
+-
+-	while (i--)
+-		clk_disable_unprepare(hdata->clk_gates[i]);
+-}
+-
+ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
  {
- 	struct gsc_dev *gsc = platform_get_drvdata(pdev);
--	int i;
- 
- 	pm_runtime_get_sync(&pdev->dev);
- 
-@@ -1255,8 +1247,7 @@ static int gsc_remove(struct platform_device *pdev)
- 	v4l2_device_unregister(&gsc->v4l2_dev);
- 
- 	vb2_dma_contig_clear_max_seg_size(&pdev->dev);
--	for (i = 0; i < gsc->num_clocks; i++)
--		clk_disable_unprepare(gsc->clock[i]);
-+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
- 
- 	pm_runtime_put_noidle(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
-@@ -1307,18 +1298,12 @@ static int gsc_runtime_resume(struct device *dev)
- {
- 	struct gsc_dev *gsc = dev_get_drvdata(dev);
+ 	struct device *dev = hdata->dev;
  	int ret = 0;
++	struct clk_bulk_data *clk_muxes = hdata->clk_muxes;
+ 	int i;
+ 
+ 	for (i = 0; i < hdata->drv_data->clk_muxes.count; i += 3) {
+-		struct clk **c = &hdata->clk_muxes[i];
+-
+-		ret = clk_set_parent(c[2], c[to_phy]);
++		ret = clk_set_parent(clk_muxes[i + 2].clk,
++				     clk_muxes[i + to_phy].clk);
+ 		if (!ret)
+ 			continue;
+ 
+@@ -1655,54 +1628,36 @@ static irqreturn_t hdmi_irq_thread(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int hdmi_clks_get(struct hdmi_context *hdata,
+-			 const struct string_array_spec *names,
+-			 struct clk **clks)
++static struct clk_bulk_data *hdmi_clks_alloc_get(struct hdmi_context *hdata,
++					const struct string_array_spec *names)
+ {
+-	struct device *dev = hdata->dev;
 -	int i;
+-
+-	for (i = 0; i < names->count; ++i) {
+-		struct clk *clk = devm_clk_get(dev, names->data[i]);
+-
+-		if (IS_ERR(clk)) {
+-			int ret = PTR_ERR(clk);
++	struct clk_bulk_data *ptr;
++	int ret;
  
- 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
+-			dev_err(dev, "Cannot get clock %s, %d\n",
+-				names->data[i], ret);
++	ptr = devm_clk_bulk_alloc(hdata->dev, names->count, names->data);
++	if (IS_ERR(ptr))
++		return ptr;
  
--	for (i = 0; i < gsc->num_clocks; i++) {
--		ret = clk_prepare_enable(gsc->clock[i]);
--		if (ret) {
--			while (--i >= 0)
--				clk_disable_unprepare(gsc->clock[i]);
 -			return ret;
 -		}
+-
+-		clks[i] = clk;
 -	}
-+	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
-+	if (ret)
-+		return ret;
++	ret = devm_clk_bulk_get(hdata->dev, names->count, ptr);
++	if (ret < 0)
++		return ERR_PTR(ret);
  
- 	gsc_hw_set_sw_reset(gsc);
- 	gsc_wait_reset(gsc);
-@@ -1331,14 +1316,12 @@ static int gsc_runtime_suspend(struct device *dev)
+-	return 0;
++	return ptr;
+ }
+ 
+ static int hdmi_clk_init(struct hdmi_context *hdata)
  {
- 	struct gsc_dev *gsc = dev_get_drvdata(dev);
- 	int ret = 0;
--	int i;
+ 	const struct hdmi_driver_data *drv_data = hdata->drv_data;
+-	int count = drv_data->clk_gates.count + drv_data->clk_muxes.count;
+-	struct device *dev = hdata->dev;
+-	struct clk **clks;
+-	int ret;
  
- 	ret = gsc_m2m_suspend(gsc);
- 	if (ret)
+-	if (!count)
+-		return 0;
+-
+-	clks = devm_kzalloc(dev, sizeof(*clks) * count, GFP_KERNEL);
+-	if (!clks)
+-		return -ENOMEM;
++	hdata->clk_muxes = hdmi_clks_alloc_get(hdata, &drv_data->clk_muxes);
++	if (IS_ERR(hdata->clk_muxes))
++		return PTR_ERR(hdata->clk_muxes);
+ 
+-	hdata->clk_gates = clks;
+-	hdata->clk_muxes = clks + drv_data->clk_gates.count;
++	hdata->clk_gates = hdmi_clks_alloc_get(hdata, &drv_data->clk_gates);
++	if (IS_ERR(hdata->clk_gates))
++		return PTR_ERR(hdata->clk_gates);
+ 
+-	ret = hdmi_clks_get(hdata, &drv_data->clk_gates, hdata->clk_gates);
+-	if (ret)
+-		return ret;
+-
+-	return hdmi_clks_get(hdata, &drv_data->clk_muxes, hdata->clk_muxes);
++	return 0;
+ }
+ 
+ 
+@@ -2073,7 +2028,8 @@ static int __maybe_unused exynos_hdmi_suspend(struct device *dev)
+ {
+ 	struct hdmi_context *hdata = dev_get_drvdata(dev);
+ 
+-	hdmi_clk_disable_gates(hdata);
++	clk_bulk_disable_unprepare(hdata->drv_data->clk_gates.count,
++				   hdata->clk_gates);
+ 
+ 	return 0;
+ }
+@@ -2083,7 +2039,8 @@ static int __maybe_unused exynos_hdmi_resume(struct device *dev)
+ 	struct hdmi_context *hdata = dev_get_drvdata(dev);
+ 	int ret;
+ 
+-	ret = hdmi_clk_enable_gates(hdata);
++	ret = clk_bulk_prepare_enable(hdata->drv_data->clk_gates.count,
++				      hdata->clk_gates);
+ 	if (ret < 0)
  		return ret;
  
--	for (i = gsc->num_clocks - 1; i >= 0; i--)
--		clk_disable_unprepare(gsc->clock[i]);
-+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
- 
- 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
- 	return ret;
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
-index 715d9c9d..08ff7b9 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.h
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.h
-@@ -334,7 +334,7 @@ struct gsc_dev {
- 	struct gsc_variant		*variant;
- 	u16				id;
- 	int				num_clocks;
--	struct clk			*clock[GSC_MAX_CLOCKS];
-+	struct clk_bulk_data		*clocks;
- 	void __iomem			*regs;
- 	wait_queue_head_t		irq_queue;
- 	struct gsc_m2m_device		m2m;
 -- 
 2.7.4
