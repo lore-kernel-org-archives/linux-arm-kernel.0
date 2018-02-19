@@ -1,8 +1,8 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 19 Feb 2018 19:18:22 +0100
-Subject: [PATCH] arm64: dts: r8a77965-salvator-xs: Add support for Salvator-XS
- with R-Car M3-N
-Message-ID: <1519064302-12003-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 19 Feb 2018 19:20:55 +0100
+Subject: [PATCH v2] arm64: dts: renesas: Add support for Salvator-XS with
+ R-Car M3-N
+Message-ID: <1519064455-12505-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,12 +18,9 @@ Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 [geert: Switch to SPDX-License-Identifier, update patch description]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-Against renesas-devel-20180212-v4.16-rc1 with Jacopo Mondi's "[PATCH
-00/15] R-Car M3-N initial support"
-(https://www.spinics.net/lists/arm-kernel/msg634121.html).
-See branches topic/r8a77965-v1 and topic/r8a77965-v1+ in
-git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
-
+v2:
+  - Fix patch prefix.
+---
  arch/arm64/boot/dts/renesas/Makefile                |  2 +-
  .../arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 21 +++++++++++++++++++++
  2 files changed, 22 insertions(+), 1 deletion(-)
