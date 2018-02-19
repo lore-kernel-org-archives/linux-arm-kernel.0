@@ -1,47 +1,85 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Feb 2018 10:04:01 +0100
-Subject: [PATCH v3 1/7] ARM: sun8i: smp: Add support for A83T
-In-Reply-To: <20180219081837.15482-2-mylene.josserand@bootlin.com>
-References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
- <20180219081837.15482-2-mylene.josserand@bootlin.com>
-Message-ID: <20180219090401.5uxmwtnkd7oadaxx@flea.lan>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 19 Feb 2018 10:10:43 +0100
+Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
+In-Reply-To: <20180202140343.GX5453@intel.com>
+References: <20180201130446.6165-1-linus.walleij@linaro.org>
+ <20180201131907.GO5453@intel.com>
+ <CACRpkdaFyKYxnVB-QuUiT+G9QcrpyPkzd2KXUm1sWNSgzyF9AA@mail.gmail.com>
+ <20180202140343.GX5453@intel.com>
+Message-ID: <20180219091043.GE22199@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Feb 19, 2018 at 09:18:31AM +0100, Myl?ne Josserand wrote:
-> Add the support for A83T.
+On Fri, Feb 02, 2018 at 04:03:43PM +0200, Ville Syrj?l? wrote:
+> On Fri, Feb 02, 2018 at 02:56:30PM +0100, Linus Walleij wrote:
+> > On Thu, Feb 1, 2018 at 2:19 PM, Ville Syrj?l?
+> > <ville.syrjala@linux.intel.com> wrote:
+> > > [Me]
+> > >> +     /*
+> > >> +      * If we run into a situation where, for example, the primary plane
+> > >> +      * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
+> > >> +      * 16) we need to scale down the depth of the sizes we request.
+> > >> +      */
+> > >> +     drm_for_each_plane(plane, fb_helper->dev) {
+> > >> +             /* Only check the primary plane */
+> > >> +             if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+> > >> +                     continue;
+> > >
+> > > I think this should look at crtc->primary for each of the crtcs managed
+> > > by the fb_helper.
+> > >
+> > > Also this probably shouldn't look at YUV formats at all?
+> > 
+> > I guess I can look into doing it this way, sorry for not knowing how to
+> > properly inspect DRM objects, I'm lost sometimes...
+> > 
+> > > I do wonder if instead we should just have the driver specify the
+> > > pixel format explicitly instead of trying to guess based on bpp?
+> > 
+> > That makes a lot more sense to me actually. It would
+> > give a better sense of control so the driver feel it knows
+> > what is actually going on.
+> > 
+> > So I would just update
+> > drm_fb_cma_fbdev_init() and drm_fb_helper_initial_config()
+> > to pass a reasonable pixel format instead and refactor all the
+> > way down?
 > 
-> A83T SoC has an additional register than A80 to handle CPU configurations:
-> R_CPUS_CFG. Information about the register comes from Allwinner's BSP
-> driver.
-> An important difference is the Power Off Gating register for clusters
-> which is BIT(4) in case of SUN9I-A80 and BIT(0) in case of SUN8I-A83T.
+> Yeah, something along those lines would seem like the better approach
+> to me. But it's been a while since I've looked at this code so I might
+> be totally wrong :)
+
+Yeah, that would definitely fit better with the new world - fbdev
+emulation hasnt ever been updated to the pixel format approach.
+
+But fbdev emulation also predates the list of acceptable formats for each
+plane, so I'd go one step further and try to out-guess something if the
+driver passes a pixel format of 0. Your above loop almost does that
+already. That way only drivers which want something non-standard would
+need to set that parameter. For everyone else we could go through all
+rgb/bgr formats, from most pixels to least (well, all those that fbdev
+supports), with C8 as the ultimate fallback.
+
+But just going to pixel formats would be a good step already for sure.
+-Daniel
+
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-
-This is some high-level review, but you should split this patch in
-three:
-  - One to refactor the current code to split the DT parsing function
-    (and rename the function to sun9i_smp_dt_parse) and the variable renames
-  - One to enable the A83t SMP (with the function called sun8i_a83t_smp_dt_parse)
-  - One to enable the A83t hotplug (merged with your last patch)
-
-Also, you're calling a lot of times of_machine_is_compatible, and this
-is quite inefficient. You should call it once and store the result.
-
-Thanks!
-Maxime
+> > 
+> > It does hit a lot of code on the way, but if everyone thinks this
+> > is a good idea I can very well take a stab at it.
+> > 
+> > Yours,
+> > Linus Walleij
+> 
+> -- 
+> Ville Syrj?l?
+> Intel OTC
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/1af9d3d5/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
