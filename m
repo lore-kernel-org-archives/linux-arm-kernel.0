@@ -1,28 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Feb 2018 21:01:31 -0600
-Subject: [PATCH 13/15] Documentation: devicetree: ravb: Add r8a77965
-In-Reply-To: <20180215154235.ndpizqzkciqyifun@verge.net.au>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-14-git-send-email-jacopo+renesas@jmondi.org>
- <20180215154235.ndpizqzkciqyifun@verge.net.au>
-Message-ID: <20180219030131.ufslinagun7pba3e@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 19 Feb 2018 11:01:19 +0800
+Subject: [PATCH v3 2/7] watchdog: sunxi: allow setting timeout in
+ devicetree
+In-Reply-To: <20180219000619.4pjftflhcew5zav6@rob-hp-laptop>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+ <20180211200847.25000-2-marcus.folkesson@gmail.com>
+ <20180219000619.4pjftflhcew5zav6@rob-hp-laptop>
+Message-ID: <CAGb2v67ei8atFKyiFXA=EZ_wPbjBt+-2e-aSRqSzS9zaxHaTKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 04:45:34PM +0100, Simon Horman wrote:
-> On Tue, Feb 13, 2018 at 10:46:00AM +0100, Jacopo Mondi wrote:
-> > Add documentation for r8a77965 compatible string to renesas ravb device
-> > tree bindings documentation.
-> > 
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> This needs to be CCed to Sergei and netdev to proceed into mainline.
-> 
-> There are lot of examples and little consistency, but I believe a good
-> prefix and subject for the patch would be:
-> 
-> dt-bindings: net: ravb: Add support for r8a77965 SoC
+On Mon, Feb 19, 2018 at 8:06 AM, Rob Herring <robh@kernel.org> wrote:
+> On Sun, Feb 11, 2018 at 09:08:42PM +0100, Marcus Folkesson wrote:
+>> watchdog_init_timeout() will allways pick timeout_param since it
+>> defaults to a valid timeout.
+>>
+>> By following best practice described in
+>> Documentation/watchdog/watchdog-kernel-api.txt, it also
+>> let us to set timout-sec property in devicetree.
+>>
+>> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>  Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 4 ++++
+>>  drivers/watchdog/sunxi_wdt.c                             | 2 +-
+>>  2 files changed, 5 insertions(+), 1 deletion(-)
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
