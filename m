@@ -1,29 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Feb 2018 15:39:35 +0000
-Subject: [PATCH v2 0/2] arm64: Unimplemented syscall kernel message
-In-Reply-To: <20180201221338.9952-1-michael.weiser@gmx.de>
-References: <20180122131851.GA28638@arm.com>
- <20180201221338.9952-1-michael.weiser@gmx.de>
-Message-ID: <20180219153934.GA1740@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 Feb 2018 08:36:20 -0600
+Subject: [PATCH 1/5] dt-bindings: clock: ti: add latching support to mux
+ and divider clocks
+In-Reply-To: <1518698991-10099-2-git-send-email-t-kristo@ti.com>
+References: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
+ <1518698991-10099-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20180219143620.vu3ucann7vmgsdlt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-On Thu, Feb 01, 2018 at 11:13:35PM +0100, Michael Weiser wrote:
-> I've dropped the message from the compat change, which makes it much
-> more straight-forward. We are still dropping the offending log message
-> from do_ni_syscall(). The second change now just mirrors the part of arm
-> behaviour in compat_arm_syscall() that raises SIGILL for (most)
-> unimplemented syscalls. Finally show_unhandled_signals is disabled by
-> default.
+On Thu, Feb 15, 2018 at 02:49:47PM +0200, Tero Kristo wrote:
+> Certain hardware configurations, like dra76x, have some of the clock
+> registers partitioned in a funky manner that requires the clock
+> control setup to be latched for PRCM to be notified of the change. This
+> is accomplished with a separate control bit under the register. Add
+> support for this clock latching support to divider and mux clocks.
 > 
-> All are compile-tested as well as manually prodded with some randomly
-> chosen syscall numbers from aarch64 and arm-eabi binaries while running
-> under qemu-system-aarch64. New show_unhandled_signals defaults and
-> enabling via /proc/sys have been tested with a minimal segfaulting test
-> program.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  Documentation/devicetree/bindings/clock/ti/divider.txt | 3 +++
+>  Documentation/devicetree/bindings/clock/ti/mux.txt     | 3 +++
+>  2 files changed, 6 insertions(+)
 
-Thanks, I'll pick these up for 4.17.
-
-Will
+Reviewed-by: Rob Herring <robh@kernel.org>
