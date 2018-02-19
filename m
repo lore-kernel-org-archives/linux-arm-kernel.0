@@ -1,47 +1,61 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Feb 2018 09:10:50 +0100
-Subject: [RFC PATCH] ARM: configs: sunxi: Set ondemand govenor as default
-In-Reply-To: <20180217142235.28541-1-embed3d@gmail.com>
-References: <20180217142235.28541-1-embed3d@gmail.com>
-Message-ID: <20180219081050.vvfhnbw4foved2fb@flea.lan>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Mon, 19 Feb 2018 09:18:30 +0100
+Subject: [PATCH v3 0/7] Add SMP support on sun8i-a83t
+Message-ID: <20180219081837.15482-1-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 03:22:35PM +0100, Philipp Rossak wrote:
-> Right now the performance govenor is the default frequency govenor on
-> sunxi devices. This causes some general problems.
-> When the cpu is idle the cpu runs with its maximum frequency.
-> This causes a higher cpu temperature in the idle state. When the cpu is
-> now under load the cpu gets with that higher idle temperature now faster
-> to its thermal limits.
-> An other big problem of the performace govenor is the missing
-> thermal throttling. Some tests with cpuburn resulted in a system crash
-> when the soc reached its thermal limits since no thermal throttling
-> occurred.
+Hello everyone,
 
-This won't change anything with cpuburn. While cpuburn will be
-running, ondemand will increase the frequency of the cores to the
-maximum frequency, putting yourself in the exact same situation.
+This is a V3 of my series that adds SMP support for Allwinner sun8i-a83t.
+Based on sunxi's tree, sunxi/for-next branch.
 
-The only difference is going to be when you're idle or have a rather
-small CPU load. But then, you won't heat much in that case either.
+Changes since v2:
+    - Rebased my modifications according to new Chen-Yu Tsai's patch series
+    that adds SMP support for sun9i-a80 (without MCPM).
+    - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
+    and PRCM registers.
+    - The hotplug of CPU0 is currently not working (even after trying what
+    Allwinner's code is doing) so remove the possibility of disabling
+    this CPU. Created a new patch for it.
 
-> With this patch we set the default frequency govenor to ondemand mode
-> and reduce the temperature when the cpu is idle and activate the thermal
-> throtteling.
+Changes since v1:
+    - Add Chen Yu's patch in my series (see path 01)
+    - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
+    Create two functions to separate the DT parsing of sun9i-a80 and
+    sun8i-a83t.
+    - Thanks to Maxime's review: order device tree's nodes according
+    to physical addresses, remove unused label and fix registers' sizes.
+    Update the commit log and commit title of my last patch (see
+    patch 05).
 
-This patch doesn't activate the thermal throttling.
+Patch 01: Convert the sunxi SMP driver to add support for A83T.
+This SoC has a bit flip that needs to be handled.
+Patch 02-03-04: Add registers nodes (prcm, cpucfg and r_cpucfg) needed
+for SMP bringup.
+Patch 05: Add CCI-400 node for a83t.
+Patch 06: Fix the use of virtual timers that hangs the kernel in
+case of SMP support.
+Patch 07: Remove the possibility to disable the CPU0 because it is
+currently not working for sun8i-a83t.
 
-Maxime
+If you have any remarks/questions, let me know.
+Thank you in advance,
+Myl?ne
+
+Myl?ne Josserand (7):
+  ARM: sun8i: smp: Add support for A83T
+  ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
+  ARM: dts: sun8i: Add PRCM device node for the A83T dtsi
+  ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
+  arm: dts: sun8i: a83t: Add CCI-400 node
+  arm: dts: sun8i: a83t: Fix undefined offset with virtual timer
+  ARM: sun8i: smp: Remove the disabling of CPU0
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi |  57 +++++++++
+ arch/arm/mach-sunxi/Kconfig       |   2 +-
+ arch/arm/mach-sunxi/mc_smp.c      | 245 +++++++++++++++++++++++++++++++-------
+ 3 files changed, 260 insertions(+), 44 deletions(-)
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/94a61b97/attachment.sig>
+2.11.0
