@@ -1,63 +1,44 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 19 Feb 2018 11:55:50 +0100
-Subject: [PATCH 1/6] nand: davinci: rename the platform driver
-In-Reply-To: <93fd5120-28c6-96c7-4a0d-a4bd065f5ae6@lechnology.com>
-References: <20180216164712.25898-1-brgl@bgdev.pl>
- <20180216164712.25898-2-brgl@bgdev.pl>
- <20180216201923.16bfca7f@bbrezillon>
- <93fd5120-28c6-96c7-4a0d-a4bd065f5ae6@lechnology.com>
-Message-ID: <CAMRc=MeR6-kXR1+fqwH+h6FosYsdmG0z5eVrAx4Z93zB9isc0A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Feb 2018 11:58:50 +0100
+Subject: [PATCH] arm64: Fix compilation error while accessing
+ MPIDR_HWID_BITMASK from .S files
+In-Reply-To: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+References: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+Message-ID: <CAK8P3a2v9s8A8u+aRYgkQJL+TBmEauwuyFzPb_gnvU=1ZkntRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-16 20:22 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 02/16/2018 01:19 PM, Boris Brezillon wrote:
->>
->> On Fri, 16 Feb 2018 17:47:07 +0100
->> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> Commit d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock
->>> lookup table") broke the nand support in board file mode for
->>> da850-based boards. Instead of reverting it and breaking the DT users
->>> in the process (due to clock lookup), rename the driver to match the
->>> clock table before renaming the users.
->>>
->>> Fixes: d8e22fb4ccac ("ARM: da850: add the nand dev_id to the clock lookup
->>> table")
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>   drivers/mtd/nand/davinci_nand.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/mtd/nand/davinci_nand.c
->>> b/drivers/mtd/nand/davinci_nand.c
->>> index ccc8c43abcff..4fb143bf1872 100644
->>> --- a/drivers/mtd/nand/davinci_nand.c
->>> +++ b/drivers/mtd/nand/davinci_nand.c
->>> @@ -865,7 +865,7 @@ static struct platform_driver nand_davinci_driver = {
->>>         .probe          = nand_davinci_probe,
->>>         .remove         = nand_davinci_remove,
->>>         .driver         = {
->>> -               .name   = "davinci_nand",
->>> +               .name   = "davinci-nand",
->>
->>
->> Another side-effect of this change you should be aware of: by doing
->> that you also break all users that were defining partitions through the
->> cmdline using mtdparts=davinci_nand.0:<part-layout>.
->>
->> Not sure this is a good idea ;-).
+On Mon, Feb 19, 2018 at 7:39 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Since commit e1a50de37860b3a93a9d643b09638db5aff47650 (arm64: cputype:
+> Silence Sparse warnings), compilation of arm64 architecture is broken
+> with the following error messages:
 >
+>   AR      arch/arm64/kernel/built-in.o
+>   arch/arm64/kernel/head.S: Assembler messages:
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>   arch/arm64/kernel/head.S:677: Error: junk at end of line, first
+>   unrecognized character is `L'
+>   arch/arm64/kernel/head.S:677: Error: unexpected characters following
+>   instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
+>   arch/arm64/kernel/head.S:677: Error: unexpected characters following
+>   instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
 >
-> Also, once we move to the common clock framework, the AUXDATA that causes
-> the DT clock lookup breakage you are trying to avoid will go away, so that
-> won't be a reason for changing this either.
+> This patch fixes the same by using the UL() macro correctly for
+> assigning the MPIDR_HWID_BITMASK macro value.
 >
->
+> Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
 
-Ok, let's wait for v7 of your series then and reiterate this one.
+Saw the same thing in the kernelci report for linux-next.
 
-Best regards,
-Bartosz Golaszewski
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Note that when referencing a commit, it's best to abbreviate the commit
+ID to the first 12 characters like "e1a50de37860". You can also a line like
+
+Fixes: e1a50de37860 ("arm64: cputype: Silence Sparse warnings")
+
+which is the standard format to describe such regressions.
+
+       Arnd
