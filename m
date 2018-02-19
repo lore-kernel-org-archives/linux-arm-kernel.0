@@ -1,30 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Feb 2018 17:02:30 +0000
-Subject: [PATCH] arm64: cpufeature: Fix CTR_EL0 field definitions
-In-Reply-To: <1519051304-25141-1-git-send-email-will.deacon@arm.com>
-References: <1519051304-25141-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180219170229.akb4pupomzpbhxjr@armageddon.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 19 Feb 2018 18:02:56 +0100
+Subject: [PATCH v3 5/7] watchdog: mtk: allow setting timeout in devicetree
+In-Reply-To: <20180211200847.25000-5-marcus.folkesson@gmail.com>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+ <20180211200847.25000-5-marcus.folkesson@gmail.com>
+Message-ID: <e179fed7-225f-2c07-2c00-41ccd28d4784@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 02:41:44PM +0000, Will Deacon wrote:
-> Our field definitions for CTR_EL0 suffer from a number of problems:
-> 
->   - The IDC and DIC fields are missing, which causes us to enable CTR
->     trapping on CPUs with either of these returning non-zero values.
-> 
->   - The ERG is FTR_LOWER_SAFE, whereas it should be treated like CWG as
->     FTR_HIGHER_SAFE so that applications can use it to avoid false sharing.
-> 
->   - [nit] A RES1 field is described as "RAO"
-> 
-> This patch updates the CTR_EL0 field definitions to fix these issues.
-> 
-> Cc: <stable@vger.kernel.org>
-> Cc: Shanker Donthineni <shankerd@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Queued for -rc3.
 
--- 
-Catalin
+On 02/11/2018 09:08 PM, Marcus Folkesson wrote:
+> watchdog_init_timeout() will allways pick timeout_param since it
+> defaults to a valid timeout.
+> 
+> By following best practice described in
+> Documentation/watchdog/watchdog-kernel-api.txt, it also
+> let us to set timout-sec property in devicetree.
+> 
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 4 ++++
+>  drivers/watchdog/mtk_wdt.c                             | 2 +-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> index 5b38a30e608c..859dee167b91 100644
+> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> @@ -11,9 +11,13 @@ Required properties:
+>  
+>  - reg : Specifies base physical address and size of the registers.
+>  
+> +Optional properties:
+> +- timeout-sec: contains the watchdog timeout in seconds.
+> +
+>  Example:
+>  
+>  wdt: watchdog at 10000000 {
+>  	compatible = "mediatek,mt6589-wdt";
+>  	reg = <0x10000000 0x18>;
+> +	timeout-sec = <10>;
+>  };
+> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+> index 7ed417a765c7..fcdc10ec28a3 100644
+> --- a/drivers/watchdog/mtk_wdt.c
+> +++ b/drivers/watchdog/mtk_wdt.c
+> @@ -57,7 +57,7 @@
+>  #define DRV_VERSION		"1.0"
+>  
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+> -static unsigned int timeout = WDT_MAX_TIMEOUT;
+> +static unsigned int timeout;
+>  
+>  struct mtk_wdt_dev {
+>  	struct watchdog_device wdt_dev;
+> 
+
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
