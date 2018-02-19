@@ -1,48 +1,79 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 19 Feb 2018 12:30:46 -0600
-Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
- CTR_EL0.IDC
-In-Reply-To: <20180219171852.jsbzawbsyv7v5yi7@armageddon.cambridge.arm.com>
-References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
- <20180219143820.5oxc2kendvq4bbtt@armageddon.cambridge.arm.com>
- <92836754-2ab3-d5db-f0be-7ee3e10f368f@codeaurora.org>
- <20180219171852.jsbzawbsyv7v5yi7@armageddon.cambridge.arm.com>
-Message-ID: <da2b54da-cb05-b478-ce61-eeb3308de672@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 19 Feb 2018 19:46:46 +0100
+Subject: [PATCH v2 3/8] drm/bridge: dw-hdmi: allow overriding of phy-type
+ reading
+In-Reply-To: <3905607.btOD7ERYi5@avalon>
+References: <20180216204158.29839-1-heiko@sntech.de>
+ <20180216204158.29839-4-heiko@sntech.de> <3905607.btOD7ERYi5@avalon>
+Message-ID: <3104429.3dFhngZnWQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Catalin for your comments.
+Hi Laurent,
 
-On 02/19/2018 11:18 AM, Catalin Marinas wrote:
-> On Mon, Feb 19, 2018 at 10:35:30AM -0600, Shanker Donthineni wrote:
->> On 02/19/2018 08:38 AM, Catalin Marinas wrote:
->>> On the patch, I'd rather have an alternative framework entry for no VAU
->>> cache maint required and some ret instruction at the beginning of the
->>> cache maint function rather than jumping out of the loop somewhere
->>> inside the cache maintenance code, penalising the CPUs that do require
->>> it.
->>
->> Alternative framework might break things in case of CPU hotplug. I need one
->> more confirmation from you on incorporating alternative framework.     
+Am Montag, 19. Februar 2018, 17:59:02 CET schrieb Laurent Pinchart:
+> On Friday, 16 February 2018 22:41:53 EET Heiko Stuebner wrote:
+> > In some IP implementations the reading of the phy-type may be broken.
+> > One example are the Rockchip rk3228 and rk3328 socs that use a separate
+> > phy from Innosilicon but still report the HDMI20_TX type.
+> > 
+> > So allow the glue driver to force a specific type, like the vendor-phy
+> > for these cases.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> CPU hotplug can be an issue but it should be handled like other similar
-> cases: if a CPU comes online late and its features are incompatible, it
-> should not be brought online. The cpufeature code handles this.
-> 
-> With Will's patch for CTR_EL0, we handle different CPU features during
-> boot, defaulting to the lowest value for the IDC/DIC bits.
-> 
-> I suggest you add new ARM64_HAS_* feature bits and enable them based on
-> CTR_EL0.IDC and DIC. You could check for both being 1 with a single
-> feature bit but I guess an implementation is allowed to have these
-> different (e.g. DIC == 0 and IDC == 1).
-> 
+> Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I'll add two new features ARM64_HAS_DIC and ARM64_HAS_IDC to support
-all implementations. Unfortunately QCOM server chips supports IDC not DIC.
- 
+thanks for testing :-)
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> > ---
+> >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 4 +++-
+> >  include/drm/bridge/dw_hdmi.h              | 1 +
+> >  2 files changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
+> > f9802399cc0d..50d231626c4d 100644
+> > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > @@ -2218,7 +2218,9 @@ static int dw_hdmi_detect_phy(struct dw_hdmi *hdmi)
+> >  	unsigned int i;
+> >  	u8 phy_type;
+> > 
+> > -	phy_type = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
+> > +	phy_type = (hdmi->plat_data->phy_force_type) ?
+> > +				hdmi->plat_data->phy_force_type :
+> > +				hdmi_readb(hdmi, HDMI_CONFIG2_ID);
+> 
+> No need for parentheses. You could even write this
+> 
+>         phy_type = hdmi->plat_data->phy_force_type ? 
+>                  : hdmi_readb(hdmi, HDMI_CONFIG2_ID);
+> 
+> but that's up to you.
+> 
+> What if a driver wants to force the PHY type to DW_HDMI_PHY_DWC_HDMI_TX_PHY ? 
+> Or do you expect only the DW_HDMI_PHY_VENDOR_PHY type to be forced ? If so, we 
+> could also use a force_vendor_phy boolean field instead of phy_force_type.
+
+Initially I thought of implicitly overriding the phy-type when the external
+phy-ops are set, but decided against it because that might break
+(theoretical) cases where phy-ops may be always set but only used when
+the ip returns a matching phy-type and thus came to just allow overriding
+that type reading.
+
+As for limiting to only allow forcing the vendor type, my personal feeling
+would be to allow glue drivers to just override the type as needed
+like done in the patch. As can be seen on the rk3328, the dw-hdmi
+reports one of the regular phys (forgot which one) but instead has a
+completely separate ip for it, so I'd guess we may very well see
+implementations that just report a wrong type (no vendor-type).
+
+So I don't see an issue with drivers being allowed to set the type to
+DW_HDMI_PHY_DWC_HDMI_TX_PHY, because such cases may exist in the
+future and I'd expect driver authors to somewhat know what they're doing.
+
+But I'm not tied to that, so will go with the majority opinion :-D .
+
+
+Heiko
