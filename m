@@ -1,29 +1,38 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Mon, 19 Feb 2018 09:46:25 +0100
-Subject: [PATCH v2 0/3] USB OTG on STM32H743
-Message-ID: <1519029988-9261-1-git-send-email-amelie.delaunay@st.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Feb 2018 09:49:44 +0100
+Subject: [PATCH v3 5/7] arm: dts: sun8i: a83t: Add CCI-400 node
+In-Reply-To: <20180219081837.15482-6-mylene.josserand@bootlin.com>
+References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
+ <20180219081837.15482-6-mylene.josserand@bootlin.com>
+Message-ID: <20180219084944.iqrdzhpl63gdf6wy@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for USB OTG HS and FS on stm32h743 SoC.
-It also enables USB OTG HS on stm32h743i-eval board in OTG (DRD) mode. It is
-possible to use OTG HS in Peripheral or Host mode depending on the USB
-connector.
+Hi,
 
----
+On Mon, Feb 19, 2018 at 09:18:35AM +0100, Myl?ne Josserand wrote:
+> +				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
 
-Changes in v2:
-- Fix compatible string (https://patchwork.kernel.org/patch/10222153/)
+You should align these blocks on the first one in the array.
 
-Amelie Delaunay (3):
-  ARM: dts: stm32: add USB OTG HS support for STM32H743 SoC
-  ARM: dts: stm32: add USB OTG FS support for STM32H743 SoC
-  ARM: dts: stm32: enable USB OTG HS on stm32h743i-eval
-
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/stm32h743.dtsi         | 21 +++++++++++++++++++++
- arch/arm/boot/dts/stm32h743i-eval.dts    | 16 ++++++++++++++++
- 3 files changed, 57 insertions(+)
+Thanks!
+Maxime
 
 -- 
-2.7.4
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/7ec2ff17/attachment-0001.sig>
