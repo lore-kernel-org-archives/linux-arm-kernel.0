@@ -1,220 +1,115 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 19 Feb 2018 14:21:46 -0600
-Subject: [PATCH v7 25/42] ARM: davinci: dm644x: add new clock init using
- common clock framework
+Date: Mon, 19 Feb 2018 14:21:52 -0600
+Subject: [PATCH v7 31/42] ARM: davinci: switch to common clock framework
 In-Reply-To: <1519071723-31790-1-git-send-email-david@lechnology.com>
 References: <1519071723-31790-1-git-send-email-david@lechnology.com>
-Message-ID: <1519071723-31790-26-git-send-email-david@lechnology.com>
+Message-ID: <1519071723-31790-32-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new board-specific clock init in mach-davinci/dm644x.c
-using the new common clock framework drivers.
+This switches ARCH_DAVINCI to use the common clock framework. The legacy
+clock code in arch/arm/mach-davinci/ is no longer used. New drivers in
+drivers/clk/davinci/ are used instead.
 
-The #ifdefs are needed to prevent compile errors until the entire
-ARCH_DAVINCI is converted.
-
-Also clean up the #includes since we are adding some here.
+A few macros had to be moved to prevent compilation errors.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v7 changes:
-- add clock platform device declarations
-- register platform devices instead of registering clocks directly
-- add davinci prefix to commit description
+- s/compile/compilation and space instead of tab
+- add PM_GENERIC_DOMAINS dependencies
 
 v6 changes:
-- add blank lines between function calls
+- clean up indent on Common objects section
 
 
- arch/arm/mach-davinci/board-dm644x-evm.c  |  2 +
- arch/arm/mach-davinci/board-neuros-osd2.c |  2 +
- arch/arm/mach-davinci/board-sffsdr.c      |  2 +
- arch/arm/mach-davinci/davinci.h           |  1 +
- arch/arm/mach-davinci/dm644x.c            | 83 +++++++++++++++++++++++++++----
- 5 files changed, 81 insertions(+), 9 deletions(-)
+ arch/arm/Kconfig                | 5 ++++-
+ arch/arm/mach-davinci/Makefile  | 4 ++--
+ arch/arm/mach-davinci/clock.h   | 4 ----
+ arch/arm/mach-davinci/davinci.h | 4 ++++
+ arch/arm/mach-davinci/psc.h     | 2 --
+ 5 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 95b55aa..91c7525 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -768,6 +768,8 @@ static __init void davinci_evm_init(void)
- 	struct clk *aemif_clk;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e3d535..563fade 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -608,13 +608,16 @@ config ARCH_S3C24XX
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select CLKDEV_LOOKUP
++	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_CHIP
+ 	select GPIOLIB
+ 	select HAVE_IDE
++	select PM_GENERIC_DOMAINS if PM
++	select PM_GENERIC_DOMAINS_OF if PM && OF
++	select RESET_CONTROLLER
+ 	select USE_OF
+ 	select ZONE_DMA
+ 	help
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 4e81780..8725d8b 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -5,8 +5,8 @@
+ #
  
-+	dm644x_register_clocks();
-+
- 	ret = dm644x_gpio_register();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index f287577..ae17d3e 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -174,6 +174,8 @@ static __init void davinci_ntosd2_init(void)
- 	struct clk *aemif_clk;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ # Common objects
+-obj-y 			:= time.o clock.o serial.o psc.o \
+-			   usb.o common.o sram.o aemif.o
++obj-y 					:= time.o serial.o usb.o \
++					   common.o sram.o aemif.o
  
-+	dm644x_register_clocks();
-+
- 	ret = dm644x_gpio_register();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 2922da9..933cc08 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -134,6 +134,8 @@ static __init void davinci_sffsdr_init(void)
- {
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
  
-+	dm644x_register_clocks();
-+
- 	platform_add_devices(davinci_sffsdr_devices,
- 			     ARRAY_SIZE(davinci_sffsdr_devices));
- 	sffsdr_init_i2c();
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index d7894d5..2d05856 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -12,10 +12,6 @@
+ #ifndef __ARCH_ARM_DAVINCI_CLOCK_H
+ #define __ARCH_ARM_DAVINCI_CLOCK_H
+ 
+-#define DAVINCI_PLL1_BASE 0x01c40800
+-#define DAVINCI_PLL2_BASE 0x01c40c00
+-#define MAX_PLL 2
+-
+ /* PLL/Reset register offsets */
+ #define PLLCTL          0x100
+ #define PLLCTL_PLLEN    BIT(0)
 diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index c865226..2861a6f 100644
+index a200977..a227f80 100644
 --- a/arch/arm/mach-davinci/davinci.h
 +++ b/arch/arm/mach-davinci/davinci.h
-@@ -107,6 +107,7 @@ int dm365_gpio_register(void);
- /* DM644x function declarations */
- void dm644x_init(void);
- void dm644x_init_time(void);
-+void dm644x_register_clocks(void);
- void dm644x_init_asp(void);
- int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
- int dm644x_gpio_register(void);
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 71a16fc..64f5193 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -8,28 +8,31 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
--#include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/serial_8250.h>
-+#include <linux/clk-provider.h>
- #include <linux/dmaengine.h>
--#include <linux/platform_device.h>
-+#include <linux/init.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
+@@ -35,6 +35,10 @@
+ #include <media/davinci/vpbe.h>
+ #include <media/davinci/vpbe_osd.h>
  
- #include <asm/mach/map.h>
++#define DAVINCI_PLL1_BASE		0x01c40800
++#define DAVINCI_PLL2_BASE		0x01c40c00
++#define DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01c41000
++
+ #define DAVINCI_SYSTEM_MODULE_BASE	0x01c40000
+ #define SYSMOD_VDAC_CONFIG		0x2c
+ #define SYSMOD_VIDCLKCTL		0x38
+diff --git a/arch/arm/mach-davinci/psc.h b/arch/arm/mach-davinci/psc.h
+index 8af9f09..b58707c 100644
+--- a/arch/arm/mach-davinci/psc.h
++++ b/arch/arm/mach-davinci/psc.h
+@@ -27,8 +27,6 @@
+ #ifndef __ASM_ARCH_PSC_H
+ #define __ASM_ARCH_PSC_H
  
-+#include <mach/common.h>
- #include <mach/cputype.h>
- #include <mach/irqs.h>
--#include "psc.h"
- #include <mach/mux.h>
--#include <mach/time.h>
- #include <mach/serial.h>
--#include <mach/common.h>
-+#include <mach/time.h>
- 
-+#include "asp.h"
- #include "davinci.h"
--#include "clock.h"
- #include "mux.h"
--#include "asp.h"
-+
-+#ifndef CONFIG_COMMON_CLK
-+#include "clock.h"
-+#include "psc.h"
-+#endif
- 
- /*
-  * Device specific clocks
-@@ -43,6 +46,7 @@
- #define DM644X_EMAC_CNTRL_RAM_OFFSET	0x2000
- #define DM644X_EMAC_CNTRL_RAM_SIZE	0x2000
- 
-+#ifndef CONFIG_COMMON_CLK
- static struct pll_data pll1_data = {
- 	.num       = 1,
- 	.phys_base = DAVINCI_PLL1_BASE,
-@@ -326,6 +330,7 @@ static struct clk_lookup dm644x_clks[] = {
- 	CLK("davinci-wdt", NULL, &timer2_clk),
- 	CLK(NULL, NULL, NULL),
- };
-+#endif
- 
- static struct emac_platform_data dm644x_emac_pdata = {
- 	.ctrl_reg_offset	= DM644X_EMAC_CNTRL_OFFSET,
-@@ -934,8 +939,68 @@ void __init dm644x_init(void)
- 
- void __init dm644x_init_time(void)
- {
-+#ifdef CONFIG_COMMON_CLK
-+	struct clk *clk;
-+
-+	clk = clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM644X_REF_FREQ);
-+
-+	davinci_timer_init(clk);
-+#else
- 	davinci_clk_init(dm644x_clks);
- 	davinci_timer_init(&timer0_clk);
-+#endif
-+}
-+
-+static struct resource dm644x_pll1_resources[] = {
-+	{
-+		.start	= DAVINCI_PLL1_BASE,
-+		.end	= DAVINCI_PLL1_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device dm644x_pll1_device = {
-+	.name		= "dm644x-pll1",
-+	.id		= -1,
-+	.resource	= dm644x_pll1_resources,
-+	.num_resources	= ARRAY_SIZE(dm644x_pll1_resources),
-+};
-+
-+static struct resource dm644x_pll2_resources[] = {
-+	{
-+		.start	= DAVINCI_PLL2_BASE,
-+		.end	= DAVINCI_PLL2_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device dm644x_pll2_device = {
-+	.name		= "dm644x-pll2",
-+	.id		= -1,
-+	.resource	= dm644x_pll2_resources,
-+	.num_resources	= ARRAY_SIZE(dm644x_pll2_resources),
-+};
-+
-+static struct resource dm644x_psc_resources[] = {
-+	{
-+		.start	= DAVINCI_PWR_SLEEP_CNTRL_BASE,
-+		.end	= DAVINCI_PWR_SLEEP_CNTRL_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device dm644x_psc_device = {
-+	.name		= "dm644x-psc",
-+	.id		= -1,
-+	.resource	= dm644x_psc_resources,
-+	.num_resources	= ARRAY_SIZE(dm644x_psc_resources),
-+};
-+
-+void __init dm644x_register_clocks(void)
-+{
-+	platform_device_register(&dm644x_pll1_device);
-+	platform_device_register(&dm644x_pll2_device);
-+	platform_device_register(&dm644x_psc_device);
- }
- 
- int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
+-#define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
+-
+ /* Power and Sleep Controller (PSC) Domains */
+ #define DAVINCI_GPSC_ARMDOMAIN		0
+ #define DAVINCI_GPSC_DSPDOMAIN		1
 -- 
 2.7.4
