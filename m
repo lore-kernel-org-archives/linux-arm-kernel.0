@@ -1,87 +1,72 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 19 Feb 2018 14:21:25 -0600
-Subject: [PATCH v7 04/42] clk: davinci: Add platform information for TI DA850
+Date: Mon, 19 Feb 2018 14:21:24 -0600
+Subject: [PATCH v7 03/42] clk: davinci: Add platform information for TI DA830
  PLL
 In-Reply-To: <1519071723-31790-1-git-send-email-david@lechnology.com>
 References: <1519071723-31790-1-git-send-email-david@lechnology.com>
-Message-ID: <1519071723-31790-5-git-send-email-david@lechnology.com>
+Message-ID: <1519071723-31790-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds platform-specific declarations for the PLL clocks on TI DA850/
-OMAP-L138/AM18XX SoCs.
+This adds platform-specific declarations for the PLL clocks on TI DA830/
+OMAP-L137/AM17XX SoCs.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v7 changes:
 - include clkdev lookup registration here instead of in mach-davinci
-- split registration functions for each PLL
 - Add platform_device_id lookup
 
 v6 changes:
-- Added da850_pll{0,1}_info with controller-specific information
-- Added OBSCLK data
+- Added da830_pll_info with controller-specific information
 - Add empty lines between function calls
 
-
- drivers/clk/davinci/Makefile    |   1 +
- drivers/clk/davinci/pll-da850.c | 178 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/davinci/pll.c       |   4 +
- drivers/clk/davinci/pll.h       |   5 ++
- 4 files changed, 188 insertions(+)
- create mode 100644 drivers/clk/davinci/pll-da850.c
+ drivers/clk/davinci/Makefile    |  1 +
+ drivers/clk/davinci/pll-da830.c | 58 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/davinci/pll.c       |  1 +
+ drivers/clk/davinci/pll.h       |  4 +++
+ 4 files changed, 64 insertions(+)
+ create mode 100644 drivers/clk/davinci/pll-da830.c
 
 diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
-index 9061e19..13049d4 100644
+index d9673bd..9061e19 100644
 --- a/drivers/clk/davinci/Makefile
 +++ b/drivers/clk/davinci/Makefile
-@@ -3,4 +3,5 @@
+@@ -2,4 +2,5 @@
+ 
  ifeq ($(CONFIG_COMMON_CLK), y)
  obj-y += pll.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
-+obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pll-da850.o
++obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
  endif
-diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
+diff --git a/drivers/clk/davinci/pll-da830.c b/drivers/clk/davinci/pll-da830.c
 new file mode 100644
-index 0000000..1b4e011
+index 0000000..240b17a
 --- /dev/null
-+++ b/drivers/clk/davinci/pll-da850.c
-@@ -0,0 +1,178 @@
++++ b/drivers/clk/davinci/pll-da830.c
+@@ -0,0 +1,58 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * PLL clock descriptions for TI DA850/OMAP-L138/AM18XX
++ * PLL clock descriptions for TI DA830/OMAP-L137/AM17XX
 + *
 + * Copyright (C) 2018 David Lechner <david@lechnology.com>
 + */
 +
-+#include <linux/bitops.h>
-+#include <linux/clk-provider.h>
 +#include <linux/clkdev.h>
++#include <linux/bitops.h>
 +#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/of.h>
 +#include <linux/types.h>
 +
 +#include "pll.h"
 +
-+#define OCSEL_OCSRC_OSCIN		0x14
-+#define OCSEL_OCSRC_PLL0_SYSCLK(n)	(0x16 + (n))
-+#define OCSEL_OCSRC_PLL1_OBSCLK		0x1e
-+#define OCSEL_OCSRC_PLL1_SYSCLK(n)	(0x16 + (n))
-+
-+static const struct davinci_pll_clk_info da850_pll0_info __initconst = {
++static const struct davinci_pll_clk_info da830_pll_info __initconst = {
 +	.name = "pll0",
-+	.unlock_reg = CFGCHIP(0),
-+	.unlock_mask = CFGCHIP0_PLL_MASTER_LOCK,
 +	.pllm_mask = GENMASK(4, 0),
 +	.pllm_min = 4,
 +	.pllm_max = 32,
 +	.pllout_min_rate = 300000000,
 +	.pllout_max_rate = 600000000,
-+	.flags = PLL_HAS_CLKMODE | PLL_HAS_PREDIV | PLL_HAS_POSTDIV |
-+		 PLL_HAS_EXTCLKSRC,
++	.flags = PLL_HAS_CLKMODE | PLL_HAS_PREDIV | PLL_HAS_POSTDIV,
 +};
 +
 +/*
@@ -91,173 +76,56 @@ index 0000000..1b4e011
 + * currently not a need for it.
 + */
 +
-+static const struct davinci_pll_sysclk_info da850_pll0_sysclk_info[] __initconst = {
-+	SYSCLK(1, pll0_sysclk1, pll0_pllen, 5, SYSCLK_FIXED_DIV),
++static const struct davinci_pll_sysclk_info da830_pll_sysclk_info[] __initconst = {
 +	SYSCLK(2, pll0_sysclk2, pll0_pllen, 5, SYSCLK_FIXED_DIV),
 +	SYSCLK(3, pll0_sysclk3, pll0_pllen, 5, 0),
 +	SYSCLK(4, pll0_sysclk4, pll0_pllen, 5, SYSCLK_FIXED_DIV),
 +	SYSCLK(5, pll0_sysclk5, pll0_pllen, 5, 0),
-+	SYSCLK(6, pll0_sysclk6, pll0_pllen, 5, SYSCLK_ARM_RATE | SYSCLK_FIXED_DIV),
++	SYSCLK(6, pll0_sysclk6, pll0_pllen, 5, SYSCLK_FIXED_DIV),
 +	SYSCLK(7, pll0_sysclk7, pll0_pllen, 5, 0),
 +	{ }
 +};
 +
-+static const char * const da850_pll0_obsclk_parent_names[] __initconst = {
-+	"oscin",
-+	"pll0_sysclk1",
-+	"pll0_sysclk2",
-+	"pll0_sysclk3",
-+	"pll0_sysclk4",
-+	"pll0_sysclk5",
-+	"pll0_sysclk6",
-+	"pll0_sysclk7",
-+	"pll1_obsclk",
-+};
-+
-+static u32 da850_pll0_obsclk_table[] = {
-+	OCSEL_OCSRC_OSCIN,
-+	OCSEL_OCSRC_PLL0_SYSCLK(1),
-+	OCSEL_OCSRC_PLL0_SYSCLK(2),
-+	OCSEL_OCSRC_PLL0_SYSCLK(3),
-+	OCSEL_OCSRC_PLL0_SYSCLK(4),
-+	OCSEL_OCSRC_PLL0_SYSCLK(5),
-+	OCSEL_OCSRC_PLL0_SYSCLK(6),
-+	OCSEL_OCSRC_PLL0_SYSCLK(7),
-+	OCSEL_OCSRC_PLL1_OBSCLK,
-+};
-+
-+static const struct davinci_pll_obsclk_info da850_pll0_obsclk_info __initconst = {
-+	.name = "pll0_obsclk",
-+	.parent_names = da850_pll0_obsclk_parent_names,
-+	.num_parents = ARRAY_SIZE(da850_pll0_obsclk_parent_names),
-+	.table = da850_pll0_obsclk_table,
-+	.ocsrc_mask = GENMASK(4, 0),
-+};
-+
-+static const struct davinci_pll_clk_info da850_pll1_info __initconst = {
-+	.name = "pll1",
-+	.unlock_reg = CFGCHIP(3),
-+	.unlock_mask = CFGCHIP3_PLL1_MASTER_LOCK,
-+	.pllm_mask = GENMASK(4, 0),
-+	.pllm_min = 4,
-+	.pllm_max = 32,
-+	.pllout_min_rate = 300000000,
-+	.pllout_max_rate = 600000000,
-+	.flags = PLL_HAS_POSTDIV,
-+};
-+
-+static const struct davinci_pll_sysclk_info da850_pll1_sysclk_info[] __initconst = {
-+	SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, 0),
-+	SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, 0),
-+	{ }
-+};
-+
-+static const char * const da850_pll1_obsclk_parent_names[] __initconst = {
-+	"oscin",
-+	"pll1_sysclk1",
-+	"pll1_sysclk2",
-+	"pll1_sysclk3",
-+};
-+
-+static u32 da850_pll1_obsclk_table[] = {
-+	OCSEL_OCSRC_OSCIN,
-+	OCSEL_OCSRC_PLL1_SYSCLK(1),
-+	OCSEL_OCSRC_PLL1_SYSCLK(2),
-+	OCSEL_OCSRC_PLL1_SYSCLK(3),
-+};
-+
-+static const struct davinci_pll_obsclk_info da850_pll1_obsclk_info __initconst = {
-+	.name = "pll1_obsclk",
-+	.parent_names = da850_pll1_obsclk_parent_names,
-+	.num_parents = ARRAY_SIZE(da850_pll1_obsclk_parent_names),
-+	.table = da850_pll1_obsclk_table,
-+	.ocsrc_mask = GENMASK(4, 0),
-+};
-+
-+int __init da850_pll0_init(struct device *dev, void __iomem *base)
++int __init da830_pll_init(struct device *dev, void __iomem *base)
 +{
 +	const struct davinci_pll_sysclk_info *info;
 +	struct clk *clk;
 +
-+	davinci_pll_clk_register(dev, &da850_pll0_info, "ref_clk", base);
++	davinci_pll_clk_register(dev, &da830_pll_info, "ref_clk", base);
 +
-+	davinci_pll_auxclk_register(dev, "pll0_auxclk", base);
-+
-+	clk = clk_register_fixed_factor(dev, "async2", "pll0_auxclk",
-+					CLK_IS_CRITICAL, 1, 1);
-+
++	clk = davinci_pll_auxclk_register(dev, "pll0_auxclk", base);
 +	clk_register_clkdev(clk, NULL, "i2c_davinci.1");
 +	clk_register_clkdev(clk, "timer0", NULL);
 +	clk_register_clkdev(clk, NULL, "davinci-wdt");
 +
-+	for (info = da850_pll0_sysclk_info; info->name; info++)
++	for (info = da830_pll_sysclk_info; info->name; info++)
 +		davinci_pll_sysclk_register(dev, info, base);
 +
-+	davinci_pll_obsclk_register(dev, &da850_pll0_obsclk_info, base);
-+
 +	return 0;
-+}
-+
-+int __init da850_pll1_init(struct device *dev, void __iomem *base)
-+{
-+	const struct davinci_pll_sysclk_info *info;
-+
-+	davinci_pll_clk_register(dev, &da850_pll1_info, "oscin", base);
-+
-+	for (info = da850_pll1_sysclk_info; info->name; info++)
-+		davinci_pll_sysclk_register(dev, info, base);
-+
-+	davinci_pll_obsclk_register(dev, &da850_pll1_obsclk_info, base);
-+
-+	return 0;
-+}
-+
-+int __init of_da850_pll0_init(struct device *dev, void __iomem *base)
-+{
-+	return of_davinci_pll_init(dev, &da850_pll0_info,
-+				   &da850_pll0_obsclk_info,
-+				   da850_pll0_sysclk_info, 7, base);
-+}
-+
-+int __init of_da850_pll1_init(struct device *dev, void __iomem *base)
-+{
-+	return of_davinci_pll_init(dev, &da850_pll1_info,
-+				   &da850_pll1_obsclk_info,
-+				   da850_pll1_sysclk_info, 3, base);
 +}
 diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
-index 9a22511..7c56397 100644
+index e4f3e5f..9a22511 100644
 --- a/drivers/clk/davinci/pll.c
 +++ b/drivers/clk/davinci/pll.c
-@@ -747,11 +747,15 @@ int of_davinci_pll_init(struct device *dev,
- }
- 
- static const struct of_device_id davinci_pll_of_match[] = {
-+	{ .compatible = "ti,da850-pll0", .data = of_da850_pll0_init },
-+	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
- 	{ }
+@@ -751,6 +751,7 @@ static const struct of_device_id davinci_pll_of_match[] = {
  };
  
  static const struct platform_device_id davinci_pll_id_table[] = {
- 	{ .name = "da830-pll",   .driver_data = (kernel_ulong_t)da830_pll_init   },
-+	{ .name = "da850-pll0",  .driver_data = (kernel_ulong_t)da850_pll0_init  },
-+	{ .name = "da850-pll1",  .driver_data = (kernel_ulong_t)da850_pll1_init  },
++	{ .name = "da830-pll",   .driver_data = (kernel_ulong_t)da830_pll_init   },
  	{ }
  };
  
 diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
-index 5c4c5c8..545a156 100644
+index 50fe429..5c4c5c8 100644
 --- a/drivers/clk/davinci/pll.h
 +++ b/drivers/clk/davinci/pll.h
-@@ -121,4 +121,9 @@ int of_davinci_pll_init(struct device *dev,
+@@ -117,4 +117,8 @@ int of_davinci_pll_init(struct device *dev,
+ 			u8 max_sysclk_id,
+ 			void __iomem *base);
  
- int da830_pll_init(struct device *dev, void __iomem *base);
- 
-+int da850_pll0_init(struct device *dev, void __iomem *base);
-+int da850_pll1_init(struct device *dev, void __iomem *base);
-+int of_da850_pll0_init(struct device *dev, void __iomem *base);
-+int of_da850_pll1_init(struct device *dev, void __iomem *base);
++/* Platform-specific callbacks */
++
++int da830_pll_init(struct device *dev, void __iomem *base);
 +
  #endif /* __CLK_DAVINCI_PLL_H___ */
 -- 
