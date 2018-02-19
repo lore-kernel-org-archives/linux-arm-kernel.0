@@ -1,20 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Feb 2018 21:03:09 -0600
-Subject: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-In-Reply-To: <20180213101412.5717-3-liwei213@huawei.com>
-References: <20180213101412.5717-1-liwei213@huawei.com>
- <20180213101412.5717-3-liwei213@huawei.com>
-Message-ID: <20180219030309.vcunedttrszwmidk@rob-hp-laptop>
+Date: Sun, 18 Feb 2018 21:05:38 -0600
+Subject: [PATCH 1/9] dt-bindings: power: Fix "debounce-interval" property
+ misspelling
+In-Reply-To: <1518531335-5170-2-git-send-email-geert+renesas@glider.be>
+References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
+ <1518531335-5170-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180219030538.yioxsjaemoecxysk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 06:14:09PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon.
+On Tue, Feb 13, 2018 at 03:15:27PM +0100, Geert Uytterhoeven wrote:
+> "debounce_interval" was never supported.
 > 
-> Signed-off-by: Li Wei <liwei213@huawei.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 > ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> Please apply to your tree when appropriate.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Done.
+
+> 
+>  Documentation/devicetree/bindings/power/wakeup-source.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
