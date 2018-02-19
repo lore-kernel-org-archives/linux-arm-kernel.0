@@ -1,43 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 19 Feb 2018 21:46:04 +0100
-Subject: [PATCH v2 8/8] drm/rockchip: dw_hdmi: add dw-hdmi support for the
- rk3328
-In-Reply-To: <20180219202853.eovn6onxtk7p7f4p@rob-hp-laptop>
-References: <20180216204158.29839-1-heiko@sntech.de>
- <20180216204158.29839-9-heiko@sntech.de>
- <20180219202853.eovn6onxtk7p7f4p@rob-hp-laptop>
-Message-ID: <6129590.ZtzF0TqO4l@phil>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 19 Feb 2018 21:35:19 +0100
+Subject: setterm -blank force no longer works after switch to omapdrm
+In-Reply-To: <20180219191623.GA2347@amd>
+References: <20180217211927.GC9640@amd>
+ <20180219191623.GA2347@amd>
+Message-ID: <20180219203519.GA4936@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Am Montag, 19. Februar 2018, 21:28:53 CET schrieb Rob Herring:
-> On Fri, Feb 16, 2018 at 09:41:58PM +0100, Heiko Stuebner wrote:
-> > The rk3328 uses an external hdmi phy from Innosilicon which uses
-> > the generic phy framework for access. Add the necessary data
-> > and the compatible for it.
+On Mon 2018-02-19 20:16:23, Pavel Machek wrote:
+> On Sat 2018-02-17 22:19:27, Pavel Machek wrote:
+> > Hi!
 > > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  .../bindings/display/rockchip/dw_hdmi-rockchip.txt |   1 +
-> >  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 106 +++++++++++++++++++++
-> >  2 files changed, 107 insertions(+)
+> > I used to have use omap fb driver, and blanking worked as expected. It
+> > no longer works with omap drm driver. (Tested on v4.16-rc1, but I
+> > believe it is broken in older versions, too.)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > index 937bfb472e1d..39143424a474 100644
-> > --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > @@ -13,6 +13,7 @@ Required properties:
-> >  
-> >  - compatible: should be one of the following:
-> >  		"rockchip,rk3288-dw-hdmi"
-> > +		"rockchip,rk3328-dw-hdmi"
+> > Can you test it on your hw? Any ideas what could be wrong?
+> > 
+> > xset dpms force on/off works as expected.
 > 
-> Is Designware (Synopsys) now Innosilicon?
+> next-20180219 seems to work as expected, too.
 
-Nope :-) .
-
-The rk3328 just combines the Designware dw-hdmi with an (external)
-hdmi-phy from Innosilicon, where the hdmi-phy otherwise was was
-integrated into the hdmi ip-block.
+...because I did not switch to omap drm driver for my next- kernels,
+yet. Oops :-).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180219/a70cb073/attachment-0001.sig>
