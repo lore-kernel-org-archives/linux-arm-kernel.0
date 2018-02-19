@@ -1,54 +1,34 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Mon, 19 Feb 2018 11:42:34 +0100
-Subject: [PATCH v3 3/7] ARM: dts: sun8i: Add PRCM device node for the
- A83T dtsi
-In-Reply-To: <20180219084822.zudk3w55z75lx5gx@flea.lan>
+Date: Mon, 19 Feb 2018 11:43:10 +0100
+Subject: [PATCH v3 5/7] arm: dts: sun8i: a83t: Add CCI-400 node
+In-Reply-To: <20180219084944.iqrdzhpl63gdf6wy@flea.lan>
 References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
- <20180219081837.15482-4-mylene.josserand@bootlin.com>
- <20180219084822.zudk3w55z75lx5gx@flea.lan>
-Message-ID: <20180219114234.0eeec1fc@dell-desktop.home>
+ <20180219081837.15482-6-mylene.josserand@bootlin.com>
+ <20180219084944.iqrdzhpl63gdf6wy@flea.lan>
+Message-ID: <20180219114310.6b60b775@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, 19 Feb 2018 09:48:22 +0100
+On Mon, 19 Feb 2018 09:49:44 +0100
 Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
 > Hi,
 > 
-> On Mon, Feb 19, 2018 at 09:18:33AM +0100, Myl?ne Josserand wrote:
-> > As we found in Sun9i-A80, PRCM is a collection of clock controls,
-> > reset controls, and various power switches/gates.
-> > It is used with CPUCFG for SMP bringup and CPU hotplugging.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > index e45bab836620..3e7317ec3e43 100644
-> > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > @@ -699,6 +699,11 @@
-> >  			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> >  		};
-> >  
-> > +		prcm at 1f01400 {
-> > +			compatible = "allwinner,sun8i-a83t-prcm";
-> > +			reg = <0x1f01400 0x400>;
-> > +		};
-> > +
-> >  		r_ccu: clock at 1f01400 {
-> >  			compatible = "allwinner,sun8i-a83t-r-ccu";
-> >  			reg = <0x01f01400 0x400>;  
+> On Mon, Feb 19, 2018 at 09:18:35AM +0100, Myl?ne Josserand wrote:
+> > +				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+> > +				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;  
 > 
-> These two are exactly the same nodes.
+> You should align these blocks on the first one in the array.
 
-Oh, yes, I did not pay attention to that.
-
-Thanks,
+Yep, thanks.
 
 Myl?ne
 
