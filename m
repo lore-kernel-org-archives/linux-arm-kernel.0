@@ -1,89 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 19 Feb 2018 08:32:34 -0600
-Subject: [RFC PATCH v2 2/6] dt-bindings: add bindings for Samsung
- micro-USB 11-pin connector
-In-Reply-To: <20180215103920.32017-3-a.hajda@samsung.com>
-References: <20180215103920.32017-1-a.hajda@samsung.com>
- <CGME20180215103926eucas1p2f13dcf5aa4e102e7f0145c976a60bc72@eucas1p2.samsung.com>
- <20180215103920.32017-3-a.hajda@samsung.com>
-Message-ID: <20180219143234.5k47c5sihqwuwwqw@rob-hp-laptop>
+Date: Mon, 19 Feb 2018 08:34:31 -0600
+Subject: [PATCH 1/4][v4] dt-bindings: mtd-physmap: Add endianness supports
+In-Reply-To: <20180215114904.23627-1-prabhakar.kushwaha@nxp.com>
+References: <20180215114904.23627-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180219143431.ulznksgjv6ng5e6p@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:39:16AM +0100, Andrzej Hajda wrote:
-> Samsung micro-USB 11-pin connector beside standard micro-USB pins,
-> has pins dedicated to route MHL traffic.
+On Thu, Feb 15, 2018 at 05:19:04PM +0530, Prabhakar Kushwaha wrote:
+> Connection between flash and controller is not necessary to be always
+> of same type. It may varies from platform to platform.
 > 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> Adding endianness (optional) property to provide connection type
+> information.
+> 
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 > ---
->  .../connector/samsung,usb-connector-11pin.txt      | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
+> Changes for v2: updated subject
+> Changes for v3: fixed typo for "big-endian"
+> Changes for v4: Moved binding definition in mtd-physmap.txt
+> as discussed at https://patchwork.ozlabs.org/patch/842543/
 > 
-> diff --git a/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
-> new file mode 100644
-> index 000000000000..c8ef1ad6732f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
-> @@ -0,0 +1,51 @@
-> +Samsung micro-USB 11-pin connector
-> +==================================
-> +
-> +Samsung micro-USB 11-pin connector is an extension of micro-USB connector.
-> +It is present in multiple Samsung mobile devices.
-> +It has additional pins to route MHL traffic simultanously with USB.
-> +
-> +The bindings are superset of usb-connector bindings for micro-USB connector[1].
-> +
-> +Required properties:
-> +- compatible: must be: "samsung,usb-connector-11pin", "usb-b-connector",
-> +- type: must be "micro".
-> +
-> +Optional properties:
-> +- label: symbolic name for the connector.
-
-This is already defined in [1] so you don't need it here.
-
-Otherwise,
+>  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
-
-> +
-> +Required nodes:
-> +- any data bus to the connector should be modeled using the OF graph bindings
-> +  specified in bindings/graph.txt, unless the bus is between parent node and
-> +  the connector. Since single connector can have multpile data buses every bus
-> +  has assigned OF graph port number as follows:
-> +    0: High Speed (HS),
-> +    3: Mobile High-Definition Link (MHL), specific to 11-pin Samsung micro-USB.
-> +
-> +[1]: bindings/connector/usb-connector.txt
-> +
-> +Example
-> +-------
-> +
-> +Micro-USB connector with HS lines routed via controller (MUIC) and :
-> +
-> +muic-max77843 at 66 {
-> +	...
-> +	usb_con: connector {
-> +		compatible = "samsung,usb-connector-11pin", "usb-b-connector";
-> +		label = "micro-USB";
-> +		type = "micro";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +				usb_con_mhl: endpoint {
-> +					remote-endpoint = <&sii8620_mhl>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.16.1
-> 
