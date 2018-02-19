@@ -1,36 +1,37 @@
 From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 19 Feb 2018 13:47:34 +0100
-Subject: [PATCH v4 11/13] ARM: dtsi: sun8i: a711: enable battery power supply
- subnode
+Date: Mon, 19 Feb 2018 13:47:28 +0100
+Subject: [PATCH v4 05/13] mfd: axp20x: probe axp20x_adc driver for AXP813
 In-Reply-To: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
 References: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
-Message-ID: <18433bfad4e66af7803b5f655b818fa265b3044c.1519044068.git-series.quentin.schulz@bootlin.com>
+Message-ID: <a82ff9673c8652d3fbc17c5966feb230349e6200.1519044068.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TBS A711 has an AXP813 PMIC and a soldered battery, thus, we enable
-the battery power supply subnode in its Device Tree.
+This makes the axp20x_adc driver probe with platform device id
+"axp813-adc".
 
 Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mfd/axp20x.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index 511fca4..1de362f 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -231,6 +231,10 @@
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 1977a03..e5516aa 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -885,7 +885,10 @@ static struct mfd_cell axp813_cells[] = {
+ 	}, {
+ 		.name			= "axp20x-gpio",
+ 		.of_compatible		= "x-powers,axp813-gpio",
+-	}
++	}, {
++		.name			= "axp813-adc",
++		.of_compatible		= "x-powers,axp813-adc",
++	},
+ };
  
- #include "axp81x.dtsi"
- 
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
+ static struct axp20x_dev *axp20x_pm_power_off;
 -- 
 git-series 0.9.1
