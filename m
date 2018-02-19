@@ -1,242 +1,380 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 19 Feb 2018 22:43:47 +0530
-Subject: [PATCH 01/10] dt-bindings: pinctrl: Add bindings for Actions
- S900 SoC
-In-Reply-To: <77989e71-3cde-bb01-e07d-a9a809751a9b@suse.de>
-References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
- <20180217204433.3095-2-manivannan.sadhasivam@linaro.org>
- <77989e71-3cde-bb01-e07d-a9a809751a9b@suse.de>
-Message-ID: <20180219171347.kdxibfd4vfuajudj@linaro.org>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Mon, 19 Feb 2018 17:13:57 +0000
+Subject: [PATCH 3/6] gpio: Add GPIO support for the ST Multi-Function
+ eXpander
+In-Reply-To: <CAHp75VfuEd5fgjv40A27hOgj_Nd_LK2Yh=oBR-8qgPc+gSiiQw@mail.gmail.com>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-4-git-send-email-amelie.delaunay@st.com>
+ <CAHp75VfuEd5fgjv40A27hOgj_Nd_LK2Yh=oBR-8qgPc+gSiiQw@mail.gmail.com>
+Message-ID: <32166cf0-5384-c313-f1be-4c27baf40ccf@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-On Sat, Feb 17, 2018 at 10:03:53PM +0100, Andreas F?rber wrote:
-> Am 17.02.2018 um 21:44 schrieb Manivannan Sadhasivam:
-> > Add pinctrl bindings for Actions Semi S900 SoC
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  .../bindings/pinctrl/actions,s900-pinctrl.txt      | 171 +++++++++++++++++++++
-> >  1 file changed, 171 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
-> > new file mode 100644
-> > index 000000000000..ee7d3ecd9bd9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
-> > @@ -0,0 +1,171 @@
-> > +Actions Semi S900 Pin Controller
-> 
-> So you are targeting to have one bindings file per SoC?
-> 
-Yes. Similar to what Qcom drivers are doing! Having a single
-binding will look messy if we add support for other
-OWL family SoC's like S500, S700...
-> > +
-> > +This binding describes the pin controller found in the S900 SoC.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible:   Should be "actions,s900-pinctrl"
-> > +- reg:          Should contain the register base address and size of
-> > +                the pin controller.
-> > +- clocks:       phandle of the clock feeding the pin controller
-> > +
-> > +Please refer to pinctrl-bindings.txt in this directory for details of the
-> > +common pinctrl bindings used by client devices, including the meaning of the
-> > +phrase "pin configuration node".
-> > +
-> > +The pin configuration nodes act as a container for an arbitrary number of
-> > +subnodes. Each of these subnodes represents some desired configuration for a
-> > +pin, a group, or a list of pins or groups. This configuration can include the
-> > +mux function to select on those group(s), and various pin configuration
-> > +parameters, such as pull-up, drive strength, etc.
-> > +
-> > +PIN CONFIGURATION NODES:
-> > +
-> > +The name of each subnode is not important; all subnodes should be enumerated
-> > +and processed purely based on their content.
-> > +
-> > +Each subnode only affects those parameters that are explicitly listed. In
-> > +other words, a subnode that lists a mux function but no pin configuration
-> > +parameters implies no information about any pin configuration parameters.
-> > +Similarly, a pin subnode that describes a pullup parameter implies no
-> > +information about e.g. the mux function.
-> > +
-> > +Pinmux functions are available only for the pin groups while pinconf
-> > +parameters are available for both pin groups and individual pins.
-> > +
-> > +The following generic properties as defined in pinctrl-bindings.txt are valid
-> > +to specify in a pin configuration subnode:
-> > +
-> > +Required Properties:
-> > +
-> > +- pins:           An array of strings, each string containing the name of a pin.
-> > +                  These pins are used for selecting the pull control and schmitt
-> > +                  trigger parameters. The following are the list of pins
-> > +                  available:
-> > +
-> > +                  ETH_TXD0, ETH_TXD1, ETH_TXEN, ETH_RXER, ETH_CRS_DV,
-> > +                  ETH_RXD1, ETH_RXD0, ETH_REF_CLK, ETH_MDC, ETH_MDIO,
-> > +                  SIRQ0, SIRQ1, SIRQ2, I2S_D0, I2S_BCLK0, I2S_LRCLK0,
-> > +                  I2S_MCLK0, I2S_D1, I2S_BCLK1, I2S_LRCLK1, I2S_MCLK1,
-> > +                  PCM1_IN, PCM1_CLK, PCM1_SYNC, PCM1_OUT, ERAM_A5,
-> > +                  ERAM_A6, ERAM_A7, ERAM_A8, ERAM_A9, ERAM_A10, ERAM_A11,
-> > +                  LVDS_OEP, LVDS_OEN, LVDS_ODP, LVDS_ODN, LVDS_OCP,
-> > +                  LVDS_OCN, LVDS_OBP, LVDS_OBN, LVDS_OAP, LVDS_OAN,
-> > +                  LVDS_EEP, LVDS_EEN, LVDS_EDP, LVDS_EDN, LVDS_ECP,
-> > +                  LVDS_ECN, LVDS_EBP, LVDS_EBN, LVDS_EAP, LVDS_EAN,
-> > +                  SD0_D0, SD0_D1, SD0_D2, SD0_D3, SD1_D0, SD1_D1,
-> > +                  SD1_D2, SD1_D3, SD0_CMD, SD0_CLK, SD1_CMD, SD1_CLK,
-> > +                  SPI0_SCLK, SPI0_SS, SPI0_MISO, SPI0_MOSI, UART0_RX,
-> > +                  UART0_TX, UART2_RX, UART2_TX, UART2_RTSB, UART2_CTSB,
-> > +                  UART3_RX, UART3_TX, UART3_RTSB, UART3_CTSB, UART4_RX,
-> > +                  UART4_TX, I2C0_SCLK, I2C0_SDATA, I2C1_SCLK, I2C1_SDATA,
-> > +                  I2C2_SCLK, I2C2_SDATA, CSI0_DN0, CSI0_DP0, CSI0_DN1,
-> > +                  CSI0_DP1, CSI0_CN, CSI0_CP, CSI0_DN2, CSI0_DP2, CSI0_DN3,
-> > +                  CSI0_DP3, DSI_DP3, DSI_DN3, DSI_DP1, DSI_DN1, DSI_CP,
-> > +                  DSI_CN, DSI_DP0, DSI_DN0, DSI_DP2, DSI_DN2, SENSOR0_PCLK,
-> > +                  CSI1_DN0,CSI1_DP0,CSI1_DN1, CSI1_DP1, CSI1_CN, CSI1_CP,
-> > +                  SENSOR0_CKOUT, NAND0_D0, NAND0_D1, NAND0_D2, NAND0_D3,
-> > +                  NAND0_D4, NAND0_D5, NAND0_D6, NAND0_D7, NAND0_DQS,
-> > +                  NAND0_DQSN, NAND0_ALE, NAND0_CLE, NAND0_CEB0, NAND0_CEB1,
-> > +                  NAND0_CEB2, NAND0_CEB3, NAND1_D0, NAND1_D1, NAND1_D2,
-> > +                  NAND1_D3, NAND1_D4, NAND1_D5, NAND1_D6, NAND1_D7, NAND1_DQS,
-> > +                  NAND1_DQSN, NAND1_ALE, NAND1_CLE, NAND1_CEB0, NAND1_CEB1,
-> > +                  NAND1_CEB2, NAND1_CEB3, SGPIO0, SGPIO1, SGPIO2, SGPIO3
-> 
-> Should be lower-case?
-> 
-Okay.
-> > +
-> > +- groups:         An array of strings, each string containing the name of a pin
-> > +                  group. These pin groups are used for selecting the pinmux
-> > +                  functions. The following are the list of pin groups available:
-> > +
-> > +                  mfp0_22, mfp0_21_20_eth_mdc, mfp0_21_20_eth_mdio,
-> > +                  mfp0_19_sirq0, mfp0_19_sirq1, mfp0_18_16_eth_txd0,
-> > +                  mfp0_18_16_eth_txd1, mfp0_15_13_eth_txen, mfp0_15_13_eth_rxer,
-> > +                  mfp0_12_11, mfp0_10_8_eth_rxd1, mfp0_10_8_eth_rxd0, mfp0_7_6,
-> > +                  mfp0_5_i2s_d0, mfp0_5_i2s_d1, mfp0_4_3, mfp0_2_i2s0,
-> > +                  mfp0_2_i2s1, mfp0_1_0_pcm1_in_out, mfp0_1_0_pcm1_clk,
-> > +                  mfp0_1_0_pcm1_sync, mfp1_31_29_eram_a5, mfp1_31_29_eram_a6,
-> > +                  mfp1_31_29_eram_a7, mfp1_28_26_eram_a8, mfp1_28_26_eram_a9,
-> > +                  mfp1_28_26_eram_a10, mfp1_25_23, mfp1_22_lvds_oep_odn,
-> > +                  mfp1_22_lvds_ocp_obn, mfp1_22_lvds_oap_oan, mfp1_21_lvds_e,
-> > +                  mfp1_5_4, mfp1_3_1_spi0_ss, mfp1_3_1_spi0_miso, mfp2_23,
-> > +                  mfp2_22, mfp2_21, mfp2_20, mfp2_19_17, mfp2_16_14, mfp2_13_11,
-> > +                  mfp2_10_9, mfp2_8_7, mfp2_6_5, mfp2_4_3, mfp2_2_0, mfp3_27,
-> > +                  mfp3_21_19, mfp3_18_16, mfp3_15, mfp3_14, mfp3_13,
-> > +                  mfp3_12_dsi_dp3_dn1, mfp3_12_dsi_cp_dn0, mfp3_12_dsi_dp2_dn2,
-> > +                  mfp3_11, mfp3_10_nand1_ceb3, mfp3_10_nand1_ceb0, mfp3_9,
-> > +                  mfp3_8
-> > +
-> > +                  These pin groups are used for selecting the drive strength
-> > +                  parameters.
-> > +
-> > +                  drv0_31_30, drv0_29_28, drv0_27_26, drv0_25_24, drv0_23_22,
-> > +                  drv0_21_20, drv0_19_18, drv0_17_16, drv0_15_14, drv0_13_12,
-> > +                  drv0_11_10, drv0_9_8, drv0_7_6, drv0_5_4, drv0_3_2, drv0_1_0,
-> > +                  drv1_29_28, drv1_27_26, drv1_25_24, drv1_23_22, drv1_21_20,
-> > +                  drv1_19_18, drv1_17_16, drv1_15_14, drv1_13_12, drv1_11_10,
-> > +                  drv1_9_8, drv1_7_6, drv1_5_4, drv2_31_30, drv2_29_28,
-> > +                  drv2_27_26, drv2_21_20
-> > +
-> > +                  These pin groups are used for selecting the slew rate
-> > +                  parameters.
-> > +
-> > +                  sr0_15, sr0_14, sr0_13, sr0_12, sr0_11, sr0_10, sr0_9, sr0_8,
-> > +                  sr0_7, sr0_6, sr0_5, sr0_4, sr0_3, sr0_2, sr0_1, sr0_0,
-> > +                  sr1_25, sr1_24, sr1_23, sr1_22, sr1_21, sr1_20, sr1_19,
-> > +                  sr1_18, sr2_31, sr2_30, sr2_29, sr2_25
-> > +
-> > +- function:       An array of strings, each string containing the name of the
-> > +                  pinmux functions. These functions can only be selected by
-> > +                  the corresponding pin groups. The following are the list of
-> > +                  pinmux functions available:
-> > +
-> > +                  eram, eth_rmii, eth_smii, spi0, spi1, spi2, spi3, sens0,
-> > +                  uart0, uart1, uart2, uart3, uart4, uart5, uart6, i2s0, i2s1,
-> > +                  pcm0, pcm1, jtag, pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, sd0,
-> > +                  sd1, sd2, sd3, i2c0, i2c1, i2c2, i2c3, i2c4, i2c5, lvds,
-> > +                  usb30, usb20, gpu, mipi_csi0, mipi_csi1, mipi_dsi, nand0,
-> > +                  nand1, spdif, sirq0, sirq1, sirq2
-> > +
-> > +Optional Properties:
-> > +
-> > +- bias-bus-hold:  No arguments. The specified pins should retain the previous
-> > +                  state value.
-> > +- bias-high-impedance: No arguments. The specified pins should be configured
-> > +                  as high impedance.
-> > +- bias-pull-down: No arguments. The specified pins should be configued as
-> 
-> configured
-> 
-Ack.
-> > +                  pull down.
-> > +- bias-pull-up:   No arguments. The specified pins should be configued as
-> 
-> ditto
-> 
-Ack.
-> > +                  pull up.
-> > +- input-schmitt-enable: No arguments: Enable schmitt trigger for the specified
-> > +                  pins
-> > +- input-schmitt-disable: No arguments: Disable schmitt trigger for the specified
-> > +                  pins
-> > +- slew-rate:      Integer. Sets slew rate for the specified pins.
-> > +                  Valid values are:
-> > +                  <0>  - Slow
-> > +                  <1>  - Fast
-> > +- drive-strength: Integer. Selects the drive strength for the specified
-> > +                  pins.
-> > +                  Valid values are:
-> > +                  <2>  - mA
-> > +                  <4>  - mA
-> > +                  <8>  - mA
-> > +                  <12> - mA
-> 
-> This looks weird and should get a better explanation: <2> - 2 mA?
-> Or "... drive strength in mA for ..." and drop "- mA"?
-> 
-How about,
 
-drive-strength: Integer. Selects the drive strength for the specified
-                pins in mA.
-                Valid values are:
-                2
-                4
-                8
-                12
 
-Thanks,
-Mani
-> > +
-> > +Example:
-> > +
-> > +          pinctrl: pinctrl at e01b0000 {
-> > +                  compatible = "actions,s900-pinctrl";
-> > +                  reg = <0x0 0xe01b0000 0x0 0x1000>;
-> > +                  clocks = <&cmu CLK_GPIO>;
-> > +
-> > +                  uart2-default: uart2-default {
-> > +                          pinmux {
-> > +                                  groups = "mfp1_22_lvds_oep_odn";
-> > +                                  function = "uart2";
-> > +                          };
-> > +                          pinconf {
-> > +                                  groups = "drv1_27_26";
-> > +                                  drive-strength = <12>;
-> > +                          };
-> > +                  };
-> > +          };
+On 02/14/2018 04:30 PM, Andy Shevchenko wrote:
+> On Thu, Feb 8, 2018 at 4:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
+>> ST Multi-Function eXpander (MFX) can be used as GPIO expander.
+>> It has 16 fast GPIOs and can have 8 extra alternate GPIOs
+>> when other MFX features are not enabled.
 > 
-> Regards,
-> Andreas
+>> +config GPIO_ST_MFX
+>> +       bool "ST-MFX GPIOs"
+>> +       depends on MFD_ST_MFX
+>> +       depends on OF_GPIO
+>> +       select GPIOLIB_IRQCHIP
+>> +       help
+>> +         GPIO driver for STMicroelectronics Multi-Function eXpander.
+>> +
+>> +         This provides GPIO interface supporting inputs and outputs.
 > 
-> -- 
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+>> +/*
+>> + * STMicroelectronics Multi-Function eXpander (ST-MFX) - GPIO expander driver.
+>> + *
+>> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
+> 
+>> + * License terms: GPL V2.0.
+>> + *
+>> + * st-mfx-gpio is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License version 2 as published by
+>> + * the Free Software Foundation.
+>> + *
+>> + * st-mfx-gpio is distributed in the hope that it will be useful, but
+>> + * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+>> + * details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * st-mfx-gpio. If not, see <http://www.gnu.org/licenses/>.
+> 
+> Use SPDX instead.
+> 
+OK.
+>> + */
+> 
+>> +#include <linux/of_gpio.h>
+> 
+>> +/* MFX has a maximum of 24 gpios, with 8 gpios per bank, so 3 banks maximum */
+>> +#define NR_MAX_GPIOS           24
+>> +#define NR_GPIOS_PER_BANK      8
+>> +#define NR_MAX_BANKS           (NR_MAX_GPIOS / NR_GPIOS_PER_BANK)
+> 
+>> +#define get_bank(offset)       ((u8)((offset) / NR_GPIOS_PER_BANK))
+>> +#define get_mask(offset)       ((u8)BIT((offset) % NR_GPIOS_PER_BANK))
+> 
+> I would rather keep it consistent, i.e.
+> get_bank() [as is]
+> get_mask -> get_shift() [w/o BIT() macro]
+> 
+#define get_shift(offset)       ((u8)((offset) % NR_GPIOS_PER_BANK))
+u8 mask = (u8)BIT(get_shift(offset));
+I'm not sure consistency is more important than readability and 
+convenience ?
+
+>> +enum { REG_IRQ_SRC, REG_IRQ_EVT, REG_IRQ_TYPE, NR_CACHE_IRQ_REGS };
+> 
+> Please, do one item per line.
+> 
+OK.
+
+>> +/*
+>> + * This is MFX-specific flags, overloading Linux-specific of_gpio_flags,
+>> + * needed in of_xlate callback.
+> 
+>> + * on MFX: - if GPIO is output:
+> 
+> Split to two lines.
+> 
+OK.
+
+>> + *             * (0) means PUSH_PULL
+>> + *             * OF_GPIO_SINGLE_ENDED (=2) means OPEN-DRAIN
+>> + *        - if GPIO is input:
+>> + *             * (0) means NO_PULL
+>> + *             * OF_MFX_GPI_PUSH_PULL (=2) means PUSH_PULL
+>> + *
+>> + *             * OF_MFX_GPIO_PULL_UP programs pull up resistor on the GPIO,
+>> + *               whatever its direction, without this flag, depending on
+>> + *               GPIO type and direction, it programs either no pull or
+>> + *               pull down resistor.
+>> + */
+>> +enum of_mfx_gpio_flags {
+>> +       OF_MFX_GPI_PUSH_PULL = 0x2,
+>> +       OF_MFX_GPIO_PULL_UP = 0x4,
+> 
+> These have misleading prefix. OF_ is reserved for general OF stuff.
+> 
+You're right. I will fix it in V2.
+
+>> +};
+>> +
+>> +struct mfx_gpio {
+>> +       struct gpio_chip gc;
+>> +       struct mfx *mfx;
+> 
+>> +       struct device *dev;
+> 
+> Don't you have it in gc above as a parent device?
+> 
+Yes, I agree to remove it.
+
+>> +       struct mutex irq_lock; /* IRQ bus lock */
+>> +       u32 flags[NR_MAX_GPIOS];
+>> +       /* Caches of interrupt control registers for bus_lock */
+>> +       u8 regs[NR_CACHE_IRQ_REGS][NR_MAX_BANKS];
+>> +       u8 oldregs[NR_CACHE_IRQ_REGS][NR_MAX_BANKS];
+>> +};
+> 
+>> +static int mfx_gpio_direction_input(struct gpio_chip *gc,
+>> +                                   unsigned int offset)
+>> +{
+>> +       struct mfx_gpio *mfx_gpio = gpiochip_get_data(gc);
+>> +       struct mfx *mfx = mfx_gpio->mfx;
+>> +       u8 reg_type = MFX_REG_GPIO_TYPE + get_bank(offset);
+>> +       u8 reg_pupd = MFX_REG_GPIO_PUPD + get_bank(offset);
+>> +       u8 reg_dir = MFX_REG_GPIO_DIR + get_bank(offset);
+>> +       u8 mask = get_mask(offset);
+>> +       int ret;
+>> +
+>> +       /*
+>> +        * In case of input direction, there is actually no way to apply some
+>> +        * configuration in hardware, as it can be done with
+>> +        * .set_config in case of output direction. That's why we apply
+>> +        * here the MFX specific-flags.
+>> +        */
+>> +       if (mfx_gpio->flags[offset] & OF_MFX_GPI_PUSH_PULL)
+>> +               ret = mfx_set_bits(mfx, reg_type, mask, mask);
+>> +       else
+>> +               ret = mfx_set_bits(mfx, reg_type, mask, 0);
+> 
+>> +
+> 
+> Redundant empty line.
+> 
+OK.
+
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       if (mfx_gpio->flags[offset] & OF_MFX_GPIO_PULL_UP)
+>> +               ret = mfx_set_bits(mfx, reg_pupd, mask, mask);
+>> +       else
+>> +               ret = mfx_set_bits(mfx, reg_pupd, mask, 0);
+> 
+>> +
+> 
+> Ditto.
+> 
+OK.
+
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       return mfx_set_bits(mfx, reg_dir, mask, 0);
+>> +}
+> 
+>> +static void mfx_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gc)
+>> +{
+>> +       struct mfx_gpio *mfx_gpio = gpiochip_get_data(gc);
+>> +       struct mfx *mfx = mfx_gpio->mfx;
+>> +       u16 i;
+>> +
+>> +       for (i = 0; i < gc->ngpio; i++) {
+>> +               int gpio = i + gc->base;
+>> +               const char *label = gpiochip_is_requested(gc, i);
+>> +               int dir = mfx_gpio_get_direction(gc, i);
+>> +               int val = mfx_gpio_get(gc, i);
+>> +               u8 mask = get_mask(i);
+>> +               u8 reg;
+>> +               int type, pupd;
+>> +               int irqsrc, irqevt, irqtype, irqpending;
+> 
+>> +               if (!label)
+>> +                       label = "Unrequested";
+> 
+> I would rather put label = gpiochip_...(); immediately before this
+> condition for better readability.
+> 
+You're right.
+
+>> +
+>> +               seq_printf(s, " gpio-%-3d (%-20.20s) ", gpio, label);
+>> +
+> 
+>> +               reg = MFX_REG_IRQ_GPI_PENDING + get_bank(i);
+>> +               irqpending = mfx_reg_read(mfx, reg);
+>> +               if (irqpending < 0)
+>> +                       return;
+>> +               irqpending = !!(irqpending & mask);
+>> +
+> 
+>> +               if (!dir) {
+> 
+> Why not to use
+> 
+> if (dir) {
+> 
+> ?
+> 
+My brain orders things in ascending order, I think it is the reason why 
+this code manages false cases (=0) before the others.
+
+>> +                       seq_printf(s, "out %s ", val ? "high" : "low");
+>> +                       if (type)
+>> +                               seq_puts(s, "open drain ");
+>> +                       else
+>> +                               seq_puts(s, "push pull ");
+>> +                       if (pupd && type)
+>> +                               seq_puts(s, "with internal pull-up ");
+>> +                       else
+>> +                               seq_puts(s, "without internal pull-up ");
+>> +               } else {
+>> +                       seq_printf(s, "in %s ", val ? "high" : "low");
+>> +                       if (type)
+>> +                               seq_printf(s, "with internal pull-%s ",
+>> +                                          pupd ? "up" : "down");
+>> +                       else
+>> +                               seq_printf(s, "%s ",
+>> +                                          pupd ? "floating" : "analog");
+>> +               }
+>> +
+>> +               if (irqsrc) {
+>> +                       seq_printf(s, "IRQ generated on %s %s",
+>> +                                  !irqevt ?
+>> +                                  (!irqtype ? "Low level" : "High level") :
+>> +                                  (!irqtype ? "Falling edge" : "Rising edge"),
+>> +                                  irqpending ? "(pending)" : "");
+> 
+> Why do you use negative conditions? Use positive ones.
+> 
+OK, I will make the effort in V2.
+>> +               }
+>> +
+>> +               seq_puts(s, "\n");
+>> +       }
+>> +}
+> 
+>> +static void mfx_gpio_irq_toggle_trigger(struct gpio_chip *gc, int offset)
+>> +{
+>> +       struct mfx_gpio *mfx_gpio = gpiochip_get_data(gc);
+>> +       struct mfx *mfx = mfx_gpio->mfx;
+>> +       u8 bank = get_bank(offset);
+>> +       u8 mask = get_mask(offset);
+>> +       int val = mfx_gpio_get(gc, offset);
+>> +
+> 
+>> +       if (val < 0) {
+>> +               dev_err(mfx_gpio->dev, "can't get value of gpio%d: ret=%d\n",
+>> +                       offset, val);
+> 
+> Is it somehow useful on err level?
+> 
+I can drop it.
+>> +               return;
+>> +       }
+> 
+>> +}
+> 
+>> +static int mfx_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+>> +{
+>> +       struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+>> +       struct mfx_gpio *mfx_gpio = gpiochip_get_data(gc);
+>> +       int bank = get_bank(d->hwirq);
+>> +       int mask = get_mask(d->hwirq);
+>> +
+> 
+>> +       if ((type & IRQ_TYPE_LEVEL_LOW) || (type & IRQ_TYPE_LEVEL_HIGH))
+> 
+> IRQ_TYPE_LEVEL_MASK?
+> 
+You're right.
+>> +               mfx_gpio->regs[REG_IRQ_EVT][bank] &= ~mask;
+>> +       else
+>> +               mfx_gpio->regs[REG_IRQ_EVT][bank] |= mask;
+>> +
+>> +       if ((type & IRQ_TYPE_EDGE_RISING) || (type & IRQ_TYPE_LEVEL_HIGH))
+> 
+> IRQ_TYPE_EDGE_BOTH ?
+> 
+No, here I test EDGE_RISING and LEVEL_HIGH, so mixing EDGE and LEVEL type.
+>> +               mfx_gpio->regs[REG_IRQ_TYPE][bank] |= mask;
+>> +       else
+>> +               mfx_gpio->regs[REG_IRQ_TYPE][bank] &= ~mask;
+>> +
+> 
+>> +}
+> 
+>> +static void mfx_gpio_irq_lock(struct irq_data *d)
+> 
+> Missed annotation that this acquires a lock.
+> 
+It is .irq_bus_lock and .irq_bus_sync_unlock. Description is available 
+in include/linux/irq.h:
+  * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
+  * @irq_bus_sync_unlock:function to sync and unlock slow bus (i2c) chips
+>> +static void mfx_gpio_irq_sync_unlock(struct irq_data *d)
+> 
+> Ditto for releasing lock.
+> 
+>> +static irqreturn_t mfx_gpio_irq(int irq, void *dev)
+>> +{
+>> +       struct mfx_gpio *mfx_gpio = dev;
+>> +       struct mfx *mfx = mfx_gpio->mfx;
+>> +       int num_banks = mfx->num_gpio / 8;
+>> +       u8 status[num_banks];
+> 
+>> +       int ret;
+>> +       u8 bank;
+> 
+> Swap lines.
+> 
+OK.
+>> +
+>> +       ret = mfx_block_read(mfx, MFX_REG_IRQ_GPI_PENDING, ARRAY_SIZE(status),
+>> +                            status);
+>> +       if (ret < 0) {
+> 
+>> +               dev_err(mfx_gpio->dev, "can't get IRQ_GPI_PENDING: %d\n", ret);
+> 
+> In IRQ context on err level? Hmm...
+> 
+OK I will remove it in V2.
+>> +               return IRQ_NONE;
+>> +       }
+>> +
+>> +       for (bank = 0; bank < ARRAY_SIZE(status); bank++) {
+>> +               u8 stat = status[bank];
+>> +
+>> +               if (!stat)
+>> +                       continue;
+>> +
+> 
+>> +               while (stat) {
+>> +                       int bit = __ffs(stat);
+> 
+> for_each_set_bit() ?
+> 
+You're right.
+>> +                       int offset = bank * NR_GPIOS_PER_BANK + bit;
+>> +                       int gpio_irq = irq_find_mapping(mfx_gpio->gc.irq.domain,
+>> +                                                       offset);
+>> +                       int irq_trigger = irq_get_trigger_type(gpio_irq);
+>> +
+>> +                       handle_nested_irq(gpio_irq);
+>> +                       stat &= ~(BIT(bit));
+>> +
+>> +                       if (irq_trigger & IRQ_TYPE_EDGE_BOTH)
+>> +                               mfx_gpio_irq_toggle_trigger(&mfx_gpio->gc,
+>> +                                                           offset);
+>> +               }
+>> +
+>> +               mfx_reg_write(mfx, MFX_REG_IRQ_GPI_ACK + bank, status[bank]);
+>> +       }
+>> +
+>> +       return IRQ_HANDLED;
+>> +}
+> 
+
+Thanks for review,
+Amelie
