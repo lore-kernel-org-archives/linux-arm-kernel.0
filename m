@@ -1,132 +1,145 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 19 Feb 2018 22:19:42 +0200
-Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
-In-Reply-To: <20180216182041.GU5453@intel.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
- <20180216182041.GU5453@intel.com>
-Message-ID: <1841868.3gpkeNesVL@avalon>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 19 Feb 2018 14:21:22 -0600
+Subject: [PATCH v7 01/42] dt-bindings: clock: Add new bindings for TI Davinci
+ PLL clocks
+In-Reply-To: <1519071723-31790-1-git-send-email-david@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+Message-ID: <1519071723-31790-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ville,
+This adds a new binding for the PLL IP blocks in the mach-davinci
+family of processors. Currently, only da850 has device tree support
+but these bindings can also work for other SoCs in this family just
+by adding new compatible strings.
 
-On Friday, 16 February 2018 20:20:41 EET Ville Syrj?l? wrote:
-> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
-> > Some drivers duplicate the logic to create a property to store a per-plane
-> > alpha.
-> > 
-> > This is especially useful if we ever want to support extra protocols for
-> > Wayland like:
-> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.ht
-> > ml
-> > 
-> > Let's create a helper in order to move that to the core.
-> > 
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> > 
-> >  Documentation/gpu/kms-properties.csv |  2 +-
-> >  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
-> >  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
-> >  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
-> >  include/drm/drm_blend.h              |  1 +-
-> >  include/drm/drm_plane.h              |  6 +++++-
-> >  6 files changed, 48 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/gpu/kms-properties.csv
-> > b/Documentation/gpu/kms-properties.csv index 927b65e14219..25ad3503d663
-> > 100644
-> > --- a/Documentation/gpu/kms-properties.csv
-> > +++ b/Documentation/gpu/kms-properties.csv
-> > @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0,
-> > Max=1",Connector,TBD> 
-> >  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
-> >  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
-> >  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
-> > 
-> > -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
-> > +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the
-> > plane from transparent (0) to fully opaque (MAX). If this property is set
-> > to a value different than max, and that the pixel will define an alpha
-> > component, the property will have precendance and the pixel value will be
-> > ignored.
-> 
-> Those semantics don't seem particularly good to me. I think we would want
-> the per-pixel alpha and global alpha both to be effecive at the same time.
-> You can always decide to ignore the per-pixel alpha by using a pixel format
-> without alpha.
+Note: Although these PLL controllers are very similar to the TI Keystone
+SoCs, we are not re-using those bindings. The Keystone bindings use a
+legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
+have a slightly different PLL register layout and a number of quirks
+that can't be handled by the existing bindings, so the keystone bindings
+could not be used as-is anyway.
 
-That makes sense to me. However, it also brings a new question: how should a 
-driver that supports either global alpha or pixel alpha but not both signal 
-that to userspace, and how should it reacts when userspace selects a format 
-with an alpha channel and set a global alpha value other than fully opaque ? 
-To make things more complex, note that some drivers support combining global 
-alpha and pixel alpha only for a subset of the formats with an alpha channel 
-(for instance for ARGB 1555 formats, but not for ARGB 8888 formats).
+Signed-off-by: David Lechner <david@lechnology.com>
+---
 
-> Also, where's the userspace that wants this feature?
-> 
-> <snip>
-> 
-> > diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
-> > index 8185e3468a23..5a6f29524f12 100644
-> > --- a/include/drm/drm_plane.h
-> > +++ b/include/drm/drm_plane.h
-> > @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
-> >   *	plane (in 16.16)
-> >   * @src_w: width of visible portion of plane (in 16.16)
-> >   * @src_h: height of visible portion of plane (in 16.16)
-> > + * @alpha: opacity of the plane
-> >   * @rotation: rotation of the plane
-> >   * @zpos: priority of the given plane on crtc (optional)
-> >   *	Note that multiple active planes on the same crtc can have an
-> >   identical
-> > @@ -105,6 +106,9 @@ struct drm_plane_state {
-> >  	uint32_t src_x, src_y;
-> >  	uint32_t src_h, src_w;
-> > 
-> > +	/* Plane opacity */
-> > +	u8 alpha;
-> 
-> We may want to make that u16. The general we expect 16bpc for most color
-> related things, but since this is a range prop I suppose we should just
-> expose the actual hardware range. But making it u16 might avoid some head
-> scratching for the first person to have hardware with higher precision.
-> Either that or we should make the prop creation fail if the driver asks
-> for more bits than we have in the state.
+v7 changes:
+- None (there was some debate about having child nodes, but the consensus was
+  that this is "good enough" as it is)
 
-I'm tempted to go one step further and always make the alpha property 16-bits 
-wide for new users (we can't do so for existing users as it could break 
-userspace), and let drivers convert that internally to the range they need. 
-There could however be drawbacks I don't foresee.
+v6 changes:
+- Added clock-names property
+- Added ti,clkmode-square-wave property
+- Added pllout child node
+- Added obsclk child node
+- Expanded examples
 
-> Oh, and you should plug this into the state dumper as well.
-> 
-> > +
-> > 
-> >  	/* Plane rotation */
-> >  	unsigned int rotation;
-> > @@ -481,6 +485,7 @@ enum drm_plane_type {
-> >   * @funcs: helper functions
-> >   * @properties: property tracking for this plane
-> >   * @type: type of plane (overlay, primary, cursor)
-> > + * @alpha_property: alpha property for this plane
-> >   * @zpos_property: zpos property for this plane
-> >   * @rotation_property: rotation property for this plane
-> >   * @helper_private: mid-layer private data
-> > @@ -556,6 +561,7 @@ struct drm_plane {
-> >  	 */
-> >  	
-> >  	struct drm_plane_state *state;
-> > +	struct drm_property *alpha_property;
-> >  	struct drm_property *zpos_property;
-> >  	struct drm_property *rotation_property;
-> >  };
 
+ .../devicetree/bindings/clock/ti/davinci/pll.txt   | 96 ++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+new file mode 100644
+index 0000000..36998e1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+@@ -0,0 +1,96 @@
++Binding for TI DaVinci PLL Controllers
++
++The PLL provides clocks to most of the components on the SoC. In addition
++to the PLL itself, this controller also contains bypasses, gates, dividers,
++an multiplexers for various clock signals.
++
++Required properties:
++- compatible: shall be one of:
++	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
++	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
++- reg: physical base address and size of the controller's register area.
++- clocks: phandles corresponding to the clock names
++- clock-names: names of the clock sources - depends on compatible string
++	- for "ti,da850-pll0", shall be "clksrc", "extclksrc"
++	- for "ti,da850-pll1", shall be "clksrc"
++
++Optional properties:
++- ti,clkmode-square-wave: Indicates that the the board is supplying a square
++	wave input on the OSCIN pin instead of using a crystal oscillator.
++	This property is only valid when compatible = "ti,da850-pll0".
++
++
++Optional child nodes:
++
++pllout
++	Describes the main PLL clock output (before POSTDIV). The node name must
++	be "pllout".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++sysclk
++	Describes the PLLDIVn divider clocks that provide the SYSCLKn clock
++	domains. The node name must be "sysclk". Consumers of this node should
++	use "n" in "SYSCLKn" as the index parameter for the clock cell.
++
++	Required properties:
++	- #clock-cells: shall be 1
++
++auxclk
++	Describes the AUXCLK output of the PLL. The node name must be "auxclk".
++	This child node is only valid when compatible = "ti,da850-pll0".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++obsclk
++	Describes the OBSCLK output of the PLL. The node name must be "obsclk".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++
++Examples:
++
++	pll0: clock-controller at 11000 {
++		compatible = "ti,da850-pll0";
++		reg = <0x11000 0x1000>;
++		clocks = <&ref_clk>, <&pll1_sysclk 3>;
++		clock-names = "clksrc", "extclksrc";
++		ti,clkmode-square-wave;
++
++		pll0_pllout: pllout {
++			#clock-cells = <0>;
++		};
++
++		pll0_sysclk: sysclk {
++			#clock-cells = <1>;
++		};
++
++		pll0_auxclk: auxclk {
++			#clock-cells = <0>;
++		};
++
++		pll0_obsclk: obsclk {
++			#clock-cells = <0>;
++		};
++	};
++
++	pll1: clock-controller at 21a000 {
++		compatible = "ti,da850-pll1";
++		reg = <0x21a000 0x1000>;
++		clocks = <&ref_clk>;
++		clock-names = "clksrc";
++
++		pll0_sysclk: sysclk {
++			#clock-cells = <1>;
++		};
++
++		pll0_obsclk: obsclk {
++			#clock-cells = <0>;
++		};
++	};
++
++Also see:
++- Documentation/devicetree/bindings/clock/clock-bindings.txt
 -- 
-Regards,
-
-Laurent Pinchart
+2.7.4
