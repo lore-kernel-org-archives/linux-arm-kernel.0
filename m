@@ -1,31 +1,32 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Sun, 18 Feb 2018 21:35:03 -0600
-Subject: [PATCH 7/9] ARM: dts: am33xx: Mark emif with ti,no-idle
+Date: Sun, 18 Feb 2018 21:35:00 -0600
+Subject: [PATCH 4/9] ARM: dts: am4372: Update emif node
 In-Reply-To: <1519011305-17822-1-git-send-email-d-gerlach@ti.com>
 References: <1519011305-17822-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1519011305-17822-8-git-send-email-d-gerlach@ti.com>
+Message-ID: <1519011305-17822-5-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can never idle the emif hwmod from within the HLOS so mark the emif
-node with ti,no-idle.
+Now that we will use ti-emif-sram driver for am4372 PM, update the
+emif DT node with the required sram property.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am4372.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 842e726b944e..77c618829734 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -964,6 +964,7 @@
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 81a03c1ad770..10dc52a07b32 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -237,6 +237,8 @@
+ 			compatible = "ti,emif-am4372";
+ 			reg = <0x4c000000 0x1000000>;
  			ti,hwmods = "emif";
- 			sram = <&pm_sram_code
- 				&pm_sram_data>;
-+			ti,no-idle;
++			sram = <&pm_sram_code
++				&pm_sram_data>;
  		};
  
- 		gpmc: gpmc at 50000000 {
+ 		edma: edma at 49000000 {
 -- 
 2.16.1
