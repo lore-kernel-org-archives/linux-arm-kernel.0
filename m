@@ -1,102 +1,325 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 19 Feb 2018 10:36:16 -0600
-Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
- CTR_EL0.IDC
-In-Reply-To: <20180219144346.GF30394@arm.com>
-References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
- <20180219144346.GF30394@arm.com>
-Message-ID: <e8b54f7a-880f-eeb2-e978-cb19bd440de9@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Feb 2018 16:36:51 +0000
+Subject: [PATCH v4 3/4] arm64: dts: sdm845: Add minimal dts/dtsi files
+ for sdm845 SoC and MTP
+In-Reply-To: <20180216060503.22006-4-rnayak@codeaurora.org>
+References: <20180216060503.22006-1-rnayak@codeaurora.org>
+ <20180216060503.22006-4-rnayak@codeaurora.org>
+Message-ID: <20180219163651.66936056@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, 16 Feb 2018 11:35:02 +0530
+Rajendra Nayak <rnayak@codeaurora.org> wrote:
 
-On 02/19/2018 08:43 AM, Will Deacon wrote:
-> Hi Shanker,
+> Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
 > 
-> On Fri, Feb 16, 2018 at 06:57:46PM -0600, Shanker Donthineni wrote:
->> Two point of unification cache maintenance operations 'DC CVAU' and
->> 'IC IVAU' are optional for implementors as per ARMv8 specification.
->> This patch parses the updated CTR_EL0 register definition and adds
->> the required changes to skip POU operations if the hardware reports
->> CTR_EL0.IDC and/or CTR_EL0.IDC.
->>
->> CTR_EL0.DIC: Instruction cache invalidation requirements for
->>  instruction to data coherence. The meaning of this bit[29].
->>   0: Instruction cache invalidation to the point of unification
->>      is required for instruction to data coherence.
->>   1: Instruction cache cleaning to the point of unification is
->>       not required for instruction to data coherence.
->>
->> CTR_EL0.IDC: Data cache clean requirements for instruction to data
->>  coherence. The meaning of this bit[28].
->>   0: Data cache clean to the point of unification is required for
->>      instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
->>      or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
->>   1: Data cache clean to the point of unification is not required
->>      for instruction to data coherence.
->>
->> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>  arch/arm64/include/asm/assembler.h | 48 ++++++++++++++++++++++++--------------
->>  arch/arm64/include/asm/cache.h     |  2 ++
->>  arch/arm64/kernel/cpufeature.c     |  2 ++
->>  arch/arm64/mm/cache.S              | 26 ++++++++++++++-------
->>  4 files changed, 51 insertions(+), 27 deletions(-)
-> 
-> I was looking at our CTR_EL0 code last week but forgot to post the patch I
-> wrote fixing up some of the fields. I just send it now, so please can
-> you rebase on top of:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/560488.html
-> 
-> Also:
-> 
->> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
->> index ea9bb4e..aea533b 100644
->> --- a/arch/arm64/include/asm/cache.h
->> +++ b/arch/arm64/include/asm/cache.h
->> @@ -22,6 +22,8 @@
->>  #define CTR_L1IP_MASK		3
->>  #define CTR_CWG_SHIFT		24
->>  #define CTR_CWG_MASK		15
->> +#define CTR_IDC_SHIFT		28
->> +#define CTR_DIC_SHIFT		29
->>  
->>  #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
->>  
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 29b1f87..f42bb5a 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -200,6 +200,8 @@ static int __init register_cpu_hwcaps_dumper(void)
->>  
->>  static const struct arm64_ftr_bits ftr_ctr[] = {
->>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 0),	/* DIC */
->> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 0),	/* IDC */
->>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
->>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
->>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
-> 
-> Could you update the other table entries here to use the CTR_*_SHIFT values
-> as well?
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  arch/arm64/boot/dts/qcom/Makefile       |   1 +
+>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  15 ++
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 277 ++++++++++++++++++++++++++++++++
+>  3 files changed, 293 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
 > 
 
-I'll do.
+[...]
 
-> Thanks,
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> new file mode 100644
+> index 000000000000..c46e726af621
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -0,0 +1,277 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * SDM845 SoC device tree source
+> + *
+> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	interrupt-parent = <&intc>;
+> +
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	chosen { };
+> +
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		/* We expect the bootloader to fill in the size */
+> +		reg = <0 0x80000000 0 0>;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		CPU0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x0>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_0>;
+> +			L2_0: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +				L3_0: l3-cache {
+> +				      compatible = "cache";
+> +				};
+> +			};
+> +		};
+> +
+> +		CPU1: cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x100>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_100>;
+> +			L2_100: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU2: cpu at 200 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x200>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_200>;
+> +			L2_200: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU3: cpu at 300 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x300>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_300>;
+> +			L2_300: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU4: cpu at 400 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x400>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_400>;
+> +			L2_400: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU5: cpu at 500 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x500>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_500>;
+> +			L2_500: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU6: cpu at 600 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x600>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_600>;
+> +			L2_600: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +
+> +		CPU7: cpu at 700 {
+> +			device_type = "cpu";
+> +			compatible = "qcom,kryo385";
+> +			reg = <0x0 0x700>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&L2_700>;
+> +			L2_700: l2-cache {
+> +				compatible = "cache";
+> +				next-level-cache = <&L3_0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +
+> +	clocks {
+> +		xo_board: xo-board {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <19200000>;
+> +		};
+> +
+> +		sleep_clk: sleep-clk {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <32764>;
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-1.0";
+> +		method = "smc";
+> +	};
+> +
+> +	soc: soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0 0xffffffff>;
+> +		compatible = "simple-bus";
+> +
+> +		intc: interrupt-controller at 17a00000 {
+> +			compatible = "arm,gic-v3";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			#interrupt-cells = <3>;
+> +			interrupt-controller;
+> +			#redistributor-regions = <1>;
+> +			redistributor-stride = <0x0 0x20000>;
+> +			reg = <0x17a00000 0x10000>,     /* GICD */
+> +			      <0x17a60000 0x100000>;    /* GICR * 8 */
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +			gic-its at 17a40000 {
+> +				compatible = "arm,gic-v3-its";
+> +				msi-controller;
+> +				#msi-cells = <1>;
+> +				reg = <0x17a40000 0x20000>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		gcc: clock-controller at 100000 {
+> +			compatible = "qcom,gcc-sdm845";
+> +			reg = <0x100000 0x1f0000>;
+> +			#clock-cells = <1>;
+> +			#reset-cells = <1>;
+> +		};
+> +
+> +		tlmm: pinctrl at 3400000 {
+> +			compatible = "qcom,sdm845-pinctrl";
+> +			reg = <0x03400000 0xc00000>;
+> +			interrupts = <GIC_SPI 208 IRQ_TYPE_NONE>;
 
+Please do not use IRQ_TYPE_NONE, ever. It doesn't exist in the GIC
+binding. Set it to the actual trigger value.
+
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +		};
+> +
+> +		timer at 17c90000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			compatible = "arm,armv7-timer-mem";
+> +			reg = <0x17c90000 0x1000>;
+> +
+> +			frame at 17ca0000 {
+> +				frame-number = <0>;
+> +				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17ca0000 0x1000>,
+> +				      <0x17cb0000 0x1000>;
+> +			};
+> +
+> +			frame at 17cc0000 {
+> +				frame-number = <1>;
+> +				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17cc0000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			frame at 17cd0000 {
+> +				frame-number = <2>;
+> +				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17cd0000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			frame at 17ce0000 {
+> +				frame-number = <3>;
+> +				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17ce0000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			frame at 17cf0000 {
+> +				frame-number = <4>;
+> +				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17cf0000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			frame at 17d00000 {
+> +				frame-number = <5>;
+> +				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17d00000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			frame at 17d10000 {
+> +				frame-number = <6>;
+> +				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> +				reg = <0x17d10000 0x1000>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		spmi_bus: spmi at c440000 {
+> +			compatible = "qcom,spmi-pmic-arb";
+> +			reg = <0xc440000 0x1100>,
+> +			      <0xc600000 0x2000000>,
+> +			      <0xe600000 0x100000>,
+> +			      <0xe700000 0xa0000>,
+> +			      <0xc40a000 0x26000>;
+> +			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
+> +			interrupt-names = "periph_irq";
+> +			interrupts = <GIC_SPI 481 IRQ_TYPE_NONE>;
+
+Same here.
+
+> +			qcom,ee = <0>;
+> +			qcom,channel = <0>;
+> +			#address-cells = <2>;
+> +			#size-cells = <0>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <4>;
+> +			cell-index = <0>;
+> +		};
+> +	};
+> +};
+
+Thanks,
+
+	M.
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Without deviation from the norm, progress is not possible.
