@@ -1,76 +1,48 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Mon, 19 Feb 2018 15:34:51 +0100
-Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
- kevin panel
-In-Reply-To: <20180208174855.55620-7-seanpaul@chromium.org>
-References: <20180208174855.55620-1-seanpaul@chromium.org>
- <20180208174855.55620-7-seanpaul@chromium.org>
-Message-ID: <CAFqH_53Z7qTi8jKcjBpEawFQW3imzOks+qFh5dqMuD4XGETv+w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Feb 2018 14:38:21 +0000
+Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
+ CTR_EL0.IDC
+In-Reply-To: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
+References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20180219143820.5oxc2kendvq4bbtt@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-08 18:48 GMT+01:00 Sean Paul <seanpaul@chromium.org>:
-> This patch adds an override mode for kevin devices. The mode increases
-> both back porches to allow a pixel clock of 26666kHz as opposed to the
-> 'typical' value of 252750kHz. This is needed to avoid interference with
-> the touch digitizer on these laptops.
->
-> Changes in v2:
->  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
-> Changes in v3:
->  - Unwrap the timing from display-timings and rename panel-timing (Rob)
->
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: St?phane Marchesin <marcheu@chromium.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-rockchip at lists.infradead.org
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index 191a6bcb1704..658411ce37ea 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -98,6 +98,20 @@
->                 backlight = <&backlight>;
->                 power-supply = <&pp3300_disp>;
->
-> +               panel-timing {
-> +                       clock-frequency = <266604720>;
-> +                       hactive = <2400>;
-> +                       hfront-porch = <48>;
-> +                       hback-porch = <84>;
-> +                       hsync-len = <32>;
-> +                       hsync-active = <0>;
-> +                       vactive = <1600>;
-> +                       vfront-porch = <3>;
-> +                       vback-porch = <120>;
-> +                       vsync-len = <10>;
-> +                       vsync-active = <0>;
-> +               };
-> +
->                 ports {
->                         panel_in_edp: endpoint {
->                                 remote-endpoint = <&edp_out_panel>;
-> --
+On Fri, Feb 16, 2018 at 06:57:46PM -0600, Shanker Donthineni wrote:
+> Two point of unification cache maintenance operations 'DC CVAU' and
+> 'IC IVAU' are optional for implementors as per ARMv8 specification.
+> This patch parses the updated CTR_EL0 register definition and adds
+> the required changes to skip POU operations if the hardware reports
+> CTR_EL0.IDC and/or CTR_EL0.IDC.
+> 
+> CTR_EL0.DIC: Instruction cache invalidation requirements for
+>  instruction to data coherence. The meaning of this bit[29].
+>   0: Instruction cache invalidation to the point of unification
+>      is required for instruction to data coherence.
+>   1: Instruction cache cleaning to the point of unification is
+>       not required for instruction to data coherence.
+> 
+> CTR_EL0.IDC: Data cache clean requirements for instruction to data
+>  coherence. The meaning of this bit[28].
+>   0: Data cache clean to the point of unification is required for
+>      instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
+>      or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
+>   1: Data cache clean to the point of unification is not required
+>      for instruction to data coherence.
 
+There is a difference between cache maintenance to PoU "is not required"
+and the actual instructions being optional (i.e. undef when executed).
+If your caches are transparent and DC CVAU/IC IVAU is not required,
+these instructions should behave as NOPs. So, are you trying to improve
+the performance of the cache maintenance routines in the kernel? If yes,
+please show some (relative) numbers and a better description in the
+commit log.
 
-Tested on top of linux-next on a Samsung Chromebook Plus.
+On the patch, I'd rather have an alternative framework entry for no VAU
+cache maint required and some ret instruction at the beginning of the
+cache maint function rather than jumping out of the loop somewhere
+inside the cache maintenance code, penalising the CPUs that do require
+it.
 
-Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-
-
-> 2.16.0.rc1.238.g530d649a79-goog
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+-- 
+Catalin
