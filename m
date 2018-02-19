@@ -1,36 +1,40 @@
 From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 19 Feb 2018 13:47:25 +0100
-Subject: [PATCH v4 02/13] ARM: dtsi: axp22x: add node for ADC
+Date: Mon, 19 Feb 2018 13:47:33 +0100
+Subject: [PATCH v4 10/13] ARM: dtsi: axp81x: add battery power supply subnode
 In-Reply-To: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
 References: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
-Message-ID: <b6fd4d32e99d343f85eac484ae9c7c7133fcc471.1519044068.git-series.quentin.schulz@bootlin.com>
+Message-ID: <30ee1b77a0006b2a9a5b8fbd0b72a1dd568519e8.1519044068.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DT node for the ADC of the PMIC so that there can be
-consumers of its IIO channels declaring their consumptions via DT.
+The X-Powers AXP81X PMIC exposes battery supply various data such as
+the battery status (charging, discharging, full, dead), current max
+limit, current current, battery capacity (in percentage), voltage max
+and min limits, current voltage, and battery capacity (in Ah).
+
+This adds the battery power supply subnode for AXP81X PMIC.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/axp22x.dtsi | 5 +++++
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
-index 87fb08e..65a07a6 100644
---- a/arch/arm/boot/dts/axp22x.dtsi
-+++ b/arch/arm/boot/dts/axp22x.dtsi
-@@ -57,6 +57,11 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 6b5e7bc..1b05c7f 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -69,6 +69,11 @@
+ 		};
  	};
  
-+	axp_adc: adc {
-+		compatible = "x-powers,axp221-adc";
-+		#io-channel-cells = <1>;
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp813-battery-power-supply";
++		status = "disabled";
 +	};
 +
- 	battery_power_supply: battery-power-supply {
- 		compatible = "x-powers,axp221-battery-power-supply";
- 		status = "disabled";
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
 -- 
 git-series 0.9.1
