@@ -1,26 +1,48 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 19 Feb 2018 12:29:24 -0600
-Subject: [PATCH v3 4/5] dt-bindings: clock: mediatek: update audsys
- documentation to adapt MFD device
-In-Reply-To: <61928ad523a7aeffb8f16d4caad56836b65ae407.1518424204.git.ryder.lee@mediatek.com>
-References: <cover.1518424204.git.ryder.lee@mediatek.com>
- <61928ad523a7aeffb8f16d4caad56836b65ae407.1518424204.git.ryder.lee@mediatek.com>
-Message-ID: <CAL_JsqJgo0pKJjrs2fdw+q=DJYwht0X5L3Bomz8gf98mEN7hkg@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 19 Feb 2018 12:30:46 -0600
+Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
+ CTR_EL0.IDC
+In-Reply-To: <20180219171852.jsbzawbsyv7v5yi7@armageddon.cambridge.arm.com>
+References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
+ <20180219143820.5oxc2kendvq4bbtt@armageddon.cambridge.arm.com>
+ <92836754-2ab3-d5db-f0be-7ee3e10f368f@codeaurora.org>
+ <20180219171852.jsbzawbsyv7v5yi7@armageddon.cambridge.arm.com>
+Message-ID: <da2b54da-cb05-b478-ce61-eeb3308de672@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 5:28 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> The MediaTek audio hardware block that exposes functionalities that are
-> handled by separate subsystems in the kernel.  These functions are all
-> mapped somewhere at 0x112xxxxx, and there are some control bits are mixed
-> up with other functions within the same registers.
+Thanks Catalin for your comments.
 
-I still don't think this change is necessary.
+On 02/19/2018 11:18 AM, Catalin Marinas wrote:
+> On Mon, Feb 19, 2018 at 10:35:30AM -0600, Shanker Donthineni wrote:
+>> On 02/19/2018 08:38 AM, Catalin Marinas wrote:
+>>> On the patch, I'd rather have an alternative framework entry for no VAU
+>>> cache maint required and some ret instruction at the beginning of the
+>>> cache maint function rather than jumping out of the loop somewhere
+>>> inside the cache maintenance code, penalising the CPUs that do require
+>>> it.
+>>
+>> Alternative framework might break things in case of CPU hotplug. I need one
+>> more confirmation from you on incorporating alternative framework.     
+> 
+> CPU hotplug can be an issue but it should be handled like other similar
+> cases: if a CPU comes online late and its features are incompatible, it
+> should not be brought online. The cpufeature code handles this.
+> 
+> With Will's patch for CTR_EL0, we handle different CPU features during
+> boot, defaulting to the lowest value for the IDC/DIC bits.
+> 
+> I suggest you add new ARM64_HAS_* feature bits and enable them based on
+> CTR_EL0.IDC and DIC. You could check for both being 1 with a single
+> feature bit but I guess an implementation is allowed to have these
+> different (e.g. DIC == 0 and IDC == 1).
+> 
 
-Just because a hardware block in DT maps to different subsystems in a
-particular OS doesn't mean you need a DT node for each OS subsystem.
-What we have subsystems for changes over time and DT shouldn't really
-be changing based on that. And DT is not the only way to instantiate
-drivers.
+I'll add two new features ARM64_HAS_DIC and ARM64_HAS_IDC to support
+all implementations. Unfortunately QCOM server chips supports IDC not DIC.
+ 
 
-Rob
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
