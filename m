@@ -1,46 +1,126 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 19 Feb 2018 16:43:58 +0100
-Subject: [PATCH 0/8] Use clk bulk API in exynos5433 drivers
-References: <CGME20180219154456eucas1p178a82b3bb643028dc7c99ccca9c6eaca@eucas1p1.samsung.com>
-Message-ID: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
+Date: Mon, 19 Feb 2018 16:44:00 +0100
+Subject: [PATCH 2/8] media: s5p-jpeg: Use bulk clk API
+In-Reply-To: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
+References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
+ <CGME20180219154457eucas1p163264992903698a8878aa5abbc8aa17b@eucas1p1.samsung.com>
+Message-ID: <1519055046-2399-3-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Using bulk clk functions simplifies the driver's code. Use devm_clk_bulk
+functions instead of iterating over an array of clks.
 
-the main goal of this patchset is to simplify clk management code in
-exynos5433 drivers by using clk bulk API. In order to achieve that,
-patch #1 adds a new function to clk core, which dynamically allocates
-clk_bulk_data array and fills its id fields.
+Signed-off-by: Maciej Purski <m.purski@samsung.com>
+---
+ drivers/media/platform/s5p-jpeg/jpeg-core.c | 45 ++++++++++++-----------------
+ drivers/media/platform/s5p-jpeg/jpeg-core.h |  2 +-
+ 2 files changed, 20 insertions(+), 27 deletions(-)
 
-Best regards,
-
-Maciej Purski
-
-Maciej Purski (8):
-  clk: Add clk_bulk_alloc functions
-  media: s5p-jpeg: Use bulk clk API
-  drm/exynos/decon: Use clk bulk API
-  drm/exynos/dsi: Use clk bulk API
-  drm/exynos: mic: Use clk bulk API
-  drm/exynos/hdmi: Use clk bulk API
-  [media] exynos-gsc: Use clk bulk API
-  [media] s5p-mfc: Use clk bulk API
-
- drivers/clk/clk-bulk.c                          | 16 +++++
- drivers/clk/clk-devres.c                        | 37 +++++++++--
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c   | 50 +++++----------
- drivers/gpu/drm/exynos/exynos_drm_dsi.c         | 68 +++++++++-----------
- drivers/gpu/drm/exynos/exynos_drm_mic.c         | 44 +++++--------
- drivers/gpu/drm/exynos/exynos_hdmi.c            | 85 ++++++++-----------------
- drivers/media/platform/exynos-gsc/gsc-core.c    | 55 ++++++----------
- drivers/media/platform/exynos-gsc/gsc-core.h    |  2 +-
- drivers/media/platform/s5p-jpeg/jpeg-core.c     | 45 ++++++-------
- drivers/media/platform/s5p-jpeg/jpeg-core.h     |  2 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  6 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_pm.c     | 41 +++++-------
- include/linux/clk.h                             | 64 +++++++++++++++++++
- 13 files changed, 263 insertions(+), 252 deletions(-)
-
+diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+index 79b63da..681a515 100644
+--- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
++++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+@@ -2903,7 +2903,7 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
+ {
+ 	struct s5p_jpeg *jpeg;
+ 	struct resource *res;
+-	int i, ret;
++	int ret;
+ 
+ 	/* JPEG IP abstraction struct */
+ 	jpeg = devm_kzalloc(&pdev->dev, sizeof(struct s5p_jpeg), GFP_KERNEL);
+@@ -2938,15 +2938,16 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* clocks */
+-	for (i = 0; i < jpeg->variant->num_clocks; i++) {
+-		jpeg->clocks[i] = devm_clk_get(&pdev->dev,
+-					      jpeg->variant->clk_names[i]);
+-		if (IS_ERR(jpeg->clocks[i])) {
+-			dev_err(&pdev->dev, "failed to get clock: %s\n",
+-				jpeg->variant->clk_names[i]);
+-			return PTR_ERR(jpeg->clocks[i]);
+-		}
+-	}
++	jpeg->clocks = devm_clk_bulk_alloc(&pdev->dev,
++					   jpeg->variant->num_clocks,
++					   jpeg->variant->clk_names);
++	if (IS_ERR(jpeg->clocks))
++		return PTR_ERR(jpeg->clocks);
++
++	ret = devm_clk_bulk_get(&pdev->dev, jpeg->variant->num_clocks,
++				jpeg->clocks);
++	if (ret < 0)
++		return ret;
+ 
+ 	/* v4l2 device */
+ 	ret = v4l2_device_register(&pdev->dev, &jpeg->v4l2_dev);
+@@ -3047,7 +3048,6 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
+ static int s5p_jpeg_remove(struct platform_device *pdev)
+ {
+ 	struct s5p_jpeg *jpeg = platform_get_drvdata(pdev);
+-	int i;
+ 
+ 	pm_runtime_disable(jpeg->dev);
+ 
+@@ -3058,8 +3058,8 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
+ 	v4l2_device_unregister(&jpeg->v4l2_dev);
+ 
+ 	if (!pm_runtime_status_suspended(&pdev->dev)) {
+-		for (i = jpeg->variant->num_clocks - 1; i >= 0; i--)
+-			clk_disable_unprepare(jpeg->clocks[i]);
++		clk_bulk_disable_unprepare(jpeg->variant->num_clocks,
++					   jpeg->clocks);
+ 	}
+ 
+ 	return 0;
+@@ -3069,10 +3069,8 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
+ static int s5p_jpeg_runtime_suspend(struct device *dev)
+ {
+ 	struct s5p_jpeg *jpeg = dev_get_drvdata(dev);
+-	int i;
+ 
+-	for (i = jpeg->variant->num_clocks - 1; i >= 0; i--)
+-		clk_disable_unprepare(jpeg->clocks[i]);
++	clk_bulk_disable_unprepare(jpeg->variant->num_clocks, jpeg->clocks);
+ 
+ 	return 0;
+ }
+@@ -3081,16 +3079,11 @@ static int s5p_jpeg_runtime_resume(struct device *dev)
+ {
+ 	struct s5p_jpeg *jpeg = dev_get_drvdata(dev);
+ 	unsigned long flags;
+-	int i, ret;
+-
+-	for (i = 0; i < jpeg->variant->num_clocks; i++) {
+-		ret = clk_prepare_enable(jpeg->clocks[i]);
+-		if (ret) {
+-			while (--i >= 0)
+-				clk_disable_unprepare(jpeg->clocks[i]);
+-			return ret;
+-		}
+-	}
++	int ret;
++
++	ret = clk_bulk_prepare_enable(jpeg->variant->num_clocks, jpeg->clocks);
++	if (ret)
++		return ret;
+ 
+ 	spin_lock_irqsave(&jpeg->slock, flags);
+ 
+diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.h b/drivers/media/platform/s5p-jpeg/jpeg-core.h
+index a46465e..dc6ed98 100644
+--- a/drivers/media/platform/s5p-jpeg/jpeg-core.h
++++ b/drivers/media/platform/s5p-jpeg/jpeg-core.h
+@@ -133,7 +133,7 @@ struct s5p_jpeg {
+ 	void __iomem		*regs;
+ 	unsigned int		irq;
+ 	enum exynos4_jpeg_result irq_ret;
+-	struct clk		*clocks[JPEG_MAX_CLOCKS];
++	struct clk_bulk_data	*clocks;
+ 	struct device		*dev;
+ 	struct s5p_jpeg_variant *variant;
+ 	u32			irq_status;
 -- 
 2.7.4
