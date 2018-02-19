@@ -1,34 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 19 Feb 2018 14:49:28 +0100
-Subject: [PATCH v5 05/12] drm/bridge/synopsys: dw-hdmi: don't clobber
- drvdata
-In-Reply-To: <20180214200906.31509-6-jernej.skrabec@siol.net>
-References: <20180214200906.31509-1-jernej.skrabec@siol.net>
- <20180214200906.31509-6-jernej.skrabec@siol.net>
-Message-ID: <1519048168.3408.13.camel@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 19 Feb 2018 13:55:36 +0000
+Subject: [PATCH] crypto: marvell/cesa - Clean up redundant #include
+Message-ID: <99d8deb60039adf572aec26b091f2b0c61edf397.1519048413.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-14 at 21:08 +0100, Jernej Skrabec wrote:
-> dw_hdmi shouldn't set drvdata since some drivers might need to store
-> it's own data there. Rework dw_hdmi in a way to return struct dw_hdmi
-> instead to store it in drvdata. This way drivers are responsible to
-> store and pass structure when needed.
-> 
-> Idea was taken from the following commit:
-> 8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata")
-> 
-> Cc: p.zabel at pengutronix.de
-> Cc: narmstrong at baylibre.com
-> Cc: Laurent.pinchart at ideasonboard.com
-> Cc: hjc at rock-chips.com
-> Cc: heiko at sntech.de
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+The inclusion of dma-direct.h was only needed temporarily to prevent
+breakage from the DMA API rework, since the actual CESA fix making it
+redundant was merged in parallel. Now that both have landed, it can go.
 
-For i.MX:
-Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/crypto/marvell/cesa.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-regards
-Philipp
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index aca2373fa1de..f81fa4a3e66b 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -25,7 +25,6 @@
+ #include <linux/scatterlist.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+-#include <linux/dma-direct.h> /* XXX: drivers shall never use this directly! */
+ #include <linux/clk.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+-- 
+2.16.1.dirty
