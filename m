@@ -1,198 +1,150 @@
 From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 19 Feb 2018 16:43:59 +0100
-Subject: [PATCH 1/8] clk: Add clk_bulk_alloc functions
+Date: Mon, 19 Feb 2018 16:44:05 +0100
+Subject: [PATCH 7/8] [media] exynos-gsc: Use clk bulk API
 In-Reply-To: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
 References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154456eucas1p15f4073beaf61312238f142f217a8bb3c@eucas1p1.samsung.com>
-Message-ID: <1519055046-2399-2-git-send-email-m.purski@samsung.com>
+ <CGME20180219154502eucas1p20e8daf3edc6737817f8d62db5a2099f2@eucas1p2.samsung.com>
+Message-ID: <1519055046-2399-8-git-send-email-m.purski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a driver is going to use clk_bulk_get() function, it has to
-initialize an array of clk_bulk_data, by filling its id fields.
-
-Add a new function to the core, which dynamically allocates
-clk_bulk_data array and fills its id fields. Add clk_bulk_free()
-function, which frees the array allocated by clk_bulk_alloc() function.
-Add a managed version of clk_bulk_alloc().
+Using bulk clk functions simplifies the driver's code. Use devm_clk_bulk
+functions instead of iterating over an array of clks.
 
 Signed-off-by: Maciej Purski <m.purski@samsung.com>
 ---
- drivers/clk/clk-bulk.c   | 16 ++++++++++++
- drivers/clk/clk-devres.c | 37 +++++++++++++++++++++++++---
- include/linux/clk.h      | 64 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 113 insertions(+), 4 deletions(-)
+ drivers/media/platform/exynos-gsc/gsc-core.c | 55 ++++++++++------------------
+ drivers/media/platform/exynos-gsc/gsc-core.h |  2 +-
+ 2 files changed, 20 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index 4c10456..2f16941 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -19,6 +19,22 @@
- #include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/export.h>
-+#include <linux/slab.h>
-+
-+struct clk_bulk_data *clk_bulk_alloc(int num_clocks, const char *const *clk_ids)
-+{
-+	struct clk_bulk_data *ptr;
-+	int i;
-+
-+	ptr = kcalloc(num_clocks, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	for (i = 0; i < num_clocks; i++)
-+		ptr[i].id = clk_ids[i];
-+
-+	return ptr;
-+}
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index 17854a3..fa7e993 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -1149,7 +1149,6 @@ static int gsc_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	const struct gsc_driverdata *drv_data = of_device_get_match_data(dev);
+ 	int ret;
+-	int i;
  
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
- {
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index d854e26..2115b97 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -9,6 +9,39 @@
- #include <linux/export.h>
- #include <linux/gfp.h>
+ 	gsc = devm_kzalloc(dev, sizeof(struct gsc_dev), GFP_KERNEL);
+ 	if (!gsc)
+@@ -1187,25 +1186,19 @@ static int gsc_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
  
-+struct clk_bulk_devres {
-+	struct clk_bulk_data *clks;
-+	int num_clks;
-+};
+-	for (i = 0; i < gsc->num_clocks; i++) {
+-		gsc->clock[i] = devm_clk_get(dev, drv_data->clk_names[i]);
+-		if (IS_ERR(gsc->clock[i])) {
+-			dev_err(dev, "failed to get clock: %s\n",
+-				drv_data->clk_names[i]);
+-			return PTR_ERR(gsc->clock[i]);
+-		}
+-	}
++	gsc->clocks = devm_clk_bulk_alloc(dev, gsc->num_clocks,
++					  drv_data->clk_names);
++	if (IS_ERR(gsc->clocks))
++		return PTR_ERR(gsc->clocks);
+ 
+-	for (i = 0; i < gsc->num_clocks; i++) {
+-		ret = clk_prepare_enable(gsc->clock[i]);
+-		if (ret) {
+-			dev_err(dev, "clock prepare failed for clock: %s\n",
+-				drv_data->clk_names[i]);
+-			while (--i >= 0)
+-				clk_disable_unprepare(gsc->clock[i]);
+-			return ret;
+-		}
+-	}
++	ret = devm_clk_bulk_get(dev, gsc->num_clocks,
++				gsc->clocks);
++	if (ret)
++		return ret;
 +
-+static void devm_clk_alloc_release(struct device *dev, void *res)
-+{
-+	struct clk_bulk_devres *devres = res;
++	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
++	if (ret)
++		return ret;
+ 
+ 	ret = devm_request_irq(dev, res->start, gsc_irq_handler,
+ 				0, pdev->name, gsc);
+@@ -1239,15 +1232,14 @@ static int gsc_probe(struct platform_device *pdev)
+ err_v4l2:
+ 	v4l2_device_unregister(&gsc->v4l2_dev);
+ err_clk:
+-	for (i = gsc->num_clocks - 1; i >= 0; i--)
+-		clk_disable_unprepare(gsc->clock[i]);
++	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
 +
-+	clk_bulk_free(devres->clks);
-+}
-+
-+struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev, int num_clks,
-+					  const char *const *clk_ids)
-+{
-+	struct clk_bulk_data **ptr, *clk_bulk;
-+
-+	ptr = devres_alloc(devm_clk_alloc_release,
-+			   num_clks * sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk_bulk = clk_bulk_alloc(num_clks, clk_ids);
-+	if (clk_bulk) {
-+		*ptr = clk_bulk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return clk_bulk;
-+}
-+
- static void devm_clk_release(struct device *dev, void *res)
- {
- 	clk_put(*(struct clk **)res);
-@@ -34,10 +67,6 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return ret;
  }
- EXPORT_SYMBOL(devm_clk_get);
  
--struct clk_bulk_devres {
--	struct clk_bulk_data *clks;
--	int num_clks;
--};
- 
- static void devm_clk_bulk_release(struct device *dev, void *res)
+ static int gsc_remove(struct platform_device *pdev)
  {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 4c4ef9f..7d66f41 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -15,6 +15,7 @@
- #include <linux/err.h>
- #include <linux/kernel.h>
- #include <linux/notifier.h>
-+#include <linux/slab.h>
+ 	struct gsc_dev *gsc = platform_get_drvdata(pdev);
+-	int i;
  
- struct device;
- struct clk;
-@@ -240,6 +241,52 @@ static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
- #endif
+ 	pm_runtime_get_sync(&pdev->dev);
  
- #ifdef CONFIG_HAVE_CLK
-+
-+/**
-+ * clk_bulk_alloc - allocates an array of clk_bulk_data and fills their
-+ *		    id field
-+ * @num_clks: number of clk_bulk_data
-+ * @clk_ids: array of clock consumer ID's
-+ *
-+ * This function allows drivers to dynamically create an array of clk_bulk_data
-+ * and fill their id field in one operation. If successful, it allows calling
-+ * clk_bulk_get on the pointer returned by this function.
-+ *
-+ * Returns a pointer to a clk_bulk_data array, or valid IS_ERR() condition
-+ * containing errno.
-+ */
-+struct clk_bulk_data *clk_bulk_alloc(int num_clks, const char *const *clk_ids);
-+
-+/**
-+ * devm_clk_bulk_alloc - allocates an array of clk_bulk_data and fills their
-+ *			 id field
-+ * @dev: device for clock "consumer"
-+ * @num_clks: number of clk_bulk_data
-+ * @clk_ids: array of clock consumer ID's
-+ *
-+ * This function allows drivers to dynamically create an array of clk_bulk_data
-+ * and fill their id field in one operation with management, the array will
-+ * automatically be freed when the device is unbound. If successful, it allows
-+ * calling clk_bulk_get on the pointer returned by this function.
-+ *
-+ * Returns a pointer to a clk_bulk_data array, or valid IS_ERR() condition
-+ * containing errno.
-+ */
-+struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev, int num_clks,
-+					  const char * const *clk_ids);
-+
-+/**
-+ * clk_bulk_free - frees the array of clk_bulk_data
-+ * @clks: pointer to clk_bulk_data array
-+ *
-+ * This function frees the array allocated by clk_bulk_data. It must be called
-+ * when all clks are freed.
-+ */
-+static inline void clk_bulk_free(struct clk_bulk_data *clks)
-+{
-+	kfree(clks);
-+}
-+
- /**
-  * clk_get - lookup and obtain a reference to a clock producer.
-  * @dev: device for clock "consumer"
-@@ -598,6 +645,23 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+@@ -1255,8 +1247,7 @@ static int gsc_remove(struct platform_device *pdev)
+ 	v4l2_device_unregister(&gsc->v4l2_dev);
  
- #else /* !CONFIG_HAVE_CLK */
+ 	vb2_dma_contig_clear_max_seg_size(&pdev->dev);
+-	for (i = 0; i < gsc->num_clocks; i++)
+-		clk_disable_unprepare(gsc->clock[i]);
++	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
  
-+static inline struct clk_bulk_data *clk_bulk_alloc(int num_clks,
-+						   const char **clk_ids)
-+{
-+	return NULL;
-+}
-+
-+static inline struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev,
-+							int num_clks,
-+							const char **clk_ids)
-+{
-+	return NULL;
-+}
-+
-+static inline void clk_bulk_free(struct clk_bulk_data *clks)
-+{
-+}
-+
- static inline struct clk *clk_get(struct device *dev, const char *id)
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -1307,18 +1298,12 @@ static int gsc_runtime_resume(struct device *dev)
  {
- 	return NULL;
+ 	struct gsc_dev *gsc = dev_get_drvdata(dev);
+ 	int ret = 0;
+-	int i;
+ 
+ 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
+ 
+-	for (i = 0; i < gsc->num_clocks; i++) {
+-		ret = clk_prepare_enable(gsc->clock[i]);
+-		if (ret) {
+-			while (--i >= 0)
+-				clk_disable_unprepare(gsc->clock[i]);
+-			return ret;
+-		}
+-	}
++	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
++	if (ret)
++		return ret;
+ 
+ 	gsc_hw_set_sw_reset(gsc);
+ 	gsc_wait_reset(gsc);
+@@ -1331,14 +1316,12 @@ static int gsc_runtime_suspend(struct device *dev)
+ {
+ 	struct gsc_dev *gsc = dev_get_drvdata(dev);
+ 	int ret = 0;
+-	int i;
+ 
+ 	ret = gsc_m2m_suspend(gsc);
+ 	if (ret)
+ 		return ret;
+ 
+-	for (i = gsc->num_clocks - 1; i >= 0; i--)
+-		clk_disable_unprepare(gsc->clock[i]);
++	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
+ 
+ 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
+ 	return ret;
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
+index 715d9c9d..08ff7b9 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.h
++++ b/drivers/media/platform/exynos-gsc/gsc-core.h
+@@ -334,7 +334,7 @@ struct gsc_dev {
+ 	struct gsc_variant		*variant;
+ 	u16				id;
+ 	int				num_clocks;
+-	struct clk			*clock[GSC_MAX_CLOCKS];
++	struct clk_bulk_data		*clocks;
+ 	void __iomem			*regs;
+ 	wait_queue_head_t		irq_queue;
+ 	struct gsc_m2m_device		m2m;
 -- 
 2.7.4
