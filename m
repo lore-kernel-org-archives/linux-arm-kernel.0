@@ -1,44 +1,37 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Mon, 19 Feb 2018 09:18:36 +0100
-Subject: [PATCH v3 6/7] arm: dts: sun8i: a83t: Fix undefined offset with
- virtual timer
+Date: Mon, 19 Feb 2018 09:18:37 +0100
+Subject: [PATCH v3 7/7] ARM: sun8i: smp: Remove the disabling of CPU0
 In-Reply-To: <20180219081837.15482-1-mylene.josserand@bootlin.com>
 References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
-Message-ID: <20180219081837.15482-7-mylene.josserand@bootlin.com>
+Message-ID: <20180219081837.15482-8-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architected timers use an offset between their physical and
-virtual counters. That offset should be configured by the bootloader
-in CNTVOFF.
-
-However, the A83t bootloader fails to do so, and we end up with an
-undefined offset (which in our case is random), meaning that each CPU
-will have a different time, which isn't working very well.
-
-Fix that by setting the arm,cpu-registers-not-fw-configured that will
-make Linux use the physical timers instead of the virtual ones. One
-possible side effect would be that the virtualization features would
-be disabled. However, due to the way the GIC has been integrated in
-the system, it is already unusable so we're effectively not losing any
-feature.
+On sun8i-a63t, hotplug CPU for CPU0 is currently not working.
+Remove the possibility to disable CPU0 only for sun8i-a83t.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-sunxi/mc_smp.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index e97a6d17b8d0..b9bdb891cf2f 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -123,6 +123,7 @@
- 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-+		arm,cpu-registers-not-fw-configured;
- 	};
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index fec592bf68b4..69d5ae5b3d72 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -661,8 +661,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
+ 	return !ret;
+ }
  
- 	clocks {
+-static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
++static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
+ {
++	/* CPU0 hotplug handled only for sun9i */
++	if (of_machine_is_compatible("allwinner,sun8i-a83t"))
++		if (cpu == 0)
++			return false;
+ 	return true;
+ }
+ #endif
 -- 
 2.11.0
