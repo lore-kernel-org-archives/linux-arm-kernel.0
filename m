@@ -1,52 +1,47 @@
-From: svenbrauch@googlemail.com (Sven Brauch)
-Date: Mon, 19 Feb 2018 16:11:10 +0100
-Subject: [PATCH] fix imx7d UART1_RX_DATA__ENET1_MDIO daisy chain register
- setting
-Message-ID: <CAE_ay6n-LV_RZGGQ=iYL8Y5AmBA7d6=XaLkfjTzNukt+dPTkPg@mail.gmail.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Mon, 19 Feb 2018 16:12:52 +0100
+Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
+Message-ID: <20180219151252.29289-1-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to the pin multiplexing, some pads need to be multiplexed
-internally to the right input. This setting was not performed for one
-of the pins, resulting in ethernet not working when using that pin
-multiplexing setting.
+From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-See i.MX7D Reference Manual table 8.2.7.344 for why this is the correct
-setting.
+Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
+during registration") ULPI has been broken on Tegra20 leading to the
+following error message during boot:
 
-Signed-off-by: Sven Brauch <svb@discovergy.com>
+[    1.974698] ulpi_phy_power_on: ulpi write failed
+[    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
+[    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
 
-Postscriptum: I'm actually quite surprised by how this issue can happen.
-Is this file not automatically generated? I really wouldn't have expected
-anything to be wrong here and it took me quite some time to spot this ...
+Debugging through the changes and finally also consulting the TRM
+revealed that rather than the CDEV2 clock off OSC requiring such pin
+muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
+just worked by chance of that one having been enabled which Stephen's
+commit now changed when reparenting sclk away from pll_p_out4 leaving
+that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
+as the ULPI PHY clock.
 
-I'm not subscribed to the list, please CC me in replies.
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
 ---
- arch/arm/boot/dts/imx7d-pinfunc.h | 2 +-
+
+ arch/arm/boot/dts/tegra20.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h
-b/arch/arm/boot/dts/imx7d-pinfunc.h
-index f2493bc63da4..1204c28bc811 100644
---- a/arch/arm/boot/dts/imx7d-pinfunc.h
-+++ b/arch/arm/boot/dts/imx7d-pinfunc.h
-@@ -580,7 +580,7 @@
- #define MX7D_PAD_UART1_RX_DATA__ECSPI1_SS1
-0x0128 0x0398 0x0000 0x3 0x0
- #define MX7D_PAD_UART1_RX_DATA__ENET2_1588_EVENT0_IN
-0x0128 0x0398 0x0000 0x4 0x0
- #define MX7D_PAD_UART1_RX_DATA__GPIO4_IO0
-0x0128 0x0398 0x0000 0x5 0x0
--#define MX7D_PAD_UART1_RX_DATA__ENET1_MDIO
-0x0128 0x0398 0x0000 0x6 0x0
-+#define MX7D_PAD_UART1_RX_DATA__ENET1_MDIO
-0x0128 0x0398 0x0568 0x6 0x1
- #define MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX
-0x012C 0x039C 0x0000 0x0 0x0
- #define MX7D_PAD_UART1_TX_DATA__UART1_DTE_RX
-0x012C 0x039C 0x06F4 0x0 0x1
- #define MX7D_PAD_UART1_TX_DATA__I2C1_SDA
-0x012C 0x039C 0x05D8 0x1 0x0
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 864a95872b8d..e05b6bb2599f 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -741,7 +741,7 @@
+ 		phy_type = "ulpi";
+ 		clocks = <&tegra_car TEGRA20_CLK_USB2>,
+ 			 <&tegra_car TEGRA20_CLK_PLL_U>,
+-			 <&tegra_car TEGRA20_CLK_CDEV2>;
++			 <&tegra_car TEGRA20_CLK_PLL_P_OUT4>;
+ 		clock-names = "reg", "pll_u", "ulpi-link";
+ 		resets = <&tegra_car 58>, <&tegra_car 22>;
+ 		reset-names = "usb", "utmi-pads";
 -- 
-2.16.2
+2.14.3
