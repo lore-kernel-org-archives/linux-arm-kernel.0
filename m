@@ -1,60 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Feb 2018 09:42:52 +0100
-Subject: [PATCH 2/2] ARM: shmobile: porter: enable R-Car Gen2 regulator
- quirk
-In-Reply-To: <20180217020642.21375-2-marek.vasut+renesas@gmail.com>
-References: <20180217020642.21375-1-marek.vasut+renesas@gmail.com>
- <20180217020642.21375-2-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdVu2LvxtvUYDOrW3Yhqujk4+=bN0sg-aJhxX_g0Kbpx6g@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Mon, 19 Feb 2018 09:46:27 +0100
+Subject: [PATCH v2 2/3] ARM: dts: stm32: add USB OTG FS support for STM32H743
+ SoC
+In-Reply-To: <1519029988-9261-1-git-send-email-amelie.delaunay@st.com>
+References: <1519029988-9261-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1519029988-9261-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 3:06 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Porter needs the regulator quirk, just like the other boards,
-> the DA9063 and DA9210 IRQ line is connected to CPU IRQ2 . But
-> unlike the other boards, the DA9063 is at 0x5a on Porter.
->
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
->  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> index 862f7757ef5d..7963f0eea9e1 100644
-> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-> @@ -132,11 +132,16 @@ static int __init rcar_gen2_regulator_quirk(void)
->         u32 mon;
->
->         if (!of_machine_is_compatible("renesas,koelsch") &&
-> +           !of_machine_is_compatible("renesas,porter") &&
->             !of_machine_is_compatible("renesas,lager") &&
->             !of_machine_is_compatible("renesas,stout") &&
->             !of_machine_is_compatible("renesas,gose"))
->                 return -ENODEV;
->
-> +       /* DA9063 on M2W Porter is at 0x5a */
-> +       if (of_machine_is_compatible("renesas,porter"))
-> +               da9xxx_msgs[0].addr = 0x5a;
-> +
->         irqc = ioremap(IRQC_BASE, PAGE_SIZE);
->         if (!irqc)
->                 return -ENOMEM;
+This patch adds support for USB OTG FS on STM32H743 SoC.
+USB OTG FS controller is the same than the one used on STM32F4 SoCs.
 
-Doing the same of_machine_is_compatible() check again is an indicator that
-you should switch to an of_device_id-based match interface...
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32h743.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 0f6c078..68fc12f 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -229,6 +229,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		usbotg_fs: usb at 40080000 {
++			compatible = "st,stm32f4x9-fsotg";
++			reg = <0x40080000 0x40000>;
++			interrupts = <101>;
++			clocks = <&rcc USB2OTG_CK>;
++			clock-names = "otg";
++			status = "disabled";
++		};
++
+ 		mdma1: dma at 52000000 {
+ 			compatible = "st,stm32h7-mdma";
+ 			reg = <0x52000000 0x1000>;
+-- 
+2.7.4
