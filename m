@@ -1,43 +1,100 @@
 From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 19 Feb 2018 13:47:30 +0100
-Subject: [PATCH v4 07/13] dt-bindings: power: supply: axp20x: add AXP813
- battery DT binding
+Date: Mon, 19 Feb 2018 13:47:31 +0100
+Subject: [PATCH v4 08/13] power: supply: axp20x_battery: add support for AXP813
 In-Reply-To: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
 References: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
-Message-ID: <f572d282b5a20183f5bab5e6331be8e6b960eae3.1519044068.git-series.quentin.schulz@bootlin.com>
+Message-ID: <2a735c19cdb3ba1050172c7f025ead0d27583e10.1519044068.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813 can have a battery as power supply, so let's add it to the
-list of compatibles.
+The X-Powers AXP813 PMIC has got some slight differences from
+AXP20X/AXP22X PMICs:
+ - the maximum voltage supplied by the PMIC is 4.35 instead of 4.36/4.24
+ for AXP20X/AXP22X,
+ - the constant charge current formula is different,
+
+It also has a bit to tell whether the battery percentage returned by the
+PMIC is valid.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/power/supply/axp20x_battery.txt | 8 +++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/power/supply/axp20x_battery.c | 42 ++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-index c248866..41916f6 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-@@ -4,12 +4,12 @@ Required Properties:
-  - compatible, one of:
- 			"x-powers,axp209-battery-power-supply"
- 			"x-powers,axp221-battery-power-supply"
-+			"x-powers,axp813-battery-power-supply"
+diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
+index 099e785..b1a4c41 100644
+--- a/drivers/power/supply/axp20x_battery.c
++++ b/drivers/power/supply/axp20x_battery.c
+@@ -49,6 +49,8 @@
+ #define AXP22X_CHRG_CTRL1_TGT_4_22V	(1 << 5)
+ #define AXP22X_CHRG_CTRL1_TGT_4_24V	(3 << 5)
  
--This node is a subnode of the axp20x/axp22x PMIC.
-+This node is a subnode of its respective PMIC DT node.
++#define AXP813_CHRG_CTRL1_TGT_4_35V	(3 << 5)
++
+ #define AXP20X_CHRG_CTRL1_TGT_CURR	GENMASK(3, 0)
  
--The AXP20X and AXP22X can read the battery voltage, charge and discharge
--currents of the battery by reading ADC channels from the AXP20X/AXP22X
--ADC.
-+The supported devices can read the battery voltage, charge and discharge
-+currents of the battery by reading ADC channels from the ADC.
+ #define AXP20X_V_OFF_MASK		GENMASK(2, 0)
+@@ -133,6 +135,35 @@ static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
+ 	return 0;
+ }
  
- Example:
++static int axp813_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
++					  int *val)
++{
++	int ret, reg;
++
++	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
++	if (ret)
++		return ret;
++
++	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
++	case AXP20X_CHRG_CTRL1_TGT_4_1V:
++		*val = 4100000;
++		break;
++	case AXP20X_CHRG_CTRL1_TGT_4_15V:
++		*val = 4150000;
++		break;
++	case AXP20X_CHRG_CTRL1_TGT_4_2V:
++		*val = 4200000;
++		break;
++	case AXP813_CHRG_CTRL1_TGT_4_35V:
++		*val = 4350000;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
+ 					      int *val)
+ {
+@@ -491,6 +522,14 @@ const struct axp_data axp221_data = {
+ 	.set_max_voltage = axp22x_battery_set_max_voltage,
+ };
  
++const struct axp_data axp813_data = {
++	.ccc_scale = 200000,
++	.ccc_offset = 200000,
++	.has_fg_valid = true,
++	.get_max_voltage = axp813_battery_get_max_voltage,
++	.set_max_voltage = axp20x_battery_set_max_voltage,
++};
++
+ static const struct of_device_id axp20x_battery_ps_id[] = {
+ 	{
+ 		.compatible = "x-powers,axp209-battery-power-supply",
+@@ -498,6 +537,9 @@ static const struct of_device_id axp20x_battery_ps_id[] = {
+ 	}, {
+ 		.compatible = "x-powers,axp221-battery-power-supply",
+ 		.data = (void *)&axp221_data,
++	}, {
++		.compatible = "x-powers,axp813-battery-power-supply",
++		.data = (void *)&axp813_data,
+ 	}, { /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
 -- 
 git-series 0.9.1
