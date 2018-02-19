@@ -1,51 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Feb 2018 11:13:22 +0100
-Subject: [4.9-stable 3/9] arm64: sunxi: always enable reset controller
+Date: Mon, 19 Feb 2018 11:13:26 +0100
+Subject: [4.9-stable 7/9] arm64: fix warning about swapper_pg_dir overflow
 In-Reply-To: <20180219101343.2922561-1-arnd@arndb.de>
 References: <20180219101343.2922561-1-arnd@arndb.de>
-Message-ID: <20180219101343.2922561-4-arnd@arndb.de>
+Message-ID: <20180219101343.2922561-8-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 900a9020af7a023f9b64c919fddf8a7486108962 upstream.
+commit 12f043ff2b28fa64c9123b454cbe30a8a9e1967e upstream.
 
-The sunxi clk driver causes a link error when the reset controller
-subsystem is disabled:
+With 4 levels of 16KB pages, we get this warning about the fact that we are
+copying a whole page into an array that is declared as having only two pointers
+for the top level of the page table:
 
-drivers/clk/built-in.o: In function `sun4i_ve_clk_setup':
-:(.init.text+0xd040): undefined reference to `reset_controller_register'
-drivers/clk/built-in.o: In function `sun4i_a10_display_init':
-:(.init.text+0xe5e0): undefined reference to `reset_controller_register'
-drivers/clk/built-in.o: In function `sunxi_usb_clk_setup':
-:(.init.text+0x10074): undefined reference to `reset_controller_register'
+arch/arm64/mm/mmu.c: In function 'paging_init':
+arch/arm64/mm/mmu.c:528:2: error: 'memcpy' writing 16384 bytes into a region of size 16 overflows the destination [-Werror=stringop-overflow=]
 
-We already force it to be enabled on arm32 and some other arm64 platforms,
-but not on arm64/sunxi. This adds the respective Kconfig statements to
-also select it here.
+This is harmless since we actually reserve a whole page in the definition of the
+array that comes from, and just the extern declaration is short. The pgdir
+is initialized to zero either way, so copying the actual entries here seems
+like the best solution.
 
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[arnd: manually rebased to 4.9]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+[slightly adapted to apply on 4.9]
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/Kconfig.platforms | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 101794f5ce10..08a4497f70a6 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,9 +2,11 @@ menu "Platform selection"
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 05615a3fdc6f..d5cc6d73c2c4 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -479,7 +479,7 @@ void __init paging_init(void)
+ 	 * To do this we need to go via a temporary pgd.
+ 	 */
+ 	cpu_replace_ttbr1(__va(pgd_phys));
+-	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
++	memcpy(swapper_pg_dir, pgd, PGD_SIZE);
+ 	cpu_replace_ttbr1(swapper_pg_dir);
  
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select PINCTRL_SUN50I_A64
-+	select RESET_CONTROLLER
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
- 
+ 	pgd_clear_fixmap();
 -- 
 2.9.0
