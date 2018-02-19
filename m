@@ -1,17 +1,18 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 19 Feb 2018 08:03:46 -0300
-Subject: [PATCH] ARM: dts: imx6dl: remove 'lcdif' node
-In-Reply-To: <1519037225-22872-1-git-send-email-LW@KARO-electronics.de>
-References: <1519037225-22872-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <CAOMZO5B3=eL7dRYFzKcCUXDLRS9ZjjmpSZc6s=o0S1A1W4=zQA@mail.gmail.com>
+Date: Mon, 19 Feb 2018 08:05:26 -0300
+Subject: [PATCH 2/2] ARM: dts: hummingboard: Remove mention of nonexistent
+ node
+In-Reply-To: <d7edf747a7e4f94488d7f2430fcd2cd660a6123d.1519027005.git.baruch@tkos.co.il>
+References: <535f327ebffa93ee780381e6c9f9f39b7c6d1a26.1519027005.git.baruch@tkos.co.il>
+ <d7edf747a7e4f94488d7f2430fcd2cd660a6123d.1519027005.git.baruch@tkos.co.il>
+Message-ID: <CAOMZO5CpSidJBn7y5L8S=dTt7b1MBm6m5hV7ox5k_W+N2eXNKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 7:47 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> According to the "i.MX 6Solo/6DualLite Applications Processor
-> Reference Manual" Rev. 3, 09/2017 there is no LCDIF unit on the
-> i.MX6DL.
+On Mon, Feb 19, 2018 at 4:56 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> There is no pinctrl_usbotg_2 node in current Hummingboard dts files.
+> Drop reference to that.
 >
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
