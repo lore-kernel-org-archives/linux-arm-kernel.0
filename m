@@ -1,79 +1,52 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 19 Feb 2018 08:28:47 -0600
-Subject: [RFC PATCH v2 1/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <20180215103920.32017-2-a.hajda@samsung.com>
+Date: Mon, 19 Feb 2018 08:32:34 -0600
+Subject: [RFC PATCH v2 2/6] dt-bindings: add bindings for Samsung
+ micro-USB 11-pin connector
+In-Reply-To: <20180215103920.32017-3-a.hajda@samsung.com>
 References: <20180215103920.32017-1-a.hajda@samsung.com>
- <CGME20180215103925eucas1p1d82fd73ac6ea77c8b66de4ed26101a71@eucas1p1.samsung.com>
- <20180215103920.32017-2-a.hajda@samsung.com>
-Message-ID: <20180219142847.3rnvtai6msjlyj5b@rob-hp-laptop>
+ <CGME20180215103926eucas1p2f13dcf5aa4e102e7f0145c976a60bc72@eucas1p2.samsung.com>
+ <20180215103920.32017-3-a.hajda@samsung.com>
+Message-ID: <20180219143234.5k47c5sihqwuwwqw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:39:15AM +0100, Andrzej Hajda wrote:
-> These bindings allow to describe most known standard USB connectors
-> and it should be possible to extend it if necessary.
-> USB connectors, beside USB can be used to route other protocols,
-> for example UART, Audio, MHL. In such case every device passing data
-> through the connector should have appropriate graph bindings.
+On Thu, Feb 15, 2018 at 11:39:16AM +0100, Andrzej Hajda wrote:
+> Samsung micro-USB 11-pin connector beside standard micro-USB pins,
+> has pins dedicated to route MHL traffic.
 > 
 > Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
-> v3:
-> - removed MHL port (samsung connector will have separate bindings),
-> - added 2nd example for USB-C,
-> - improved formatting
-> v2:
-> - moved connector type(A,B,C) to compatible string (Rob),
-> - renamed size property to type (Rob),
-> - changed type description to be less confusing (Laurent),
-> - removed vendor specific compatibles (implied by graph port number),
-> - added requirement of connector being a child of IC (Rob),
-> - removed max-mode (subtly suggested by Rob, it should be detected anyway
->   by USB Controller in runtime, downside is that device is not able to
->   report its real capabilities, maybe better would be to make it optional(?)),
-> - assigned port numbers to data buses (Rob).
+>  .../connector/samsung,usb-connector-11pin.txt      | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
 > 
-> Regards
-> Andrzej
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> 
-> dt-bindings: add bindings for USB physical connector v3
-> ---
->  .../bindings/connector/usb-connector.txt           | 74 ++++++++++++++++++++++
->  1 file changed, 74 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+> diff --git a/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
 > new file mode 100644
-> index 000000000000..1efda92639da
+> index 000000000000..c8ef1ad6732f
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
-> @@ -0,0 +1,74 @@
-> +USB Connector
-> +=============
+> +++ b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
+> @@ -0,0 +1,51 @@
+> +Samsung micro-USB 11-pin connector
+> +==================================
 > +
-> +USB connector node represents physical USB connector. It should be
-> +a child of USB interface controller.
+> +Samsung micro-USB 11-pin connector is an extension of micro-USB connector.
+> +It is present in multiple Samsung mobile devices.
+> +It has additional pins to route MHL traffic simultanously with USB.
+> +
+> +The bindings are superset of usb-connector bindings for micro-USB connector[1].
 > +
 > +Required properties:
-> +- compatible: describes type of the connector, must be one of:
-> +    "usb-a-connector",
-> +    "usb-b-connector",
-> +    "usb-c-connector".
+> +- compatible: must be: "samsung,usb-connector-11pin", "usb-b-connector",
+> +- type: must be "micro".
 > +
 > +Optional properties:
-> +- label: symbolic name for the connector,
-> +- type: size of the connector, should be specified in case of USB-A, USB-B
-> +  non-standard (large) connector sizes: "mini", "micro".
+> +- label: symbolic name for the connector.
 
-The smaller connectors are standard too. Perhaps "non-fullsize connector 
-sizes".
+This is already defined in [1] so you don't need it here.
 
-We're missing a micro-AB connector, but I think those are actually 
-pretty rare. Most phones are micro-B connectors, but do both host and 
-device.
+Otherwise,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 > +
 > +Required nodes:
@@ -81,60 +54,31 @@ device.
 > +  specified in bindings/graph.txt, unless the bus is between parent node and
 > +  the connector. Since single connector can have multpile data buses every bus
 > +  has assigned OF graph port number as follows:
-> +    0: High Speed (HS), present in all connectors,
-> +    1: Super Speed (SS), present in SS capable connectors,
-
-This should also say endpoint 0 is USB-SS, endpoint 1 (and higher?) is 
-Alternate Mode. And show in the example.
-
-> +    2: Sideband use (SBU), present in USB-C.
+> +    0: High Speed (HS),
+> +    3: Mobile High-Definition Link (MHL), specific to 11-pin Samsung micro-USB.
 > +
-> +Examples
-> +--------
+> +[1]: bindings/connector/usb-connector.txt
 > +
-> +1. Micro-USB connector with HS lines routed via controller (MUIC):
+> +Example
+> +-------
+> +
+> +Micro-USB connector with HS lines routed via controller (MUIC) and :
 > +
 > +muic-max77843 at 66 {
 > +	...
 > +	usb_con: connector {
-> +		compatible = "usb-b-connector";
+> +		compatible = "samsung,usb-connector-11pin", "usb-b-connector";
 > +		label = "micro-USB";
 > +		type = "micro";
-> +	};
-> +};
-> +
-> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
-> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort:
-
-Having SBU to DP but no DP video path connection is wrong.
-
-> +
-> +ccic: s2mm005 at 33 {
-> +	...
-> +	usb_con: connector {
-> +		compatible = "usb-c-connector";
-> +		label = "USB-C";
 > +
 > +		ports {
 > +			#address-cells = <1>;
 > +			#size-cells = <0>;
 > +
-> +			port at 0 {
-> +				reg = <0>;
-> +				usb_con_hs: endpoint {
-> +					remote-endpoint = <&max77865_usbc_hs>;
-> +				};
-> +			};
-> +			port at 1 {
-> +				reg = <1>;
-> +				usb_con_ss: endpoint {
-> +					remote-endpoint = <&usbdrd_phy_ss>;
-> +				};
-> +			};
-> +			port at 2 {
-> +				reg = <2>;
-> +				usb_con_sbu: endpoint {
-> +					remote-endpoint = <&dp_aux>;
+> +			port at 3 {
+> +				reg = <3>;
+> +				usb_con_mhl: endpoint {
+> +					remote-endpoint = <&sii8620_mhl>;
 > +				};
 > +			};
 > +		};
