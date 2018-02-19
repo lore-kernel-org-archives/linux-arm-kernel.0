@@ -1,19 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Feb 2018 21:12:09 -0600
-Subject: [PATCH v3 04/10] clk: qcom: Add DT bindings for CPU clock driver
- for msm8996
-In-Reply-To: <1518616792-29028-5-git-send-email-ilialin@codeaurora.org>
-References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
- <1518616792-29028-5-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180219031209.5yywl4heny46hlue@rob-hp-laptop>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Sun, 18 Feb 2018 21:35:01 -0600
+Subject: [PATCH 5/9] ARM: dts: am33xx: Add pm-sram phandle to soc node
+In-Reply-To: <1519011305-17822-1-git-send-email-d-gerlach@ti.com>
+References: <1519011305-17822-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1519011305-17822-6-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 03:59:46PM +0200, Ilia Lin wrote:
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/clock/qcom,kryocc.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+Add a phandle to point to both the pm-sram-code and pm-sram-data nodes
+so that the pm code can locate the sram regions needed to copy low level
+PM code.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index c27ef2cac394..842e726b944e 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -147,6 +147,8 @@
+ 		mpu {
+ 			compatible = "ti,omap3-mpu";
+ 			ti,hwmods = "mpu";
++			pm-sram = <&pm_sram_code
++				   &pm_sram_data>;
+ 		};
+ 	};
+ 
+-- 
+2.16.1
