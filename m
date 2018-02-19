@@ -1,61 +1,242 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Feb 2018 18:02:56 +0100
-Subject: [PATCH v3 5/7] watchdog: mtk: allow setting timeout in devicetree
-In-Reply-To: <20180211200847.25000-5-marcus.folkesson@gmail.com>
-References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
- <20180211200847.25000-5-marcus.folkesson@gmail.com>
-Message-ID: <e179fed7-225f-2c07-2c00-41ccd28d4784@gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 19 Feb 2018 22:43:47 +0530
+Subject: [PATCH 01/10] dt-bindings: pinctrl: Add bindings for Actions
+ S900 SoC
+In-Reply-To: <77989e71-3cde-bb01-e07d-a9a809751a9b@suse.de>
+References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
+ <20180217204433.3095-2-manivannan.sadhasivam@linaro.org>
+ <77989e71-3cde-bb01-e07d-a9a809751a9b@suse.de>
+Message-ID: <20180219171347.kdxibfd4vfuajudj@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andreas,
+On Sat, Feb 17, 2018 at 10:03:53PM +0100, Andreas F?rber wrote:
+> Am 17.02.2018 um 21:44 schrieb Manivannan Sadhasivam:
+> > Add pinctrl bindings for Actions Semi S900 SoC
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  .../bindings/pinctrl/actions,s900-pinctrl.txt      | 171 +++++++++++++++++++++
+> >  1 file changed, 171 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+> > new file mode 100644
+> > index 000000000000..ee7d3ecd9bd9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+> > @@ -0,0 +1,171 @@
+> > +Actions Semi S900 Pin Controller
+> 
+> So you are targeting to have one bindings file per SoC?
+> 
+Yes. Similar to what Qcom drivers are doing! Having a single
+binding will look messy if we add support for other
+OWL family SoC's like S500, S700...
+> > +
+> > +This binding describes the pin controller found in the S900 SoC.
+> > +
+> > +Required Properties:
+> > +
+> > +- compatible:   Should be "actions,s900-pinctrl"
+> > +- reg:          Should contain the register base address and size of
+> > +                the pin controller.
+> > +- clocks:       phandle of the clock feeding the pin controller
+> > +
+> > +Please refer to pinctrl-bindings.txt in this directory for details of the
+> > +common pinctrl bindings used by client devices, including the meaning of the
+> > +phrase "pin configuration node".
+> > +
+> > +The pin configuration nodes act as a container for an arbitrary number of
+> > +subnodes. Each of these subnodes represents some desired configuration for a
+> > +pin, a group, or a list of pins or groups. This configuration can include the
+> > +mux function to select on those group(s), and various pin configuration
+> > +parameters, such as pull-up, drive strength, etc.
+> > +
+> > +PIN CONFIGURATION NODES:
+> > +
+> > +The name of each subnode is not important; all subnodes should be enumerated
+> > +and processed purely based on their content.
+> > +
+> > +Each subnode only affects those parameters that are explicitly listed. In
+> > +other words, a subnode that lists a mux function but no pin configuration
+> > +parameters implies no information about any pin configuration parameters.
+> > +Similarly, a pin subnode that describes a pullup parameter implies no
+> > +information about e.g. the mux function.
+> > +
+> > +Pinmux functions are available only for the pin groups while pinconf
+> > +parameters are available for both pin groups and individual pins.
+> > +
+> > +The following generic properties as defined in pinctrl-bindings.txt are valid
+> > +to specify in a pin configuration subnode:
+> > +
+> > +Required Properties:
+> > +
+> > +- pins:           An array of strings, each string containing the name of a pin.
+> > +                  These pins are used for selecting the pull control and schmitt
+> > +                  trigger parameters. The following are the list of pins
+> > +                  available:
+> > +
+> > +                  ETH_TXD0, ETH_TXD1, ETH_TXEN, ETH_RXER, ETH_CRS_DV,
+> > +                  ETH_RXD1, ETH_RXD0, ETH_REF_CLK, ETH_MDC, ETH_MDIO,
+> > +                  SIRQ0, SIRQ1, SIRQ2, I2S_D0, I2S_BCLK0, I2S_LRCLK0,
+> > +                  I2S_MCLK0, I2S_D1, I2S_BCLK1, I2S_LRCLK1, I2S_MCLK1,
+> > +                  PCM1_IN, PCM1_CLK, PCM1_SYNC, PCM1_OUT, ERAM_A5,
+> > +                  ERAM_A6, ERAM_A7, ERAM_A8, ERAM_A9, ERAM_A10, ERAM_A11,
+> > +                  LVDS_OEP, LVDS_OEN, LVDS_ODP, LVDS_ODN, LVDS_OCP,
+> > +                  LVDS_OCN, LVDS_OBP, LVDS_OBN, LVDS_OAP, LVDS_OAN,
+> > +                  LVDS_EEP, LVDS_EEN, LVDS_EDP, LVDS_EDN, LVDS_ECP,
+> > +                  LVDS_ECN, LVDS_EBP, LVDS_EBN, LVDS_EAP, LVDS_EAN,
+> > +                  SD0_D0, SD0_D1, SD0_D2, SD0_D3, SD1_D0, SD1_D1,
+> > +                  SD1_D2, SD1_D3, SD0_CMD, SD0_CLK, SD1_CMD, SD1_CLK,
+> > +                  SPI0_SCLK, SPI0_SS, SPI0_MISO, SPI0_MOSI, UART0_RX,
+> > +                  UART0_TX, UART2_RX, UART2_TX, UART2_RTSB, UART2_CTSB,
+> > +                  UART3_RX, UART3_TX, UART3_RTSB, UART3_CTSB, UART4_RX,
+> > +                  UART4_TX, I2C0_SCLK, I2C0_SDATA, I2C1_SCLK, I2C1_SDATA,
+> > +                  I2C2_SCLK, I2C2_SDATA, CSI0_DN0, CSI0_DP0, CSI0_DN1,
+> > +                  CSI0_DP1, CSI0_CN, CSI0_CP, CSI0_DN2, CSI0_DP2, CSI0_DN3,
+> > +                  CSI0_DP3, DSI_DP3, DSI_DN3, DSI_DP1, DSI_DN1, DSI_CP,
+> > +                  DSI_CN, DSI_DP0, DSI_DN0, DSI_DP2, DSI_DN2, SENSOR0_PCLK,
+> > +                  CSI1_DN0,CSI1_DP0,CSI1_DN1, CSI1_DP1, CSI1_CN, CSI1_CP,
+> > +                  SENSOR0_CKOUT, NAND0_D0, NAND0_D1, NAND0_D2, NAND0_D3,
+> > +                  NAND0_D4, NAND0_D5, NAND0_D6, NAND0_D7, NAND0_DQS,
+> > +                  NAND0_DQSN, NAND0_ALE, NAND0_CLE, NAND0_CEB0, NAND0_CEB1,
+> > +                  NAND0_CEB2, NAND0_CEB3, NAND1_D0, NAND1_D1, NAND1_D2,
+> > +                  NAND1_D3, NAND1_D4, NAND1_D5, NAND1_D6, NAND1_D7, NAND1_DQS,
+> > +                  NAND1_DQSN, NAND1_ALE, NAND1_CLE, NAND1_CEB0, NAND1_CEB1,
+> > +                  NAND1_CEB2, NAND1_CEB3, SGPIO0, SGPIO1, SGPIO2, SGPIO3
+> 
+> Should be lower-case?
+> 
+Okay.
+> > +
+> > +- groups:         An array of strings, each string containing the name of a pin
+> > +                  group. These pin groups are used for selecting the pinmux
+> > +                  functions. The following are the list of pin groups available:
+> > +
+> > +                  mfp0_22, mfp0_21_20_eth_mdc, mfp0_21_20_eth_mdio,
+> > +                  mfp0_19_sirq0, mfp0_19_sirq1, mfp0_18_16_eth_txd0,
+> > +                  mfp0_18_16_eth_txd1, mfp0_15_13_eth_txen, mfp0_15_13_eth_rxer,
+> > +                  mfp0_12_11, mfp0_10_8_eth_rxd1, mfp0_10_8_eth_rxd0, mfp0_7_6,
+> > +                  mfp0_5_i2s_d0, mfp0_5_i2s_d1, mfp0_4_3, mfp0_2_i2s0,
+> > +                  mfp0_2_i2s1, mfp0_1_0_pcm1_in_out, mfp0_1_0_pcm1_clk,
+> > +                  mfp0_1_0_pcm1_sync, mfp1_31_29_eram_a5, mfp1_31_29_eram_a6,
+> > +                  mfp1_31_29_eram_a7, mfp1_28_26_eram_a8, mfp1_28_26_eram_a9,
+> > +                  mfp1_28_26_eram_a10, mfp1_25_23, mfp1_22_lvds_oep_odn,
+> > +                  mfp1_22_lvds_ocp_obn, mfp1_22_lvds_oap_oan, mfp1_21_lvds_e,
+> > +                  mfp1_5_4, mfp1_3_1_spi0_ss, mfp1_3_1_spi0_miso, mfp2_23,
+> > +                  mfp2_22, mfp2_21, mfp2_20, mfp2_19_17, mfp2_16_14, mfp2_13_11,
+> > +                  mfp2_10_9, mfp2_8_7, mfp2_6_5, mfp2_4_3, mfp2_2_0, mfp3_27,
+> > +                  mfp3_21_19, mfp3_18_16, mfp3_15, mfp3_14, mfp3_13,
+> > +                  mfp3_12_dsi_dp3_dn1, mfp3_12_dsi_cp_dn0, mfp3_12_dsi_dp2_dn2,
+> > +                  mfp3_11, mfp3_10_nand1_ceb3, mfp3_10_nand1_ceb0, mfp3_9,
+> > +                  mfp3_8
+> > +
+> > +                  These pin groups are used for selecting the drive strength
+> > +                  parameters.
+> > +
+> > +                  drv0_31_30, drv0_29_28, drv0_27_26, drv0_25_24, drv0_23_22,
+> > +                  drv0_21_20, drv0_19_18, drv0_17_16, drv0_15_14, drv0_13_12,
+> > +                  drv0_11_10, drv0_9_8, drv0_7_6, drv0_5_4, drv0_3_2, drv0_1_0,
+> > +                  drv1_29_28, drv1_27_26, drv1_25_24, drv1_23_22, drv1_21_20,
+> > +                  drv1_19_18, drv1_17_16, drv1_15_14, drv1_13_12, drv1_11_10,
+> > +                  drv1_9_8, drv1_7_6, drv1_5_4, drv2_31_30, drv2_29_28,
+> > +                  drv2_27_26, drv2_21_20
+> > +
+> > +                  These pin groups are used for selecting the slew rate
+> > +                  parameters.
+> > +
+> > +                  sr0_15, sr0_14, sr0_13, sr0_12, sr0_11, sr0_10, sr0_9, sr0_8,
+> > +                  sr0_7, sr0_6, sr0_5, sr0_4, sr0_3, sr0_2, sr0_1, sr0_0,
+> > +                  sr1_25, sr1_24, sr1_23, sr1_22, sr1_21, sr1_20, sr1_19,
+> > +                  sr1_18, sr2_31, sr2_30, sr2_29, sr2_25
+> > +
+> > +- function:       An array of strings, each string containing the name of the
+> > +                  pinmux functions. These functions can only be selected by
+> > +                  the corresponding pin groups. The following are the list of
+> > +                  pinmux functions available:
+> > +
+> > +                  eram, eth_rmii, eth_smii, spi0, spi1, spi2, spi3, sens0,
+> > +                  uart0, uart1, uart2, uart3, uart4, uart5, uart6, i2s0, i2s1,
+> > +                  pcm0, pcm1, jtag, pwm0, pwm1, pwm2, pwm3, pwm4, pwm5, sd0,
+> > +                  sd1, sd2, sd3, i2c0, i2c1, i2c2, i2c3, i2c4, i2c5, lvds,
+> > +                  usb30, usb20, gpu, mipi_csi0, mipi_csi1, mipi_dsi, nand0,
+> > +                  nand1, spdif, sirq0, sirq1, sirq2
+> > +
+> > +Optional Properties:
+> > +
+> > +- bias-bus-hold:  No arguments. The specified pins should retain the previous
+> > +                  state value.
+> > +- bias-high-impedance: No arguments. The specified pins should be configured
+> > +                  as high impedance.
+> > +- bias-pull-down: No arguments. The specified pins should be configued as
+> 
+> configured
+> 
+Ack.
+> > +                  pull down.
+> > +- bias-pull-up:   No arguments. The specified pins should be configued as
+> 
+> ditto
+> 
+Ack.
+> > +                  pull up.
+> > +- input-schmitt-enable: No arguments: Enable schmitt trigger for the specified
+> > +                  pins
+> > +- input-schmitt-disable: No arguments: Disable schmitt trigger for the specified
+> > +                  pins
+> > +- slew-rate:      Integer. Sets slew rate for the specified pins.
+> > +                  Valid values are:
+> > +                  <0>  - Slow
+> > +                  <1>  - Fast
+> > +- drive-strength: Integer. Selects the drive strength for the specified
+> > +                  pins.
+> > +                  Valid values are:
+> > +                  <2>  - mA
+> > +                  <4>  - mA
+> > +                  <8>  - mA
+> > +                  <12> - mA
+> 
+> This looks weird and should get a better explanation: <2> - 2 mA?
+> Or "... drive strength in mA for ..." and drop "- mA"?
+> 
+How about,
 
+drive-strength: Integer. Selects the drive strength for the specified
+                pins in mA.
+                Valid values are:
+                2
+                4
+                8
+                12
 
-On 02/11/2018 09:08 PM, Marcus Folkesson wrote:
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
+Thanks,
+Mani
+> > +
+> > +Example:
+> > +
+> > +          pinctrl: pinctrl at e01b0000 {
+> > +                  compatible = "actions,s900-pinctrl";
+> > +                  reg = <0x0 0xe01b0000 0x0 0x1000>;
+> > +                  clocks = <&cmu CLK_GPIO>;
+> > +
+> > +                  uart2-default: uart2-default {
+> > +                          pinmux {
+> > +                                  groups = "mfp1_22_lvds_oep_odn";
+> > +                                  function = "uart2";
+> > +                          };
+> > +                          pinconf {
+> > +                                  groups = "drv1_27_26";
+> > +                                  drive-strength = <12>;
+> > +                          };
+> > +                  };
+> > +          };
 > 
-> By following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt, it also
-> let us to set timout-sec property in devicetree.
+> Regards,
+> Andreas
 > 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 4 ++++
->  drivers/watchdog/mtk_wdt.c                             | 2 +-
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> index 5b38a30e608c..859dee167b91 100644
-> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-> @@ -11,9 +11,13 @@ Required properties:
->  
->  - reg : Specifies base physical address and size of the registers.
->  
-> +Optional properties:
-> +- timeout-sec: contains the watchdog timeout in seconds.
-> +
->  Example:
->  
->  wdt: watchdog at 10000000 {
->  	compatible = "mediatek,mt6589-wdt";
->  	reg = <0x10000000 0x18>;
-> +	timeout-sec = <10>;
->  };
-> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
-> index 7ed417a765c7..fcdc10ec28a3 100644
-> --- a/drivers/watchdog/mtk_wdt.c
-> +++ b/drivers/watchdog/mtk_wdt.c
-> @@ -57,7 +57,7 @@
->  #define DRV_VERSION		"1.0"
->  
->  static bool nowayout = WATCHDOG_NOWAYOUT;
-> -static unsigned int timeout = WDT_MAX_TIMEOUT;
-> +static unsigned int timeout;
->  
->  struct mtk_wdt_dev {
->  	struct watchdog_device wdt_dev;
-> 
-
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
