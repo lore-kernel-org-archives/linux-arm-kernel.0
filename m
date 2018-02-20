@@ -1,30 +1,46 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 20 Feb 2018 10:45:03 -0600
-Subject: [PATCH v2 0/3] Support qcom pinctrl protected pins
-In-Reply-To: <20180126011400.2191-1-sboyd@codeaurora.org>
-References: <20180126011400.2191-1-sboyd@codeaurora.org>
-Message-ID: <94a7bd07-8ad5-7ab1-20ab-a02fe2476efd@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 20 Feb 2018 08:45:10 -0800
+Subject: [PATCH] ARM: make CONFIG_DEBUG_WX depend on MMU
+In-Reply-To: <20180220150932.3285766-1-arnd@arndb.de>
+References: <20180220150932.3285766-1-arnd@arndb.de>
+Message-ID: <bea07eb7-1763-147c-9da5-e70d2fcf876b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2018 07:13 PM, Stephen Boyd wrote:
-> This patchset proposes a solution to describing the valid
-> pins for a pin controller in a semi-generic way so that qcom
-> platforms can expose the pins that are really available.
+On 02/20/2018 07:09 AM, Arnd Bergmann wrote:
+> Without CONFIG_MMU, this results in a build failure:
 > 
-> Typically, this has been done by having drivers and firmware
-> descriptions only use pins they know they have access to, and that
-> still works now because we no longer read the pin direction at
-> boot. But there are still some userspace drivers and debugfs facilities
-> that don't know what pins are available and attempt to read everything
-> they can. On qcom platforms, this may lead to a system hang, which isn't
-> very nice behavior, even if root is the only user that can trigger it.
+> ./arch/arm/include/asm/memory.h:92:23: error: initializer element is not constant
+>   #define VECTORS_BASE  vectors_base
+> arch/arm/mm/dump.c:32:4: note: in expansion of macro 'VECTORS_BASE'
+>    { VECTORS_BASE, "Vectors" },
+> 
+> arch/arm/mm/dump.c:71:11: error: 'L_PTE_USER' undeclared here (not in a function); did you mean 'VTIME_USER'?
+>     .mask = L_PTE_USER,
+>             ^~~~~~~~~~
+> 
+> Obviously the feature only makes sense with an MMU, so let's add the
+> dependency here.
+> 
 
-Any progress on this patch set?  Stephen no longer works for Qualcomm, 
-so I don't know what the next step is, and I really want this feature in 
-4.17 (we've missed so many merge windows already).
+Acked-by: Laura Abbott <labbott@redhat.com>
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Fixes: a8e53c151fe7 ("ARM: 8737/1: mm: dump: add checking for writable and executable")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   arch/arm/Kconfig.debug | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 7b3d9c5c73bb..6db106b5b9e9 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -22,6 +22,7 @@ config ARM_PTDUMP_DEBUGFS
+>   
+>   config DEBUG_WX
+>   	bool "Warn on W+X mappings at boot"
+> +	depends on MMU
+>   	select ARM_PTDUMP_CORE
+>   	---help---
+>   		Generate a warning if any W+X mappings are found at boot.
+> 
