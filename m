@@ -1,115 +1,87 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Tue, 20 Feb 2018 09:40:51 +0000
-Subject: [PATCH 1/2] dt-bindings: phy: add support for STM32 USB PHY
- Controller (USBPHYC)
-In-Reply-To: <20180219015108.bxt6qn7tz53ydguv@rob-hp-laptop>
-References: <1518438929-5254-1-git-send-email-amelie.delaunay@st.com>
- <1518438929-5254-2-git-send-email-amelie.delaunay@st.com>
- <20180219015108.bxt6qn7tz53ydguv@rob-hp-laptop>
-Message-ID: <05225cb4-6584-a003-380f-bb9ca5f2da85@st.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 20 Feb 2018 10:52:46 +0100
+Subject: [PATCH] drm: simple_kms_helper: Add mode_valid() callback support
+In-Reply-To: <20180220072859.3386-1-linus.walleij@linaro.org>
+References: <20180220072859.3386-1-linus.walleij@linaro.org>
+Message-ID: <20180220095246.GF23425@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/19/2018 02:51 AM, Rob Herring wrote:
-> On Mon, Feb 12, 2018 at 01:35:28PM +0100, Amelie Delaunay wrote:
->> This patch adds the device tree bindings description for STM32 USBPHYC
->> (USB PHY Controller).
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> ---
->>   .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  | 46 ++++++++++++++++++++++
->>   1 file changed, 46 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->> new file mode 100644
->> index 0000000..1e65e0a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->> @@ -0,0 +1,46 @@
->> +STMicroelectronics STM32 USB HS PHY controller
->> +
->> +The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
->> +switch. It controls PHY configuration and status, and the UTMI+ switch that
->> +selects either OTG or HOST controller for the second PHY port. It also sets
->> +PLL configuration.
->> +
->> +USBPHYC
->> +  |_ PLL
->> +  |
->> +  |_ PHY port#1 _________________ HOST controller
->> +  |                                      |
->> +  |_ PHY port#2_______                   |
->> +  |                   |_                 |
->> +  |_ UTMI switch_____/ 1|________________|
->> +                    |   |________________
->> +                     \_0|                |
->> +		                  OTG controller
->> +
->> +Required properties:
->> +- compatible: must be "st,stm32mp1-usbphyc"
->> +- reg: address and length of the usb phy control register set
->> +- clocks: phandle + clock specifier for the PLL phy clock
->> +- phy-supply: from the generic phy bindings, phandle to the regulator
->> +  providing 3V3 power to the PHY, see phy-bindings.txt
->> +- vdda1v1-supply: phandle to the regulator providing 1V1 power to the PHY
->> +- vdda1v8-supply: phandle to the regulator providing 1V8 power to the PHY
->> +
->> +Optional properties:
->> +- assigned-clocks: phandle + clock specifier for the PLL phy clock
->> +- assigned-clock-parents: the PLL phy clock parent
->> +- resets: phandle + reset specifier
->> +- st,port2-switch-to-host: select HOST controller on UTMI switch for port#2
+On Tue, Feb 20, 2018 at 08:28:59AM +0100, Linus Walleij wrote:
+> The PL111 needs to filter valid modes based on memory bandwidth.
+> I guess it is a pretty simple operation, so we can still claim
+> the DRM KMS helper pipeline is simple after adding this (optional)
+> vtable callback.
 > 
-> This one seems very specific. If another device had the mux on a
-> different port number you'd need a new property for example.
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Fix up the kerneldoc to just refer to the enum.
+> - Collect Eric's and Daniel's review tags.
+> ---
+>  drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
+>  include/drm/drm_simple_kms_helper.h     | 14 ++++++++++++++
+>  2 files changed, 29 insertions(+)
 > 
+> diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
+> index 9f3b1c94802b..652cde9a5a6b 100644
+> --- a/drivers/gpu/drm/drm_simple_kms_helper.c
+> +++ b/drivers/gpu/drm/drm_simple_kms_helper.c
+> @@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
+>  };
+>  
+> +static enum drm_mode_status
+> +drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
+> +			       const struct drm_display_mode *mode)
+> +{
+> +	struct drm_simple_display_pipe *pipe;
+> +
+> +	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
+> +	if (!pipe->funcs || !pipe->funcs->mode_valid)
+> +		/* Anything goes */
+> +		return MODE_OK;
+> +
+> +	return pipe->funcs->mode_valid(crtc, mode);
+> +}
+> +
+>  static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
+>  				     struct drm_crtc_state *state)
+>  {
+> @@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
+>  }
+>  
+>  static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
+> +	.mode_valid = drm_simple_kms_crtc_mode_valid,
+>  	.atomic_check = drm_simple_kms_crtc_check,
+>  	.atomic_enable = drm_simple_kms_crtc_enable,
+>  	.atomic_disable = drm_simple_kms_crtc_disable,
+> diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+> index 6d9adbb46293..d9e4c3c3f009 100644
+> --- a/include/drm/drm_simple_kms_helper.h
+> +++ b/include/drm/drm_simple_kms_helper.h
+> @@ -21,6 +21,20 @@ struct drm_simple_display_pipe;
+>   *                                        display pipeline
+>   */
+>  struct drm_simple_display_pipe_funcs {
+> +	/**
+> +	 * @mode_valid:
+> +	 *
+> +	 * This function is called to filter out valid modes from the
+> +	 * suggestions suggested by the bridge or display. This optional
 
-You're right. I will update the scheme with the following:
+This is a little awkward to read. Perhaps something like "... filter out
+valid modes from those suggested by..."?
 
-USBPHYC
-      |_ PLL
-      |
-      |_ PHY port#1 _________________ HOST controller
-      |                    _                 |
-      |                  / 1|________________|
-      |_ PHY port#2 ----|   |________________
-      |                  \_0|                |
-      |_ UTMI switch_______|          OTG controller
+Otherwise looks good:
 
-
-This way would be more generic:
-st,utmi-switch = <0>; //To select the controller connected to UTMI 
-switch #0 output.
-st,utmi-switch = <1>; //To select the controller connected to UTMI 
-switch #1 output.
-
-> But really I think this should be determined by either a USB connector
-> node (a binding is in the works) or cable detection.
->
-
-This needs to be further studied. Could it be an upcoming evolution ?
-
-Thanks for review,
-Amelie
->> +
->> +
->> +Example:
->> +		usbphyc: usbphyc at 5a006000 {
-> 
-> usb-phy at ...
-> 
->> +			compatible = "st,stm32mp1-usbphyc";
->> +			reg = <0x5a006000 0x1000>;
->> +			clocks = <&rcc_clk USBPHY_K>;
->> +			resets = <&rcc_rst USBPHY_R>;
->> +			st,port2-switch-to-host;
->> +			phy-supply = <&vdd_usb>;
->> +			vdda1v1-supply = <&reg11>;
->> +			vdda1v8-supply = <&reg18>
->> +		};
->> -- 
->> 2.7.4
->>
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180220/9b0ff373/attachment.sig>
