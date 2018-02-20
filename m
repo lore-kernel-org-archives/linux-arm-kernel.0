@@ -1,36 +1,35 @@
 From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Tue, 20 Feb 2018 18:00:44 +0100
-Subject: [PATCH 3/8] ARM: dts: artpec: remove 0x prefix from clkctrl unit
- address
+Date: Tue, 20 Feb 2018 18:00:43 +0100
+Subject: [PATCH 2/8] ARM: dts: artpec: use 1 GiB RAM
 In-Reply-To: <20180220170049.22809-1-niklas.cassel@axis.com>
 References: <20180220170049.22809-1-niklas.cassel@axis.com>
-Message-ID: <20180220170049.22809-4-niklas.cassel@axis.com>
+Message-ID: <20180220170049.22809-3-niklas.cassel@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove 0x prefix from clkctrl unit address.
+There has never been an artpec6 devboard produced
+with less than 1 GiB RAM.
 
-This silences the following dtc warning:
-Warning (unit_address_format):
- Node /clkctrl at 0xf8000000 unit name should not have leading "0x"
+Increase the default value to 1 GiB RAM, so that we
+can netboot with large initramfs without going OOM.
 
 Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
 ---
- arch/arm/boot/dts/artpec6.dtsi | 2 +-
+ arch/arm/boot/dts/artpec6-devboard.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index d9776a97d8ff..f4b39738f1ac 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -98,7 +98,7 @@
- 		clock-frequency = <125000000>;
- 	};
+diff --git a/arch/arm/boot/dts/artpec6-devboard.dts b/arch/arm/boot/dts/artpec6-devboard.dts
+index 9dfe845694cf..502f3de6dc5b 100644
+--- a/arch/arm/boot/dts/artpec6-devboard.dts
++++ b/arch/arm/boot/dts/artpec6-devboard.dts
+@@ -26,7 +26,7 @@
  
--	clkctrl: clkctrl at 0xf8000000 {
-+	clkctrl: clkctrl at f8000000 {
- 		#clock-cells = <1>;
- 		compatible = "axis,artpec6-clkctrl";
- 		reg = <0xf8000000 0x48>;
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x0 0x10000000>;
++		reg = <0x0 0x40000000>;
+ 	};
+ };
+ 
 -- 
 2.14.2
