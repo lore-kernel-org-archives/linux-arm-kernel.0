@@ -1,288 +1,309 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 20 Feb 2018 13:58:06 +0200
-Subject: [PATCH v4 1/7] firmware: tegra: Simplify channel management
+Date: Tue, 20 Feb 2018 13:58:12 +0200
+Subject: [PATCH v4 7/7] arm64: tegra: Add device tree for the Tegra194
+ P2972-0000 board
 In-Reply-To: <20180220115812.24108-1-mperttunen@nvidia.com>
 References: <20180220115812.24108-1-mperttunen@nvidia.com>
-Message-ID: <20180220115812.24108-2-mperttunen@nvidia.com>
+Message-ID: <20180220115812.24108-8-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra194 BPMP only implements 5 channels (4 to BPMP, 1 to CCPLEX),
-and they are not placed contiguously in memory. The current channel
-management in the BPMP driver does not support this.
-
-Simplify and refactor the channel management such that only one atomic
-transmit channel and one receive channel are supported, and channels
-are not required to be placed contiguously in memory. The same
-configuration also works on T186 so we end up with less code.
+Add device tree files for the Tegra194 P2972-0000 development board.
+The board consists of the P2888 compute module and the P2822 baseboard.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/firmware/tegra/bpmp.c | 142 +++++++++++++++++++-----------------------
- include/soc/tegra/bpmp.h      |   4 +-
- 2 files changed, 66 insertions(+), 80 deletions(-)
+ arch/arm64/boot/dts/nvidia/Makefile                |   1 +
+ arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     | 248 +++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts |  16 ++
+ 3 files changed, 265 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
 
-diff --git a/drivers/firmware/tegra/bpmp.c b/drivers/firmware/tegra/bpmp.c
-index a7f461f2e650..81bc2dce8626 100644
---- a/drivers/firmware/tegra/bpmp.c
-+++ b/drivers/firmware/tegra/bpmp.c
-@@ -70,57 +70,20 @@ void tegra_bpmp_put(struct tegra_bpmp *bpmp)
- }
- EXPORT_SYMBOL_GPL(tegra_bpmp_put);
- 
--static int tegra_bpmp_channel_get_index(struct tegra_bpmp_channel *channel)
--{
--	return channel - channel->bpmp->channels;
--}
--
- static int
- tegra_bpmp_channel_get_thread_index(struct tegra_bpmp_channel *channel)
- {
- 	struct tegra_bpmp *bpmp = channel->bpmp;
--	unsigned int offset, count;
-+	unsigned int count;
- 	int index;
- 
--	offset = bpmp->soc->channels.thread.offset;
- 	count = bpmp->soc->channels.thread.count;
- 
--	index = tegra_bpmp_channel_get_index(channel);
--	if (index < 0)
--		return index;
--
--	if (index < offset || index >= offset + count)
-+	index = channel - channel->bpmp->threaded_channels;
-+	if (index < 0 || index >= count)
- 		return -EINVAL;
- 
--	return index - offset;
--}
--
--static struct tegra_bpmp_channel *
--tegra_bpmp_channel_get_thread(struct tegra_bpmp *bpmp, unsigned int index)
--{
--	unsigned int offset = bpmp->soc->channels.thread.offset;
--	unsigned int count = bpmp->soc->channels.thread.count;
--
--	if (index >= count)
--		return NULL;
--
--	return &bpmp->channels[offset + index];
--}
--
--static struct tegra_bpmp_channel *
--tegra_bpmp_channel_get_tx(struct tegra_bpmp *bpmp)
--{
--	unsigned int offset = bpmp->soc->channels.cpu_tx.offset;
--
--	return &bpmp->channels[offset + smp_processor_id()];
--}
--
--static struct tegra_bpmp_channel *
--tegra_bpmp_channel_get_rx(struct tegra_bpmp *bpmp)
--{
--	unsigned int offset = bpmp->soc->channels.cpu_rx.offset;
--
--	return &bpmp->channels[offset];
-+	return index;
- }
- 
- static bool tegra_bpmp_message_valid(const struct tegra_bpmp_message *msg)
-@@ -271,11 +234,7 @@ tegra_bpmp_write_threaded(struct tegra_bpmp *bpmp, unsigned int mrq,
- 		goto unlock;
- 	}
- 
--	channel = tegra_bpmp_channel_get_thread(bpmp, index);
--	if (!channel) {
--		err = -EINVAL;
--		goto unlock;
--	}
-+	channel = &bpmp->threaded_channels[index];
- 
- 	if (!tegra_bpmp_master_free(channel)) {
- 		err = -EBUSY;
-@@ -328,12 +287,18 @@ int tegra_bpmp_transfer_atomic(struct tegra_bpmp *bpmp,
- 	if (!tegra_bpmp_message_valid(msg))
- 		return -EINVAL;
- 
--	channel = tegra_bpmp_channel_get_tx(bpmp);
-+	channel = bpmp->tx_channel;
+diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
+index 676aa2f238d1..7c13d7df484e 100644
+--- a/arch/arm64/boot/dts/nvidia/Makefile
++++ b/arch/arm64/boot/dts/nvidia/Makefile
+@@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-smaug.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_186_SOC) += tegra186-p2771-0000.dtb
++dtb-$(CONFIG_ARCH_TEGRA_194_SOC) += tegra194-p2972-0000.dtb
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
+new file mode 100644
+index 000000000000..ecb034177fc2
+--- /dev/null
++++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
+@@ -0,0 +1,248 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "tegra194.dtsi"
 +
-+	spin_lock(&bpmp->atomic_tx_lock);
- 
- 	err = tegra_bpmp_channel_write(channel, msg->mrq, MSG_ACK,
- 				       msg->tx.data, msg->tx.size);
--	if (err < 0)
-+	if (err < 0) {
-+		spin_unlock(&bpmp->atomic_tx_lock);
- 		return err;
-+	}
++#include <dt-bindings/mfd/max77620.h>
 +
-+	spin_unlock(&bpmp->atomic_tx_lock);
- 
- 	err = mbox_send_message(bpmp->mbox.channel, NULL);
- 	if (err < 0)
-@@ -607,7 +572,7 @@ static void tegra_bpmp_handle_rx(struct mbox_client *client, void *data)
- 	unsigned int i, count;
- 	unsigned long *busy;
- 
--	channel = tegra_bpmp_channel_get_rx(bpmp);
-+	channel = bpmp->rx_channel;
- 	count = bpmp->soc->channels.thread.count;
- 	busy = bpmp->threaded.busy;
- 
-@@ -619,9 +584,7 @@ static void tegra_bpmp_handle_rx(struct mbox_client *client, void *data)
- 	for_each_set_bit(i, busy, count) {
- 		struct tegra_bpmp_channel *channel;
- 
--		channel = tegra_bpmp_channel_get_thread(bpmp, i);
--		if (!channel)
--			continue;
-+		channel = &bpmp->threaded_channels[i];
- 
- 		if (tegra_bpmp_master_acked(channel)) {
- 			tegra_bpmp_channel_signal(channel);
-@@ -698,7 +661,6 @@ static void tegra_bpmp_channel_cleanup(struct tegra_bpmp_channel *channel)
- 
- static int tegra_bpmp_probe(struct platform_device *pdev)
- {
--	struct tegra_bpmp_channel *channel;
- 	struct tegra_bpmp *bpmp;
- 	unsigned int i;
- 	char tag[32];
-@@ -758,24 +720,45 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
- 		goto free_rx;
- 	}
- 
--	bpmp->num_channels = bpmp->soc->channels.cpu_tx.count +
--			     bpmp->soc->channels.thread.count +
--			     bpmp->soc->channels.cpu_rx.count;
-+	spin_lock_init(&bpmp->atomic_tx_lock);
-+	bpmp->tx_channel = devm_kzalloc(&pdev->dev, sizeof(*bpmp->tx_channel),
-+					GFP_KERNEL);
-+	if (!bpmp->tx_channel) {
-+		err = -ENOMEM;
-+		goto free_rx;
-+	}
- 
--	bpmp->channels = devm_kcalloc(&pdev->dev, bpmp->num_channels,
--				      sizeof(*channel), GFP_KERNEL);
--	if (!bpmp->channels) {
-+	bpmp->rx_channel = devm_kzalloc(&pdev->dev, sizeof(*bpmp->rx_channel),
-+	                                GFP_KERNEL);
-+	if (!bpmp->rx_channel) {
- 		err = -ENOMEM;
- 		goto free_rx;
- 	}
- 
--	/* message channel initialization */
--	for (i = 0; i < bpmp->num_channels; i++) {
--		struct tegra_bpmp_channel *channel = &bpmp->channels[i];
-+	bpmp->threaded_channels = devm_kcalloc(&pdev->dev, bpmp->threaded.count,
-+					       sizeof(*bpmp->threaded_channels),
-+					       GFP_KERNEL);
-+	if (!bpmp->threaded_channels) {
-+		err = -ENOMEM;
-+		goto free_rx;
-+	}
- 
--		err = tegra_bpmp_channel_init(channel, bpmp, i);
-+	err = tegra_bpmp_channel_init(bpmp->tx_channel, bpmp,
-+				      bpmp->soc->channels.cpu_tx.offset);
-+	if (err < 0)
-+		goto free_rx;
++/ {
++	model = "NVIDIA Tegra194 P2888 Processor Module";
++	compatible = "nvidia,p2888", "nvidia,tegra194";
 +
-+	err = tegra_bpmp_channel_init(bpmp->rx_channel, bpmp,
-+				      bpmp->soc->channels.cpu_rx.offset);
-+	if (err < 0)
-+		goto cleanup_tx_channel;
++	aliases {
++		sdhci0 = "/cbb/sdhci at 3460000";
++		sdhci1 = "/cbb/sdhci at 3400000";
++		serial0 = &uartb;
++		i2c0 = "/bpmp/i2c";
++		i2c1 = "/cbb/i2c at 3160000";
++		i2c2 = "/cbb/i2c at c240000";
++		i2c3 = "/cbb/i2c at 3180000";
++		i2c4 = "/cbb/i2c at 3190000";
++		i2c5 = "/cbb/i2c at 31c0000";
++		i2c6 = "/cbb/i2c at c250000";
++		i2c7 = "/cbb/i2c at 31e0000";
++	};
 +
-+	for (i = 0; i < bpmp->threaded.count; i++) {
-+		err = tegra_bpmp_channel_init(
-+			&bpmp->threaded_channels[i], bpmp,
-+			bpmp->soc->channels.thread.offset + i);
- 		if (err < 0)
--			goto cleanup_channels;
-+			goto cleanup_threaded_channels;
- 	}
- 
- 	/* mbox registration */
-@@ -788,15 +771,14 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
- 	if (IS_ERR(bpmp->mbox.channel)) {
- 		err = PTR_ERR(bpmp->mbox.channel);
- 		dev_err(&pdev->dev, "failed to get HSP mailbox: %d\n", err);
--		goto cleanup_channels;
-+		goto cleanup_threaded_channels;
- 	}
- 
- 	/* reset message channels */
--	for (i = 0; i < bpmp->num_channels; i++) {
--		struct tegra_bpmp_channel *channel = &bpmp->channels[i];
--
--		tegra_bpmp_channel_reset(channel);
--	}
-+	tegra_bpmp_channel_reset(bpmp->tx_channel);
-+	tegra_bpmp_channel_reset(bpmp->rx_channel);
-+	for (i = 0; i < bpmp->threaded.count; i++)
-+		tegra_bpmp_channel_reset(&bpmp->threaded_channels[i]);
- 
- 	err = tegra_bpmp_request_mrq(bpmp, MRQ_PING,
- 				     tegra_bpmp_mrq_handle_ping, bpmp);
-@@ -845,9 +827,15 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
- 	tegra_bpmp_free_mrq(bpmp, MRQ_PING, bpmp);
- free_mbox:
- 	mbox_free_channel(bpmp->mbox.channel);
--cleanup_channels:
--	while (i--)
--		tegra_bpmp_channel_cleanup(&bpmp->channels[i]);
-+cleanup_threaded_channels:
-+	for (i = 0; i < bpmp->threaded.count; i++) {
-+		if (bpmp->threaded_channels[i].bpmp)
-+			tegra_bpmp_channel_cleanup(&bpmp->threaded_channels[i]);
-+	}
++	chosen {
++		bootargs = "console=ttyS0,115200n8";
++		stdout-path = "serial0:115200n8";
++	};
 +
-+	tegra_bpmp_channel_cleanup(bpmp->rx_channel);
-+cleanup_tx_channel:
-+	tegra_bpmp_channel_cleanup(bpmp->tx_channel);
- free_rx:
- 	gen_pool_free(bpmp->rx.pool, (unsigned long)bpmp->rx.virt, 4096);
- free_tx:
-@@ -858,18 +846,16 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
- static const struct tegra_bpmp_soc tegra186_soc = {
- 	.channels = {
- 		.cpu_tx = {
--			.offset = 0,
--			.count = 6,
-+			.offset = 3,
- 			.timeout = 60 * USEC_PER_SEC,
- 		},
- 		.thread = {
--			.offset = 6,
--			.count = 7,
-+			.offset = 0,
-+			.count = 3,
- 			.timeout = 600 * USEC_PER_SEC,
- 		},
- 		.cpu_rx = {
- 			.offset = 13,
--			.count = 1,
- 			.timeout = 0,
- 		},
- 	},
-diff --git a/include/soc/tegra/bpmp.h b/include/soc/tegra/bpmp.h
-index aeae4466dd25..e69e4c4d80ae 100644
---- a/include/soc/tegra/bpmp.h
-+++ b/include/soc/tegra/bpmp.h
-@@ -75,8 +75,8 @@ struct tegra_bpmp {
- 		struct mbox_chan *channel;
- 	} mbox;
- 
--	struct tegra_bpmp_channel *channels;
--	unsigned int num_channels;
-+	spinlock_t atomic_tx_lock;
-+	struct tegra_bpmp_channel *tx_channel, *rx_channel, *threaded_channels;
- 
- 	struct {
- 		unsigned long *allocated;
++	cbb {
++		serial at 3110000 {
++			status = "okay";
++		};
++
++		/* SDMMC1 (SD/MMC) */
++		sdhci at 3400000 {
++/*
++			cd-gpios = <&gpio TEGRA194_MAIN_GPIO(A, 0) GPIO_ACTIVE_LOW>;
++*/
++		};
++
++		/* SDMMC4 (eMMC) */
++		sdhci at 3460000 {
++			status = "okay";
++			bus-width = <8>;
++			non-removable;
++
++			vqmmc-supply = <&vdd_1v8ls>;
++			vmmc-supply = <&vdd_emmc_3v3>;
++		};
++
++		pmc at c360000 {
++			nvidia,invert-interrupt;
++		};
++	};
++
++	bpmp {
++		i2c {
++			status = "okay";
++
++			pmic: pmic at 3c {
++				compatible = "maxim,max20024";
++				reg = <0x3c>;
++
++				interrupts = <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++
++				#gpio-cells = <2>;
++				gpio-controller;
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&max20024_default>;
++
++				max20024_default: pinmux {
++					gpio0 {
++						pins = "gpio0";
++						function = "gpio";
++					};
++
++					gpio1 {
++						pins = "gpio1";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_DEF>;
++					};
++
++					gpio2 {
++						pins = "gpio2";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_DEF>;
++					};
++
++					gpio3 {
++						pins = "gpio3";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_DEF>;
++					};
++
++					gpio4 {
++						pins = "gpio4";
++						function = "32k-out1";
++						drive-push-pull = <1>;
++					};
++
++					gpio6 {
++						pins = "gpio6";
++						function = "gpio";
++						drive-push-pull = <1>;
++					};
++
++					gpio7 {
++						pins = "gpio7";
++						function = "gpio";
++						drive-push-pull = <0>;
++					};
++				};
++
++				fps {
++					fps0 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++
++					fps1 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN1>;
++						maxim,shutdown-fps-time-period-us = <640>;
++						maxim,device-state-on-disabled-event = <MAX77620_FPS_INACTIVE_STATE_SLEEP>;
++					};
++
++					fps2 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++				};
++
++				regulators {
++					in-sd0-supply = <&vdd_5v0_sys>;
++					in-sd1-supply = <&vdd_5v0_sys>;
++					in-sd2-supply = <&vdd_5v0_sys>;
++					in-sd3-supply = <&vdd_5v0_sys>;
++					in-sd4-supply = <&vdd_5v0_sys>;
++
++					in-ldo0-1-supply = <&vdd_5v0_sys>;
++					in-ldo2-supply = <&vdd_5v0_sys>;
++					in-ldo3-5-supply = <&vdd_5v0_sys>;
++					in-ldo4-6-supply = <&vdd_5v0_sys>;
++					in-ldo7-8-supply = <&vdd_1v8ls>;
++
++					sd0 {
++						regulator-name = "VDD_1V0";
++						regulator-min-microvolt = <1000000>;
++						regulator-max-microvolt = <1000000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					sd1 {
++						regulator-name = "VDD_1V8HS";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_1v8ls: sd2 {
++						regulator-name = "VDD_1V8LS";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					sd3 {
++						regulator-name = "VDD_1V8AO";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					sd4 {
++						regulator-name = "VDD_DDR_1V1";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <1100000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo0 {
++						regulator-name = "VDD_RTC";
++						regulator-min-microvolt = <800000>;
++						regulator-max-microvolt = <800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo2 {
++						regulator-name = "VDD_AO_3V3";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_emmc_3v3: ldo3 {
++						regulator-name = "VDD_EMMC_3V3";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					ldo5 {
++						regulator-name = "VDD_USB_3V3";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					ldo6 {
++						regulator-name = "VDD_SDIO_3V3";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					ldo7 {
++						regulator-name = "VDD_CSI_1V2";
++						regulator-min-microvolt = <1200000>;
++						regulator-max-microvolt = <1200000>;
++					};
++				};
++			};
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vdd_5v0_sys: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++
++			regulator-name = "VIN_SYS_5V0";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts b/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+new file mode 100644
+index 000000000000..9ff3c18280c4
+--- /dev/null
++++ b/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/dts-v1/;
++
++#include "tegra194-p2888.dtsi"
++
++/ {
++	model = "NVIDIA Tegra194 P2972-0000 Development Board";
++	compatible = "nvidia,p2972-0000", "nvidia,tegra194";
++
++	cbb {
++		/* SDMMC1 (SD/MMC) */
++		sdhci at 3400000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 2.16.1
