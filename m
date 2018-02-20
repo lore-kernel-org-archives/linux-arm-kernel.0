@@ -1,60 +1,103 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 20 Feb 2018 11:31:34 +0100
-Subject: [PATCH 3/9] serial: imx: Fix out-of-bounds access through DT alias
-In-Reply-To: <1519119624-1268-4-git-send-email-geert+renesas@glider.be>
-References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
- <1519119624-1268-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180220103134.xfh2zl2vgonb2ywb@pengutronix.de>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 20 Feb 2018 11:33:47 +0100
+Subject: [PATCH] drm: simple_kms_helper: Add mode_valid() callback support
+In-Reply-To: <20180220095246.GF23425@ulmo>
+References: <20180220072859.3386-1-linus.walleij@linaro.org>
+ <20180220095246.GF23425@ulmo>
+Message-ID: <20180220103347.GH22199@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
-
-On Tue, Feb 20, 2018 at 10:40:18AM +0100, Geert Uytterhoeven wrote:
-> The imx_ports[] array is indexed using a value derived from the
-> "serialN" alias in DT, which may lead to an out-of-bounds access.
+On Tue, Feb 20, 2018 at 10:52:46AM +0100, Thierry Reding wrote:
+> On Tue, Feb 20, 2018 at 08:28:59AM +0100, Linus Walleij wrote:
+> > The PL111 needs to filter valid modes based on memory bandwidth.
+> > I guess it is a pretty simple operation, so we can still claim
+> > the DRM KMS helper pipeline is simple after adding this (optional)
+> > vtable callback.
+> > 
+> > Reviewed-by: Eric Anholt <eric@anholt.net>
+> > Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > ChangeLog v1->v2:
+> > - Fix up the kerneldoc to just refer to the enum.
+> > - Collect Eric's and Daniel's review tags.
+> > ---
+> >  drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
+> >  include/drm/drm_simple_kms_helper.h     | 14 ++++++++++++++
+> >  2 files changed, 29 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
+> > index 9f3b1c94802b..652cde9a5a6b 100644
+> > --- a/drivers/gpu/drm/drm_simple_kms_helper.c
+> > +++ b/drivers/gpu/drm/drm_simple_kms_helper.c
+> > @@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
+> >  	.destroy = drm_encoder_cleanup,
+> >  };
+> >  
+> > +static enum drm_mode_status
+> > +drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
+> > +			       const struct drm_display_mode *mode)
+> > +{
+> > +	struct drm_simple_display_pipe *pipe;
+> > +
+> > +	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
+> > +	if (!pipe->funcs || !pipe->funcs->mode_valid)
+> > +		/* Anything goes */
+> > +		return MODE_OK;
+> > +
+> > +	return pipe->funcs->mode_valid(crtc, mode);
+> > +}
+> > +
+> >  static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
+> >  				     struct drm_crtc_state *state)
+> >  {
+> > @@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
+> >  }
+> >  
+> >  static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
+> > +	.mode_valid = drm_simple_kms_crtc_mode_valid,
+> >  	.atomic_check = drm_simple_kms_crtc_check,
+> >  	.atomic_enable = drm_simple_kms_crtc_enable,
+> >  	.atomic_disable = drm_simple_kms_crtc_disable,
+> > diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+> > index 6d9adbb46293..d9e4c3c3f009 100644
+> > --- a/include/drm/drm_simple_kms_helper.h
+> > +++ b/include/drm/drm_simple_kms_helper.h
+> > @@ -21,6 +21,20 @@ struct drm_simple_display_pipe;
+> >   *                                        display pipeline
+> >   */
+> >  struct drm_simple_display_pipe_funcs {
+> > +	/**
+> > +	 * @mode_valid:
+> > +	 *
+> > +	 * This function is called to filter out valid modes from the
+> > +	 * suggestions suggested by the bridge or display. This optional
 > 
-> Fix this by adding a range check.
+> This is a little awkward to read. Perhaps something like "... filter out
+> valid modes from those suggested by..."?
+
+If you want to respin the kerneldoc I suggest you align more with the one
+for drm_crtc_helper_funcs.mode_valid. There's a bunch of things you're
+missing here. I think for consistency probably best to just copypaste the
+entire thing, with an s/crtc/simple display pipe/ or similar.
+-Daniel
+
+
 > 
-> Fixes: 9206ab8a0350c3da ("serial: imx: Fix out-of-bounds access through DT alias")
-
-huh, this patch fixes itself?
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  drivers/tty/serial/imx.c | 5 +++++
->  1 file changed, 5 insertions(+)
+> Otherwise looks good:
 > 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 1d7ca382bc12b238..e89e90ad87d8245c 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -2041,6 +2041,11 @@ static int serial_imx_probe(struct platform_device *pdev)
->  		serial_imx_probe_pdata(sport, pdev);
->  	else if (ret < 0)
->  		return ret;
+> Reviewed-by: Thierry Reding <treding@nvidia.com>
 
-I'd prefer an empty line here.
 
-> +	if (sport->port.line >= UART_NR) {
 
-I would have used:
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-	if (sport->port.line >= ARRAY_SIZE(imx_ports))
-
-which IMHO is better understandable
-> +		dev_err(&pdev->dev, "serial%d out of range\n",
-> +			sport->port.line);
-
-Note that the same overflow can happen when a device is probed using
-platform data (and your commit fixes that, too). Maybe worth to point
-out in the commit log?
-
-Other than that: Good catch, thanks for your patch.
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
