@@ -1,21 +1,19 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 16:44:09 +0100
-Subject: [PATCH v2 04/19] soc: renesas: rcar-sysc: Add R-Car M3-N support
-In-Reply-To: <1519139541-18783-5-git-send-email-jacopo+renesas@jmondi.org>
+Date: Tue, 20 Feb 2018 16:44:32 +0100
+Subject: [PATCH v2 07/19] ARM64: Add Renesas R-Car M3-N config symbol
+In-Reply-To: <1519139541-18783-8-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-5-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWJXwnNd-f9mnnWeFtBC97rO5RFc4JwEQCNhibsGVxCWw@mail.gmail.com>
+ <1519139541-18783-8-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVbzRgBUYhuxjv_Z=1MyZf=JWNM0P6ibMAAmzc-=3e1hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add support for R-Car M3-N (R8A77965) power areas.
+> Add configuration option for the R-Car M3-N (R8A77965) SoC.
 >
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-We'll sort out the remaining issues later.
 
 Gr{oetje,eeting}s,
 
