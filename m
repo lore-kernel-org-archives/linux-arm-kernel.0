@@ -1,47 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 22:59:47 +0100
-Subject: [PATCH 0/7] ARM: hacks for link-time optimization
-Message-ID: <20180220215954.4092811-1-arnd@arndb.de>
+Date: Tue, 20 Feb 2018 22:59:51 +0100
+Subject: [PATCH 4/7] ARM: io-acorn: fix LTO linking without CONFIG_PRINTK
+In-Reply-To: <20180220215954.4092811-1-arnd@arndb.de>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+Message-ID: <20180220215954.4092811-5-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico, all,
+When CONFIG_LTO is enabled, we get a link error for this file
+that contains a reference to printk():
 
-I was playing with ARM link-time optimization handling earlier this
-month, and eventually got it to build cleanly with randconfig kernels,
-but ended up with a lot of ugly hacks to actually pull it off.
+arch/arm/lib/io-acorn.o: In function `outsl':
+(.text+0x38): undefined reference to `printk'
 
-Here are the ones that I don't think we actually want to merge,
-but it may be helpful to have these for reference for the next
-person that tries to make it work.
+Normally the file is simply dropped, but that doesn't happen
+with LTO. Making the reference conditional helps, but perhaps
+a better fix would be to make sure the LTO linker drops the
+entire file in the same way that we normally do.
 
-      Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/lib/io-acorn.S | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Arnd Bergmann (7):
-  ARM: disallow combining XIP and LTO
-  ARM: LTO: avoid THUMB2_KERNEL+LTO
-  [HACK] pass endianess flag to LTO linker
-  ARM: io-acorn: fix LTO linking without CONFIG_PRINTK
-  ARM: fix __inflate_kernel_data stack warning for LTO
-  ARM: mark assembler-referenced symbols as __visible
-  efi: disable LTO for EFI stub
-
- arch/arm/Kconfig                      |  4 +++-
- arch/arm/Makefile                     |  2 ++
- arch/arm/kernel/Makefile              |  3 ---
- arch/arm/kernel/head-inflate-data.c   |  3 ++-
- arch/arm/kernel/process.c             |  2 +-
- arch/arm/kernel/suspend.c             |  2 ++
- arch/arm/kernel/unwind.c              |  1 +
- arch/arm/lib/io-acorn.S               |  4 ++++
- arch/arm/probes/kprobes/core.c        |  2 +-
- arch/arm/probes/kprobes/test-core.c   | 11 ++++++-----
- arch/arm/vdso/vgettimeofday.c         |  2 ++
- drivers/bus/arm-cci.c                 |  6 +++---
- drivers/firmware/efi/libstub/Makefile |  4 +++-
- drivers/soc/bcm/brcmstb/pm/pm-arm.c   |  2 +-
- lib/clz_ctz.c                         | 20 ++++++++++----------
- 15 files changed, 41 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/lib/io-acorn.S b/arch/arm/lib/io-acorn.S
+index 69719bad674d..3522a899460b 100644
+--- a/arch/arm/lib/io-acorn.S
++++ b/arch/arm/lib/io-acorn.S
+@@ -27,6 +27,10 @@
+  */
+ ENTRY(insl)
+ ENTRY(outsl)
++#ifdef CONFIG_PRINTK
+ 		adr	r0, .Liosl_warning
+ 		mov	r1, lr
+ 		b	printk
++#else
++		ret	lr
++#endif
 -- 
 2.9.0
