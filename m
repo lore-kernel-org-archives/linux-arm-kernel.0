@@ -1,75 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 20 Feb 2018 14:46:24 -0800
-Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include PAN
- emulation
-Message-ID: <20180220224624.GA28218@beast>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 20 Feb 2018 23:51:30 +0100
+Subject: [PATCH v3] MAINTAINERS: add Freescale pin controllers
+Message-ID: <20180220225130.14468-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PAN emulation notification was only happening for non-boot CPUs
-if CPU capabilities had already been configured. This seems to be the
-wrong place, as it's system-wide and isn't attached to capabilities,
-so its reporting didn't normally happen. Instead, report it once from
-the boot CPU. Additionally removes the redundant "feature" word from the
-"CPU features:" line.
+Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
+and the Pengutronix kernel team as reviewer.
 
-Before (redundant "feature", and missing PAN emulation report):
-
- SMP: Total of 4 processors activated.
- CPU features: detected feature: 32-bit EL0 Support
- CPU features: detected feature: Kernel page table isolation (KPTI)
- CPU: All CPU(s) started at EL2
-
-After:
-
- SMP: Total of 4 processors activated.
- CPU features: detected: 32-bit EL0 Support
- CPU features: detected: Kernel page table isolation (KPTI)
- CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
- CPU: All CPU(s) started at EL2
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- arch/arm64/kernel/cpufeature.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ MAINTAINERS | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 29b1f873e337..6c799ca58b53 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 93a12af4f180..621f3ec7e85e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10926,6 +10926,17 @@ L:	linux-gpio at vger.kernel.org
+ S:	Supported
+ F:	drivers/pinctrl/pinctrl-at91-pio4.*
  
- 	if (system_supports_sve())
- 		verify_sve_features();
--
--	if (system_uses_ttbr0_pan())
--		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- }
- 
- void check_local_cpu_capabilities(void)
-@@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
- 
- static void __init setup_feature_capabilities(void)
- {
--	update_cpu_capabilities(arm64_features, "detected feature:");
-+	update_cpu_capabilities(arm64_features, "detected:");
- 	enable_cpu_capabilities(arm64_features);
- }
- 
-@@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
- 	if (system_supports_32bit_el0())
- 		setup_elf_hwcaps(compat_elf_hwcaps);
- 
-+	if (system_uses_ttbr0_pan())
-+		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
++PIN CONTROLLER - FREESCALE
++M:	Dong Aisheng <aisheng.dong@nxp.com>
++M:	Fabio Estevam <festevam@gmail.com>
++M:	Shawn Guo <shawnguo@kernel.org>
++M:	Stefan Agner <stefan@agner.ch>
++R:	Pengutronix Kernel Team <kernel@pengutronix.de>
++L:	linux-gpio at vger.kernel.org
++S:	Maintained
++F:	drivers/pinctrl/freescale/*
++F:	Documentation/devicetree/bindings/pinctrl/fsl,*
 +
- 	sve_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
+ PIN CONTROLLER - INTEL
+ M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+ M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
 -- 
-2.7.4
-
-
--- 
-Kees Cook
-Pixel Security
+2.16.2
