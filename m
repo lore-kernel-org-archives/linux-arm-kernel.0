@@ -1,61 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Feb 2018 18:07:54 +0000
-Subject: [PATCH v3 6/7] arm: dts: sun8i: a83t: Fix undefined offset with
- virtual timer
-In-Reply-To: <20180219081837.15482-7-mylene.josserand@bootlin.com>
-References: <20180219081837.15482-1-mylene.josserand@bootlin.com>
- <20180219081837.15482-7-mylene.josserand@bootlin.com>
-Message-ID: <823f256a-3240-7bb4-cc0b-711108f3076c@arm.com>
+From: mort@bork.org (Martin Hicks)
+Date: Tue, 20 Feb 2018 13:01:23 -0500
+Subject: [PATCH V2] tty: serial: imx: allow breaks to be received when
+ using dma
+In-Reply-To: <20180209212240.14095-1-troy.kisky@boundarydevices.com>
+References: <20180209212240.14095-1-troy.kisky@boundarydevices.com>
+Message-ID: <20180220180123.GB7751@darwin.bork.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Myl?ne,
+On Fri, Feb 09, 2018 at 01:22:40PM -0800, Troy Kisky wrote:
+> This allows me to login after sending a break when service
+> serial-getty at ttymxc0.service is running
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-On 19/02/18 08:18, Myl?ne Josserand wrote:
-> The ARM architected timers use an offset between their physical and
-> virtual counters. That offset should be configured by the bootloader
-> in CNTVOFF.
+Tested-by:  Martin Hicks <mort@bork.org>
+
+Works for me.
+mh
+
 > 
-> However, the A83t bootloader fails to do so, and we end up with an
-> undefined offset (which in our case is random), meaning that each CPU
-> will have a different time, which isn't working very well.
-> 
-> Fix that by setting the arm,cpu-registers-not-fw-configured that will
-> make Linux use the physical timers instead of the virtual ones. One
-> possible side effect would be that the virtualization features would
-> be disabled. However, due to the way the GIC has been integrated in
-> the system, it is already unusable so we're effectively not losing any
-> feature.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 > ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+> v2: rebase only
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index e97a6d17b8d0..b9bdb891cf2f 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -123,6 +123,7 @@
->  			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-> +		arm,cpu-registers-not-fw-configured;
->  	};
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 1d7ca382bc12..2eb8c4a20d68 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -927,7 +927,6 @@ static void dma_rx_callback(void *data)
+>  	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
 >  
->  	clocks {
+>  	if (status == DMA_ERROR) {
+> -		dev_err(sport->port.dev, "DMA transaction error.\n");
+>  		clear_rx_errors(sport);
+>  		return;
+>  	}
+> @@ -1028,6 +1027,7 @@ static int start_rx_dma(struct imx_port *sport)
+>  
+>  static void clear_rx_errors(struct imx_port *sport)
+>  {
+> +	struct tty_port *port = &sport->port.state->port;
+>  	unsigned int status_usr1, status_usr2;
+>  
+>  	status_usr1 = readl(sport->port.membase + USR1);
+> @@ -1036,12 +1036,18 @@ static void clear_rx_errors(struct imx_port *sport)
+>  	if (status_usr2 & USR2_BRCD) {
+>  		sport->port.icount.brk++;
+>  		writel(USR2_BRCD, sport->port.membase + USR2);
+> -	} else if (status_usr1 & USR1_FRAMERR) {
+> -		sport->port.icount.frame++;
+> -		writel(USR1_FRAMERR, sport->port.membase + USR1);
+> -	} else if (status_usr1 & USR1_PARITYERR) {
+> -		sport->port.icount.parity++;
+> -		writel(USR1_PARITYERR, sport->port.membase + USR1);
+> +		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
+> +			sport->port.icount.buf_overrun++;
+> +		tty_flip_buffer_push(port);
+> +	} else {
+> +		dev_err(sport->port.dev, "DMA transaction error.\n");
+> +		if (status_usr1 & USR1_FRAMERR) {
+> +			sport->port.icount.frame++;
+> +			writel(USR1_FRAMERR, sport->port.membase + USR1);
+> +		} else if (status_usr1 & USR1_PARITYERR) {
+> +			sport->port.icount.parity++;
+> +			writel(USR1_PARITYERR, sport->port.membase + USR1);
+> +		}
+>  	}
+>  
+>  	if (status_usr2 & USR2_ORE) {
+> -- 
+> 2.14.1
 > 
 
-Is the firmware dropping you in the kernel in secure or non-secure mode?
-
-If the later, what you have is the only solution. If the former, that
-I'd suggest you adopt what we already have for the Renesas stuff (see
-arch/arm/mach-shmobile/headsmp-apmu.S and commit 3fd45a136ff6).
-
-It would allow you to use the virtual timer as intended.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Martin Hicks P.Eng.    |      mort at bork.org
+Bork Consulting Inc.   |  +1 (613) 266-2296
