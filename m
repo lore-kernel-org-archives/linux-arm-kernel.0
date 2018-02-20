@@ -1,54 +1,84 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Tue, 20 Feb 2018 08:25:16 +0100
-Subject: [PATCH 2/4] ARM: OMAP2+: Introduce low-level suspend code for
- AM43XX
-In-Reply-To: <20180216214002.6209-3-d-gerlach@ti.com>
-References: <20180216214002.6209-1-d-gerlach@ti.com>
- <20180216214002.6209-3-d-gerlach@ti.com>
-Message-ID: <CAOFm3uGUN387rU6xVZf+qndM_s9j=PT+4uuS3JQ=cdSOGm46GA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Feb 2018 08:28:59 +0100
+Subject: [PATCH] drm: simple_kms_helper: Add mode_valid() callback support
+Message-ID: <20180220072859.3386-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+The PL111 needs to filter valid modes based on memory bandwidth.
+I guess it is a pretty simple operation, so we can still claim
+the DRM KMS helper pipeline is simple after adding this (optional)
+vtable callback.
 
-On Fri, Feb 16, 2018 at 10:40 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> Although similar to AM33XX, introduce a new low-level asm file for
-> suspend containing new context save and restore paths for EMIF and l2
-> cache disabling and enabling.
->
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/mach-omap2/sleep43xx.S | 393 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 393 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/sleep43xx.S
->
-> diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
-> new file mode 100644
-> index 000000000000..3a8bfd62a33c
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/sleep43xx.S
-> @@ -0,0 +1,393 @@
-> +/*
-> + * Low level suspend code for AM43XX SoCs
-> + *
-> + * Copyright (C) 2013-2018 Texas Instruments Incorporated - http://www.ti.com/
-> + *     Dave Gerlach, Vaibhav Bedia
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Fix up the kerneldoc to just refer to the enum.
+- Collect Eric's and Daniel's review tags.
+---
+ drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
+ include/drm/drm_simple_kms_helper.h     | 14 ++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-Do you mind using SPDX tags per [1] rather that this fine but long
-legalese here and in the whole patch set? Unless you are a legalese
-lover of course!
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
+index 9f3b1c94802b..652cde9a5a6b 100644
+--- a/drivers/gpu/drm/drm_simple_kms_helper.c
++++ b/drivers/gpu/drm/drm_simple_kms_helper.c
+@@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
+ 	.destroy = drm_encoder_cleanup,
+ };
+ 
++static enum drm_mode_status
++drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
++			       const struct drm_display_mode *mode)
++{
++	struct drm_simple_display_pipe *pipe;
++
++	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
++	if (!pipe->funcs || !pipe->funcs->mode_valid)
++		/* Anything goes */
++		return MODE_OK;
++
++	return pipe->funcs->mode_valid(crtc, mode);
++}
++
+ static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
+ 				     struct drm_crtc_state *state)
+ {
+@@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
+ }
+ 
+ static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
++	.mode_valid = drm_simple_kms_crtc_mode_valid,
+ 	.atomic_check = drm_simple_kms_crtc_check,
+ 	.atomic_enable = drm_simple_kms_crtc_enable,
+ 	.atomic_disable = drm_simple_kms_crtc_disable,
+diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+index 6d9adbb46293..d9e4c3c3f009 100644
+--- a/include/drm/drm_simple_kms_helper.h
++++ b/include/drm/drm_simple_kms_helper.h
+@@ -21,6 +21,20 @@ struct drm_simple_display_pipe;
+  *                                        display pipeline
+  */
+ struct drm_simple_display_pipe_funcs {
++	/**
++	 * @mode_valid:
++	 *
++	 * This function is called to filter out valid modes from the
++	 * suggestions suggested by the bridge or display. This optional
++	 * hook is passed in when initializing the pipeline.
++	 *
++	 * RETURNS:
++	 *
++	 * drm_mode_status Enum
++	 */
++	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
++					   const struct drm_display_mode *mode);
++
+ 	/**
+ 	 * @enable:
+ 	 *
 -- 
-Cordially
-Philippe Ombredanne
+2.14.3
