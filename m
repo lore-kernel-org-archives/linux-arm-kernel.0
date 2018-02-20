@@ -1,15 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 16:45:48 +0100
-Subject: [PATCH v2 08/19] ARM64: dts: Add Renesas R8A77965 SoC support
-In-Reply-To: <1519139541-18783-9-git-send-email-jacopo+renesas@jmondi.org>
+Date: Tue, 20 Feb 2018 16:46:23 +0100
+Subject: [PATCH v2 09/19] ARM64: dts: Add R-Car Salvator-x M3-N support
+In-Reply-To: <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-9-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdVR6qCkBMYvnN5eqjiCgvtD1zW2gW0N=ZpAosYpp+Tj_g@mail.gmail.com>
+ <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Basic support for the Gen 3 R-Car M3-N SoC.
+> Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
 >
 > Based on original work from:
 > Takeshi Kihara <takeshi.kihara.df@renesas.com>
