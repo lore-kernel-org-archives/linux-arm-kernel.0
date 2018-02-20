@@ -1,23 +1,23 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 20 Feb 2018 08:22:26 +0800
-Subject: [PATCH 2/8] media: s5p-jpeg: Use bulk clk API
-In-Reply-To: <1519055046-2399-3-git-send-email-m.purski@samsung.com>
-References: <1519055046-2399-3-git-send-email-m.purski@samsung.com>
-Message-ID: <201802200822.9KP7Ld7V%fengguang.wu@intel.com>
+Date: Tue, 20 Feb 2018 08:26:40 +0800
+Subject: [PATCH 1/2] ARM: dts: stm32: add RTC support on STM32H743
+In-Reply-To: <1518787000-10675-2-git-send-email-amelie.delaunay@st.com>
+References: <1518787000-10675-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <201802200817.6IN63yYp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+Hi Amelie,
 
 Thank you for the patch! Yet something to improve:
 
-[auto build test ERROR on linuxtv-media/master]
+[auto build test ERROR on robh/for-next]
 [also build test ERROR on v4.16-rc2 next-20180219]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/Use-clk-bulk-API-in-exynos5433-drivers/20180220-054431
-base:   git://linuxtv.org/media_tree.git master
-config: arm-multi_v7_defconfig (attached as .config)
+url:    https://github.com/0day-ci/linux/commits/Amelie-Delaunay/RTC-support-on-STM32H743/20180219-061718
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-multi_v5_defconfig (attached as .config)
 compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
@@ -27,7 +27,7 @@ reproduce:
 
 All errors (new ones prefixed by >>):
 
->> ERROR: "devm_clk_bulk_alloc" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+>> ERROR: Input tree has errors, aborting (use -f to force output)
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -36,6 +36,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 42953 bytes
+Size: 29970 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180220/47159b04/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180220/0ffefead/attachment-0001.gz>
