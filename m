@@ -1,160 +1,146 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 20 Feb 2018 16:12:18 +0100
-Subject: [PATCH v2 16/19] ARM64: dts: r8a77965: Add GPIO nodes
-In-Reply-To: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519139541-18783-17-git-send-email-jacopo+renesas@jmondi.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 20 Feb 2018 09:23:55 -0600
+Subject: [RFC PATCH v2 1/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <d5d38789-4d28-dce7-054f-f91bd82275cc@samsung.com>
+References: <20180215103920.32017-1-a.hajda@samsung.com>
+ <CGME20180215103925eucas1p1d82fd73ac6ea77c8b66de4ed26101a71@eucas1p1.samsung.com>
+ <20180215103920.32017-2-a.hajda@samsung.com>
+ <20180219142847.3rnvtai6msjlyj5b@rob-hp-laptop>
+ <d5d38789-4d28-dce7-054f-f91bd82275cc@samsung.com>
+Message-ID: <CAL_JsqKjZvRU56fdxArnmDVsAyim9zhU84BsxkUy-Yin19E7cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO nodes to r8a77965 SoC device tree file.
+On Tue, Feb 20, 2018 at 2:10 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+> On 19.02.2018 15:28, Rob Herring wrote:
+>> On Thu, Feb 15, 2018 at 11:39:15AM +0100, Andrzej Hajda wrote:
+>>> These bindings allow to describe most known standard USB connectors
+>>> and it should be possible to extend it if necessary.
+>>> USB connectors, beside USB can be used to route other protocols,
+>>> for example UART, Audio, MHL. In such case every device passing data
+>>> through the connector should have appropriate graph bindings.
+>>>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>> v3:
+>>> - removed MHL port (samsung connector will have separate bindings),
+>>> - added 2nd example for USB-C,
+>>> - improved formatting
+>>> v2:
+>>> - moved connector type(A,B,C) to compatible string (Rob),
+>>> - renamed size property to type (Rob),
+>>> - changed type description to be less confusing (Laurent),
+>>> - removed vendor specific compatibles (implied by graph port number),
+>>> - added requirement of connector being a child of IC (Rob),
+>>> - removed max-mode (subtly suggested by Rob, it should be detected anyway
+>>>   by USB Controller in runtime, downside is that device is not able to
+>>>   report its real capabilities, maybe better would be to make it optional(?)),
+>>> - assigned port numbers to data buses (Rob).
+>>>
+>>> Regards
+>>> Andrzej
+>>>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>>
+>>> dt-bindings: add bindings for USB physical connector v3
+>>> ---
+>>>  .../bindings/connector/usb-connector.txt           | 74 ++++++++++++++++++++++
+>>>  1 file changed, 74 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+>>> new file mode 100644
+>>> index 000000000000..1efda92639da
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+>>> @@ -0,0 +1,74 @@
+>>> +USB Connector
+>>> +=============
+>>> +
+>>> +USB connector node represents physical USB connector. It should be
+>>> +a child of USB interface controller.
+>>> +
+>>> +Required properties:
+>>> +- compatible: describes type of the connector, must be one of:
+>>> +    "usb-a-connector",
+>>> +    "usb-b-connector",
+>>> +    "usb-c-connector".
+>>> +
+>>> +Optional properties:
+>>> +- label: symbolic name for the connector,
+>>> +- type: size of the connector, should be specified in case of USB-A, USB-B
+>>> +  non-standard (large) connector sizes: "mini", "micro".
+>> The smaller connectors are standard too. Perhaps "non-fullsize connector
+>> sizes".
+>
+> The word "standard" is used in specs, but your description looks better,
+> maybe even shorter version would work: "non-fullsize connectors:".
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Sure.
 
----
-v1 -> v2:
-- Replace ALWAYS_ON power area define with numeric constant
-- Do not move gpio nodes
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 104 +++++++++++++++++++++++++++---
- 1 file changed, 96 insertions(+), 8 deletions(-)
+>> We're missing a micro-AB connector, but I think those are actually
+>> pretty rare. Most phones are micro-B connectors, but do both host and
+>> device.
+>>
+>>> +
+>>> +Required nodes:
+>>> +- any data bus to the connector should be modeled using the OF graph bindings
+>>> +  specified in bindings/graph.txt, unless the bus is between parent node and
+>>> +  the connector. Since single connector can have multpile data buses every bus
+>>> +  has assigned OF graph port number as follows:
+>>> +    0: High Speed (HS), present in all connectors,
+>>> +    1: Super Speed (SS), present in SS capable connectors,
+>> This should also say endpoint 0 is USB-SS, endpoint 1 (and higher?) is
+>> Alternate Mode. And show in the example.
+>
+> What if there is SS mux before, which muxes USB-SS and DP lines. In my
+> case the mux is located in USB-PHY (it is 2nd example below).
+> In such case there is only one graph connection to SS port and this
+> connection will handle both USB-SS and AltMode traffic.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 3cb1a33..55f05f7 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -197,35 +197,123 @@
- 		};
- 
- 		gpio0: gpio at e6050000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 912>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 912>;
- 		};
- 
- 		gpio1: gpio at e6051000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 29>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 911>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 911>;
- 		};
- 
- 		gpio2: gpio at e6052000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 15>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 910>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 910>;
- 		};
- 
- 		gpio3: gpio at e6053000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 909>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 909>;
- 		};
- 
- 		gpio4: gpio at e6054000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 18>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 908>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 908>;
- 		};
- 
- 		gpio5: gpio at e6055000 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 26>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 907>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 907>;
- 		};
- 
- 		gpio6: gpio at e6055400 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 906>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 906>;
- 		};
- 
- 		gpio7: gpio at e6055800 {
--			/* placeholder */
-+			compatible = "renesas,gpio-r8a77965",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055800 0 0x50>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 224 4>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 905>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 905>;
- 		};
- 
- 		intc_ex: interrupt-controller at e61c0000 {
--- 
-2.7.4
+Ah yes, good point.
+
+> Anyway from USB-C connector's point of view, there is no distinction
+> which lines are USB-SS, which are AltMode. In fact platform decides in
+> real time about muxing of SS and AltMode signals, as it depends on
+> cable/plug orientations. Maybe instead of mapping endpoint numbers to
+> SS/AltMode, we should map them to SS1/SS2 lines if necessary(???).
+>
+> To be sure of your intentions. Do you want to model simple SS muxes as a
+> part of USB-C connector?
+
+That was, but you are right. That should be part of whatever device
+does the muxing.
+
+Given you need a uC just to manage the USB-C connector, I'd guess
+there isn't any simple case like just a GPIO to control a mux.
+
+>
+>>> +    2: Sideband use (SBU), present in USB-C.
+>>> +
+>>> +Examples
+>>> +--------
+>>> +
+>>> +1. Micro-USB connector with HS lines routed via controller (MUIC):
+>>> +
+>>> +muic-max77843 at 66 {
+>>> +    ...
+>>> +    usb_con: connector {
+>>> +            compatible = "usb-b-connector";
+>>> +            label = "micro-USB";
+>>> +            type = "micro";
+>>> +    };
+>>> +};
+>>> +
+>>> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
+>>> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort:
+>> Having SBU to DP but no DP video path connection is wrong.
+>
+> But it is real hardware :)
+> As I said earlier, DP video lines are connected to mux in USB3-PHY.
+> I can add this explanation to the description to make it clear.
+
+Okay.
+
+Rob
