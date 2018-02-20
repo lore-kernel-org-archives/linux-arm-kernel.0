@@ -1,36 +1,160 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 20 Feb 2018 16:12:17 +0100
-Subject: [PATCH v2 15/19] dt-bindings: gpio: Add support for r8a77965
+Date: Tue, 20 Feb 2018 16:12:18 +0100
+Subject: [PATCH v2 16/19] ARM64: dts: r8a77965: Add GPIO nodes
 In-Reply-To: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519139541-18783-16-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1519139541-18783-17-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for R-Car M3-N (r8a77965) in gpio-rcar.
+Add GPIO nodes to r8a77965 SoC device tree file.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 v1 -> v2:
-- Drop SoC-specific compatible string from drivers/gpio/gpio-rcar.c
-- Change patch subject to reflect it only changes dt bindings
+- Replace ALWAYS_ON power area define with numeric constant
+- Do not move gpio nodes
 ---
- Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 104 +++++++++++++++++++++++++++---
+ 1 file changed, 96 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-index 9474138..f2af897 100644
---- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-+++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-@@ -14,6 +14,7 @@ Required Properties:
-     - "renesas,gpio-r8a7794": for R8A7794 (R-Car E2) compatible GPIO controller.
-     - "renesas,gpio-r8a7795": for R8A7795 (R-Car H3) compatible GPIO controller.
-     - "renesas,gpio-r8a7796": for R8A7796 (R-Car M3-W) compatible GPIO controller.
-+    - "renesas,gpio-r8a77965": for R8A77965 (R-Car M3-N) compatible GPIO controller.
-     - "renesas,gpio-r8a77970": for R8A77970 (R-Car V3M) compatible GPIO controller.
-     - "renesas,gpio-r8a77995": for R8A77995 (R-Car D3) compatible GPIO controller.
-     - "renesas,rcar-gen1-gpio": for a generic R-Car Gen1 GPIO controller.
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index 3cb1a33..55f05f7 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -197,35 +197,123 @@
+ 		};
+ 
+ 		gpio0: gpio at e6050000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6050000 0 0x50>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 0 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 912>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 912>;
+ 		};
+ 
+ 		gpio1: gpio at e6051000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6051000 0 0x50>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 32 29>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 911>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 911>;
+ 		};
+ 
+ 		gpio2: gpio at e6052000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6052000 0 0x50>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 64 15>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 910>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 910>;
+ 		};
+ 
+ 		gpio3: gpio at e6053000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6053000 0 0x50>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 96 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 909>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 909>;
+ 		};
+ 
+ 		gpio4: gpio at e6054000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6054000 0 0x50>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 128 18>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 908>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 908>;
+ 		};
+ 
+ 		gpio5: gpio at e6055000 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055000 0 0x50>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 160 26>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 907>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 907>;
+ 		};
+ 
+ 		gpio6: gpio at e6055400 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055400 0 0x50>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 192 32>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 906>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 906>;
+ 		};
+ 
+ 		gpio7: gpio at e6055800 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055800 0 0x50>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 224 4>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 905>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 905>;
+ 		};
+ 
+ 		intc_ex: interrupt-controller at e61c0000 {
 -- 
 2.7.4
