@@ -1,88 +1,108 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 20 Feb 2018 14:56:33 +0200
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <1519077427-30165-1-git-send-email-david@lechnology.com>
-References: <1519077427-30165-1-git-send-email-david@lechnology.com>
-Message-ID: <CAHp75VeR2LG-qAzQs2048K3pyfRkz7OKioHDNyU8bVAPsgy8ew@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Tue, 20 Feb 2018 13:58:12 +0100
+Subject: [PATCH v2] usb: host: ehci-platform: add support for optional
+ external vbus supply
+Message-ID: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 11:57 PM, David Lechner <david@lechnology.com> wrote:
-> This fixes pcs_request_gpio() in the pinctrl-single driver when
-> bits_per_mux != 0. It appears this was overlooked when the multiple
-> pins per register feature was added.
->
-> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v2 changes:
-> - don't wrap Fixes: line in commit message since it is a special machine-
->   readable line.
->
-> There was some discussion in v1 about using DIV_ROUND_UP(), etc. macros, but
-> the consensus was to leave it as-is since it matches existing code and that
-> macros can be introduced in another patch.
->
->  drivers/pinctrl/pinctrl-single.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index cec7537..a7c5eb3 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -391,9 +391,25 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
->                         || pin < frange->offset)
->                         continue;
+On some boards, especially when vbus supply requires large current,
+and the charge pump on the PHY isn't enough, an external vbus power switch
+may be used.
+Add support for this optional external vbus supply in ehci-platform.
 
->                 mux_bytes = pcs->width / BITS_PER_BYTE;
-> -               data = pcs->read(pcs->base + pin * mux_bytes) & ~pcs->fmask;
-> -               data |= frange->gpiofunc;
-> -               pcs->write(data, pcs->base + pin * mux_bytes);
-> +
-> +               if (pcs->bits_per_mux) {
-> +                       int byte_num, offset, pin_shift;
-> +
-> +                       byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
-> +                       offset = (byte_num / mux_bytes) * mux_bytes;
-> +                       pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
-> +                                   pcs->bits_per_pin;
-> +
-> +                       data = pcs->read(pcs->base + offset);
-> +                       data &= ~(pcs->fmask << pin_shift);
-> +                       data |= frange->gpiofunc << pin_shift;
-> +                       pcs->write(data, pcs->base + offset);
-> +               } else {
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 
-> +                       data = pcs->read(pcs->base + pin * mux_bytes);
-> +                       data &= ~pcs->fmask;
-> +                       data |= frange->gpiofunc;
-> +                       pcs->write(data, pcs->base + pin * mux_bytes);
+---
+Changes in v2:
+ * Address Roger Quadros comments: move regulator_enable/disable from
+ehci_platform_power_on/off to ehci_platform_port_power.
+---
+ Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
+ drivers/usb/host/ehci-platform.c                   | 31 ++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-Just an idea, you may leave this almost untouched and do calculate
-pin_shift and offset in condition, like
-
-if (...) {
- pin_shift = ...
- offset = ...
-} else {
- pin_shift = 0;
- offset = pin * mux_bytes;
-}
-
-                       data = pcs->read(pcs->base + offset);
-                       data &= ~(pcs->fmask << pin_shift);
-                       data |= frange->gpiofunc << pin_shift;
-                       pcs->write(data, pcs->base + offset);
-
-It's also possible to split to two changes, where first introduces
-that variables and their default values (see 'else' branch) and second
-one introduces an if branch override.
-
-> +               }
->                 break;
-
+diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+index 3efde12..fc480cd 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+@@ -19,6 +19,7 @@ Optional properties:
+  - phys : phandle + phy specifier pair
+  - phy-names : "usb"
+  - resets : phandle + reset specifier pair
++ - vbus-supply : phandle of regulator supplying vbus
+ 
+ Example (Sequoia 440EPx):
+     ehci at e0000300 {
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index b065a96..05be100 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -29,6 +29,7 @@
+ #include <linux/of.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+@@ -46,6 +47,7 @@ struct ehci_platform_priv {
+ 	struct reset_control *rsts;
+ 	struct phy **phys;
+ 	int num_phys;
++	struct regulator *vbus_supply;
+ 	bool reset_on_resume;
+ };
+ 
+@@ -76,6 +78,25 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+ 	return 0;
+ }
+ 
++static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
++				    bool enable)
++{
++	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
++	int ret = 0;
++
++	if (priv->vbus_supply) {
++		if (enable)
++			ret = regulator_enable(priv->vbus_supply);
++		else
++			ret = regulator_disable(priv->vbus_supply);
++		if (ret)
++			dev_err(hcd->self.controller,
++				"failed to %s vbus supply: %d\n",
++				enable ? "enable" : "disable", ret);
++	}
++	return ret;
++}
++
+ static int ehci_platform_power_on(struct platform_device *dev)
+ {
+ 	struct usb_hcd *hcd = platform_get_drvdata(dev);
+@@ -134,6 +155,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
+ static const struct ehci_driver_overrides platform_overrides __initconst = {
+ 	.reset =		ehci_platform_reset,
+ 	.extra_priv_size =	sizeof(struct ehci_platform_priv),
++	.port_power =		ehci_platform_port_power,
+ };
+ 
+ static struct usb_ehci_pdata ehci_platform_defaults = {
+@@ -247,6 +269,15 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	if (err)
+ 		goto err_put_clks;
+ 
++	priv->vbus_supply = devm_regulator_get_optional(&dev->dev, "vbus");
++	if (IS_ERR(priv->vbus_supply)) {
++		err = PTR_ERR(priv->vbus_supply);
++		if (err == -ENODEV)
++			priv->vbus_supply = NULL;
++		else
++			goto err_reset;
++	}
++
+ 	if (pdata->big_endian_desc)
+ 		ehci->big_endian_desc = 1;
+ 	if (pdata->big_endian_mmio)
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
