@@ -1,38 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 22:59:54 +0100
-Subject: [PATCH 7/7] efi: disable LTO for EFI stub
+Date: Tue, 20 Feb 2018 22:59:48 +0100
+Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
 In-Reply-To: <20180220215954.4092811-1-arnd@arndb.de>
 References: <20180220215954.4092811-1-arnd@arndb.de>
-Message-ID: <20180220215954.4092811-8-arnd@arndb.de>
+Message-ID: <20180220215954.4092811-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the EFI stub on 32-bit ARM with LTO resulted in a build error:
+This fails during deflate_xip_data.sh
 
-arm-linux-gnueabi-ld: drivers/firmware/efi/libstub/arm-stub.stub.o: plugin needed to handle lto object
-arch/arm/boot/compressed/head.o: In function `efi_stub_entry':
+  /home/arnd/cross-gcc/bin/arm-linux-gnueabi-objcopy -O binary -R .comment -S  vmlinux arch/arm/boot/xipImage && /bin/bash -c '/git/arm-soc/arch/arm/boot/deflate_xip_data.sh vmlinux arch/arm/boot/xipImage || { rm -f arch/arm/boot/xipImage; false; }'
+make -f /git/arm-soc/scripts/Makefile.modpost
++ sym_val __data_loc
++ sed -n / __data_loc$/{s/ .*$//p;q}
++ /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+/home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
++ local val=ac74c0f4
++ [ ac74c0f4 ]
++ echo 2893332724
++ __data_loc=2893332724
++ sym_val _edata_loc
++ /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
++ sed -n / _edata_loc$/{s/ .*$//p;q}
+/home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
++ local val=ac7b8744
++ [ ac7b8744 ]
++ echo 2893776708
++ _edata_loc=2893776708
++ sym_val _xiprom
++ sed -n / _xiprom$/{s/ .*$//p;q}
++ /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+/home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
 
-Locally disabling LTO for this directory seems to do the trick.
+Obviously we want to make the combination work, no idea why it doesn't.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/firmware/efi/libstub/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index 7b3ba40f0745..cc4c53f1ff0a 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -20,7 +20,9 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
- KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
- 				   -D__NO_FORTIFY \
- 				   $(call cc-option,-ffreestanding) \
--				   $(call cc-option,-fno-stack-protector)
-+				   $(call cc-option,-fno-stack-protector) \
-+				   $(DISABLE_LTO)
-+
- 
- GCOV_PROFILE			:= n
- KASAN_SANITIZE			:= n
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 823e397ee0f3..8ed0f664f86f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1976,6 +1976,7 @@ endchoice
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+ 	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
++	depends on !LTO
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
 -- 
 2.9.0
