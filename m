@@ -1,112 +1,115 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Feb 2018 10:36:03 +0100
-Subject: [PATCH 1/8] clk: Add clk_bulk_alloc functions
-In-Reply-To: <b67b5043-f5e5-826a-f0b8-f7cf722c61e6@arm.com>
-References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154456eucas1p15f4073beaf61312238f142f217a8bb3c@eucas1p1.samsung.com>
- <1519055046-2399-2-git-send-email-m.purski@samsung.com>
- <b67b5043-f5e5-826a-f0b8-f7cf722c61e6@arm.com>
-Message-ID: <f13fb12b-54e6-104b-4ec0-192d1bb72cc8@samsung.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Tue, 20 Feb 2018 09:40:51 +0000
+Subject: [PATCH 1/2] dt-bindings: phy: add support for STM32 USB PHY
+ Controller (USBPHYC)
+In-Reply-To: <20180219015108.bxt6qn7tz53ydguv@rob-hp-laptop>
+References: <1518438929-5254-1-git-send-email-amelie.delaunay@st.com>
+ <1518438929-5254-2-git-send-email-amelie.delaunay@st.com>
+ <20180219015108.bxt6qn7tz53ydguv@rob-hp-laptop>
+Message-ID: <05225cb4-6584-a003-380f-bb9ca5f2da85@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
-On 2018-02-19 17:29, Robin Murphy wrote:
-> Hi Maciej,
->
-> On 19/02/18 15:43, Maciej Purski wrote:
->> When a driver is going to use clk_bulk_get() function, it has to
->> initialize an array of clk_bulk_data, by filling its id fields.
+
+On 02/19/2018 02:51 AM, Rob Herring wrote:
+> On Mon, Feb 12, 2018 at 01:35:28PM +0100, Amelie Delaunay wrote:
+>> This patch adds the device tree bindings description for STM32 USBPHYC
+>> (USB PHY Controller).
 >>
->> Add a new function to the core, which dynamically allocates
->> clk_bulk_data array and fills its id fields. Add clk_bulk_free()
->> function, which frees the array allocated by clk_bulk_alloc() function.
->> Add a managed version of clk_bulk_alloc().
->
-> Seeing how every subsequent patch ends up with the roughly this same 
-> stanza:
->
-> ????x = devm_clk_bulk_alloc(dev, num, names);
-> ????if (IS_ERR(x)
-> ??????? return PTR_ERR(x);
-> ????ret = devm_clk_bulk_get(dev, x, num);
->
-> I wonder if it might be better to simply implement:
->
-> ????int devm_clk_bulk_alloc_get(dev, &x, num, names)
->
-> that does the whole lot in one go, and let drivers that want to do 
-> more fiddly things continue to open-code the allocation.
->
-> But perhaps that's an abstraction too far... I'm not all that familiar 
-> with the lie of the land here.
-
-Hmmm. This patchset clearly shows, that it would be much simpler if we
-get rid of clk_bulk_data structure at all and let clk_bulk_* functions
-to operate on struct clk *array[]. Typically the list of clock names
-is already in some kind of array (taken from driver data or statically
-embedded into driver), so there is little benefit from duplicating it
-in clk_bulk_data. Sadly, I missed clk_bulk_* api discussion and maybe
-there are other benefits from this approach.
-
-If not, I suggest simplifying clk_bulk_* api by dropping clk_bulk_data
-structure and switching to clock ptr array:
-
-int clk_bulk_get(struct device *dev, int num_clock, struct clk *clocks[],
- ??? ??? ??? ???? const char *clk_names[]);
-int clk_bulk_prepare(int num_clks, struct clk *clks[]);
-int clk_bulk_enable(int num_clks, struct clk *clks[]);
-...
-
-
-
->
->> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 >> ---
->> ? drivers/clk/clk-bulk.c?? | 16 ++++++++++++
->> ? drivers/clk/clk-devres.c | 37 +++++++++++++++++++++++++---
->> ? include/linux/clk.h????? | 64 
->> ++++++++++++++++++++++++++++++++++++++++++++++++
->> ? 3 files changed, 113 insertions(+), 4 deletions(-)
+>>   .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  | 46 ++++++++++++++++++++++
+>>   1 file changed, 46 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
 >>
->
-> [...]
->> @@ -598,6 +645,23 @@ struct clk *clk_get_sys(const char *dev_id, 
->> const char *con_id);
->> ? ? #else /* !CONFIG_HAVE_CLK */
->> ? +static inline struct clk_bulk_data *clk_bulk_alloc(int num_clks,
->> +?????????????????????????? const char **clk_ids)
->> +{
->> +??? return NULL;
->
-> Either way, is it intentional not returning an ERR_PTR() value in this 
-> case? Since NULL will pass an IS_ERR() check, it seems a bit fragile 
-> for an allocation call to apparently succeed when the whole API is 
-> configured out (and I believe introducing new uses of IS_ERR_OR_NULL() 
-> is in general strongly discouraged.)
->
-> Robin.
->
->> +}
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+>> new file mode 100644
+>> index 0000000..1e65e0a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+>> @@ -0,0 +1,46 @@
+>> +STMicroelectronics STM32 USB HS PHY controller
 >> +
->> +static inline struct clk_bulk_data *devm_clk_bulk_alloc(struct 
->> device *dev,
->> +??????????????????????????? int num_clks,
->> +??????????????????????????? const char **clk_ids)
->> +{
->> +??? return NULL;
->> +}
+>> +The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
+>> +switch. It controls PHY configuration and status, and the UTMI+ switch that
+>> +selects either OTG or HOST controller for the second PHY port. It also sets
+>> +PLL configuration.
 >> +
->> +static inline void clk_bulk_free(struct clk_bulk_data *clks)
->> +{
->> +}
+>> +USBPHYC
+>> +  |_ PLL
+>> +  |
+>> +  |_ PHY port#1 _________________ HOST controller
+>> +  |                                      |
+>> +  |_ PHY port#2_______                   |
+>> +  |                   |_                 |
+>> +  |_ UTMI switch_____/ 1|________________|
+>> +                    |   |________________
+>> +                     \_0|                |
+>> +		                  OTG controller
 >> +
->> ? static inline struct clk *clk_get(struct device *dev, const char *id)
->> ? {
->> ????? return NULL;
+>> +Required properties:
+>> +- compatible: must be "st,stm32mp1-usbphyc"
+>> +- reg: address and length of the usb phy control register set
+>> +- clocks: phandle + clock specifier for the PLL phy clock
+>> +- phy-supply: from the generic phy bindings, phandle to the regulator
+>> +  providing 3V3 power to the PHY, see phy-bindings.txt
+>> +- vdda1v1-supply: phandle to the regulator providing 1V1 power to the PHY
+>> +- vdda1v8-supply: phandle to the regulator providing 1V8 power to the PHY
+>> +
+>> +Optional properties:
+>> +- assigned-clocks: phandle + clock specifier for the PLL phy clock
+>> +- assigned-clock-parents: the PLL phy clock parent
+>> +- resets: phandle + reset specifier
+>> +- st,port2-switch-to-host: select HOST controller on UTMI switch for port#2
+> 
+> This one seems very specific. If another device had the mux on a
+> different port number you'd need a new property for example.
+> 
+
+You're right. I will update the scheme with the following:
+
+USBPHYC
+      |_ PLL
+      |
+      |_ PHY port#1 _________________ HOST controller
+      |                    _                 |
+      |                  / 1|________________|
+      |_ PHY port#2 ----|   |________________
+      |                  \_0|                |
+      |_ UTMI switch_______|          OTG controller
+
+
+This way would be more generic:
+st,utmi-switch = <0>; //To select the controller connected to UTMI 
+switch #0 output.
+st,utmi-switch = <1>; //To select the controller connected to UTMI 
+switch #1 output.
+
+> But really I think this should be determined by either a USB connector
+> node (a binding is in the works) or cable detection.
 >
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+
+This needs to be further studied. Could it be an upcoming evolution ?
+
+Thanks for review,
+Amelie
+>> +
+>> +
+>> +Example:
+>> +		usbphyc: usbphyc at 5a006000 {
+> 
+> usb-phy at ...
+> 
+>> +			compatible = "st,stm32mp1-usbphyc";
+>> +			reg = <0x5a006000 0x1000>;
+>> +			clocks = <&rcc_clk USBPHY_K>;
+>> +			resets = <&rcc_rst USBPHY_R>;
+>> +			st,port2-switch-to-host;
+>> +			phy-supply = <&vdd_usb>;
+>> +			vdda1v1-supply = <&reg11>;
+>> +			vdda1v8-supply = <&reg18>
+>> +		};
+>> -- 
+>> 2.7.4
+>>
