@@ -1,34 +1,35 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 20 Feb 2018 16:12:08 +0100
-Subject: [PATCH v2 06/19] dt-bindings: arm: Document R-Car M3-N SoC DT bindings
+Date: Tue, 20 Feb 2018 16:12:09 +0100
+Subject: [PATCH v2 07/19] ARM64: Add Renesas R-Car M3-N config symbol
 In-Reply-To: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519139541-18783-7-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1519139541-18783-8-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree bindings documentation for Renesas R-Car M3-N (r8a77965)
-SoC.
+Add configuration option for the R-Car M3-N (R8A77965) SoC.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 41d3920..67889a9 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -39,6 +39,8 @@ SoCs:
-     compatible = "renesas,r8a7795"
-   - R-Car M3-W (R8A77960)
-     compatible = "renesas,r8a7796"
-+  - R-Car M3-N (R8A77965)
-+    compatible = "renesas,r8a77965"
-   - R-Car V3M (R8A77970)
-     compatible = "renesas,r8a77970"
-   - R-Car V3H (R8A77980)
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index b51db26..2b1535c 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -190,6 +190,12 @@ config ARCH_R8A7796
+ 	help
+ 	  This enables support for the Renesas R-Car M3-W SoC.
+ 
++config ARCH_R8A77965
++	bool "Renesas R-Car M3-N SoC Platform"
++	depends on ARCH_RENESAS
++	help
++	  This enables support for the Renesas R-Car M3-N SoC.
++
+ config ARCH_R8A77970
+ 	bool "Renesas R-Car V3M SoC Platform"
+ 	depends on ARCH_RENESAS
 -- 
 2.7.4
