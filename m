@@ -1,95 +1,75 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 20 Feb 2018 23:08:37 +0100
-Subject: [PATCH 2/3] arm64: dts: rockchip: add rk3328 display nodes
-In-Reply-To: <d2195e38-7ca1-e0b3-240e-0acfe941c572@arm.com>
-References: <20180216223817.2821-1-heiko@sntech.de>
- <20180216223817.2821-3-heiko@sntech.de>
- <d2195e38-7ca1-e0b3-240e-0acfe941c572@arm.com>
-Message-ID: <2712253.IuLOJ454Fc@phil>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 20 Feb 2018 14:46:24 -0800
+Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include PAN
+ emulation
+Message-ID: <20180220224624.GA28218@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+The PAN emulation notification was only happening for non-boot CPUs
+if CPU capabilities had already been configured. This seems to be the
+wrong place, as it's system-wide and isn't attached to capabilities,
+so its reporting didn't normally happen. Instead, report it once from
+the boot CPU. Additionally removes the redundant "feature" word from the
+"CPU features:" line.
 
-Am Dienstag, 20. Februar 2018, 14:14:31 CET schrieb Robin Murphy:
-> On 16/02/18 22:38, Heiko Stuebner wrote:
-> > Add the chain of display nodes from the core display-subsystem
-> > through the one vop to the dw-hdmi output.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 56 ++++++++++++++++++++++++++++++++
-> >   1 file changed, 56 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> > index 1615effcc191..65b7d460a044 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> > @@ -185,6 +185,11 @@
-> >   		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-> >   	};
-> >   
-> > +	display_subsystem: display-subsystem {
-> > +		compatible = "rockchip,display-subsystem";
-> > +		ports = <&vop_out>;
-> > +	};
-> > +
-> >   	psci {
-> >   		compatible = "arm,psci-1.0", "arm,psci-0.2";
-> >   		method = "smc";
-> > @@ -626,6 +631,28 @@
-> >   		status = "disabled";
-> >   	};
-> >   
-> > +	vop: vop at ff370000 {
-> > +		compatible = "rockchip,rk3328-vop";
-> > +		reg = <0x0 0xff370000 0x0 0x3efc>;
-> > +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
-> 
-> Another of those rogue trailing zero cells has snuck in here.
+Before (redundant "feature", and missing PAN emulation report):
 
-Oh great.
-Either they are missing when needed or trailing when not needed :-) .
+ SMP: Total of 4 processors activated.
+ CPU features: detected feature: 32-bit EL0 Support
+ CPU features: detected feature: Kernel page table isolation (KPTI)
+ CPU: All CPU(s) started at EL2
 
+After:
 
-> <digression>
-> Unfortunately, even having learned the difference between drm-next and 
-> drm-misc-next (thanks for the pointer!) so I could apply this and the 
-> other series, I only managed to get it to not-quite-work on the box I'm 
-> currently reverse-engineering a mainline DT for (Beelink A1).
-> 
-> I've got a monitor connected via HDMI-DVI (which the stock 3.10 Android 
-> kernel *does* drive happily) - it appears to be detected, but when the 
-> virtual console tries to come up I just see a handful of timeout splats 
-> from drm_atomic_helper_wait_for_vblanks() and no signal at the monitor.
-> 
-> Any idea where to start debugging? (I'm 99% certain I had your clk/next 
-> branch pulled in as well since it looked significant, but I'll 
-> double-check tonight)
+ SMP: Total of 4 processors activated.
+ CPU features: detected: 32-bit EL0 Support
+ CPU features: detected: Kernel page table isolation (KPTI)
+ CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
+ CPU: All CPU(s) started at EL2
 
-I guess first interesting point would be to check if the edid of the monitor
-got read correctly. There are a bunch of funny GRF options related to i2c
-voltages and such that get wiggled on hotplug events and they're not
-really documented at all. (see all the *_5V_* constants in the dw-hdmi).
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm64/kernel/cpufeature.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-In my current setup (with a VS0801H hdmi switch between my boardfarm
-and display) it's reading the monitor edid correctly every time, but I
-remember having lots of issues with getting an actual edid at all.
-I may need to check without the switch if this somehow improves the
-situation in my installation.
-
-Also, you could give Rockchip's 4.4 vendor kernel a try [0]. I wasn't even
-aware that rk3328 boxes used a 3.10 kernel in the wild :-) . The 4.4 kernel
-was similarly picky with my monitors edid, if I remember correctly.
-
-Maybe also check your regulators (if any) if they get turned off.
-
-And finally, for completenes sake, I do have a branch sitting on top of
-lima kernel patches and recent mainline that includes everything and
-does bring up the display [and partial gpu support :-) ] for me at [1].
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 29b1f873e337..6c799ca58b53 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
+ 
+ 	if (system_supports_sve())
+ 		verify_sve_features();
+-
+-	if (system_uses_ttbr0_pan())
+-		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+ }
+ 
+ void check_local_cpu_capabilities(void)
+@@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
+ 
+ static void __init setup_feature_capabilities(void)
+ {
+-	update_cpu_capabilities(arm64_features, "detected feature:");
++	update_cpu_capabilities(arm64_features, "detected:");
+ 	enable_cpu_capabilities(arm64_features);
+ }
+ 
+@@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
+ 	if (system_supports_32bit_el0())
+ 		setup_elf_hwcaps(compat_elf_hwcaps);
+ 
++	if (system_uses_ttbr0_pan())
++		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
++
+ 	sve_setup();
+ 
+ 	/* Advertise that we have computed the system capabilities */
+-- 
+2.7.4
 
 
-Heiko
-
-[0] https://github.com/rockchip-linux/kernel
-[1] https://github.com/mmind/linux-rockchip/tree/devel/lima-yuq-mali450
+-- 
+Kees Cook
+Pixel Security
