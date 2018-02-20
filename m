@@ -1,83 +1,70 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 11:38:43 +0100
-Subject: [PATCH 9/9] serial: xuartps: Fix out-of-bounds access through DT
- alias
-In-Reply-To: <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
+Date: Tue, 20 Feb 2018 11:49:41 +0100
+Subject: [PATCH 3/9] serial: imx: Fix out-of-bounds access through DT alias
+In-Reply-To: <20180220103134.xfh2zl2vgonb2ywb@pengutronix.de>
 References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
- <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
- <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
-Message-ID: <CAMuHMdUOKMM5mSrnnrxCi0gX_TbjYkj7vwn11b2D5p7XigM+Ag@mail.gmail.com>
+ <1519119624-1268-4-git-send-email-geert+renesas@glider.be>
+ <20180220103134.xfh2zl2vgonb2ywb@pengutronix.de>
+Message-ID: <CAMuHMdVMoEuOOffRNHDa0JwaLH1auByOQfNW8DgkXGaq5GFnsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Uwe,
 
-On Tue, Feb 20, 2018 at 11:22 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 20.2.2018 10:40, Geert Uytterhoeven wrote:
->> The cdns_uart_port[] array is indexed using a value derived from the
+On Tue, Feb 20, 2018 at 11:31 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, Feb 20, 2018 at 10:40:18AM +0100, Geert Uytterhoeven wrote:
+>> The imx_ports[] array is indexed using a value derived from the
 >> "serialN" alias in DT, which may lead to an out-of-bounds access.
 >>
 >> Fix this by adding a range check.
 >>
->> Fixes: 1f118c02a1819856 ("serial: xuartps: Fix out-of-bounds access through DT alias")
+>> Fixes: 9206ab8a0350c3da ("serial: imx: Fix out-of-bounds access through DT alias")
 >
-> I didn't find this sha1 - patch name is this one.
+> huh, this patch fixes itself?
 
-Bummer, I totally screwed up my scripting...
+Oops
 
-Fixes: 928e9263492069ee ("tty: xuartps: Initialize ports according to aliases")
+    Fixes: ff05967a07225ab6 ("serial/imx: add of_alias_get_id() reference back")
 
+>
 >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 >> ---
->>  drivers/tty/serial/xilinx_uartps.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>  drivers/tty/serial/imx.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
 >>
->> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
->> index b9b2bc76bcac606c..abcb4d09a2d866d0 100644
->> --- a/drivers/tty/serial/xilinx_uartps.c
->> +++ b/drivers/tty/serial/xilinx_uartps.c
->> @@ -1110,7 +1110,7 @@ static struct uart_port *cdns_uart_get_port(int id)
->>       struct uart_port *port;
->>
->>       /* Try the given port id if failed use default method */
->> -     if (cdns_uart_port[id].mapbase != 0) {
->> +     if (id < CDNS_UART_NR_PORTS && cdns_uart_port[id].mapbase != 0) {
->>               /* Find the next unused port */
->>               for (id = 0; id < CDNS_UART_NR_PORTS; id++)
->>                       if (cdns_uart_port[id].mapbase == 0)
->>
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>> index 1d7ca382bc12b238..e89e90ad87d8245c 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -2041,6 +2041,11 @@ static int serial_imx_probe(struct platform_device *pdev)
+>>               serial_imx_probe_pdata(sport, pdev);
+>>       else if (ret < 0)
+>>               return ret;
 >
-> Below should be better fix for this driver.
+> I'd prefer an empty line here.
 
-I considered that, too, but...
+OK
 
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -1109,6 +1109,9 @@ static struct uart_port *cdns_uart_get_port(int id)
->  {
->         struct uart_port *port;
+>> +     if (sport->port.line >= UART_NR) {
 >
-> +       if (id >= CDNS_UART_NR_PORTS)
-> +               return NULL;
-> +
->         /* Try the given port id if failed use default method */
->         if (cdns_uart_port[id].mapbase != 0) {
->                 /* Find the next unused port */
-> @@ -1117,9 +1120,6 @@ static struct uart_port *cdns_uart_get_port(int id)
->                                 break;
->         }
+> I would have used:
 >
-> -       if (id >= CDNS_UART_NR_PORTS)
-> -               return NULL;
-> -
-
-... the above check cannot be removed, as it is needed to support the loop
-above to find an unused port.
-
->         port = &cdns_uart_port[id];
+>         if (sport->port.line >= ARRAY_SIZE(imx_ports))
 >
->         /* At this point, we've got an empty uart_port struct,
-> initialize it */
+> which IMHO is better understandable
+
+OK.
+
+>> +             dev_err(&pdev->dev, "serial%d out of range\n",
+>> +                     sport->port.line);
+>
+> Note that the same overflow can happen when a device is probed using
+> platform data (and your commit fixes that, too). Maybe worth to point
+> out in the commit log?
+
+That's correct. But board code is tied more intimate to the kernel.
+Will update.
 
 Gr{oetje,eeting}s,
 
