@@ -1,138 +1,234 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 20 Feb 2018 10:11:32 +0800
-Subject: [PATCH] arm64: Add support for new control bits CTR_EL0.IDC and
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 19 Feb 2018 20:59:06 -0600
+Subject: [PATCH v2] arm64: Add support for new control bits CTR_EL0.DIC and
  CTR_EL0.IDC
-In-Reply-To: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
-References: <1518829066-3558-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <201802201000.EqpnvgN2%fengguang.wu@intel.com>
+Message-ID: <1519095546-24420-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+The DCache clean & ICache invalidation requirements for instructions
+to be data coherence are discoverable through new fields in CTR_EL0.
+The following two control bits DIC and IDC were defined for this
+purpose. No need to perform point of unification cache maintenance
+operations from software on systems where CPU caches are transparent.
 
-Thank you for the patch! Yet something to improve:
+This patch optimize the three functions __flush_cache_user_range(),
+clean_dcache_area_pou() and invalidate_icache_range() if the hardware
+reports CTR_EL0.IDC and/or CTR_EL0.IDC. Basically it skips the two
+instructions 'DC CVAU' and 'IC IVAU', and the associated loop logic
+in order to avoid the unnecessary overhead.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.16-rc2 next-20180219]
-[cannot apply to arm64/for-next/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+CTR_EL0.DIC: Instruction cache invalidation requirements for
+ instruction to data coherence. The meaning of this bit[29].
+  0: Instruction cache invalidation to the point of unification
+     is required for instruction to data coherence.
+  1: Instruction cache cleaning to the point of unification is
+      not required for instruction to data coherence.
 
-url:    https://github.com/0day-ci/linux/commits/Shanker-Donthineni/arm64-Add-support-for-new-control-bits-CTR_EL0-IDC-and-CTR_EL0-IDC/20180219-031155
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+CTR_EL0.IDC: Data cache clean requirements for instruction to data
+ coherence. The meaning of this bit[28].
+  0: Data cache clean to the point of unification is required for
+     instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
+     or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
+  1: Data cache clean to the point of unification is not required
+     for instruction to data coherence.
 
-All errors (new ones prefixed by >>):
-
-   arch/arm64/kernel/hibernate-asm.S: Assembler messages:
->> arch/arm64/kernel/hibernate-asm.S:101: Error: unexpected comma after the mnemonic name `mrs' -- `mrs ,ctr_el0'
->> arch/arm64/kernel/hibernate-asm.S:101: Error: operand 2 must be an integer register -- `ubfm x3,,#16,#19'
---
-   arch/arm64/kernel/relocate_kernel.S: Assembler messages:
->> arch/arm64/kernel/relocate_kernel.S:37: Error: unexpected comma after the mnemonic name `mrs' -- `mrs ,ctr_el0'
->> arch/arm64/kernel/relocate_kernel.S:37: Error: operand 2 must be an integer register -- `ubfm x0,,#16,#19'
-
-vim +101 arch/arm64/kernel/hibernate-asm.S
-
-82869ac57 James Morse        2016-04-27   46  
-82869ac57 James Morse        2016-04-27   47  
-82869ac57 James Morse        2016-04-27   48  /*
-82869ac57 James Morse        2016-04-27   49   * Resume from hibernate
-82869ac57 James Morse        2016-04-27   50   *
-82869ac57 James Morse        2016-04-27   51   * Loads temporary page tables then restores the memory image.
-82869ac57 James Morse        2016-04-27   52   * Finally branches to cpu_resume() to restore the state saved by
-82869ac57 James Morse        2016-04-27   53   * swsusp_arch_suspend().
-82869ac57 James Morse        2016-04-27   54   *
-82869ac57 James Morse        2016-04-27   55   * Because this code has to be copied to a 'safe' page, it can't call out to
-82869ac57 James Morse        2016-04-27   56   * other functions by PC-relative address. Also remember that it may be
-82869ac57 James Morse        2016-04-27   57   * mid-way through over-writing other functions. For this reason it contains
-82869ac57 James Morse        2016-04-27   58   * code from flush_icache_range() and uses the copy_page() macro.
-82869ac57 James Morse        2016-04-27   59   *
-82869ac57 James Morse        2016-04-27   60   * This 'safe' page is mapped via ttbr0, and executed from there. This function
-82869ac57 James Morse        2016-04-27   61   * switches to a copy of the linear map in ttbr1, performs the restore, then
-82869ac57 James Morse        2016-04-27   62   * switches ttbr1 to the original kernel's swapper_pg_dir.
-82869ac57 James Morse        2016-04-27   63   *
-82869ac57 James Morse        2016-04-27   64   * All of memory gets written to, including code. We need to clean the kernel
-82869ac57 James Morse        2016-04-27   65   * text to the Point of Coherence (PoC) before secondary cores can be booted.
-82869ac57 James Morse        2016-04-27   66   * Because the kernel modules and executable pages mapped to user space are
-82869ac57 James Morse        2016-04-27   67   * also written as data, we clean all pages we touch to the Point of
-82869ac57 James Morse        2016-04-27   68   * Unification (PoU).
-82869ac57 James Morse        2016-04-27   69   *
-82869ac57 James Morse        2016-04-27   70   * x0: physical address of temporary page tables
-82869ac57 James Morse        2016-04-27   71   * x1: physical address of swapper page tables
-82869ac57 James Morse        2016-04-27   72   * x2: address of cpu_resume
-82869ac57 James Morse        2016-04-27   73   * x3: linear map address of restore_pblist in the current kernel
-82869ac57 James Morse        2016-04-27   74   * x4: physical address of __hyp_stub_vectors, or 0
-82869ac57 James Morse        2016-04-27   75   * x5: physical address of a  zero page that remains zero after resume
-82869ac57 James Morse        2016-04-27   76   */
-82869ac57 James Morse        2016-04-27   77  .pushsection    ".hibernate_exit.text", "ax"
-82869ac57 James Morse        2016-04-27   78  ENTRY(swsusp_arch_suspend_exit)
-82869ac57 James Morse        2016-04-27   79  	/*
-82869ac57 James Morse        2016-04-27   80  	 * We execute from ttbr0, change ttbr1 to our copied linear map tables
-82869ac57 James Morse        2016-04-27   81  	 * with a break-before-make via the zero page
-82869ac57 James Morse        2016-04-27   82  	 */
-529c4b05a Kristina Martsenko 2017-12-13   83  	break_before_make_ttbr_switch	x5, x0, x6
-82869ac57 James Morse        2016-04-27   84  
-82869ac57 James Morse        2016-04-27   85  	mov	x21, x1
-82869ac57 James Morse        2016-04-27   86  	mov	x30, x2
-82869ac57 James Morse        2016-04-27   87  	mov	x24, x4
-82869ac57 James Morse        2016-04-27   88  	mov	x25, x5
-82869ac57 James Morse        2016-04-27   89  
-82869ac57 James Morse        2016-04-27   90  	/* walk the restore_pblist and use copy_page() to over-write memory */
-82869ac57 James Morse        2016-04-27   91  	mov	x19, x3
-82869ac57 James Morse        2016-04-27   92  
-82869ac57 James Morse        2016-04-27   93  1:	ldr	x10, [x19, #HIBERN_PBE_ORIG]
-82869ac57 James Morse        2016-04-27   94  	mov	x0, x10
-82869ac57 James Morse        2016-04-27   95  	ldr	x1, [x19, #HIBERN_PBE_ADDR]
-82869ac57 James Morse        2016-04-27   96  
-82869ac57 James Morse        2016-04-27   97  	copy_page	x0, x1, x2, x3, x4, x5, x6, x7, x8, x9
-82869ac57 James Morse        2016-04-27   98  
-82869ac57 James Morse        2016-04-27   99  	add	x1, x10, #PAGE_SIZE
-82869ac57 James Morse        2016-04-27  100  	/* Clean the copied page to PoU - based on flush_icache_range() */
-072f0a633 Suzuki K Poulose   2016-09-09 @101  	raw_dcache_line_size x2, x3
-82869ac57 James Morse        2016-04-27  102  	sub	x3, x2, #1
-82869ac57 James Morse        2016-04-27  103  	bic	x4, x10, x3
-82869ac57 James Morse        2016-04-27  104  2:	dc	cvau, x4	/* clean D line / unified line */
-82869ac57 James Morse        2016-04-27  105  	add	x4, x4, x2
-82869ac57 James Morse        2016-04-27  106  	cmp	x4, x1
-82869ac57 James Morse        2016-04-27  107  	b.lo	2b
-82869ac57 James Morse        2016-04-27  108  
-82869ac57 James Morse        2016-04-27  109  	ldr	x19, [x19, #HIBERN_PBE_NEXT]
-82869ac57 James Morse        2016-04-27  110  	cbnz	x19, 1b
-82869ac57 James Morse        2016-04-27  111  	dsb	ish		/* wait for PoU cleaning to finish */
-82869ac57 James Morse        2016-04-27  112  
-82869ac57 James Morse        2016-04-27  113  	/* switch to the restored kernels page tables */
-529c4b05a Kristina Martsenko 2017-12-13  114  	break_before_make_ttbr_switch	x25, x21, x6
-82869ac57 James Morse        2016-04-27  115  
-82869ac57 James Morse        2016-04-27  116  	ic	ialluis
-82869ac57 James Morse        2016-04-27  117  	dsb	ish
-82869ac57 James Morse        2016-04-27  118  	isb
-82869ac57 James Morse        2016-04-27  119  
-82869ac57 James Morse        2016-04-27  120  	cbz	x24, 3f		/* Do we need to re-initialise EL2? */
-82869ac57 James Morse        2016-04-27  121  	hvc	#0
-82869ac57 James Morse        2016-04-27  122  3:	ret
-82869ac57 James Morse        2016-04-27  123  
-82869ac57 James Morse        2016-04-27  124  	.ltorg
-82869ac57 James Morse        2016-04-27  125  ENDPROC(swsusp_arch_suspend_exit)
-82869ac57 James Morse        2016-04-27  126  
-
-:::::: The code at line 101 was first introduced by commit
-:::::: 072f0a633838aca13b5a8b211eb64f5c445cfd7c arm64: Introduce raw_{d,i}cache_line_size
-
-:::::: TO: Suzuki K Poulose <suzuki.poulose@arm.com>
-:::::: CC: Will Deacon <will.deacon@arm.com>
-
+Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38167 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180220/f342e89f/attachment-0001.gz>
+Changes since v1:
+  -Reworded commit text.
+  -Used the alternatives framework as Catalin suggested.
+  -Rebased on top of https://patchwork.kernel.org/patch/10227927/
+
+ arch/arm64/Kconfig               | 21 +++++++++++++++++++
+ arch/arm64/include/asm/cache.h   |  5 +++++
+ arch/arm64/include/asm/cpucaps.h |  4 +++-
+ arch/arm64/kernel/cpufeature.c   | 44 ++++++++++++++++++++++++++++++++++------
+ arch/arm64/mm/cache.S            | 15 ++++++++++++++
+ 5 files changed, 82 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index f55fe5b..4061210 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1095,6 +1095,27 @@ config ARM64_RAS_EXTN
+ 	  and access the new registers if the system supports the extension.
+ 	  Platform RAS features may additionally depend on firmware support.
+ 
++config ARM64_CACHE_IDC
++	bool "Enable support for DCache clean PoU optimization"
++	default y
++	help
++	  The data cache clean to the point of unification is not required
++	  for instruction to be data coherence if CTR_EL0.IDC has value 1.
++
++	  Selecting this feature will allow the kernel to optimize the POU
++	  cache maintaince operations where it requires 'DC CVAU'.
++
++config ARM64_CACHE_DIC
++	bool "Enable support for ICache invalidation PoU optimization"
++	default y
++	help
++	  Instruction cache invalidation to the point of unification is not
++	  required for instruction to be data coherence if CTR_EL0.DIC has
++	  value 1.
++
++	  Selecting this feature will allow the kernel to optimize the POU
++	  cache maintaince operations where it requires 'IC IVAU'.
++
+ endmenu
+ 
+ config ARM64_SVE
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index ea9bb4e..e22178b 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -20,8 +20,13 @@
+ 
+ #define CTR_L1IP_SHIFT		14
+ #define CTR_L1IP_MASK		3
++#define CTR_DMLINE_SHIFT	16
++#define CTR_ERG_SHIFT		20
+ #define CTR_CWG_SHIFT		24
+ #define CTR_CWG_MASK		15
++#define CTR_IDC_SHIFT		28
++#define CTR_DIC_SHIFT		29
++#define CTR_B31_SHIFT		31
+ 
+ #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
+ 
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bb26382..8dd42ae 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -45,7 +45,9 @@
+ #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+ #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+ #define ARM64_HAS_RAS_EXTN			26
++#define ARM64_HAS_CACHE_IDC			27
++#define ARM64_HAS_CACHE_DIC			28
+ 
+-#define ARM64_NCAPS				27
++#define ARM64_NCAPS				29
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index ff8a6e9..53a7266 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -199,12 +199,12 @@ static int __init register_cpu_hwcaps_dumper(void)
+ };
+ 
+ static const struct arm64_ftr_bits ftr_ctr[] = {
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RES1 */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 29, 1, 1),	/* DIC */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 28, 1, 1),	/* IDC */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 20, 4, 0),	/* ERG */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, CTR_B31_SHIFT, 1, 1),         /* RES1 */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),    /* DIC */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 1),    /* IDC */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_CWG_SHIFT, 4, 0),   /* CWG */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_ERG_SHIFT, 4, 0),   /* ERG */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DMLINE_SHIFT, 4, 1), /* DminLine */
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+ 	 * make use of *minLine.
+@@ -864,6 +864,22 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+ 					ID_AA64PFR0_FP_SHIFT) < 0;
+ }
+ 
++#ifdef CONFIG_ARM64_CACHE_IDC
++static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
++			  int __unused)
++{
++	return !!(read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_IDC_SHIFT));
++}
++#endif
++
++#ifdef CONFIG_ARM64_CACHE_DIC
++static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
++			  int __unused)
++{
++	return !!(read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_DIC_SHIFT));
++}
++#endif
++
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ 
+@@ -1100,6 +1116,22 @@ static int cpu_copy_el2regs(void *__unused)
+ 		.enable = cpu_clear_disr,
+ 	},
+ #endif /* CONFIG_ARM64_RAS_EXTN */
++#ifdef CONFIG_ARM64_CACHE_IDC
++	{
++		.desc = "DCache clean to POU",
++		.capability = ARM64_HAS_CACHE_IDC,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = has_cache_idc,
++	},
++#endif /* CONFIG_ARM64_CACHE_IDC */
++#ifdef CONFIG_ARM64_CACHE_DIC
++	{
++		.desc = "ICache invalidation to POU",
++		.capability = ARM64_HAS_CACHE_DIC,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = has_cache_dic,
++	},
++#endif /* CONFIG_ARM64_CACHE_DIC */
+ 	{},
+ };
+ 
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 758bde7..7d37d71 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -50,6 +50,9 @@ ENTRY(flush_icache_range)
+  */
+ ENTRY(__flush_cache_user_range)
+ 	uaccess_ttbr0_enable x2, x3, x4
++alternative_if ARM64_HAS_CACHE_IDC
++	b	8f
++alternative_else_nop_endif
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+@@ -60,6 +63,11 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+ 	b.lo	1b
+ 	dsb	ish
+ 
++8:
++alternative_if ARM64_HAS_CACHE_DIC
++	mov	x0, #0
++	b	1f
++alternative_else_nop_endif
+ 	invalidate_icache_by_line x0, x1, x2, x3, 9f
+ 	mov	x0, #0
+ 1:
+@@ -80,6 +88,10 @@ ENDPROC(__flush_cache_user_range)
+  *	- end     - virtual end address of region
+  */
+ ENTRY(invalidate_icache_range)
++alternative_if ARM64_HAS_CACHE_DIC
++	mov	x0, xzr
++	ret
++alternative_else_nop_endif
+ 	uaccess_ttbr0_enable x2, x3, x4
+ 
+ 	invalidate_icache_by_line x0, x1, x2, x3, 2f
+@@ -116,6 +128,9 @@ ENDPIPROC(__flush_dcache_area)
+  *	- size    - size in question
+  */
+ ENTRY(__clean_dcache_area_pou)
++alternative_if ARM64_HAS_CACHE_IDC
++	ret
++alternative_else_nop_endif
+ 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
+ 	ret
+ ENDPROC(__clean_dcache_area_pou)
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
