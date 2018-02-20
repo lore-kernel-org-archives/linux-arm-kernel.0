@@ -1,132 +1,36 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 20 Feb 2018 16:12:13 +0100
-Subject: [PATCH v2 11/19] ARM64: dts: r8a77965: Add dmac device nods
+Date: Tue, 20 Feb 2018 16:12:17 +0100
+Subject: [PATCH v2 15/19] dt-bindings: gpio: Add support for r8a77965
 In-Reply-To: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519139541-18783-12-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1519139541-18783-16-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dmac[0-2] device nodes for R-Car M3-N (r8a77965) SoC.
+Add compatible string for R-Car M3-N (r8a77965) in gpio-rcar.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 96 ++++++++++++++++++++++++++++++-
- 1 file changed, 93 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 6b6ec65..b83dafc 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -233,15 +233,105 @@
- 		};
- 
- 		dmac0: dma-controller at e6700000 {
--			/* placeholder */
-+			compatible = "renesas,dmac-r8a77965",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe6700000 0 0x10000>;
-+			interrupts = <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 219>;
-+			clock-names = "fck";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 219>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
- 		};
- 
- 		dmac1: dma-controller at e7300000 {
--			/* placeholder */
-+			compatible = "renesas,dmac-r8a77965",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe7300000 0 0x10000>;
-+			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 218>;
-+			clock-names = "fck";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 218>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
- 		};
- 
- 		dmac2: dma-controller at e7310000 {
--			/* placeholder */
-+			compatible = "renesas,dmac-r8a77965",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe7310000 0 0x10000>;
-+			interrupts = <GIC_SPI 416 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 417 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 418 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 419 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 423 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 426 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 427 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 428 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 429 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 431 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 217>;
-+			clock-names = "fck";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 217>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
- 		};
- 
- 		scif0: serial at e6e60000 {
+---
+v1 -> v2:
+- Drop SoC-specific compatible string from drivers/gpio/gpio-rcar.c
+- Change patch subject to reflect it only changes dt bindings
+---
+ Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+index 9474138..f2af897 100644
+--- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
++++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+@@ -14,6 +14,7 @@ Required Properties:
+     - "renesas,gpio-r8a7794": for R8A7794 (R-Car E2) compatible GPIO controller.
+     - "renesas,gpio-r8a7795": for R8A7795 (R-Car H3) compatible GPIO controller.
+     - "renesas,gpio-r8a7796": for R8A7796 (R-Car M3-W) compatible GPIO controller.
++    - "renesas,gpio-r8a77965": for R8A77965 (R-Car M3-N) compatible GPIO controller.
+     - "renesas,gpio-r8a77970": for R8A77970 (R-Car V3M) compatible GPIO controller.
+     - "renesas,gpio-r8a77995": for R8A77995 (R-Car D3) compatible GPIO controller.
+     - "renesas,rcar-gen1-gpio": for a generic R-Car Gen1 GPIO controller.
 -- 
 2.7.4
