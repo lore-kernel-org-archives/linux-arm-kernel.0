@@ -1,21 +1,27 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 19:36:40 +0100
-Subject: [PATCH v2 18/19] pinctrl: sh-pfc: r8a77965: Add EtherAVB
- groups/functions
-In-Reply-To: <1519139541-18783-19-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-19-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWi9Gh=3vz=tgXzS+KDczwiVQUcPVXXf6TDPukw93C62g@mail.gmail.com>
+Date: Tue, 20 Feb 2018 19:38:07 +0100
+Subject: [PATCH] pinctrl: samsung: Validate alias coming from DT
+In-Reply-To: <20180220181751.20826-1-krzk@kernel.org>
+References: <20180220181751.20826-1-krzk@kernel.org>
+Message-ID: <CAMuHMdUg-Fj5J7peAWUBc-5qnDc5RSzOg1TxURdEW4g9NrsYsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add EtherAVB groups and functions definitions for R-Car M3-N.
+On Tue, Feb 20, 2018 at 7:17 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Driver uses alias from Device Tree as an index of pin controller data
+> array.  In case of a wrong DTB or an out-of-tree DTB, the alias could be
+> outside of this data array leading to out-of-bounds access.
 >
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Depending on binary and memory layout, this could be handled properly
+> (showing error like "samsung-pinctrl 3860000.pinctrl: driver data not
+> available") or could lead to exceptions.
+>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: <stable@vger.kernel.org>
+> Fixes: 30574f0db1b1 ("pinctrl: add samsung pinctrl and gpiolib driver")
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Queueing in sh-pfc-for-v4.17.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
 
