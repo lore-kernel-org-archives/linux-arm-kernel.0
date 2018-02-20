@@ -1,28 +1,26 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Feb 2018 00:26:58 +0900
-Subject: [PATCH v2 0/2] add ethernet nodes for UniPhier SoCs
-In-Reply-To: <1518600629-14317-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1518600629-14317-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNASu-+GhZ11TPP3bjpJdTRbisSAKDJB6JJBJyQ3uZkA-bw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Feb 2018 16:29:37 +0100
+Subject: [PATCH v2 02/19] soc: renesas: rcar-rst: Add support for R-Car
+ M3-N
+In-Reply-To: <1519139541-18783-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVPkbKQf=svj+R_jjt2_+FqHXaCRmW7Wu7c0AfJzZR2Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-14 18:30 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> This series adds ethernet nodes for UniPhier Pro4, PXs2, LD6b, LD11, LD20 SoCs
-> and the boards.
->
-> Changes since v1:
-> - move common descriptions to .dtsi files
-> - rename labels of the ethernet nodes to "eth"
->
-> Kunihiko Hayashi (2):
->   ARM: dts: uniphier: add AVE ethernet node
->   arm64: dts: uniphier: add AVE ethernet node
->
+On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Applied to linux-uniphier. Thanks!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Gr{oetje,eeting}s,
 
--- 
-Best Regards
-Masahiro Yamada
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
