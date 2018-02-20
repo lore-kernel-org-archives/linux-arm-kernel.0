@@ -1,37 +1,54 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 10:40:20 +0100
-Subject: [PATCH 5/9] serial: pxa: Fix out-of-bounds access through DT alias
-In-Reply-To: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
-References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1519119624-1268-6-git-send-email-geert+renesas@glider.be>
+From: masami.hiramatsu@linaro.org (Masami Hiramatsu)
+Date: Tue, 20 Feb 2018 19:21:43 +0900
+Subject: [PATCH] ASoC: uniphier: evea: fix typo 'eva' -> 'evea'
+In-Reply-To: <20180220095310.13464-1-suzuki.katsuhiro@socionext.com>
+References: <20180220095310.13464-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAA93ih00RV2rhfMyLupxe+-3xvkLyA-TgpzybPKm4E0FqTJKOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The serial_pxa_ports[] array is indexed using a value derived from the
-"serialN" alias in DT, which may lead to an out-of-bounds access.
+2018-02-20 18:53 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
 
-Fix this by adding a range check.
+Looks good to me:)
 
-Fixes: c8dcdc77298dde67 ("serial: pxa: Fix out-of-bounds access through DT alias")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/tty/serial/pxa.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
 
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index baf552944d5686e8..ac25faa95baaad0e 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -885,6 +885,10 @@ static int serial_pxa_probe(struct platform_device *dev)
- 		sport->port.line = dev->id;
- 	else if (ret < 0)
- 		goto err_clk;
-+	if (sport->port.line > ARRAY_SIZE(serial_pxa_ports)) {
-+		dev_err(&dev->dev, "serial%d out of range\n", sport->port.line);
-+		return -EINVAL;
-+	}
- 	snprintf(sport->name, PXA_NAME_LEN - 1, "UART%d", sport->port.line + 1);
- 
- 	sport->port.membase = ioremap(mmres->start, resource_size(mmres));
+Thanks,
+
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> ---
+>  sound/soc/uniphier/evea.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
+> index cad7e60de21d..ac2d30b55fb6 100644
+> --- a/sound/soc/uniphier/evea.c
+> +++ b/sound/soc/uniphier/evea.c
+> @@ -292,7 +292,7 @@ static int evea_set_switch_hp(struct snd_kcontrol *kcontrol,
+>         return evea_update_switch_hp(evea);
+>  }
+>
+> -static const struct snd_kcontrol_new eva_controls[] = {
+> +static const struct snd_kcontrol_new evea_controls[] = {
+>         SOC_SINGLE_BOOL_EXT("Line Capture Switch", 0,
+>                             evea_get_switch_lin, evea_set_switch_lin),
+>         SOC_SINGLE_BOOL_EXT("Line Playback Switch", 0,
+> @@ -384,8 +384,8 @@ static struct snd_soc_component_driver soc_codec_evea = {
+>         .num_dapm_widgets       = ARRAY_SIZE(evea_widgets),
+>         .dapm_routes            = evea_routes,
+>         .num_dapm_routes        = ARRAY_SIZE(evea_routes),
+> -       .controls               = eva_controls,
+> -       .num_controls           = ARRAY_SIZE(eva_controls),
+> +       .controls               = evea_controls,
+> +       .num_controls           = ARRAY_SIZE(evea_controls),
+>         .idle_bias_on           = 1,
+>         .use_pmdown_time        = 1,
+>         .endianness             = 1,
+> --
+> 2.16.1
+>
+
+
+
 -- 
-2.7.4
+Masami Hiramatsu
