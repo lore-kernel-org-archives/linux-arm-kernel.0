@@ -1,25 +1,24 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 11:51:13 +0100
-Subject: [PATCH 2/9] serial: fsl_lpuart: Fix out-of-bounds access through
+Date: Tue, 20 Feb 2018 11:51:49 +0100
+Subject: [PATCH 4/9] serial: mxs-auart: Fix out-of-bounds access through
  DT alias
-In-Reply-To: <1519119624-1268-3-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <1519119624-1268-5-git-send-email-geert+renesas@glider.be>
 References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
- <1519119624-1268-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdXrFQbopFKipo0yGejyayHXWXy_t50ZDJMbn6dj04LtOw@mail.gmail.com>
+ <1519119624-1268-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdW8LHTd4q9q_pL97W1vtM68x+Fep8QjCx_O2sNre1CNng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 10:40 AM, Geert Uytterhoeven
 <geert+renesas@glider.be> wrote:
-> The lpuart_ports[] array is indexed using a value derived from the
+> The auart_port[] array is indexed using a value derived from the
 > "serialN" alias in DT, which may lead to an out-of-bounds access.
 >
 > Fix this by adding a range check.
 >
-> Fixes: 970416c691dc68b5 ("serial: fsl_lpuart: Fix out-of-bounds access through DT alias")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Fixes: cabf23e7aa00b145 ("serial: mxs-auart: Fix out-of-bounds access through DT alias")
 
-Fixes: c9e2e946fb0ba5d2 ("tty: serial: add Freescale lpuart driver support")
+Fixes: 1ea6607d4cdc9179 ("serial: mxs-auart: Allow device tree probing")
 
 Gr{oetje,eeting}s,
 
