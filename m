@@ -1,36 +1,30 @@
 From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Tue, 20 Feb 2018 18:00:42 +0100
-Subject: [PATCH 1/8] ARM: dts: artpec: disable Accelerator Coherency Port
-In-Reply-To: <20180220170049.22809-1-niklas.cassel@axis.com>
-References: <20180220170049.22809-1-niklas.cassel@axis.com>
-Message-ID: <20180220170049.22809-2-niklas.cassel@axis.com>
+Date: Tue, 20 Feb 2018 18:00:41 +0100
+Subject: [PATCH 0/8] ARTPEC-6 ARM SoC device tree updates
+Message-ID: <20180220170049.22809-1-niklas.cassel@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Accesses via 0x80000000 go through the ACP instead of using the DDR
-directly.
+Hello,
 
-Unfortunately the ACP has proven to be the cause of complete system
-hangs. Disabling the ACP makes these problems go away.
+Here comes some ARTPEC-6 ARM SoC device tree updates.
 
-Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
----
- arch/arm/boot/dts/artpec6.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Regards,
+Niklas
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 2ed11773048d..d9776a97d8ff 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -185,8 +185,7 @@
- 		#address-cells = <0x1>;
- 		#size-cells = <0x1>;
- 		ranges;
--		dma-ranges = <0x80000000 0x00000000 0x40000000>;
--		dma-coherent;
-+		dma-ranges;
- 
- 		ethernet: ethernet at f8010000 {
- 			clock-names = "phy_ref_clk", "apb_pclk";
+Niklas Cassel (8):
+  ARM: dts: artpec: disable Accelerator Coherency Port
+  ARM: dts: artpec: use 1 GiB RAM
+  ARM: dts: artpec: remove 0x prefix from clkctrl unit address
+  ARM: dts: artpec: migrate ethernet to stmmac binding
+  ARM: dts: artpec: add and utilize artpec6 pin controller
+  ARM: dts: artpec: add and utilize nbpfaxi DMA controllers
+  ARM: dts: artpec: add disabled node for PCIe endpoint mode
+  ARM: dts: artpec: add node for hardware crypto accelerator
+
+ arch/arm/boot/dts/artpec6-devboard.dts |   3 +-
+ arch/arm/boot/dts/artpec6.dtsi         | 165 +++++++++++++++++++++++++++++++--
+ 2 files changed, 157 insertions(+), 11 deletions(-)
+
 -- 
 2.14.2
