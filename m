@@ -1,104 +1,78 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 20 Feb 2018 12:39:59 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v7_00/42]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
-Message-ID: <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 20 Feb 2018 18:42:34 +0000
+Subject: [PATCH 00/11] APEI in_nmi() rework and arm64 SDEI wire-up
+In-Reply-To: <20180215185606.26736-1-james.morse@arm.com> (James Morse's
+ message of "Thu, 15 Feb 2018 18:55:55 +0000")
+References: <20180215185606.26736-1-james.morse@arm.com>
+Message-ID: <87a7w3zen9.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2018 07:33 AM, Bartosz Golaszewski wrote:
-> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
->> This series converts mach-davinci to use the common clock framework.
->>
->>
-> 
-> Hi David,
-> 
-> just some quick results from today's playing with v7.
-> 
-> I started out with da850-lcdk with my standard rootfs over NFS. I was
-> not able to boot to console so far. The first problem is that mdio
-> fails to probe:
-> 
-> libphy: Fixed MDIO Bus: probed
-> davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
-> davinci_mdio 1e24000.mdio: no live phy, scanning all
-> davinci_mdio: probe of 1e24000.mdio failed with error -5> 
-> After some digging I noticed that the supplied clock rate differs
-> between mainline (114000000Hz) vs common-clock-v7 (18000000). Since
-> we're not setting the rate in mdio, using LPSC_SET_RATE_PARENT would
-> not help like with lcdc.
+James Morse <james.morse@arm.com> writes:
 
-Can you post the output of this command so that I can see how your
-clocks are setup:
+> Hello!
 
-cat /sys/kernel/debug/clk/clk_summary
+Hi
 
+>
+> The aim of this series is to wire arm64's SDEI into APEI.
+>
 
-> 
-> After that, the boot just hangs without ever getting to emac's probe.
+[...]
 
-Using your workaround, can you run:
+>
+> Trees... The changes outside APEI are tiny, but there will be some changes
+> to how arch/arm64/mm/fault.c generates signals, affecting do_sea() that will
+> cause conflicts with patch 5.
 
-cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+All but the last patch applied cleanly on v4.16-rc2 for me.
 
-If you see:
-   
-1e27000.clock-controller: emac  off-0
+Other than the comments I've already sent the patches look good to me.
 
-then genpd is not working like it is supposed to. You should see something
-like this for device that are working:
-           
-1e27000.clock-controller: uart2  on
-     /devices/platform/soc at 1c00000/1d0d000.serial        active
+FWIW,
 
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 
-> 
-> Once I set the emac clock to always enabled (a workaround that was
-> necessary with v6, but could be dropped with my first
-> genpd-in-a-separate-driver attempt), I'm getting a rather strange NULL
-> pointer dereference:
+Thanks,
+Punit
 
-I noticed this too when adding the power-domains property to some device
-tree nodes. This is part of the reason why I didn't add it everywhere.
-I wasn't able to figure out the cause of this yet. As a work around
-though, please try removing the power-domains property from the emac
-and mdio nodes and use your previous workaround of having an always
-enabled clock.
-
-> 
-> Backtrace:
-> [<c049d464>] (strlen) from [<c01f32a8>] (start_creating+0x58/0xc0)
-> [<c01f3250>] (start_creating) from [<c01f34c8>] (debugfs_create_dir+0x14/0xd8)
->   r7:c04dadbc r6:c0567480 r5:c0656274 r4:c68a9300
-> [<c01f34b4>] (debugfs_create_dir) from [<c0296838>]
-> (clk_debug_create_one+0x28/0x1d0)
->   r5:c0656274 r4:c68a9300
-> [<c0296810>] (clk_debug_create_one) from [<c05cdf84>]
-> (clk_debug_init+0x100/0x15c)
->   r5:c0656274 r4:c68a9300
-> [<c05cde84>] (clk_debug_init) from [<c000a54c>] (do_one_initcall+0x50/0x19c)
->   r7:c05e3834 r6:ffffe000 r5:c05f7008 r4:c05cde84
-> [<c000a4fc>] (do_one_initcall) from [<c05b6eb4>]
-> (kernel_init_freeable+0x110/0x1cc)
->   r9:c05b4584 r8:c05b6614 r7:c05e3834 r6:c063cc80 r5:00000073 r4:c05f2354
-> [<c05b6da4>] (kernel_init_freeable) from [<c04a2ce4>] (kernel_init+0x10/0xfc)
->   r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c04a2cd4
->   r4:00000000
-> [<c04a2cd4>] (kernel_init) from [<c00090e0>] (ret_from_fork+0x14/0x34)
-> 
-> It turns out that the emac clock is correctly registered in
-> __davinci_psc_register_clocks() and a corresponding clk_core structure
-> is added to the list and core->name is correctly assigned, but then
-> later when clk_debug_init() is called, the name in emac clk_core is
-> NULL. This is the direct reason for the panic. Interestingly other
-> members of clk_core seem to be fine.
-> 
-> I'll continue on debugging it. Let me know if you have any ideas.
-> 
-> Best regards,
-> Bartosz Golaszewski
-> 
+>
+>
+> Thanks,
+>
+> James
+>
+> [0] http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
+>
+> James Morse (11):
+>   ACPI / APEI: Move the estatus queue code up, and under its own ifdef
+>   ACPI / APEI: Generalise the estatus queue's add/remove and notify code
+>   ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
+>   KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
+>   arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
+>   ACPI / APEI: Make the fixmap_idx per-ghes to allow multiple in_nmi()
+>     users
+>   ACPI / APEI: Split fixmap pages for arm64 NMI-like notifications
+>   firmware: arm_sdei: Add ACPI GHES registration helper
+>   ACPI / APEI: Add support for the SDEI GHES Notification type
+>   mm/memory-failure: increase queued recovery work's priority
+>   arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
+>
+>  arch/arm/include/asm/kvm_ras.h       |  14 +
+>  arch/arm/include/asm/system_misc.h   |   5 -
+>  arch/arm64/include/asm/acpi.h        |   3 +
+>  arch/arm64/include/asm/daifflags.h   |   1 +
+>  arch/arm64/include/asm/fixmap.h      |   8 +-
+>  arch/arm64/include/asm/kvm_ras.h     |  29 ++
+>  arch/arm64/include/asm/system_misc.h |   2 -
+>  arch/arm64/kernel/acpi.c             |  49 ++++
+>  arch/arm64/mm/fault.c                |  30 +-
+>  drivers/acpi/apei/ghes.c             | 533 ++++++++++++++++++++---------------
+>  drivers/firmware/arm_sdei.c          |  75 +++++
+>  include/acpi/ghes.h                  |   5 +
+>  include/linux/arm_sdei.h             |   8 +
+>  mm/memory-failure.c                  |  11 +-
+>  virt/kvm/arm/mmu.c                   |   4 +-
+>  15 files changed, 517 insertions(+), 260 deletions(-)
+>  create mode 100644 arch/arm/include/asm/kvm_ras.h
+>  create mode 100644 arch/arm64/include/asm/kvm_ras.h
