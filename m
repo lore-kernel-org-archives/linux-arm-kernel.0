@@ -1,81 +1,37 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Tue, 20 Feb 2018 15:02:41 +0200
-Subject: [PATCH v2] usb: host: ehci-platform: add support for optional
- external vbus supply
-In-Reply-To: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
-References: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <87h8qbq0em.fsf@linux.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Feb 2018 13:11:08 +0000
+Subject: [PATCH] drm/rockchip: Set IRQ_NOAUTOEN flag before requesting the
+ interrupt
+In-Reply-To: <20180210142020.30212-1-marc.zyngier@arm.com>
+References: <20180210142020.30212-1-marc.zyngier@arm.com>
+Message-ID: <249356f0-34a8-4fba-6102-dfe9e658ed6d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/02/18 14:20, Marc Zyngier wrote:
+> Calling request_irq() followed by disable_irq() is usually a bad idea,
+> specially if the interrupt can be pending, and you're not yet in a
+> position to handle it.
+> 
+> This is exactly what happens on my kevin system when rebooting in a
+> second kernel using kexec: Some interrupt is left pending from
+> the previous kernel, and we take it too early, before disable_irq()
+> could do anything.
+> 
+> A better way of ensuring safety is to set the IRQ_NOAUTOEN flag
+> on the irq before requesting it.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Hi,
+For the record, I've posted a (much) improved version of this as part of
+a series here[1].
 
-Amelie Delaunay <amelie.delaunay@st.com> writes:
-> On some boards, especially when vbus supply requires large current,
-> and the charge pump on the PHY isn't enough, an external vbus power switch
-> may be used.
-> Add support for this optional external vbus supply in ehci-platform.
->
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->
-> ---
-> Changes in v2:
->  * Address Roger Quadros comments: move regulator_enable/disable from
-> ehci_platform_power_on/off to ehci_platform_port_power.
-> ---
->  Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
->  drivers/usb/host/ehci-platform.c                   | 31 ++++++++++++++++++++++
->  2 files changed, 32 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index 3efde12..fc480cd 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -19,6 +19,7 @@ Optional properties:
->   - phys : phandle + phy specifier pair
->   - phy-names : "usb"
->   - resets : phandle + reset specifier pair
-> + - vbus-supply : phandle of regulator supplying vbus
->  
->  Example (Sequoia 440EPx):
->      ehci at e0000300 {
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index b065a96..05be100 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -29,6 +29,7 @@
->  #include <linux/of.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/reset.h>
->  #include <linux/usb.h>
->  #include <linux/usb/hcd.h>
-> @@ -46,6 +47,7 @@ struct ehci_platform_priv {
->  	struct reset_control *rsts;
->  	struct phy **phys;
->  	int num_phys;
-> +	struct regulator *vbus_supply;
->  	bool reset_on_resume;
->  };
->  
-> @@ -76,6 +78,25 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->  	return 0;
->  }
->  
-> +static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
-> +				    bool enable)
-> +{
-> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
-> +	int ret = 0;
-> +
-> +	if (priv->vbus_supply) {
+Thanks,
 
-you can reduce indentation here:
+	M.
 
-	if (!priv->vbus_supply)
-        	return 0;
-
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/560703.html
 -- 
-balbi
+Jazz is not dead. It just smells funny...
