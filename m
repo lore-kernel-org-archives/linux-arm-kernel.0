@@ -1,36 +1,37 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 21 Feb 2018 00:15:47 +0800
-Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
-Message-ID: <201802210046.59uEBAs8%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Feb 2018 17:24:50 +0100
+Subject: [PATCH 1/3] ARM: clps711x: mark clps711x_compat as const
+Message-ID: <20180220162519.1498223-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   c5c41ef842979735d1f655a307b6c72ab8ebb42b
-commit: c5c41ef842979735d1f655a307b6c72ab8ebb42b [1/1] uglyhack printascii
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout c5c41ef842979735d1f655a307b6c72ab8ebb42b
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+The array of string pointers is put in __initconst, and the strings themselves
+are marke 'const' but the the pointers are not, which caused a warning when
+built with LTO:
 
-All errors (new ones prefixed by >>):
+arch/arm/mach-clps711x/board-dt.c:72:20: error: 'clps711x_compat' causes a section type conflict with 'feroceon_ids'
+ static const char *clps711x_compat[] __initconst = {
 
-   init/main.o: In function `start_kernel':
->> main.c:(.init.text+0x594): undefined reference to `printascii'
-   kernel/printk/printk.o: In function `vprintk_emit':
->> printk.c:(.text+0x2038): undefined reference to `printascii'
+This marks the array itself const as well, which was certainly the
+intention originally.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23600 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/a231e66d/attachment-0001.gz>
+ arch/arm/mach-clps711x/board-dt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-clps711x/board-dt.c b/arch/arm/mach-clps711x/board-dt.c
+index ee1f83b1a332..4c89a8e9a2e3 100644
+--- a/arch/arm/mach-clps711x/board-dt.c
++++ b/arch/arm/mach-clps711x/board-dt.c
+@@ -69,7 +69,7 @@ static void clps711x_restart(enum reboot_mode mode, const char *cmd)
+ 	soft_restart(0);
+ }
+ 
+-static const char *clps711x_compat[] __initconst = {
++static const char *const clps711x_compat[] __initconst = {
+ 	"cirrus,ep7209",
+ 	NULL
+ };
+-- 
+2.9.0
