@@ -1,96 +1,61 @@
 From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Tue, 20 Feb 2018 18:00:45 +0100
-Subject: [PATCH 4/8] ARM: dts: artpec: migrate ethernet to stmmac binding
+Date: Tue, 20 Feb 2018 18:00:48 +0100
+Subject: [PATCH 7/8] ARM: dts: artpec: add disabled node for PCIe endpoint mode
 In-Reply-To: <20180220170049.22809-1-niklas.cassel@axis.com>
 References: <20180220170049.22809-1-niklas.cassel@axis.com>
-Message-ID: <20180220170049.22809-5-niklas.cassel@axis.com>
+Message-ID: <20180220170049.22809-8-niklas.cassel@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The snps,dwc-qos-ethernet binding is still supported as a glue layer
-in the stmmac driver.
-However, since the snps,dwc-qos-ethernet binding is now deprecated,
-migrate to stmmac's native binding.
+The PCIe controller in the artpec6 SoC supports both root complex and
+endpoint mode, however, the controller can only be used in one of the
+modes.
 
-At the same time, enable features supported by the stmmac driver,
-such as PTP, LPI, and an additional tx queue.
+Both pci nodes are disabled by default. A DTS file can enable one of
+them, depending on what mode it wants to run.
 
 Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
 ---
- arch/arm/boot/dts/artpec6-devboard.dts |  1 +
- arch/arm/boot/dts/artpec6.dtsi         | 42 ++++++++++++++++++++++++++++------
- 2 files changed, 36 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/artpec6.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/artpec6-devboard.dts b/arch/arm/boot/dts/artpec6-devboard.dts
-index 502f3de6dc5b..d20d95359b28 100644
---- a/arch/arm/boot/dts/artpec6-devboard.dts
-+++ b/arch/arm/boot/dts/artpec6-devboard.dts
-@@ -59,6 +59,7 @@
- 	mdio {
- 		#address-cells = <0x1>;
- 		#size-cells = <0x0>;
-+		compatible = "snps,dwmac-mdio";
- 		phy1: phy at 0 {
- 			compatible = "ethernet-phy-ieee802.3-c22";
- 			device_type = "ethernet-phy";
 diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index f4b39738f1ac..981aecd27b0b 100644
+index 1c46df0c03ce..8d02d210574a 100644
 --- a/arch/arm/boot/dts/artpec6.dtsi
 +++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -188,19 +188,47 @@
- 		dma-ranges;
+@@ -154,6 +154,10 @@
+ 		interrupt-affinity = <&cpu0>, <&cpu1>;
+ 	};
  
- 		ethernet: ethernet at f8010000 {
--			clock-names = "phy_ref_clk", "apb_pclk";
--			clocks = <&eth_phy_ref_clk>,
--				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
--			compatible = "snps,dwc-qos-ethernet-4.10";
--			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "stmmaceth", "ptp_ref";
-+			clocks = <&clkctrl ARTPEC6_CLK_ETH_ACLK>,
-+				<&clkctrl ARTPEC6_CLK_PTP_REF>;
-+			compatible = "snps,dwmac-4.10a", "snps,dwmac";
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq", "eth_lpi";
- 			reg = <0xf8010000 0x4000>;
++	/*
++	 * Both pci nodes cannot be enabled at the same time,
++	 * leave the unwanted node as disabled.
++	 */
+ 	pcie: pcie at f8050000 {
+ 		compatible = "axis,artpec6-pcie", "snps,dw-pcie";
+ 		reg = <0xf8050000 0x2000
+@@ -181,6 +185,22 @@
+ 		status = "disabled";
+ 	};
  
--			snps,write-requests = <2>;
--			snps,read-requests = <16>;
-+			snps,axi-config = <&stmmac_axi_setup>;
-+			snps,mtl-rx-config = <&mtl_rx_setup>;
-+			snps,mtl-tx-config = <&mtl_tx_setup>;
++	pcie_ep: pcie_ep@f8050000 {
++		compatible = "axis,artpec6-pcie-ep", "snps,dw-pcie";
++		reg = <0xf8050000 0x2000
++		       0xf8051000 0x2000
++		       0xf8040000 0x1000
++		       0xc0000000 0x20000000>;
++		reg-names = "dbi", "dbi2", "phy", "addr_space";
++		num-ib-windows = <6>;
++		num-ob-windows = <2>;
++		num-lanes = <2>;
++		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "msi";
++		axis,syscon-pcie = <&syscon>;
++		status = "disabled";
++	};
 +
- 			snps,txpbl = <8>;
- 			snps,rxpbl = <2>;
-+			snps,aal;
-+			snps,tso;
- 
- 			status = "disabled";
-+
-+			stmmac_axi_setup: stmmac-axi-config {
-+				snps,wr_osr_lmt = <1>;
-+				snps,rd_osr_lmt = <15>;
-+				/* If FB is disabled, the AXI master chooses
-+				 * a burst length of any value less than the
-+				 * maximum enabled burst length
-+				 * (all lesser burst length enables are redundant).
-+				 */
-+				snps,blen = <0 0 0 0 16 0 0>;
-+			};
-+
-+			mtl_rx_setup: rx-queues-config {
-+				snps,rx-queues-to-use = <1>;
-+				queue0 {};
-+			};
-+
-+			mtl_tx_setup: tx-queues-config {
-+				snps,tx-queues-to-use = <2>;
-+				queue0 {};
-+				queue1 {};
-+			};
- 		};
- 
- 		uart0: serial at f8036000 {
+ 	pinctrl: pinctrl at f801d000 {
+ 		compatible = "axis,artpec6-pinctrl";
+ 		reg = <0xf801d000 0x400>;
 -- 
 2.14.2
