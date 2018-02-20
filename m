@@ -1,19 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 16:46:23 +0100
-Subject: [PATCH v2 09/19] ARM64: dts: Add R-Car Salvator-x M3-N support
-In-Reply-To: <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
+Date: Tue, 20 Feb 2018 16:46:49 +0100
+Subject: [PATCH v2 12/19] dt-bindings: serial: sh-sci: Add support for
+ r8a77965 (H)SCIF
+In-Reply-To: <1519139541-18783-13-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
+ <1519139541-18783-13-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVEEcG6HcnnS0W6gTW57aD-y5Gg5ojvEr6TDvUp_irUPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
->
-> Based on original work from:
-> Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Magnus Damm <damm+renesas@opensource.se>
+> Add documentation for r8a77965 compatible string to Renesas sci-serial
+> device tree bindings documentation.
 >
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
