@@ -1,20 +1,54 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 19 Feb 2018 23:15:23 -0500 (EST)
-Subject: [PATCH net 2/4] net/8390: Fix msg_enable patch snafu
-In-Reply-To: <alpine.LNX.2.21.1802201108100.8@nippy.intranet>
-References: <alpine.LNX.2.21.1802200844340.8@nippy.intranet>
- <20180219.184343.1801583131809551924.davem@davemloft.net>
- <alpine.LNX.2.21.1802201108100.8@nippy.intranet>
-Message-ID: <20180219.231523.2226814242777657736.davem@davemloft.net>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Tue, 20 Feb 2018 08:25:16 +0100
+Subject: [PATCH 2/4] ARM: OMAP2+: Introduce low-level suspend code for
+ AM43XX
+In-Reply-To: <20180216214002.6209-3-d-gerlach@ti.com>
+References: <20180216214002.6209-1-d-gerlach@ti.com>
+ <20180216214002.6209-3-d-gerlach@ti.com>
+Message-ID: <CAOFm3uGUN387rU6xVZf+qndM_s9j=PT+4uuS3JQ=cdSOGm46GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finn Thain <fthain@telegraphics.com.au>
-Date: Tue, 20 Feb 2018 11:42:26 +1100 (AEDT)
+Dave,
 
-> If there was an unused variables I would happily remove that too but the 
-> 'version' string is not unused. The etherh.c and mac8390.c files both 
-> include "lib8390.c" and in there you'll find the 'version' string used in 
-> ethdev_setup().
+On Fri, Feb 16, 2018 at 10:40 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> Although similar to AM33XX, introduce a new low-level asm file for
+> suspend containing new context save and restore paths for EMIF and l2
+> cache disabling and enabling.
+>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/sleep43xx.S | 393 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 393 insertions(+)
+>  create mode 100644 arch/arm/mach-omap2/sleep43xx.S
+>
+> diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
+> new file mode 100644
+> index 000000000000..3a8bfd62a33c
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/sleep43xx.S
+> @@ -0,0 +1,393 @@
+> +/*
+> + * Low level suspend code for AM43XX SoCs
+> + *
+> + * Copyright (C) 2013-2018 Texas Instruments Incorporated - http://www.ti.com/
+> + *     Dave Gerlach, Vaibhav Bedia
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 
-My bad, thanks for being so patient with me :)
+Do you mind using SPDX tags per [1] rather that this fine but long
+legalese here and in the whole patch set? Unless you are a legalese
+lover of course!
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+-- 
+Cordially
+Philippe Ombredanne
