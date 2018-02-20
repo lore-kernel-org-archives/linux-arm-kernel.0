@@ -1,46 +1,36 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 20 Feb 2018 08:45:10 -0800
-Subject: [PATCH] ARM: make CONFIG_DEBUG_WX depend on MMU
-In-Reply-To: <20180220150932.3285766-1-arnd@arndb.de>
-References: <20180220150932.3285766-1-arnd@arndb.de>
-Message-ID: <bea07eb7-1763-147c-9da5-e70d2fcf876b@redhat.com>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Tue, 20 Feb 2018 18:00:42 +0100
+Subject: [PATCH 1/8] ARM: dts: artpec: disable Accelerator Coherency Port
+In-Reply-To: <20180220170049.22809-1-niklas.cassel@axis.com>
+References: <20180220170049.22809-1-niklas.cassel@axis.com>
+Message-ID: <20180220170049.22809-2-niklas.cassel@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2018 07:09 AM, Arnd Bergmann wrote:
-> Without CONFIG_MMU, this results in a build failure:
-> 
-> ./arch/arm/include/asm/memory.h:92:23: error: initializer element is not constant
->   #define VECTORS_BASE  vectors_base
-> arch/arm/mm/dump.c:32:4: note: in expansion of macro 'VECTORS_BASE'
->    { VECTORS_BASE, "Vectors" },
-> 
-> arch/arm/mm/dump.c:71:11: error: 'L_PTE_USER' undeclared here (not in a function); did you mean 'VTIME_USER'?
->     .mask = L_PTE_USER,
->             ^~~~~~~~~~
-> 
-> Obviously the feature only makes sense with an MMU, so let's add the
-> dependency here.
-> 
+Accesses via 0x80000000 go through the ACP instead of using the DDR
+directly.
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+Unfortunately the ACP has proven to be the cause of complete system
+hangs. Disabling the ACP makes these problems go away.
 
-> Fixes: a8e53c151fe7 ("ARM: 8737/1: mm: dump: add checking for writable and executable")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   arch/arm/Kconfig.debug | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 7b3d9c5c73bb..6db106b5b9e9 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -22,6 +22,7 @@ config ARM_PTDUMP_DEBUGFS
->   
->   config DEBUG_WX
->   	bool "Warn on W+X mappings at boot"
-> +	depends on MMU
->   	select ARM_PTDUMP_CORE
->   	---help---
->   		Generate a warning if any W+X mappings are found at boot.
-> 
+Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
+---
+ arch/arm/boot/dts/artpec6.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index 2ed11773048d..d9776a97d8ff 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -185,8 +185,7 @@
+ 		#address-cells = <0x1>;
+ 		#size-cells = <0x1>;
+ 		ranges;
+-		dma-ranges = <0x80000000 0x00000000 0x40000000>;
+-		dma-coherent;
++		dma-ranges;
+ 
+ 		ethernet: ethernet at f8010000 {
+ 			clock-names = "phy_ref_clk", "apb_pclk";
+-- 
+2.14.2
