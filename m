@@ -1,36 +1,41 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 19 Feb 2018 18:06:59 -0600
-Subject: syscon regmap for disabled node?
-In-Reply-To: <CAK8P3a25wQiCreFB3qBuyE86GvwmjpZmqyTszF-ZBJRDPwHotQ@mail.gmail.com>
-References: <e9863f03-f1b5-9158-76f3-37158a0b4cd4@ti.com>
- <CAK8P3a25wQiCreFB3qBuyE86GvwmjpZmqyTszF-ZBJRDPwHotQ@mail.gmail.com>
-Message-ID: <112b03a1-8f2d-dddf-529c-e70561722722@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 20 Feb 2018 08:22:26 +0800
+Subject: [PATCH 2/8] media: s5p-jpeg: Use bulk clk API
+In-Reply-To: <1519055046-2399-3-git-send-email-m.purski@samsung.com>
+References: <1519055046-2399-3-git-send-email-m.purski@samsung.com>
+Message-ID: <201802200822.9KP7Ld7V%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2018 01:51 PM, Arnd Bergmann wrote:
-> On Sat, Feb 17, 2018 at 2:40 AM, Suman Anna <s-anna@ti.com> wrote:
->> Hi Pankaj, Arnd, Lee,
->>
->> I am testing some code to use a syscon/regmap interface and I find that
->> the syscon/regmap is initialized even on a disabled device node using a
->> "syscon" compatible property when I have expected it to fail. Prior to
->> commit bdb0066df96e ("mfd: syscon: Decouple syscon interface from
->> platform devices"), the driver would have never probed, and the
->> of_syscon_register() only checks for the compatible, but not if the
->> device node is available. Is this intentional or a bug?
-> 
-> My guess would be that nothing relies on the current behavior and that
-> it could be changed if it causes problems, but it's hard to tell for the general
-> case.
-> 
-> Can you describe why you have a disabled syscon node? Most uses of the
-> status property are for on-chip devices that we disable because nothing is
-> connected to them, but that seems unlikely for a syscon.
+Hi Maciej,
 
-I am just testing the failure paths in my code by specifically disabling
-the syscon node, and to my surprise, the code went through fine when I
-had expected the syscon_node_to_regmap() call to fail.
+Thank you for the patch! Yet something to improve:
 
-regards
-Suman
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.16-rc2 next-20180219]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Maciej-Purski/Use-clk-bulk-API-in-exynos5433-drivers/20180220-054431
+base:   git://linuxtv.org/media_tree.git master
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: "devm_clk_bulk_alloc" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 42953 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180220/47159b04/attachment-0001.gz>
