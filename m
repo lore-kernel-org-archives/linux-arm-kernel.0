@@ -1,24 +1,23 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 11:51:49 +0100
-Subject: [PATCH 4/9] serial: mxs-auart: Fix out-of-bounds access through
- DT alias
-In-Reply-To: <1519119624-1268-5-git-send-email-geert+renesas@glider.be>
+Date: Tue, 20 Feb 2018 11:52:14 +0100
+Subject: [PATCH 5/9] serial: pxa: Fix out-of-bounds access through DT alias
+In-Reply-To: <1519119624-1268-6-git-send-email-geert+renesas@glider.be>
 References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
- <1519119624-1268-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdW8LHTd4q9q_pL97W1vtM68x+Fep8QjCx_O2sNre1CNng@mail.gmail.com>
+ <1519119624-1268-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdX-9+7WRDP848Y6xwqF-iNGm6A32gKgTPFdsLY=5K2q9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 10:40 AM, Geert Uytterhoeven
 <geert+renesas@glider.be> wrote:
-> The auart_port[] array is indexed using a value derived from the
+> The serial_pxa_ports[] array is indexed using a value derived from the
 > "serialN" alias in DT, which may lead to an out-of-bounds access.
 >
 > Fix this by adding a range check.
 >
-> Fixes: cabf23e7aa00b145 ("serial: mxs-auart: Fix out-of-bounds access through DT alias")
+> Fixes: c8dcdc77298dde67 ("serial: pxa: Fix out-of-bounds access through DT alias")
 
-Fixes: 1ea6607d4cdc9179 ("serial: mxs-auart: Allow device tree probing")
+Fixes: 699c20f3e6310aa2 ("serial: pxa: add OF support")
 
 Gr{oetje,eeting}s,
 
