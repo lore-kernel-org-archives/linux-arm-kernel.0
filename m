@@ -1,69 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 17:24:52 +0100
-Subject: [PATCH 3/3] ARM: davinci: mark spi_board_info arrays as const
-In-Reply-To: <20180220162519.1498223-1-arnd@arndb.de>
-References: <20180220162519.1498223-1-arnd@arndb.de>
-Message-ID: <20180220162519.1498223-3-arnd@arndb.de>
+From: igor.stoppa@huawei.com (Igor Stoppa)
+Date: Tue, 20 Feb 2018 18:28:17 +0200
+Subject: arm64 physmap (was Re: [kernel-hardening] [PATCH 4/6] Protectable
+ Memory)
+In-Reply-To: <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
+References: <20180124175631.22925-1-igor.stoppa@huawei.com>
+ <20180126053542.GA30189@bombadil.infradead.org>
+ <alpine.DEB.2.20.1802021236510.31548@nuc-kabylake>
+ <f2ddaed0-313e-8664-8a26-9d10b66ed0c5@huawei.com>
+ <b75b5903-0177-8ad9-5c2b-fc63438fb5f2@huawei.com>
+ <CAFUG7CfrCpcbwgf5ixMC5EZZgiVVVp1NXhDHK1UoJJcC08R2qQ@mail.gmail.com>
+ <8818bfd4-dd9f-f279-0432-69b59531bd41@huawei.com>
+ <CAFUG7CeUhFcvA82uZ2ZH1j_6PM=aBo4XmYDN85pf8G0gPU44dg@mail.gmail.com>
+ <17e5b515-84c8-dca2-1695-cdf819834ea2@huawei.com>
+ <CAGXu5j+LS1pgOOroi7Yxp2nh=DwtTnU3p-NZa6bQu_wkvvVkwg@mail.gmail.com>
+ <414027d3-dd73-cf11-dc2a-e8c124591646@redhat.com>
+ <CAGXu5j++igQD4tMh0J8nZ9jNji5mU16C7OygFJ5Td+Bq-KSMgw@mail.gmail.com>
+ <CAG48ez1utN_vwHUwk=BU6zM4Wa_53TPu8rm9JuTtY-vGP0Shqw@mail.gmail.com>
+ <f4226a44-92fd-8ead-b458-7551ba82f96d@redhat.com>
+ <CAGXu5j+zOCLerneUt2b-tvyLLg7fEbr9B0YYow-4DH6oV-nnCw@mail.gmail.com>
+ <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
+ <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
+Message-ID: <b67209f5-4aa7-ffc0-99e6-3ab05e281ce5@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building with LTO revealed that three spi_board_info arrays are marked
-__initconst, but not const:
 
-arch/arm/mach-davinci/board-dm365-evm.c: In function 'dm365_evm_init':
-arch/arm/mach-davinci/board-dm365-evm.c:729:30: error: 'dm365_evm_spi_info' causes a section type conflict with 'dm646x_edma_device'
- static struct spi_board_info dm365_evm_spi_info[] __initconst = {
-                              ^
-arch/arm/mach-davinci/dm646x.c:603:42: note: 'dm646x_edma_device' was declared here
- static const struct platform_device_info dm646x_edma_device __initconst = {
 
-This marks them const as well, as was originally intended.
+On 14/02/18 21:29, Kees Cook wrote:
+> On Wed, Feb 14, 2018 at 11:06 AM, Laura Abbott <labbott@redhat.com> wrote:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-davinci/board-dm355-evm.c     | 2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c | 2 +-
- arch/arm/mach-davinci/board-dm365-evm.c     | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index e457f299cd44..d6b11907380c 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -368,7 +368,7 @@ static struct spi_eeprom at25640a = {
- 	.flags		= EE_ADDR2,
- };
- 
--static struct spi_board_info dm355_evm_spi_info[] __initconst = {
-+static const struct spi_board_info dm355_evm_spi_info[] __initconst = {
- 	{
- 		.modalias	= "at25",
- 		.platform_data	= &at25640a,
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index be997243447b..fad9a5611a5d 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -217,7 +217,7 @@ static struct spi_eeprom at25640a = {
- 	.flags		= EE_ADDR2,
- };
- 
--static struct spi_board_info dm355_leopard_spi_info[] __initconst = {
-+static const struct spi_board_info dm355_leopard_spi_info[] __initconst = {
- 	{
- 		.modalias	= "at25",
- 		.platform_data	= &at25640a,
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index e75741fb2c1d..e3780986d2a3 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -726,7 +726,7 @@ static struct spi_eeprom at25640 = {
- 	.flags		= EE_ADDR2,
- };
- 
--static struct spi_board_info dm365_evm_spi_info[] __initconst = {
-+static const struct spi_board_info dm365_evm_spi_info[] __initconst = {
- 	{
- 		.modalias	= "at25",
- 		.platform_data	= &at25640,
--- 
-2.9.0
+>> Kernel code should be fine, if it isn't that is a bug that should be
+>> fixed. Modules yes are not fully protected. The conclusion from past
+> 
+> I think that's a pretty serious problem: we can't have aliases with
+> mismatched permissions; this degrades a deterministic protection
+> (read-only) to a probabilistic protection (knowing where the alias of
+> a target is mapped). Having an attack be "needs some info leaks"
+> instead of "need execution control to change perms" is a much lower
+> bar, IMO.
+
+Why "need execution control to change permission"?
+Or, iow, what does it mean exactly?
+ROP/JOP? Data-oriented control flow hijack?
+
+Unless I misunderstand the meaning of "need execution control", I think
+that "need write capability to arbitrary data address" should be
+sufficient, albeit uncomfortable to use.
+
+OTOH, "need read/write capability from/to arbitrary data address" would
+be enough, I think, assuming that one knows the offset where to write to
+- but that information could be inferred, for example, by scanning the
+memory for known patterns.
+
+IMHO the attack surface is so vast that it's not unreasonable to expect
+that it will be possible to fish out means to perform arbitrary R/W into
+kernel address space. Ex: some more recent/less tested driver.
+
+One can argue that this sort of R/W activity probably does require some
+form of execution control, but AFAIK, the only way to to prevent it, is
+to have CFI - btw, is there any standardization in that sense?
+
+So, from my (pessimistic?) perspective, the best that can be hoped for,
+is to make it much harder to figure out where the data is located.
+
+Virtual mapping has this side effect, compared to linear mapping.
+
+But, once easier attack targets are removed, I suspect the page mapping
+will become the next target.
+
+--
+igor
