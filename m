@@ -1,121 +1,88 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 13:51:28 +0100
-Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 20 Feb 2018 14:56:33 +0200
+Subject: [PATCH v2] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
+ bits_per_mux != 0
+In-Reply-To: <1519077427-30165-1-git-send-email-david@lechnology.com>
+References: <1519077427-30165-1-git-send-email-david@lechnology.com>
+Message-ID: <CAHp75VeR2LG-qAzQs2048K3pyfRkz7OKioHDNyU8bVAPsgy8ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 6:44 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> this series has been around for some time as RFC, and it has collected
-> useful comments from the community along the way.
-> The solution proposed by this patch set works for most R-Car Gen2 and
-> RZ/G1 devices, but not all of them. We now know that for some R-Car
-> Gen2 early revisions there is no proper software fix. Anyway, no
-> product has been built around early revisions, but development boards
-> mounting early revisions (basically prototypes) are still out there.
-> As a result, this series isn't enabling the internal watchdog on R-Car
-> Gen2 boards, developers may enable it in board specific device trees
-> if needed.
-> This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
-> and Koelsch boards.
+On Mon, Feb 19, 2018 at 11:57 PM, David Lechner <david@lechnology.com> wrote:
+> This fixes pcs_request_gpio() in the pinctrl-single driver when
+> bits_per_mux != 0. It appears this was overlooked when the multiple
+> pins per register feature was added.
 >
-> The problem
-> ===========
-> To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
-> to ICRAM1 and we program the [S]BAR registers so that when we turn ON
-> the non-boot CPUs they are redirected to the reset vector installed by
-> Linux in ICRAM1, and eventually they continue the execution to RAM,
-> where the SMP bring-up code will take care of the rest.
-> The content of the [S]BAR registers survives a watchdog triggered reset,
-> and as such after the watchdog fires the boot core will try and execute
-> the SMP bring-up code instead of jumping to the bootrom code.
+> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
 >
-> The fix
-> =======
-> The main strategy for the solution is to let the reset vector decide
-> if it needs to jump to shmobile_boot_fn or to the bootrom code.
-> In a watchdog triggered reset scenario, since the [S]BAR registers keep
-> their values, the boot CPU will jump into the newly designed reset
-> vector, the assembly routine will eventually test WOVF (a bit in register
-> RWTCSRA that indicates if the watchdog counter has overflown, the value
-> of this bit gets retained in this scenario), and jump to the bootrom code
-> which will in turn load up the bootloader, etc.
-> When bringing up SMP or using CPU hotplug, the reset vector will jump
-> to shmobile_boot_fn instead.
+> v2 changes:
+> - don't wrap Fixes: line in commit message since it is a special machine-
+>   readable line.
 >
-> Thank you All for your help.
+> There was some discussion in v1 about using DIV_ROUND_UP(), etc. macros, but
+> the consensus was to leave it as-is since it matches existing code and that
+> macros can be introduced in another patch.
 >
-> Best regards,
+>  drivers/pinctrl/pinctrl-single.c | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
 >
-> Fabrizio Castro (26):
->   ARM: shmobile: Add watchdog support
->   ARM: dts: r8a7743: Adjust SMP routine size
->   ARM: dts: r8a7745: Adjust SMP routine size
->   ARM: dts: r8a7790: Adjust SMP routine size
->   ARM: dts: r8a7791: Adjust SMP routine size
->   ARM: dts: r8a7792: Adjust SMP routine size
->   ARM: dts: r8a7793: Adjust SMP routine size
->   ARM: dts: r8a7794: Adjust SMP routine size
->   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
->   ARM: shmobile: rcar-gen2: Add watchdog support
->   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
->   watchdog: renesas_wdt: Add R-Car Gen2 support
->   watchdog: renesas_wdt: Add restart handler
->   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
->   clk: renesas: r8a7743: Add rwdt clock
->   clk: renesas: r8a7745: Add rwdt clock
->   clk: renesas: r8a7790: Add rwdt clock
->   clk: renesas: r8a7791/r8a7793: Add rwdt clock
->   clk: renesas: r8a7794: Add rwdt clock
->   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
->   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
->   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
->
->  .../devicetree/bindings/watchdog/renesas-wdt.txt   | 19 ++++++--
->  arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  5 ++
->  arch/arm/boot/dts/r8a7743.dtsi                     | 12 ++++-
->  arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |  5 ++
->  arch/arm/boot/dts/r8a7745.dtsi                     | 12 ++++-
->  arch/arm/boot/dts/r8a7790.dtsi                     | 12 ++++-
->  arch/arm/boot/dts/r8a7791.dtsi                     | 12 ++++-
->  arch/arm/boot/dts/r8a7792.dtsi                     |  2 +-
->  arch/arm/boot/dts/r8a7793.dtsi                     |  2 +-
->  arch/arm/boot/dts/r8a7794.dtsi                     | 12 ++++-
->  arch/arm/configs/shmobile_defconfig                |  1 +
->  arch/arm/mach-shmobile/common.h                    |  6 +++
->  arch/arm/mach-shmobile/headsmp.S                   | 55 ++++++++++++++++++++++
->  arch/arm/mach-shmobile/platsmp-apmu.c              |  1 +
->  arch/arm/mach-shmobile/pm-rcar-gen2.c              | 15 ++++--
->  drivers/clk/renesas/r8a7743-cpg-mssr.c             |  2 +
->  drivers/clk/renesas/r8a7745-cpg-mssr.c             |  2 +
->  drivers/clk/renesas/r8a7790-cpg-mssr.c             |  2 +
->  drivers/clk/renesas/r8a7791-cpg-mssr.c             |  2 +
->  drivers/clk/renesas/r8a7794-cpg-mssr.c             |  2 +
->  drivers/soc/renesas/rcar-rst.c                     | 35 +++++++++++---
->  drivers/watchdog/renesas_wdt.c                     | 39 +++++++++++++--
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index cec7537..a7c5eb3 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -391,9 +391,25 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
+>                         || pin < frange->offset)
+>                         continue;
 
-Thanks, I've queued the clock patches in clk-renesas-for-v4.17, as they are
-a hard dependency for:
-  (1) The new reset vector in arch/arm/mach-shmobile/
-  (2) The watchdog driver.
+>                 mux_bytes = pcs->width / BITS_PER_BYTE;
+> -               data = pcs->read(pcs->base + pin * mux_bytes) & ~pcs->fmask;
+> -               data |= frange->gpiofunc;
+> -               pcs->write(data, pcs->base + pin * mux_bytes);
+> +
+> +               if (pcs->bits_per_mux) {
+> +                       int byte_num, offset, pin_shift;
+> +
+> +                       byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
+> +                       offset = (byte_num / mux_bytes) * mux_bytes;
+> +                       pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
+> +                                   pcs->bits_per_pin;
+> +
+> +                       data = pcs->read(pcs->base + offset);
+> +                       data &= ~(pcs->fmask << pin_shift);
+> +                       data |= frange->gpiofunc << pin_shift;
+> +                       pcs->write(data, pcs->base + offset);
+> +               } else {
 
-Note that the watchdog driver itself (2) has a hard dependency on the
-new reset vector (1).
+> +                       data = pcs->read(pcs->base + pin * mux_bytes);
+> +                       data &= ~pcs->fmask;
+> +                       data |= frange->gpiofunc;
+> +                       pcs->write(data, pcs->base + pin * mux_bytes);
 
-Gr{oetje,eeting}s,
+Just an idea, you may leave this almost untouched and do calculate
+pin_shift and offset in condition, like
 
-                        Geert
+if (...) {
+ pin_shift = ...
+ offset = ...
+} else {
+ pin_shift = 0;
+ offset = pin * mux_bytes;
+}
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+                       data = pcs->read(pcs->base + offset);
+                       data &= ~(pcs->fmask << pin_shift);
+                       data |= frange->gpiofunc << pin_shift;
+                       pcs->write(data, pcs->base + offset);
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+It's also possible to split to two changes, where first introduces
+that variables and their default values (see 'else' branch) and second
+one introduces an if branch override.
+
+> +               }
+>                 break;
+
+-- 
+With Best Regards,
+Andy Shevchenko
