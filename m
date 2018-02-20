@@ -1,59 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 22:59:49 +0100
-Subject: [PATCH 2/7] ARM: LTO: avoid THUMB2_KERNEL+LTO
-In-Reply-To: <20180220215954.4092811-1-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
-Message-ID: <20180220215954.4092811-3-arnd@arndb.de>
+Date: Tue, 20 Feb 2018 22:59:47 +0100
+Subject: [PATCH 0/7] ARM: hacks for link-time optimization
+Message-ID: <20180220215954.4092811-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trying to build an LTO-Enabled kernel with Thumb2 instructions failed
-horribly for me, with an endless output of things like
+Hi Nico, all,
 
-ccVnNycO.s:2665: Error: thumb conditional instruction should be in IT block -- `bxne lr'
-ccVnNycO.s:7128: Error: thumb conditional instruction should be in IT block -- `strexeq r5,r2,[r3]'
-ccVnNycO.s:7258: Error: thumb conditional instruction should be in IT block -- `strexeq lr,r0,[r3]'
-ccVnNycO.s:17380: Error: thumb conditional instruction should be in IT block -- `strexeq r1,r2,[r6]'
-ccVnNycO.s:19163: Error: thumb conditional instruction should be in IT block -- `strexeq r8,r6,[r3]'
-ccVnNycO.s:22722: Error: thumb conditional instruction should be in IT block -- `strexeq r7,r1,[r0]'
-ccVnNycO.s:24105: conditional infixes are deprecated in unified syntax
-ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `sbcccs r1,r1,r3'
-ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
-ccVnNycO.s:24210: conditional infixes are deprecated in unified syntax
-ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `sbcccs r2,r2,r3'
-ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
+I was playing with ARM link-time optimization handling earlier this
+month, and eventually got it to build cleanly with randconfig kernels,
+but ended up with a lot of ugly hacks to actually pull it off.
 
-I did not investigate this too much, disabling Thumb2 support when LTO is
-set lets me build randconfig kernels.
+Here are the ones that I don't think we actually want to merge,
+but it may be helpful to have these for reference for the next
+person that tries to make it work.
 
-Since ARM_SINGLE_ARMV7M is Thumb2-only, I have to disallow LTO for V7-M
-targets.
+      Arnd
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Arnd Bergmann (7):
+  ARM: disallow combining XIP and LTO
+  ARM: LTO: avoid THUMB2_KERNEL+LTO
+  [HACK] pass endianess flag to LTO linker
+  ARM: io-acorn: fix LTO linking without CONFIG_PRINTK
+  ARM: fix __inflate_kernel_data stack warning for LTO
+  ARM: mark assembler-referenced symbols as __visible
+  efi: disable LTO for EFI stub
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8ed0f664f86f..fbf2c3ab9a97 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -18,7 +18,7 @@ config ARM
- 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
- 	select ARCH_SUPPORTS_ATOMIC_RMW
--	select ARCH_SUPPORTS_LTO
-+	select ARCH_SUPPORTS_LTO if !ARM_SINGLE_ARMV7M
- 	select ARCH_USE_BUILTIN_BSWAP
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_WANT_IPC_PARSE_VERSION
-@@ -1533,6 +1533,7 @@ config SCHED_HRTICK
- config THUMB2_KERNEL
- 	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
- 	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
-+	depends on !LTO
- 	default y if CPU_THUMBONLY
- 	select ARM_UNWIND
- 	help
+ arch/arm/Kconfig                      |  4 +++-
+ arch/arm/Makefile                     |  2 ++
+ arch/arm/kernel/Makefile              |  3 ---
+ arch/arm/kernel/head-inflate-data.c   |  3 ++-
+ arch/arm/kernel/process.c             |  2 +-
+ arch/arm/kernel/suspend.c             |  2 ++
+ arch/arm/kernel/unwind.c              |  1 +
+ arch/arm/lib/io-acorn.S               |  4 ++++
+ arch/arm/probes/kprobes/core.c        |  2 +-
+ arch/arm/probes/kprobes/test-core.c   | 11 ++++++-----
+ arch/arm/vdso/vgettimeofday.c         |  2 ++
+ drivers/bus/arm-cci.c                 |  6 +++---
+ drivers/firmware/efi/libstub/Makefile |  4 +++-
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c   |  2 +-
+ lib/clz_ctz.c                         | 20 ++++++++++----------
+ 15 files changed, 41 insertions(+), 27 deletions(-)
+
 -- 
 2.9.0
