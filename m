@@ -1,53 +1,32 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 20 Feb 2018 13:58:07 +0200
-Subject: [PATCH v4 2/7] soc/tegra: Add Tegra194 SoC configuration option
+Date: Tue, 20 Feb 2018 13:58:08 +0200
+Subject: [PATCH v4 3/7] soc/tegra: pmc: Add Tegra194 compatibility string
 In-Reply-To: <20180220115812.24108-1-mperttunen@nvidia.com>
 References: <20180220115812.24108-1-mperttunen@nvidia.com>
-Message-ID: <20180220115812.24108-3-mperttunen@nvidia.com>
+Message-ID: <20180220115812.24108-4-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the configuration option to enable support for the Tegra194
-system-on-chip, and enable it by default in the arm64 defconfig.
+The Tegra194 PMC is mostly compatible with Tegra186, including in all
+currently supported features. As such, add a new compatibility string
+but point to the existing Tegra186 SoC data for now.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- arch/arm64/configs/defconfig |  1 +
- drivers/soc/tegra/Kconfig    | 10 ++++++++++
- 2 files changed, 11 insertions(+)
+ drivers/soc/tegra/pmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 78f669a21a9b..5a8f15baa850 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -537,6 +537,7 @@ CONFIG_ROCKCHIP_PM_DOMAINS=y
- CONFIG_ARCH_TEGRA_132_SOC=y
- CONFIG_ARCH_TEGRA_210_SOC=y
- CONFIG_ARCH_TEGRA_186_SOC=y
-+CONFIG_ARCH_TEGRA_194_SOC=y
- CONFIG_EXTCON_USB_GPIO=y
- CONFIG_IIO=y
- CONFIG_EXYNOS_ADC=y
-diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
-index 89ebe22a3e27..fe4481676da6 100644
---- a/drivers/soc/tegra/Kconfig
-+++ b/drivers/soc/tegra/Kconfig
-@@ -104,6 +104,16 @@ config ARCH_TEGRA_186_SOC
- 	  multi-format support, ISP for image capture processing and BPMP for
- 	  power management.
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index ce62a47a6647..a2df230bf51a 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -1920,6 +1920,7 @@ static const struct tegra_pmc_soc tegra186_pmc_soc = {
+ };
  
-+config ARCH_TEGRA_194_SOC
-+	bool "NVIDIA Tegra194 SoC"
-+	select MAILBOX
-+	select TEGRA_BPMP
-+	select TEGRA_HSP_MBOX
-+	select TEGRA_IVC
-+	select SOC_TEGRA_PMC
-+	help
-+	  Enable support for the NVIDIA Tegra194 SoC.
-+
- endif
- endif
- 
+ static const struct of_device_id tegra_pmc_match[] = {
++	{ .compatible = "nvidia,tegra194-pmc", .data = &tegra186_pmc_soc },
+ 	{ .compatible = "nvidia,tegra186-pmc", .data = &tegra186_pmc_soc },
+ 	{ .compatible = "nvidia,tegra210-pmc", .data = &tegra210_pmc_soc },
+ 	{ .compatible = "nvidia,tegra132-pmc", .data = &tegra124_pmc_soc },
 -- 
 2.16.1
