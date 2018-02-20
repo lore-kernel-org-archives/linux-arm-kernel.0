@@ -1,103 +1,91 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 20 Feb 2018 11:33:47 +0100
-Subject: [PATCH] drm: simple_kms_helper: Add mode_valid() callback support
-In-Reply-To: <20180220095246.GF23425@ulmo>
-References: <20180220072859.3386-1-linus.walleij@linaro.org>
- <20180220095246.GF23425@ulmo>
-Message-ID: <20180220103347.GH22199@phenom.ffwll.local>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Feb 2018 11:38:43 +0100
+Subject: [PATCH 9/9] serial: xuartps: Fix out-of-bounds access through DT
+ alias
+In-Reply-To: <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
+References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
+ <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
+ <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
+Message-ID: <CAMuHMdUOKMM5mSrnnrxCi0gX_TbjYkj7vwn11b2D5p7XigM+Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 10:52:46AM +0100, Thierry Reding wrote:
-> On Tue, Feb 20, 2018 at 08:28:59AM +0100, Linus Walleij wrote:
-> > The PL111 needs to filter valid modes based on memory bandwidth.
-> > I guess it is a pretty simple operation, so we can still claim
-> > the DRM KMS helper pipeline is simple after adding this (optional)
-> > vtable callback.
-> > 
-> > Reviewed-by: Eric Anholt <eric@anholt.net>
-> > Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> > ChangeLog v1->v2:
-> > - Fix up the kerneldoc to just refer to the enum.
-> > - Collect Eric's and Daniel's review tags.
-> > ---
-> >  drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
-> >  include/drm/drm_simple_kms_helper.h     | 14 ++++++++++++++
-> >  2 files changed, 29 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
-> > index 9f3b1c94802b..652cde9a5a6b 100644
-> > --- a/drivers/gpu/drm/drm_simple_kms_helper.c
-> > +++ b/drivers/gpu/drm/drm_simple_kms_helper.c
-> > @@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
-> >  	.destroy = drm_encoder_cleanup,
-> >  };
-> >  
-> > +static enum drm_mode_status
-> > +drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
-> > +			       const struct drm_display_mode *mode)
-> > +{
-> > +	struct drm_simple_display_pipe *pipe;
-> > +
-> > +	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
-> > +	if (!pipe->funcs || !pipe->funcs->mode_valid)
-> > +		/* Anything goes */
-> > +		return MODE_OK;
-> > +
-> > +	return pipe->funcs->mode_valid(crtc, mode);
-> > +}
-> > +
-> >  static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
-> >  				     struct drm_crtc_state *state)
-> >  {
-> > @@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
-> >  }
-> >  
-> >  static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
-> > +	.mode_valid = drm_simple_kms_crtc_mode_valid,
-> >  	.atomic_check = drm_simple_kms_crtc_check,
-> >  	.atomic_enable = drm_simple_kms_crtc_enable,
-> >  	.atomic_disable = drm_simple_kms_crtc_disable,
-> > diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
-> > index 6d9adbb46293..d9e4c3c3f009 100644
-> > --- a/include/drm/drm_simple_kms_helper.h
-> > +++ b/include/drm/drm_simple_kms_helper.h
-> > @@ -21,6 +21,20 @@ struct drm_simple_display_pipe;
-> >   *                                        display pipeline
-> >   */
-> >  struct drm_simple_display_pipe_funcs {
-> > +	/**
-> > +	 * @mode_valid:
-> > +	 *
-> > +	 * This function is called to filter out valid modes from the
-> > +	 * suggestions suggested by the bridge or display. This optional
-> 
-> This is a little awkward to read. Perhaps something like "... filter out
-> valid modes from those suggested by..."?
+Hi Michal,
 
-If you want to respin the kerneldoc I suggest you align more with the one
-for drm_crtc_helper_funcs.mode_valid. There's a bunch of things you're
-missing here. I think for consistency probably best to just copypaste the
-entire thing, with an s/crtc/simple display pipe/ or similar.
--Daniel
+On Tue, Feb 20, 2018 at 11:22 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 20.2.2018 10:40, Geert Uytterhoeven wrote:
+>> The cdns_uart_port[] array is indexed using a value derived from the
+>> "serialN" alias in DT, which may lead to an out-of-bounds access.
+>>
+>> Fix this by adding a range check.
+>>
+>> Fixes: 1f118c02a1819856 ("serial: xuartps: Fix out-of-bounds access through DT alias")
+>
+> I didn't find this sha1 - patch name is this one.
 
+Bummer, I totally screwed up my scripting...
 
-> 
-> Otherwise looks good:
-> 
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
+Fixes: 928e9263492069ee ("tty: xuartps: Initialize ports according to aliases")
 
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  drivers/tty/serial/xilinx_uartps.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+>> index b9b2bc76bcac606c..abcb4d09a2d866d0 100644
+>> --- a/drivers/tty/serial/xilinx_uartps.c
+>> +++ b/drivers/tty/serial/xilinx_uartps.c
+>> @@ -1110,7 +1110,7 @@ static struct uart_port *cdns_uart_get_port(int id)
+>>       struct uart_port *port;
+>>
+>>       /* Try the given port id if failed use default method */
+>> -     if (cdns_uart_port[id].mapbase != 0) {
+>> +     if (id < CDNS_UART_NR_PORTS && cdns_uart_port[id].mapbase != 0) {
+>>               /* Find the next unused port */
+>>               for (id = 0; id < CDNS_UART_NR_PORTS; id++)
+>>                       if (cdns_uart_port[id].mapbase == 0)
+>>
+>
+> Below should be better fix for this driver.
 
+I considered that, too, but...
 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -1109,6 +1109,9 @@ static struct uart_port *cdns_uart_get_port(int id)
+>  {
+>         struct uart_port *port;
+>
+> +       if (id >= CDNS_UART_NR_PORTS)
+> +               return NULL;
+> +
+>         /* Try the given port id if failed use default method */
+>         if (cdns_uart_port[id].mapbase != 0) {
+>                 /* Find the next unused port */
+> @@ -1117,9 +1120,6 @@ static struct uart_port *cdns_uart_get_port(int id)
+>                                 break;
+>         }
+>
+> -       if (id >= CDNS_UART_NR_PORTS)
+> -               return NULL;
+> -
 
+... the above check cannot be removed, as it is needed to support the loop
+above to find an unused port.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+>         port = &cdns_uart_port[id];
+>
+>         /* At this point, we've got an empty uart_port struct,
+> initialize it */
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
