@@ -1,64 +1,100 @@
-From: stschake@gmail.com (Stefan Schake)
-Date: Tue, 20 Feb 2018 16:10:28 +0100
-Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
-In-Reply-To: <20180216182041.GU5453@intel.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
- <20180216182041.GU5453@intel.com>
-Message-ID: <CAOZHkRw=eNmkKwpFc=tRaO=TjpNPzcfncCCUneaDb0aBaaONQw@mail.gmail.com>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Tue, 20 Feb 2018 16:12:02 +0100
+Subject: [PATCH v2 00/19] R-Car M3-N initial support
+Message-ID: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 16, 2018 at 7:20 PM, Ville Syrj?l?
-<ville.syrjala@linux.intel.com> wrote:
-> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
->> Some drivers duplicate the logic to create a property to store a per-plane
->> alpha.
->>
->> This is especially useful if we ever want to support extra protocols for
->> Wayland like:
->> https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
->>
->> Let's create a helper in order to move that to the core.
->>
->> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->> ---
->>  Documentation/gpu/kms-properties.csv |  2 +-
->>  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
->>  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
->>  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
->>  include/drm/drm_blend.h              |  1 +-
->>  include/drm/drm_plane.h              |  6 +++++-
->>  6 files changed, 48 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
->> index 927b65e14219..25ad3503d663 100644
->> --- a/Documentation/gpu/kms-properties.csv
->> +++ b/Documentation/gpu/kms-properties.csv
->> @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
->>  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
->>  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
->>  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
->> -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
->> +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the plane from transparent (0) to fully opaque (MAX). If this property is set to a value different than max, and that the pixel will define an alpha component, the property will have precendance and the pixel value will be ignored.
->
-> Those semantics don't seem particularly good to me. I think we would want the
-> per-pixel alpha and global alpha both to be effecive at the same time. You can
-> always decide to ignore the per-pixel alpha by using a pixel format without
-> alpha.
->
-> Also, where's the userspace that wants this feature?
+Hello, second round for R-Car M3-N SoC and M3-N based Salvator-X board.
 
-drm_hwcomposer uses an 8-bit per-plane alpha property, and from what I
-can tell the semantics are that both pixel and plane alpha apply
-simultaneously if present.
-Here is what I think was the kernel-side for this:
+I have fixed all comments I have received and re-based on latest Geert's
+renesas-drivers-2018-02-13-v4.16-rc1
 
-https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/306122
+I have applied requested changes, and updated PFC tables to comply with
+last patches applied to r8a7796 that were not part of v4.15 which v1 was
+based on.
 
-I've added Sean Paul, he might be able to give a more definitive answer.
+I have added a per-patch change log as summarizing all little changes here
+had not real benefit imho, being them mostly tiny changes specific to each
+patch.
 
-Regards,
-Stefan
+As a general note, I have split patches and bindings where requested and split
+single patches in multiple ones where opportune (mostly when adding components
+to drivers/soc/ and when introducing board and SoC DT files).
+
+Tested serial console output and Ethernet interface.
+
+Thanks
+   j
+
+v1 -> v2:
+- Rebased on renesas-drivers-2018-02-13-v4.16-rc1
+- Split patches when introducing rst, sysc in drivers/soc/
+- Split patches when adding device tree file for Salvator-X board and
+  r8a77965 SoC.
+- Single change logs are reported per-patch
+
+Jacopo Mondi (19):
+  clk: renesas: cpg-mssr: Add support for R-Car M3-N
+  soc: renesas: rcar-rst: Add support for R-Car M3-N
+  soc: renesas: Identify R-Car M3-N
+  soc: renesas: rcar-sysc: Add R-Car M3-N support
+  pinctrl: sh-pfc: Initial R-Car M3-N support
+  dt-bindings: arm: Document R-Car M3-N SoC DT bindings
+  ARM64: Add Renesas R-Car M3-N config symbol
+  ARM64: dts: Add Renesas R8A77965 SoC support
+  ARM64: dts: Add R-Car Salvator-x M3-N support
+  dt-bindings: dmaengine: rcar-dmac: document R8A77965 support
+  ARM64: dts: r8a77965: Add dmac device nods
+  dt-bindings: serial: sh-sci: Add support for r8a77965 (H)SCIF
+  pinctrl: sh-pfc: r8a77965: Add SCIFs groups/functions
+  ARM64: dts: r8a77965: Add SCIF device nodes
+  dt-bindings: gpio: Add support for r8a77965
+  ARM64: dts: r8a77965: Add GPIO nodes
+  dt-bindings: net: ravb: Add support for r8a77965 SoC
+  pinctrl: sh-pfc: r8a77965: Add EtherAVB groups/functions
+  ARM64: dts: r8a77965: Add EtherAVB device node
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |    2 +
+ .../devicetree/bindings/clock/renesas,cpg-mssr.txt |    1 +
+ .../devicetree/bindings/dma/renesas,rcar-dmac.txt  |    1 +
+ .../devicetree/bindings/gpio/renesas,gpio-rcar.txt |    1 +
+ .../devicetree/bindings/net/renesas,ravb.txt       |    1 +
+ .../bindings/pinctrl/renesas,pfc-pinctrl.txt       |    1 +
+ .../bindings/power/renesas,rcar-sysc.txt           |    1 +
+ .../devicetree/bindings/reset/renesas,rst.txt      |    1 +
+ .../bindings/serial/renesas,sci-serial.txt         |    2 +
+ arch/arm64/Kconfig.platforms                       |    6 +
+ arch/arm64/boot/dts/renesas/Makefile               |    1 +
+ .../arm64/boot/dts/renesas/r8a77965-salvator-x.dts |   21 +
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi          |  782 +++++
+ drivers/clk/renesas/Kconfig                        |    5 +
+ drivers/clk/renesas/Makefile                       |    1 +
+ drivers/clk/renesas/r8a77965-cpg-mssr.c            |  334 +++
+ drivers/clk/renesas/renesas-cpg-mssr.c             |    6 +
+ drivers/clk/renesas/renesas-cpg-mssr.h             |    1 +
+ drivers/pinctrl/sh-pfc/Kconfig                     |    5 +
+ drivers/pinctrl/sh-pfc/Makefile                    |    1 +
+ drivers/pinctrl/sh-pfc/core.c                      |    6 +
+ drivers/pinctrl/sh-pfc/pfc-r8a77965.c              | 3128 ++++++++++++++++++++
+ drivers/pinctrl/sh-pfc/sh_pfc.h                    |    1 +
+ drivers/soc/renesas/Kconfig                        |    9 +-
+ drivers/soc/renesas/Makefile                       |    1 +
+ drivers/soc/renesas/r8a77965-sysc.c                |   37 +
+ drivers/soc/renesas/rcar-rst.c                     |    1 +
+ drivers/soc/renesas/rcar-sysc.c                    |    3 +
+ drivers/soc/renesas/rcar-sysc.h                    |    1 +
+ drivers/soc/renesas/renesas-soc.c                  |    8 +
+ include/dt-bindings/clock/r8a77965-cpg-mssr.h      |   62 +
+ include/dt-bindings/power/r8a77965-sysc.h          |   30 +
+ 32 files changed, 4459 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77965.dtsi
+ create mode 100644 drivers/clk/renesas/r8a77965-cpg-mssr.c
+ create mode 100644 drivers/pinctrl/sh-pfc/pfc-r8a77965.c
+ create mode 100644 drivers/soc/renesas/r8a77965-sysc.c
+ create mode 100644 include/dt-bindings/clock/r8a77965-cpg-mssr.h
+ create mode 100644 include/dt-bindings/power/r8a77965-sysc.h
+
+--
+2.7.4
