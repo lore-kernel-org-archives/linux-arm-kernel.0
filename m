@@ -1,71 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 12:54:56 +0100
-Subject: [4.4-stable 09/22] ARM: tegra: select USB_ULPI from EHCI rather than
- platform
-In-Reply-To: <20180220115527.1806578-1-arnd@arndb.de>
-References: <20180220115527.1806578-1-arnd@arndb.de>
-Message-ID: <20180220115527.1806578-10-arnd@arndb.de>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 20 Feb 2018 13:58:05 +0200
+Subject: [PATCH v4 0/7] Initial support for NVIDIA Tegra194
+Message-ID: <20180220115812.24108-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit a262e87ff354f12447bb6268bd63edf7ba1c20e0 upstream.
+Hello everyone,
 
-For historic reasons, the tegra platform selects USB_ULPI from architecture
-code, but that hasn't really made sense for a long time, as the only
-user of that code is the Tegra EHCI driver that has its own Kconfig
-symbol.
+this series adds initial support for the NVIDIA Tegra194 "Xavier"
+system-on-chip. Initially UART, I2C, SDMMC, as well as the PMIC
+are supported, allowing booting to a console.
 
-This removes the 'select' statements from mach-tegra and drivers/soc/tegra
-and adds them with the device driver that actually needs them.
+The changes consist almost completely of the new device trees,
+however some fixes are required in the BPMP driver to support the
+new channel layout in Tegra194.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
-[arnd: rebased to 4.4-stable]
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-tegra/Kconfig  | 2 --
- arch/arm64/Kconfig.platforms | 2 --
- drivers/usb/host/Kconfig     | 2 ++
- 3 files changed, 2 insertions(+), 4 deletions(-)
+The series has been tested on Tegra186 (Jetson TX2) and Tegra194
+(P2972).
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 0fa4c5f8b1be..2d43357d4a0a 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -12,8 +12,6 @@ menuconfig ARCH_TEGRA
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select RESET_CONTROLLER
- 	select SOC_BUS
--	select USB_ULPI if USB_PHY
--	select USB_ULPI_VIEWPORT if USB_PHY
- 	help
- 	  This enables support for NVIDIA Tegra based systems.
- 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 4043c35962cc..5edb50772c11 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -90,8 +90,6 @@ config ARCH_TEGRA_132_SOC
- 	bool "NVIDIA Tegra132 SoC"
- 	depends on ARCH_TEGRA
- 	select PINCTRL_TEGRA124
--	select USB_ULPI if USB_PHY
--	select USB_ULPI_VIEWPORT if USB_PHY
- 	help
- 	  Enable support for NVIDIA Tegra132 SoC, based on the Denver
- 	  ARMv8 CPU.  The Tegra132 SoC is similar to the Tegra124 SoC,
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3bb08870148f..95e72d75e0a0 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -220,6 +220,8 @@ config USB_EHCI_TEGRA
-        depends on ARCH_TEGRA
-        select USB_EHCI_ROOT_HUB_TT
-        select USB_PHY
-+	select USB_ULPI
-+	select USB_ULPI_VIEWPORT
-        help
-          This driver enables support for the internal USB Host Controllers
-          found in NVIDIA Tegra SoCs. The controllers are EHCI compliant.
+Cheers,
+Mikko
+
+Mikko Perttunen (7):
+  firmware: tegra: Simplify channel management
+  soc/tegra: Add Tegra194 SoC configuration option
+  soc/tegra: pmc: Add Tegra194 compatibility string
+  dt-bindings: tegra: Add missing chips and NVIDIA boards
+  dt-bindings: tegra: Add documentation for nvidia,tegra194-pmc
+  arm64: tegra: Add Tegra194 chip device tree
+  arm64: tegra: Add device tree for the Tegra194 P2972-0000 board
+
+ Documentation/devicetree/bindings/arm/tegra.txt    |  16 +
+ .../bindings/arm/tegra/nvidia,tegra186-pmc.txt     |   2 +
+ arch/arm64/boot/dts/nvidia/Makefile                |   1 +
+ arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     | 248 +++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts |  16 +
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi           | 344 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/firmware/tegra/bpmp.c                      | 142 ++++-----
+ drivers/soc/tegra/Kconfig                          |  10 +
+ drivers/soc/tegra/pmc.c                            |   1 +
+ include/dt-bindings/clock/tegra194-clock.h         | 321 +++++++++++++++++++
+ include/dt-bindings/gpio/tegra194-gpio.h           |  61 ++++
+ include/dt-bindings/power/tegra194-powergate.h     |  35 +++
+ include/dt-bindings/reset/tegra194-reset.h         | 152 +++++++++
+ include/soc/tegra/bpmp.h                           |   4 +-
+ 15 files changed, 1274 insertions(+), 80 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
+ create mode 100644 include/dt-bindings/clock/tegra194-clock.h
+ create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
+ create mode 100644 include/dt-bindings/power/tegra194-powergate.h
+ create mode 100644 include/dt-bindings/reset/tegra194-reset.h
+
 -- 
-2.9.0
+2.16.1
