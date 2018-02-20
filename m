@@ -1,63 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 20 Feb 2018 14:19:35 +0200
-Subject: [PATCH v5 5/5] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
-In-Reply-To: <cover.1519128054.git.baruch@tkos.co.il>
-References: <cover.1519128054.git.baruch@tkos.co.il>
-Message-ID: <a6d59692dc4847e0b1639a26542e28c95ad5240f.1519128054.git.baruch@tkos.co.il>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Feb 2018 13:27:53 +0100
+Subject: [PATCH 9/9] serial: xuartps: Fix out-of-bounds access through DT
+ alias
+In-Reply-To: <6cabf7c6-302e-efa9-8f4d-25fd35ecddad@xilinx.com>
+References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
+ <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
+ <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
+ <CAMuHMdUOKMM5mSrnnrxCi0gX_TbjYkj7vwn11b2D5p7XigM+Ag@mail.gmail.com>
+ <6cabf7c6-302e-efa9-8f4d-25fd35ecddad@xilinx.com>
+Message-ID: <CAMuHMdWe9XkoDKkyfu1pOG0oS0_Tdx1w=OOk05EvTr_dK=tp7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
+Hi Michal,
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v5:
-  * Drop the 'firmware' property
+On Tue, Feb 20, 2018 at 12:27 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 20.2.2018 11:38, Geert Uytterhoeven wrote:
+>> On Tue, Feb 20, 2018 at 11:22 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>> On 20.2.2018 10:40, Geert Uytterhoeven wrote:
+>>>> The cdns_uart_port[] array is indexed using a value derived from the
+>>>> "serialN" alias in DT, which may lead to an out-of-bounds access.
+>>>>
+>>>> Fix this by adding a range check.
 
-v4:
-  * Move the gpio node under the firmware node
-  * Rename the gpio node to plain 'gpio'
-  * Add Stefan's ack
+> I have checked 4 patches I have sent in past which didn't reach mainline
+> (probably because of RFC)
+> Take a look at
+> https://www.spinics.net/lists/linux-serial/msg27106.html
+>
+> I have removed cdns_uart_port array completely there.
 
-v3:
-  * List GPIO names one per line.
+Nice! I'd love to get rid of fixed arrays in serial...
 
-v2:
-  * Move GPIO expander node out of the soc container
-  * Rename compatible string
-  * Add gpio-line-names property
----
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+However, IMHO it's still worthwhile to fix the out-of-bounds access first,
+as that fix can be backported to stable kernels easily.
 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 3e4ed7c5b0b3..0b31d995a066 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -25,6 +25,23 @@
- 	};
- };
- 
-+&firmware {
-+	expgpio: gpio {
-+		compatible = "raspberrypi,firmware-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-line-names = "BT_ON",
-+				  "WL_ON",
-+				  "STATUS_LED",
-+				  "LAN_RUN",
-+				  "HPD_N",
-+				  "CAM_GPIO0",
-+				  "CAM_GPIO1",
-+				  "PWR_LOW_N";
-+		status = "okay";
-+	};
-+};
-+
- /* uart0 communicates with the BT module */
- &uart0 {
- 	pinctrl-names = "default";
--- 
-2.16.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
