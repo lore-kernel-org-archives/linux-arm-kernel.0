@@ -1,32 +1,61 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 20 Feb 2018 13:58:08 +0200
-Subject: [PATCH v4 3/7] soc/tegra: pmc: Add Tegra194 compatibility string
+Date: Tue, 20 Feb 2018 13:58:09 +0200
+Subject: [PATCH v4 4/7] dt-bindings: tegra: Add missing chips and NVIDIA boards
 In-Reply-To: <20180220115812.24108-1-mperttunen@nvidia.com>
 References: <20180220115812.24108-1-mperttunen@nvidia.com>
-Message-ID: <20180220115812.24108-4-mperttunen@nvidia.com>
+Message-ID: <20180220115812.24108-5-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra194 PMC is mostly compatible with Tegra186, including in all
-currently supported features. As such, add a new compatibility string
-but point to the existing Tegra186 SoC data for now.
+Add compatibility strings for supported but undocumented Tegra chips
+(Tegra114/124/132/210/186/194) and reference boards.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/soc/tegra/pmc.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index ce62a47a6647..a2df230bf51a 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -1920,6 +1920,7 @@ static const struct tegra_pmc_soc tegra186_pmc_soc = {
- };
+Notes:
+    v2:
+    - add patch
+
+ Documentation/devicetree/bindings/arm/tegra.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index 7f1411bbabf7..32f62bb7006d 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -9,6 +9,12 @@ following compatible values:
  
- static const struct of_device_id tegra_pmc_match[] = {
-+	{ .compatible = "nvidia,tegra194-pmc", .data = &tegra186_pmc_soc },
- 	{ .compatible = "nvidia,tegra186-pmc", .data = &tegra186_pmc_soc },
- 	{ .compatible = "nvidia,tegra210-pmc", .data = &tegra210_pmc_soc },
- 	{ .compatible = "nvidia,tegra132-pmc", .data = &tegra124_pmc_soc },
+   nvidia,tegra20
+   nvidia,tegra30
++  nvidia,tegra114
++  nvidia,tegra124
++  nvidia,tegra132
++  nvidia,tegra210
++  nvidia,tegra186
++  nvidia,tegra194
+ 
+ Boards
+ -------------------------------------------
+@@ -26,8 +32,18 @@ board-specific compatible values:
+   nvidia,cardhu
+   nvidia,cardhu-a02
+   nvidia,cardhu-a04
++  nvidia,dalmore
+   nvidia,harmony
++  nvidia,jetson-tk1
++  nvidia,norrin
++  nvidia,p2371-0000
++  nvidia,p2371-2180
++  nvidia,p2571
++  nvidia,p2771-0000
++  nvidia,p2972-0000
++  nvidia,roth
+   nvidia,seaboard
++  nvidia,tn7
+   nvidia,ventana
+   toradex,apalis_t30
+   toradex,apalis_t30-eval
 -- 
 2.16.1
