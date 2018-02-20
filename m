@@ -1,151 +1,30 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 20 Feb 2018 18:33:33 +0200
-Subject: [PATCH v2] usb: host: ehci-platform: add support for optional
- external vbus supply
-In-Reply-To: <2ef38200-947c-1419-1c91-f033da390f74@st.com>
-References: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
- <bfaa3001-d90f-7903-17e8-90af9a03c338@ti.com>
- <2ef38200-947c-1419-1c91-f033da390f74@st.com>
-Message-ID: <f2af8c41-f3d7-cffb-4e1e-2a12bc51c776@ti.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 20 Feb 2018 10:45:03 -0600
+Subject: [PATCH v2 0/3] Support qcom pinctrl protected pins
+In-Reply-To: <20180126011400.2191-1-sboyd@codeaurora.org>
+References: <20180126011400.2191-1-sboyd@codeaurora.org>
+Message-ID: <94a7bd07-8ad5-7ab1-20ab-a02fe2476efd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/18 16:46, Amelie DELAUNAY wrote:
-> Hi,
+On 01/25/2018 07:13 PM, Stephen Boyd wrote:
+> This patchset proposes a solution to describing the valid
+> pins for a pin controller in a semi-generic way so that qcom
+> platforms can expose the pins that are really available.
 > 
-> On 02/20/2018 03:00 PM, Roger Quadros wrote:
->> Hi,
->>
->> On 20/02/18 14:58, Amelie Delaunay wrote:
->>> On some boards, especially when vbus supply requires large current,
->>> and the charge pump on the PHY isn't enough, an external vbus power switch
->>> may be used.
->>> Add support for this optional external vbus supply in ehci-platform.
->>>
->>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->>>
->>> ---
->>> Changes in v2:
->>>   * Address Roger Quadros comments: move regulator_enable/disable from
->>> ehci_platform_power_on/off to ehci_platform_port_power.
->>> ---
->>>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
->>>   drivers/usb/host/ehci-platform.c                   | 31 ++++++++++++++++++++++
->>>   2 files changed, 32 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> index 3efde12..fc480cd 100644
->>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> @@ -19,6 +19,7 @@ Optional properties:
->>>    - phys : phandle + phy specifier pair
->>>    - phy-names : "usb"
->>>    - resets : phandle + reset specifier pair
->>> + - vbus-supply : phandle of regulator supplying vbus
->>>   
->>
->> Can platforms have more than one regulator e.g. one regulator per port?
->>
-> 
-> I imagine that yes, platforms could have one regulator per port.
-> Regulator consumers bindings impose a <name>-supply property per 
-> regulator, so, what do you think about :
-> vbus0-supply for port#0
-> vbus1-supply for port#1
-> ...
-> vbusN-supply for port#N
-> 
-> And then in probe, allocate 'struct regulator *vbus_supplies' with a 
-> size corresponding to 'HCS_N_PORTS(ehci->hcs_params) * sizeof(struct 
-> regulator *)'.
-> And loop to get optional regulator vbus0, vbus1,..., vbusN.
-> And then enable/disable the corresponding regulator in 
-> ehci_platform_port_power thanks to portnum.
+> Typically, this has been done by having drivers and firmware
+> descriptions only use pins they know they have access to, and that
+> still works now because we no longer read the pin direction at
+> boot. But there are still some userspace drivers and debugfs facilities
+> that don't know what pins are available and attempt to read everything
+> they can. On qcom platforms, this may lead to a system hang, which isn't
+> very nice behavior, even if root is the only user that can trigger it.
 
-Looks fine to me but we need to get Alan's opinion if this is worth the effort.
-If there isn't a single platform needing it we could probably do without it
-but the DT binding must be scalable to add this feature in the future.
-
-And what if it is ganged power? i.e. one regulator for more than one port.
-Probably they all can point to the same regulator instance and it should work.
-
-> 
->>>   Example (Sequoia 440EPx):
->>>       ehci at e0000300 {
->>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
->>> index b065a96..05be100 100644
->>> --- a/drivers/usb/host/ehci-platform.c
->>> +++ b/drivers/usb/host/ehci-platform.c
->>> @@ -29,6 +29,7 @@
->>>   #include <linux/of.h>
->>>   #include <linux/phy/phy.h>
->>>   #include <linux/platform_device.h>
->>> +#include <linux/regulator/consumer.h>
->>>   #include <linux/reset.h>
->>>   #include <linux/usb.h>
->>>   #include <linux/usb/hcd.h>
->>> @@ -46,6 +47,7 @@ struct ehci_platform_priv {
->>>   	struct reset_control *rsts;
->>>   	struct phy **phys;
->>>   	int num_phys;
->>> +	struct regulator *vbus_supply;
->>>   	bool reset_on_resume;
->>>   };
->>>   
->>> @@ -76,6 +78,25 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->>>   	return 0;
->>>   }
->>>   
->>> +static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
->>> +				    bool enable)
->>> +{
->>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
->>> +	int ret = 0;
->>> +
->>> +	if (priv->vbus_supply) {
->>> +		if (enable)
->>> +			ret = regulator_enable(priv->vbus_supply);
->>> +		else
->>> +			ret = regulator_disable(priv->vbus_supply);
->>> +		if (ret)
->>> +			dev_err(hcd->self.controller,
->>> +				"failed to %s vbus supply: %d\n",
->>> +				enable ? "enable" : "disable", ret);
->>> +	}
->>> +	return ret;
->>> +}
->>> +
->>>   static int ehci_platform_power_on(struct platform_device *dev)
->>>   {
->>>   	struct usb_hcd *hcd = platform_get_drvdata(dev);
->>> @@ -134,6 +155,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
->>>   static const struct ehci_driver_overrides platform_overrides __initconst = {
->>>   	.reset =		ehci_platform_reset,
->>>   	.extra_priv_size =	sizeof(struct ehci_platform_priv),
->>> +	.port_power =		ehci_platform_port_power,
->>>   };
->>>   
->>>   static struct usb_ehci_pdata ehci_platform_defaults = {
->>> @@ -247,6 +269,15 @@ static int ehci_platform_probe(struct platform_device *dev)
->>>   	if (err)
->>>   		goto err_put_clks;
->>>   
->>> +	priv->vbus_supply = devm_regulator_get_optional(&dev->dev, "vbus");
->>> +	if (IS_ERR(priv->vbus_supply)) {
->>> +		err = PTR_ERR(priv->vbus_supply);
->>> +		if (err == -ENODEV)
->>> +			priv->vbus_supply = NULL;
->>> +		else
->>> +			goto err_reset;
->>> +	}
->>> +
->>>   	if (pdata->big_endian_desc)
->>>   		ehci->big_endian_desc = 1;
->>>   	if (pdata->big_endian_mmio)
->>>
+Any progress on this patch set?  Stephen no longer works for Qualcomm, 
+so I don't know what the next step is, and I really want this feature in 
+4.17 (we've missed so many merge windows already).
 
 -- 
-cheers,
--roger
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
