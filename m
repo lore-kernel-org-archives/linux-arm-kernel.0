@@ -1,42 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 22:59:51 +0100
-Subject: [PATCH 4/7] ARM: io-acorn: fix LTO linking without CONFIG_PRINTK
+Date: Tue, 20 Feb 2018 22:59:54 +0100
+Subject: [PATCH 7/7] efi: disable LTO for EFI stub
 In-Reply-To: <20180220215954.4092811-1-arnd@arndb.de>
 References: <20180220215954.4092811-1-arnd@arndb.de>
-Message-ID: <20180220215954.4092811-5-arnd@arndb.de>
+Message-ID: <20180220215954.4092811-8-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_LTO is enabled, we get a link error for this file
-that contains a reference to printk():
+Building the EFI stub on 32-bit ARM with LTO resulted in a build error:
 
-arch/arm/lib/io-acorn.o: In function `outsl':
-(.text+0x38): undefined reference to `printk'
+arm-linux-gnueabi-ld: drivers/firmware/efi/libstub/arm-stub.stub.o: plugin needed to handle lto object
+arch/arm/boot/compressed/head.o: In function `efi_stub_entry':
 
-Normally the file is simply dropped, but that doesn't happen
-with LTO. Making the reference conditional helps, but perhaps
-a better fix would be to make sure the LTO linker drops the
-entire file in the same way that we normally do.
+Locally disabling LTO for this directory seems to do the trick.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/lib/io-acorn.S | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/firmware/efi/libstub/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/lib/io-acorn.S b/arch/arm/lib/io-acorn.S
-index 69719bad674d..3522a899460b 100644
---- a/arch/arm/lib/io-acorn.S
-+++ b/arch/arm/lib/io-acorn.S
-@@ -27,6 +27,10 @@
-  */
- ENTRY(insl)
- ENTRY(outsl)
-+#ifdef CONFIG_PRINTK
- 		adr	r0, .Liosl_warning
- 		mov	r1, lr
- 		b	printk
-+#else
-+		ret	lr
-+#endif
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 7b3ba40f0745..cc4c53f1ff0a 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,9 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   $(DISABLE_LTO)
++
+ 
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
 -- 
 2.9.0
