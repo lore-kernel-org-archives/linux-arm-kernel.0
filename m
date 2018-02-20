@@ -1,36 +1,43 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 20 Feb 2018 09:34:39 +0000
-Subject: [alsa-devel] [PATCH v3 05/25] ASoC: qcom: qdsp6: Add support to
- Q6AFE
-In-Reply-To: <2465335e-4d45-02d7-2e64-0a1c28a44ff1@codeaurora.org>
+Date: Tue, 20 Feb 2018 09:36:10 +0000
+Subject: [alsa-devel] [PATCH v3 14/25] ASoC: qcom: qdsp6: Add support to
+ q6afe dai driver
+In-Reply-To: <84723548-02a4-10e7-3de1-b347416d4fb0@codeaurora.org>
 References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-6-srinivas.kandagatla@linaro.org>
- <2465335e-4d45-02d7-2e64-0a1c28a44ff1@codeaurora.org>
-Message-ID: <2360f3a9-f207-bc84-b0da-2675b7c9f0e0@linaro.org>
+ <20180213165837.1620-15-srinivas.kandagatla@linaro.org>
+ <84723548-02a4-10e7-3de1-b347416d4fb0@codeaurora.org>
+Message-ID: <f5aed3f1-d037-861b-5efd-d6abd8cf7e6e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your review comments
+Thanks for testing this out,
+
+On 19/02/18 10:32, Rohit Kumar wrote:
+>>
+>> diff --git a/sound/soc/qcom/qdsp6/Makefile 
+>> b/sound/soc/qcom/qdsp6/Makefile
+>> index 660afcab98fd..c7833842b878 100644
+>> --- a/sound/soc/qcom/qdsp6/Makefile
+>> +++ b/sound/soc/qcom/qdsp6/Makefile
+>> @@ -1,5 +1,5 @@
+>>   obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+>> -obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+>> +obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o q6afe-dai.o
+> depmod: ERROR: Cycle detected: q6afe -> q6afe_dai -> q6afe
+> need to use like:
+> +qdsp6_afe-objs := q6afe.o q6afe-dai.o
+> +obj-$(CONFIG_SND_SOC_QDSP6_AFE) += qdsp6_afe.o
+> similarly for asm and adm
 
 
+Yep, will fix this in next version,
 
-On 19/02/18 10:30, Rohit Kumar wrote:
->> diff --git a/sound/soc/qcom/Makefile b/sound/soc/qcom/Makefile
->> index d5280355c24f..748f5e891dcf 100644
->> --- a/sound/soc/qcom/Makefile
->> +++ b/sound/soc/qcom/Makefile
->> @@ -13,6 +13,11 @@ obj-$(CONFIG_SND_SOC_LPASS_APQ8016) += 
->> snd-soc-lpass-apq8016.o
->>   # Machine
->>   snd-soc-storm-objs := storm.o
->>   snd-soc-apq8016-sbc-objs := apq8016_sbc.o
->> +snd-soc-msm8996-objs := apq8096.o
-> This needs to be moved out of this patch
-
-Will fix it in next version.
-
->>   obj-$(CONFIG_SND_SOC_STORM) += snd-soc-storm.o
->>   obj-$(CONFIG_SND_SOC_APQ8016_SBC) += snd-soc-apq8016-sbc.o
->> +obj-$(CONFIG_SND_SOC_MSM8996) += snd-soc-msm8996.o
->> +
->> +#DSP lib 
+thanks,
+srini
+>>   obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o q6routing.o
+>>   obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+>>   obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+>> diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c 
+>> b/sound/soc/qcom/qdsp6/q6afe-dai.c
+>> new file mode 100644
+>> index 000000000000..f6a618e9db9e 
