@@ -1,33 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 19:46:47 +0100
-Subject: [PATCH v2 01/19] clk: renesas: cpg-mssr: Add support for R-Car
- M3-N
-In-Reply-To: <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdVL1-PDa7V4AnB4mu0Qmqs19P_Te+wjxOGYKhanKpVnbw@mail.gmail.com>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Tue, 20 Feb 2018 11:21:04 -0800
+Subject: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP firmware
+In-Reply-To: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1519154467-2896-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Initial support for R-Car M3-N (r8a77965), including core and module
-> clocks.
->
-> Based on Table 8.2d of "R-Car Series, 3rd Generation User's Manual:
-> Hardware (Rev. 0.80, Oct 31, 2017)".
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Add documentation to describe Xilinx ZynqMP firmware driver
+bindings. Firmware driver provides an interface to firmware
+APIs. Interface APIs can be used by any driver to communicate
+to PMUFW (Platform Management Unit).
 
-Queued in clk-renesas-for-v4.17.
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+---
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+new file mode 100644
+index 0000000..99434ba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+@@ -0,0 +1,24 @@
++Xilinx Zynq MPSoC Firmware Device Tree Bindings
++
++The zynqmp-firmware node describes the interface to platform firmware.
++ZynqMP has an interface to communicate with secure firmware. Firmware
++driver provides an interface to firmware APIs. Interface APIs can be
++used by any driver to communicate to PMUFW(Platform Management Unit).
++These requests include clock management, pin control, device control,
++power management service, FPGA service and other platform management
++services.
++
++Required properties:
++ - compatible:	Must contain:  "xlnx,zynqmp-firmware"
++ - method:	The method of calling the PM-API firmware layer.
++		Permitted values are:
++		  - "smc" : SMC #0, following the SMCCC
++		  - "hvc" : HVC #0, following the SMCCC
++
++Examples:
++	firmware {
++		zynqmp_firmware: zynqmp-firmware {
++			compatible = "xlnx,zynqmp-firmware";
++			method = "smc";
++		};
++	};
+-- 
+2.7.4
