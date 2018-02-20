@@ -1,59 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Feb 2018 22:59:52 +0100
-Subject: [PATCH 5/7] ARM: fix __inflate_kernel_data stack warning for LTO
-In-Reply-To: <20180220215954.4092811-1-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
-Message-ID: <20180220215954.4092811-6-arnd@arndb.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 20 Feb 2018 23:08:37 +0100
+Subject: [PATCH 2/3] arm64: dts: rockchip: add rk3328 display nodes
+In-Reply-To: <d2195e38-7ca1-e0b3-240e-0acfe941c572@arm.com>
+References: <20180216223817.2821-1-heiko@sntech.de>
+ <20180216223817.2821-3-heiko@sntech.de>
+ <d2195e38-7ca1-e0b3-240e-0acfe941c572@arm.com>
+Message-ID: <2712253.IuLOJ454Fc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ca8b5d97d6bf ("ARM: XIP kernel: store .data compressed in ROM")
-moved the decompressor workspace to the stack and added a compiler
-flag to avoid the stack size warning.
+Hi Robin,
 
-With LTO, that warning comes back. Moving the workspace into an initdata
-variable avoids that warning but presumably also undoes the optimization.
+Am Dienstag, 20. Februar 2018, 14:14:31 CET schrieb Robin Murphy:
+> On 16/02/18 22:38, Heiko Stuebner wrote:
+> > Add the chain of display nodes from the core display-subsystem
+> > through the one vop to the dw-hdmi output.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 56 ++++++++++++++++++++++++++++++++
+> >   1 file changed, 56 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> > index 1615effcc191..65b7d460a044 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> > @@ -185,6 +185,11 @@
+> >   		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
+> >   	};
+> >   
+> > +	display_subsystem: display-subsystem {
+> > +		compatible = "rockchip,display-subsystem";
+> > +		ports = <&vop_out>;
+> > +	};
+> > +
+> >   	psci {
+> >   		compatible = "arm,psci-1.0", "arm,psci-0.2";
+> >   		method = "smc";
+> > @@ -626,6 +631,28 @@
+> >   		status = "disabled";
+> >   	};
+> >   
+> > +	vop: vop at ff370000 {
+> > +		compatible = "rockchip,rk3328-vop";
+> > +		reg = <0x0 0xff370000 0x0 0x3efc>;
+> > +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
+> 
+> Another of those rogue trailing zero cells has snuck in here.
 
-We could also try disabling the warning locally in that file with
-_Pragma("GCC disagnostic"), but we lack a little bit of infrastructure
-to do that nicely.
+Oh great.
+Either they are missing when needed or trailing when not needed :-) .
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/kernel/Makefile            | 3 ---
- arch/arm/kernel/head-inflate-data.c | 3 ++-
- 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index b59ac4bf82b8..2e8d40d442a2 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -88,9 +88,6 @@ head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
--# This is executed very early using a temporary stack when no memory allocator
--# nor global data is available. Everything has to be allocated on the stack.
--CFLAGS_head-inflate-data.o := $(call cc-option,-Wframe-larger-than=10240)
- obj-$(CONFIG_XIP_DEFLATED_DATA) += head-inflate-data.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-diff --git a/arch/arm/kernel/head-inflate-data.c b/arch/arm/kernel/head-inflate-data.c
-index 6dd0ce5e6058..b208c4541bd1 100644
---- a/arch/arm/kernel/head-inflate-data.c
-+++ b/arch/arm/kernel/head-inflate-data.c
-@@ -35,10 +35,11 @@ extern char _sdata[];
-  * stack then there is no need to clean up before returning.
-  */
- 
-+static __initdata struct inflate_state state;
-+
- int __init __inflate_kernel_data(void)
- {
- 	struct z_stream_s stream, *strm = &stream;
--	struct inflate_state state;
- 	char *in = __data_loc;
- 	int rc;
- 
--- 
-2.9.0
+> <digression>
+> Unfortunately, even having learned the difference between drm-next and 
+> drm-misc-next (thanks for the pointer!) so I could apply this and the 
+> other series, I only managed to get it to not-quite-work on the box I'm 
+> currently reverse-engineering a mainline DT for (Beelink A1).
+> 
+> I've got a monitor connected via HDMI-DVI (which the stock 3.10 Android 
+> kernel *does* drive happily) - it appears to be detected, but when the 
+> virtual console tries to come up I just see a handful of timeout splats 
+> from drm_atomic_helper_wait_for_vblanks() and no signal at the monitor.
+> 
+> Any idea where to start debugging? (I'm 99% certain I had your clk/next 
+> branch pulled in as well since it looked significant, but I'll 
+> double-check tonight)
+
+I guess first interesting point would be to check if the edid of the monitor
+got read correctly. There are a bunch of funny GRF options related to i2c
+voltages and such that get wiggled on hotplug events and they're not
+really documented at all. (see all the *_5V_* constants in the dw-hdmi).
+
+In my current setup (with a VS0801H hdmi switch between my boardfarm
+and display) it's reading the monitor edid correctly every time, but I
+remember having lots of issues with getting an actual edid at all.
+I may need to check without the switch if this somehow improves the
+situation in my installation.
+
+Also, you could give Rockchip's 4.4 vendor kernel a try [0]. I wasn't even
+aware that rk3328 boxes used a 3.10 kernel in the wild :-) . The 4.4 kernel
+was similarly picky with my monitors edid, if I remember correctly.
+
+Maybe also check your regulators (if any) if they get turned off.
+
+And finally, for completenes sake, I do have a branch sitting on top of
+lima kernel patches and recent mainline that includes everything and
+does bring up the display [and partial gpu support :-) ] for me at [1].
+
+
+Heiko
+
+[0] https://github.com/rockchip-linux/kernel
+[1] https://github.com/mmind/linux-rockchip/tree/devel/lima-yuq-mali450
