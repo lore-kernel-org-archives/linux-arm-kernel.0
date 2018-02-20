@@ -1,86 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Feb 2018 13:01:18 +0000
-Subject: [PATCH 1/3] drm/rockchip: Clear all interrupts before requesting the
- IRQ
-In-Reply-To: <20180220130120.5254-1-marc.zyngier@arm.com>
-References: <20180220130120.5254-1-marc.zyngier@arm.com>
-Message-ID: <20180220130120.5254-2-marc.zyngier@arm.com>
+Date: Tue, 20 Feb 2018 13:01:17 +0000
+Subject: [PATCH 0/3] drm/rockchip: VOP interrupt fixes
+Message-ID: <20180220130120.5254-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling request_irq() followed by disable_irq() is usually a bad idea,
-specially if the interrupt can be pending, and you're not yet in a
-position to handle it.
+This small series fixes a number of issues that I found while trying
+to get kexec working on the Chromebook Plus (aka rk3399-gru-kevin) in
+order to use it as some sort of interactive bootloader.
 
-This is exactly what happens on my kevin system when rebooting in a
-second kernel using kexec: Some interrupt is left pending from
-the previous kernel, and we take it too early, before disable_irq()
-could do anything.
+The main issue is that the vop driver expects the interrupts to be
+cleared and disabled when booting. Nothing could be more wrong. The
+device should be expected to be alive and screaming, and it is the
+driver's job to put it back into a sane state.
 
-Let's clear the pending interrupts as we initialize the HW, and move
-the interrupt request after that point. This ensures that we're in
-a sane state when the interrupt is requested.
+This is what the first patch does, making sure the interrupt is
+requested only when the device has been put back into a known
+state. Given that this is an observable bug that has been around for a
+while, I've tagged it with a Cc: stable.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+The two following patches are less important: Using memcpy on MMIO
+ranges is plain wrong, and using spin_lock_irqsave in irq context is
+slightly pointless.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index ba7505292b78..7b224e08cbf1 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1414,6 +1414,9 @@ static int vop_initial(struct vop *vop)
- 	usleep_range(10, 20);
- 	reset_control_deassert(ahb_rst);
- 
-+	VOP_INTR_SET_TYPE(vop, clear, INTR_MASK, 1);
-+	VOP_INTR_SET_TYPE(vop, enable, INTR_MASK, 0);
-+
- 	memcpy(vop->regsbak, vop->regs, vop->len);
- 
- 	VOP_REG_SET(vop, misc, global_regdone_en, 1);
-@@ -1569,17 +1572,9 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 
- 	mutex_init(&vop->vsync_mutex);
- 
--	ret = devm_request_irq(dev, vop->irq, vop_isr,
--			       IRQF_SHARED, dev_name(dev), vop);
--	if (ret)
--		return ret;
--
--	/* IRQ is initially disabled; it gets enabled in power_on */
--	disable_irq(vop->irq);
--
- 	ret = vop_create_crtc(vop);
- 	if (ret)
--		goto err_enable_irq;
-+		return ret;
- 
- 	pm_runtime_enable(&pdev->dev);
- 
-@@ -1590,13 +1585,19 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 		goto err_disable_pm_runtime;
- 	}
- 
-+	ret = devm_request_irq(dev, vop->irq, vop_isr,
-+			       IRQF_SHARED, dev_name(dev), vop);
-+	if (ret)
-+		goto err_disable_pm_runtime;
-+
-+	/* IRQ is initially disabled; it gets enabled in power_on */
-+	disable_irq(vop->irq);
-+
- 	return 0;
- 
- err_disable_pm_runtime:
- 	pm_runtime_disable(&pdev->dev);
- 	vop_destroy_crtc(vop);
--err_enable_irq:
--	enable_irq(vop->irq); /* To balance out the disable_irq above */
- 	return ret;
- }
- 
+With these patches in, I'm able to get kexec to work. There is still
+some funny issues at the iommu level, but that's for another day.
+
+Patches on top of 4.16-rc2.
+
+Marc Zyngier (3):
+  drm/rockchip: Clear all interrupts before requesting the IRQ
+  drm/rockchip: Do not use memcpy for MMIO addresses
+  drm/rockchip: Don't use spin_lock_irqsave in interrupt context
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 44 +++++++++++++++--------------
+ 1 file changed, 23 insertions(+), 21 deletions(-)
+
 -- 
 2.14.2
