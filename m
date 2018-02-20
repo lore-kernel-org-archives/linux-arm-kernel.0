@@ -1,47 +1,121 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 20 Feb 2018 13:39:25 +0100
-Subject: [PATCH 9/9] serial: xuartps: Fix out-of-bounds access through DT
- alias
-In-Reply-To: <CAMuHMdWe9XkoDKkyfu1pOG0oS0_Tdx1w=OOk05EvTr_dK=tp7Q@mail.gmail.com>
-References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
- <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
- <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
- <CAMuHMdUOKMM5mSrnnrxCi0gX_TbjYkj7vwn11b2D5p7XigM+Ag@mail.gmail.com>
- <6cabf7c6-302e-efa9-8f4d-25fd35ecddad@xilinx.com>
- <CAMuHMdWe9XkoDKkyfu1pOG0oS0_Tdx1w=OOk05EvTr_dK=tp7Q@mail.gmail.com>
-Message-ID: <aa9792b6-14c2-0bf9-712d-f537050ea9df@xilinx.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Feb 2018 13:51:28 +0100
+Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.2.2018 13:27, Geert Uytterhoeven wrote:
-> Hi Michal,
-> 
-> On Tue, Feb 20, 2018 at 12:27 PM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 20.2.2018 11:38, Geert Uytterhoeven wrote:
->>> On Tue, Feb 20, 2018 at 11:22 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>> On 20.2.2018 10:40, Geert Uytterhoeven wrote:
->>>>> The cdns_uart_port[] array is indexed using a value derived from the
->>>>> "serialN" alias in DT, which may lead to an out-of-bounds access.
->>>>>
->>>>> Fix this by adding a range check.
-> 
->> I have checked 4 patches I have sent in past which didn't reach mainline
->> (probably because of RFC)
->> Take a look at
->> https://www.spinics.net/lists/linux-serial/msg27106.html
->>
->> I have removed cdns_uart_port array completely there.
-> 
-> Nice! I'd love to get rid of fixed arrays in serial...
-> 
-> However, IMHO it's still worthwhile to fix the out-of-bounds access first,
-> as that fix can be backported to stable kernels easily.
+On Mon, Feb 12, 2018 at 6:44 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> this series has been around for some time as RFC, and it has collected
+> useful comments from the community along the way.
+> The solution proposed by this patch set works for most R-Car Gen2 and
+> RZ/G1 devices, but not all of them. We now know that for some R-Car
+> Gen2 early revisions there is no proper software fix. Anyway, no
+> product has been built around early revisions, but development boards
+> mounting early revisions (basically prototypes) are still out there.
+> As a result, this series isn't enabling the internal watchdog on R-Car
+> Gen2 boards, developers may enable it in board specific device trees
+> if needed.
+> This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
+> and Koelsch boards.
+>
+> The problem
+> ===========
+> To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
+> to ICRAM1 and we program the [S]BAR registers so that when we turn ON
+> the non-boot CPUs they are redirected to the reset vector installed by
+> Linux in ICRAM1, and eventually they continue the execution to RAM,
+> where the SMP bring-up code will take care of the rest.
+> The content of the [S]BAR registers survives a watchdog triggered reset,
+> and as such after the watchdog fires the boot core will try and execute
+> the SMP bring-up code instead of jumping to the bootrom code.
+>
+> The fix
+> =======
+> The main strategy for the solution is to let the reset vector decide
+> if it needs to jump to shmobile_boot_fn or to the bootrom code.
+> In a watchdog triggered reset scenario, since the [S]BAR registers keep
+> their values, the boot CPU will jump into the newly designed reset
+> vector, the assembly routine will eventually test WOVF (a bit in register
+> RWTCSRA that indicates if the watchdog counter has overflown, the value
+> of this bit gets retained in this scenario), and jump to the bootrom code
+> which will in turn load up the bootloader, etc.
+> When bringing up SMP or using CPU hotplug, the reset vector will jump
+> to shmobile_boot_fn instead.
+>
+> Thank you All for your help.
+>
+> Best regards,
+>
+> Fabrizio Castro (26):
+>   ARM: shmobile: Add watchdog support
+>   ARM: dts: r8a7743: Adjust SMP routine size
+>   ARM: dts: r8a7745: Adjust SMP routine size
+>   ARM: dts: r8a7790: Adjust SMP routine size
+>   ARM: dts: r8a7791: Adjust SMP routine size
+>   ARM: dts: r8a7792: Adjust SMP routine size
+>   ARM: dts: r8a7793: Adjust SMP routine size
+>   ARM: dts: r8a7794: Adjust SMP routine size
+>   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
+>   ARM: shmobile: rcar-gen2: Add watchdog support
+>   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
+>   watchdog: renesas_wdt: Add R-Car Gen2 support
+>   watchdog: renesas_wdt: Add restart handler
+>   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+>   clk: renesas: r8a7743: Add rwdt clock
+>   clk: renesas: r8a7745: Add rwdt clock
+>   clk: renesas: r8a7790: Add rwdt clock
+>   clk: renesas: r8a7791/r8a7793: Add rwdt clock
+>   clk: renesas: r8a7794: Add rwdt clock
+>   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
+>   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+>   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+>
+>  .../devicetree/bindings/watchdog/renesas-wdt.txt   | 19 ++++++--
+>  arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  5 ++
+>  arch/arm/boot/dts/r8a7743.dtsi                     | 12 ++++-
+>  arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |  5 ++
+>  arch/arm/boot/dts/r8a7745.dtsi                     | 12 ++++-
+>  arch/arm/boot/dts/r8a7790.dtsi                     | 12 ++++-
+>  arch/arm/boot/dts/r8a7791.dtsi                     | 12 ++++-
+>  arch/arm/boot/dts/r8a7792.dtsi                     |  2 +-
+>  arch/arm/boot/dts/r8a7793.dtsi                     |  2 +-
+>  arch/arm/boot/dts/r8a7794.dtsi                     | 12 ++++-
+>  arch/arm/configs/shmobile_defconfig                |  1 +
+>  arch/arm/mach-shmobile/common.h                    |  6 +++
+>  arch/arm/mach-shmobile/headsmp.S                   | 55 ++++++++++++++++++++++
+>  arch/arm/mach-shmobile/platsmp-apmu.c              |  1 +
+>  arch/arm/mach-shmobile/pm-rcar-gen2.c              | 15 ++++--
+>  drivers/clk/renesas/r8a7743-cpg-mssr.c             |  2 +
+>  drivers/clk/renesas/r8a7745-cpg-mssr.c             |  2 +
+>  drivers/clk/renesas/r8a7790-cpg-mssr.c             |  2 +
+>  drivers/clk/renesas/r8a7791-cpg-mssr.c             |  2 +
+>  drivers/clk/renesas/r8a7794-cpg-mssr.c             |  2 +
+>  drivers/soc/renesas/rcar-rst.c                     | 35 +++++++++++---
+>  drivers/watchdog/renesas_wdt.c                     | 39 +++++++++++++--
 
-I agree with you. Not a problem with your patch and for me it won't be
-problem to rebase.
+Thanks, I've queued the clock patches in clk-renesas-for-v4.17, as they are
+a hard dependency for:
+  (1) The new reset vector in arch/arm/mach-shmobile/
+  (2) The watchdog driver.
 
-I would love to get rid of CDNS_UART_NR_PORTS but unfortunately this is
-passed to core via .nr.
+Note that the watchdog driver itself (2) has a hard dependency on the
+new reset vector (1).
 
-Thanks,
-Michal
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
