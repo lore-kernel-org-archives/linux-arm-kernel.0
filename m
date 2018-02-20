@@ -1,38 +1,38 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 20 Feb 2018 10:40:19 +0100
-Subject: [PATCH 4/9] serial: mxs-auart: Fix out-of-bounds access through DT
+Date: Tue, 20 Feb 2018 10:40:17 +0100
+Subject: [PATCH 2/9] serial: fsl_lpuart: Fix out-of-bounds access through DT
  alias
 In-Reply-To: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
 References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1519119624-1268-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1519119624-1268-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The auart_port[] array is indexed using a value derived from the
+The lpuart_ports[] array is indexed using a value derived from the
 "serialN" alias in DT, which may lead to an out-of-bounds access.
 
 Fix this by adding a range check.
 
-Fixes: cabf23e7aa00b145 ("serial: mxs-auart: Fix out-of-bounds access through DT alias")
+Fixes: 970416c691dc68b5 ("serial: fsl_lpuart: Fix out-of-bounds access through DT alias")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/tty/serial/mxs-auart.c | 4 ++++
+ drivers/tty/serial/fsl_lpuart.c | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 079dc47aa142d8e1..7ec1298512facfc8 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -1663,6 +1663,10 @@ static int mxs_auart_probe(struct platform_device *pdev)
- 		s->port.line = pdev->id < 0 ? 0 : pdev->id;
- 	else if (ret < 0)
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 8cf112f2efc30707..5218e2ed1ba90a5b 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -2145,6 +2145,10 @@ static int lpuart_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
  		return ret;
-+	if (s->port.line >= MXS_AUART_PORTS) {
-+		dev_err(&pdev->dev, "serial%d out of range\n", s->port.line);
+ 	}
++	if (ret >= UART_NR) {
++		dev_err(&pdev->dev, "serial%d out of range\n", ret);
 +		return -EINVAL;
 +	}
- 
- 	if (of_id) {
- 		pdev->id_entry = of_id->data;
+ 	sport->port.line = ret;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
 -- 
 2.7.4
