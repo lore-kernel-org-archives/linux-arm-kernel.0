@@ -1,112 +1,122 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 20 Feb 2018 10:04:54 +0100
-Subject: [PATCH] drm/meson: fix vsync buffer update
-In-Reply-To: <20180219151900.GP22199@phenom.ffwll.local>
-References: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
- <20180219151900.GP22199@phenom.ffwll.local>
-Message-ID: <261b72e2-554c-6fcc-34ea-1e4f8201d21e@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Feb 2018 09:07:38 +0000
+Subject: [PATCH v2] irqchip/gic-v3-its: Add workaround for ThunderX2
+ erratum #174
+In-Reply-To: <20180219211151.GA158953@jc-sabre>
+References: <20180118052820.30286-1-ganapatrao.kulkarni@cavium.com>
+ <20180121070038.GA4450@jc-sabre>
+ <86po635trt.wl-marc.zyngier@arm.com>
+ <20180219211151.GA158953@jc-sabre>
+Message-ID: <86lgfoc9lx.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/2018 16:19, Daniel Vetter wrote:
-> On Thu, Feb 15, 2018 at 11:19:36AM +0100, Neil Armstrong wrote:
->> The plane buffer address/stride/height was incorrectly updated in the
->> plane_atomic_update operation instead of the vsync irq.
->> This patch delays this operation in the vsync irq along with the
->> other plane delayed setup.
->>
->> This issue was masked using legacy framebuffer and X11 modesetting, but
->> is clearly visible using gbm rendering when buffer is submitted late after
->> vblank, like using software decoding and OpenGL rendering in Kodi.
->> With this patch, tearing and other artifacts disappears completely.
+On Mon, 19 Feb 2018 21:12:10 +0000,
+Jayachandran C wrote:
 > 
-> You mean the frontbuffer rendering nature of X11 with all it's tearing
-> made the issue not noticeable? I'm also not clear what you mean with
-> legacy framebuffer ...
-
-Yeah I don't have to correct technical terms, sorry.
-
+> On Sun, Jan 21, 2018 at 11:35:34AM +0000, Marc Zyngier wrote:
+> > On Sun, 21 Jan 2018 07:00:48 +0000,
+> > Jayachandran C wrote:
+> > > 
+> > > On Thu, Jan 18, 2018 at 10:58:20AM +0530, Ganapatrao Kulkarni wrote:
+> > > > This erratum is observed on the ThunderX2 GICv3 ITS. When a
+> > > > MOVI command is used to change affinity of a LPI to a collection/cpu
+> > > > on another node, the LPI is not delivered to the cpu.
+> > > > An additional INV command is required after the MOVI to deliver
+> > > > the LPI to the new destination.
+> > > > 
+> > > > If we add INV after MOVI, there is a chance that we lose LPIs which
+> > > > are raised when the affinity is changed. So for now, adding workaround fix
+> > > > to disable inter node affinity change.
+> > > > 
+> > > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > > > ---
+> > > > 
+> > > > v2: Added workaround to avoid inter node affinity change.
+> > > > 
+> > > > v1: Initial patch
+> > > > 
+> > > >  Documentation/arm64/silicon-errata.txt |  1 +
+> > > >  arch/arm64/Kconfig                     | 10 ++++++++++
+> > > >  drivers/irqchip/irq-gic-v3-its.c       | 21 ++++++++++++++++++++-
+> > > >  3 files changed, 31 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> > > > index fc1c884..fb27cb5 100644
+> > > > --- a/Documentation/arm64/silicon-errata.txt
+> > > > +++ b/Documentation/arm64/silicon-errata.txt
+> > > > @@ -63,6 +63,7 @@ stable kernels.
+> > > >  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+> > > >  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
+> > > >  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+> > > > +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
+> > > >  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+> > > >  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+> > > >  |                |                 |                 |                             |
+> > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > > index c9a7e9e..0dbf3bd 100644
+> > > > --- a/arch/arm64/Kconfig
+> > > > +++ b/arch/arm64/Kconfig
+> > > > @@ -461,6 +461,16 @@ config ARM64_ERRATUM_843419
+> > > >  
+> > > >  	  If unsure, say Y.
+> > > >  
+> > > > +config CAVIUM_ERRATUM_174
+> > > > +	bool "Cavium ThunderX2 erratum 174"
+> > > > +	default y
+> > > > +	help
+> > > > +	  Cavium ThunderX2 dual socket systems may loose interrupts
+> > > > +	  on affinity change to a cpu on other node.
+> > > > +	  This workaround fix avoids inter node affinity change.
+> > > 
+> > > This has to be fixed up to match the commit message (and for spelling).
+> > > I have seen some questions offlist about how important this fix is,
+> > > and how it can affect users - so that would be useful to have in the
+> > > description as well.
+> > > 
+> > > To clarify, this errata comes into play only when the irq affinity is
+> > > forced from the node given by the device (and ITS) affinity to another
+> > > node.  This should not happen in normal, useful configurations.
+> > 
+> > Define normal. That's all under control of userspace, and the kernel
+> > doesn't really have a say. irqbalance will happily move interrupts
+> > around. Disable all CPUs from node at runtime (again, from userspace),
+> > and you'll get the exact same thing. I can't see what's so "abnormal"
+> > about any of that.
+> > 
+> > > Also, we will hold further posting of this errata until we do another
+> > > round of investigation with the hardware team for a better solution.
+> > > If we can handle the pending interrupts for the small window of MOVI/INV
+> > > in first workaround, we will not need this restriction at all.
+> > 
+> > What do you mean by "If we can handle the pending interrupts for the
+> > small window of MOVI/INV"? Taking the interrupt on the source CPU?
+> > Sure, that would be fine. But that's assuming that the souce CPU is in
+> > a position to actually handle this, and is not simply going down.
+> > 
+> > If there is only a slight possibility that you may loose an interrupt
+> > in the MOVI/INV window (which is not that small, since that's a 4
+> > command sequence), your only other solution is to inject a spurious
+> > interrupt to replace the one you may have lost in that window.
+> > 
+> > In the meantime, and until I see a patch fixing this (or a decent
+> > explanation of why this isn't a problem), I'll consider it broken.
 > 
-> Either way looks reasonable:
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> After reviewing the issue with our hardware team, we decided to
+> tweak the redistributor cache configuration from firmware rather
+> than go with this errata workaournd in Linux (and other OSes).
+> 
+> So, with the new firmware MOVI will work across nodes as expected,
+> and this patch is no longer neeeded.
+
+That's good news! One question though: how do we detect the old (or
+new) firmware? We'd still need mitigation for the "old firmware"
+case, unless you have a way to guarantee that all existing boxes are
+magically updated to a fixed version?
 
 Thanks,
 
-Pushed to drm-misc-fixes.
+	M.
 
-Neil
-
-> 
->> Cc: Michal Lazo <michal.lazo@gmail.com>
->> Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/gpu/drm/meson/meson_crtc.c  | 6 ++++++
->>  drivers/gpu/drm/meson/meson_drv.h   | 3 +++
->>  drivers/gpu/drm/meson/meson_plane.c | 7 +++----
->>  3 files changed, 12 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
->> index 5155f01..0552020 100644
->> --- a/drivers/gpu/drm/meson/meson_crtc.c
->> +++ b/drivers/gpu/drm/meson/meson_crtc.c
->> @@ -36,6 +36,7 @@
->>  #include "meson_venc.h"
->>  #include "meson_vpp.h"
->>  #include "meson_viu.h"
->> +#include "meson_canvas.h"
->>  #include "meson_registers.h"
->>  
->>  /* CRTC definition */
->> @@ -192,6 +193,11 @@ void meson_crtc_irq(struct meson_drm *priv)
->>  		} else
->>  			meson_vpp_disable_interlace_vscaler_osd1(priv);
->>  
->> +		meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
->> +			   priv->viu.osd1_addr, priv->viu.osd1_stride,
->> +			   priv->viu.osd1_height, MESON_CANVAS_WRAP_NONE,
->> +			   MESON_CANVAS_BLKMODE_LINEAR);
->> +
->>  		/* Enable OSD1 */
->>  		writel_bits_relaxed(VPP_OSD1_POSTBLEND, VPP_OSD1_POSTBLEND,
->>  				    priv->io_base + _REG(VPP_MISC));
->> diff --git a/drivers/gpu/drm/meson/meson_drv.h b/drivers/gpu/drm/meson/meson_drv.h
->> index 5e8b392..8450d6ac 100644
->> --- a/drivers/gpu/drm/meson/meson_drv.h
->> +++ b/drivers/gpu/drm/meson/meson_drv.h
->> @@ -43,6 +43,9 @@ struct meson_drm {
->>  		bool osd1_commit;
->>  		uint32_t osd1_ctrl_stat;
->>  		uint32_t osd1_blk0_cfg[5];
->> +		uint32_t osd1_addr;
->> +		uint32_t osd1_stride;
->> +		uint32_t osd1_height;
->>  	} viu;
->>  
->>  	struct {
->> diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
->> index d0a6ac8..27bd350 100644
->> --- a/drivers/gpu/drm/meson/meson_plane.c
->> +++ b/drivers/gpu/drm/meson/meson_plane.c
->> @@ -164,10 +164,9 @@ static void meson_plane_atomic_update(struct drm_plane *plane,
->>  	/* Update Canvas with buffer address */
->>  	gem = drm_fb_cma_get_gem_obj(fb, 0);
->>  
->> -	meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
->> -			   gem->paddr, fb->pitches[0],
->> -			   fb->height, MESON_CANVAS_WRAP_NONE,
->> -			   MESON_CANVAS_BLKMODE_LINEAR);
->> +	priv->viu.osd1_addr = gem->paddr;
->> +	priv->viu.osd1_stride = fb->pitches[0];
->> +	priv->viu.osd1_height = fb->height;
->>  
->>  	spin_unlock_irqrestore(&priv->drm->event_lock, flags);
->>  }
->> -- 
->> 2.7.4
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
+-- 
+Jazz is not dead, it just smell funny.
