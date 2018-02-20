@@ -1,29 +1,36 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Mon, 19 Feb 2018 18:46:14 -0500
-Subject: [PATCH] arm64: Make L1_CACHE_SHIFT configurable
-In-Reply-To: <126b2cc2-a61e-b30d-1ff9-ea30af7abf57@gmail.com>
-References: <1518479125-14428-1-git-send-email-f.fainelli@gmail.com>
- <ca6c47f9-86df-bcdb-bbe1-eac9db68ec33@codeaurora.org>
- <ffc090d5-62c9-e608-32e2-8d13d01234e6@gmail.com>
- <f5d6d768-d354-56b5-ce0c-4f46d4e6d642@codeaurora.org>
- <126b2cc2-a61e-b30d-1ff9-ea30af7abf57@gmail.com>
-Message-ID: <9a5190d1-eb8d-0275-d8d9-39de622a679c@jonmasters.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 19 Feb 2018 18:06:59 -0600
+Subject: syscon regmap for disabled node?
+In-Reply-To: <CAK8P3a25wQiCreFB3qBuyE86GvwmjpZmqyTszF-ZBJRDPwHotQ@mail.gmail.com>
+References: <e9863f03-f1b5-9158-76f3-37158a0b4cd4@ti.com>
+ <CAK8P3a25wQiCreFB3qBuyE86GvwmjpZmqyTszF-ZBJRDPwHotQ@mail.gmail.com>
+Message-ID: <112b03a1-8f2d-dddf-529c-e70561722722@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 07:17 PM, Florian Fainelli wrote:
-> On 02/12/2018 04:10 PM, Timur Tabi wrote:
->> On 02/12/2018 05:57 PM, Florian Fainelli wrote:
->>> That is debatable, is there a good publicly available table of what the
->>> typical L1 cache line size is on ARMv8 platforms?
+On 02/17/2018 01:51 PM, Arnd Bergmann wrote:
+> On Sat, Feb 17, 2018 at 2:40 AM, Suman Anna <s-anna@ti.com> wrote:
+>> Hi Pankaj, Arnd, Lee,
+>>
+>> I am testing some code to use a syscon/regmap interface and I find that
+>> the syscon/regmap is initialized even on a disabled device node using a
+>> "syscon" compatible property when I have expected it to fail. Prior to
+>> commit bdb0066df96e ("mfd: syscon: Decouple syscon interface from
+>> platform devices"), the driver would have never probed, and the
+>> of_syscon_register() only checks for the compatible, but not if the
+>> device node is available. Is this intentional or a bug?
+> 
+> My guess would be that nothing relies on the current behavior and that
+> it could be changed if it causes problems, but it's hard to tell for the general
+> case.
+> 
+> Can you describe why you have a disabled syscon node? Most uses of the
+> status property are for on-chip devices that we disable because nothing is
+> connected to them, but that seems unlikely for a syscon.
 
-With a server hat on...
+I am just testing the failure paths in my code by specifically disabling
+the syscon node, and to my surprise, the code went through fine when I
+had expected the syscon_node_to_regmap() call to fail.
 
-There are many ARMv8 server platforms that do 64b today, but future
-designs are likely to head toward 128b (for a variety of reasons). Many
-of the earlier designs were 64b because that's what certain other arches
-were using in their server cores. I doubt Vulcan will remain a unique
-and special case for very long. On the CCIX side of things, I've been
-trying to push people to go with 128b lines in future designs too.
-
-Jon.
+regards
+Suman
