@@ -1,121 +1,235 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 20 Feb 2018 16:00:36 +0200
-Subject: [PATCH v2] usb: host: ehci-platform: add support for optional
- external vbus supply
-In-Reply-To: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
-References: <1519131492-27913-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <bfaa3001-d90f-7903-17e8-90af9a03c338@ti.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 20 Feb 2018 16:02:18 +0200
+Subject: [PATCH 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <20180220090827.913-3-ard.biesheuvel@linaro.org>
+References: <20180220090827.913-1-ard.biesheuvel@linaro.org>
+ <20180220090827.913-3-ard.biesheuvel@linaro.org>
+Message-ID: <CAHp75VeUJpXLpL55erp+uoMH4jqppoG5zTt1DcffqNYPsJMdUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 20, 2018 at 11:08 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> This is a cleaned up version of the I2C controller driver for
+> the Fujitsu F_I2C IP, which was never supported upstream, and
+> has now been incorporated into the Socionext SynQuacer SoC.
+>
 
-On 20/02/18 14:58, Amelie Delaunay wrote:
-> On some boards, especially when vbus supply requires large current,
-> and the charge pump on the PHY isn't enough, an external vbus power switch
-> may be used.
-> Add support for this optional external vbus supply in ehci-platform.
-> 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> 
-> ---
-> Changes in v2:
->  * Address Roger Quadros comments: move regulator_enable/disable from
-> ehci_platform_power_on/off to ehci_platform_port_power.
-> ---
->  Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
->  drivers/usb/host/ehci-platform.c                   | 31 ++++++++++++++++++++++
->  2 files changed, 32 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index 3efde12..fc480cd 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -19,6 +19,7 @@ Optional properties:
->   - phys : phandle + phy specifier pair
->   - phy-names : "usb"
->   - resets : phandle + reset specifier pair
-> + - vbus-supply : phandle of regulator supplying vbus
->  
+Typical issues below.
 
-Can platforms have more than one regulator e.g. one regulator per port?
+> +/* SPDX-License-Identifier: GPL-2.0 */
 
->  Example (Sequoia 440EPx):
->      ehci at e0000300 {
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index b065a96..05be100 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -29,6 +29,7 @@
->  #include <linux/of.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/reset.h>
->  #include <linux/usb.h>
->  #include <linux/usb/hcd.h>
-> @@ -46,6 +47,7 @@ struct ehci_platform_priv {
->  	struct reset_control *rsts;
->  	struct phy **phys;
->  	int num_phys;
-> +	struct regulator *vbus_supply;
->  	bool reset_on_resume;
->  };
->  
-> @@ -76,6 +78,25 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->  	return 0;
->  }
->  
-> +static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
-> +				    bool enable)
+Shouldn't be // ?
+
+> +#include <linux/init.h>
+
+> +#include <linux/module.h>
+
+Supposed to be one of them, not both.
+
+> +#define WAIT_PCLK(n, rate)     ndelay((((1000000000 +  (rate) - 1) / \
+> +                                        (rate) + n - 1) / n) + 10)
+
+This split makes it harder to catch the calculus.
+Also, you can use DIV_ROUND_UP(), though it longer, but adds a bit of
+clarity to the calculus.
+
+> +#define SYNQUACER_I2C_TIMEOUT(x) (msecs_to_jiffies(x))
+
+Isn't shorter to use original function in place?
+
+> +static inline unsigned long calc_timeout_ms(struct synquacer_i2c *i2c,
+> +                                           struct i2c_msg *msgs,
+> +                                           int num)
 > +{
-> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
-> +	int ret = 0;
+> +       unsigned long bit_count = 0;
+> +       int i;
 > +
-> +	if (priv->vbus_supply) {
-> +		if (enable)
-> +			ret = regulator_enable(priv->vbus_supply);
-> +		else
-> +			ret = regulator_disable(priv->vbus_supply);
-> +		if (ret)
-> +			dev_err(hcd->self.controller,
-> +				"failed to %s vbus supply: %d\n",
-> +				enable ? "enable" : "disable", ret);
-> +	}
-> +	return ret;
+> +       for (i = 0; i < num; i++, msgs++)
+> +               bit_count += msgs->len;
+> +
+> +       return DIV_ROUND_UP(((bit_count * 9) + (10 * num)) * 3, 200) + 10;
+
+Redundant parens surrounding multiplications.
+
+bit_count * 9 + num * 10 ?
+
 > +}
+
+> +static void synquacer_i2c_stop(struct synquacer_i2c *i2c, int ret)
+> +{
+> +       dev_dbg(i2c->dev, "STOP\n");
+
+Hmm... Can't use FTRACE ?
+
 > +
->  static int ehci_platform_power_on(struct platform_device *dev)
->  {
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
-> @@ -134,6 +155,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
->  static const struct ehci_driver_overrides platform_overrides __initconst = {
->  	.reset =		ehci_platform_reset,
->  	.extra_priv_size =	sizeof(struct ehci_platform_priv),
-> +	.port_power =		ehci_platform_port_power,
->  };
->  
->  static struct usb_ehci_pdata ehci_platform_defaults = {
-> @@ -247,6 +269,15 @@ static int ehci_platform_probe(struct platform_device *dev)
->  	if (err)
->  		goto err_put_clks;
->  
-> +	priv->vbus_supply = devm_regulator_get_optional(&dev->dev, "vbus");
-> +	if (IS_ERR(priv->vbus_supply)) {
-> +		err = PTR_ERR(priv->vbus_supply);
-> +		if (err == -ENODEV)
-> +			priv->vbus_supply = NULL;
-> +		else
-> +			goto err_reset;
-> +	}
+> +       /*
+> +        * clear IRQ (INT=0, BER=0)
+> +        * set Stop Condition (MSS=0)
+> +        * Interrupt Disable
+> +        */
+> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BCR);
 > +
->  	if (pdata->big_endian_desc)
->  		ehci->big_endian_desc = 1;
->  	if (pdata->big_endian_mmio)
-> 
+> +       i2c->state = STATE_IDLE;
+> +
+> +       i2c->msg_ptr = 0;
+> +       i2c->msg = NULL;
+> +       i2c->msg_idx++;
+> +       i2c->msg_num = 0;
+> +       if (ret)
+> +               i2c->msg_idx = ret;
+> +
+> +       complete(&i2c->completion);
+> +}
+
+> +       default:
+> +               BUG();
+
+Oh, oh. What is the strong argument to have this kind of crash here?
+
+> +static int synquacer_i2c_master_start(struct synquacer_i2c *i2c,
+> +                                     struct i2c_msg *pmsg)
+> +{
+> +       unsigned char bsr, bcr;
+
+> +       dev_dbg(i2c->dev, "%s slave:0x%02x\n", __func__, pmsg->addr);
+
+__func__ is redundant (See dynamic debug manual how to enable run-time).
+
+> +       /* Force to make one clock pulse */
+
+> +       count = 0;
+> +       for (;;) {
+
+> +               if (++count > 9) {
+> +                       dev_err(i2c->dev, "%s: count: %i, bc2r: 0x%x\n",
+> +                               __func__, count, bc2r);
+> +                       return -EIO;
+> +               }
+> +       }
+
+Personally I think for iterations do {} while approach looks cleaner
+and more understandable:
+
+unsigned int count = 10;
+
+do {
+...
+} while (--count);
+
+> +static int synquacer_i2c_doxfer(struct synquacer_i2c *i2c,
+> +                               struct i2c_msg *msgs, int num)
+> +{
+> +       unsigned char bsr;
+> +       unsigned long timeout, bb_timeout;
+
+> +       int ret = 0;
+
+Redundant assignment.
+
+> +       ret = synquacer_i2c_master_start(i2c, i2c->msg);
+> +       if (ret < 0) {
+> +               dev_dbg(i2c->dev, "Address failed: (0x%08x)\n", ret);
+
+ret as a hex?!?!
+So confusing.
+
+A side note, %#08x will print 0x.
+
+> +out:
+> +       return ret;
+
+Useless label since there is nothing except returning an error code.
+
+> +static int synquacer_i2c_probe(struct platform_device *pdev)
+> +{
+> +       struct synquacer_i2c *i2c;
+> +       struct resource *r;
+> +       int speed_khz;
+> +       int ret;
+
+> +       if (dev_of_node(&pdev->dev)) {
+> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
+> +               if (IS_ERR(i2c->clk)) {
+> +                       dev_err(&pdev->dev, "cannot get clock\n");
+> +                       return PTR_ERR(i2c->clk);
+> +               }
+> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
+> +
+> +               i2c->clkrate = clk_get_rate(i2c->clk);
+> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
+> +               clk_prepare_enable(i2c->clk);
+> +       } else {
+
+> +               ret = device_property_read_u32(&pdev->dev,
+> +                                              "socionext,pclk-rate",
+> +                                              &i2c->clkrate);
+
+I suppose for ACPI we just register a fixed rate clock and use it in
+the driver in the same way as in OF case.
+I guess at some point we even can provide a generic clock provider for
+ACPI based on rate property.
+
+> +               if (ret)
+> +                       return ret;
+> +       }
+
+> +       i2c->state = STATE_IDLE;
+> +       i2c->dev = &pdev->dev;
+
+> +       i2c->msg = NULL;
+
+Isn't it done by z letter in allocation?
+
+
+> +#ifdef CONFIG_PM_SLEEP
+
+__maybe_unused instead of ugly #ifdef:s.
+
+> +static int synquacer_i2c_suspend(struct device *dev)
+
+> +static int synquacer_i2c_resume(struct device *dev)
+
+> +#else
+> +#define SYNQUACER_I2C_PM       NULL
+> +#endif
+
+> +#ifdef CONFIG_OF
+
+OK, this is fine since we have an ACPI ID for it.
+
+> +static const struct of_device_id synquacer_i2c_dt_ids[] = {
+> +       { .compatible = "socionext,synquacer-i2c" },
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, synquacer_i2c_dt_ids);
+> +#endif
+> +
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id synquacer_i2c_acpi_ids[] = {
+> +       { "SCX0003" },
+> +       { /* sentinel */ }
+> +};
+> +#endif
+
+> +static struct platform_driver synquacer_i2c_driver = {
+> +       .probe  = synquacer_i2c_probe,
+> +       .remove = synquacer_i2c_remove,
+> +       .driver = {
+
+> +               .owner = THIS_MODULE,
+
+Macro below will fill this for you.
+
+> +               .name = "synquacer_i2c",
+> +               .of_match_table = of_match_ptr(synquacer_i2c_dt_ids),
+> +               .acpi_match_table = ACPI_PTR(synquacer_i2c_acpi_ids),
+> +               .pm = SYNQUACER_I2C_PM,
+> +       },
+> +};
+> +module_platform_driver(synquacer_i2c_driver);
 
 -- 
-cheers,
--roger
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+With Best Regards,
+Andy Shevchenko
