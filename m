@@ -1,54 +1,72 @@
-From: masami.hiramatsu@linaro.org (Masami Hiramatsu)
-Date: Tue, 20 Feb 2018 19:21:43 +0900
-Subject: [PATCH] ASoC: uniphier: evea: fix typo 'eva' -> 'evea'
-In-Reply-To: <20180220095310.13464-1-suzuki.katsuhiro@socionext.com>
-References: <20180220095310.13464-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAA93ih00RV2rhfMyLupxe+-3xvkLyA-TgpzybPKm4E0FqTJKOg@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 20 Feb 2018 11:22:05 +0100
+Subject: [PATCH 9/9] serial: xuartps: Fix out-of-bounds access through DT
+ alias
+In-Reply-To: <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
+References: <1519119624-1268-1-git-send-email-geert+renesas@glider.be>
+ <1519119624-1268-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <c16b025a-a302-8515-2697-f7eca478e939@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-20 18:53 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+On 20.2.2018 10:40, Geert Uytterhoeven wrote:
+> The cdns_uart_port[] array is indexed using a value derived from the
+> "serialN" alias in DT, which may lead to an out-of-bounds access.
+> 
+> Fix this by adding a range check.
+> 
+> Fixes: 1f118c02a1819856 ("serial: xuartps: Fix out-of-bounds access through DT alias")
 
-Looks good to me:)
+I didn't find this sha1 - patch name is this one.
 
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  drivers/tty/serial/xilinx_uartps.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index b9b2bc76bcac606c..abcb4d09a2d866d0 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -1110,7 +1110,7 @@ static struct uart_port *cdns_uart_get_port(int id)
+>  	struct uart_port *port;
+>  
+>  	/* Try the given port id if failed use default method */
+> -	if (cdns_uart_port[id].mapbase != 0) {
+> +	if (id < CDNS_UART_NR_PORTS && cdns_uart_port[id].mapbase != 0) {
+>  		/* Find the next unused port */
+>  		for (id = 0; id < CDNS_UART_NR_PORTS; id++)
+>  			if (cdns_uart_port[id].mapbase == 0)
+> 
+
+Below should be better fix for this driver.
 
 Thanks,
+Michal
 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
->  sound/soc/uniphier/evea.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
-> index cad7e60de21d..ac2d30b55fb6 100644
-> --- a/sound/soc/uniphier/evea.c
-> +++ b/sound/soc/uniphier/evea.c
-> @@ -292,7 +292,7 @@ static int evea_set_switch_hp(struct snd_kcontrol *kcontrol,
->         return evea_update_switch_hp(evea);
->  }
->
-> -static const struct snd_kcontrol_new eva_controls[] = {
-> +static const struct snd_kcontrol_new evea_controls[] = {
->         SOC_SINGLE_BOOL_EXT("Line Capture Switch", 0,
->                             evea_get_switch_lin, evea_set_switch_lin),
->         SOC_SINGLE_BOOL_EXT("Line Playback Switch", 0,
-> @@ -384,8 +384,8 @@ static struct snd_soc_component_driver soc_codec_evea = {
->         .num_dapm_widgets       = ARRAY_SIZE(evea_widgets),
->         .dapm_routes            = evea_routes,
->         .num_dapm_routes        = ARRAY_SIZE(evea_routes),
-> -       .controls               = eva_controls,
-> -       .num_controls           = ARRAY_SIZE(eva_controls),
-> +       .controls               = evea_controls,
-> +       .num_controls           = ARRAY_SIZE(evea_controls),
->         .idle_bias_on           = 1,
->         .use_pmdown_time        = 1,
->         .endianness             = 1,
-> --
-> 2.16.1
->
+diff --git a/drivers/tty/serial/xilinx_uartps.c
+b/drivers/tty/serial/xilinx_uartps.c
+index b9b2bc76bcac..b77c6477ed93 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1109,6 +1109,9 @@ static struct uart_port *cdns_uart_get_port(int id)
+ {
+        struct uart_port *port;
 
++       if (id >= CDNS_UART_NR_PORTS)
++               return NULL;
++
+        /* Try the given port id if failed use default method */
+        if (cdns_uart_port[id].mapbase != 0) {
+                /* Find the next unused port */
+@@ -1117,9 +1120,6 @@ static struct uart_port *cdns_uart_get_port(int id)
+                                break;
+        }
 
+-       if (id >= CDNS_UART_NR_PORTS)
+-               return NULL;
+-
+        port = &cdns_uart_port[id];
 
--- 
-Masami Hiramatsu
+        /* At this point, we've got an empty uart_port struct,
+initialize it */
