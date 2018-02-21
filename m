@@ -1,101 +1,152 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 21 Feb 2018 08:16:00 -0800
-Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
- document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+Date: Wed, 21 Feb 2018 08:15:58 -0800
+Subject: [PATCH v2 0/8] PECI device driver introduction
+Message-ID: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a dt-bindings document of PECI adapter driver for Aspeed
-AST24xx/25xx SoCs.
+Introduction of the Platform Environment Control Interface (PECI) bus
+device driver. PECI is a one-wire bus interface that provides a
+communication channel between Intel processor and chipset components to
+external monitoring or control devices. PECI is designed to support the
+following sideband functions:
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- .../devicetree/bindings/peci/peci-aspeed.txt       | 73 ++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
+* Processor and DRAM thermal management
+  - Processor fan speed control is managed by comparing Digital Thermal
+    Sensor (DTS) thermal readings acquired via PECI against the
+    processor-specific fan speed control reference point, or TCONTROL.
+    Both TCONTROL and DTS thermal readings are accessible via the processor
+    PECI client. These variables are referenced to a common temperature,
+    the TCC activation point, and are both defined as negative offsets from
+    that reference.
+  - PECI based access to the processor package configuration space provides
+    a means for Baseboard Management Controllers (BMC) or other platform
+    management devices to actively manage the processor and memory power
+    and thermal features.
+
+* Platform Manageability
+  - Platform manageability functions including thermal, power, and error
+    monitoring. Note that platform 'power' management includes monitoring
+    and control for both the processor and DRAM subsystem to assist with
+    data center power limiting.
+  - PECI allows read access to certain error registers in the processor MSR
+    space and status monitoring registers in the PCI configuration space
+    within the processor and downstream devices.
+  - PECI permits writes to certain registers in the processor PCI
+    configuration space.
+
+* Processor Interface Tuning and Diagnostics
+  - Processor interface tuning and diagnostics capabilities
+    (Intel(c) Interconnect BIST). The processors Intel(c) Interconnect
+    Built In Self Test (Intel(c) IBIST) allows for infield diagnostic
+    capabilities in the Intel UPI and memory controller interfaces. PECI
+    provides a port to execute these diagnostics via its PCI Configuration
+    read and write capabilities.
+
+* Failure Analysis
+  - Output the state of the processor after a failure for analysis via
+    Crashdump.
+
+PECI uses a single wire for self-clocking and data transfer. The bus
+requires no additional control lines. The physical layer is a self-clocked
+one-wire bus that begins each bit with a driven, rising edge from an idle
+level near zero volts. The duration of the signal driven high depends on
+whether the bit value is a logic '0' or logic '1'. PECI also includes
+variable data transfer rate established with every message. In this way,
+it is highly flexible even though underlying logic is simple.
+
+The interface design was optimized for interfacing to Intel processor and
+chipset components in both single processor and multiple processor
+environments. The single wire interface provides low board routing
+overhead for the multiple load connections in the congested routing area
+near the processor and chipset components. Bus speed, error checking, and
+low protocol overhead provides adequate link bandwidth and reliability to
+transfer critical device operating conditions and configuration
+information.
+
+This implementation provides the basic framework to add PECI extensions
+to the Linux bus and device models. A hardware specific 'Adapter' driver
+can be attached to the PECI bus to provide sideband functions described
+above. It is also possible to access all devices on an adapter from
+userspace through the /dev interface. A device specific 'Client' driver
+also can be attached to the PECI bus so each processor client's features
+can be supported by the 'Client' driver through an adapter connection in
+the bus. This patch set includes Aspeed 24xx/25xx PECI driver and a generic
+PECI hwmon driver as the first implementation for both adapter and client
+drivers on the PECI bus framework.
+
+v1 -> v2
+- Additionally implemented a core driver to support PECI linux bus driver
+  model.
+- Modified Aspeed PECI driver to make that to be an adapter driver in PECI
+  bus.
+- Modified PECI hwmon driver to make that to be a client driver in PECI
+  bus.
+- Simplified hwmon driver attribute labels and removed redundant strings.
+- Removed core_nums from device tree setting of hwmon driver and modified
+  core number detection logic to check the resolved_core register in
+  client CPU's local PCI configuration area.
+- Removed dimm_nums from device tree setting of hwmon driver and added
+  populated DIMM detection logic to support dynamic creation.
+- Removed indexing gap on core temperature and DIMM temperature attributes.
+- Improved hwmon registration and dynamic attribute creation logic.
+- Fixed structure definitions in PECI uapi header to make that use __u8,
+  __u16 and etc.
+- Modified wait_for_completion_interruptible_timeout error handling logic
+  in Aspeed PECI driver to deliver errors correctly.
+- Removed low-level xfer command from ioctl and kept only high-level PECI
+  command suite as ioctls.
+- Fixed I/O timeout logic in Aspeed PECI driver using ktime.
+- Added a function into hwmon driver to simplify update delay checking.
+- Added a function into hwmon driver to convert 10.6 to millidegree.
+- Dropped non-standard attributes in hwmon driver.
+- Fixed OF table for hwmon to make it indicate as a PECI client of Intel
+  CPU target.
+- Added a maintainer of PECI subsystem into MAINTAINERS document.
+
+Thanks,
+
+-Jae
+
+Jae Hyun Yoo (8):
+  drivers/peci: Add support for PECI bus driver core
+  Documentations: dt-bindings: Add a document of PECI adapter driver for
+    Aspeed AST24xx/25xx SoCs
+  ARM: dts: aspeed: peci: Add PECI node
+  drivers/peci: Add a PECI adapter driver for Aspeed AST24xx/AST25xx
+  Documentation: dt-bindings: Add a document for PECI hwmon client driver
+  Documentation: hwmon: Add a document for a PECI hwmon client driver
+  drivers/hwmon: Add a generic PECI hwmon client driver
+  Add a maintainer for the PECI subsystem
+
+ .../devicetree/bindings/hwmon/peci-hwmon.txt       |   27 +
+ .../devicetree/bindings/peci/peci-aspeed.txt       |   73 ++
+ Documentation/hwmon/peci-hwmon                     |   73 ++
+ MAINTAINERS                                        |    9 +
+ arch/arm/boot/dts/aspeed-g4.dtsi                   |   25 +
+ arch/arm/boot/dts/aspeed-g5.dtsi                   |   25 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/hwmon/Kconfig                              |   10 +
+ drivers/hwmon/Makefile                             |    1 +
+ drivers/hwmon/peci-hwmon.c                         |  928 ++++++++++++++
+ drivers/peci/Kconfig                               |   39 +
+ drivers/peci/Makefile                              |    9 +
+ drivers/peci/peci-aspeed.c                         |  510 ++++++++
+ drivers/peci/peci-core.c                           | 1337 ++++++++++++++++
+ include/linux/peci.h                               |   97 ++
+ include/uapi/linux/peci-ioctl.h                    |  207 +++
+ 17 files changed, 3373 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
  create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
+ create mode 100644 Documentation/hwmon/peci-hwmon
+ create mode 100644 drivers/hwmon/peci-hwmon.c
+ create mode 100644 drivers/peci/Kconfig
+ create mode 100644 drivers/peci/Makefile
+ create mode 100644 drivers/peci/peci-aspeed.c
+ create mode 100644 drivers/peci/peci-core.c
+ create mode 100644 include/linux/peci.h
+ create mode 100644 include/uapi/linux/peci-ioctl.h
 
-diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-new file mode 100644
-index 000000000000..8a86f346d550
---- /dev/null
-+++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-@@ -0,0 +1,73 @@
-+Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
-+
-+Required properties:
-+- compatible
-+	"aspeed,ast2400-peci" or "aspeed,ast2500-peci"
-+	- aspeed,ast2400-peci: Aspeed AST2400 family PECI controller
-+	- aspeed,ast2500-peci: Aspeed AST2500 family PECI controller
-+
-+- reg
-+	Should contain PECI registers location and length.
-+
-+- #address-cells
-+	Should be <1>.
-+
-+- #size-cells
-+	Should be <0>.
-+
-+- interrupts
-+	Should contain PECI interrupt.
-+
-+- clocks
-+	Should contain clock source for PECI hardware module. Should reference
-+	clkin clock.
-+
-+- clock_frequency
-+	Should contain the operation frequency of PECI hardware module.
-+	187500 ~ 24000000
-+
-+Optional properties:
-+- msg-timing-nego
-+	Message timing negotiation period. This value will determine the period
-+	of message timing negotiation to be issued by PECI controller. The unit
-+	of the programmed value is four times of PECI clock period.
-+	0 ~ 255 (default: 1)
-+
-+- addr-timing-nego
-+	Address timing negotiation period. This value will determine the period
-+	of address timing negotiation to be issued by PECI controller. The unit
-+	of the programmed value is four times of PECI clock period.
-+	0 ~ 255 (default: 1)
-+
-+- rd-sampling-point
-+	Read sampling point selection. The whole period of a bit time will be
-+	divided into 16 time frames. This value will determine which time frame
-+	this controller will sample PECI signal for data read back. Usually in
-+	the middle of a bit time is the best.
-+	0 ~ 15 (default: 8)
-+
-+- cmd_timeout_ms
-+	Command timeout in units of ms.
-+	1 ~ 60000 (default: 1000)
-+
-+Example:
-+	peci: peci at 1e78b000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x1e78b000 0x60>;
-+
-+		peci0: peci-bus at 0 {
-+			compatible = "aspeed,ast2500-peci";
-+			reg = <0x0 0x60>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <15>;
-+			clocks = <&clk_clkin>;
-+			clock-frequency = <24000000>;
-+			msg-timing-nego = <1>;
-+			addr-timing-nego = <1>;
-+			rd-sampling-point = <8>;
-+			cmd-timeout-ms = <1000>;
-+		};
-+	};
-\ No newline at end of file
 -- 
 2.16.1
