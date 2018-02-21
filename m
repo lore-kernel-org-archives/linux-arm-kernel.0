@@ -1,66 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 21 Feb 2018 08:37:04 +0000
-Subject: [PATCH 3/7] [HACK] pass endianess flag to LTO linker
-In-Reply-To: <20180220215954.4092811-4-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-4-arnd@arndb.de>
-Message-ID: <CAKv+Gu-Be_saZeHzpWrjJBdeiOSJih0H-d1pjkpj+sq7ytLVyw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 Feb 2018 09:55:26 +0100
+Subject: [PATCH] i2c: busses: i2c-sirf: Fix spelling: "formular" ->
+ "formula".
+In-Reply-To: <20180126201926.18804-1-patryk@kocielnik.pl>
+References: <20180126201926.18804-1-patryk@kocielnik.pl>
+Message-ID: <20180221085526.xjx2fhgrsmydvkfn@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2018 at 21:59, Arnd Bergmann <arnd@arndb.de> wrote:
-> We need some way to pass -mbig-endian to the linker during the
-> LTO link stage, otherwise we get a waning like
->
-> arm-linux-gnueabi/bin/ld: arch/arm/lib/clearbit.o: compiled for a big endian system and target is little endian
->
-> for each file we link in.
->
-> There is probably a better method of passing that flag, I'm just
-> adding it to a different hack that I added earlier for x86 LTO
-> here.
->
+On Fri, Jan 26, 2018 at 09:19:26PM +0100, Patryk Kocielnik wrote:
+> Fix spelling.
+> 
+> Signed-off-by: Patryk Kocielnik <patryk.kocielnik@gmail.com>
 
-In general, LTO requires that *all* C flags are passed to the linker.
-Given that linking now involves code generation, any C flag that
-affects code generation must be visible to the linker as well, which
-includes all the tweaks and overrides that we add per-file or
-per-directory. It is not clear to me how much of this is carried in
-the intermediate representation as metadata, but we should probably
-err on the side of caution here, and update the Kbuild routines to
-pass the complete value of KBUILD_CFLAGS (or whatever it is called) to
-ld as well.
+Applied to for-current, thanks!
 
+Please check for surrounding typos, too, to reduce the amount of
+patches. There was another typo in "Initalisation". I fixed that now.
 
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Makefile | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 33b7eb4502aa..f39c2e2d55c0 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -49,11 +49,13 @@ endif
->
->  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
->  KBUILD_CPPFLAGS        += -mbig-endian
-> +KBUILD_BIARCHFLAGS += -mbig-endian
->  CHECKFLAGS     += -D__ARMEB__
->  AS             += -EB
->  LD             += -EB
->  else
->  KBUILD_CPPFLAGS        += -mlittle-endian
-> +KBUILD_BIARCHFLAGS += -mlittle-endian
->  CHECKFLAGS     += -D__ARMEL__
->  AS             += -EL
->  LD             += -EL
-> --
-> 2.9.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/c61695d2/attachment.sig>
