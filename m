@@ -1,144 +1,54 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Feb 2018 13:57:01 +0100
-Subject: [PATCH 1/3] drm/sun4i: tcon: Reduce the scope of the LVDS error a bit
-Message-ID: <20180221125703.4595-1-maxime.ripard@bootlin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Feb 2018 12:59:27 +0000
+Subject: [PATCH] arm64: Enforce BBM for huge IO/VMAP mappings
+Message-ID: <1519217967-2545-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic to deal with old DT missing the LVDS properties doesn't
-take into account whether the LVDS output is supported in the first place,
-resulting in spurious error messages on SoCs where it doesn't even matter.
+ioremap_page_range doesn't honour break-before-make and attempts to put
+down huge mappings (using p*d_set_huge) over the top of pre-existing
+table entries. This leads to us leaking page table memory and also gives
+rise to TLB conflicts and spurious aborts, which have been seen in
+practice on Cortex-A75.
 
-Introduce a new TCON flag to list if LVDS is supported at all to prevent
-this from happening.
+Until this has been resolved, refuse to put block mappings when the
+existing entry is found to be present.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reported-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reported-by: Lei Li <lious.lilei@hisilicon.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 86 ++++++++++++++++++++------------------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 2 files changed, 46 insertions(+), 41 deletions(-)
+ arch/arm64/mm/mmu.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 3c15cf24b503..6ff0e2e84e81 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -870,52 +870,56 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
--	/*
--	 * This can only be made optional since we've had DT nodes
--	 * without the LVDS reset properties.
--	 *
--	 * If the property is missing, just disable LVDS, and print a
--	 * warning.
--	 */
--	tcon->lvds_rst = devm_reset_control_get_optional(dev, "lvds");
--	if (IS_ERR(tcon->lvds_rst)) {
--		dev_err(dev, "Couldn't get our reset line\n");
--		return PTR_ERR(tcon->lvds_rst);
--	} else if (tcon->lvds_rst) {
--		has_lvds_rst = true;
--		reset_control_reset(tcon->lvds_rst);
--	} else {
--		has_lvds_rst = false;
--	}
-+	if (tcon->quirks->supports_lvds) {
-+		/*
-+		 * This can only be made optional since we've had DT
-+		 * nodes without the LVDS reset properties.
-+		 *
-+		 * If the property is missing, just disable LVDS, and
-+		 * print a warning.
-+		 */
-+		tcon->lvds_rst = devm_reset_control_get_optional(dev, "lvds");
-+		if (IS_ERR(tcon->lvds_rst)) {
-+			dev_err(dev, "Couldn't get our reset line\n");
-+			return PTR_ERR(tcon->lvds_rst);
-+		} else if (tcon->lvds_rst) {
-+			has_lvds_rst = true;
-+			reset_control_reset(tcon->lvds_rst);
-+		} else {
-+			has_lvds_rst = false;
-+		}
- 
--	/*
--	 * This can only be made optional since we've had DT nodes
--	 * without the LVDS reset properties.
--	 *
--	 * If the property is missing, just disable LVDS, and print a
--	 * warning.
--	 */
--	if (tcon->quirks->has_lvds_alt) {
--		tcon->lvds_pll = devm_clk_get(dev, "lvds-alt");
--		if (IS_ERR(tcon->lvds_pll)) {
--			if (PTR_ERR(tcon->lvds_pll) == -ENOENT) {
--				has_lvds_alt = false;
-+		/*
-+		 * This can only be made optional since we've had DT
-+		 * nodes without the LVDS reset properties.
-+		 *
-+		 * If the property is missing, just disable LVDS, and
-+		 * print a warning.
-+		 */
-+		if (tcon->quirks->has_lvds_alt) {
-+			tcon->lvds_pll = devm_clk_get(dev, "lvds-alt");
-+			if (IS_ERR(tcon->lvds_pll)) {
-+				if (PTR_ERR(tcon->lvds_pll) == -ENOENT) {
-+					has_lvds_alt = false;
-+				} else {
-+					dev_err(dev, "Couldn't get the LVDS PLL\n");
-+					return PTR_ERR(tcon->lvds_pll);
-+				}
- 			} else {
--				dev_err(dev, "Couldn't get the LVDS PLL\n");
--				return PTR_ERR(tcon->lvds_pll);
-+				has_lvds_alt = true;
- 			}
--		} else {
--			has_lvds_alt = true;
- 		}
--	}
- 
--	if (!has_lvds_rst || (tcon->quirks->has_lvds_alt && !has_lvds_alt)) {
--		dev_warn(dev,
--			 "Missing LVDS properties, Please upgrade your DT\n");
--		dev_warn(dev, "LVDS output disabled\n");
-+		if (!has_lvds_rst ||
-+		    (tcon->quirks->has_lvds_alt && !has_lvds_alt)) {
-+			dev_warn(dev, "Missing LVDS properties, Please upgrade your DT\n");
-+			dev_warn(dev, "LVDS output disabled\n");
-+			can_lvds = false;
-+		} else {
-+			can_lvds = true;
-+		}
-+	} else {
- 		can_lvds = false;
--	} else {
--		can_lvds = true;
- 	}
- 
- 	ret = sun4i_tcon_init_clocks(dev, tcon);
-@@ -1134,7 +1138,7 @@ static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
- };
- 
- static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
--	/* nothing is supported */
-+	.supports_lvds		= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index b761c7b823c5..278700c7bf9f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -175,6 +175,7 @@ struct sun4i_tcon_quirks {
- 	bool	has_channel_1;	/* a33 does not have channel 1 */
- 	bool	has_lvds_alt;	/* Does the LVDS clock have a parent other than the TCON clock? */
- 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
-+	bool	supports_lvds;   /* Does the TCON support an LVDS output? */
- 
- 	/* callback to handle tcon muxing options */
- 	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 3161b853f29e..84a019f55022 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -933,6 +933,11 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+ {
+ 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
+ 					pgprot_val(mk_sect_prot(prot)));
++
++	/* ioremap_page_range doesn't honour BBM */
++	if (pud_present(READ_ONCE(*pudp)))
++		return 0;
++
+ 	BUG_ON(phys & ~PUD_MASK);
+ 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
+ 	return 1;
+@@ -942,6 +947,11 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
+ {
+ 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
+ 					pgprot_val(mk_sect_prot(prot)));
++
++	/* ioremap_page_range doesn't honour BBM */
++	if (pmd_present(READ_ONCE(*pmdp)))
++		return 0;
++
+ 	BUG_ON(phys & ~PMD_MASK);
+ 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
+ 	return 1;
 -- 
-2.14.3
+2.1.4
