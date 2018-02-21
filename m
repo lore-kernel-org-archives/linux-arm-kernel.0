@@ -1,63 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 21 Feb 2018 09:05:51 +0530
-Subject: [PATCH] cpufreq: scpi: invoke frequency-invariance setter function
-In-Reply-To: <20180220111057.14756-1-dietmar.eggemann@arm.com>
-References: <20180220111057.14756-1-dietmar.eggemann@arm.com>
-Message-ID: <20180221033551.GN28462@vireshk-i7>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Feb 2018 04:49:38 +0100
+Subject: [PATCH 2/3] ARM: orion: mark orion_ge00_mvmdio_bus_name as const
+In-Reply-To: <20180220162519.1498223-2-arnd@arndb.de>
+References: <20180220162519.1498223-1-arnd@arndb.de>
+ <20180220162519.1498223-2-arnd@arndb.de>
+Message-ID: <20180221034938.GE14844@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-02-18, 11:10, Dietmar Eggemann wrote:
-> Commit 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
-> changed the cpufreq driver on juno from arm_big_little to scpi.
+On Tue, Feb 20, 2018 at 05:24:51PM +0100, Arnd Bergmann wrote:
+> A section type mismatch warning shows up when building with LTO,
+> since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
+> const itself:
 > 
-> The scpi set_target function does not call the frequency-invariance
-> setter function arch_set_freq_scale() like the arm_big_little set_target
-> function does. As a result the task scheduler load and utilization
-> signals are not frequency-invariant on this platform anymore.
-> 
-> Fix this by adding a call to arch_set_freq_scale() into
-> scpi_cpufreq_set_target().
-> 
-> Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/cpufreq/scpi-cpufreq.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-> index c32a833e1b00..3101d4e9c2de 100644
-> --- a/drivers/cpufreq/scpi-cpufreq.c
-> +++ b/drivers/cpufreq/scpi-cpufreq.c
-> @@ -51,13 +51,19 @@ static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
->  static int
->  scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->  {
-> +	unsigned long freq = policy->freq_table[index].frequency;
->  	struct scpi_data *priv = policy->driver_data;
-> -	u64 rate = policy->freq_table[index].frequency * 1000;
-> +	u64 rate = freq * 1000;
->  	int ret;
->  
->  	ret = clk_set_rate(priv->clk, rate);
-> -	if (!ret && (clk_get_rate(priv->clk) != rate))
-> -		ret = -EIO;
-> +	if (!ret) {
-> +		if (clk_get_rate(priv->clk) != rate)
-> +			ret = -EIO;
-> +
-> +		arch_set_freq_scale(policy->related_cpus, freq,
-> +				    policy->cpuinfo.max_freq);
-> +	}
->  
->  	return ret;
->  }
+> include/linux/of.h: In function 'spear_setup_of_timer':
+> arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
+>  static const struct of_device_id timer_of_match[] __initconst = {
+>                                   ^
+> arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
+>  static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+>
+> This marks it const as well.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hi Arnd
 
--- 
-viresh
+I'm not sure this is the correct fix. orion_ge00_mvmdio_bus_name is
+assigned to orion_ge00_switch_board_info->bus_id. This is then passed
+to mdiobus_register_board_info() which makes a copy of
+orion_ge00_switch_board_info and adds it to its linked list. The
+original orion_ge00_switch_board_info will get freed since it is
+__initdata, but the copy still has a pointer to
+orion_ge00_mvmdio_bus_name, which also gets freed.
+
+I think the correct fix is to remove the __initconst from
+orion_ge00_mvmdio_bus_name. Marking it const is however valid.
+
+	Andrew
