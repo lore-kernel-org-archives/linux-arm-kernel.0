@@ -1,26 +1,87 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 21 Feb 2018 18:13:49 +0100
-Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
- document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180221171349.GG29204@lunn.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Feb 2018 18:15:04 +0100
+Subject: [PATCH v2 09/19] ARM64: dts: Add R-Car Salvator-x M3-N support
+In-Reply-To: <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
+Message-ID: <20180221171504.dac7yikrqfnjiiog@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 08:16:00AM -0800, Jae Hyun Yoo wrote:
-> This commit adds a dt-bindings document of PECI adapter driver for Aspeed
-> AST24xx/25xx SoCs.
+On Tue, Feb 20, 2018 at 04:46:23PM +0100, Geert Uytterhoeven wrote:
+> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> > Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
+> >
+> > Based on original work from:
+> > Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Magnus Damm <damm+renesas@opensource.se>
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Jae
+Thanks, applied with prefix updated to
 
-It would be good to separate this into two. One binding document for a
-generic adaptor, with a generic PECI bus, and generic client
-devices. List all the properties you expect at the generic level.
+"arm64: dts: renesas:"
 
-Then have an aspeed specific binding for those properties which are
-specific to the Aspeed adaptor.
+There was some fuzz applying this patch, the result is as follows.
 
-	 Andrew
- 
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Subject: [PATCH] arm64: dts: renesas: Add R-Car Salvator-x M3-N support
+
+Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
+
+Based on original work from:
+Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Magnus Damm <damm+renesas@opensource.se>
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/boot/dts/renesas/Makefile                |  1 +
+ arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index c885eef4e660..9ea5ec0daeba 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-h3ulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3ulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
++dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb
+ dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
+ dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb
+ dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+new file mode 100644
+index 000000000000..75d890d91df9
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the Salvator-X board with R-Car M3-N
++ *
++ * Copyright (C) 2018 Jacopo Mondi <jacopo+renesas@jmondi.org>
++ */
++
++/dts-v1/;
++#include "r8a77965.dtsi"
++#include "salvator-x.dtsi"
++
++/ {
++	model = "Renesas Salvator-X board based on r8a77965";
++	compatible = "renesas,salvator-x", "renesas,r8a77965";
++
++	memory at 48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x78000000>;
++	};
++};
+-- 
+2.11.0
