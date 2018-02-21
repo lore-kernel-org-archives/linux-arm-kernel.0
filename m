@@ -1,33 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Feb 2018 17:47:19 +0000
-Subject: [PATCH] arm64: Enforce BBM for huge IO/VMAP mappings
-In-Reply-To: <20180221174423.tdqy43y64tcdzkmw@armageddon.cambridge.arm.com>
-References: <1519217967-2545-1-git-send-email-will.deacon@arm.com>
- <20180221174423.tdqy43y64tcdzkmw@armageddon.cambridge.arm.com>
-Message-ID: <20180221174718.GA3083@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 21 Feb 2018 18:47:31 +0100
+Subject: [PATCH v4 20/40] KVM: arm/arm64: Remove leftover comment from
+ kvm_vcpu_run_vhe
+In-Reply-To: <20180215210332.8648-21-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-21-christoffer.dall@linaro.org>
+Message-ID: <20180221174731.mrykgulbdjesyz4m@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 05:44:24PM +0000, Catalin Marinas wrote:
-> On Wed, Feb 21, 2018 at 12:59:27PM +0000, Will Deacon wrote:
-> > ioremap_page_range doesn't honour break-before-make and attempts to put
-> > down huge mappings (using p*d_set_huge) over the top of pre-existing
-> > table entries. This leads to us leaking page table memory and also gives
-> > rise to TLB conflicts and spurious aborts, which have been seen in
-> > practice on Cortex-A75.
-> > 
-> > Until this has been resolved, refuse to put block mappings when the
-> > existing entry is found to be present.
-> > 
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Reported-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Reported-by: Lei Li <lious.lilei@hisilicon.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Thu, Feb 15, 2018 at 10:03:12PM +0100, Christoffer Dall wrote:
+> The comment only applied to SPE on non-VHE systems, so we simply remove
+> it.
 > 
-> Queued for 4.16. Shall we put a cc stable?
+> Suggested-by: Andrew Jones <drjones@redhat.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 717c8f5c6be7..a99224996e33 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -410,10 +410,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+>  	}
+>  
+> -	/*
+> -	 * This must come after restoring the host sysregs, since a non-VHE
+> -	 * system may enable SPE here and make use of the TTBRs.
+> -	 */
+>  	__debug_switch_to_host(vcpu);
+>  
+>  	return exit_code;
+> -- 
+> 2.14.2
+>
 
-Yes, good idea:
-
-Fixes: 324420bf91f60 ("arm64: add support for ioremap() block mappings")
-
-Will
+Reviewed-by: Andrew Jones <drjones@redhat.com>
