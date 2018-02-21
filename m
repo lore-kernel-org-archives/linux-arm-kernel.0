@@ -1,33 +1,28 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 21 Feb 2018 18:43:49 +0100
-Subject: [PATCH v4 16/40] KVM: arm64: Remove noop calls to timer
- save/restore from VHE switch
-In-Reply-To: <20180215210332.8648-17-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-17-christoffer.dall@linaro.org>
-Message-ID: <20180221174349.3e7kpo475k3pi6rv@kamzik.brq.redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 21 Feb 2018 17:44:24 +0000
+Subject: [PATCH] arm64: Enforce BBM for huge IO/VMAP mappings
+In-Reply-To: <1519217967-2545-1-git-send-email-will.deacon@arm.com>
+References: <1519217967-2545-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180221174423.tdqy43y64tcdzkmw@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 10:03:08PM +0100, Christoffer Dall wrote:
-> The VHE switch function calls __timer_enable_traps and
-> __timer_disable_traps which don't do anything on VHE systems.
-> Therefore, simply remove these calls from the VHE switch function and
-> make the functions non-conditional as they are now only called from the
-> non-VHE switch path.
+On Wed, Feb 21, 2018 at 12:59:27PM +0000, Will Deacon wrote:
+> ioremap_page_range doesn't honour break-before-make and attempts to put
+> down huge mappings (using p*d_set_huge) over the top of pre-existing
+> table entries. This leads to us leaking page table memory and also gives
+> rise to TLB conflicts and spurious aborts, which have been seen in
+> practice on Cortex-A75.
 > 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
+> Until this has been resolved, refuse to put block mappings when the
+> existing entry is found to be present.
 > 
-> Notes:
->     Changes since v2:
->      - Added comment explaining the timer enable/disable functions
->        are for !VHE only.
-> 
->  arch/arm64/kvm/hyp/switch.c |  2 --
->  virt/kvm/arm/hyp/timer-sr.c | 44 ++++++++++++++++++++++----------------------
->  2 files changed, 22 insertions(+), 24 deletions(-)
->
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Reported-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Reported-by: Lei Li <lious.lilei@hisilicon.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Queued for 4.16. Shall we put a cc stable?
+
+-- 
+Catalin
