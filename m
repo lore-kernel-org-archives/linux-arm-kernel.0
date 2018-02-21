@@ -1,56 +1,83 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 21 Feb 2018 16:54:42 +0100
-Subject: [PATCH v4 5/6] extcon: add possibility to get extcon device by
- OF node
-In-Reply-To: <CAHp75VdxGDCGQBN05bL3_h8P62-v6+5oGW3M7CA+701o15ZXnQ@mail.gmail.com>
-References: <CGME20180221085608eucas1p162d2e579a1cc887672b722458edb98fe@eucas1p1.samsung.com>
- <20180221085541.14556-1-a.hajda@samsung.com>
- <20180221085541.14556-6-a.hajda@samsung.com>
- <CAHp75VdxGDCGQBN05bL3_h8P62-v6+5oGW3M7CA+701o15ZXnQ@mail.gmail.com>
-Message-ID: <6da27f54-76d0-2ac8-666e-e3ebfc71b2c1@samsung.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 21 Feb 2018 21:30:34 +0530
+Subject: [PATCH v2 00/10] Add Actions Semi S900 pinctrl and gpio support
+Message-ID: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.02.2018 15:27, Andy Shevchenko wrote:
-> On Wed, Feb 21, 2018 at 10:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
->> Since extcon property is not allowed in DT, extcon subsystem requires
->> another way to get extcon device. Lets try the simplest approach - get
->> edev by of_node.
->> +/*
->> + * extcon_get_edev_by_of_node - Get the extcon device from devicetree.
->> + * @node       : OF node identyfying edev
->> + *
->> + * Return the pointer of extcon device if success or ERR_PTR(err) if fail.
->> + */
->> +struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
-> First of all, the all other similar cases use "_by_node" in the name.
+This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
+Pinctrl and gpio subsystems share the common set of register range but
+implemented as individual drivers for making it less complex.
 
-OK, looks better.
+Pinmux functions are only accessible for pin groups while pinconf
+parameters are available for both pin groups and individual pins.
 
-> Second, it's not _get_, it's _find_.
+gpio-line-names has been added for the Bubblegum-96 board matching the
+96Boards CE specification v1.0.
 
-The patch splits exisiting extcon_get_edev_by_phandle function into two
-functions, nothing more.
-Thus it followed naming convention present in extcon framework. I can
-switch it of course to _find_.
+Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
 
->
->> +{
->> +       struct extcon_dev *edev;
->> +
->> +       mutex_lock(&extcon_dev_list_lock);
->> +       list_for_each_entry(edev, &extcon_dev_list, entry)
->> +               if (edev->dev.parent && edev->dev.parent->of_node == node)
->> +                       goto out;
->> +       edev = ERR_PTR(-EPROBE_DEFER);
->> +out:
->> +       mutex_unlock(&extcon_dev_list_lock);
->> +
->> +       return edev;
-> Can't it be done using bus_find_device()?
+This patchset depends on the clock driver which is still under review:
+https://lkml.org/lkml/2018/2/9/831
 
-There is no special extcon bus, so I am not sure. Anyway if it can, it
-should be done probably in another patch.
+There is also S500 pinctrl and gpio driver developed by Andreas Farber
+independently to this patchset.
+https://github.com/afaerber/linux/commits/bg96-next
 
-Regards
-Andrzej
+If this patchseries seems to be good enough to add base OWL pinctrl and
+gpio support. Then, we may decide on adding S500 support on top of this later
+by reusing the pinctrl definitions from Andreas.
+
+Thanks,
+Mani
+
+Changes in v2:
+
+* Implemented each GPIO bank as its own gpio-controller
+* Added gpio-ranges property
+* Modified pin group to follow pad names instead of register names
+* Incorporated review comments from Andy
+* Incorporated review comments from Andreas
+* Fixed the MODULE_LICENSE with respect to SPDX tag
+* Added Reviewed by tag from Rob for pinctrl binding
+
+Manivannan Sadhasivam (10):
+  dt-bindings: pinctrl: Add bindings for Actions S900 SoC
+  arm64: dts: actions: Add pinctrl node for S900
+  arm64: actions: Enable PINCTRL in platforms Kconfig
+  pinctrl: actions: Add Actions S900 pinctrl driver
+  dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
+  arm64: dts: actions: Add S900 gpio nodes
+  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+  gpio: Add gpio driver for Actions OWL S900 SoC
+  MAINTAINERS: Add reviewer for ACTIONS platforms
+  MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
+
+ .../devicetree/bindings/gpio/actions,owl-gpio.txt  |   76 +
+ .../bindings/pinctrl/actions,s900-pinctrl.txt      |  178 ++
+ MAINTAINERS                                        |    5 +
+ arch/arm64/Kconfig.platforms                       |    1 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  201 ++
+ arch/arm64/boot/dts/actions/s900.dtsi              |   54 +
+ drivers/gpio/Kconfig                               |    8 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-owl.c                            |  219 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/actions/Kconfig                    |   12 +
+ drivers/pinctrl/actions/Makefile                   |    2 +
+ drivers/pinctrl/actions/pinctrl-owl.c              |  571 +++++
+ drivers/pinctrl/actions/pinctrl-owl.h              |  178 ++
+ drivers/pinctrl/actions/pinctrl-s900.c             | 2505 ++++++++++++++++++++
+ 16 files changed, 4013 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ create mode 100644 drivers/gpio/gpio-owl.c
+ create mode 100644 drivers/pinctrl/actions/Kconfig
+ create mode 100644 drivers/pinctrl/actions/Makefile
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.c
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.h
+ create mode 100644 drivers/pinctrl/actions/pinctrl-s900.c
+
+-- 
+2.14.1
