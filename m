@@ -1,178 +1,86 @@
-From: rohitkr@codeaurora.org (Rohit Kumar)
-Date: Wed, 21 Feb 2018 16:44:24 +0530
-Subject: [alsa-devel] [PATCH v3 15/25] ASoC: qcom: qdsp6: Add support to
- q6asm dai driver
-In-Reply-To: <20180213165837.1620-16-srinivas.kandagatla@linaro.org>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-16-srinivas.kandagatla@linaro.org>
-Message-ID: <6ea65838-f01a-ecbf-70cd-0dc9299eae80@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Feb 2018 11:18:27 +0000
+Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include
+ PAN emulation
+In-Reply-To: <20180220224624.GA28218@beast>
+References: <20180220224624.GA28218@beast>
+Message-ID: <20180221111823.GB32331@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 20, 2018 at 02:46:24PM -0800, Kees Cook wrote:
+> The PAN emulation notification was only happening for non-boot CPUs
+> if CPU capabilities had already been configured. This seems to be the
+> wrong place, as it's system-wide and isn't attached to capabilities,
+> so its reporting didn't normally happen. Instead, report it once from
+> the boot CPU. Additionally removes the redundant "feature" word from the
+> "CPU features:" line.
+> 
+> Before (redundant "feature", and missing PAN emulation report):
+> 
+>  SMP: Total of 4 processors activated.
+>  CPU features: detected feature: 32-bit EL0 Support
+>  CPU features: detected feature: Kernel page table isolation (KPTI)
+>  CPU: All CPU(s) started at EL2
+> 
+> After:
+> 
+>  SMP: Total of 4 processors activated.
+>  CPU features: detected: 32-bit EL0 Support
+>  CPU features: detected: Kernel page table isolation (KPTI)
+>  CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
+>  CPU: All CPU(s) started at EL2
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 29b1f873e337..6c799ca58b53 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
+>  
+>  	if (system_supports_sve())
+>  		verify_sve_features();
+> -
+> -	if (system_uses_ttbr0_pan())
+> -		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+>  }
+>  
+>  void check_local_cpu_capabilities(void)
+> @@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
+>  
+>  static void __init setup_feature_capabilities(void)
+>  {
+> -	update_cpu_capabilities(arm64_features, "detected feature:");
+> +	update_cpu_capabilities(arm64_features, "detected:");
 
+Although I get what you're saying about redundant use of the word
+"features", this feels like cosmetic churn that is unrelated to the
+problem this patch is addressing.
 
-On 2/13/2018 10:28 PM, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->
-> This patch adds support to q6asm dai driver which configures Q6ASM streams
-> to pass pcm data.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-[..]
-> diff --git a/sound/soc/qcom/qdsp6/q6asm-dai.c b/sound/soc/qcom/qdsp6/q6asm-dai.c
-> new file mode 100644
-> index 000000000000..7c5e94b2ced4
-> --- /dev/null
-> +++ b/sound/soc/qcom/qdsp6/q6asm-dai.c
-> @@ -0,0 +1,621 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2011-2016, The Linux Foundation
-> + * Copyright (c) 2017, Linaro Limited
-> + */
+It could be worth reviewing the CPU errata messages and other
+miscellaneous printks together to make them less verbose and more
+consistent all in one go, but that would be a separate patch...
+
+>  	enable_cpu_capabilities(arm64_features);
+>  }
+>  
+> @@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
+>  	if (system_supports_32bit_el0())
+>  		setup_elf_hwcaps(compat_elf_hwcaps);
+>  
+> +	if (system_uses_ttbr0_pan())
+> +		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
 > +
-> +#include <linux/init.h>
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <sound/soc.h>
-> +#include <sound/soc-dapm.h>
-> +#include <sound/pcm.h>
-> +#include <asm/dma.h>
-[..]
-> +static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
-> +	.count = ARRAY_SIZE(supported_sample_rates),
-> +	.list = supported_sample_rates,
-> +	.mask = 0,
-> +};
-> +
-> +static void event_handler(uint32_t opcode, uint32_t token,
-> +			  uint32_t *payload, void *priv)
-> +{
-> +	struct q6asm_dai_rtd *prtd = priv;
-> +	struct snd_pcm_substream *substream = prtd->substream;
-> +
-> +	switch (opcode) {
-> +	case ASM_CLIENT_EVENT_CMD_RUN_DONE:
-Need to add support for V2 version of opcodes
-> +		q6asm_write_async(prtd->audio_client,
-> +				   prtd->pcm_count, 0, 0, NO_TIMESTAMP);
-> +		break;
-> +	case ASM_CLIENT_EVENT_CMD_EOS_DONE:
-> +		prtd->state = Q6ASM_STREAM_STOPPED;
-> +		break;
-> +	case ASM_CLIENT_EVENT_DATA_WRITE_DONE: {
-> +		prtd->pcm
-[..]
-> +
-> +static int q6asm_dai_trigger(struct snd_pcm_substream *substream, int cmd)
-> +{
-> +	int ret = 0;
-> +	struct snd_pcm_runtime *runtime = substream->runtime;
-> +	struct q6asm_dai_rtd *prtd = runtime->private_data;
-> +
-> +	switch (cmd) {
-> +	case SNDRV_PCM_TRIGGER_START:
-> +		ret = q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
-> +		break;
-below two cases can be combined with START if no change
-> +	case SNDRV_PCM_TRIGGER_RESUME:
-> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> +		ret = q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
-> +		break;
-> +	case SNDRV_PCM_TRIGGER_STOP:
-> +		prtd->state = Q6ASM_STREAM_STOPPED;
-> +		ret = q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
-> +		break;
-> +	case SNDRV_PCM_TRIGGER_SUSPEND:
-> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-> +		ret = q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
-> +		break;
-> +	default:
-> +		ret = -EINVAL;
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int q6asm_dai_open(struct snd_pcm_substream *substream)
-> +{
-> +	struct snd_pcm_runtime *runtime = substream->runtime;
-> +	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
-> +	struct snd_soc_dai *cpu_dai = soc_prtd->cpu_dai;
-> +
-> +	struct q6asm_dai_rtd *prtd;
-> +	struct q6asm_dai_data *pdata;
-> +	struct device *dev = soc_prtd->platform->dev;
-> +	int ret = 0;
-> +	int stream_id;
-> +
-> +	stream_id = cpu_dai->driver->id;
-> +
-> +	pdata = q6asm_get_dai_data(dev);
-> +	if (!pdata) {
-> +		pr_err("Platform data not found ..\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	prtd = kzalloc(sizeof(struct q6asm_dai_rtd), GFP_KERNEL);
-> +	if (prtd == NULL)
-> +		return -ENOMEM;
-> +
-> +	prtd->substream = substream;
-> +	prtd->audio_client = q6asm_audio_client_alloc(dev,
-> +				(q6asm_cb)event_handler, prtd, stream_id);
-> +	if (!prtd->audio_client) {
-> +		pr_info("%s: Could not allocate memory\n", __func__);
-> +		kfree(prtd);
-> +		return -ENOMEM;
-> +	}
-> +
-> +//	prtd->audio_client->dev = dev;
-cleanup this
-> +
-> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-> +		runtime->hw = q6asm_dai_hardware_playback;
-> +
-> +	ret = snd_pcm_hw_constraint_list(runtime, 0,
-> +				SNDRV_PCM_HW_PARAM_RATE,
-> +				&constraints_sample_rates);
-[..]
-> +
-> +static int q6asm_dai_pcm_new(struct snd_soc_pcm_runtime *rtd)
-> +{
-> +	struct snd_pcm_substream *substream;
-> +	struct of_phandle_args args;
-> +	struct device_node *node;
-> +	struct q6asm_dai_data *pdata;
-> +	struct snd_pcm *pcm = rtd->pcm;
-> +	struct device *dev;
-> +	int size, ret;
-> +
-> +	dev = rtd->platform->dev->parent;
-> +	node = dev->of_node;
-> +	pdata = q6asm_get_dai_data(rtd->platform->dev);
-> +
-> +	ret = of_parse_phandle_with_fixed_args(node, "iommus", 1, 0, &args);
-> +	if (ret < 0)
-> +		pdata->sid = -1;
-> +	else
-> +		pdata->sid = args.args[0];
-> +
-> +
-> +
-iommus for sdm845 is 16bit value. we need to have sid_mask which is 0x1 
-in sdm845. We need to mask sid with 0x1 to get proper sid.
-pdata->sid &= 0x1;
-> +	substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
-> +	size = q6asm_dai_hardware_playback.buffer_bytes_max;
-> +	ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, dev, size,
-> +				  &substream->dma_buffer);
-> +	if (ret)
-> +		dev_err(dev, "Cannot allocate buffer(s)\n");
-> +
-> +	return ret;
-> +}
-> +
+
+Moving this seems sensible.  The other option would be to paste it into
+update_cpu_capabilities(), but the message would still potentially get
+printed multiple times, so that doesn't feel like the right approach.
+
+[...]
+
+Cheers
+---Dave
