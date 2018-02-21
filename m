@@ -1,75 +1,200 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 21 Feb 2018 23:36:10 +0800
-Subject: [PATCH v2 08/10] drm/panel: Add Huarui LHR050H41 panel driver
-In-Reply-To: <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
-References: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
- <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v66c-KntNqkb0=qyP2JCafUOcPuh1o_VqeGencMXEuEfMA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Feb 2018 15:38:51 +0000
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <20180221011303.20392-3-labbott@redhat.com>
+References: <20180221011303.20392-1-labbott@redhat.com>
+ <20180221011303.20392-3-labbott@redhat.com>
+Message-ID: <20180221153850.ywpzsigfnz3etoun@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Laura,
 
-On Wed, Feb 21, 2018 at 5:20 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> The LHR050H41 panel is the panel shipped with the BananaPi M2-Magic. Add a
-> driver for it.
+On Tue, Feb 20, 2018 at 05:13:03PM -0800, Laura Abbott wrote:
+> Implementation of stackleak based heavily on the x86 version
 
-So I distinctly remember questioning the vendor name the first time.
-I would just use Bananapi as the vendor name instead.
+Neat!
 
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/panel/Kconfig                  |   9 +-
->  drivers/gpu/drm/panel/Makefile                 |   1 +-
->  drivers/gpu/drm/panel/panel-huarui-lhr050h41.c | 506 ++++++++++++++++++-
->  3 files changed, 516 insertions(+)
->  create mode 100644 drivers/gpu/drm/panel/panel-huarui-lhr050h41.c
->
-> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> index 6ba4031f3919..965310fd129a 100644
-> --- a/drivers/gpu/drm/panel/Kconfig
-> +++ b/drivers/gpu/drm/panel/Kconfig
-> @@ -28,6 +28,15 @@ config DRM_PANEL_SIMPLE
->           that it can be automatically turned off when the panel goes into a
->           low power state.
->
-> +config DRM_PANEL_HUARUI_LHR050H41
-> +       tristate "Huarui LHR050H41 panel"
-> +       depends on OF
-> +       depends on DRM_MIPI_DSI
-> +       depends on BACKLIGHT_CLASS_DEVICE
-> +       help
-> +         Say Y if you want to enable support for the Huarui Lighting
-> +         LHR05041 DSI panel. The panel has a 1280x720 resolution.
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index ec2ee720e33e..b909b436293a 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -401,6 +401,11 @@ tsk	.req	x28		// current thread_info
+>  
+>  	.text
+>  
+> +	.macro	erase_kstack
+> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> +	bl	__erase_kstack
+> +#endif
+> +	.endm
+>  /*
+>   * Exception vectors.
+>   */
+> @@ -901,6 +906,7 @@ work_pending:
+>   */
+>  ret_to_user:
+>  	disable_daif
+> +	erase_kstack
+
+I *think* this should happen in finish_ret_to_user a few lines down, since we
+can call C code if we branch to work_pending, dirtying the stack.
+
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]
+>  	and	x2, x1, #_TIF_WORK_MASK
+>  	cbnz	x2, work_pending
+> @@ -1337,3 +1343,105 @@ alternative_else_nop_endif
+>  ENDPROC(__sdei_asm_handler)
+>  NOKPROBE(__sdei_asm_handler)
+>  #endif /* CONFIG_ARM_SDE_INTERFACE */
 > +
+> +/*
+> + * This is what the stack looks like
+> + *
+> + * +---+ <- task_stack_page(p) + THREAD_SIZE
+> + * |   |
+> + * +---+ <- task_stack_page(p) + THREAD_START_SP
+> + * |   |
+> + * |   |
+> + * +---+ <- task_pt_regs(p)
 
-And it seems this panel is driven by an ILI9881C from Ilitek. So
-maybe you could make the panel driver more like the IL9322, as in
-having common code for the driver IC, then a data structure tied
-to actual panel compatible strings to handle any quirks.
+THREAD_START_SP got killed off in commit 34be98f4944f9907 as part of the
+VMAP_STACK rework, so this can be:
 
-The datasheet can be found simply by googling the part ID, or here:
+      +---+ <- task_stack_page(p) + THREAD_SIZE
+      |   |
+      |   |
+      +---+ <- task_pt_regs(p)
+       ...
 
-   http://en.startek-lcd.com/res/starteklcden/pdres/201706/20170617115241070.pdf
+> + * |   |
+> + * |   |
+> + * |   | <- current_sp
+> + * ~~~~~
+> + *
+> + * ~~~~~
+> + * |   | <- lowest_stack
+> + * |   |
+> + * |   |
+> + * +---+ <- task_stack_page(p)
+> + *
+> + * This function is desgned to poison the memory between the lowest_stack
+> + * and the current stack pointer. After clearing the stack, the lowest
+> + * stack is reset.
+> + */
+> +
+> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> +ENTRY(__erase_kstack)
+> +	mov	x10, x0	// save x0 for the fast path
 
-This should help with the init command sequence.
+AFAICT, we only call this from ret_to_user, where x0 doesn't need to be
+preserved.
 
-I also found this:
+Is that for ret_fast_syscall? In some cases, ret_fast_syscall can bypass
+ret_to_user and calls kernel_exit directly, so we might need a call there.
 
-http://www.ampdisplay.com/documents/pdf/AM-7201280ETZQW-00H.pdf
+> +
+> +	get_thread_info	x0
+> +	ldr	x1, [x0, #TSK_TI_LOWEST_STACK]
+> +
+> +	/* get the number of bytes to check for lowest stack */
+> +	mov	x3, x1
+> +	and	x3, x3, #THREAD_SIZE - 1
+> +	lsr	x3, x3, #3
+> +
+> +	/* generate addresses from the bottom of the stack */
+> +	mov	x4, sp
+> +	movn	x2, #THREAD_SIZE - 1
+> +	and	x1, x4, x2
 
-which might or might not be the same panel.
+Can we replace the MOVN;AND with a single instruction to clear the low bits?
+e.g.
 
-Now the IL9332 driver simply uses the device model (Dlink DIR-685)
-as part of the compatible string.
+	mov	x4, sp
+	bic	x1, x4, #THREAD_SIZE - 1
 
-Regards
-ChenYu
+... IIUC BIC is an alias for the bitfield instructions, though I can't recall
+exactly which one(s).
 
->  config DRM_PANEL_ILITEK_IL9322
->         tristate "Ilitek ILI9322 320x240 QVGA panels"
->         depends on OF && SPI
+> +
+> +	mov	x2, #STACKLEAK_POISON
+> +
+> +	mov	x5, #0
+> +1:
+> +	/*
+> +	 * As borrowed from the x86 logic, start from the lowest_stack
+> +	 * and go to the bottom to find the poison value.
+> +	 * The check of 16 is to hopefully avoid false positives.
+> +	 */
+> +	cbz	x3, 4f
+> +	ldr	x4, [x1, x3, lsl #3]
+> +	cmp	x4, x2
+> +	csinc	x5, xzr, x5, ne
+> +	tbnz	x5, #STACKLEAK_POISON_CHECK_DEPTH/4, 4f	// found 16 poisons?
+> +	sub	x3, x3, #1
+> +	b	1b
+> +
+> +4:
+> +	/* total number of bytes to poison */
+> +	add     x5, x1, x3, lsl #3
+> +	mov	x4, sp
+> +	sub     x8, x4, x5
+> +
+> +	cmp     x8, #THREAD_SIZE // sanity check the range
+> +	b.lo    5f
+> +	ASM_BUG()
+> +
+> +5:
+> +	/*
+> +	 * We may have hit a path where the stack did not get used,
+> +	 * no need to do anything here
+> +	 */
+> +	cbz	x8, 7f
+> +
+> +	sub	x8, x8, #1 // don't poison the current stack pointer
+> +
+> +	lsr     x8, x8, #3
+> +	add     x3, x3, x8
+> +
+> +	/*
+> +	 * The logic of this loop ensures the last stack word isn't
+> +	 * ovewritten.
+> +	 */
+
+Is that to ensure that we don't clobber the word at the current sp value?
+
+> +6:
+> +	cbz     x8, 7f
+> +	str     x2, [x1, x3, lsl #3]
+> +	sub     x3, x3, #1
+> +	sub     x8, x8, #1
+> +	b	6b
+> +
+> +	/* Reset the lowest stack to the top of the stack */
+> +7:
+> +	mov	x1, sp
+> +	str	x1, [x0, #TSK_TI_LOWEST_STACK]
+> +
+> +	mov	x0, x10
+> +	ret
+> +ENDPROC(__erase_kstack)
+> +#endif
+
+[...]
+
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index 7b3ba40f0745..35ebbc1b17ff 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+>  KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+>  				   -D__NO_FORTIFY \
+>  				   $(call cc-option,-ffreestanding) \
+> -				   $(call cc-option,-fno-stack-protector)
+> +				   $(call cc-option,-fno-stack-protector) \
+> +				   $(DISABLE_STACKLEAK_PLUGIN)
+
+I believe the KVM hyp code will also need to opt-out of this.
+
+Thanks,
+Mark.
