@@ -1,274 +1,85 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 21 Feb 2018 15:59:21 -0700
-Subject: [PATCH 11/14] drm/msm: Add support for iommu-sva PASIDs
+Date: Wed, 21 Feb 2018 15:59:23 -0700
+Subject: [PATCH 13/14] drm/msm: Support per-instance address spaces
 In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
 References: <20180221225924.30737-1-jcrouse@codeaurora.org>
-Message-ID: <20180221225924.30737-12-jcrouse@codeaurora.org>
+Message-ID: <20180221225924.30737-14-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU core can support creating multiple pagetables
-for a specific domai and making them available to a client
-driver that has the means to manage the pagetable itself.
-
-PASIDs are unique indexes to a software created pagetable with
-the same format and characteristics as the parent IOMMU device.
-The IOMMU driver allocates the pagetable and tracks it with a
-unique token (PASID) - it does not touch the actual hardware.
- The client driver is expected to be able to manage the pagetables
-and do something interesting with them.
-
-Some flavors of the MSM GPU are able to allow each DRM instance
-to have its own pagetable (and virtual memory space) and switch them
-asynchronously at the beginning of a command.  This protects against
-accidental or malicious corruption or copying of buffers from other
-instances.
-
-The first step is to add a MMU implementation that can allocate a
-PASID and set up a msm_mmu struct to abstract (most) of the details
-from the rest of the system.
+Create a per-instance address spaces when a new DRM file instance is
+opened assuming the target supports it and the underlying
+infrastructure exists. If the operation is unsupported fall back
+quietly to use the global pagetable.
 
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- drivers/gpu/drm/msm/msm_iommu.c | 184 ++++++++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/msm/msm_mmu.h   |   6 ++
- 2 files changed, 190 insertions(+)
+ drivers/gpu/drm/msm/msm_drv.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/msm_iommu.c b/drivers/gpu/drm/msm/msm_iommu.c
-index fdbe1a8372f0..de8669c9a5a1 100644
---- a/drivers/gpu/drm/msm/msm_iommu.c
-+++ b/drivers/gpu/drm/msm/msm_iommu.c
-@@ -15,6 +15,9 @@
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
+index 74dd09db93d7..24d23293b090 100644
+--- a/drivers/gpu/drm/msm/msm_drv.c
++++ b/drivers/gpu/drm/msm/msm_drv.c
+@@ -22,6 +22,7 @@
+ #include "msm_fence.h"
+ #include "msm_gpu.h"
+ #include "msm_kms.h"
++#include "msm_gem.h"
  
-+#include <linux/hashtable.h>
-+#include <linux/arm-smmu.h>
+ 
+ /*
+@@ -511,7 +512,27 @@ static int context_init(struct drm_device *dev, struct drm_file *file)
+ 
+ 	msm_submitqueue_init(dev, ctx);
+ 
+-	ctx->aspace = priv->gpu->aspace;
++	/* FIXME: Do we want a dynamic name of some sort? */
++	/* FIXME: We need a smarter way to set the range based on target */
 +
- #include "msm_drv.h"
- #include "msm_mmu.h"
++	ctx->aspace = msm_gem_address_space_create_instance(
++		priv->gpu->aspace->mmu, "gpu", 0x100000000, 0x1ffffffff);
++
++	if (IS_ERR(ctx->aspace)) {
++		int ret = PTR_ERR(ctx->aspace);
++
++		/*
++		 * if per-instance pagetables are not supported, fall back to
++		 * using the generic address space
++		 */
++		if (ret == -EOPNOTSUPP)
++			ctx->aspace = priv->gpu->aspace;
++		else {
++			kfree(ctx);
++			return ret;
++		}
++	}
++
+ 	file->driver_priv = ctx;
  
-@@ -34,12 +37,29 @@ static int msm_fault_handler(struct iommu_domain *domain, struct device *dev,
  	return 0;
+@@ -527,8 +548,12 @@ static int msm_open(struct drm_device *dev, struct drm_file *file)
+ 	return context_init(dev, file);
  }
  
-+static bool msm_iommu_check_per_instance(struct msm_iommu *iommu)
-+{
-+	int val;
-+
-+	if (!IS_ENABLED(CONFIG_IOMMU_SVA))
-+		return false;
-+
-+	if (iommu_domain_get_attr(iommu->domain, DOMAIN_ATTR_ENABLE_TTBR1,
-+		&val))
-+		return false;
-+
-+	return val ? true : false;
-+}
-+
- static int msm_iommu_attach(struct msm_mmu *mmu, const char * const *names,
- 			    int cnt)
+-static void context_close(struct msm_file_private *ctx)
++static void context_close(struct msm_drm_private *priv,
++		struct msm_file_private *ctx)
  {
- 	struct msm_iommu *iommu = to_msm_iommu(mmu);
- 	int ret;
- 
-+	if (msm_iommu_check_per_instance(iommu))
-+		msm_mmu_set_feature(mmu, MMU_FEATURE_PER_INSTANCE_TABLES);
++	if (ctx && ctx->aspace != priv->gpu->aspace)
++		msm_gem_address_space_put(ctx->aspace);
 +
- 	pm_runtime_get_sync(mmu->dev);
- 	ret = iommu_attach_device(iommu->domain, mmu->dev);
- 	pm_runtime_put_sync(mmu->dev);
-@@ -112,3 +132,167 @@ struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain)
- 
- 	return &iommu->base;
+ 	msm_submitqueue_close(ctx);
+ 	kfree(ctx);
  }
-+
-+struct pasid_entry {
-+	int pasid;
-+	u64 ttbr;
-+	u32 asid;
-+	struct hlist_node node;
-+};
-+
-+DECLARE_HASHTABLE(pasid_table, 4);
-+
-+static int install_pasid_cb(int pasid, u64 ttbr, u32 asid, void *data)
-+{
-+	struct pasid_entry *entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-+
-+	if (!entry)
-+		return -ENOMEM;
-+
-+	entry->pasid = pasid;
-+	entry->ttbr = ttbr;
-+	entry->asid = asid;
-+
-+	/* FIXME: Assume that we'll never have a pasid conflict? */
-+	/* FIXME: locks? RCU? */
-+	hash_add(pasid_table, &entry->node, pasid);
-+	return 0;
-+}
-+
-+static void remove_pasid_cb(int pasid, void *data)
-+{
-+	struct pasid_entry *entry;
-+
-+	hash_for_each_possible(pasid_table, entry, node, pasid) {
-+		if (pasid == entry->pasid) {
-+			hash_del(&entry->node);
-+			kfree(entry);
-+			return;
-+		}
-+	}
-+}
-+
-+struct msm_iommu_pasid {
-+	struct msm_mmu base;
-+	int pasid;
-+	u64 ttbr;
-+	u32 asid;
-+};
-+#define to_msm_iommu_pasid(x) container_of(x, struct msm_iommu_pasid, base)
-+
-+static int msm_iommu_pasid_attach(struct msm_mmu *mmu,
-+		const char * const *names, int cnt)
-+{
-+	return 0;
-+}
-+
-+static int msm_iommu_pasid_map(struct msm_mmu *mmu, uint64_t iova,
-+		struct sg_table *sgt, unsigned len, int prot)
-+{
-+	struct msm_iommu_pasid *pasid = to_msm_iommu_pasid(mmu);
-+	int ret;
-+
-+	ret = iommu_sva_map_sg(pasid->pasid, iova, sgt->sgl, sgt->nents, prot);
-+	WARN_ON(ret < 0);
-+
-+	return (ret == len) ? 0 : -EINVAL;
-+}
-+
-+static int msm_iommu_pasid_unmap(struct msm_mmu *mmu, uint64_t iova,
-+		struct sg_table *sgt, unsigned len)
-+{
-+	struct msm_iommu_pasid *pasid = to_msm_iommu_pasid(mmu);
-+
-+	iommu_sva_unmap(pasid->pasid, iova, len);
-+
-+	return 0;
-+}
-+
-+static void msm_iommu_pasid_detach(struct msm_mmu *mmu,
-+		const char * const *names, int cnt)
-+{
-+}
-+
-+static void msm_iommu_pasid_destroy(struct msm_mmu *mmu)
-+{
-+	struct msm_iommu_pasid *pasid = to_msm_iommu_pasid(mmu);
-+
-+	iommu_sva_free_pasid(pasid->pasid);
-+	kfree(pasid);
-+}
-+
-+static const struct msm_mmu_funcs pasid_funcs = {
-+		.attach = msm_iommu_pasid_attach,
-+		.detach = msm_iommu_pasid_detach,
-+		.map = msm_iommu_pasid_map,
-+		.unmap = msm_iommu_pasid_unmap,
-+		.destroy = msm_iommu_pasid_destroy,
-+};
-+
-+static const struct arm_smmu_pasid_ops msm_iommu_pasid_ops = {
-+	.install_pasid = install_pasid_cb,
-+	.remove_pasid = remove_pasid_cb,
-+};
-+
-+struct msm_mmu *msm_iommu_pasid_new(struct msm_mmu *parent)
-+{
-+	struct msm_iommu *parent_iommu = to_msm_iommu(parent);
-+	struct msm_iommu_pasid *pasid;
-+	int id;
-+
-+	if (!msm_mmu_has_feature(parent, MMU_FEATURE_PER_INSTANCE_TABLES))
-+		return ERR_PTR(-EOPNOTSUPP);
-+
-+	pasid = kzalloc(sizeof(*pasid), GFP_KERNEL);
-+	if (!pasid)
-+		return ERR_PTR(-ENOMEM);
-+
-+	arm_smmu_add_pasid_ops(parent_iommu->domain, &msm_iommu_pasid_ops,
-+		NULL);
-+
-+	id = iommu_sva_alloc_pasid(parent_iommu->domain, parent->dev);
-+	if (id < 0) {
-+		kfree(pasid);
-+		return ERR_PTR(id);
-+	}
-+
-+	pasid->pasid = id;
-+	msm_mmu_init(&pasid->base, parent->dev, &pasid_funcs);
-+
-+	return &pasid->base;
-+}
-+
-+/* Given a pasid return the TTBR and ASID associated with it */
-+int msm_iommu_pasid_info(struct msm_mmu *mmu, u64 *ttbr, u32 *asid)
-+{
-+	struct msm_iommu_pasid *pasid;
-+	struct pasid_entry *entry;
-+
-+	if (mmu->funcs->map != msm_iommu_pasid_map)
-+		return -ENODEV;
-+
-+	pasid = to_msm_iommu_pasid(mmu);
-+
-+	if (!pasid->ttbr) {
-+		/* Find the pasid entry in the hash */
-+		hash_for_each_possible(pasid_table, entry, node, pasid->pasid) {
-+			if (pasid->pasid == entry->pasid) {
-+				pasid->ttbr = entry->ttbr;
-+				pasid->asid = entry->asid;
-+				goto out;
-+			}
-+		}
-+
-+		WARN(1, "Couldn't find the entry for pasid %d\n", pasid->pasid);
-+		return -EINVAL;
-+	}
-+
-+out:
-+	if (*ttbr)
-+		*ttbr = pasid->ttbr;
-+
-+	if (*asid)
-+		*asid = pasid->asid;
-+
-+	return 0;
-+}
-diff --git a/drivers/gpu/drm/msm/msm_mmu.h b/drivers/gpu/drm/msm/msm_mmu.h
-index 85df78d71398..29436b9daa73 100644
---- a/drivers/gpu/drm/msm/msm_mmu.h
-+++ b/drivers/gpu/drm/msm/msm_mmu.h
-@@ -30,6 +30,9 @@ struct msm_mmu_funcs {
- 	void (*destroy)(struct msm_mmu *mmu);
- };
+@@ -543,7 +568,7 @@ static void msm_postclose(struct drm_device *dev, struct drm_file *file)
+ 		priv->lastctx = NULL;
+ 	mutex_unlock(&dev->struct_mutex);
  
-+/* MMU features */
-+#define MMU_FEATURE_PER_INSTANCE_TABLES (1 << 0)
-+
- struct msm_mmu {
- 	const struct msm_mmu_funcs *funcs;
- 	struct device *dev;
-@@ -48,6 +51,9 @@ static inline void msm_mmu_init(struct msm_mmu *mmu, struct device *dev,
- struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain);
- struct msm_mmu *msm_gpummu_new(struct device *dev, struct msm_gpu *gpu);
+-	context_close(ctx);
++	context_close(priv, ctx);
+ }
  
-+struct msm_mmu *msm_iommu_pasid_new(struct msm_mmu *parent);
-+int msm_iommu_pasid_info(struct msm_mmu *mmu, u64 *ttbr, u32 *asid);
-+
- static inline void msm_mmu_set_fault_handler(struct msm_mmu *mmu, void *arg,
- 		int (*handler)(void *arg, unsigned long iova, int flags))
- {
+ static irqreturn_t msm_irq(int irq, void *arg)
 -- 
 2.16.1
