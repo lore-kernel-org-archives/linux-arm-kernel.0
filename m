@@ -1,271 +1,38 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 21 Feb 2018 12:31:24 -0800
-Subject: [PATCH v2 1/8] [PATCH 1/8] drivers/peci: Add support for PECI bus
- driver core
-In-Reply-To: <20180221170434.GF29204@lunn.ch>
+Date: Wed, 21 Feb 2018 12:35:35 -0800
+Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
+ document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
+In-Reply-To: <20180221171349.GG29204@lunn.ch>
 References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
- <20180221170434.GF29204@lunn.ch>
-Message-ID: <650488e8-8516-1329-b35b-88d628d21cc2@linux.intel.com>
+ <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+ <20180221171349.GG29204@lunn.ch>
+Message-ID: <4afd2fec-b015-72d4-300e-3dd7696f6ff0@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-Thanks for sharing your time to review it. Please check my answers inline.
-
-On 2/21/2018 9:04 AM, Andrew Lunn wrote:
->> +static int peci_locked_xfer(struct peci_adapter *adapter,
->> +			    struct peci_xfer_msg *msg,
->> +			    bool do_retry,
->> +			    bool has_aw_fcs)
->> +{
->> +	ktime_t start, end;
->> +	s64 elapsed_ms;
->> +	int rc = 0;
->> +
->> +	if (!adapter->xfer) {
->> +		dev_dbg(&adapter->dev, "PECI level transfers not supported\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	if (in_atomic() || irqs_disabled()) {
+On 2/21/2018 9:13 AM, Andrew Lunn wrote:
+> On Wed, Feb 21, 2018 at 08:16:00AM -0800, Jae Hyun Yoo wrote:
+>> This commit adds a dt-bindings document of PECI adapter driver for Aspeed
+>> AST24xx/25xx SoCs.
 > 
 > Hi Jae
 > 
-> Is there a real need to do transfers in atomic context, or with
-> interrupts disabled?
+> It would be good to separate this into two. One binding document for a
+> generic adaptor, with a generic PECI bus, and generic client
+> devices. List all the properties you expect at the generic level.
+> 
+> Then have an aspeed specific binding for those properties which are
+> specific to the Aspeed adaptor.
 > 
 
-Actually, no. Generally, this function will be called in sleep-able 
-context so this code is for an exceptional case handling.
+That makes sense. I'll add generic PECI bus/adapter/client and Aspeed 
+specific documents as separated.
 
-I'll rewrite this code like below:
-	if (in_atomic() || irqs_disabled()) {
-		dev_dbg(&adapter->dev,
-			"xfer in non-sleepable context is not supported\n");
-		return -EWOULDBLOCK;
-	}
-
-And then, will add a sleep call into the below loop.
-
-I know that in_atomic() call is not recommended in driver code but some 
-driver codes still use it since there is no alternative way at this 
-time, AFAIK. Please tell me if there is a better solution.
-
->> +		rt_mutex_trylock(&adapter->bus_lock);
->> +		if (!rc)
->> +			return -EAGAIN; /* PECI activity is ongoing */
->> +	} else {
->> +		rt_mutex_lock(&adapter->bus_lock);
->> +	}
->> +
->> +	if (do_retry)
->> +		start = ktime_get();
->> +
->> +	do {
->> +		rc = adapter->xfer(adapter, msg);
->> +
->> +		if (!do_retry)
->> +			break;
->> +
->> +		/* Per the PECI spec, need to retry commands that return 0x8x */
->> +		if (!(!rc && ((msg->rx_buf[0] & DEV_PECI_CC_RETRY_ERR_MASK) ==
->> +			      DEV_PECI_CC_TIMEOUT)))
->> +			break;
->> +
->> +		/* Set the retry bit to indicate a retry attempt */
->> +		msg->tx_buf[1] |= DEV_PECI_RETRY_BIT;
->> +
->> +		/* Recalculate the AW FCS if it has one */
->> +		if (has_aw_fcs)
->> +			msg->tx_buf[msg->tx_len - 1] = 0x80 ^
->> +						peci_aw_fcs((u8 *)msg,
->> +							    2 + msg->tx_len);
->> +
->> +		/* Retry for at least 250ms before returning an error */
->> +		end = ktime_get();
->> +		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
->> +		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
->> +			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
->> +			break;
->> +		}
->> +	} while (true);
-> 
-> So you busy loop to 1/4 second? How about putting a sleep in here so
-> other things can be done between each retry.
-> 
-> And should it not return -ETIMEDOUT after that 1/4 second?
+> 	 Andrew
+>   
 > 
 
-Yes, you are right. I'll rewrite this code like below after adding the 
-above change:
+Thanks again for sharing your time to review it. I really appreciate it.
 
-		/**
-		 * Retry for at least 250ms before returning an error.
-		 * Retry interval guideline:
-		 *   No minimum < Retry Interval < No maximum
-		 *                (recommend 10ms)
-		 */
-		end = ktime_get();
-		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
-		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
-			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
-			rc = -ETIMEDOUT;
-			break;
-		}
-
-		usleep_range(DEV_PECI_RETRY_INTERVAL_MS * 1000,
-			     (DEV_PECI_RETRY_INTERVAL_MS * 1000) + 1000);
-
->> +static int peci_scan_cmd_mask(struct peci_adapter *adapter)
->> +{
->> +	struct peci_xfer_msg msg;
->> +	u32 dib;
->> +	int rc = 0;
->> +
->> +	/* Update command mask just once */
->> +	if (adapter->cmd_mask & BIT(PECI_CMD_PING))
->> +		return 0;
->> +
->> +	msg.addr      = PECI_BASE_ADDR;
->> +	msg.tx_len    = GET_DIB_WR_LEN;
->> +	msg.rx_len    = GET_DIB_RD_LEN;
->> +	msg.tx_buf[0] = GET_DIB_PECI_CMD;
->> +
->> +	rc = peci_xfer(adapter, &msg);
->> +	if (rc < 0) {
->> +		dev_dbg(&adapter->dev, "PECI xfer error, rc : %d\n", rc);
->> +		return rc;
->> +	}
->> +
->> +	dib = msg.rx_buf[0] | (msg.rx_buf[1] << 8) |
->> +	      (msg.rx_buf[2] << 16) | (msg.rx_buf[3] << 24);
->> +
->> +	/* Check special case for Get DIB command */
->> +	if (dib == 0x00) {
->> +		dev_dbg(&adapter->dev, "DIB read as 0x00\n");
->> +		return -1;
->> +	}
->> +
->> +	if (!rc) {
->> +		/**
->> +		 * setting up the supporting commands based on minor rev#
->> +		 * see PECI Spec Table 3-1
->> +		 */
->> +		dib = (dib >> 8) & 0xF;
->> +
->> +		if (dib >= 0x1) {
->> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PKG_CFG);
->> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PKG_CFG);
->> +		}
->> +
->> +		if (dib >= 0x2)
->> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSR);
->> +
->> +		if (dib >= 0x3) {
->> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG_LOCAL);
->> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG_LOCAL);
->> +		}
->> +
->> +		if (dib >= 0x4)
->> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG);
->> +
->> +		if (dib >= 0x5)
->> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG);
->> +
->> +		if (dib >= 0x6)
->> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_IA_MSR);
-> 
-> Lots of magic numbers here. Can they be replaced with #defines.  Also,
-> it looks like a switch statement could be used, with fall through.
-> 
-
-I agree. Will rewrite it.
-
->> +
->> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_TEMP);
->> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_DIB);
->> +		adapter->cmd_mask |= BIT(PECI_CMD_PING);
->> +	} else {
->> +		dev_dbg(&adapter->dev, "Error reading DIB, rc : %d\n", rc);
->> +	}
->> +
->> +	return rc;
->> +}
->> +
-> 
->> +static int peci_ioctl_get_temp(struct peci_adapter *adapter, void *vmsg)
->> +{
->> +	struct peci_get_temp_msg *umsg = vmsg;
->> +	struct peci_xfer_msg msg;
->> +	int rc;
->> +
-> 
-> Is this getting the temperature?
-> 
-
-Yes, this is getting the 'die' temperature of a processor package.
-
->> +	rc = peci_cmd_support(adapter, PECI_CMD_GET_TEMP);
->> +	if (rc < 0)
->> +		return rc;
->> +
->> +	msg.addr      = umsg->addr;
->> +	msg.tx_len    = GET_TEMP_WR_LEN;
->> +	msg.rx_len    = GET_TEMP_RD_LEN;
->> +	msg.tx_buf[0] = GET_TEMP_PECI_CMD;
->> +
->> +	rc = peci_xfer(adapter, &msg);
->> +	if (rc < 0)
->> +		return rc;
->> +
->> +	umsg->temp_raw = msg.rx_buf[0] | (msg.rx_buf[1] << 8);
->> +
->> +	return 0;
->> +}
-> 
-> 
-> 
->> +static long peci_ioctl(struct file *file, unsigned int iocmd, unsigned long arg)
->> +{
->> +	struct peci_adapter *adapter = file->private_data;
->> +	void __user *argp = (void __user *)arg;
->> +	unsigned int msg_len;
->> +	enum peci_cmd cmd;
->> +	u8 *msg;
->> +	int rc = 0;
->> +
->> +	dev_dbg(&adapter->dev, "ioctl, cmd=0x%x, arg=0x%lx\n", iocmd, arg);
->> +
->> +	switch (iocmd) {
->> +	case PECI_IOC_PING:
->> +	case PECI_IOC_GET_DIB:
->> +	case PECI_IOC_GET_TEMP:
->> +	case PECI_IOC_RD_PKG_CFG:
->> +	case PECI_IOC_WR_PKG_CFG:
->> +	case PECI_IOC_RD_IA_MSR:
->> +	case PECI_IOC_RD_PCI_CFG:
->> +	case PECI_IOC_RD_PCI_CFG_LOCAL:
->> +	case PECI_IOC_WR_PCI_CFG_LOCAL:
->> +		cmd = _IOC_TYPE(iocmd) - PECI_IOC_BASE;
->> +		msg_len = _IOC_SIZE(iocmd);
->> +		break;
-> 
-> Adding new ioctl calls is pretty frowned up. Can you export this info
-> via /sysfs?
-> 
-
-Most of these are not simple IOs so ioctl is better suited, I think.
-
-> Also, should there be some permission checks here? Or is any user
-> allowed to call these ioctls?
-> 
-
-I agree. I will add some permission checks here.
-
-> 	Andrew
-> 
-
-Thanks a lot,
+BR,
 Jae
