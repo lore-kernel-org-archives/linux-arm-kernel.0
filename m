@@ -1,206 +1,94 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 21 Feb 2018 15:59:15 -0700
-Subject: [PATCH 05/14] iommu: arm-smmu: Add pasid implementation
+Date: Wed, 21 Feb 2018 15:59:19 -0700
+Subject: [PATCH 09/14] drm/msm/gpu: Support using TTBR1 for kernel buffer
+ objects
 In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
 References: <20180221225924.30737-1-jcrouse@codeaurora.org>
-Message-ID: <20180221225924.30737-6-jcrouse@codeaurora.org>
+Message-ID: <20180221225924.30737-10-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for allocating and populating pagetables
-indexed by pasid. Each new pasid is allocated a pagetable
-with the same parameters and format as the parent domain.
+arm-smmu based targets can support split pagetables (TTBR0/TTBR1).
+This is most useful for implementing per-instance pagetables so that
+the "user" pagetable can be swapped out while the "kernel" or
+"global" pagetable remains entact.
+
+if the target specifies a global virtual memory range then try to
+enable TTBR1 (the "global" pagetable) on the domain and and if
+successful use the global virtual memory range for allocations
+on the default GPU address space - this ensures that the global
+allocations make it into the right space. Per-instance pagetables
+still need additional support to be enabled but even if they
+aren't set up it isn't harmful to just use TTBR1 for all
+virtual memory regions and leave the other pagetable unused.
+
+If TTBR1 support isn't enabled then fall back to the "legacy"
+virtual address space both kernel and user.
 
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- drivers/iommu/arm-smmu.c | 148 +++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 143 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/msm/msm_gpu.c | 20 ++++++++++++++++++--
+ drivers/gpu/drm/msm/msm_gpu.h |  4 ++--
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ebfa59b59622..42f5bfa3e26e 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -250,6 +250,9 @@ struct arm_smmu_domain {
- 	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
- 	u32 attributes;
- 	struct iommu_domain		domain;
-+
-+	spinlock_t			pasid_lock;
-+	struct list_head		pasid_list;
- };
+diff --git a/drivers/gpu/drm/msm/msm_gpu.c b/drivers/gpu/drm/msm/msm_gpu.c
+index 086fb347b554..94332faa316f 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.c
++++ b/drivers/gpu/drm/msm/msm_gpu.c
+@@ -701,7 +701,8 @@ static int get_clocks(struct platform_device *pdev, struct msm_gpu *gpu)
  
- struct arm_smmu_option_prop {
-@@ -257,6 +260,139 @@ struct arm_smmu_option_prop {
- 	const char *prop;
- };
- 
-+static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
-+{
-+	return container_of(dom, struct arm_smmu_domain, domain);
-+}
-+
-+struct arm_smmu_pasid {
-+	struct iommu_domain *domain;
-+	struct io_pgtable_ops		*pgtbl_ops;
-+	struct list_head node;
-+	int pasid;
-+};
-+
-+struct arm_smmu_pasid *arm_smmu_get_pasid(struct arm_smmu_domain *smmu_domain,
-+		int pasid)
-+{
-+	struct arm_smmu_pasid *node, *obj = NULL;
-+
-+	spin_lock(&smmu_domain->pasid_lock);
-+	list_for_each_entry(node, &smmu_domain->pasid_list, node) {
-+		if (node->pasid == pasid) {
-+			obj = node;
-+			break;
-+		}
-+	}
-+	spin_unlock(&smmu_domain->pasid_lock);
-+
-+	return obj;
-+}
-+
-+static void arm_smmu_pasid_free(struct iommu_domain *domain, int pasid)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct arm_smmu_pasid *node, *obj = NULL;
-+
-+	spin_lock(&smmu_domain->pasid_lock);
-+	list_for_each_entry(node, &smmu_domain->pasid_list, node) {
-+		if (node->pasid == pasid) {
-+			obj = node;
-+			list_del(&obj->node);
-+			break;
-+		}
-+	}
-+	spin_unlock(&smmu_domain->pasid_lock);
-+
-+	if (obj)
-+		free_io_pgtable_ops(obj->pgtbl_ops);
-+
-+	kfree(obj);
-+}
-+
-+static size_t arm_smmu_sva_unmap(struct iommu_domain *domain, int pasid,
-+		unsigned long iova, size_t size)
-+{
-+	struct arm_smmu_pasid *obj =
-+		arm_smmu_get_pasid(to_smmu_domain(domain), pasid);
-+
-+	if (!obj)
-+		return -ENODEV;
-+
-+	return obj->pgtbl_ops->unmap(obj->pgtbl_ops, iova, size);
-+}
-+
-+
-+static int arm_smmu_sva_map(struct iommu_domain *domain, int pasid,
-+		unsigned long iova, phys_addr_t paddr, size_t size, int prot)
-+{
-+	struct arm_smmu_pasid *obj =
-+		arm_smmu_get_pasid(to_smmu_domain(domain), pasid);
-+
-+	if (!obj)
-+		return -ENODEV;
-+
-+	return obj->pgtbl_ops->map(obj->pgtbl_ops, iova, paddr, size, prot);
-+}
-+
-+static int arm_smmu_pasid_alloc(struct iommu_domain *domain, struct device *dev,
-+		int pasid)
-+{
-+	struct arm_smmu_pasid *obj;
-+	struct io_pgtable_cfg pgtbl_cfg;
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
-+	enum io_pgtable_fmt fmt;
-+	unsigned long ias, oas;
-+
-+	/* Only allow pasid backed tables to be created on S1 domains */
-+	if (smmu_domain->stage != ARM_SMMU_DOMAIN_S1)
-+		return -EINVAL;
-+
-+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
-+	if (!obj)
-+		return -ENOMEM;
-+
-+	/* Get the same exact format as the parent domain */
-+	ias = smmu->va_size;
-+	oas = smmu->ipa_size;
-+
-+	if (smmu_domain->cfg.fmt == ARM_SMMU_CTX_FMT_AARCH64)
-+		fmt = ARM_64_LPAE_S1;
-+	else if (smmu_domain->cfg.fmt == ARM_SMMU_CTX_FMT_AARCH32_L) {
-+		fmt = ARM_32_LPAE_S1;
-+		ias = min(ias, 32UL);
-+		oas = min(oas, 40UL);
-+	} else {
-+		fmt = ARM_V7S;
-+		ias = min(ias, 32UL);
-+		oas = min(oas, 32UL);
-+	}
-+
-+	pgtbl_cfg = (struct io_pgtable_cfg) {
-+		.pgsize_bitmap = smmu->pgsize_bitmap,
-+		.ias = ias,
-+		.oas = oas,
-+		.tlb = NULL,
-+		.iommu_dev = smmu->dev
-+	};
-+
-+	obj->pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
-+	if (!obj->pgtbl_ops) {
-+		kfree(obj);
-+		return -ENOMEM;
-+	}
-+
-+	obj->domain = domain;
-+	obj->pasid = pasid;
-+
-+	spin_lock(&smmu_domain->pasid_lock);
-+	list_add_tail(&obj->node, &smmu_domain->pasid_list);
-+	spin_unlock(&smmu_domain->pasid_lock);
-+
-+	return 0;
-+}
-+
- static atomic_t cavium_smmu_context_count = ATOMIC_INIT(0);
- 
- static bool using_legacy_binding, using_generic_binding;
-@@ -266,11 +402,6 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ 0, NULL},
- };
- 
--static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
--{
--	return container_of(dom, struct arm_smmu_domain, domain);
--}
--
- static void parse_driver_options(struct arm_smmu_device *smmu)
+ static struct msm_gem_address_space *
+ msm_gpu_create_address_space(struct msm_gpu *gpu, struct platform_device *pdev,
+-		uint64_t va_start, uint64_t va_end)
++		u64 va_start, u64 va_end,
++		u64 va_global_start, u64 va_global_end)
  {
- 	int i = 0;
-@@ -961,6 +1092,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->cb_lock);
+ 	struct iommu_domain *iommu;
+ 	struct msm_gem_address_space *aspace;
+@@ -719,6 +720,20 @@ msm_gpu_create_address_space(struct msm_gpu *gpu, struct platform_device *pdev,
+ 	iommu->geometry.aperture_start = va_start;
+ 	iommu->geometry.aperture_end = va_end;
  
-+	spin_lock_init(&smmu_domain->pasid_lock);
-+	INIT_LIST_HEAD(&smmu_domain->pasid_list);
++	/* If a va_global range was specified then try to set up TTBR1 */
++	if (va_global_start && va_global_end) {
++		int val = 1;
 +
- 	return &smmu_domain->domain;
- }
++		/* Try to enable TTBR1 on the domain */
++		ret = iommu_domain_set_attr(iommu, DOMAIN_ATTR_ENABLE_TTBR1,
++			&val);
++
++		if (!WARN(ret, "Unable to enable TTBR1 for the IOMMU\n")) {
++			iommu->geometry.aperture_start = va_global_start;
++			iommu->geometry.aperture_end = va_global_end;
++		}
++	}
++
+ 	dev_info(gpu->dev->dev, "%s: using IOMMU\n", gpu->name);
  
-@@ -1588,6 +1722,10 @@ static struct iommu_ops arm_smmu_ops = {
- 	.of_xlate		= arm_smmu_of_xlate,
- 	.get_resv_regions	= arm_smmu_get_resv_regions,
- 	.put_resv_regions	= arm_smmu_put_resv_regions,
-+	.pasid_alloc		= arm_smmu_pasid_alloc,
-+	.sva_map		= arm_smmu_sva_map,
-+	.sva_unmap		= arm_smmu_sva_unmap,
-+	.pasid_free		= arm_smmu_pasid_free,
- 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ 	aspace = msm_gem_address_space_create(&pdev->dev, iommu, "gpu");
+@@ -811,7 +826,8 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
+ 	msm_devfreq_init(gpu);
+ 
+ 	gpu->aspace = msm_gpu_create_address_space(gpu, pdev,
+-		config->va_start, config->va_end);
++		config->va_start, config->va_end, config->va_start_global,
++		config->va_end_global);
+ 
+ 	if (gpu->aspace == NULL)
+ 		dev_info(drm->dev, "%s: no IOMMU, fallback to VRAM carveout!\n", name);
+diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
+index fccfccd303af..698eca2c1431 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.h
++++ b/drivers/gpu/drm/msm/msm_gpu.h
+@@ -31,8 +31,8 @@ struct msm_gpu_perfcntr;
+ struct msm_gpu_config {
+ 	const char *ioname;
+ 	const char *irqname;
+-	uint64_t va_start;
+-	uint64_t va_end;
++	uint64_t va_start, va_end;
++	uint64_t va_start_global, va_end_global;
+ 	unsigned int nr_rings;
  };
  
 -- 
