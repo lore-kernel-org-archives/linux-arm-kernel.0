@@ -1,54 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Feb 2018 12:59:27 +0000
-Subject: [PATCH] arm64: Enforce BBM for huge IO/VMAP mappings
-Message-ID: <1519217967-2545-1-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Feb 2018 14:00:33 +0100
+Subject: [PATCH 3/7] [HACK] pass endianess flag to LTO linker
+In-Reply-To: <CAKv+Gu-PR4mS+oB6fdGhpG3Fp+OhZUr=KkbueOoC9YpmDQgeqQ@mail.gmail.com>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-4-arnd@arndb.de>
+ <CAKv+Gu-Be_saZeHzpWrjJBdeiOSJih0H-d1pjkpj+sq7ytLVyw@mail.gmail.com>
+ <CAK8P3a11uyLcB=42ZTFOMDvxv5XZ3tCPh+f_MN6SEAjmPRRjtg@mail.gmail.com>
+ <CAKv+Gu-PR4mS+oB6fdGhpG3Fp+OhZUr=KkbueOoC9YpmDQgeqQ@mail.gmail.com>
+Message-ID: <CAK8P3a15V4wHQJ=kjZz-V-R1HuP4pd3m+FoZbt_myvUCR6souw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap_page_range doesn't honour break-before-make and attempts to put
-down huge mappings (using p*d_set_huge) over the top of pre-existing
-table entries. This leads to us leaking page table memory and also gives
-rise to TLB conflicts and spurious aborts, which have been seen in
-practice on Cortex-A75.
+On Wed, Feb 21, 2018 at 11:09 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 21 February 2018 at 09:48, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wed, Feb 21, 2018 at 9:37 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 20 February 2018 at 21:59, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> In some cases we turn off
+>> some optimization step for a file, we might remove '-pg', or build for
+>> a particular target architecture. Do we have to turn off -flto for any file
+>> that requires this for correct behavior?
+>>
+>
+> Excellent question. I think the problem is that the file boundary is
+> becoming blurred with LTO, and so any option that is absolutely
+> required to build a single file correctly may need to be applied to
+> vmlinux as a whole. Whether that is the case for any particular option
+> depends on which compiler pass(es) is (are) affected by the option,
+> i.e., whether it is taken into account when creating the intermediate
+> representation.
 
-Until this has been resolved, refuse to put block mappings when the
-existing entry is found to be present.
+Newer compilers are able to change both the optimization and warning
+flags per function using a #pragma or _Pragma() directive or
+function attributes.
+There has been some recent discussion about requiring a newer gcc
+version, so if we do that, we could perhaps replace all the existing
+CFLAGS overrides with those pragmas.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reported-by: Lei Li <lious.lilei@hisilicon.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 3161b853f29e..84a019f55022 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -933,6 +933,11 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- {
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
-+
-+	/* ioremap_page_range doesn't honour BBM */
-+	if (pud_present(READ_ONCE(*pudp)))
-+		return 0;
-+
- 	BUG_ON(phys & ~PUD_MASK);
- 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
- 	return 1;
-@@ -942,6 +947,11 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- {
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
-+
-+	/* ioremap_page_range doesn't honour BBM */
-+	if (pmd_present(READ_ONCE(*pmdp)))
-+		return 0;
-+
- 	BUG_ON(phys & ~PMD_MASK);
- 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
--- 
-2.1.4
+     Arnd
