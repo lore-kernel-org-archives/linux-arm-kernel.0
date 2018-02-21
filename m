@@ -1,95 +1,62 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 21 Feb 2018 15:59:19 -0700
-Subject: [PATCH 09/14] drm/msm/gpu: Support using TTBR1 for kernel buffer
- objects
+Date: Wed, 21 Feb 2018 15:59:17 -0700
+Subject: [PATCH 07/14] drm/msm: Enable 64 bit mode by default
 In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
 References: <20180221225924.30737-1-jcrouse@codeaurora.org>
-Message-ID: <20180221225924.30737-10-jcrouse@codeaurora.org>
+Message-ID: <20180221225924.30737-8-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-smmu based targets can support split pagetables (TTBR0/TTBR1).
-This is most useful for implementing per-instance pagetables so that
-the "user" pagetable can be swapped out while the "kernel" or
-"global" pagetable remains entact.
-
-if the target specifies a global virtual memory range then try to
-enable TTBR1 (the "global" pagetable) on the domain and and if
-successful use the global virtual memory range for allocations
-on the default GPU address space - this ensures that the global
-allocations make it into the right space. Per-instance pagetables
-still need additional support to be enabled but even if they
-aren't set up it isn't harmful to just use TTBR1 for all
-virtual memory regions and leave the other pagetable unused.
-
-If TTBR1 support isn't enabled then fall back to the "legacy"
-virtual address space both kernel and user.
+A5XX GPUs can be run in either 32 or 64 bit mode. The GPU registers
+and the microcode use 64 bit virtual addressing in either case but the
+upper 32 bits are ignored if the GPU is in 32 bit mode. There is no
+performance disadvantage to remaining in 64 bit mode even if we are
+only generating 32 bit addresses so switch over now to prepare for
+using addresses above 4G for targets that support them.
 
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- drivers/gpu/drm/msm/msm_gpu.c | 20 ++++++++++++++++++--
- drivers/gpu/drm/msm/msm_gpu.h |  4 ++--
- 2 files changed, 20 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/msm/adreno/a5xx_gpu.c | 14 ++++++++++++++
+ drivers/gpu/drm/msm/msm_iommu.c       |  2 +-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/msm/msm_gpu.c b/drivers/gpu/drm/msm/msm_gpu.c
-index 086fb347b554..94332faa316f 100644
---- a/drivers/gpu/drm/msm/msm_gpu.c
-+++ b/drivers/gpu/drm/msm/msm_gpu.c
-@@ -701,7 +701,8 @@ static int get_clocks(struct platform_device *pdev, struct msm_gpu *gpu)
+diff --git a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
+index 7e09d44e4a15..c106606887e2 100644
+--- a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
+@@ -695,6 +695,20 @@ static int a5xx_hw_init(struct msm_gpu *gpu)
+ 		REG_A5XX_RBBM_SECVID_TSB_TRUSTED_BASE_HI, 0x00000000);
+ 	gpu_write(gpu, REG_A5XX_RBBM_SECVID_TSB_TRUSTED_SIZE, 0x00000000);
  
- static struct msm_gem_address_space *
- msm_gpu_create_address_space(struct msm_gpu *gpu, struct platform_device *pdev,
--		uint64_t va_start, uint64_t va_end)
-+		u64 va_start, u64 va_end,
-+		u64 va_global_start, u64 va_global_end)
- {
- 	struct iommu_domain *iommu;
- 	struct msm_gem_address_space *aspace;
-@@ -719,6 +720,20 @@ msm_gpu_create_address_space(struct msm_gpu *gpu, struct platform_device *pdev,
- 	iommu->geometry.aperture_start = va_start;
- 	iommu->geometry.aperture_end = va_end;
- 
-+	/* If a va_global range was specified then try to set up TTBR1 */
-+	if (va_global_start && va_global_end) {
-+		int val = 1;
++	/* Put the GPU into 64 bit by default */
++	gpu_write(gpu, REG_A5XX_CP_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_VSC_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_GRAS_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_RB_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_PC_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_HLSQ_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_VFD_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_VPC_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_UCHE_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_SP_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_TPL1_ADDR_MODE_CNTL, 0x1);
++	gpu_write(gpu, REG_A5XX_RBBM_SECVID_TSB_ADDR_MODE_CNTL, 0x1);
 +
-+		/* Try to enable TTBR1 on the domain */
-+		ret = iommu_domain_set_attr(iommu, DOMAIN_ATTR_ENABLE_TTBR1,
-+			&val);
-+
-+		if (!WARN(ret, "Unable to enable TTBR1 for the IOMMU\n")) {
-+			iommu->geometry.aperture_start = va_global_start;
-+			iommu->geometry.aperture_end = va_global_end;
-+		}
-+	}
-+
- 	dev_info(gpu->dev->dev, "%s: using IOMMU\n", gpu->name);
- 
- 	aspace = msm_gem_address_space_create(&pdev->dev, iommu, "gpu");
-@@ -811,7 +826,8 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
- 	msm_devfreq_init(gpu);
- 
- 	gpu->aspace = msm_gpu_create_address_space(gpu, pdev,
--		config->va_start, config->va_end);
-+		config->va_start, config->va_end, config->va_start_global,
-+		config->va_end_global);
- 
- 	if (gpu->aspace == NULL)
- 		dev_info(drm->dev, "%s: no IOMMU, fallback to VRAM carveout!\n", name);
-diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
-index fccfccd303af..698eca2c1431 100644
---- a/drivers/gpu/drm/msm/msm_gpu.h
-+++ b/drivers/gpu/drm/msm/msm_gpu.h
-@@ -31,8 +31,8 @@ struct msm_gpu_perfcntr;
- struct msm_gpu_config {
- 	const char *ioname;
- 	const char *irqname;
--	uint64_t va_start;
--	uint64_t va_end;
-+	uint64_t va_start, va_end;
-+	uint64_t va_start_global, va_end_global;
- 	unsigned int nr_rings;
- };
+ 	ret = adreno_hw_init(gpu);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/gpu/drm/msm/msm_iommu.c b/drivers/gpu/drm/msm/msm_iommu.c
+index b23d33622f37..fdbe1a8372f0 100644
+--- a/drivers/gpu/drm/msm/msm_iommu.c
++++ b/drivers/gpu/drm/msm/msm_iommu.c
+@@ -30,7 +30,7 @@ static int msm_fault_handler(struct iommu_domain *domain, struct device *dev,
+ 	struct msm_iommu *iommu = arg;
+ 	if (iommu->base.handler)
+ 		return iommu->base.handler(iommu->base.arg, iova, flags);
+-	pr_warn_ratelimited("*** fault: iova=%08lx, flags=%d\n", iova, flags);
++	pr_warn_ratelimited("*** fault: iova=%16lx, flags=%d\n", iova, flags);
+ 	return 0;
+ }
  
 -- 
 2.16.1
