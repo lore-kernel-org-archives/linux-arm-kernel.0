@@ -1,98 +1,231 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 21 Feb 2018 14:39:55 +0000
-Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include
- PAN emulation
-In-Reply-To: <20180221111823.GB32331@e103592.cambridge.arm.com>
-References: <20180220224624.GA28218@beast>
- <20180221111823.GB32331@e103592.cambridge.arm.com>
-Message-ID: <20180221143954.zlwau63wx75ixslv@salmiak>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 21 Feb 2018 06:46:23 -0800
+Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
+ based tachometer
+In-Reply-To: <ee03e1e5-bbeb-1238-04ed-b992fe3a3ce6@kapsi.fi>
+References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
+ <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
+ <ee03e1e5-bbeb-1238-04ed-b992fe3a3ce6@kapsi.fi>
+Message-ID: <c1192f75-0e6e-c735-67e1-2901624831ae@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 11:18:27AM +0000, Dave Martin wrote:
-> On Tue, Feb 20, 2018 at 02:46:24PM -0800, Kees Cook wrote:
-> > The PAN emulation notification was only happening for non-boot CPUs
-> > if CPU capabilities had already been configured. This seems to be the
-> > wrong place, as it's system-wide and isn't attached to capabilities,
-> > so its reporting didn't normally happen. Instead, report it once from
-> > the boot CPU. Additionally removes the redundant "feature" word from the
-> > "CPU features:" line.
-> > 
-> > Before (redundant "feature", and missing PAN emulation report):
-> > 
-> >  SMP: Total of 4 processors activated.
-> >  CPU features: detected feature: 32-bit EL0 Support
-> >  CPU features: detected feature: Kernel page table isolation (KPTI)
-> >  CPU: All CPU(s) started at EL2
-> > 
-> > After:
-> > 
-> >  SMP: Total of 4 processors activated.
-> >  CPU features: detected: 32-bit EL0 Support
-> >  CPU features: detected: Kernel page table isolation (KPTI)
-> >  CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
-> >  CPU: All CPU(s) started at EL2
-> > 
-> > Signed-off-by: Kees Cook <keescook@chromium.org>
-> > ---
-> >  arch/arm64/kernel/cpufeature.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > index 29b1f873e337..6c799ca58b53 100644
-> > --- a/arch/arm64/kernel/cpufeature.c
-> > +++ b/arch/arm64/kernel/cpufeature.c
-> > @@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
-> >  
-> >  	if (system_supports_sve())
-> >  		verify_sve_features();
-> > -
-> > -	if (system_uses_ttbr0_pan())
-> > -		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-> >  }
-> >  
-> >  void check_local_cpu_capabilities(void)
-> > @@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
-> >  
-> >  static void __init setup_feature_capabilities(void)
-> >  {
-> > -	update_cpu_capabilities(arm64_features, "detected feature:");
-> > +	update_cpu_capabilities(arm64_features, "detected:");
+On 02/20/2018 11:15 PM, Mikko Perttunen wrote:
+> AIUI, the PWM framework already exposes a sysfs node with period information. We should just use that instead of adding a new driver for this.
 > 
-> Although I get what you're saying about redundant use of the word
-> "features", this feels like cosmetic churn that is unrelated to the
-> problem this patch is addressing.
 
-Given it seems sensible, shall we just split that into a separate patch? 
+I am kind of lost. Please explain.
 
-FWIW, for a patch with just this change:
+Are you saying that we should drop the pwm-fan driver as well (which goes
+the opposite way), as well as any other drivers doing anything with pwm signals,
+because after all those signals are already exposed to userspace a sysfs attributes,
+and a kernel driver to abstract those values is thus not needed ?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-> It could be worth reviewing the CPU errata messages and other
-> miscellaneous printks together to make them less verbose and more
-> consistent all in one go, but that would be a separate patch...
+> In any case, we cannot add something like this to device tree since it's not a hardware device.
 > 
-> >  	enable_cpu_capabilities(arm64_features);
-> >  }
-> >  
-> > @@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
-> >  	if (system_supports_32bit_el0())
-> >  		setup_elf_hwcaps(compat_elf_hwcaps);
-> >  
-> > +	if (system_uses_ttbr0_pan())
-> > +		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-> > +
+
+So you are saying there is no means to express in devicetree that
+a pwm input is connected to a fan ? How is that not hardware ?
+
+If so, how do you express in devicetree that a pwm signal is connected
+to anything ?
+
+Guenter
+
+> Mikko
 > 
-> Moving this seems sensible.  The other option would be to paste it into
-> update_cpu_capabilities(), but the message would still potentially get
-> printed multiple times, so that doesn't feel like the right approach.
-
-I think that more ideally, we'd give this an entry in the arm64_features array,
-but because it's effectively a negative feature, it's a little tricky.
-
-This also looks fine to me, so FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+> On 21.02.2018 08:58, Rajkumar Rampelli wrote:
+>> Add generic PWM based tachometer driver via HWMON interface
+>> to report the RPM of motor. This drivers get the period/duty
+>> cycle from PWM IP which captures the motor PWM output.
+>>
+>> This driver implements a simple interface for monitoring the speed of
+>> a fan and exposes it in roatations per minute (RPM) to the user space
+>> by using the hwmon's sysfs interface
+>>
+>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
+>> ---
+>> ?Documentation/hwmon/generic-pwm-tachometer |? 17 +++++
+>> ?drivers/hwmon/Kconfig????????????????????? |? 10 +++
+>> ?drivers/hwmon/Makefile???????????????????? |?? 1 +
+>> ?drivers/hwmon/generic-pwm-tachometer.c???? | 112 +++++++++++++++++++++++++++++
+>> ?4 files changed, 140 insertions(+)
+>> ?create mode 100644 Documentation/hwmon/generic-pwm-tachometer
+>> ?create mode 100644 drivers/hwmon/generic-pwm-tachometer.c
+>>
+>> diff --git a/Documentation/hwmon/generic-pwm-tachometer b/Documentation/hwmon/generic-pwm-tachometer
+>> new file mode 100644
+>> index 0000000..e0713ee
+>> --- /dev/null
+>> +++ b/Documentation/hwmon/generic-pwm-tachometer
+>> @@ -0,0 +1,17 @@
+>> +Kernel driver generic-pwm-tachometer
+>> +====================================
+>> +
+>> +This driver enables the use of a PWM module to monitor a fan. It uses the
+>> +generic PWM interface and can be used on SoCs as along as the SoC supports
+>> +Tachometer controller that moniors the Fan speed in periods.
+>> +
+>> +Author: Rajkumar Rampelli <rrajk@nvidia.com>
+>> +
+>> +Description
+>> +-----------
+>> +
+>> +The driver implements a simple interface for monitoring the Fan speed using
+>> +PWM module and Tachometer controller. It requests period value through PWM
+>> +capture interface to Tachometer and measures the Rotations per minute using
+>> +received period value. It exposes the Fan speed in RPM to the user space by
+>> +using the hwmon's sysfs interface.
+>> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+>> index ef23553..8912dcb 100644
+>> --- a/drivers/hwmon/Kconfig
+>> +++ b/drivers/hwmon/Kconfig
+>> @@ -1878,6 +1878,16 @@ config SENSORS_XGENE
+>> ?????? If you say yes here you get support for the temperature
+>> ?????? and power sensors for APM X-Gene SoC.
+>>
+>> +config GENERIC_PWM_TACHOMETER
+>> +??? tristate "Generic PWM based tachometer driver"
+>> +??? depends on PWM
+>> +??? help
+>> +????? Enables a driver to use PWM signal from motor to use
+>> +????? for measuring the motor speed. The RPM is captured by
+>> +????? PWM modules which has PWM capture capability and this
+>> +????? drivers reads the captured data from PWM IP to convert
+>> +????? it to speed in RPM.
+>> +
+>> ?if ACPI
+>>
+>> ?comment "ACPI drivers"
+>> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+>> index f814b4a..9dcc374 100644
+>> --- a/drivers/hwmon/Makefile
+>> +++ b/drivers/hwmon/Makefile
+>> @@ -175,6 +175,7 @@ obj-$(CONFIG_SENSORS_WM8350)??? += wm8350-hwmon.o
+>> ?obj-$(CONFIG_SENSORS_XGENE)??? += xgene-hwmon.o
+>>
+>> ?obj-$(CONFIG_PMBUS)??????? += pmbus/
+>> +obj-$(CONFIG_GENERIC_PWM_TACHOMETER) += generic-pwm-tachometer.o
+>>
+>> ?ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
+>>
+>> diff --git a/drivers/hwmon/generic-pwm-tachometer.c b/drivers/hwmon/generic-pwm-tachometer.c
+>> new file mode 100644
+>> index 0000000..9354d43
+>> --- /dev/null
+>> +++ b/drivers/hwmon/generic-pwm-tachometer.c
+>> @@ -0,0 +1,112 @@
+>> +/*
+>> + * Copyright (c) 2017-2018, NVIDIA CORPORATION.? All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.? See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/err.h>
+>> +#include <linux/pwm.h>
+>> +#include <linux/hwmon.h>
+>> +#include <linux/hwmon-sysfs.h>
+>> +
+>> +struct pwm_hwmon_tach {
+>> +??? struct device??????? *dev;
+>> +??? struct pwm_device??? *pwm;
+>> +??? struct device??????? *hwmon;
+>> +};
+>> +
+>> +static ssize_t show_rpm(struct device *dev, struct device_attribute *attr,
+>> +??????????? char *buf)
+>> +{
+>> +??? struct pwm_hwmon_tach *ptt = dev_get_drvdata(dev);
+>> +??? struct pwm_device *pwm = ptt->pwm;
+>> +??? struct pwm_capture result;
+>> +??? int err;
+>> +??? unsigned int rpm = 0;
+>> +
+>> +??? err = pwm_capture(pwm, &result, 0);
+>> +??? if (err < 0) {
+>> +??????? dev_err(ptt->dev, "Failed to capture PWM: %d\n", err);
+>> +??????? return err;
+>> +??? }
+>> +
+>> +??? if (result.period)
+>> +??????? rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
+>> +??????????????????????? result.period);
+>> +
+>> +??? return sprintf(buf, "%u\n", rpm);
+>> +}
+>> +
+>> +static SENSOR_DEVICE_ATTR(rpm, 0444, show_rpm, NULL, 0);
+>> +
+>> +static struct attribute *pwm_tach_attrs[] = {
+>> +??? &sensor_dev_attr_rpm.dev_attr.attr,
+>> +??? NULL,
+>> +};
+>> +
+>> +ATTRIBUTE_GROUPS(pwm_tach);
+>> +
+>> +static int pwm_tach_probe(struct platform_device *pdev)
+>> +{
+>> +??? struct pwm_hwmon_tach *ptt;
+>> +??? int err;
+>> +
+>> +??? ptt = devm_kzalloc(&pdev->dev, sizeof(*ptt), GFP_KERNEL);
+>> +??? if (!ptt)
+>> +??????? return -ENOMEM;
+>> +
+>> +??? ptt->dev = &pdev->dev;
+>> +
+>> +??? platform_set_drvdata(pdev, ptt);
+>> +??? dev_set_drvdata(&pdev->dev, ptt);
+>> +
+>> +??? ptt->pwm = devm_of_pwm_get(&pdev->dev, pdev->dev.of_node, NULL);
+>> +??? if (IS_ERR(ptt->pwm)) {
+>> +??????? err = PTR_ERR(ptt->pwm);
+>> +??????? dev_err(&pdev->dev, "Failed to get pwm handle, err: %d\n",
+>> +??????????? err);
+>> +??????? return err;
+>> +??? }
+>> +
+>> +??? ptt->hwmon = devm_hwmon_device_register_with_groups(&pdev->dev,
+>> +???????????????????? "pwm_tach", ptt, pwm_tach_groups);
+>> +??? if (IS_ERR(ptt->hwmon)) {
+>> +??????? err = PTR_ERR_OR_ZERO(ptt->hwmon);
+>> +??????? dev_err(&pdev->dev, "Failed to register hwmon device: %d\n",
+>> +??????????? err);
+>> +??????? return err;
+>> +??? }
+>> +
+>> +??? return 0;
+>> +}
+>> +
+>> +static const struct of_device_id pwm_tach_of_match[] = {
+>> +??? { .compatible = "generic-pwm-tachometer" },
+>> +??? {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, pwm_tach_of_match);
+>> +
+>> +static struct platform_driver pwm_tach_driver = {
+>> +??? .driver = {
+>> +??????? .name = "generic-pwm-tachometer",
+>> +??????? .of_match_table = pwm_tach_of_match,
+>> +??? },
+>> +??? .probe = pwm_tach_probe,
+>> +};
+>> +
+>> +module_platform_driver(pwm_tach_driver);
+>> +
+>> +MODULE_DESCRIPTION("PWM based Generic Tachometer driver");
+>> +MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
+>> +MODULE_AUTHOR("Rajkumar Rampelli <rrajk@nvidia.com>");
+>> +MODULE_LICENSE("GPL v2");
+>>
+> 
