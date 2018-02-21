@@ -1,210 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 21 Feb 2018 15:33:47 +0000
-Subject: [PATCH v4 28/40] KVM: arm64: Defer saving/restoring 64-bit
- sysregs to vcpu load/put on VHE
-In-Reply-To: <20180215210332.8648-29-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-29-christoffer.dall@linaro.org>
-Message-ID: <864lmal5lw.wl-marc.zyngier@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 21 Feb 2018 23:36:10 +0800
+Subject: [PATCH v2 08/10] drm/panel: Add Huarui LHR050H41 panel driver
+In-Reply-To: <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
+References: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
+ <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v66c-KntNqkb0=qyP2JCafUOcPuh1o_VqeGencMXEuEfMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Feb 2018 21:03:20 +0000,
-Christoffer Dall wrote:
-> 
-> Some system registers do not affect the host kernel's execution and can
-> therefore be loaded when we are about to run a VCPU and we don't have to
-> restore the host state to the hardware before the time when we are
-> actually about to return to userspace or schedule out the VCPU thread.
-> 
-> The EL1 system registers and the userspace state registers only
-> affecting EL0 execution do not need to be saved and restored on every
-> switch between the VM and the host, because they don't affect the host
-> kernel's execution.
-> 
-> We mark all registers which are now deffered as such in the
-> vcpu_{read,write}_sys_reg accessors in sys-regs.c to ensure the most
-> up-to-date copy is always accessed.
-> 
-> Note MPIDR_EL1 (controlled via VMPIDR_EL2) is accessed from other vcpu
-> threads, for example via the GIC emulation, and therefore must be
-> declared as immediate, which is fine as the guest cannot modify this
-> value.
-> 
-> The 32-bit sysregs can also be deferred but we do this in a separate
-> patch as it requires a bit more infrastructure.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi,
+
+On Wed, Feb 21, 2018 at 5:20 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> The LHR050H41 panel is the panel shipped with the BananaPi M2-Magic. Add a
+> driver for it.
+
+So I distinctly remember questioning the vendor name the first time.
+I would just use Bananapi as the vendor name instead.
+
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
-> 
-> Notes:
->     Changes since v3:
->      - Changed to switch-based sysreg approach
-> 
->  arch/arm64/kvm/hyp/sysreg-sr.c | 39 +++++++++++++++++++++++++++++++--------
->  arch/arm64/kvm/sys_regs.c      | 40 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 71 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 906606dc4e2c..9c60b8062724 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -25,8 +25,12 @@
->  /*
->   * Non-VHE: Both host and guest must save everything.
->   *
-> - * VHE: Host must save tpidr*_el0, mdscr_el1, sp_el0,
-> - * and guest must save everything.
-> + * VHE: Host and guest must save mdscr_el1 and sp_el0 (and the PC and pstate,
-> + * which are handled as part of the el2 return state) on every switch.
-> + * tpidr_el0 and tpidrro_el0 only need to be switched when going
+>  drivers/gpu/drm/panel/Kconfig                  |   9 +-
+>  drivers/gpu/drm/panel/Makefile                 |   1 +-
+>  drivers/gpu/drm/panel/panel-huarui-lhr050h41.c | 506 ++++++++++++++++++-
+>  3 files changed, 516 insertions(+)
+>  create mode 100644 drivers/gpu/drm/panel/panel-huarui-lhr050h41.c
+>
+> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+> index 6ba4031f3919..965310fd129a 100644
+> --- a/drivers/gpu/drm/panel/Kconfig
+> +++ b/drivers/gpu/drm/panel/Kconfig
+> @@ -28,6 +28,15 @@ config DRM_PANEL_SIMPLE
+>           that it can be automatically turned off when the panel goes into a
+>           low power state.
+>
+> +config DRM_PANEL_HUARUI_LHR050H41
+> +       tristate "Huarui LHR050H41 panel"
+> +       depends on OF
+> +       depends on DRM_MIPI_DSI
+> +       depends on BACKLIGHT_CLASS_DEVICE
+> +       help
+> +         Say Y if you want to enable support for the Huarui Lighting
+> +         LHR05041 DSI panel. The panel has a 1280x720 resolution.
+> +
 
-How about suspend/resume, which saves/restores both of these EL0
-registers (see cpu_do_suspend)? We may not need to do anything (either
-because vcpu_put will have happened, or because we'll come back
-exactly where we were), but I'd like to make sure this hasn't been
-overlooked.
+And it seems this panel is driven by an ILI9881C from Ilitek. So
+maybe you could make the panel driver more like the IL9322, as in
+having common code for the driver IC, then a data structure tied
+to actual panel compatible strings to handle any quirks.
 
-> + * to host userspace or a different VCPU.  EL1 registers only need to be
-> + * switched when potentially going to run a different VCPU.  The latter two
-> + * classes are handled as part of kvm_arch_vcpu_load and kvm_arch_vcpu_put.
->   */
->  
->  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-> @@ -93,14 +97,11 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
->  void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_save_common_state(ctxt);
-> -	__sysreg_save_user_state(ctxt);
->  }
->  
->  void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
->  {
-> -	__sysreg_save_el1_state(ctxt);
->  	__sysreg_save_common_state(ctxt);
-> -	__sysreg_save_user_state(ctxt);
->  	__sysreg_save_el2_return_state(ctxt);
->  }
->  
-> @@ -169,14 +170,11 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
->  void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_restore_common_state(ctxt);
-> -	__sysreg_restore_user_state(ctxt);
->  }
->  
->  void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
->  {
-> -	__sysreg_restore_el1_state(ctxt);
->  	__sysreg_restore_common_state(ctxt);
-> -	__sysreg_restore_user_state(ctxt);
->  	__sysreg_restore_el2_return_state(ctxt);
->  }
->  
-> @@ -240,6 +238,18 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
->   */
->  void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
->  {
-> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
-> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
-> +
-> +	if (!has_vhe())
-> +		return;
-> +
-> +	__sysreg_save_user_state(host_ctxt);
-> +
-> +	__sysreg_restore_user_state(guest_ctxt);
-> +	__sysreg_restore_el1_state(guest_ctxt);
-> +
-> +	vcpu->arch.sysregs_loaded_on_cpu = true;
->  }
->  
->  /**
-> @@ -255,6 +265,19 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
->   */
->  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
->  {
-> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
-> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
-> +
-> +	if (!has_vhe())
-> +		return;
-> +
-> +	__sysreg_save_el1_state(guest_ctxt);
-> +	__sysreg_save_user_state(guest_ctxt);
-> +
-> +	/* Restore host user state */
-> +	__sysreg_restore_user_state(host_ctxt);
-> +
-> +	vcpu->arch.sysregs_loaded_on_cpu = false;
->  }
->  
->  void __hyp_text __kvm_set_tpidr_el2(u64 tpidr_el2)
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index b3c3f014aa61..f060309337aa 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -87,6 +87,26 @@ u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
->  	 * exit from the guest but are only saved on vcpu_put.
->  	 */
->  	switch (reg) {
-> +	case CSSELR_EL1:	return read_sysreg_s(SYS_CSSELR_EL1);
-> +	case SCTLR_EL1:		return read_sysreg_s(sctlr_EL12);
-> +	case ACTLR_EL1:		return read_sysreg_s(SYS_ACTLR_EL1);
-> +	case CPACR_EL1:		return read_sysreg_s(cpacr_EL12);
-> +	case TTBR0_EL1:		return read_sysreg_s(ttbr0_EL12);
-> +	case TTBR1_EL1:		return read_sysreg_s(ttbr1_EL12);
-> +	case TCR_EL1:		return read_sysreg_s(tcr_EL12);
-> +	case ESR_EL1:		return read_sysreg_s(esr_EL12);
-> +	case AFSR0_EL1:		return read_sysreg_s(afsr0_EL12);
-> +	case AFSR1_EL1:		return read_sysreg_s(afsr1_EL12);
-> +	case FAR_EL1:		return read_sysreg_s(far_EL12);
-> +	case MAIR_EL1:		return read_sysreg_s(mair_EL12);
-> +	case VBAR_EL1:		return read_sysreg_s(vbar_EL12);
-> +	case CONTEXTIDR_EL1:	return read_sysreg_s(contextidr_EL12);
-> +	case TPIDR_EL0:		return read_sysreg_s(SYS_TPIDR_EL0);
-> +	case TPIDRRO_EL0:	return read_sysreg_s(SYS_TPIDRRO_EL0);
-> +	case TPIDR_EL1:		return read_sysreg_s(SYS_TPIDR_EL1);
-> +	case AMAIR_EL1:		return read_sysreg_s(amair_EL12);
-> +	case CNTKCTL_EL1:	return read_sysreg_s(cntkctl_EL12);
-> +	case PAR_EL1:		return read_sysreg_s(SYS_PAR_EL1);
->  	}
->  
->  immediate_read:
-> @@ -103,6 +123,26 @@ void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
->  	 * entry to the guest but are only restored on vcpu_load.
->  	 */
->  	switch (reg) {
-> +	case CSSELR_EL1:	write_sysreg_s(val, SYS_CSSELR_EL1);	return;
-> +	case SCTLR_EL1:		write_sysreg_s(val, sctlr_EL12);	return;
-> +	case ACTLR_EL1:		write_sysreg_s(val, SYS_ACTLR_EL1);	return;
-> +	case CPACR_EL1:		write_sysreg_s(val, cpacr_EL12);	return;
-> +	case TTBR0_EL1:		write_sysreg_s(val, ttbr0_EL12);	return;
-> +	case TTBR1_EL1:		write_sysreg_s(val, ttbr1_EL12);	return;
-> +	case TCR_EL1:		write_sysreg_s(val, tcr_EL12);		return;
-> +	case ESR_EL1:		write_sysreg_s(val, esr_EL12);		return;
-> +	case AFSR0_EL1:		write_sysreg_s(val, afsr0_EL12);	return;
-> +	case AFSR1_EL1:		write_sysreg_s(val, afsr1_EL12);	return;
-> +	case FAR_EL1:		write_sysreg_s(val, far_EL12);		return;
-> +	case MAIR_EL1:		write_sysreg_s(val, mair_EL12);		return;
-> +	case VBAR_EL1:		write_sysreg_s(val, vbar_EL12);		return;
-> +	case CONTEXTIDR_EL1:	write_sysreg_s(val, contextidr_EL12);	return;
-> +	case TPIDR_EL0:		write_sysreg_s(val, SYS_TPIDR_EL0);	return;
-> +	case TPIDRRO_EL0:	write_sysreg_s(val, SYS_TPIDRRO_EL0);	return;
-> +	case TPIDR_EL1:		write_sysreg_s(val, SYS_TPIDR_EL1);	return;
-> +	case AMAIR_EL1:		write_sysreg_s(val, amair_EL12);	return;
-> +	case CNTKCTL_EL1:	write_sysreg_s(val, cntkctl_EL12);	return;
-> +	case PAR_EL1:		write_sysreg_s(val, SYS_PAR_EL1);	return;
->  	}
->  
->  immediate_write:
-> -- 
-> 2.14.2
-> 
+The datasheet can be found simply by googling the part ID, or here:
 
-Looks good to me otherwise.
+   http://en.startek-lcd.com/res/starteklcden/pdres/201706/20170617115241070.pdf
 
-	M.
+This should help with the init command sequence.
 
--- 
-Jazz is not dead, it just smell funny.
+I also found this:
+
+http://www.ampdisplay.com/documents/pdf/AM-7201280ETZQW-00H.pdf
+
+which might or might not be the same panel.
+
+Now the IL9332 driver simply uses the device model (Dlink DIR-685)
+as part of the compatible string.
+
+Regards
+ChenYu
+
+>  config DRM_PANEL_ILITEK_IL9322
+>         tristate "Ilitek ILI9322 320x240 QVGA panels"
+>         depends on OF && SPI
