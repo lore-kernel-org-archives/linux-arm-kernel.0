@@ -1,100 +1,76 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Feb 2018 10:20:34 +0100
-Subject: [PATCH v2 10/10] [DO NOT MERGE] arm: dts: sun8i: bpi-m2m: Add DSI
- display
+Date: Wed, 21 Feb 2018 10:20:26 +0100
+Subject: [PATCH v2 02/10] drm/sun4i: tcon: Add TRI finish interrupt for vblank
 In-Reply-To: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
 References: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
-Message-ID: <ed1743dcc1a117f6787cdb77e8fb4c7c8bbd8525.1519204731.git-series.maxime.ripard@bootlin.com>
+Message-ID: <d73b03fd75dfe9d7657235f63480e9d9c61e95a6.1519204731.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The BananaPi M2M has an optional 1280x720 DSI panel. Since that panel is
-optional, we can only show a DT patch that would show how to enable it.
+The "CPU" (or Intel 8080) interface uses a different interrupt called
+TRI_FINISH (most likely TRI being for trigger) to notify the end of frames,
+and hence the VBLANK period.
 
+And that interrupt to the possible VBLANK interrupts source.
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts | 39 +++++++++++++++++++++-
- 1 file changed, 39 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-index eaf09666720d..11a4dfde2679 100644
---- a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-+++ b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-@@ -44,6 +44,7 @@
- #include "sun8i-a33.dtsi"
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 3c15cf24b503..b73acab74867 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -196,7 +196,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ 	DRM_DEBUG_DRIVER("%sabling VBLANK interrupt\n", enable ? "En" : "Dis");
  
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
+ 	mask = SUN4I_TCON_GINT0_VBLANK_ENABLE(0) |
+-	       SUN4I_TCON_GINT0_VBLANK_ENABLE(1);
++		SUN4I_TCON_GINT0_VBLANK_ENABLE(1) |
++		SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE;
  
- / {
- 	model = "BananaPi M2 Magic";
-@@ -81,6 +82,14 @@
- 		};
- 	};
+ 	if (enable)
+ 		val = mask;
+@@ -545,7 +546,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
  
-+	pwm_bl: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <1 2 4 8 16 32 64 128 255>;
-+		default-brightness-level = <8>;
-+		enable-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PG10 */
-+	};
-+
- 	reg_vcc5v0: vcc5v0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc5v0";
-@@ -120,6 +129,26 @@
- 	status = "okay";
- };
+ 	if (!(status & (SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			SUN4I_TCON_GINT0_VBLANK_INT(1))))
++			SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT)))
+ 		return IRQ_NONE;
  
-+&de {
-+	status = "okay";
-+};
-+
-+&dphy0 {
-+	status = "okay";
-+};
-+
-+&dsi0 {
-+	status = "okay";
-+
-+	panel at 0 {
-+		compatible = "huarui,lhr050h41";
-+		reg = <0>;
-+		power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
-+		reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
-+		backlight = <&pwm_bl>;
-+	};
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -179,6 +208,12 @@
- 	status = "okay";
- };
+ 	drm_crtc_handle_vblank(&scrtc->crtc);
+@@ -554,7 +556,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	/* Acknowledge the interrupt */
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON_GINT0_REG,
+ 			   SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			   SUN4I_TCON_GINT0_VBLANK_INT(1),
++			   SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			   SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT,
+ 			   0);
  
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
+ 	return IRQ_HANDLED;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index b761c7b823c5..067183076807 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -28,7 +28,11 @@
  
-@@ -291,6 +326,10 @@
- 	status = "okay";
- };
+ #define SUN4I_TCON_GINT0_REG			0x4
+ #define SUN4I_TCON_GINT0_VBLANK_ENABLE(pipe)		BIT(31 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE	BIT(27)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_ENABLE	BIT(26)
+ #define SUN4I_TCON_GINT0_VBLANK_INT(pipe)		BIT(15 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT		BIT(11)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_INT		BIT(10)
  
-+&tcon0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_b>;
+ #define SUN4I_TCON_GINT1_REG			0x8
+ #define SUN4I_TCON_FRM_CTL_REG			0x10
 -- 
 git-series 0.9.1
