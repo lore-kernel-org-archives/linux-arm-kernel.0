@@ -1,19 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Feb 2018 17:45:12 +0100
-Subject: [PATCH v2 02/19] soc: renesas: rcar-rst: Add support for R-Car
- M3-N
-In-Reply-To: <CAMuHMdVPkbKQf=svj+R_jjt2_+FqHXaCRmW7Wu7c0AfJzZR2Sg@mail.gmail.com>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-3-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdVPkbKQf=svj+R_jjt2_+FqHXaCRmW7Wu7c0AfJzZR2Sg@mail.gmail.com>
-Message-ID: <20180221164511.sb7aifjg6vd3pxai@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 21 Feb 2018 09:46:28 -0700
+Subject: [PATCH] ARM: dtc: tegra: enable front panel leds in TrimSlice
+In-Reply-To: <873b01dc-3ca5-3151-2654-a8272cb9dd88@gmail.com>
+References: <20180219201623.6987-1-tmn505@gmail.com>
+ <57945bd2-d8c2-f7bc-f01f-29d679762446@wwwdotorg.org>
+ <873b01dc-3ca5-3151-2654-a8272cb9dd88@gmail.com>
+Message-ID: <f291dd94-107f-cf03-a8e8-bc0806421c2d@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 04:29:37PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+On 02/21/2018 09:20 AM, Tomasz Maciej Nowak wrote:
+> W dniu 20.02.2018 o?20:55, Stephen Warren pisze:
+>> On 02/19/2018 01:16 PM, Tomasz Maciej Nowak wrote:
+>>> Adds device nodes for two front panel LEDs.
+>>
+>> Why do you need to change the pinmux settings? Configuring a pin as a 
+>> GPIO should override any pinmux special function selection and hence 
+>> make it irrelevant, so I don't think you should need to change the 
+>> pinmux.
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> At first I did exactly that without changing the pinmux, but the LEDs 
+> didn't light up. After that I compared with CompuLab source tree [1]. 
+> The pinmux was specified as in my patch. With this change the LEDs are 
+> fully functional.
+> 
+> 1. 
+> https://gitorious.org/trimslice-kernel/trimslice-kernel?p=trimslice-kernel:trimslice-kernel.git;a=blob;f=arch/arm/mach-tegra/board-trimslice-pinmux.c;h=cc6d5225d97eb9327c820bf1d5b2bc16ab8c6dda;hb=d25bf45d6314089489b30d218ed8a0d6d94417f9#l45 
 
-Thanks, applied.
+Oh I see. Your patch isn't changing the pinmux function selection but 
+the other configuration bits, which are relevant even when the pin is in 
+GPIO mode. In particular, it clears the tristate bit for the dte 
+pingroup. That makes perfect sense.
