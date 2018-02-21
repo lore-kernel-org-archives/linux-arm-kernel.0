@@ -1,281 +1,314 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 21 Feb 2018 21:30:42 +0530
-Subject: [PATCH v2 08/10] gpio: Add gpio driver for Actions OWL S900 SoC
-In-Reply-To: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
-References: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180221160044.15089-9-manivannan.sadhasivam@linaro.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Wed, 21 Feb 2018 10:14:28 -0600
+Subject: [PATCH v3] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <20180221150929.hkvtwu4fgfeis5cy@salmiak>
+References: <1519220946-13901-1-git-send-email-shankerd@codeaurora.org>
+ <20180221150929.hkvtwu4fgfeis5cy@salmiak>
+Message-ID: <5be4684b-e2d8-1b3b-4c96-03c7dae0b619@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
-controlling the gpio shares the same register range with pinctrl block.
+Hi Mark,
 
-GPIO registers are organized as 6 banks and each bank controls the
-maximum of 32 gpios.
+On 02/21/2018 09:09 AM, Mark Rutland wrote:
+> On Wed, Feb 21, 2018 at 07:49:06AM -0600, Shanker Donthineni wrote:
+>> The DCache clean & ICache invalidation requirements for instructions
+>> to be data coherence are discoverable through new fields in CTR_EL0.
+>> The following two control bits DIC and IDC were defined for this
+>> purpose. No need to perform point of unification cache maintenance
+>> operations from software on systems where CPU caches are transparent.
+>>
+>> This patch optimize the three functions __flush_cache_user_range(),
+>> clean_dcache_area_pou() and invalidate_icache_range() if the hardware
+>> reports CTR_EL0.IDC and/or CTR_EL0.IDC. Basically it skips the two
+>> instructions 'DC CVAU' and 'IC IVAU', and the associated loop logic
+>> in order to avoid the unnecessary overhead.
+>>
+>> CTR_EL0.DIC: Instruction cache invalidation requirements for
+>>  instruction to data coherence. The meaning of this bit[29].
+>>   0: Instruction cache invalidation to the point of unification
+>>      is required for instruction to data coherence.
+>>   1: Instruction cache cleaning to the point of unification is
+>>       not required for instruction to data coherence.
+>>
+>> CTR_EL0.IDC: Data cache clean requirements for instruction to data
+>>  coherence. The meaning of this bit[28].
+>>   0: Data cache clean to the point of unification is required for
+>>      instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
+>>      or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
+>>   1: Data cache clean to the point of unification is not required
+>>      for instruction to data coherence.
+>>
+>> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> Changes since v2:
+>>   -Included barriers, DSB/ISB with DIC set, and DSB with IDC set.
+>>   -Single Kconfig option.
+>>
+>> Changes since v1:
+>>   -Reworded commit text.
+>>   -Used the alternatives framework as Catalin suggested.
+>>   -Rebased on top of https://patchwork.kernel.org/patch/10227927/
+>>
+>>  arch/arm64/Kconfig               | 12 ++++++++++++
+>>  arch/arm64/include/asm/cache.h   |  5 +++++
+>>  arch/arm64/include/asm/cpucaps.h |  4 +++-
+>>  arch/arm64/kernel/cpufeature.c   | 40 ++++++++++++++++++++++++++++++++++------
+>>  arch/arm64/mm/cache.S            | 21 +++++++++++++++++++--
+>>  5 files changed, 73 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index f55fe5b..82b8053 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -1095,6 +1095,18 @@ config ARM64_RAS_EXTN
+>>  	  and access the new registers if the system supports the extension.
+>>  	  Platform RAS features may additionally depend on firmware support.
+>>  
+>> +config ARM64_SKIP_CACHE_POU
+>> +	bool "Enable support to skip cache POU operations"
+>> +	default y
+>> +	help
+>> +	  Explicit point of unification cache operations can be eliminated
+>> +	  in software if the hardware handles transparently. The new bits in
+>> +	  CTR_EL0, CTR_EL0.DIC and CTR_EL0.IDC indicates the hardware
+>> +	  capabilities of ICache and DCache POU requirements.
+>> +
+>> +	  Selecting this feature will allow the kernel to optimize the POU
+>> +	  cache maintaince operations where it requires 'D{I}C C{I}VAU'
+>> +
+>>  endmenu
+> 
+> Is it worth having a config option for this at all? The savings from turning
+> this off seem trivial.
+> 
+>>  
+>>  config ARM64_SVE
+>> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+>> index ea9bb4e..e22178b 100644
+>> --- a/arch/arm64/include/asm/cache.h
+>> +++ b/arch/arm64/include/asm/cache.h
+>> @@ -20,8 +20,13 @@
+>>  
+>>  #define CTR_L1IP_SHIFT		14
+>>  #define CTR_L1IP_MASK		3
+>> +#define CTR_DMLINE_SHIFT	16
+>> +#define CTR_ERG_SHIFT		20
+>>  #define CTR_CWG_SHIFT		24
+>>  #define CTR_CWG_MASK		15
+>> +#define CTR_IDC_SHIFT		28
+>> +#define CTR_DIC_SHIFT		29
+>> +#define CTR_B31_SHIFT		31
+>>  
+>>  #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
+>>  
+>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+>> index bb26382..8dd42ae 100644
+>> --- a/arch/arm64/include/asm/cpucaps.h
+>> +++ b/arch/arm64/include/asm/cpucaps.h
+>> @@ -45,7 +45,9 @@
+>>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>>  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>>  #define ARM64_HAS_RAS_EXTN			26
+>> +#define ARM64_HAS_CACHE_IDC			27
+>> +#define ARM64_HAS_CACHE_DIC			28
+>>  
+>> -#define ARM64_NCAPS				27
+>> +#define ARM64_NCAPS				29
+>>  
+>>  #endif /* __ASM_CPUCAPS_H */
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index ff8a6e9..12e100a 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -199,12 +199,12 @@ static int __init register_cpu_hwcaps_dumper(void)
+>>  };
+>>  
+>>  static const struct arm64_ftr_bits ftr_ctr[] = {
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RES1 */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 29, 1, 1),	/* DIC */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 28, 1, 1),	/* IDC */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 20, 4, 0),	/* ERG */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, CTR_B31_SHIFT, 1, 1),         /* RES1 */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),    /* DIC */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 1),    /* IDC */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_CWG_SHIFT, 4, 0),   /* CWG */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_ERG_SHIFT, 4, 0),   /* ERG */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DMLINE_SHIFT, 4, 1), /* DminLine */
+>>  	/*
+>>  	 * Linux can handle differing I-cache policies. Userspace JITs will
+>>  	 * make use of *minLine.
+>> @@ -864,6 +864,20 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+>>  					ID_AA64PFR0_FP_SHIFT) < 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return (read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_IDC_SHIFT));
+>> +}
+>> +
+>> +static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return (read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_DIC_SHIFT));
+>> +}
+>> +#endif
+>> +
+>>  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+>>  static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>>  
+>> @@ -1100,6 +1114,20 @@ static int cpu_copy_el2regs(void *__unused)
+>>  		.enable = cpu_clear_disr,
+>>  	},
+>>  #endif /* CONFIG_ARM64_RAS_EXTN */
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +	{
+>> +		.desc = "DCache clean to POU",
+> 
+> This description is confusing, and sounds like it's describing DC CVAU, rather
+> than the ability to ellide it. How about:
+> 
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- drivers/gpio/Kconfig    |   8 ++
- drivers/gpio/Makefile   |   1 +
- drivers/gpio/gpio-owl.c | 219 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 228 insertions(+)
- create mode 100644 drivers/gpio/gpio-owl.c
+Sure, I'll take your suggestion.
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 8dbb2280538d..09ceb98e2434 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -364,6 +364,14 @@ config GPIO_OMAP
- 	help
- 	  Say yes here to enable GPIO support for TI OMAP SoCs.
+> 		.desc = "D-cache maintenance ellision (IDC)"
+> 
+>> +		.capability = ARM64_HAS_CACHE_IDC,
+>> +		.def_scope = SCOPE_SYSTEM,
+>> +		.matches = has_cache_idc,
+>> +	},
+>> +	{
+>> +		.desc = "ICache invalidation to POU",
+> 
+> ... and correspondingly:
+> 
+> 		.desc = "I-cache maintenance ellision (DIC)"
+> 
+>> +		.capability = ARM64_HAS_CACHE_DIC,
+>> +		.def_scope = SCOPE_SYSTEM,
+>> +		.matches = has_cache_dic,
+>> +	},
+>> +#endif /* CONFIG_ARM64_CACHE_DIC */
+>>  	{},
+>>  };
+>>  
+>> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+>> index 758bde7..76c55ef 100644
+>> --- a/arch/arm64/mm/cache.S
+>> +++ b/arch/arm64/mm/cache.S
+>> @@ -50,6 +50,9 @@ ENTRY(flush_icache_range)
+>>   */
+>>  ENTRY(__flush_cache_user_range)
+>>  	uaccess_ttbr0_enable x2, x3, x4
+>> +alternative_if ARM64_HAS_CACHE_IDC
+>> +	b	7f
+>> +alternative_else_nop_endif
+> 
+> As there's no ifdef here, this will always result in an alternative entry, no?
+> 
+
+Yes it always enable alternative entry, If you want I can put ifdef guard.
+
+> ... and likewise for hte other asm.
+> 
+>>  	dcache_line_size x2, x3
+>>  	sub	x3, x2, #1
+>>  	bic	x4, x0, x3
+>> @@ -58,10 +61,14 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+>>  	add	x4, x4, x2
+>>  	cmp	x4, x1
+>>  	b.lo	1b
+>> -	dsb	ish
+>> +7:	dsb	ish
+> 
+> I *think* that with IDC set, we can make this a DSB ISHST. We're trying to
+> ensure that prior stores are visible, and ISHST is sufficient for that.
+> 
+
+The reason I used ISH instead of ISHST to simplify the code changes. I don't see
+any correctness issue using ISH...
  
-+config GPIO_OWL
-+	tristate "Actions OWL GPIO support"
-+	default ARCH_ACTIONS
-+	depends on ARCH_ACTIONS || COMPILE_TEST
-+	depends on OF_GPIO
-+	help
-+	  Say yes here to enable GPIO support for Actions OWL SoCs.
-+
- config GPIO_PL061
- 	bool "PrimeCell PL061 GPIO support"
- 	depends on ARM_AMBA
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index cccb0d40846c..b2bb11d4675f 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -91,6 +91,7 @@ obj-$(CONFIG_GPIO_MXC)		+= gpio-mxc.o
- obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
- obj-$(CONFIG_GPIO_OCTEON)	+= gpio-octeon.o
- obj-$(CONFIG_GPIO_OMAP)		+= gpio-omap.o
-+obj-$(CONFIG_GPIO_OWL)		+= gpio-owl.o
- obj-$(CONFIG_GPIO_PCA953X)	+= gpio-pca953x.o
- obj-$(CONFIG_GPIO_PCF857X)	+= gpio-pcf857x.o
- obj-$(CONFIG_GPIO_PCH)		+= gpio-pch.o
-diff --git a/drivers/gpio/gpio-owl.c b/drivers/gpio/gpio-owl.c
-new file mode 100644
-index 000000000000..0464c08e0422
---- /dev/null
-+++ b/drivers/gpio/gpio-owl.c
-@@ -0,0 +1,219 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * OWL SoC's GPIO driver
-+ *
-+ * Copyright (c) 2018 Linaro Ltd.
-+ * Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/gpio/driver.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define GPIO_OUTEN	0x0000
-+#define GPIO_INEN	0x0004
-+#define GPIO_DAT	0x0008
-+
-+#define OWL_GPIO_PORT_A 0
-+#define OWL_GPIO_PORT_B 1
-+#define OWL_GPIO_PORT_C 2
-+#define OWL_GPIO_PORT_D 3
-+#define OWL_GPIO_PORT_E 4
-+#define OWL_GPIO_PORT_F 5
-+
-+struct owl_gpio_port {
-+	const char *name;
-+	unsigned int offset;
-+	unsigned int pins;
-+};
-+
-+struct owl_gpio {
-+	struct gpio_chip gpio;
-+	const struct owl_gpio_port *port;
-+	void __iomem *base;
-+	int id;
-+};
-+
-+static void owl_gpio_set_reg(void __iomem *base, unsigned int pin, int flag)
-+{
-+	u32 val;
-+
-+	if (flag) {
-+		val = readl(base);
-+		val |= BIT(pin);
-+		writel(val, base);
-+	} else {
-+		val = readl(base);
-+		val &= ~BIT(pin);
-+		writel(val, base);
-+	}
-+}
-+
-+static int owl_gpio_request(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+
-+	/*
-+	 * GPIOs have higher priority over other modules, so either setting
-+	 * them as OUT or IN is sufficient
-+	 */
-+	owl_gpio_set_reg(gpio_base + GPIO_OUTEN, offset, true);
-+
-+	return 0;
-+}
-+
-+static void owl_gpio_free(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+
-+	/* disable gpio output */
-+	owl_gpio_set_reg(gpio_base + GPIO_OUTEN, offset, false);
-+
-+	/* disable gpio input */
-+	owl_gpio_set_reg(gpio_base + GPIO_INEN, offset, false);
-+}
-+
-+static int owl_gpio_get(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+	u32 val;
-+
-+	val = readl(gpio_base + GPIO_DAT);
-+
-+	return !!(val & BIT(offset));
-+}
-+
-+static void owl_gpio_set(struct gpio_chip *chip, unsigned int offset, int value)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+	u32 val;
-+
-+	val = readl(gpio_base + GPIO_DAT);
-+
-+	if (value)
-+		val |= BIT(offset);
-+	else
-+		val &= ~BIT(offset);
-+
-+	writel(val, gpio_base + GPIO_DAT);
-+}
-+
-+static int owl_gpio_direction_input(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+
-+	owl_gpio_set_reg(gpio_base + GPIO_OUTEN, offset, false);
-+	owl_gpio_set_reg(gpio_base + GPIO_INEN, offset, true);
-+
-+	return 0;
-+}
-+
-+static int owl_gpio_direction_output(struct gpio_chip *chip,
-+				unsigned int offset, int value)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	const struct owl_gpio_port *port = gpio->port;
-+	void __iomem *gpio_base = gpio->base + port->offset;
-+
-+	owl_gpio_set_reg(gpio_base + GPIO_INEN, offset, false);
-+	owl_gpio_set_reg(gpio_base + GPIO_OUTEN, offset, true);
-+	owl_gpio_set(chip, offset, value);
-+
-+	return 0;
-+}
-+
-+#define OWL_GPIO_PORT(port, base, count)		\
-+	[OWL_GPIO_PORT_##port] = {			\
-+		.name = #port,				\
-+		.offset = base,				\
-+		.pins = count,				\
-+	}
-+
-+static const struct owl_gpio_port s900_gpio_ports[] = {
-+	OWL_GPIO_PORT(A, 0x0000, 32),
-+	OWL_GPIO_PORT(B, 0x000C, 32),
-+	OWL_GPIO_PORT(C, 0x0018, 12),
-+	OWL_GPIO_PORT(D, 0x0024, 30),
-+	OWL_GPIO_PORT(E, 0x0030, 32),
-+	OWL_GPIO_PORT(F, 0x00F0, 8),
-+};
-+
-+static int owl_gpio_probe(struct platform_device *pdev)
-+{
-+	struct owl_gpio *gpio;
-+	const struct owl_gpio_port *port;
-+	int ret;
-+
-+	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
-+	if (!gpio)
-+		return -ENOMEM;
-+
-+	gpio->base = of_iomap(pdev->dev.of_node, 0);
-+	if (IS_ERR(gpio->base))
-+		return PTR_ERR(gpio->base);
-+
-+	gpio->id = of_alias_get_id(pdev->dev.of_node, "gpio");
-+	if (gpio->id < 0)
-+		return gpio->id;
-+
-+	port = &s900_gpio_ports[gpio->id];
-+
-+	gpio->gpio.request = owl_gpio_request;
-+	gpio->gpio.free = owl_gpio_free;
-+	gpio->gpio.get = owl_gpio_get;
-+	gpio->gpio.set = owl_gpio_set;
-+	gpio->gpio.direction_input = owl_gpio_direction_input;
-+	gpio->gpio.direction_output = owl_gpio_direction_output;
-+
-+	gpio->gpio.base = -1;
-+	gpio->gpio.parent = &pdev->dev;
-+	gpio->gpio.label = port->name;
-+	gpio->gpio.ngpio = port->pins;
-+
-+	gpio->port = port;
-+
-+	platform_set_drvdata(pdev, gpio);
-+
-+	ret = devm_gpiochip_add_data(&pdev->dev, &gpio->gpio, gpio);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to register gpiochip\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id owl_gpio_of_match[] = {
-+	{ .compatible = "actions,s900-gpio", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, owl_gpio_of_match);
-+
-+static struct platform_driver owl_gpio_driver = {
-+	.driver		= {
-+		.name	= "owl-gpio",
-+		.of_match_table = owl_gpio_of_match,
-+	},
-+	.probe		= owl_gpio_probe,
-+};
-+module_platform_driver(owl_gpio_driver);
-+
-+MODULE_AUTHOR("Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>");
-+MODULE_DESCRIPTION("Actions Semi OWL SoCs GPIO driver");
-+MODULE_LICENSE("GPL");
+>> +alternative_if ARM64_HAS_CACHE_DIC
+>> +	isb
+> 
+> Why have we gained an ISB here if DIC is set?
+> 
+
+I believe synchronization barrier (ISB) is required here to support self-modifying/jump-labels
+code. 
+  
+> This is for a user address, and I can't see why DIC would imply we need an
+> extra ISB kernel-side.
+> 
+
+This is for user and kernel addresses, alternatives and jumplabel patching logic
+calls flush_icache_range().
+
+>> +	b	8f
+>> +alternative_else_nop_endif
+>>  	invalidate_icache_by_line x0, x1, x2, x3, 9f
+>> -	mov	x0, #0
+>> +8:	mov	x0, #0
+>>  1:
+>>  	uaccess_ttbr0_disable x1, x2
+>>  	ret
+>> @@ -80,6 +87,12 @@ ENDPROC(__flush_cache_user_range)
+>>   *	- end     - virtual end address of region
+>>   */
+>>  ENTRY(invalidate_icache_range)
+>> +alternative_if ARM64_HAS_CACHE_DIC
+>> +	mov	x0, xzr
+>> +	dsb	ish
+> 
+> Do we actually need a DSB in this case?
+> 
+
+I'll remove if everyone agree.
+
+Will, Can you comment on this?
+
+> As-is, this function *only* invalidates the I-cache, so we already assume that
+> the data is visible at the PoU at this point. I don't see what extra gaurantee
+> we'd need the DSB for.
+> 
+>> +	isb
+> 
+> We could theoretically need this (though AFAICT, KVM is the only user of this,
+> and doesn't).
+> 
+>> +	ret
+>> +alternative_else_nop_endif
+>>  	uaccess_ttbr0_enable x2, x3, x4
+>>  
+>>  	invalidate_icache_by_line x0, x1, x2, x3, 2f
+>> @@ -116,6 +129,10 @@ ENDPIPROC(__flush_dcache_area)
+>>   *	- size    - size in question
+>>   */
+>>  ENTRY(__clean_dcache_area_pou)
+>> +alternative_if ARM64_HAS_CACHE_IDC
+>> +	dsb	ish
+> 
+> As above, I think this can be DSB ISHST.
+> 
+
+I'll change to DSB ISHST in v4 patch.
+
+> Thanks,
+> Mark.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-2.14.1
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
