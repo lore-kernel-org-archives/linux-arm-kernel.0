@@ -1,35 +1,45 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Feb 2018 13:57:02 +0100
-Subject: [PATCH 2/3] drm/sun4i: rgb: Fix potential division by zero
+Date: Wed, 21 Feb 2018 13:57:03 +0100
+Subject: [PATCH 3/3] drm/sun4i: crtc: Call drm_crtc_vblank_on /
+ drm_crtc_vblank_off
 In-Reply-To: <20180221125703.4595-1-maxime.ripard@bootlin.com>
 References: <20180221125703.4595-1-maxime.ripard@bootlin.com>
-Message-ID: <20180221125703.4595-2-maxime.ripard@bootlin.com>
+Message-ID: <20180221125703.4595-3-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case where mode_valid callback of our RGB connector was called
-before mode_set was being called, the range of dividers would not be set,
-resulting in a division by zero later on in the clk_round_rate logic.
+Make sure that the CRTC code will call the enable/disable_vblank hooks.
 
-Set the range of dividers before calling clk_round_rate to fix this.
+Otherwise, since the refcounting will be off, we might end up in a
+situation where the vblank management functions are called while the CRTC
+is off.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 832f8f9bc47f..b8da5a50a61d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -92,6 +92,8 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 5decae0069d0..78cbc3145e44 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -93,6 +93,8 @@ static void sun4i_crtc_atomic_disable(struct drm_crtc *crtc,
  
- 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+ 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
  
-+	tcon->dclk_min_div = 6;
-+	tcon->dclk_max_div = 127;
- 	rounded_rate = clk_round_rate(tcon->dclk, rate);
- 	if (rounded_rate < rate)
- 		return MODE_CLOCK_LOW;
++	drm_crtc_vblank_off(crtc);
++
+ 	sun4i_tcon_set_status(scrtc->tcon, encoder, false);
+ 
+ 	if (crtc->state->event && !crtc->state->active) {
+@@ -113,6 +115,8 @@ static void sun4i_crtc_atomic_enable(struct drm_crtc *crtc,
+ 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
+ 
+ 	sun4i_tcon_set_status(scrtc->tcon, encoder, true);
++
++	drm_crtc_vblank_on(crtc);
+ }
+ 
+ static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
 -- 
 2.14.3
