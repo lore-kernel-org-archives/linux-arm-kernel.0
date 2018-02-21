@@ -1,33 +1,92 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 21 Feb 2018 09:46:28 -0700
-Subject: [PATCH] ARM: dtc: tegra: enable front panel leds in TrimSlice
-In-Reply-To: <873b01dc-3ca5-3151-2654-a8272cb9dd88@gmail.com>
-References: <20180219201623.6987-1-tmn505@gmail.com>
- <57945bd2-d8c2-f7bc-f01f-29d679762446@wwwdotorg.org>
- <873b01dc-3ca5-3151-2654-a8272cb9dd88@gmail.com>
-Message-ID: <f291dd94-107f-cf03-a8e8-bc0806421c2d@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Feb 2018 17:50:54 +0100
+Subject: [PATCH v2 03/19] soc: renesas: Identify R-Car M3-N
+In-Reply-To: <CAMuHMdVw4OSPP7XYLGuE7SfVjOk_6VK847NdsVwszBX9XshQ3A@mail.gmail.com>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-4-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdVw4OSPP7XYLGuE7SfVjOk_6VK847NdsVwszBX9XshQ3A@mail.gmail.com>
+Message-ID: <20180221165053.xx6gqdyja2zfghmy@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2018 09:20 AM, Tomasz Maciej Nowak wrote:
-> W dniu 20.02.2018 o?20:55, Stephen Warren pisze:
->> On 02/19/2018 01:16 PM, Tomasz Maciej Nowak wrote:
->>> Adds device nodes for two front panel LEDs.
->>
->> Why do you need to change the pinmux settings? Configuring a pin as a 
->> GPIO should override any pinmux special function selection and hence 
->> make it irrelevant, so I don't think you should need to change the 
->> pinmux.
+On Tue, Feb 20, 2018 at 04:40:34PM +0100, Geert Uytterhoeven wrote:
+> Hi Jacopo,
 > 
-> At first I did exactly that without changing the pinmux, but the LEDs 
-> didn't light up. After that I compared with CompuLab source tree [1]. 
-> The pinmux was specified as in my patch. With this change the LEDs are 
-> fully functional.
+> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> > Add support for indentifying R-Car M3-N (R8A77965) SoC.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 > 
-> 1. 
-> https://gitorious.org/trimslice-kernel/trimslice-kernel?p=trimslice-kernel:trimslice-kernel.git;a=blob;f=arch/arm/mach-tegra/board-trimslice-pinmux.c;h=cc6d5225d97eb9327c820bf1d5b2bc16ab8c6dda;hb=d25bf45d6314089489b30d218ed8a0d6d94417f9#l45 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > --- a/drivers/soc/renesas/renesas-soc.c
+> > +++ b/drivers/soc/renesas/renesas-soc.c
+> > @@ -149,6 +149,11 @@ static const struct renesas_soc soc_rcar_v3m __initconst __maybe_unused = {
+> >         .id     = 0x54,
+> >  };
+> >
+> > +static const struct renesas_soc soc_rcar_m3_n __initconst __maybe_unused = {
+> > +       .family = &fam_rcar_gen3,
+> > +       .id     = 0x55,
+> > +};
+> 
+> Note that the list was sorted by SoC part number.
 
-Oh I see. Your patch isn't changing the pinmux function selection but 
-the other configuration bits, which are relevant even when the pin is in 
-GPIO mode. In particular, it clears the tristate bit for the dte 
-pingroup. That makes perfect sense.
+Thanks, I have moved the above structure to between
+the similar structure for m3_w and v3m. The result is below.
+
+> > +
+> >  static const struct renesas_soc soc_rcar_v3h __initconst __maybe_unused = {
+> >         .family = &fam_rcar_gen3,
+> >         .id     = 0x56,
+> > @@ -214,6 +219,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+> >  #ifdef CONFIG_ARCH_R8A7796
+> >         { .compatible = "renesas,r8a7796",      .data = &soc_rcar_m3_w },
+> >  #endif
+> > +#ifdef CONFIG_ARCH_R8A77965
+> > +       { .compatible = "renesas,r8a77965",     .data = &soc_rcar_m3_n },
+> > +#endif
+> >  #ifdef CONFIG_ARCH_R8A77970
+> >         { .compatible = "renesas,r8a77970",     .data = &soc_rcar_v3m },
+> >  #endif
+
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Subject: [PATCH] soc: renesas: Identify R-Car M3-N
+
+Add support for indentifying R-Car M3-N (R8A77965) SoC.
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/renesas-soc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index 000834321774..ea71c413c926 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -144,6 +144,11 @@ static const struct renesas_soc soc_rcar_m3_w __initconst __maybe_unused = {
+ 	.id	= 0x52,
+ };
+ 
++static const struct renesas_soc soc_rcar_m3_n __initconst __maybe_unused = {
++	.family = &fam_rcar_gen3,
++	.id     = 0x55,
++};
++
+ static const struct renesas_soc soc_rcar_v3m __initconst __maybe_unused = {
+ 	.family	= &fam_rcar_gen3,
+ 	.id	= 0x54,
+@@ -214,6 +219,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+ #ifdef CONFIG_ARCH_R8A7796
+ 	{ .compatible = "renesas,r8a7796",	.data = &soc_rcar_m3_w },
+ #endif
++#ifdef CONFIG_ARCH_R8A77965
++	{ .compatible = "renesas,r8a77965",	.data = &soc_rcar_m3_n },
++#endif
+ #ifdef CONFIG_ARCH_R8A77970
+ 	{ .compatible = "renesas,r8a77970",	.data = &soc_rcar_v3m },
+ #endif
+-- 
+2.11.0
