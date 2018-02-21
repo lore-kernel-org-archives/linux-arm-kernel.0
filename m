@@ -1,27 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 21 Feb 2018 12:13:54 +0000
-Subject: [PATCH 1/2] ASoC: add DT bindings documentation for ROHM BD28623
- codec
-In-Reply-To: <20180221043311.25840-2-suzuki.katsuhiro@socionext.com>
-References: <20180221043311.25840-1-suzuki.katsuhiro@socionext.com>
- <20180221043311.25840-2-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180221121354.GG8334@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Feb 2018 13:18:49 +0100
+Subject: [PATCH] ARM: orion: fix orion_ge00_switch_board_info initialization
+Message-ID: <20180221121856.3241260-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 01:33:10PM +0900, Katsuhiro Suzuki wrote:
+A section type mismatch warning shows up when building with LTO,
+since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
+const itself:
 
-> +Optional properties:
-> +- VCCA-supply : regulator phandle for the VCCA supply
-> +- VCCP1-supply: regulator phandle for the VCCP1 supply
-> +- VCCP2-supply: regulator phandle for the VCCP2 supply
+include/linux/of.h: In function 'spear_setup_of_timer':
+arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
+ static const struct of_device_id timer_of_match[] __initconst = {
+                                  ^
+arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
+ static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+                                ^
 
-These should be documented as mandatory unless the device genuinely
-operates without power which seems unlikely.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/385276bc/attachment.sig>
+As pointed out by Andrew Lunn, it should in fact be 'const' but not
+'__initconst' because the string is never copied but may be accessed
+after the init sections are freed. To fix that, I get rid of the
+extra symbol and rewrite the initialization in a simpler way that
+assigns both the bus_id and modalias statically.
+
+I spotted another theoretical bug in the same place, where d->netdev[i]
+may be an out of bounds access, this can be fixed by moving the device
+assignment into the loop.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: complete rewrite
+---
+ arch/arm/plat-orion/common.c | 23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index aff6994950ba..a2399fd66e97 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -472,28 +472,27 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ /*****************************************************************************
+  * Ethernet switch
+  ****************************************************************************/
+-static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+-static __initdata struct mdio_board_info
+-		  orion_ge00_switch_board_info;
++static __initdata struct mdio_board_info orion_ge00_switch_board_info = {
++	.bus_id   = "orion-mii",
++	.modalias = "mv88e6085",
++};
+ 
+ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+ {
+-	struct mdio_board_info *bd;
+ 	unsigned int i;
+ 
+ 	if (!IS_BUILTIN(CONFIG_PHYLIB))
+ 		return;
+ 
+-	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
+-		if (!strcmp(d->port_names[i], "cpu"))
++	for (i = 0; i < ARRAY_SIZE(d->port_names); i++) {
++		if (!strcmp(d->port_names[i], "cpu")) {
++			d->netdev[i] = &orion_ge00.dev;
+ 			break;
++		}
++	}
+ 
+-	bd = &orion_ge00_switch_board_info;
+-	bd->bus_id = orion_ge00_mvmdio_bus_name;
+-	bd->mdio_addr = d->sw_addr;
+-	d->netdev[i] = &orion_ge00.dev;
+-	strcpy(bd->modalias, "mv88e6085");
+-	bd->platform_data = d;
++	orion_ge00_switch_board_info.mdio_addr = d->sw_addr;
++	orion_ge00_switch_board_info.platform_data = d;
+ 
+ 	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+ }
+-- 
+2.9.0
