@@ -1,77 +1,33 @@
 From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 21 Feb 2018 18:43:00 +0100
-Subject: [PATCH v4 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-In-Reply-To: <20180215210332.8648-14-christoffer.dall@linaro.org>
+Date: Wed, 21 Feb 2018 18:43:49 +0100
+Subject: [PATCH v4 16/40] KVM: arm64: Remove noop calls to timer
+ save/restore from VHE switch
+In-Reply-To: <20180215210332.8648-17-christoffer.dall@linaro.org>
 References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-14-christoffer.dall@linaro.org>
-Message-ID: <20180221174300.74lxks5gb6qzny75@kamzik.brq.redhat.com>
+ <20180215210332.8648-17-christoffer.dall@linaro.org>
+Message-ID: <20180221174349.3e7kpo475k3pi6rv@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 10:03:05PM +0100, Christoffer Dall wrote:
-> So far this is mostly (see below) a copy of the legacy non-VHE switch
-> function, but we will start reworking these functions in separate
-> directions to work on VHE and non-VHE in the most optimal way in later
-> patches.
+On Thu, Feb 15, 2018 at 10:03:08PM +0100, Christoffer Dall wrote:
+> The VHE switch function calls __timer_enable_traps and
+> __timer_disable_traps which don't do anything on VHE systems.
+> Therefore, simply remove these calls from the VHE switch function and
+> make the functions non-conditional as they are now only called from the
+> non-VHE switch path.
 > 
-> The only difference after this patch between the VHE and non-VHE run
-> functions is that we omit the branch-predictor variant-2 hardening for
-> QC Falkor CPUs, because this workaround is specific to a series of
-> non-VHE ARMv8.0 CPUs.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
 > 
 > Notes:
->     Changes since v3:
->      - Added BUG() to 32-bit ARM VHE run function
->      - Omitted QC Falkor BP Hardening functionality from VHE-specific
->        function
->     
 >     Changes since v2:
->      - Reworded commit message
->     
->     Changes since v1:
->      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
->        __kvm_vcpu_run_nvhe
->      - Removed stray whitespace line
+>      - Added comment explaining the timer enable/disable functions
+>        are for !VHE only.
 > 
->  arch/arm/include/asm/kvm_asm.h   |  5 ++-
->  arch/arm/kvm/hyp/switch.c        |  2 +-
->  arch/arm64/include/asm/kvm_asm.h |  4 ++-
->  arch/arm64/kvm/hyp/switch.c      | 66 +++++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/arm.c               |  5 ++-
->  5 files changed, 77 insertions(+), 5 deletions(-)
-> 
+>  arch/arm64/kvm/hyp/switch.c |  2 --
+>  virt/kvm/arm/hyp/timer-sr.c | 44 ++++++++++++++++++++++----------------------
+>  2 files changed, 22 insertions(+), 24 deletions(-)
+>
 
-...
-
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 2062d9357971..5bd879c78951 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -736,7 +736,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		if (has_vhe())
->  			kvm_arm_vhe_guest_enter();
->  
-> -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> +		if (has_vhe())
-> +			ret = kvm_vcpu_run_vhe(vcpu);
-> +		else
-> +			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
->  
->  		if (has_vhe())
->  			kvm_arm_vhe_guest_exit();
-
-We can combine these has_vhe()'s
-
- if (has_vhe()) {
-    kvm_arm_vhe_guest_enter();
-    ret = kvm_vcpu_run_vhe(vcpu);
-    kvm_arm_vhe_guest_exit();
- } else
-    ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
-
-Thanks,
-drew
+Reviewed-by: Andrew Jones <drjones@redhat.com>
