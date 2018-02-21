@@ -1,53 +1,98 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 21 Feb 2018 16:27:11 +0200
-Subject: [PATCH v4 5/6] extcon: add possibility to get extcon device by OF
- node
-In-Reply-To: <20180221085541.14556-6-a.hajda@samsung.com>
-References: <CGME20180221085608eucas1p162d2e579a1cc887672b722458edb98fe@eucas1p1.samsung.com>
- <20180221085541.14556-1-a.hajda@samsung.com>
- <20180221085541.14556-6-a.hajda@samsung.com>
-Message-ID: <CAHp75VdxGDCGQBN05bL3_h8P62-v6+5oGW3M7CA+701o15ZXnQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Feb 2018 14:39:55 +0000
+Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include
+ PAN emulation
+In-Reply-To: <20180221111823.GB32331@e103592.cambridge.arm.com>
+References: <20180220224624.GA28218@beast>
+ <20180221111823.GB32331@e103592.cambridge.arm.com>
+Message-ID: <20180221143954.zlwau63wx75ixslv@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 10:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
-> Since extcon property is not allowed in DT, extcon subsystem requires
-> another way to get extcon device. Lets try the simplest approach - get
-> edev by of_node.
+On Wed, Feb 21, 2018 at 11:18:27AM +0000, Dave Martin wrote:
+> On Tue, Feb 20, 2018 at 02:46:24PM -0800, Kees Cook wrote:
+> > The PAN emulation notification was only happening for non-boot CPUs
+> > if CPU capabilities had already been configured. This seems to be the
+> > wrong place, as it's system-wide and isn't attached to capabilities,
+> > so its reporting didn't normally happen. Instead, report it once from
+> > the boot CPU. Additionally removes the redundant "feature" word from the
+> > "CPU features:" line.
+> > 
+> > Before (redundant "feature", and missing PAN emulation report):
+> > 
+> >  SMP: Total of 4 processors activated.
+> >  CPU features: detected feature: 32-bit EL0 Support
+> >  CPU features: detected feature: Kernel page table isolation (KPTI)
+> >  CPU: All CPU(s) started at EL2
+> > 
+> > After:
+> > 
+> >  SMP: Total of 4 processors activated.
+> >  CPU features: detected: 32-bit EL0 Support
+> >  CPU features: detected: Kernel page table isolation (KPTI)
+> >  CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
+> >  CPU: All CPU(s) started at EL2
+> > 
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
+> > ---
+> >  arch/arm64/kernel/cpufeature.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 29b1f873e337..6c799ca58b53 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
+> >  
+> >  	if (system_supports_sve())
+> >  		verify_sve_features();
+> > -
+> > -	if (system_uses_ttbr0_pan())
+> > -		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+> >  }
+> >  
+> >  void check_local_cpu_capabilities(void)
+> > @@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
+> >  
+> >  static void __init setup_feature_capabilities(void)
+> >  {
+> > -	update_cpu_capabilities(arm64_features, "detected feature:");
+> > +	update_cpu_capabilities(arm64_features, "detected:");
+> 
+> Although I get what you're saying about redundant use of the word
+> "features", this feels like cosmetic churn that is unrelated to the
+> problem this patch is addressing.
 
-> +/*
-> + * extcon_get_edev_by_of_node - Get the extcon device from devicetree.
-> + * @node       : OF node identyfying edev
-> + *
-> + * Return the pointer of extcon device if success or ERR_PTR(err) if fail.
-> + */
-> +struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
+Given it seems sensible, shall we just split that into a separate patch? 
 
-First of all, the all other similar cases use "_by_node" in the name.
-Second, it's not _get_, it's _find_.
+FWIW, for a patch with just this change:
 
-> +{
-> +       struct extcon_dev *edev;
-> +
-> +       mutex_lock(&extcon_dev_list_lock);
-> +       list_for_each_entry(edev, &extcon_dev_list, entry)
-> +               if (edev->dev.parent && edev->dev.parent->of_node == node)
-> +                       goto out;
-> +       edev = ERR_PTR(-EPROBE_DEFER);
-> +out:
-> +       mutex_unlock(&extcon_dev_list_lock);
-> +
-> +       return edev;
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Can't it be done using bus_find_device()?
+> It could be worth reviewing the CPU errata messages and other
+> miscellaneous printks together to make them less verbose and more
+> consistent all in one go, but that would be a separate patch...
+> 
+> >  	enable_cpu_capabilities(arm64_features);
+> >  }
+> >  
+> > @@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
+> >  	if (system_supports_32bit_el0())
+> >  		setup_elf_hwcaps(compat_elf_hwcaps);
+> >  
+> > +	if (system_uses_ttbr0_pan())
+> > +		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+> > +
+> 
+> Moving this seems sensible.  The other option would be to paste it into
+> update_cpu_capabilities(), but the message would still potentially get
+> printed multiple times, so that doesn't feel like the right approach.
 
-> +}
+I think that more ideally, we'd give this an entry in the arm64_features array,
+but because it's effectively a negative feature, it's a little tricky.
 
-See good example in i2c-core-of.c
+This also looks fine to me, so FWIW:
 
-of_find_i2c_adapter_by_node()
-of_get_i2c_adapter_by_node()
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
--- 
-With Best Regards,
-Andy Shevchenko
+Mark.
