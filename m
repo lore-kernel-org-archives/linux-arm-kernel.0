@@ -1,32 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 21 Feb 2018 23:05:29 +0800
-Subject: [PATCH v2 08/10] drm/panel: Add Huarui LHR050H41 panel driver
-In-Reply-To: <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
-References: <33efcb267bc513bb19551f1ffdcf578ebfb90369.1519204731.git-series.maxime.ripard@bootlin.com>
-Message-ID: <201802212241.kQKqkwNt%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 15:08:14 +0000
+Subject: [PATCH v4 27/40] KVM: arm64: Prepare to handle deferred
+ save/restore of ELR_EL1
+In-Reply-To: <20180215210332.8648-28-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-28-christoffer.dall@linaro.org>
+Message-ID: <86606ql6sh.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Thu, 15 Feb 2018 21:03:19 +0000,
+Christoffer Dall wrote:
+> 
+> ELR_EL1 is not used by a VHE host kernel and can be deferred, but we
+> need to rework the accesses to this register to access the latest value
+> depending on whether or not guest system registers are loaded on the CPU
+> or only reside in memory.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm64/include/asm/kvm_emulate.h | 18 +++++++++++++++++-
+>  arch/arm64/kvm/inject_fault.c        |  4 ++--
+>  2 files changed, 19 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 47c2406755fa..9cb13b23c7a1 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -90,11 +90,27 @@ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+>  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+>  }
+>  
+> -static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
+> +static inline unsigned long *__vcpu_elr_el1(const struct kvm_vcpu *vcpu)
+>  {
+>  	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
+>  }
+>  
+> +static inline unsigned long vcpu_read_elr_el1(const struct kvm_vcpu *vcpu)
+> +{
+> +	if (vcpu->arch.sysregs_loaded_on_cpu)
+> +		return read_sysreg_el1(elr);
+> +	else
+> +		return *__vcpu_elr_el1(vcpu);
+> +}
+> +
+> +static inline void vcpu_write_elr_el1(const struct kvm_vcpu *vcpu, unsigned long v)
+> +{
+> +	if (vcpu->arch.sysregs_loaded_on_cpu)
+> +		write_sysreg_el1(v, elr);
+> +	else
+> +		*__vcpu_elr_el1(vcpu) = v;
+> +}
+> +
+>  static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+>  {
+>  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
+> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> index 8dda1edae727..cc13b6f5ad11 100644
+> --- a/arch/arm64/kvm/inject_fault.c
+> +++ b/arch/arm64/kvm/inject_fault.c
+> @@ -67,7 +67,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
+>  	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
+>  	u32 esr = 0;
+>  
+> -	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+> +	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
+>  	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+>  
+>  	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+> @@ -102,7 +102,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
+>  	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>  	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
+>  
+> -	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+> +	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
+>  	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+>  
+>  	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+> -- 
+> 2.14.2
+> 
 
-I love your patch! Perhaps something to improve:
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-[auto build test WARNING on ]
+	M.
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/drm-sun4i-Allwinner-MIPI-DSI-support/20180221-203150
-base:    
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
-
-
-sparse warnings: (new ones prefixed by >>)
-
->> drivers/gpu/drm/panel/panel-huarui-lhr050h41.c:69:24: sparse: symbol 'lhr050h41_init' was not declared. Should it be
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Jazz is not dead, it just smell funny.
