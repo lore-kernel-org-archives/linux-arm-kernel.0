@@ -1,45 +1,35 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 21 Feb 2018 10:35:12 +0100
-Subject: [PATCH v4] MAINTAINERS: add Freescale pin controllers
-In-Reply-To: <20180220225546.15987-1-stefan@agner.ch>
-References: <20180220225546.15987-1-stefan@agner.ch>
-Message-ID: <1519205712.22130.10.camel@pengutronix.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 Feb 2018 10:40:09 +0100
+Subject: [PATCH 1/4] dt-bindings: at24: sort manufacturers alphabetically
+In-Reply-To: <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
+References: <20180116160618.27859-1-peda@axentia.se>
+ <20180116160618.27859-2-peda@axentia.se>
+ <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
+ <CAMRc=Mcqj36KP7dG71dzSn_7cxw-Tru5kNtXdr5-SiH=jbCfMA@mail.gmail.com>
+ <20180221091130.4sdfnalrng4sd77i@ninjato>
+ <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
+Message-ID: <20180221094009.2zql6gbzkcklbakk@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 20.02.2018, 23:55 +0100 schrieb Stefan Agner:
-> Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
-> and the Pengutronix kernel team as reviewer.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Reviewed-by: Fabio Estevam <festevam@gmail.com>
-> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+> Will do. What about this (http://patchwork.ozlabs.org/patch/867169/)
+> one? It's part of a bigger series, do you want me to apply it to my
+> tree and provide you with an immutable branch?
 
-> ---
-> ?MAINTAINERS | 11 +++++++++++
-> ?1 file changed, 11 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 93a12af4f180..ac007ea02d54 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10926,6 +10926,17 @@ L:	linux-gpio at vger.kernel.org
-> ?S:	Supported
-> ?F:	drivers/pinctrl/pinctrl-at91-pio4.*
-> ?
-> +PIN CONTROLLER - FREESCALE
-> +M:	Dong Aisheng <aisheng.dong@nxp.com>
-> +M:	Fabio Estevam <festevam@gmail.com>
-> +M:	Shawn Guo <shawnguo@kernel.org>
-> +M:	Stefan Agner <stefan@agner.ch>
-> +R:	Pengutronix Kernel Team <kernel@pengutronix.de>
-> +L:	linux-gpio at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pinctrl/freescale/
-> +F:	Documentation/devicetree/bindings/pinctrl/fsl,*
-> +
-> ?PIN CONTROLLER - INTEL
-> ?M:	Mika Westerberg <mika.westerberg@linux.intel.com>
-> ?M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Well, I would accept it for 4.16 using the "plain new id" rule. So, if
+you add it on top of Peter's sorting patch, totally fine by me.
+
+If you want it in v4.17, ok, too. I'd think an immutable branch is not
+needed. There is a fallback property in the DTS. So at worst, there will
+be a DTS warning during the merge window which will be fixed at rc1 time.
+
+Unless I overlooked something.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/cc305d42/attachment.sig>
