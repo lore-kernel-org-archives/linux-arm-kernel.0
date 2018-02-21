@@ -1,76 +1,161 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Feb 2018 16:26:22 +0000
-Subject: [PATCH] arm64: cpufeature: Trim feature reporting and include
- PAN emulation
-In-Reply-To: <20180221143954.zlwau63wx75ixslv@salmiak>
-References: <20180220224624.GA28218@beast>
- <20180221111823.GB32331@e103592.cambridge.arm.com>
- <20180221143954.zlwau63wx75ixslv@salmiak>
-Message-ID: <20180221162622.GC32331@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 16:27:25 +0000
+Subject: [PATCH v4 30/40] KVM: arm64: Defer saving/restoring 32-bit
+ sysregs to vcpu load/put
+In-Reply-To: <20180215210332.8648-31-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-31-christoffer.dall@linaro.org>
+Message-ID: <861shel34i.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 02:39:55PM +0000, Mark Rutland wrote:
-> On Wed, Feb 21, 2018 at 11:18:27AM +0000, Dave Martin wrote:
-> > On Tue, Feb 20, 2018 at 02:46:24PM -0800, Kees Cook wrote:
-> > > The PAN emulation notification was only happening for non-boot CPUs
-> > > if CPU capabilities had already been configured. This seems to be the
-> > > wrong place, as it's system-wide and isn't attached to capabilities,
-> > > so its reporting didn't normally happen. Instead, report it once from
-> > > the boot CPU. Additionally removes the redundant "feature" word from the
-> > > "CPU features:" line.
-> > > 
-> > > Before (redundant "feature", and missing PAN emulation report):
-> > > 
-> > >  SMP: Total of 4 processors activated.
-> > >  CPU features: detected feature: 32-bit EL0 Support
-> > >  CPU features: detected feature: Kernel page table isolation (KPTI)
-> > >  CPU: All CPU(s) started at EL2
-> > > 
-> > > After:
-> > > 
-> > >  SMP: Total of 4 processors activated.
-> > >  CPU features: detected: 32-bit EL0 Support
-> > >  CPU features: detected: Kernel page table isolation (KPTI)
-> > >  CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
-> > >  CPU: All CPU(s) started at EL2
-> > > 
-> > > Signed-off-by: Kees Cook <keescook@chromium.org>
-> > > ---
-> > >  arch/arm64/kernel/cpufeature.c | 8 ++++----
-> > >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > > index 29b1f873e337..6c799ca58b53 100644
-> > > --- a/arch/arm64/kernel/cpufeature.c
-> > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > @@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
-> > >  
-> > >  	if (system_supports_sve())
-> > >  		verify_sve_features();
-> > > -
-> > > -	if (system_uses_ttbr0_pan())
-> > > -		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-> > >  }
-> > >  
-> > >  void check_local_cpu_capabilities(void)
-> > > @@ -1360,7 +1357,7 @@ void check_local_cpu_capabilities(void)
-> > >  
-> > >  static void __init setup_feature_capabilities(void)
-> > >  {
-> > > -	update_cpu_capabilities(arm64_features, "detected feature:");
-> > > +	update_cpu_capabilities(arm64_features, "detected:");
-> > 
-> > Although I get what you're saying about redundant use of the word
-> > "features", this feels like cosmetic churn that is unrelated to the
-> > problem this patch is addressing.
+On Thu, 15 Feb 2018 21:03:22 +0000,
+Christoffer Dall wrote:
 > 
-> Given it seems sensible, shall we just split that into a separate patch? 
+> When running a 32-bit VM (EL1 in AArch32), the AArch32 system registers
+> can be deferred to vcpu load/put on VHE systems because neither
+> the host kernel nor host userspace uses these registers.
+> 
+> Note that we can not defer saving DBGVCR32_EL2 conditionally based
+> on the state of the debug dirty flag on VHE, but since we do the
+> load/put pretty rarely, this comes out as a win anyway.
 
-Can do, though I still think it's a bit dubious.  The original message
-as it stands isn't wrong.  I won't lose sleep over it though.
+I'm not sure I understand that comment. We don't have any deferring
+for this register, so the load/put reference seems out of place.
 
-[...]
+> 
+> We can also not defer saving FPEXC32_32 because this register only holds
+> a guest-valid value for 32-bit guests during the exit path when the
+> guest has used FPSIMD registers and restored the register in the early
+> assembly handler from taking the EL2 fault, and therefore we have to
+> check if fpsimd is enabled for the guest in the exit path and save the
+> register then, for both VHE and non-VHE guests.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v3:
+>      - Rework the FPEXC32 save/restore logic to no longer attempt to
+>        save/restore this register lazily.
+>     
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm64/kvm/hyp/switch.c    | 17 +++++++++++------
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 15 ++++++++++-----
+>  2 files changed, 21 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 22e77deb8e2e..909aa3fe9196 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -47,6 +47,15 @@ bool __hyp_text __fpsimd_enabled(void)
+>  	return __fpsimd_is_enabled()();
+>  }
+>  
+> +/* Save the 32-bit only FPSIMD system register state */
+> +static inline void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
+> +{
+> +	if (!vcpu_el1_is_32bit(vcpu))
+> +		return;
+> +
+> +	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+> +}
+> +
+>  static void __hyp_text __activate_traps_vhe(void)
+>  {
+>  	u64 val;
+> @@ -380,11 +389,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	__vgic_restore_state(vcpu);
+>  
+> -	/*
+> -	 * We must restore the 32-bit state before the sysregs, thanks
+> -	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> -	 */
+> -	__sysreg32_restore_state(vcpu);
+>  	sysreg_restore_guest_state_vhe(guest_ctxt);
+>  	__debug_switch_to_guest(vcpu);
+>  
+> @@ -398,7 +402,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  	fp_enabled = __fpsimd_enabled();
+>  
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+> -	__sysreg32_save_state(vcpu);
+>  	__vgic_save_state(vcpu);
+>  
+>  	__deactivate_traps(vcpu);
+> @@ -408,6 +411,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  	if (fp_enabled) {
+>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +		__fpsimd_save_fpexc32(vcpu);
+>  	}
+>  
+>  	__debug_switch_to_host(vcpu);
+> @@ -475,6 +479,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  	if (fp_enabled) {
+>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +		__fpsimd_save_fpexc32(vcpu);
+>  	}
+>  
+>  	/*
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 9c60b8062724..aacba4636871 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -196,10 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+>  	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+>  	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+>  
+> -	if (__fpsimd_enabled())
+> -		sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+> -
+> -	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> +	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
+>  }
+>  
+> @@ -221,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>  	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
+>  	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+>  
+> -	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> +	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+>  }
+>  
+> @@ -246,6 +243,13 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_save_user_state(host_ctxt);
+>  
+> +	/*
+> +	 * Load guest EL1 and user state
+> +	 *
+> +	 * We must restore the 32-bit state before the sysregs, thanks
+> +	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> +	 */
+> +	__sysreg32_restore_state(vcpu);
+>  	__sysreg_restore_user_state(guest_ctxt);
+>  	__sysreg_restore_el1_state(guest_ctxt);
+>  
+> @@ -273,6 +277,7 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_save_el1_state(guest_ctxt);
+>  	__sysreg_save_user_state(guest_ctxt);
+> +	__sysreg32_save_state(vcpu);
+>  
+>  	/* Restore host user state */
+>  	__sysreg_restore_user_state(host_ctxt);
+> -- 
+> 2.14.2
+> 
 
-Cheers
----Dave
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
