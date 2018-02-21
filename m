@@ -1,36 +1,191 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Feb 2018 07:23:50 -0600
-Subject: [PATCH v2 1/1] clk: npcm750: update text with fixed clocks
-In-Reply-To: <CAFd5g44argF0oaOq7fOM0YbCBK5h8NyRia+H8CbRC5qAQHe5WA@mail.gmail.com>
-References: <1518701959-22899-1-git-send-email-tali.perry1@gmail.com>
- <1518701959-22899-2-git-send-email-tali.perry1@gmail.com>
- <CAFd5g44gBJp0-mYEWGdyiA67BCi2pZWAG2bYPS-WdJEwH1oA5A@mail.gmail.com>
- <20180219144905.bfrycjnas7dcuo34@rob-hp-laptop>
- <CAFd5g44argF0oaOq7fOM0YbCBK5h8NyRia+H8CbRC5qAQHe5WA@mail.gmail.com>
-Message-ID: <CAL_JsqKq-+fKapT6RKwqBubRuJszpKMJevS7NOObPP-bVA2_kw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 13:32:45 +0000
+Subject: [PATCH v4 24/40] KVM: arm64: Rewrite system register accessors to
+ read/write functions
+In-Reply-To: <20180215210332.8648-25-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-25-christoffer.dall@linaro.org>
+Message-ID: <86a7w2lb7m.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 10:47 PM, Brendan Higgins
-<brendanhiggins@google.com> wrote:
-> On Mon, Feb 19, 2018 at 6:49 AM, Rob Herring <robh@kernel.org> wrote:
->> On Thu, Feb 15, 2018 at 02:38:12PM -0800, Brendan Higgins wrote:
->>> On Thu, Feb 15, 2018 at 5:39 AM, Tali Perry <tali.perry1@gmail.com> wrote:
->>> >
->>> > Signed-off-by: Tali Perry <tali.perry1@gmail.com>
->>> >
->>>  <snip>
->>>
->>> I think this should probably be rolled into [PATCH v2 1/1] npcm750: add fixed
->>> clocks (moved from drivers/clk/clk-npcm7xx.c):
->>> https://www.spinics.net/lists/arm-kernel/msg634678.html
->>
->> No, binding docs, dts files and driver code should all be separate
->> patches.
->
-> My mistake. This patch has a dt-bindings include file; should the include file
-> go in here, with the dtsi changes, or in its own separate patch?
+On Thu, 15 Feb 2018 21:03:16 +0000,
+Christoffer Dall wrote:
+> 
+> From: Christoffer Dall <cdall@cs.columbia.edu>
+> 
+> Currently we access the system registers array via the vcpu_sys_reg()
+> macro.  However, we are about to change the behavior to some times
+> modify the register file directly, so let's change this to two
+> primitives:
+> 
+>  * Accessor macros vcpu_write_sys_reg() and vcpu_read_sys_reg()
+>  * Direct array access macro __vcpu_sys_reg()
+> 
+> The first primitive should be used in places where the code needs to
+> access the currently loaded VCPU's state as observed by the guest.  For
+> example, when trapping on cache related registers, a write to a system
+> register should go directly to the VCPU version of the register.
+> 
+> The second primitive can be used in places where the VCPU is known to
+> never be running (for example userspace access) or for registers which
+> are never context switched (for example all the PMU system registers).
+> 
+> This rewrites all users of vcpu_sys_regs to one of the two primitives
+> above.
+> 
+> No functional change.
+> 
+> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+> ---
+> 
+> Notes:
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm64/include/asm/kvm_emulate.h | 13 ++++---
+>  arch/arm64/include/asm/kvm_host.h    | 13 ++++++-
+>  arch/arm64/include/asm/kvm_mmu.h     |  2 +-
+>  arch/arm64/kvm/debug.c               | 27 +++++++++-----
+>  arch/arm64/kvm/inject_fault.c        |  8 ++--
+>  arch/arm64/kvm/sys_regs.c            | 71 ++++++++++++++++++------------------
+>  arch/arm64/kvm/sys_regs.h            |  4 +-
+>  arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
+>  virt/kvm/arm/pmu.c                   | 37 ++++++++++---------
+>  9 files changed, 102 insertions(+), 77 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 3cc535591bdf..d313aaae5c38 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -290,15 +290,18 @@ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+>  
+>  static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+>  {
+> -	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+> +	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+>  }
+>  
+>  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+>  {
+> -	if (vcpu_mode_is_32bit(vcpu))
+> +	if (vcpu_mode_is_32bit(vcpu)) {
+>  		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
+> -	else
+> -		vcpu_sys_reg(vcpu, SCTLR_EL1) |= (1 << 25);
+> +	} else {
+> +		u64 sctlr = vcpu_read_sys_reg(vcpu, SCTLR_EL1);
+> +		sctlr |= (1 << 25);
+> +		vcpu_write_sys_reg(vcpu, SCTLR_EL1, sctlr);
 
-It defines the binding, so with the binding documentation.
+General comment: it is slightly annoying that vcpu_write_sys_reg takes
+its parameters in an order different from that of write_sysreg
+(register followed with value, instead of value followed with
+register). Not a deal breaker, but slightly confusing.
 
-Rob
+> +	}
+>  }
+>  
+>  static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+> @@ -306,7 +309,7 @@ static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+>  	if (vcpu_mode_is_32bit(vcpu))
+>  		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
+>  
+> -	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
+> +	return !!(vcpu_read_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
+>  }
+>  
+>  static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index f2a6f39aec87..68398bf7882f 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -287,7 +287,18 @@ struct kvm_vcpu_arch {
+>  };
+>  
+>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+> -#define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+> +
+> +/*
+> + * Only use __vcpu_sys_reg if you know you want the memory backed version of a
+> + * register, and not the one most recently accessed by a runnning VCPU.  For
+> + * example, for userpace access or for system registers that are never context
+> + * switched, but only emulated.
+> + */
+> +#define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+> +
+> +#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
+> +#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
+> +
+>  /*
+>   * CP14 and CP15 live in the same array, as they are backed by the
+>   * same system registers.
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 9679067a1574..95f46e73c4dc 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -249,7 +249,7 @@ struct kvm;
+>  
+>  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+>  {
+> -	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+> +	return (vcpu_read_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+>  }
+>  
+>  static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index feedb877cff8..db32d10a56a1 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -46,7 +46,8 @@ static DEFINE_PER_CPU(u32, mdcr_el2);
+>   */
+>  static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
+>  {
+> -	vcpu->arch.guest_debug_preserved.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
+> +	vcpu->arch.guest_debug_preserved.mdscr_el1 =
+> +		vcpu_read_sys_reg(vcpu, MDSCR_EL1);
+>  
+>  	trace_kvm_arm_set_dreg32("Saved MDSCR_EL1",
+>  				vcpu->arch.guest_debug_preserved.mdscr_el1);
+> @@ -54,10 +55,11 @@ static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
+>  
+>  static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
+>  {
+> -	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_preserved.mdscr_el1;
+> +	vcpu_write_sys_reg(vcpu, MDSCR_EL1,
+> +			   vcpu->arch.guest_debug_preserved.mdscr_el1);
+>  
+>  	trace_kvm_arm_set_dreg32("Restored MDSCR_EL1",
+> -				vcpu_sys_reg(vcpu, MDSCR_EL1));
+> +				vcpu_read_sys_reg(vcpu, MDSCR_EL1));
+>  }
+>  
+>  /**
+> @@ -108,6 +110,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
+>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  {
+>  	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
+> +	unsigned long mdscr;
+>  
+>  	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
+>  
+> @@ -152,9 +155,13 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  		 */
+>  		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+>  			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
+> -			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
+> +			mdscr = vcpu_read_sys_reg(vcpu, MDSCR_EL1);
+> +			mdscr |= DBG_MDSCR_SS;
+> +			vcpu_write_sys_reg(vcpu, MDSCR_EL1, mdscr);
+
+I have the feeling that we're going to need some clearbits/setbits
+variants of vcpu_write_sysreg at some point.
+
+It otherwise looks correct to me.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
