@@ -1,83 +1,102 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 21 Feb 2018 19:18:32 +0100
-Subject: [PATCH v4 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-In-Reply-To: <20180221174300.74lxks5gb6qzny75@kamzik.brq.redhat.com>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-14-christoffer.dall@linaro.org>
- <20180221174300.74lxks5gb6qzny75@kamzik.brq.redhat.com>
-Message-ID: <20180221181832.i5c46evx6y3h635k@kamzik.brq.redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 21 Feb 2018 18:20:08 +0000
+Subject: [PATCH 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <CAHp75Vd=dww8AQM4tC5Z38i4PNaV4vxMFsTf=ozJ1Yw3Gd9DWg@mail.gmail.com>
+References: <20180220090827.913-1-ard.biesheuvel@linaro.org>
+ <20180220090827.913-3-ard.biesheuvel@linaro.org>
+ <CAHp75VeUJpXLpL55erp+uoMH4jqppoG5zTt1DcffqNYPsJMdUQ@mail.gmail.com>
+ <CAKv+Gu8A1YKr5t0B=Fe2sF6+QT9iCVeRW+99K37g22viEoismA@mail.gmail.com>
+ <CAHp75Vd=dww8AQM4tC5Z38i4PNaV4vxMFsTf=ozJ1Yw3Gd9DWg@mail.gmail.com>
+Message-ID: <CAKv+Gu_5N3bTAasc5Gt0pTo-s3mMdqmvt-C=GM0ACkkptyrN-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 06:43:00PM +0100, Andrew Jones wrote:
-> On Thu, Feb 15, 2018 at 10:03:05PM +0100, Christoffer Dall wrote:
-> > So far this is mostly (see below) a copy of the legacy non-VHE switch
-> > function, but we will start reworking these functions in separate
-> > directions to work on VHE and non-VHE in the most optimal way in later
-> > patches.
-> > 
-> > The only difference after this patch between the VHE and non-VHE run
-> > functions is that we omit the branch-predictor variant-2 hardening for
-> > QC Falkor CPUs, because this workaround is specific to a series of
-> > non-VHE ARMv8.0 CPUs.
-> > 
-> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > 
-> > Notes:
-> >     Changes since v3:
-> >      - Added BUG() to 32-bit ARM VHE run function
-> >      - Omitted QC Falkor BP Hardening functionality from VHE-specific
-> >        function
-> >     
-> >     Changes since v2:
-> >      - Reworded commit message
-> >     
-> >     Changes since v1:
-> >      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
-> >        __kvm_vcpu_run_nvhe
-> >      - Removed stray whitespace line
-> > 
-> >  arch/arm/include/asm/kvm_asm.h   |  5 ++-
-> >  arch/arm/kvm/hyp/switch.c        |  2 +-
-> >  arch/arm64/include/asm/kvm_asm.h |  4 ++-
-> >  arch/arm64/kvm/hyp/switch.c      | 66 +++++++++++++++++++++++++++++++++++++++-
-> >  virt/kvm/arm/arm.c               |  5 ++-
-> >  5 files changed, 77 insertions(+), 5 deletions(-)
-> > 
-> 
-> ...
-> 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 2062d9357971..5bd879c78951 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -736,7 +736,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		if (has_vhe())
-> >  			kvm_arm_vhe_guest_enter();
-> >  
-> > -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> > +		if (has_vhe())
-> > +			ret = kvm_vcpu_run_vhe(vcpu);
-> > +		else
-> > +			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
-> >  
-> >  		if (has_vhe())
-> >  			kvm_arm_vhe_guest_exit();
-> 
-> We can combine these has_vhe()'s
-> 
->  if (has_vhe()) {
->     kvm_arm_vhe_guest_enter();
->     ret = kvm_vcpu_run_vhe(vcpu);
->     kvm_arm_vhe_guest_exit();
->  } else
->     ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
+On 20 February 2018 at 19:39, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+> On Tue, Feb 20, 2018 at 8:04 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 20 February 2018 at 14:02, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>>> On Tue, Feb 20, 2018 at 11:08 AM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+>
+>>>> +/* SPDX-License-Identifier: GPL-2.0 */
+>>>
+>>> Shouldn't be // ?
+>
+>> IIUC, this applies to .h files only, and /* */ is preferred for .c files.
+>
+> Other way around.
+>
+> Documentation/process/license-rules.rst
+>
 
-Maybe even do a cleanup patch that removes
-kvm_arm_vhe_guest_enter/exit by putting the daif
-masking/restoring directly into kvm_vcpu_run_vhe()?
+OK got it
 
-Thanks,
-drew
+>>>> +#define WAIT_PCLK(n, rate)     ndelay((((1000000000 +  (rate) - 1) / \
+>>>> +                                        (rate) + n - 1) / n) + 10)
+>>>
+>>> This split makes it harder to catch the calculus.
+>>> Also, you can use DIV_ROUND_UP(), though it longer, but adds a bit of
+>>> clarity to the calculus.
+>
+>> Yeah. This was present in the original code, and I tried to avoid
+>> touching it :-)
+>
+> Yeah, but below there are several instances with DIV_ROUND_UP().
+>
+
+I'll replace it with the equivalent
+
+#define WAIT_PCLK(n, rate) \
+    ndelay(DIV_ROUND_UP(DIV_ROUND_UP(1000000000, rate), n) + 10)
+
+>>>> +static void synquacer_i2c_stop(struct synquacer_i2c *i2c, int ret)
+>>>> +{
+>>>> +       dev_dbg(i2c->dev, "STOP\n");
+>>>
+>>> Hmm... Can't use FTRACE ?
+>
+>> What do you mean?
+>
+> The message kinda useless, esp. if you can enable functional tracing.
+> I saw a lot of debugging messages in the code, perhaps it makes sense
+> at some point to make some trace points in I2C core and leave only HW
+> related here.
+>
+
+OK, I will just drop it.
+
+>>>> +       if (dev_of_node(&pdev->dev)) {
+>>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
+>>>> +               if (IS_ERR(i2c->clk)) {
+>>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
+>>>> +                       return PTR_ERR(i2c->clk);
+>>>> +               }
+>>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
+>>>> +
+>>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
+>>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
+>>>> +               clk_prepare_enable(i2c->clk);
+>>>> +       } else {
+>>>
+>>>> +               ret = device_property_read_u32(&pdev->dev,
+>>>> +                                              "socionext,pclk-rate",
+>>>> +                                              &i2c->clkrate);
+>>>
+>>> I suppose for ACPI we just register a fixed rate clock and use it in
+>>> the driver in the same way as in OF case.
+>>> I guess at some point we even can provide a generic clock provider for
+>>> ACPI based on rate property.
+>
+>> Is there a question here? Do you want me to change anything?
+>
+> Is it opener for discussion. At least in the drivers we have done for
+> x86 we do the way I described.
+>
+> See, for example, drivers/mfd/intel-lpss.c
+>
+
+OK, I see what you mean now. But for this driver, creating a fixed
+rate clock with no controls whatsoever, only to interrogate it for its
+rate (which we retrieved from the ACPI device node in the first place)
+seems rather pointless to me. Am I missing something here?
