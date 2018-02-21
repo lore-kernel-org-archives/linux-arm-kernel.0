@@ -1,83 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Feb 2018 13:18:49 +0100
-Subject: [PATCH] ARM: orion: fix orion_ge00_switch_board_info initialization
-Message-ID: <20180221121856.3241260-1-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 12:21:11 +0000
+Subject: [PATCH v4 17/40] KVM: arm64: Move userspace system registers into
+ separate function
+In-Reply-To: <20180215210332.8648-18-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-18-christoffer.dall@linaro.org>
+Message-ID: <86bmgileiw.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A section type mismatch warning shows up when building with LTO,
-since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
-const itself:
+On Thu, 15 Feb 2018 21:03:09 +0000,
+Christoffer Dall wrote:
+> 
+> There's a semantic difference between the EL1 registers that control
+> operation of a kernel running in EL1 and EL1 registers that only control
+> userspace execution in EL0.  Since we can defer saving/restoring the
+> latter, move them into their own function.
+> 
+> ACTLR_EL1 is not used by a VHE host, so we can move this register into
+> the EL1 state which is not saved/restored for a VHE host.
 
-include/linux/of.h: In function 'spear_setup_of_timer':
-arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
- static const struct of_device_id timer_of_match[] __initconst = {
-                                  ^
-arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
- static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
-                                ^
+Nit: maybe worth adding a reference to the D10.2.1 comment in the
+ARMv8 ARM that indicates the "recommended" behaviour of this register?
 
-As pointed out by Andrew Lunn, it should in fact be 'const' but not
-'__initconst' because the string is never copied but may be accessed
-after the init sections are freed. To fix that, I get rid of the
-extra symbol and rewrite the initialization in a simpler way that
-assigns both the bus_id and modalias statically.
+> 
+> We also take this chance to rename the function saving/restoring the
+> remaining system register to make it clear this function deals with
+> the EL1 system registers.
+> 
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-I spotted another theoretical bug in the same place, where d->netdev[i]
-may be an out of bounds access, this can be fixed by moving the device
-assignment into the loop.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: complete rewrite
----
- arch/arm/plat-orion/common.c | 23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+	M.
 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index aff6994950ba..a2399fd66e97 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -472,28 +472,27 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
- /*****************************************************************************
-  * Ethernet switch
-  ****************************************************************************/
--static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
--static __initdata struct mdio_board_info
--		  orion_ge00_switch_board_info;
-+static __initdata struct mdio_board_info orion_ge00_switch_board_info = {
-+	.bus_id   = "orion-mii",
-+	.modalias = "mv88e6085",
-+};
- 
- void __init orion_ge00_switch_init(struct dsa_chip_data *d)
- {
--	struct mdio_board_info *bd;
- 	unsigned int i;
- 
- 	if (!IS_BUILTIN(CONFIG_PHYLIB))
- 		return;
- 
--	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
--		if (!strcmp(d->port_names[i], "cpu"))
-+	for (i = 0; i < ARRAY_SIZE(d->port_names); i++) {
-+		if (!strcmp(d->port_names[i], "cpu")) {
-+			d->netdev[i] = &orion_ge00.dev;
- 			break;
-+		}
-+	}
- 
--	bd = &orion_ge00_switch_board_info;
--	bd->bus_id = orion_ge00_mvmdio_bus_name;
--	bd->mdio_addr = d->sw_addr;
--	d->netdev[i] = &orion_ge00.dev;
--	strcpy(bd->modalias, "mv88e6085");
--	bd->platform_data = d;
-+	orion_ge00_switch_board_info.mdio_addr = d->sw_addr;
-+	orion_ge00_switch_board_info.platform_data = d;
- 
- 	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
- }
 -- 
-2.9.0
+Jazz is not dead, it just smell funny.
