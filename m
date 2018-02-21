@@ -1,62 +1,83 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 21 Feb 2018 10:18:21 -0800
-Subject: [PATCH v2 1/2] arm64: cpufeature: Relocate PAN emulation report
-In-Reply-To: <1519237102-46854-1-git-send-email-keescook@chromium.org>
-References: <1519237102-46854-1-git-send-email-keescook@chromium.org>
-Message-ID: <1519237102-46854-2-git-send-email-keescook@chromium.org>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 21 Feb 2018 19:18:32 +0100
+Subject: [PATCH v4 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
+In-Reply-To: <20180221174300.74lxks5gb6qzny75@kamzik.brq.redhat.com>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-14-christoffer.dall@linaro.org>
+ <20180221174300.74lxks5gb6qzny75@kamzik.brq.redhat.com>
+Message-ID: <20180221181832.i5c46evx6y3h635k@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PAN emulation notification was only happening for non-boot CPUs
-if CPU capabilities had already been configured. This seems to be the
-wrong place, as it's system-wide and isn't attached to capabilities,
-so its reporting didn't normally happen. Instead, report it once from
-the boot CPU.
+On Wed, Feb 21, 2018 at 06:43:00PM +0100, Andrew Jones wrote:
+> On Thu, Feb 15, 2018 at 10:03:05PM +0100, Christoffer Dall wrote:
+> > So far this is mostly (see below) a copy of the legacy non-VHE switch
+> > function, but we will start reworking these functions in separate
+> > directions to work on VHE and non-VHE in the most optimal way in later
+> > patches.
+> > 
+> > The only difference after this patch between the VHE and non-VHE run
+> > functions is that we omit the branch-predictor variant-2 hardening for
+> > QC Falkor CPUs, because this workaround is specific to a series of
+> > non-VHE ARMv8.0 CPUs.
+> > 
+> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> > 
+> > Notes:
+> >     Changes since v3:
+> >      - Added BUG() to 32-bit ARM VHE run function
+> >      - Omitted QC Falkor BP Hardening functionality from VHE-specific
+> >        function
+> >     
+> >     Changes since v2:
+> >      - Reworded commit message
+> >     
+> >     Changes since v1:
+> >      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
+> >        __kvm_vcpu_run_nvhe
+> >      - Removed stray whitespace line
+> > 
+> >  arch/arm/include/asm/kvm_asm.h   |  5 ++-
+> >  arch/arm/kvm/hyp/switch.c        |  2 +-
+> >  arch/arm64/include/asm/kvm_asm.h |  4 ++-
+> >  arch/arm64/kvm/hyp/switch.c      | 66 +++++++++++++++++++++++++++++++++++++++-
+> >  virt/kvm/arm/arm.c               |  5 ++-
+> >  5 files changed, 77 insertions(+), 5 deletions(-)
+> > 
+> 
+> ...
+> 
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 2062d9357971..5bd879c78951 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -736,7 +736,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  		if (has_vhe())
+> >  			kvm_arm_vhe_guest_enter();
+> >  
+> > -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+> > +		if (has_vhe())
+> > +			ret = kvm_vcpu_run_vhe(vcpu);
+> > +		else
+> > +			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
+> >  
+> >  		if (has_vhe())
+> >  			kvm_arm_vhe_guest_exit();
+> 
+> We can combine these has_vhe()'s
+> 
+>  if (has_vhe()) {
+>     kvm_arm_vhe_guest_enter();
+>     ret = kvm_vcpu_run_vhe(vcpu);
+>     kvm_arm_vhe_guest_exit();
+>  } else
+>     ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
 
-Before (missing PAN emulation report):
+Maybe even do a cleanup patch that removes
+kvm_arm_vhe_guest_enter/exit by putting the daif
+masking/restoring directly into kvm_vcpu_run_vhe()?
 
- SMP: Total of 4 processors activated.
- CPU features: detected feature: 32-bit EL0 Support
- CPU features: detected feature: Kernel page table isolation (KPTI)
- CPU: All CPU(s) started at EL2
-
-After:
-
- SMP: Total of 4 processors activated.
- CPU features: detected feature: 32-bit EL0 Support
- CPU features: detected feature: Kernel page table isolation (KPTI)
- CPU features: emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching
- CPU: All CPU(s) started at EL2
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 29b1f873e337..61aff55245ea 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1333,9 +1333,6 @@ static void verify_local_cpu_capabilities(void)
- 
- 	if (system_supports_sve())
- 		verify_sve_features();
--
--	if (system_uses_ttbr0_pan())
--		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- }
- 
- void check_local_cpu_capabilities(void)
-@@ -1394,6 +1391,9 @@ void __init setup_cpu_features(void)
- 	if (system_supports_32bit_el0())
- 		setup_elf_hwcaps(compat_elf_hwcaps);
- 
-+	if (system_uses_ttbr0_pan())
-+		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-+
- 	sve_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
--- 
-2.7.4
+Thanks,
+drew
