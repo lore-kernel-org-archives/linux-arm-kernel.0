@@ -1,84 +1,220 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 21 Feb 2018 22:48:22 +0800
-Subject: [PATCH v2 05/10] drm/sun4i: Add Allwinner A31 MIPI-DSI
- controller support
-In-Reply-To: <60ecb81e876f2c41584e5ccc55005cf12da5dc94.1519204731.git-series.maxime.ripard@bootlin.com>
-References: <60ecb81e876f2c41584e5ccc55005cf12da5dc94.1519204731.git-series.maxime.ripard@bootlin.com>
-Message-ID: <201802212257.bepJa57u%fengguang.wu@intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 21 Feb 2018 06:50:47 -0800
+Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
+ based tachometer
+In-Reply-To: <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
+References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
+ <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
+Message-ID: <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 02/20/2018 10:58 PM, Rajkumar Rampelli wrote:
+> Add generic PWM based tachometer driver via HWMON interface
+> to report the RPM of motor. This drivers get the period/duty
+> cycle from PWM IP which captures the motor PWM output.
+> 
+> This driver implements a simple interface for monitoring the speed of
+> a fan and exposes it in roatations per minute (RPM) to the user space
+> by using the hwmon's sysfs interface
+> 
+> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
+> ---
+>   Documentation/hwmon/generic-pwm-tachometer |  17 +++++
+>   drivers/hwmon/Kconfig                      |  10 +++
+>   drivers/hwmon/Makefile                     |   1 +
+>   drivers/hwmon/generic-pwm-tachometer.c     | 112 +++++++++++++++++++++++++++++
+>   4 files changed, 140 insertions(+)
+>   create mode 100644 Documentation/hwmon/generic-pwm-tachometer
+>   create mode 100644 drivers/hwmon/generic-pwm-tachometer.c
+> 
+> diff --git a/Documentation/hwmon/generic-pwm-tachometer b/Documentation/hwmon/generic-pwm-tachometer
+> new file mode 100644
+> index 0000000..e0713ee
+> --- /dev/null
+> +++ b/Documentation/hwmon/generic-pwm-tachometer
+> @@ -0,0 +1,17 @@
+> +Kernel driver generic-pwm-tachometer
+> +====================================
+> +
+> +This driver enables the use of a PWM module to monitor a fan. It uses the
+> +generic PWM interface and can be used on SoCs as along as the SoC supports
+> +Tachometer controller that moniors the Fan speed in periods.
+> +
+> +Author: Rajkumar Rampelli <rrajk@nvidia.com>
+> +
+> +Description
+> +-----------
+> +
+> +The driver implements a simple interface for monitoring the Fan speed using
+> +PWM module and Tachometer controller. It requests period value through PWM
+> +capture interface to Tachometer and measures the Rotations per minute using
+> +received period value. It exposes the Fan speed in RPM to the user space by
+> +using the hwmon's sysfs interface.
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index ef23553..8912dcb 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -1878,6 +1878,16 @@ config SENSORS_XGENE
+>   	  If you say yes here you get support for the temperature
+>   	  and power sensors for APM X-Gene SoC.
+>   
+> +config GENERIC_PWM_TACHOMETER
+> +	tristate "Generic PWM based tachometer driver"
+> +	depends on PWM
+> +	help
+> +	  Enables a driver to use PWM signal from motor to use
+> +	  for measuring the motor speed. The RPM is captured by
+> +	  PWM modules which has PWM capture capability and this
+> +	  drivers reads the captured data from PWM IP to convert
+> +	  it to speed in RPM.
+> +
+>   if ACPI
+>   
+>   comment "ACPI drivers"
+> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+> index f814b4a..9dcc374 100644
+> --- a/drivers/hwmon/Makefile
+> +++ b/drivers/hwmon/Makefile
+> @@ -175,6 +175,7 @@ obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
+>   obj-$(CONFIG_SENSORS_XGENE)	+= xgene-hwmon.o
+>   
+>   obj-$(CONFIG_PMBUS)		+= pmbus/
+> +obj-$(CONFIG_GENERIC_PWM_TACHOMETER) += generic-pwm-tachometer.o
+>   
+>   ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
+>   
+> diff --git a/drivers/hwmon/generic-pwm-tachometer.c b/drivers/hwmon/generic-pwm-tachometer.c
+> new file mode 100644
+> index 0000000..9354d43
+> --- /dev/null
+> +++ b/drivers/hwmon/generic-pwm-tachometer.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/err.h>
+> +#include <linux/pwm.h>
+> +#include <linux/hwmon.h>
+> +#include <linux/hwmon-sysfs.h>
+> +
+> +struct pwm_hwmon_tach {
+> +	struct device		*dev;
+> +	struct pwm_device	*pwm;
+> +	struct device		*hwmon;
+> +};
+> +
+> +static ssize_t show_rpm(struct device *dev, struct device_attribute *attr,
+> +			char *buf)
+> +{
+> +	struct pwm_hwmon_tach *ptt = dev_get_drvdata(dev);
+> +	struct pwm_device *pwm = ptt->pwm;
+> +	struct pwm_capture result;
+> +	int err;
+> +	unsigned int rpm = 0;
+> +
+> +	err = pwm_capture(pwm, &result, 0);
+> +	if (err < 0) {
+> +		dev_err(ptt->dev, "Failed to capture PWM: %d\n", err);
+> +		return err;
+> +	}
+> +
+> +	if (result.period)
+> +		rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
+> +					    result.period);
+> +
+> +	return sprintf(buf, "%u\n", rpm);
+> +}
+> +
+> +static SENSOR_DEVICE_ATTR(rpm, 0444, show_rpm, NULL, 0);
+> +
+> +static struct attribute *pwm_tach_attrs[] = {
+> +	&sensor_dev_attr_rpm.dev_attr.attr,
+> +	NULL,
+> +};
 
-I love your patch! Perhaps something to improve:
+"rpm" is not a standard hwmon sysfs attribute. If you don't provide
+a single standard hwmon sysfs attribute, having a hwmon driver is pointless.
 
-[auto build test WARNING on ]
+> +
+> +ATTRIBUTE_GROUPS(pwm_tach);
+> +
+> +static int pwm_tach_probe(struct platform_device *pdev)
+> +{
+> +	struct pwm_hwmon_tach *ptt;
+> +	int err;
+> +
+> +	ptt = devm_kzalloc(&pdev->dev, sizeof(*ptt), GFP_KERNEL);
+> +	if (!ptt)
+> +		return -ENOMEM;
+> +
+> +	ptt->dev = &pdev->dev;
+> +
+> +	platform_set_drvdata(pdev, ptt);
+> +	dev_set_drvdata(&pdev->dev, ptt);
+> +
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/drm-sun4i-Allwinner-MIPI-DSI-support/20180221-203150
-base:    
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+None of those is used.
 
-All warnings (new ones prefixed by >>):
+> +	ptt->pwm = devm_of_pwm_get(&pdev->dev, pdev->dev.of_node, NULL);
+> +	if (IS_ERR(ptt->pwm)) {
+> +		err = PTR_ERR(ptt->pwm);
+> +		dev_err(&pdev->dev, "Failed to get pwm handle, err: %d\n",
+> +			err);
+> +		return err;
+> +	}
+> +
+> +	ptt->hwmon = devm_hwmon_device_register_with_groups(&pdev->dev,
+> +					 "pwm_tach", ptt, pwm_tach_groups);
 
-   drivers/gpu/drm/sun4i/sun4i_tcon.c: In function 'sun4i_tcon_mode_set':
->> drivers/gpu/drm/sun4i/sun4i_tcon.c:606:30: warning: passing argument 1 of 'encoder_to_sun6i_dsi' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-      dsi = encoder_to_sun6i_dsi(encoder);
-                                 ^~~~~~~
-   In file included from drivers/gpu/drm/sun4i/sun4i_tcon.c:37:0:
-   drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h:54:33: note: expected 'struct drm_encoder *' but argument is of type 'const struct drm_encoder *'
-    static inline struct sun6i_dsi *encoder_to_sun6i_dsi(struct drm_encoder *encoder)
-                                    ^~~~~~~~~~~~~~~~~~~~
+Please use the new API - devm_hwmon_device_register_with_info -
+for new drivers.
 
-vim +606 drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +	if (IS_ERR(ptt->hwmon)) {
+> +		err = PTR_ERR_OR_ZERO(ptt->hwmon);
+> +		dev_err(&pdev->dev, "Failed to register hwmon device: %d\n",
+> +			err);
+> +		return err;
+> +	}
 
-   593	
-   594	void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
-   595				 const struct drm_encoder *encoder,
-   596				 const struct drm_display_mode *mode)
-   597	{
-   598		struct sun6i_dsi *dsi;
-   599	
-   600		switch (encoder->encoder_type) {
-   601		case DRM_MODE_ENCODER_DSI:
-   602			/*
-   603			 * This is not really elegant, but it's the "cleaner"
-   604			 * way I could think of...
-   605			 */
- > 606			dsi = encoder_to_sun6i_dsi(encoder);
-   607			sun4i_tcon0_mode_set_cpu(tcon, dsi->device, mode);
-   608			break;
-   609		case DRM_MODE_ENCODER_LVDS:
-   610			sun4i_tcon0_mode_set_lvds(tcon, encoder, mode);
-   611			break;
-   612		case DRM_MODE_ENCODER_NONE:
-   613			sun4i_tcon0_mode_set_rgb(tcon, mode);
-   614			sun4i_tcon_set_mux(tcon, 0, encoder);
-   615			break;
-   616		case DRM_MODE_ENCODER_TVDAC:
-   617		case DRM_MODE_ENCODER_TMDS:
-   618			sun4i_tcon1_mode_set(tcon, mode);
-   619			sun4i_tcon_set_mux(tcon, 1, encoder);
-   620			break;
-   621		default:
-   622			DRM_DEBUG_DRIVER("Unknown encoder type, doing nothing...\n");
-   623		}
-   624	}
-   625	EXPORT_SYMBOL(sun4i_tcon_mode_set);
-   626	
+Please no noise on failure. The failure is going to be a memory allocation failure,
+which is reported already, and user space will be informed with the error code.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65152 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/30132f03/attachment-0001.gz>
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id pwm_tach_of_match[] = {
+> +	{ .compatible = "generic-pwm-tachometer" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, pwm_tach_of_match);
+> +
+> +static struct platform_driver pwm_tach_driver = {
+> +	.driver = {
+> +		.name = "generic-pwm-tachometer",
+> +		.of_match_table = pwm_tach_of_match,
+> +	},
+> +	.probe = pwm_tach_probe,
+> +};
+> +
+> +module_platform_driver(pwm_tach_driver);
+> +
+> +MODULE_DESCRIPTION("PWM based Generic Tachometer driver");
+> +MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
+> +MODULE_AUTHOR("Rajkumar Rampelli <rrajk@nvidia.com>");
+> +MODULE_LICENSE("GPL v2");
+> 
