@@ -1,186 +1,126 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 21 Feb 2018 09:55:41 +0100
-Subject: [PATCH v4 6/6] drm/bridge/sii8620: use micro-USB cable detection
- logic to detect MHL
+Date: Wed, 21 Feb 2018 09:55:36 +0100
+Subject: [PATCH v4 1/6] dt-bindings: add bindings for USB physical connector
 In-Reply-To: <20180221085541.14556-1-a.hajda@samsung.com>
 References: <20180221085541.14556-1-a.hajda@samsung.com>
- <CGME20180221085610eucas1p162a5cf356642e8556f6bc72163c3a5db@eucas1p1.samsung.com>
-Message-ID: <20180221085541.14556-7-a.hajda@samsung.com>
+ <CGME20180221085604eucas1p11aa066a1e106d9f9850731a5171dce8b@eucas1p1.samsung.com>
+Message-ID: <20180221085541.14556-2-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maciej Purski <m.purski@samsung.com>
-
-Currently MHL chip must be turned on permanently to detect MHL cable. It
-duplicates micro-USB controller's (MUIC) functionality and consumes
-unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
-only if it detects MHL cable.
-
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
-This is rework of the patch by Maciej with following changes:
-- use micro-USB port bindings to get extcon, instead of extcon property,
-- fixed remove sequence,
-- fixed extcon get state logic.
-
-Code finding extcon node is hacky IMO, I guess ultimately it should be done
-via some framework (maybe even extcon), or at least via helper, I hope it
-can stay as is until the proper solution will be merged.
+These bindings allow to describe most known standard USB connectors
+and it should be possible to extend it if necessary.
+USB connectors, beside USB can be used to route other protocols,
+for example UART, Audio, MHL. In such case every device passing data
+through the connector should have appropriate graph bindings.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 94 insertions(+), 3 deletions(-)
+v4:
+- improved 'type' description (Rob),
+- improved description of 2nd example (Rob).
+v3:
+- removed MHL port (samsung connector will have separate bindings),
+- added 2nd example for USB-C,
+- improved formatting.
+v2:
+- moved connector type(A,B,C) to compatible string (Rob),
+- renamed size property to type (Rob),
+- changed type description to be less confusing (Laurent),
+- removed vendor specific compatibles (implied by graph port number),
+- added requirement of connector being a child of IC (Rob),
+- removed max-mode (subtly suggested by Rob, it should be detected anyway
+  by USB Controller in runtime, downside is that device is not able to
+  report its real capabilities, maybe better would be to make it optional(?)),
+- assigned port numbers to data buses (Rob).
 
-diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
-index 9e785b8e0ea2..565cc352ca81 100644
---- a/drivers/gpu/drm/bridge/sil-sii8620.c
-+++ b/drivers/gpu/drm/bridge/sil-sii8620.c
-@@ -17,6 +17,7 @@
- 
- #include <linux/clk.h>
- #include <linux/delay.h>
-+#include <linux/extcon.h>
- #include <linux/gpio/consumer.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
-@@ -25,6 +26,7 @@
- #include <linux/list.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
-+#include <linux/of_graph.h>
- #include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- 
-@@ -81,6 +83,10 @@ struct sii8620 {
- 	struct edid *edid;
- 	unsigned int gen2_write_burst:1;
- 	enum sii8620_mt_state mt_state;
-+	struct extcon_dev *extcon;
-+	struct notifier_block extcon_nb;
-+	struct work_struct extcon_wq;
-+	int cable_state;
- 	struct list_head mt_queue;
- 	struct {
- 		int r_size;
-@@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
- 	ctx->rc_dev = rc_dev;
- }
- 
-+static void sii8620_cable_out(struct sii8620 *ctx)
-+{
-+	disable_irq(to_i2c_client(ctx->dev)->irq);
-+	sii8620_hw_off(ctx);
-+}
+Regards
+Andrzej
+---
+ .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+
+diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+new file mode 100644
+index 000000000000..e1463f14af38
+--- /dev/null
++++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+@@ -0,0 +1,75 @@
++USB Connector
++=============
 +
-+static void sii8620_extcon_work(struct work_struct *work)
-+{
-+	struct sii8620 *ctx =
-+		container_of(work, struct sii8620, extcon_wq);
-+	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
++USB connector node represents physical USB connector. It should be
++a child of USB interface controller.
 +
-+	if (state == ctx->cable_state)
-+		return;
++Required properties:
++- compatible: describes type of the connector, must be one of:
++    "usb-a-connector",
++    "usb-b-connector",
++    "usb-c-connector".
 +
-+	ctx->cable_state = state;
++Optional properties:
++- label: symbolic name for the connector,
++- type: size of the connector, should be specified in case of USB-A, USB-B
++  non-fullsize connectors: "mini", "micro".
 +
-+	if (state > 0)
-+		sii8620_cable_in(ctx);
-+	else
-+		sii8620_cable_out(ctx);
-+}
++Required nodes:
++- any data bus to the connector should be modeled using the OF graph bindings
++  specified in bindings/graph.txt, unless the bus is between parent node and
++  the connector. Since single connector can have multpile data buses every bus
++  has assigned OF graph port number as follows:
++    0: High Speed (HS), present in all connectors,
++    1: Super Speed (SS), present in SS capable connectors,
++    2: Sideband use (SBU), present in USB-C.
 +
-+static int sii8620_extcon_notifier(struct notifier_block *self,
-+			unsigned long event, void *ptr)
-+{
-+	struct sii8620 *ctx =
-+		container_of(self, struct sii8620, extcon_nb);
++Examples
++--------
 +
-+	schedule_work(&ctx->extcon_wq);
++1. Micro-USB connector with HS lines routed via controller (MUIC):
 +
-+	return NOTIFY_DONE;
-+}
++muic-max77843 at 66 {
++	...
++	usb_con: connector {
++		compatible = "usb-b-connector";
++		label = "micro-USB";
++		type = "micro";
++	};
++};
 +
-+static int sii8620_extcon_init(struct sii8620 *ctx)
-+{
-+	struct extcon_dev *edev;
-+	struct device_node *musb, *muic;
-+	int ret;
++2. USB-C connector attached to CC controller (s2mm005), HS lines routed
++to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
++DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
 +
-+	/* get micro-USB connector node */
-+	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
-+	/* next get micro-USB Interface Controller node */
-+	muic = of_get_next_parent(musb);
++ccic: s2mm005 at 33 {
++	...
++	usb_con: connector {
++		compatible = "usb-c-connector";
++		label = "USB-C";
 +
-+	if (!muic) {
-+		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
-+		return 0;
-+	}
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+	edev = extcon_get_edev_by_of_node(muic);
-+	of_node_put(muic);
-+	if (IS_ERR(edev)) {
-+		if (PTR_ERR(edev) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(ctx->dev, "Invalid or missing extcon\n");
-+		return PTR_ERR(edev);
-+	}
-+
-+	ctx->extcon = edev;
-+	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
-+	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
-+	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
-+	if (ret) {
-+		dev_err(ctx->dev, "failed to register notifier for MHL\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
- {
- 	return container_of(bridge, struct sii8620, bridge);
-@@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
- 	if (ret)
- 		return ret;
- 
-+	ret = sii8620_extcon_init(ctx);
-+	if (ret < 0) {
-+		dev_err(ctx->dev, "failed to initialize EXTCON\n");
-+		return ret;
-+	}
-+
- 	i2c_set_clientdata(client, ctx);
- 
- 	ctx->bridge.funcs = &sii8620_bridge_funcs;
- 	ctx->bridge.of_node = dev->of_node;
- 	drm_bridge_add(&ctx->bridge);
- 
--	sii8620_cable_in(ctx);
-+	if (!ctx->extcon)
-+		sii8620_cable_in(ctx);
- 
- 	return 0;
- }
-@@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
- {
- 	struct sii8620 *ctx = i2c_get_clientdata(client);
- 
--	disable_irq(to_i2c_client(ctx->dev)->irq);
--	sii8620_hw_off(ctx);
-+	if (ctx->extcon) {
-+		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
-+					   &ctx->extcon_nb);
-+		flush_work(&ctx->extcon_wq);
-+		if (ctx->cable_state > 0)
-+			sii8620_cable_out(ctx);
-+	} else {
-+		sii8620_cable_out(ctx);
-+	}
- 	drm_bridge_remove(&ctx->bridge);
- 
- 	return 0;
++			port at 0 {
++				reg = <0>;
++				usb_con_hs: endpoint {
++					remote-endpoint = <&max77865_usbc_hs>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				usb_con_ss: endpoint {
++					remote-endpoint = <&usbdrd_phy_ss>;
++				};
++			};
++			port at 2 {
++				reg = <2>;
++				usb_con_sbu: endpoint {
++					remote-endpoint = <&dp_aux>;
++				};
++			};
++		};
++	};
++};
 -- 
 2.16.1
