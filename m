@@ -1,54 +1,99 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 21 Feb 2018 08:16:03 -0800
-Subject: [PATCH v2 5/8] [PATCH [5/8] Documentation: dt-bindings: Add a
- document for PECI hwmon client driver
+Date: Wed, 21 Feb 2018 08:16:04 -0800
+Subject: [PATCH v2 6/8] [PATCH 6/8] Documentation: hwmon: Add a document for
+ PECI hwmon client driver
 In-Reply-To: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
 References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180221161606.32247-6-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180221161606.32247-7-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a dt-bindings document for a generic PECI hwmon client
-driver.
+This commit adds a hwmon document for a generic PECI hwmon client driver.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 ---
- .../devicetree/bindings/hwmon/peci-hwmon.txt       | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
+ Documentation/hwmon/peci-hwmon | 73 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
+ create mode 100644 Documentation/hwmon/peci-hwmon
 
-diff --git a/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt b/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
+diff --git a/Documentation/hwmon/peci-hwmon b/Documentation/hwmon/peci-hwmon
 new file mode 100644
-index 000000000000..831813158884
+index 000000000000..93e587498536
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
-@@ -0,0 +1,27 @@
-+Bindings for Intel PECI (Platform Environment Control Interface) hwmon driver.
++++ b/Documentation/hwmon/peci-hwmon
+@@ -0,0 +1,73 @@
++Kernel driver peci-hwmon
++===============================
 +
-+Required properties:
-+- compatible
-+	Should be "intel,peci-hwmon".
++Supported chips:
++	Any recent Intel CPU which is connected through a PECI bus.
++	Addresses scanned: PECI client address 0x30 - 0x37
++	Datasheet: Available from http://www.intel.com/design/literature.htm
 +
-+- reg
-+	Should contain address of a client CPU. Address range of CPU clients is
-+	starting from 0x30 based on PECI specification.
-+	<0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
++Author:
++	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 +
-+Example:
-+	peci-bus at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		< more properties >
++Description
++-----------
 +
-+		peci-hwmon at cpu0 {
-+			compatible = "intel,peci-hwmon";
-+			reg = <0x30>;
-+		};
++This driver implements a generic PECI hwmon feature which provides Digital
++Thermal Sensor (DTS) thermal readings of the CPU package, CPU cores and DIMM
++components that are accessible using the PECI Client Command Suite via the
++processor PECI client.
 +
-+		peci-hwmon at cpu1 {
-+			compatible = "intel,peci-hwmon";
-+			reg = <0x31>;
-+		};
-+	};
++All temperature values are given in millidegree Celsius and will be measurable
++only when the target CPU is powered on.
++
++sysfs attributes
++----------------
++
++temp1_input		Provides current die temperature of the CPU package.
++temp1_max		Provides thermal control temperature of the CPU package
++			which is also known as Tcontrol.
++temp1_crit		Provides shutdown temperature of the CPU package which
++			is also known as the maximum processor junction
++			temperature, Tjmax or Tprochot.
++temp1_crit_hyst		Provides the hysteresis value from Tcontrol to Tjmax of
++			the CPU package.
++
++temp2_input		Provides current DTS thermal margin to Tcontrol of the
++			CPU package. Value 0 means it reaches to Tcontrol
++			temperature. Sub-zero value means the die temperature
++			goes across Tconrtol to Tjmax.
++temp2_min		Provides the minimum DTS thermal margin to Tcontrol of
++			the CPU package.
++temp2_lcrit		Provides the value when the CPU package temperature
++			reaches to Tjmax.
++
++temp3_input		Provides current Tcontrol temperature of the CPU
++			package which is also known as Fan Temperature target.
++			Indicates the relative value from thermal monitor trip
++			temperature at which fans should be engaged.
++temp3_crit		Provides Tcontrol critical value of the CPU package
++			which is same to Tjmax.
++
++temp4_input		Provides current Tthrottle temperature of the CPU
++			package. Used for throttling temperature. If this value
++			is allowed and lower than Tjmax - the throttle will
++			occur and reported at lower than Tjmax.
++
++temp5_input		Provides the maximum junction temperature, Tjmax of the
++			CPU package.
++
++temp<n>_label		Provides core temperature if this label indicates
++			'Core #'.
++temp[n]_input		Provides current temperature of each core.
++temp[n]_max		Provides thermal control temperature of the core.
++temp[n]_crit		Provides shutdown temperature of the core.
++temp[n]_crit_hyst	Provides the hysteresis value from Tcontrol to Tjmax of
++			the core.
++
++temp<n>_label		Provides DDR DIMM temperature if this label indicates
++			'DIMM #'.
++temp<n>_input		Provides current temperature of the DDR DIMM.
++
++Note:
++	DIMM temperature group will be appeared when the client CPU's BIOS
++	completes memory training and testing.
 -- 
 2.16.1
