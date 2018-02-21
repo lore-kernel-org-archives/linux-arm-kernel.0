@@ -1,30 +1,42 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 21 Feb 2018 21:30:37 +0530
-Subject: [PATCH v2 03/10] arm64: actions: Enable PINCTRL in platforms Kconfig
-In-Reply-To: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
-References: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180221160044.15089-4-manivannan.sadhasivam@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Feb 2018 16:02:38 +0000
+Subject: [PATCH 1/3] signal: Add FPE_FLTUNK si_code for undiagnosable fp
+ exceptions
+In-Reply-To: <1519228960-10883-1-git-send-email-Dave.Martin@arm.com>
+References: <1519228960-10883-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1519228960-10883-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select PINCTRL for Actions Semi SoCs
+Some architectures cannot always report accurately what kind of
+floating-point exception triggered a floating-point exception trap.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+This can occur with fp exceptions occuring on lanes in a vector
+instruction on arm64 for example.
+
+Rather than have every architecture come up with its own way of
+descrbing such a condition, this patch adds a common FPE_FLTUNK do
+report that an fp exception caused a trap but we cannot be certain
+which kind of fp exception it was.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ include/uapi/asm-generic/siginfo.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index fbedbd8f619a..bae1289bdc3f 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -3,6 +3,7 @@ menu "Platform selection"
- config ARCH_ACTIONS
- 	bool "Actions Semi Platforms"
- 	select OWL_TIMER
-+	select PINCTRL
- 	help
- 	  This enables support for the Actions Semiconductor S900 SoC family.
+diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+index 85dc965..10304de 100644
+--- a/include/uapi/asm-generic/siginfo.h
++++ b/include/uapi/asm-generic/siginfo.h
+@@ -229,7 +229,8 @@ typedef struct siginfo {
+ # define __FPE_INVASC	12	/* invalid ASCII digit */
+ # define __FPE_INVDEC	13	/* invalid decimal digit */
+ #endif
+-#define NSIGFPE		13
++#define FPE_FLTUNK	14	/* undiagnosed floating-point exception */
++#define NSIGFPE		14
  
+ /*
+  * SIGSEGV si_codes
 -- 
-2.14.1
+2.1.4
