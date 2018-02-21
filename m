@@ -1,230 +1,121 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 21 Feb 2018 15:59:13 -0700
-Subject: [PATCH 03/14] iommu: Create a base struct for io_mm
-In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
-References: <20180221225924.30737-1-jcrouse@codeaurora.org>
-Message-ID: <20180221225924.30737-4-jcrouse@codeaurora.org>
+Date: Wed, 21 Feb 2018 15:59:10 -0700
+Subject: [RFC 00/14] Per-instance pagetables for MSM GPUs
+Message-ID: <20180221225924.30737-1-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support both shared mm sva pagetables as well as
-io-pgtable backed tables add a base structure to
-io_mm so that the two styles can share the same idr.
+This is a request for comment for support in the iommu, arm-smmu
+and MSM GPU driver to support per (GPU) instance pagetables.
 
-Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
----
- drivers/iommu/arm-smmu-v3.c |  8 ++++----
- drivers/iommu/iommu-sva.c   | 50 ++++++++++++++++++++++++++++++---------------
- include/linux/iommu.h       | 11 +++++++++-
- 3 files changed, 47 insertions(+), 22 deletions(-)
+The general idea behind per-instance pagetables is that each GPU
+client can have its own pagetable and virtual memory space which
+prevents malicious or accidental corruption or copying.  We say
+per-instance because the pagetables are unique to each DRM file
+handle and there could be multiple instances per process.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 26935a9a5a97..4736a2bf39cf 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2454,7 +2454,7 @@ static int arm_smmu_mm_attach(struct iommu_domain *domain, struct device *dev,
- 	if (!attach_domain)
- 		return 0;
- 
--	return ops->set_entry(ops, io_mm->pasid, smmu_mm->cd);
-+	return ops->set_entry(ops, io_mm->base.pasid, smmu_mm->cd);
- }
- 
- static void arm_smmu_mm_detach(struct iommu_domain *domain, struct device *dev,
-@@ -2466,9 +2466,9 @@ static void arm_smmu_mm_detach(struct iommu_domain *domain, struct device *dev,
- 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
- 
- 	if (detach_domain)
--		ops->clear_entry(ops, io_mm->pasid, smmu_mm->cd);
-+		ops->clear_entry(ops, io_mm->base.pasid, smmu_mm->cd);
- 
--	arm_smmu_atc_inv_master_all(master, io_mm->pasid);
-+	arm_smmu_atc_inv_master_all(master, io_mm->base.pasid);
- 	/* TODO: Invalidate all mappings if last and not DVM. */
- }
- 
-@@ -2478,7 +2478,7 @@ static void arm_smmu_mm_invalidate(struct iommu_domain *domain,
- {
- 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
- 
--	arm_smmu_atc_inv_master_range(master, io_mm->pasid, iova, size);
-+	arm_smmu_atc_inv_master_range(master, io_mm->base.pasid, iova, size);
- 	/*
- 	 * TODO: Invalidate mapping if not DVM
- 	 */
-diff --git a/drivers/iommu/iommu-sva.c b/drivers/iommu/iommu-sva.c
-index d7b231cd7355..5fc689b1ef72 100644
---- a/drivers/iommu/iommu-sva.c
-+++ b/drivers/iommu/iommu-sva.c
-@@ -161,13 +161,15 @@ io_mm_alloc(struct iommu_domain *domain, struct device *dev,
- 	io_mm->mm		= mm;
- 	io_mm->notifier.ops	= &iommu_mmu_notifier;
- 	io_mm->release		= domain->ops->mm_free;
-+	io_mm->base.type	= IO_TYPE_MM;
-+
- 	INIT_LIST_HEAD(&io_mm->devices);
- 
- 	idr_preload(GFP_KERNEL);
- 	spin_lock(&iommu_sva_lock);
--	pasid = idr_alloc_cyclic(&iommu_pasid_idr, io_mm, dev_param->min_pasid,
--				 dev_param->max_pasid + 1, GFP_ATOMIC);
--	io_mm->pasid = pasid;
-+	pasid = idr_alloc_cyclic(&iommu_pasid_idr, &io_mm->base,
-+		dev_param->min_pasid, dev_param->max_pasid + 1, GFP_ATOMIC);
-+	io_mm->base.pasid = pasid;
- 	spin_unlock(&iommu_sva_lock);
- 	idr_preload_end();
- 
-@@ -200,7 +202,7 @@ io_mm_alloc(struct iommu_domain *domain, struct device *dev,
- 	 * 0 so no user could get a reference to it. Free it manually.
- 	 */
- 	spin_lock(&iommu_sva_lock);
--	idr_remove(&iommu_pasid_idr, io_mm->pasid);
-+	idr_remove(&iommu_pasid_idr, io_mm->base.pasid);
- 	spin_unlock(&iommu_sva_lock);
- 
- err_free_mm:
-@@ -231,7 +233,7 @@ static void io_mm_release(struct kref *kref)
- 	io_mm = container_of(kref, struct io_mm, kref);
- 	WARN_ON(!list_empty(&io_mm->devices));
- 
--	idr_remove(&iommu_pasid_idr, io_mm->pasid);
-+	idr_remove(&iommu_pasid_idr, io_mm->base.pasid);
- 
- 	/*
- 	 * If we're being released from mm exit, the notifier callback ->release
-@@ -286,7 +288,7 @@ static int io_mm_attach(struct iommu_domain *domain, struct device *dev,
- {
- 	int ret;
- 	bool attach_domain = true;
--	int pasid = io_mm->pasid;
-+	int pasid = io_mm->base.pasid;
- 	struct iommu_bond *bond, *tmp;
- 	struct iommu_param *dev_param = dev->iommu_param;
- 
-@@ -378,7 +380,7 @@ static int iommu_signal_mm_exit(struct iommu_bond *bond)
- 	if (!dev->iommu_param || !dev->iommu_param->mm_exit)
- 		return 0;
- 
--	return dev->iommu_param->mm_exit(dev, io_mm->pasid, bond->drvdata);
-+	return dev->iommu_param->mm_exit(dev, io_mm->base.pasid, bond->drvdata);
- }
- 
- /*
-@@ -410,7 +412,7 @@ static void iommu_notifier_release(struct mmu_notifier *mn, struct mm_struct *mm
- 	list_for_each_entry_safe(bond, next, &io_mm->devices, mm_head) {
- 		if (iommu_signal_mm_exit(bond))
- 			dev_WARN(bond->dev, "possible leak of PASID %u",
--				 io_mm->pasid);
-+				 io_mm->base.pasid);
- 
- 		io_mm_detach_all_locked(bond);
- 	}
-@@ -585,6 +587,7 @@ int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
- 			  unsigned long flags, void *drvdata)
- {
- 	int i, ret;
-+	struct io_base *io_base = NULL;
- 	struct io_mm *io_mm = NULL;
- 	struct iommu_domain *domain;
- 	struct iommu_bond *bond = NULL, *tmp;
-@@ -605,7 +608,12 @@ int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
- 
- 	/* If an io_mm already exists, use it */
- 	spin_lock(&iommu_sva_lock);
--	idr_for_each_entry(&iommu_pasid_idr, io_mm, i) {
-+	idr_for_each_entry(&iommu_pasid_idr, io_base, i) {
-+		if (io_base->type != IO_TYPE_MM)
-+			continue;
-+
-+		io_mm = container_of(io_base, struct io_mm, base);
-+
- 		if (io_mm->mm != mm || !io_mm_get_locked(io_mm))
- 			continue;
- 
-@@ -636,7 +644,7 @@ int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
- 	if (ret)
- 		io_mm_put(io_mm);
- 	else
--		*pasid = io_mm->pasid;
-+		*pasid = io_mm->base.pasid;
- 
- 	return ret;
- }
-@@ -659,6 +667,7 @@ EXPORT_SYMBOL_GPL(iommu_sva_bind_device);
- int iommu_sva_unbind_device(struct device *dev, int pasid)
- {
- 	int ret = -ESRCH;
-+	struct io_base *io_base;
- 	struct io_mm *io_mm;
- 	struct iommu_domain *domain;
- 	struct iommu_bond *bond = NULL;
-@@ -674,12 +683,14 @@ int iommu_sva_unbind_device(struct device *dev, int pasid)
- 	iommu_fault_queue_flush(dev);
- 
- 	spin_lock(&iommu_sva_lock);
--	io_mm = idr_find(&iommu_pasid_idr, pasid);
--	if (!io_mm) {
-+	io_base = idr_find(&iommu_pasid_idr, pasid);
-+	if (!io_base || io_base->type != IO_TYPE_MM) {
- 		spin_unlock(&iommu_sva_lock);
- 		return -ESRCH;
- 	}
- 
-+	io_mm = container_of(io_base, struct io_mm, base);
-+
- 	list_for_each_entry(bond, &io_mm->devices, mm_head) {
- 		if (bond->dev == dev) {
- 			io_mm_detach_locked(bond);
-@@ -777,16 +788,21 @@ EXPORT_SYMBOL_GPL(iommu_unregister_mm_exit_handler);
-  */
- struct mm_struct *iommu_sva_find(int pasid)
- {
-+	struct io_base *io_base;
- 	struct io_mm *io_mm;
- 	struct mm_struct *mm = NULL;
- 
- 	spin_lock(&iommu_sva_lock);
--	io_mm = idr_find(&iommu_pasid_idr, pasid);
--	if (io_mm && io_mm_get_locked(io_mm)) {
--		if (mmget_not_zero(io_mm->mm))
--			mm = io_mm->mm;
-+	io_base = idr_find(&iommu_pasid_idr, pasid);
-+	if (io_base && io_base->type == IO_TYPE_MM) {
-+		io_mm = container_of(io_base, struct io_mm, base);
-+
-+		if (io_mm_get_locked(io_mm)) {
-+			if (mmget_not_zero(io_mm->mm))
-+				mm = io_mm->mm;
- 
--		io_mm_put_locked(io_mm);
-+			io_mm_put_locked(io_mm);
-+		}
- 	}
- 	spin_unlock(&iommu_sva_lock);
- 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index e2c49e583d8d..e998389cf195 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -110,8 +110,17 @@ struct iommu_domain {
- 	struct list_head mm_list;
- };
- 
-+enum iommu_io_type {
-+	IO_TYPE_MM,
-+};
-+
-+struct io_base {
-+	int type;
-+	int pasid;
-+};
-+
- struct io_mm {
--	int			pasid;
-+	struct io_base		base;
- 	struct list_head	devices;
- 	struct kref		kref;
- #if defined(CONFIG_MMU_NOTIFIER)
+In newer arm-smmu implementations this behavior could be managed
+with hardware based PASIDs (see Jean Phillipe's epic SVA
+stack https://patchwork.kernel.org/patch/10214963/)
+but all the MSM GPU implementations in existence use
+arm-smmu-v2 which doesn't have the ability to support switching
+pagetables in hardware. As a result the vendor has added a bit
+of hardware specific glue to allow the GPU microcode to switch
+the pagetable asynchronously during execution (basically it
+reaches out and reprograms some of the context bank registers).
+
+To support all of this we need a handful of changes to allow
+the client driver to create a properly formatted pagetable and
+directly map and unmap buffers inside of that pagetable and
+get the parameters (i.e. the physical address of the pagetable)
+to program into the GPU at the appropriate time.
+
+This stack builds on the aforementioned code from Jean-Phillipe to
+add the needed support to iommu core and arm-smmu and then implement
+per-instance pagetables in the MSM DRM GPU driver for the a5xx
+family (tested on the db820c).
+
+The first two patches add support to create enable a TTBR1 pagetable
+for arm-smmuv-2 if the appropriate domain attribute is selected.
+It creates a pagetable and programs the appropriate registers to
+enable TTBR1.  The sign extension bit is programmed as the highest
+bit in the ibs region (or the special 48th bit when the UBS is 49
+bits).  The correct pagetable is automatically selected for
+map/unmap based on the sign extension bit.
+
+The next three patches add "virtual" pasid support. This allows
+a client to allocate a pasid which is an index to a pagetable
+structure. The pasid token is used to map and unmap entries
+in that pagetable structure.  The existing pasid idr for SVA
+is reused so that clients that also support hardware PASID
+entries can use both types if they wish.
+
+Th next patch adds a special side-band function for arm-smmu
+that registers two callbacks to inform the client driver when
+a new pasid is created/destroyed. This allows the arm-smmu
+driver to pass the pagetable information (ttbr and asid) to
+the client without needing changes to the IOMMU core.
+
+All the following patches are for the DRM/GPU driver.  The
+first enables 64 bit mode for a5xx which lets us use all
+48 bits.  The next patch 5 patches are infrastructure patches
+to cleanup address spaces and prepare for having a per-instance
+address space and the final patch enables per-instance pagetables
+for a5xx and implements the PM4 to switch the pagetable at create
+time.
+
+Please know that nearly all of this is up for discussion. In particular
+since we all know that the two hardest problems in computer science are
+caches, naming and off-by-one errors I am open to fixing the vocabulary
+and terminology for "pasid" and "per-instance" and whatever - please
+paint that bikeshed if you feel so inclined. Thanks for reading this
+far. On with the code.
+
+Applies against git://linux-arm.org/linux-jpb.git sva/v1
+
+Jordan Crouse (14):
+  iommu: Add DOMAIN_ATTR_ENABLE_TTBR1
+  iommu/arm-smmu: Add support for TTBR1
+  iommu: Create a base struct for io_mm
+  iommu: sva: Add support for pasid allocation
+  iommu: arm-smmu: Add pasid implementation
+  iommu: arm-smmu: Add side-band function to specific pasid callbacks
+  drm/msm: Enable 64 bit mode by default
+  drm/msm: Pass the MMU domain index in struct msm_file_private
+  drm/msm/gpu: Support using TTBR1 for kernel buffer objects
+  drm/msm: Add msm_mmu features
+  drm/msm: Add support for iommu-sva PASIDs
+  drm/msm: Add support for per-instance address spaces
+  drm/msm: Support per-instance address spaces
+  drm/msm/a5xx: Support per-instance pagetables
+
+ drivers/gpu/drm/msm/adreno/a5xx_gpu.c     |  69 +++++++
+ drivers/gpu/drm/msm/adreno/a5xx_gpu.h     |  17 ++
+ drivers/gpu/drm/msm/adreno/a5xx_preempt.c |  76 ++++++--
+ drivers/gpu/drm/msm/adreno/adreno_gpu.c   |  11 ++
+ drivers/gpu/drm/msm/adreno/adreno_gpu.h   |   5 +
+ drivers/gpu/drm/msm/msm_drv.c             |  45 +++--
+ drivers/gpu/drm/msm/msm_drv.h             |   4 +
+ drivers/gpu/drm/msm/msm_gem.h             |   1 +
+ drivers/gpu/drm/msm/msm_gem_submit.c      |  13 +-
+ drivers/gpu/drm/msm/msm_gem_vma.c         |  36 +++-
+ drivers/gpu/drm/msm/msm_gpu.c             |  25 ++-
+ drivers/gpu/drm/msm/msm_gpu.h             |   4 +-
+ drivers/gpu/drm/msm/msm_iommu.c           | 186 ++++++++++++++++++-
+ drivers/gpu/drm/msm/msm_mmu.h             |  19 ++
+ drivers/gpu/drm/msm/msm_ringbuffer.h      |   1 +
+ drivers/iommu/arm-smmu-regs.h             |   2 -
+ drivers/iommu/arm-smmu-v3.c               |   8 +-
+ drivers/iommu/arm-smmu.c                  | 210 +++++++++++++++++++++-
+ drivers/iommu/io-pgtable-arm.c            | 160 +++++++++++++++--
+ drivers/iommu/io-pgtable-arm.h            |  20 +++
+ drivers/iommu/io-pgtable.h                |  16 +-
+ drivers/iommu/iommu-sva.c                 | 289 ++++++++++++++++++++++++++++--
+ drivers/iommu/iommu.c                     |   3 +-
+ include/linux/arm-smmu.h                  |  18 ++
+ include/linux/iommu.h                     |  68 ++++++-
+ 25 files changed, 1205 insertions(+), 101 deletions(-)
+ create mode 100644 include/linux/arm-smmu.h
+
 -- 
 2.16.1
