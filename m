@@ -1,121 +1,271 @@
-From: atull@kernel.org (Alan Tull)
-Date: Wed, 21 Feb 2018 14:25:41 -0600
-Subject: [PATCH] arm64: dts: stratix10: enable i2c, add i2c periperals
-Message-ID: <20180221202541.3258-1-atull@kernel.org>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 21 Feb 2018 12:31:24 -0800
+Subject: [PATCH v2 1/8] [PATCH 1/8] drivers/peci: Add support for PECI bus
+ driver core
+In-Reply-To: <20180221170434.GF29204@lunn.ch>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
+ <20180221170434.GF29204@lunn.ch>
+Message-ID: <650488e8-8516-1329-b35b-88d628d21cc2@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock for i2c
-Enable i2c1
-Set the i2c bus speed to 100KHz
-Add the following i2c peripherals
-* ds1339 RTC
-* 24c32 EEPROM
-* max1619 temperature monitor
-* ltc2497 ADC
-  * Add a fixed regulator for the ADC's Vref.
+Hi Andrew,
 
-This requires Dinh Nguyen's Stratix10 clock driver
-("clk: socfpga: stratix10: add clock driver for Stratix10 platform")
+Thanks for sharing your time to review it. Please check my answers inline.
 
-Signed-off-by: Alan Tull <atull@kernel.org>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  5 ++++
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 34 ++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+On 2/21/2018 9:04 AM, Andrew Lunn wrote:
+>> +static int peci_locked_xfer(struct peci_adapter *adapter,
+>> +			    struct peci_xfer_msg *msg,
+>> +			    bool do_retry,
+>> +			    bool has_aw_fcs)
+>> +{
+>> +	ktime_t start, end;
+>> +	s64 elapsed_ms;
+>> +	int rc = 0;
+>> +
+>> +	if (!adapter->xfer) {
+>> +		dev_dbg(&adapter->dev, "PECI level transfers not supported\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	if (in_atomic() || irqs_disabled()) {
+> 
+> Hi Jae
+> 
+> Is there a real need to do transfers in atomic context, or with
+> interrupts disabled?
+> 
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 5a6a699..65d9256 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -210,6 +210,7 @@
- 			reg = <0xffc02800 0x100>;
- 			interrupts = <0 103 4>;
- 			resets = <&rst I2C0_RESET>;
-+			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
- 			status = "disabled";
- 		};
- 
-@@ -220,6 +221,7 @@
- 			reg = <0xffc02900 0x100>;
- 			interrupts = <0 104 4>;
- 			resets = <&rst I2C1_RESET>;
-+			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
- 			status = "disabled";
- 		};
- 
-@@ -230,6 +232,7 @@
- 			reg = <0xffc02a00 0x100>;
- 			interrupts = <0 105 4>;
- 			resets = <&rst I2C2_RESET>;
-+			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
- 			status = "disabled";
- 		};
- 
-@@ -240,6 +243,7 @@
- 			reg = <0xffc02b00 0x100>;
- 			interrupts = <0 106 4>;
- 			resets = <&rst I2C3_RESET>;
-+			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
- 			status = "disabled";
- 		};
- 
-@@ -250,6 +254,7 @@
- 			reg = <0xffc02c00 0x100>;
- 			interrupts = <0 107 4>;
- 			resets = <&rst I2C4_RESET>;
-+			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index b7f0b6b..cf3b519 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -51,6 +51,13 @@
- 		reg = <0 0 0 0>;
- 	};
- 
-+	ref_033v: 033-v-ref {
-+		compatible = "regulator-fixed";
-+		regulator-name = "0.33V";
-+		regulator-min-microvolt = <330000>;
-+		regulator-max-microvolt = <330000>;
-+	};
-+
- 	soc {
- 		clock-controller at ffd10000 {
- 			clocks {
-@@ -111,3 +118,30 @@
- &usb0 {
- 	status = "okay";
- };
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	adc at 14 {
-+		compatible = "lltc,ltc2497";
-+		reg = <0x14>;
-+		vref-supply = <&ref_033v>;
-+	};
-+
-+	temp at 4c {
-+		compatible = "maxim,max1619";
-+		reg = <0x4c>;
-+	};
-+
-+	eeprom at 51 {
-+		compatible = "atmel,24c32";
-+		reg = <0x51>;
-+		pagesize = <32>;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "dallas,ds1339";
-+		reg = <0x68>;
-+	};
-+};
--- 
-2.7.4
+Actually, no. Generally, this function will be called in sleep-able 
+context so this code is for an exceptional case handling.
+
+I'll rewrite this code like below:
+	if (in_atomic() || irqs_disabled()) {
+		dev_dbg(&adapter->dev,
+			"xfer in non-sleepable context is not supported\n");
+		return -EWOULDBLOCK;
+	}
+
+And then, will add a sleep call into the below loop.
+
+I know that in_atomic() call is not recommended in driver code but some 
+driver codes still use it since there is no alternative way at this 
+time, AFAIK. Please tell me if there is a better solution.
+
+>> +		rt_mutex_trylock(&adapter->bus_lock);
+>> +		if (!rc)
+>> +			return -EAGAIN; /* PECI activity is ongoing */
+>> +	} else {
+>> +		rt_mutex_lock(&adapter->bus_lock);
+>> +	}
+>> +
+>> +	if (do_retry)
+>> +		start = ktime_get();
+>> +
+>> +	do {
+>> +		rc = adapter->xfer(adapter, msg);
+>> +
+>> +		if (!do_retry)
+>> +			break;
+>> +
+>> +		/* Per the PECI spec, need to retry commands that return 0x8x */
+>> +		if (!(!rc && ((msg->rx_buf[0] & DEV_PECI_CC_RETRY_ERR_MASK) ==
+>> +			      DEV_PECI_CC_TIMEOUT)))
+>> +			break;
+>> +
+>> +		/* Set the retry bit to indicate a retry attempt */
+>> +		msg->tx_buf[1] |= DEV_PECI_RETRY_BIT;
+>> +
+>> +		/* Recalculate the AW FCS if it has one */
+>> +		if (has_aw_fcs)
+>> +			msg->tx_buf[msg->tx_len - 1] = 0x80 ^
+>> +						peci_aw_fcs((u8 *)msg,
+>> +							    2 + msg->tx_len);
+>> +
+>> +		/* Retry for at least 250ms before returning an error */
+>> +		end = ktime_get();
+>> +		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
+>> +		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
+>> +			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
+>> +			break;
+>> +		}
+>> +	} while (true);
+> 
+> So you busy loop to 1/4 second? How about putting a sleep in here so
+> other things can be done between each retry.
+> 
+> And should it not return -ETIMEDOUT after that 1/4 second?
+> 
+
+Yes, you are right. I'll rewrite this code like below after adding the 
+above change:
+
+		/**
+		 * Retry for at least 250ms before returning an error.
+		 * Retry interval guideline:
+		 *   No minimum < Retry Interval < No maximum
+		 *                (recommend 10ms)
+		 */
+		end = ktime_get();
+		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
+		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
+			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
+			rc = -ETIMEDOUT;
+			break;
+		}
+
+		usleep_range(DEV_PECI_RETRY_INTERVAL_MS * 1000,
+			     (DEV_PECI_RETRY_INTERVAL_MS * 1000) + 1000);
+
+>> +static int peci_scan_cmd_mask(struct peci_adapter *adapter)
+>> +{
+>> +	struct peci_xfer_msg msg;
+>> +	u32 dib;
+>> +	int rc = 0;
+>> +
+>> +	/* Update command mask just once */
+>> +	if (adapter->cmd_mask & BIT(PECI_CMD_PING))
+>> +		return 0;
+>> +
+>> +	msg.addr      = PECI_BASE_ADDR;
+>> +	msg.tx_len    = GET_DIB_WR_LEN;
+>> +	msg.rx_len    = GET_DIB_RD_LEN;
+>> +	msg.tx_buf[0] = GET_DIB_PECI_CMD;
+>> +
+>> +	rc = peci_xfer(adapter, &msg);
+>> +	if (rc < 0) {
+>> +		dev_dbg(&adapter->dev, "PECI xfer error, rc : %d\n", rc);
+>> +		return rc;
+>> +	}
+>> +
+>> +	dib = msg.rx_buf[0] | (msg.rx_buf[1] << 8) |
+>> +	      (msg.rx_buf[2] << 16) | (msg.rx_buf[3] << 24);
+>> +
+>> +	/* Check special case for Get DIB command */
+>> +	if (dib == 0x00) {
+>> +		dev_dbg(&adapter->dev, "DIB read as 0x00\n");
+>> +		return -1;
+>> +	}
+>> +
+>> +	if (!rc) {
+>> +		/**
+>> +		 * setting up the supporting commands based on minor rev#
+>> +		 * see PECI Spec Table 3-1
+>> +		 */
+>> +		dib = (dib >> 8) & 0xF;
+>> +
+>> +		if (dib >= 0x1) {
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PKG_CFG);
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PKG_CFG);
+>> +		}
+>> +
+>> +		if (dib >= 0x2)
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSR);
+>> +
+>> +		if (dib >= 0x3) {
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG_LOCAL);
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG_LOCAL);
+>> +		}
+>> +
+>> +		if (dib >= 0x4)
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG);
+>> +
+>> +		if (dib >= 0x5)
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG);
+>> +
+>> +		if (dib >= 0x6)
+>> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_IA_MSR);
+> 
+> Lots of magic numbers here. Can they be replaced with #defines.  Also,
+> it looks like a switch statement could be used, with fall through.
+> 
+
+I agree. Will rewrite it.
+
+>> +
+>> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_TEMP);
+>> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_DIB);
+>> +		adapter->cmd_mask |= BIT(PECI_CMD_PING);
+>> +	} else {
+>> +		dev_dbg(&adapter->dev, "Error reading DIB, rc : %d\n", rc);
+>> +	}
+>> +
+>> +	return rc;
+>> +}
+>> +
+> 
+>> +static int peci_ioctl_get_temp(struct peci_adapter *adapter, void *vmsg)
+>> +{
+>> +	struct peci_get_temp_msg *umsg = vmsg;
+>> +	struct peci_xfer_msg msg;
+>> +	int rc;
+>> +
+> 
+> Is this getting the temperature?
+> 
+
+Yes, this is getting the 'die' temperature of a processor package.
+
+>> +	rc = peci_cmd_support(adapter, PECI_CMD_GET_TEMP);
+>> +	if (rc < 0)
+>> +		return rc;
+>> +
+>> +	msg.addr      = umsg->addr;
+>> +	msg.tx_len    = GET_TEMP_WR_LEN;
+>> +	msg.rx_len    = GET_TEMP_RD_LEN;
+>> +	msg.tx_buf[0] = GET_TEMP_PECI_CMD;
+>> +
+>> +	rc = peci_xfer(adapter, &msg);
+>> +	if (rc < 0)
+>> +		return rc;
+>> +
+>> +	umsg->temp_raw = msg.rx_buf[0] | (msg.rx_buf[1] << 8);
+>> +
+>> +	return 0;
+>> +}
+> 
+> 
+> 
+>> +static long peci_ioctl(struct file *file, unsigned int iocmd, unsigned long arg)
+>> +{
+>> +	struct peci_adapter *adapter = file->private_data;
+>> +	void __user *argp = (void __user *)arg;
+>> +	unsigned int msg_len;
+>> +	enum peci_cmd cmd;
+>> +	u8 *msg;
+>> +	int rc = 0;
+>> +
+>> +	dev_dbg(&adapter->dev, "ioctl, cmd=0x%x, arg=0x%lx\n", iocmd, arg);
+>> +
+>> +	switch (iocmd) {
+>> +	case PECI_IOC_PING:
+>> +	case PECI_IOC_GET_DIB:
+>> +	case PECI_IOC_GET_TEMP:
+>> +	case PECI_IOC_RD_PKG_CFG:
+>> +	case PECI_IOC_WR_PKG_CFG:
+>> +	case PECI_IOC_RD_IA_MSR:
+>> +	case PECI_IOC_RD_PCI_CFG:
+>> +	case PECI_IOC_RD_PCI_CFG_LOCAL:
+>> +	case PECI_IOC_WR_PCI_CFG_LOCAL:
+>> +		cmd = _IOC_TYPE(iocmd) - PECI_IOC_BASE;
+>> +		msg_len = _IOC_SIZE(iocmd);
+>> +		break;
+> 
+> Adding new ioctl calls is pretty frowned up. Can you export this info
+> via /sysfs?
+> 
+
+Most of these are not simple IOs so ioctl is better suited, I think.
+
+> Also, should there be some permission checks here? Or is any user
+> allowed to call these ioctls?
+> 
+
+I agree. I will add some permission checks here.
+
+> 	Andrew
+> 
+
+Thanks a lot,
+Jae
