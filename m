@@ -1,54 +1,58 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Feb 2018 10:29:38 +0900
-Subject: [PATCH 1/4] watchdog: uniphier: change order for setting default
- timeout
-In-Reply-To: <20180210203623.17832-1-marcus.folkesson@gmail.com>
-References: <20180210203623.17832-1-marcus.folkesson@gmail.com>
-Message-ID: <CAK7LNAT2T5UHgx_iyui43=GMTTYam0bk6FViD_cdpoRSkq3y+A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 20 Feb 2018 22:01:41 -0500 (EST)
+Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
+In-Reply-To: <20180220215954.4092811-2-arnd@arndb.de>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-2-arnd@arndb.de>
+Message-ID: <nycvar.YSQ.7.76.1802202158020.31644@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-11 5:36 GMT+09:00 Marcus Folkesson <marcus.folkesson@gmail.com>:
-> watchdog_init_timeout() will preserve wdd->timeout value if no parameter
-> nor timeout-secs dt property is set.
->
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+On Tue, 20 Feb 2018, Arnd Bergmann wrote:
+
+> This fails during deflate_xip_data.sh
+> 
+>   /home/arnd/cross-gcc/bin/arm-linux-gnueabi-objcopy -O binary -R .comment -S  vmlinux arch/arm/boot/xipImage && /bin/bash -c '/git/arm-soc/arch/arm/boot/deflate_xip_data.sh vmlinux arch/arm/boot/xipImage || { rm -f arch/arm/boot/xipImage; false; }'
+> make -f /git/arm-soc/scripts/Makefile.modpost
+> + sym_val __data_loc
+> + sed -n / __data_loc$/{s/ .*$//p;q}
+> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> + local val=ac74c0f4
+> + [ ac74c0f4 ]
+> + echo 2893332724
+> + __data_loc=2893332724
+> + sym_val _edata_loc
+> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> + sed -n / _edata_loc$/{s/ .*$//p;q}
+> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> + local val=ac7b8744
+> + [ ac7b8744 ]
+> + echo 2893776708
+> + _edata_loc=2893776708
+> + sym_val _xiprom
+> + sed -n / _xiprom$/{s/ .*$//p;q}
+> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> 
+> Obviously we want to make the combination work, no idea why it doesn't.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/watchdog/uniphier_wdt.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/watchdog/uniphier_wdt.c b/drivers/watchdog/uniphier_wdt.c
-> index 0ea2339d9702..0e4f8d53ce3c 100644
-> --- a/drivers/watchdog/uniphier_wdt.c
-> +++ b/drivers/watchdog/uniphier_wdt.c
-> @@ -212,11 +212,10 @@ static int uniphier_wdt_probe(struct platform_device *pdev)
->         wdev->wdt_dev.ops = &uniphier_wdt_ops;
->         wdev->wdt_dev.max_timeout = WDT_PERIOD_MAX;
->         wdev->wdt_dev.min_timeout = WDT_PERIOD_MIN;
-> +       wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
->         wdev->wdt_dev.parent = dev;
->
-> -       if (watchdog_init_timeout(&wdev->wdt_dev, timeout, dev) < 0) {
-> -               wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
-> -       }
-> +       watchdog_init_timeout(&wdev->wdt_dev, timeout, dev);
->         watchdog_set_nowayout(&wdev->wdt_dev, nowayout);
->         watchdog_stop_on_reboot(&wdev->wdt_dev);
->
-> --
-> 2.15.1
->
+>  arch/arm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 823e397ee0f3..8ed0f664f86f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1976,6 +1976,7 @@ endchoice
+>  config XIP_KERNEL
+>  	bool "Kernel Execute-In-Place from ROM"
+>  	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
+> +	depends on !LTO
 
-I am pasting Acked-by from the author here just in case.
-
-Acked-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+You should move this to config XIP_DEFLATED_DATA instead.
 
 
-You can see his original tag here.
-https://www.spinics.net/lists/linux-watchdog/msg13513.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Nicolas
