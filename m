@@ -1,125 +1,125 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Feb 2018 14:07:57 +0100
-Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
-In-Reply-To: <CAKMK7uH+jiKt9pV+9OoXWCUr=yBGiNVh-iv600P-LVvBYcz_rw@mail.gmail.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
- <20180216182041.GU5453@intel.com> <1841868.3gpkeNesVL@avalon>
- <CAKMK7uH+jiKt9pV+9OoXWCUr=yBGiNVh-iv600P-LVvBYcz_rw@mail.gmail.com>
-Message-ID: <20180221130757.al7i57kiptrqh4j2@flea.lan>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Wed, 21 Feb 2018 07:10:34 -0600
+Subject: [PATCH v2] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <20180221111233.gylb6v4yxqnn6gyj@localhost>
+References: <1519095546-24420-1-git-send-email-shankerd@codeaurora.org>
+ <20180221111233.gylb6v4yxqnn6gyj@localhost>
+Message-ID: <23d70753-a628-f2e4-84df-39e4021337f5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 10:58:40PM +0100, Daniel Vetter wrote:
-> On Mon, Feb 19, 2018 at 9:19 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > Hi Ville,
-> >
-> > On Friday, 16 February 2018 20:20:41 EET Ville Syrj?l? wrote:
-> >> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
-> >> > Some drivers duplicate the logic to create a property to store a per-plane
-> >> > alpha.
-> >> >
-> >> > This is especially useful if we ever want to support extra protocols for
-> >> > Wayland like:
-> >> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.ht
-> >> > ml
-> >> >
-> >> > Let's create a helper in order to move that to the core.
-> >> >
-> >> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >> > Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> >> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> >> > ---
-> >> >
-> >> >  Documentation/gpu/kms-properties.csv |  2 +-
-> >> >  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
-> >> >  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
-> >> >  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
-> >> >  include/drm/drm_blend.h              |  1 +-
-> >> >  include/drm/drm_plane.h              |  6 +++++-
-> >> >  6 files changed, 48 insertions(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/Documentation/gpu/kms-properties.csv
-> >> > b/Documentation/gpu/kms-properties.csv index 927b65e14219..25ad3503d663
-> >> > 100644
-> >> > --- a/Documentation/gpu/kms-properties.csv
-> >> > +++ b/Documentation/gpu/kms-properties.csv
-> >> > @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0,
-> >> > Max=1",Connector,TBD>
-> >> >  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
-> >> >  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
-> >> >  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
-> >> >
-> >> > -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
-> >> > +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the
-> >> > plane from transparent (0) to fully opaque (MAX). If this property is set
-> >> > to a value different than max, and that the pixel will define an alpha
-> >> > component, the property will have precendance and the pixel value will be
-> >> > ignored.
+Hi Catalin,
+
+On 02/21/2018 05:12 AM, Catalin Marinas wrote:
+> On Mon, Feb 19, 2018 at 08:59:06PM -0600, Shanker Donthineni wrote:
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index f55fe5b..4061210 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -1095,6 +1095,27 @@ config ARM64_RAS_EXTN
+>>  	  and access the new registers if the system supports the extension.
+>>  	  Platform RAS features may additionally depend on firmware support.
+>>  
+>> +config ARM64_CACHE_IDC
+>> +	bool "Enable support for DCache clean PoU optimization"
+>> +	default y
+>> +	help
+>> +	  The data cache clean to the point of unification is not required
+>> +	  for instruction to be data coherence if CTR_EL0.IDC has value 1.
+>> +
+>> +	  Selecting this feature will allow the kernel to optimize the POU
+>> +	  cache maintaince operations where it requires 'DC CVAU'.
+>> +
+>> +config ARM64_CACHE_DIC
+>> +	bool "Enable support for ICache invalidation PoU optimization"
+>> +	default y
+>> +	help
+>> +	  Instruction cache invalidation to the point of unification is not
+>> +	  required for instruction to be data coherence if CTR_EL0.DIC has
+>> +	  value 1.
+>> +
+>> +	  Selecting this feature will allow the kernel to optimize the POU
+>> +	  cache maintaince operations where it requires 'IC IVAU'.
 > 
-> Please don't document new properties in that csv file, it's an
-> unreadable mess. Instead follow how we document standardized
-> properties nowadays in full-blown sections. For plane blending we
-> have:
+> A single Kconfig entry is sufficient for both features.
 > 
-> https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#plane-composition-properties
 
-Ack
+I'll do in v3 patch.
 
-> >> > diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
-> >> > index 8185e3468a23..5a6f29524f12 100644
-> >> > --- a/include/drm/drm_plane.h
-> >> > +++ b/include/drm/drm_plane.h
-> >> > @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
-> >> >   * plane (in 16.16)
-> >> >   * @src_w: width of visible portion of plane (in 16.16)
-> >> >   * @src_h: height of visible portion of plane (in 16.16)
-> >> > + * @alpha: opacity of the plane
-> >> >   * @rotation: rotation of the plane
-> >> >   * @zpos: priority of the given plane on crtc (optional)
-> >> >   * Note that multiple active planes on the same crtc can have an
-> >> >   identical
-> >> > @@ -105,6 +106,9 @@ struct drm_plane_state {
-> >> >     uint32_t src_x, src_y;
-> >> >     uint32_t src_h, src_w;
-> >> >
-> >> > +   /* Plane opacity */
-> >> > +   u8 alpha;
-> >>
-> >> We may want to make that u16. The general we expect 16bpc for most color
-> >> related things, but since this is a range prop I suppose we should just
-> >> expose the actual hardware range. But making it u16 might avoid some head
-> >> scratching for the first person to have hardware with higher precision.
-> >> Either that or we should make the prop creation fail if the driver asks
-> >> for more bits than we have in the state.
-> >
-> > I'm tempted to go one step further and always make the alpha property 16-bits
-> > wide for new users (we can't do so for existing users as it could break
-> > userspace), and let drivers convert that internally to the range they need.
-> > There could however be drawbacks I don't foresee.
+>> @@ -864,6 +864,22 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+>>  					ID_AA64PFR0_FP_SHIFT) < 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_ARM64_CACHE_IDC
+>> +static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return !!(read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_IDC_SHIFT));
+>> +}
+>> +#endif
+>> +
+>> +#ifdef CONFIG_ARM64_CACHE_DIC
+>> +static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return !!(read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_DIC_SHIFT));
+>> +}
+>> +#endif
 > 
-> I think scaling the range to match the hw is the most sensible (yes
-> I'm flip-flopping around here). And once someone needs more than u8,
-> we can extend the internal representation easily. The external
-> representation in the property is an u64, that /should/ be enough for
-> the next few years :-)
+> Nitpick: no need for !! since the function type is bool already.
+> 
 
-Just to make sure we're on the same page, you want to keep the u8, and
-if the hardware uses say an u16, the driver for that hardware will do
-the upscaling?
+Sure, I'll remove '!!'.
 
-Thanks!
-Maxime
+>> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+>> index 758bde7..7d37d71 100644
+>> --- a/arch/arm64/mm/cache.S
+>> +++ b/arch/arm64/mm/cache.S
+>> @@ -50,6 +50,9 @@ ENTRY(flush_icache_range)
+>>   */
+>>  ENTRY(__flush_cache_user_range)
+>>  	uaccess_ttbr0_enable x2, x3, x4
+>> +alternative_if ARM64_HAS_CACHE_IDC
+>> +	b	8f
+>> +alternative_else_nop_endif
+>>  	dcache_line_size x2, x3
+>>  	sub	x3, x2, #1
+>>  	bic	x4, x0, x3
+>> @@ -60,6 +63,11 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+>>  	b.lo	1b
+>>  	dsb	ish
+>>  
+>> +8:
+>> +alternative_if ARM64_HAS_CACHE_DIC
+>> +	mov	x0, #0
+>> +	b	1f
+>> +alternative_else_nop_endif
+>> 	invalidate_icache_by_line x0, x1, x2, x3, 9f
+>> 	mov	x0, #0
+>>  1:
+> 
+> You can add another label at mov x0, #0 below this hunk and keep a
+> single instruction in the alternative path.
+> 
+> However, my worry is that in an implementation with DIC set, we also
+> skip the DSB/ISB sequence in the invalidate_icache_by_line macro. For
+> example, in an implementation with transparent PoU, we could have:
+> 
+> 	str	<some instr>, [addr]
+> 	// no cache maintenance or barrier
+> 	br	<addr>
+> 
+
+Thanks for pointing out the missing barriers. I think it make sense to follow
+the existing barrier semantics in order to avoid the unknown things.
+ 
+> Is an ISB required between the instruction store and execution? I would
+> say yes but maybe Will has a better opinion here.
+> 
+Agree, an ISB is required especially for self-modifying code. I'll include in v3 patch. 
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/ec450ac6/attachment.sig>
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
