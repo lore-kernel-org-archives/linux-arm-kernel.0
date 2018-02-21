@@ -1,50 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Feb 2018 17:52:23 -0600
-Subject: [PATCH 05/10] dt-bindings: gpio: Add gpio nodes for Actions S900
- SoC
-In-Reply-To: <20180221145821.bhoxjndibp3bqfxi@linaro.org>
-References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
- <20180217204433.3095-6-manivannan.sadhasivam@linaro.org>
- <20180219203523.rhvbnym7oomzahwi@rob-hp-laptop>
- <20180221145821.bhoxjndibp3bqfxi@linaro.org>
-Message-ID: <CAL_JsqK+586zyvsZ0b9i+x78V5NDnAput6Ygfw0qFXu=B-hb9g@mail.gmail.com>
+Date: Wed, 21 Feb 2018 17:58:49 -0600
+Subject: [PATCH v4 2/4] dt-bindings: qcom: Add SDM845 bindings
+In-Reply-To: <CAD=FV=UWUD4VMN4gLxBLsSEnsTnOot+ydsaOiFqvD-B2e_RQAg@mail.gmail.com>
+References: <20180216060503.22006-1-rnayak@codeaurora.org>
+ <20180216060503.22006-3-rnayak@codeaurora.org>
+ <20180219193426.darxcui4g4oxyf32@rob-hp-laptop>
+ <CAD=FV=UWUD4VMN4gLxBLsSEnsTnOot+ydsaOiFqvD-B2e_RQAg@mail.gmail.com>
+Message-ID: <CAL_JsqL85KCd+U+1n5QdFu6Bn_ygiTPQnqmZD+xgkUgFu0qvMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 8:58 AM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
-> Hi Rob,
-> On Mon, Feb 19, 2018 at 02:35:23PM -0600, Rob Herring wrote:
->> On Sun, Feb 18, 2018 at 02:14:28AM +0530, Manivannan Sadhasivam wrote:
->> > Add gpio nodes for Actions Semi S900 SoC.
->> >
->> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->> > ---
->> >  .../devicetree/bindings/gpio/actions,owl-gpio.txt         | 15 +++++++++++++++
->> >  1 file changed, 15 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->> > new file mode 100644
->> > index 000000000000..4cd4cb7bfd1b
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->> > @@ -0,0 +1,15 @@
->> > +* Actions Semi OWL GPIO controller bindings
->> > +
->> > +- compatible      : Should be "actions,s900-gpio"
->> > +- reg             : Address and range of the GPIO controller registers.
->> > +- gpio-controller : Marks the device node as a GPIO controller.
->> > +- #gpio-cells     : Should be <2>. The first cell is the gpio number and
->> > +                    the second cell is used to specify optional parameters.
+On Wed, Feb 21, 2018 at 10:51 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Rob,
+>
+> On Mon, Feb 19, 2018 at 11:34 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Fri, Feb 16, 2018 at 11:35:01AM +0530, Rajendra Nayak wrote:
+>>> Add a SoC string 'sdm845' for the qualcomm SDM845 SoC
+>>>
+>>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/qcom.txt | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+>>> index 0ed4d39d7fe1..ee532e705d6c 100644
+>>> --- a/Documentation/devicetree/bindings/arm/qcom.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/qcom.txt
+>>> @@ -26,6 +26,7 @@ The 'SoC' element must be one of the following strings:
+>>>       msm8996
+>>>       mdm9615
+>>>       ipq8074
+>>> +     sdm845
 >>
->> Doesn't do interrupts?
+>> These should really be the full string with 'qcom,', but you don't have
+>> to fix that now.
 >>
-> Interrupt support will be added once this base driver gets in.
-> One step at a time ;-)
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>
+> Thanks for the review!  I agree that we should land this and then make
+> further progress in additional patches.
+>
+>
+> Are you suggesting to rewriting this whole bindings doc to not specify
+> things in an "M x N" type of way?  AKA the top of this doc says:
+>
+>> Each board must specify a top-level board compatible string with the following
+>> format:
+>>         compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
+>> The 'SoC' and 'board' elements are required. All other elements are optional.
+>
+> ...and then the doc goes on to give lists of known SoC and board values.
+>
+>
+> Presumably if someone were to fix this then they'd need to try to
+> track down existing boards so they could enumerate every known
+> combination?
 
-Binding are separate from the driver. Drivers can evolve, but h/w
-doesn't (for a given piece of Si). It is not a high bar to list
-#interrupt-cells and interrupt-controller.
+Ah, I forgot about all this QCom craziness. NM.
+
+Though I'm not sure any of these optional suffixes ever got
+implemented. AFAIK, downstream still uses those separate board-id
+properties (though the bootloaders can finally deal with them being
+absent).
 
 Rob
