@@ -1,269 +1,210 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Wed, 21 Feb 2018 17:20:29 +0200
-Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
- based tachometer
-In-Reply-To: <c1192f75-0e6e-c735-67e1-2901624831ae@roeck-us.net>
-References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
- <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
- <ee03e1e5-bbeb-1238-04ed-b992fe3a3ce6@kapsi.fi>
- <c1192f75-0e6e-c735-67e1-2901624831ae@roeck-us.net>
-Message-ID: <a5db25f7-6999-ff3a-21c2-161cfcf4db35@kapsi.fi>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 15:33:47 +0000
+Subject: [PATCH v4 28/40] KVM: arm64: Defer saving/restoring 64-bit
+ sysregs to vcpu load/put on VHE
+In-Reply-To: <20180215210332.8648-29-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-29-christoffer.dall@linaro.org>
+Message-ID: <864lmal5lw.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.02.2018 16:46, Guenter Roeck wrote:
-> On 02/20/2018 11:15 PM, Mikko Perttunen wrote:
->> AIUI, the PWM framework already exposes a sysfs node with period
->> information. We should just use that instead of adding a new driver
->> for this.
->>
->
-> I am kind of lost. Please explain.
->
-> Are you saying that we should drop the pwm-fan driver as well (which goes
-> the opposite way), as well as any other drivers doing anything with pwm
-> signals,
-> because after all those signals are already exposed to userspace a sysfs
-> attributes,
-> and a kernel driver to abstract those values is thus not needed ?
+On Thu, 15 Feb 2018 21:03:20 +0000,
+Christoffer Dall wrote:
+> 
+> Some system registers do not affect the host kernel's execution and can
+> therefore be loaded when we are about to run a VCPU and we don't have to
+> restore the host state to the hardware before the time when we are
+> actually about to return to userspace or schedule out the VCPU thread.
+> 
+> The EL1 system registers and the userspace state registers only
+> affecting EL0 execution do not need to be saved and restored on every
+> switch between the VM and the host, because they don't affect the host
+> kernel's execution.
+> 
+> We mark all registers which are now deffered as such in the
+> vcpu_{read,write}_sys_reg accessors in sys-regs.c to ensure the most
+> up-to-date copy is always accessed.
+> 
+> Note MPIDR_EL1 (controlled via VMPIDR_EL2) is accessed from other vcpu
+> threads, for example via the GIC emulation, and therefore must be
+> declared as immediate, which is fine as the guest cannot modify this
+> value.
+> 
+> The 32-bit sysregs can also be deferred but we do this in a separate
+> patch as it requires a bit more infrastructure.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v3:
+>      - Changed to switch-based sysreg approach
+> 
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 39 +++++++++++++++++++++++++++++++--------
+>  arch/arm64/kvm/sys_regs.c      | 40 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 71 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 906606dc4e2c..9c60b8062724 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -25,8 +25,12 @@
+>  /*
+>   * Non-VHE: Both host and guest must save everything.
+>   *
+> - * VHE: Host must save tpidr*_el0, mdscr_el1, sp_el0,
+> - * and guest must save everything.
+> + * VHE: Host and guest must save mdscr_el1 and sp_el0 (and the PC and pstate,
+> + * which are handled as part of the el2 return state) on every switch.
+> + * tpidr_el0 and tpidrro_el0 only need to be switched when going
 
-The only thing this driver does is do a constant division in 
-kernelspace. I'm not really seeing why that couldn't be done in 
-userspace. But if you think it's appropriate to do the RPM conversion in 
-kernelspace then I'm not greatly opposed to that.
+How about suspend/resume, which saves/restores both of these EL0
+registers (see cpu_do_suspend)? We may not need to do anything (either
+because vcpu_put will have happened, or because we'll come back
+exactly where we were), but I'd like to make sure this hasn't been
+overlooked.
 
->
->> In any case, we cannot add something like this to device tree since
->> it's not a hardware device.
->>
->
-> So you are saying there is no means to express in devicetree that
-> a pwm input is connected to a fan ? How is that not hardware ?
->
-> If so, how do you express in devicetree that a pwm signal is connected
-> to anything ?
+> + * to host userspace or a different VCPU.  EL1 registers only need to be
+> + * switched when potentially going to run a different VCPU.  The latter two
+> + * classes are handled as part of kvm_arch_vcpu_load and kvm_arch_vcpu_put.
+>   */
+>  
+>  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+> @@ -93,14 +97,11 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
+>  void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_save_common_state(ctxt);
+> -	__sysreg_save_user_state(ctxt);
+>  }
+>  
+>  void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
+>  {
+> -	__sysreg_save_el1_state(ctxt);
+>  	__sysreg_save_common_state(ctxt);
+> -	__sysreg_save_user_state(ctxt);
+>  	__sysreg_save_el2_return_state(ctxt);
+>  }
+>  
+> @@ -169,14 +170,11 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
+>  void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_restore_common_state(ctxt);
+> -	__sysreg_restore_user_state(ctxt);
+>  }
+>  
+>  void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
+>  {
+> -	__sysreg_restore_el1_state(ctxt);
+>  	__sysreg_restore_common_state(ctxt);
+> -	__sysreg_restore_user_state(ctxt);
+>  	__sysreg_restore_el2_return_state(ctxt);
+>  }
+>  
+> @@ -240,6 +238,18 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>  {
+> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+> +
+> +	if (!has_vhe())
+> +		return;
+> +
+> +	__sysreg_save_user_state(host_ctxt);
+> +
+> +	__sysreg_restore_user_state(guest_ctxt);
+> +	__sysreg_restore_el1_state(guest_ctxt);
+> +
+> +	vcpu->arch.sysregs_loaded_on_cpu = true;
+>  }
+>  
+>  /**
+> @@ -255,6 +265,19 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+>  {
+> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+> +
+> +	if (!has_vhe())
+> +		return;
+> +
+> +	__sysreg_save_el1_state(guest_ctxt);
+> +	__sysreg_save_user_state(guest_ctxt);
+> +
+> +	/* Restore host user state */
+> +	__sysreg_restore_user_state(host_ctxt);
+> +
+> +	vcpu->arch.sysregs_loaded_on_cpu = false;
+>  }
+>  
+>  void __hyp_text __kvm_set_tpidr_el2(u64 tpidr_el2)
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index b3c3f014aa61..f060309337aa 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -87,6 +87,26 @@ u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
+>  	 * exit from the guest but are only saved on vcpu_put.
+>  	 */
+>  	switch (reg) {
+> +	case CSSELR_EL1:	return read_sysreg_s(SYS_CSSELR_EL1);
+> +	case SCTLR_EL1:		return read_sysreg_s(sctlr_EL12);
+> +	case ACTLR_EL1:		return read_sysreg_s(SYS_ACTLR_EL1);
+> +	case CPACR_EL1:		return read_sysreg_s(cpacr_EL12);
+> +	case TTBR0_EL1:		return read_sysreg_s(ttbr0_EL12);
+> +	case TTBR1_EL1:		return read_sysreg_s(ttbr1_EL12);
+> +	case TCR_EL1:		return read_sysreg_s(tcr_EL12);
+> +	case ESR_EL1:		return read_sysreg_s(esr_EL12);
+> +	case AFSR0_EL1:		return read_sysreg_s(afsr0_EL12);
+> +	case AFSR1_EL1:		return read_sysreg_s(afsr1_EL12);
+> +	case FAR_EL1:		return read_sysreg_s(far_EL12);
+> +	case MAIR_EL1:		return read_sysreg_s(mair_EL12);
+> +	case VBAR_EL1:		return read_sysreg_s(vbar_EL12);
+> +	case CONTEXTIDR_EL1:	return read_sysreg_s(contextidr_EL12);
+> +	case TPIDR_EL0:		return read_sysreg_s(SYS_TPIDR_EL0);
+> +	case TPIDRRO_EL0:	return read_sysreg_s(SYS_TPIDRRO_EL0);
+> +	case TPIDR_EL1:		return read_sysreg_s(SYS_TPIDR_EL1);
+> +	case AMAIR_EL1:		return read_sysreg_s(amair_EL12);
+> +	case CNTKCTL_EL1:	return read_sysreg_s(cntkctl_EL12);
+> +	case PAR_EL1:		return read_sysreg_s(SYS_PAR_EL1);
+>  	}
+>  
+>  immediate_read:
+> @@ -103,6 +123,26 @@ void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
+>  	 * entry to the guest but are only restored on vcpu_load.
+>  	 */
+>  	switch (reg) {
+> +	case CSSELR_EL1:	write_sysreg_s(val, SYS_CSSELR_EL1);	return;
+> +	case SCTLR_EL1:		write_sysreg_s(val, sctlr_EL12);	return;
+> +	case ACTLR_EL1:		write_sysreg_s(val, SYS_ACTLR_EL1);	return;
+> +	case CPACR_EL1:		write_sysreg_s(val, cpacr_EL12);	return;
+> +	case TTBR0_EL1:		write_sysreg_s(val, ttbr0_EL12);	return;
+> +	case TTBR1_EL1:		write_sysreg_s(val, ttbr1_EL12);	return;
+> +	case TCR_EL1:		write_sysreg_s(val, tcr_EL12);		return;
+> +	case ESR_EL1:		write_sysreg_s(val, esr_EL12);		return;
+> +	case AFSR0_EL1:		write_sysreg_s(val, afsr0_EL12);	return;
+> +	case AFSR1_EL1:		write_sysreg_s(val, afsr1_EL12);	return;
+> +	case FAR_EL1:		write_sysreg_s(val, far_EL12);		return;
+> +	case MAIR_EL1:		write_sysreg_s(val, mair_EL12);		return;
+> +	case VBAR_EL1:		write_sysreg_s(val, vbar_EL12);		return;
+> +	case CONTEXTIDR_EL1:	write_sysreg_s(val, contextidr_EL12);	return;
+> +	case TPIDR_EL0:		write_sysreg_s(val, SYS_TPIDR_EL0);	return;
+> +	case TPIDRRO_EL0:	write_sysreg_s(val, SYS_TPIDRRO_EL0);	return;
+> +	case TPIDR_EL1:		write_sysreg_s(val, SYS_TPIDR_EL1);	return;
+> +	case AMAIR_EL1:		write_sysreg_s(val, amair_EL12);	return;
+> +	case CNTKCTL_EL1:	write_sysreg_s(val, cntkctl_EL12);	return;
+> +	case PAR_EL1:		write_sysreg_s(val, SYS_PAR_EL1);	return;
+>  	}
+>  
+>  immediate_write:
+> -- 
+> 2.14.2
+> 
 
-If we want to describe that the tachometer is connected to a fan, then 
-we should have a fan node in the board's device tree. We don't have a 
-chip that has a thing called "generic-pwm-tachometer" attached to it. 
-(We have chips that have a "nvidia,tegra186-tachometer", so it's proper 
-to have that.)
+Looks good to me otherwise.
 
-Thanks,
-Mikko
+	M.
 
->
-> Guenter
->
->> Mikko
->>
->> On 21.02.2018 08:58, Rajkumar Rampelli wrote:
->>> Add generic PWM based tachometer driver via HWMON interface
->>> to report the RPM of motor. This drivers get the period/duty
->>> cycle from PWM IP which captures the motor PWM output.
->>>
->>> This driver implements a simple interface for monitoring the speed of
->>> a fan and exposes it in roatations per minute (RPM) to the user space
->>> by using the hwmon's sysfs interface
->>>
->>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
->>> ---
->>>  Documentation/hwmon/generic-pwm-tachometer |  17 +++++
->>>  drivers/hwmon/Kconfig                      |  10 +++
->>>  drivers/hwmon/Makefile                     |   1 +
->>>  drivers/hwmon/generic-pwm-tachometer.c     | 112
->>> +++++++++++++++++++++++++++++
->>>  4 files changed, 140 insertions(+)
->>>  create mode 100644 Documentation/hwmon/generic-pwm-tachometer
->>>  create mode 100644 drivers/hwmon/generic-pwm-tachometer.c
->>>
->>> diff --git a/Documentation/hwmon/generic-pwm-tachometer
->>> b/Documentation/hwmon/generic-pwm-tachometer
->>> new file mode 100644
->>> index 0000000..e0713ee
->>> --- /dev/null
->>> +++ b/Documentation/hwmon/generic-pwm-tachometer
->>> @@ -0,0 +1,17 @@
->>> +Kernel driver generic-pwm-tachometer
->>> +====================================
->>> +
->>> +This driver enables the use of a PWM module to monitor a fan. It
->>> uses the
->>> +generic PWM interface and can be used on SoCs as along as the SoC
->>> supports
->>> +Tachometer controller that moniors the Fan speed in periods.
->>> +
->>> +Author: Rajkumar Rampelli <rrajk@nvidia.com>
->>> +
->>> +Description
->>> +-----------
->>> +
->>> +The driver implements a simple interface for monitoring the Fan
->>> speed using
->>> +PWM module and Tachometer controller. It requests period value
->>> through PWM
->>> +capture interface to Tachometer and measures the Rotations per
->>> minute using
->>> +received period value. It exposes the Fan speed in RPM to the user
->>> space by
->>> +using the hwmon's sysfs interface.
->>> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
->>> index ef23553..8912dcb 100644
->>> --- a/drivers/hwmon/Kconfig
->>> +++ b/drivers/hwmon/Kconfig
->>> @@ -1878,6 +1878,16 @@ config SENSORS_XGENE
->>>        If you say yes here you get support for the temperature
->>>        and power sensors for APM X-Gene SoC.
->>>
->>> +config GENERIC_PWM_TACHOMETER
->>> +    tristate "Generic PWM based tachometer driver"
->>> +    depends on PWM
->>> +    help
->>> +      Enables a driver to use PWM signal from motor to use
->>> +      for measuring the motor speed. The RPM is captured by
->>> +      PWM modules which has PWM capture capability and this
->>> +      drivers reads the captured data from PWM IP to convert
->>> +      it to speed in RPM.
->>> +
->>>  if ACPI
->>>
->>>  comment "ACPI drivers"
->>> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
->>> index f814b4a..9dcc374 100644
->>> --- a/drivers/hwmon/Makefile
->>> +++ b/drivers/hwmon/Makefile
->>> @@ -175,6 +175,7 @@ obj-$(CONFIG_SENSORS_WM8350)    += wm8350-hwmon.o
->>>  obj-$(CONFIG_SENSORS_XGENE)    += xgene-hwmon.o
->>>
->>>  obj-$(CONFIG_PMBUS)        += pmbus/
->>> +obj-$(CONFIG_GENERIC_PWM_TACHOMETER) += generic-pwm-tachometer.o
->>>
->>>  ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
->>>
->>> diff --git a/drivers/hwmon/generic-pwm-tachometer.c
->>> b/drivers/hwmon/generic-pwm-tachometer.c
->>> new file mode 100644
->>> index 0000000..9354d43
->>> --- /dev/null
->>> +++ b/drivers/hwmon/generic-pwm-tachometer.c
->>> @@ -0,0 +1,112 @@
->>> +/*
->>> + * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> modify it
->>> + * under the terms and conditions of the GNU General Public License,
->>> + * version 2, as published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope it will be useful, but
->>> WITHOUT
->>> + * ANY WARRANTY; without even the implied warranty of
->>> MERCHANTABILITY or
->>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
->>> License for
->>> + * more details.
->>> + *
->>> + */
->>> +
->>> +#include <linux/module.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/err.h>
->>> +#include <linux/pwm.h>
->>> +#include <linux/hwmon.h>
->>> +#include <linux/hwmon-sysfs.h>
->>> +
->>> +struct pwm_hwmon_tach {
->>> +    struct device        *dev;
->>> +    struct pwm_device    *pwm;
->>> +    struct device        *hwmon;
->>> +};
->>> +
->>> +static ssize_t show_rpm(struct device *dev, struct device_attribute
->>> *attr,
->>> +            char *buf)
->>> +{
->>> +    struct pwm_hwmon_tach *ptt = dev_get_drvdata(dev);
->>> +    struct pwm_device *pwm = ptt->pwm;
->>> +    struct pwm_capture result;
->>> +    int err;
->>> +    unsigned int rpm = 0;
->>> +
->>> +    err = pwm_capture(pwm, &result, 0);
->>> +    if (err < 0) {
->>> +        dev_err(ptt->dev, "Failed to capture PWM: %d\n", err);
->>> +        return err;
->>> +    }
->>> +
->>> +    if (result.period)
->>> +        rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
->>> +                        result.period);
->>> +
->>> +    return sprintf(buf, "%u\n", rpm);
->>> +}
->>> +
->>> +static SENSOR_DEVICE_ATTR(rpm, 0444, show_rpm, NULL, 0);
->>> +
->>> +static struct attribute *pwm_tach_attrs[] = {
->>> +    &sensor_dev_attr_rpm.dev_attr.attr,
->>> +    NULL,
->>> +};
->>> +
->>> +ATTRIBUTE_GROUPS(pwm_tach);
->>> +
->>> +static int pwm_tach_probe(struct platform_device *pdev)
->>> +{
->>> +    struct pwm_hwmon_tach *ptt;
->>> +    int err;
->>> +
->>> +    ptt = devm_kzalloc(&pdev->dev, sizeof(*ptt), GFP_KERNEL);
->>> +    if (!ptt)
->>> +        return -ENOMEM;
->>> +
->>> +    ptt->dev = &pdev->dev;
->>> +
->>> +    platform_set_drvdata(pdev, ptt);
->>> +    dev_set_drvdata(&pdev->dev, ptt);
->>> +
->>> +    ptt->pwm = devm_of_pwm_get(&pdev->dev, pdev->dev.of_node, NULL);
->>> +    if (IS_ERR(ptt->pwm)) {
->>> +        err = PTR_ERR(ptt->pwm);
->>> +        dev_err(&pdev->dev, "Failed to get pwm handle, err: %d\n",
->>> +            err);
->>> +        return err;
->>> +    }
->>> +
->>> +    ptt->hwmon = devm_hwmon_device_register_with_groups(&pdev->dev,
->>> +                     "pwm_tach", ptt, pwm_tach_groups);
->>> +    if (IS_ERR(ptt->hwmon)) {
->>> +        err = PTR_ERR_OR_ZERO(ptt->hwmon);
->>> +        dev_err(&pdev->dev, "Failed to register hwmon device: %d\n",
->>> +            err);
->>> +        return err;
->>> +    }
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static const struct of_device_id pwm_tach_of_match[] = {
->>> +    { .compatible = "generic-pwm-tachometer" },
->>> +    {}
->>> +};
->>> +MODULE_DEVICE_TABLE(of, pwm_tach_of_match);
->>> +
->>> +static struct platform_driver pwm_tach_driver = {
->>> +    .driver = {
->>> +        .name = "generic-pwm-tachometer",
->>> +        .of_match_table = pwm_tach_of_match,
->>> +    },
->>> +    .probe = pwm_tach_probe,
->>> +};
->>> +
->>> +module_platform_driver(pwm_tach_driver);
->>> +
->>> +MODULE_DESCRIPTION("PWM based Generic Tachometer driver");
->>> +MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
->>> +MODULE_AUTHOR("Rajkumar Rampelli <rrajk@nvidia.com>");
->>> +MODULE_LICENSE("GPL v2");
->>>
->>
->
+-- 
+Jazz is not dead, it just smell funny.
