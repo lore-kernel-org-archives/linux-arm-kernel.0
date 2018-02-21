@@ -1,28 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Feb 2018 18:06:44 +0100
-Subject: [PATCH v2 08/19] ARM64: dts: Add Renesas R8A77965 SoC support
-In-Reply-To: <CAMuHMdVR6qCkBMYvnN5eqjiCgvtD1zW2gW0N=ZpAosYpp+Tj_g@mail.gmail.com>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-9-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdVR6qCkBMYvnN5eqjiCgvtD1zW2gW0N=ZpAosYpp+Tj_g@mail.gmail.com>
-Message-ID: <20180221170643.qmwztqrqafj2pcyn@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Feb 2018 18:13:49 +0100
+Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
+ document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
+In-Reply-To: <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180221171349.GG29204@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 04:45:48PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > Basic support for the Gen 3 R-Car M3-N SoC.
-> >
-> > Based on original work from:
-> > Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > Magnus Damm <damm+renesas@opensource.se>
-> >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Wed, Feb 21, 2018 at 08:16:00AM -0800, Jae Hyun Yoo wrote:
+> This commit adds a dt-bindings document of PECI adapter driver for Aspeed
+> AST24xx/25xx SoCs.
 
-Thanks, applied with the patch subject updated to
+Hi Jae
 
-arm64: dts: renesas: initial R8A77965 SoC device tree
+It would be good to separate this into two. One binding document for a
+generic adaptor, with a generic PECI bus, and generic client
+devices. List all the properties you expect at the generic level.
 
-Please use "arm64: dts: renesas:" as the prefix for Gen-3 DTS/DTSI patches.
+Then have an aspeed specific binding for those properties which are
+specific to the Aspeed adaptor.
+
+	 Andrew
+ 
