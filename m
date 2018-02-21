@@ -1,88 +1,125 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Feb 2018 13:01:44 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v7_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
- <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
-Message-ID: <CAMRc=Mf_pumyTZPn9T=sG7Ab95YS3KqKc2bT0evhESTRRFeiuQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Feb 2018 12:04:11 +0000
+Subject: [PATCH 2/3] arm64: dts: rockchip: add rk3328 display nodes
+In-Reply-To: <2712253.IuLOJ454Fc@phil>
+References: <20180216223817.2821-1-heiko@sntech.de>
+ <20180216223817.2821-3-heiko@sntech.de>
+ <d2195e38-7ca1-e0b3-240e-0acfe941c572@arm.com> <2712253.IuLOJ454Fc@phil>
+Message-ID: <ca7e8c5d-55e3-0dc9-1132-f542cb577693@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-20 19:39 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 02/20/2018 07:33 AM, Bartosz Golaszewski wrote:
->>
->> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
+On 20/02/18 22:08, Heiko Stuebner wrote:
+> Hi Robin,
+> 
+> Am Dienstag, 20. Februar 2018, 14:14:31 CET schrieb Robin Murphy:
+>> On 16/02/18 22:38, Heiko Stuebner wrote:
+>>> Add the chain of display nodes from the core display-subsystem
+>>> through the one vop to the dw-hdmi output.
 >>>
->>> This series converts mach-davinci to use the common clock framework.
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>>    arch/arm64/boot/dts/rockchip/rk3328.dtsi | 56 ++++++++++++++++++++++++++++++++
+>>>    1 file changed, 56 insertions(+)
 >>>
->>>
+>>> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>>> index 1615effcc191..65b7d460a044 100644
+>>> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>>> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>>> @@ -185,6 +185,11 @@
+>>>    		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
+>>>    	};
+>>>    
+>>> +	display_subsystem: display-subsystem {
+>>> +		compatible = "rockchip,display-subsystem";
+>>> +		ports = <&vop_out>;
+>>> +	};
+>>> +
+>>>    	psci {
+>>>    		compatible = "arm,psci-1.0", "arm,psci-0.2";
+>>>    		method = "smc";
+>>> @@ -626,6 +631,28 @@
+>>>    		status = "disabled";
+>>>    	};
+>>>    
+>>> +	vop: vop at ff370000 {
+>>> +		compatible = "rockchip,rk3328-vop";
+>>> +		reg = <0x0 0xff370000 0x0 0x3efc>;
+>>> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH 0>;
 >>
->> Hi David,
+>> Another of those rogue trailing zero cells has snuck in here.
+> 
+> Oh great.
+> Either they are missing when needed or trailing when not needed :-) .
+> 
+> 
+>> <digression>
+>> Unfortunately, even having learned the difference between drm-next and
+>> drm-misc-next (thanks for the pointer!) so I could apply this and the
+>> other series, I only managed to get it to not-quite-work on the box I'm
+>> currently reverse-engineering a mainline DT for (Beelink A1).
 >>
->> just some quick results from today's playing with v7.
+>> I've got a monitor connected via HDMI-DVI (which the stock 3.10 Android
+>> kernel *does* drive happily) - it appears to be detected, but when the
+>> virtual console tries to come up I just see a handful of timeout splats
+>> from drm_atomic_helper_wait_for_vblanks() and no signal at the monitor.
 >>
->> I started out with da850-lcdk with my standard rootfs over NFS. I was
->> not able to boot to console so far. The first problem is that mdio
->> fails to probe:
->>
->> libphy: Fixed MDIO Bus: probed
->> davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
->> davinci_mdio 1e24000.mdio: no live phy, scanning all
->> davinci_mdio: probe of 1e24000.mdio failed with error -5> After some
->> digging I noticed that the supplied clock rate differs
->> between mainline (114000000Hz) vs common-clock-v7 (18000000). Since
->> we're not setting the rate in mdio, using LPSC_SET_RATE_PARENT would
->> not help like with lcdc.
->
->
-> Can you post the output of this command so that I can see how your
-> clocks are setup:
->
-> cat /sys/kernel/debug/clk/clk_summary
->
->
->>
->> After that, the boot just hangs without ever getting to emac's probe.
->
->
-> Using your workaround, can you run:
->
-> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->
-> If you see:
->   1e27000.clock-controller: emac  off-0
->
-> then genpd is not working like it is supposed to. You should see something
-> like this for device that are working:
->           1e27000.clock-controller: uart2  on
->     /devices/platform/soc at 1c00000/1d0d000.serial        active
->
->
->>
->> Once I set the emac clock to always enabled (a workaround that was
->> necessary with v6, but could be dropped with my first
->> genpd-in-a-separate-driver attempt), I'm getting a rather strange NULL
->> pointer dereference:
->
->
-> I noticed this too when adding the power-domains property to some device
-> tree nodes. This is part of the reason why I didn't add it everywhere.
-> I wasn't able to figure out the cause of this yet. As a work around
-> though, please try removing the power-domains property from the emac
-> and mdio nodes and use your previous workaround of having an always
-> enabled clock.
->
->
+>> Any idea where to start debugging? (I'm 99% certain I had your clk/next
+>> branch pulled in as well since it looked significant, but I'll
+>> double-check tonight)
+> 
+> I guess first interesting point would be to check if the edid of the monitor
+> got read correctly. There are a bunch of funny GRF options related to i2c
+> voltages and such that get wiggled on hotplug events and they're not
+> really documented at all. (see all the *_5V_* constants in the dw-hdmi).
 
-When I use any of the workarounds I just keep getting more problems
-(e.g. [1] from blk and pinctrl). I only had a couple hours today to
-play with it but it seems to me we have some memory corruption
-somewhere. I'll check the initialization order of all the frameworks
-involved tomorrow.
+Cheers, that was indeed a fruitful starting point - EDID wasn't exactly 
+the problem, but having decoded the blob dumped out of sysfs to check 
+validity it appears the only native resolution mode my ancient Iiyama is 
+advertising is 1280x1024 at 75Hz. That prompted me to go and faff with the 
+TV (the only actual HDMI endpoint I own), and sure enough a 'regular' 
+1920x1080 at 60Hz works just fine. So, for patches 1 and 2 (fixed up to 
+avoid the DTC warning):
 
-Best regards,
-Bartosz
+Tested-by: Robin Murphy <robin.murphy@arm.com>
 
-[1] https://pastebin.com/75mkkuJL
+I guess it might just be a case of the VOP and/or HDMI clocks struggling 
+to attain an appropriate pixel clock, but the failure mode is really 
+non-obvious - if the monitor is plugged in at boot I get 4 or 5 of the 
+DRM_WARNs at various points, about 160 VOP interrupts somewhere along 
+the line, and HDMI interrupts at a constant rate of around two per 
+second; plugging it in after boot, however, just seems to silently do 
+nothing (IIRC hotplugging the TV similarly did work as expected). If I 
+find the time I might go back and try forcing a 60Hz mode to narrow 
+things down a bit more.
+
+Thanks,
+Robin.
+
+> In my current setup (with a VS0801H hdmi switch between my boardfarm
+> and display) it's reading the monitor edid correctly every time, but I
+> remember having lots of issues with getting an actual edid at all.
+> I may need to check without the switch if this somehow improves the
+> situation in my installation.
+> 
+> Also, you could give Rockchip's 4.4 vendor kernel a try [0]. I wasn't even
+> aware that rk3328 boxes used a 3.10 kernel in the wild :-) . The 4.4 kernel
+> was similarly picky with my monitors edid, if I remember correctly.
+> 
+> Maybe also check your regulators (if any) if they get turned off.
+> 
+> And finally, for completenes sake, I do have a branch sitting on top of
+> lima kernel patches and recent mainline that includes everything and
+> does bring up the display [and partial gpu support :-) ] for me at [1].
+> 
+> 
+> Heiko
+> 
+> [0] https://github.com/rockchip-linux/kernel
+> [1] https://github.com/mmind/linux-rockchip/tree/devel/lima-yuq-mali450
+> 
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> 
