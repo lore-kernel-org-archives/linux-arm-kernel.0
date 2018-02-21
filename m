@@ -1,40 +1,57 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 21 Feb 2018 16:12:28 +0100
-Subject: [PATCH 2/2] ARM: pinctrl: stm32: Optimizes and enhances stm32gpio
- irqchip
-In-Reply-To: <1519221027-4028-3-git-send-email-radoslaw.pietrzyk@gmail.com>
-References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <1519221027-4028-3-git-send-email-radoslaw.pietrzyk@gmail.com>
-Message-ID: <ef3296cf-f0ed-e7a8-2b90-17defbf157db@st.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 21 Feb 2018 10:13:08 -0500 (EST)
+Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
+In-Reply-To: <CAK8P3a3S=PRwOnvtzFENMC+iTLRMiibpMmSS=GynLMSfN1OpZA@mail.gmail.com>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-2-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1802202158020.31644@knanqh.ubzr>
+ <CAK8P3a3S=PRwOnvtzFENMC+iTLRMiibpMmSS=GynLMSfN1OpZA@mail.gmail.com>
+Message-ID: <nycvar.YSQ.7.76.1802211004420.31644@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maybe you could remove ARM from commit header.
+On Wed, 21 Feb 2018, Arnd Bergmann wrote:
 
-On 02/21/2018 02:50 PM, Radoslaw Pietrzyk wrote:
-> 	- removes unneeded irq_chip.irq_eoi callback
-> 	- adds irq_chip.irq_set_wake callback for possible
-> 	in the future GPIO wakeup
+> On Wed, Feb 21, 2018 at 4:01 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 20 Feb 2018, Arnd Bergmann wrote:
+> >
+> >> This fails during deflate_xip_data.sh
+> >>
+> >>   /home/arnd/cross-gcc/bin/arm-linux-gnueabi-objcopy -O binary -R .comment -S  vmlinux arch/arm/boot/xipImage && /bin/bash -c '/git/arm-soc/arch/arm/boot/deflate_xip_data.sh vmlinux arch/arm/boot/xipImage || { rm -f arch/arm/boot/xipImage; false; }'
+> >> make -f /git/arm-soc/scripts/Makefile.modpost
+> >> + sym_val __data_loc
+> >> + sed -n / __data_loc$/{s/ .*$//p;q}
+> >> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> >> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> >> + local val=ac74c0f4
+> >> + [ ac74c0f4 ]
+> >> + echo 2893332724
+> >> + __data_loc=2893332724
+> >> + sym_val _edata_loc
+> >> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> >> + sed -n / _edata_loc$/{s/ .*$//p;q}
+> >> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> >> + local val=ac7b8744
+> >> + [ ac7b8744 ]
+> >> + echo 2893776708
+> >> + _edata_loc=2893776708
+> >> + sym_val _xiprom
+> >> + sed -n / _xiprom$/{s/ .*$//p;q}
+> >> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
+> >> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> >>
+> >> Obviously we want to make the combination work, no idea why it doesn't.
+> >>
+> >
+> > You should move this to config XIP_DEFLATED_DATA instead.
 > 
-> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
-> ---
->   drivers/pinctrl/stm32/pinctrl-stm32.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> index 617df16..5b1740d 100644
-> --- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-> +++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> @@ -268,10 +268,10 @@ static void stm32_gpio_irq_release_resources(struct irq_data *irq_data)
->   
->   static struct irq_chip stm32_gpio_irq_chip = {
->   	.name           = "stm32gpio",
-> -	.irq_eoi	= irq_chip_eoi_parent,
->   	.irq_mask       = irq_chip_mask_parent,
->   	.irq_unmask     = irq_chip_unmask_parent,
->   	.irq_set_type   = irq_chip_set_type_parent,
-> +	.irq_set_wake   = irq_chip_set_wake_parent,
->   	.irq_request_resources = stm32_gpio_irq_request_resources,
->   	.irq_release_resources = stm32_gpio_irq_release_resources,
->   };
-> 
+> Right, makes sense. I'd still prever nm to not crash, but that would be a small
+> improvement.
+
+I'll have a look at nm.
+
+However this feature is linked to head-inflate-data.c (your patch #5/7) 
+and I have no obvious quick solution in mind for that one.
+
+
+Nicolas
