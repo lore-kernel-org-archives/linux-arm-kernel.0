@@ -1,95 +1,65 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 21 Feb 2018 19:55:12 +0100
-Subject: [PATCH v2 3/8] drm/bridge: dw-hdmi: allow overriding of phy-type
- reading
-In-Reply-To: <16512170.VqSpgYmDPS@avalon>
-References: <20180216204158.29839-1-heiko@sntech.de> <3104429.3dFhngZnWQ@phil>
- <16512170.VqSpgYmDPS@avalon>
-Message-ID: <3085916.UFWCNBIZfU@phil>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 21 Feb 2018 21:13:53 +0200
+Subject: [PATCH v2 08/10] gpio: Add gpio driver for Actions OWL S900 SoC
+In-Reply-To: <20180221160044.15089-9-manivannan.sadhasivam@linaro.org>
+References: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
+ <20180221160044.15089-9-manivannan.sadhasivam@linaro.org>
+Message-ID: <CAHp75VfLkmZp7HwX-du4EYdtJ8h=y59OrSbu53Ltf-_kFfpczg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, Feb 21, 2018 at 6:00 PM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+> Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
+> controlling the gpio shares the same register range with pinctrl block.
+>
+> GPIO registers are organized as 6 banks and each bank controls the
+> maximum of 32 gpios.
 
-Am Montag, 19. Februar 2018, 20:06:40 CET schrieb Laurent Pinchart:
-> On Monday, 19 February 2018 20:46:46 EET Heiko Stuebner wrote:
-> > Am Montag, 19. Februar 2018, 17:59:02 CET schrieb Laurent Pinchart:
-> > > On Friday, 16 February 2018 22:41:53 EET Heiko Stuebner wrote:
-> > >> In some IP implementations the reading of the phy-type may be broken.
-> > >> One example are the Rockchip rk3228 and rk3328 socs that use a separate
-> > >> phy from Innosilicon but still report the HDMI20_TX type.
-> > >> 
-> > >> So allow the glue driver to force a specific type, like the vendor-phy
-> > >> for these cases.
-> > >> 
-> > >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > 
-> > > Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > thanks for testing :-)
-> > 
-> > >> ---
-> > >> 
-> > >>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 4 +++-
-> > >>  include/drm/bridge/dw_hdmi.h              | 1 +
-> > >>  2 files changed, 4 insertions(+), 1 deletion(-)
-> > >> 
-> > >> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > >> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> > >> f9802399cc0d..50d231626c4d 100644
-> > >> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > >> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > >> @@ -2218,7 +2218,9 @@ static int dw_hdmi_detect_phy(struct dw_hdmi
-> > >> *hdmi)
-> > >>  	unsigned int i;
-> > >>  	u8 phy_type;
-> > >> 
-> > >> -	phy_type = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-> > >> +	phy_type = (hdmi->plat_data->phy_force_type) ?
-> > >> +				hdmi->plat_data->phy_force_type :
-> > >> +				hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-> > > 
-> > > No need for parentheses. You could even write this
-> > > 
-> > >         phy_type = hdmi->plat_data->phy_force_type ?
-> > >                  : hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-> > > 
-> > > but that's up to you.
-> > > 
-> > > What if a driver wants to force the PHY type to
-> > > DW_HDMI_PHY_DWC_HDMI_TX_PHY ? Or do you expect only the
-> > > DW_HDMI_PHY_VENDOR_PHY type to be forced ? If so, we could also use a
-> > > force_vendor_phy boolean field instead of phy_force_type.
-> > 
-> > Initially I thought of implicitly overriding the phy-type when the external
-> > phy-ops are set, but decided against it because that might break
-> > (theoretical) cases where phy-ops may be always set but only used when
-> > the ip returns a matching phy-type and thus came to just allow overriding
-> > that type reading.
-> > 
-> > As for limiting to only allow forcing the vendor type, my personal feeling
-> > would be to allow glue drivers to just override the type as needed
-> > like done in the patch. As can be seen on the rk3328, the dw-hdmi
-> > reports one of the regular phys (forgot which one) but instead has a
-> > completely separate ip for it, so I'd guess we may very well see
-> > implementations that just report a wrong type (no vendor-type).
-> > 
-> > So I don't see an issue with drivers being allowed to set the type to
-> > DW_HDMI_PHY_DWC_HDMI_TX_PHY, because such cases may exist in the
-> > future and I'd expect driver authors to somewhat know what they're doing.
-> 
-> My point was that DW_HDMI_PHY_DWC_HDMI_TX_PHY == 0, so trying to force 
-> DW_HDMI_PHY_DWC_HDMI_TX_PHY through phy_force_type won't work.
+> +static void owl_gpio_set_reg(void __iomem *base, unsigned int pin, int flag)
+> +{
+> +       u32 val;
+> +
+> +       if (flag) {
+> +               val = readl(base);
+> +               val |= BIT(pin);
+> +               writel(val, base);
+> +       } else {
+> +               val = readl(base);
+> +               val &= ~BIT(pin);
+> +               writel(val, base);
+> +       }
+> +}
 
-Argh, ok now I get it.
+Why not to use the same pattern as below?
 
-So it will need some adaption for that, because allowing everything but
-DW_HDMI_PHY_DWC_HDMI_TX_PHY would be quite counter-intuitive :-) .
+readl()
+if ()
+ ...
+else
+...
+writel()
 
-Expecting phy_force_type == -1 for regular reads sounds bad as well,
-because then every glue driver would need to set that, which currently
-gets solves automatically when the field is not explicitly set.
+?
 
-So going with your force_vendor_phy idea sounds less intrusive for the
-time being and until there is an actual case where there is a different
-internal phy-type necessary?
+> +static void owl_gpio_set(struct gpio_chip *chip, unsigned int offset, int value)
+> +{
+> +       struct owl_gpio *gpio = gpiochip_get_data(chip);
+> +       const struct owl_gpio_port *port = gpio->port;
+> +       void __iomem *gpio_base = gpio->base + port->offset;
+> +       u32 val;
+> +
+> +       val = readl(gpio_base + GPIO_DAT);
+> +
+> +       if (value)
+> +               val |= BIT(offset);
+> +       else
+> +               val &= ~BIT(offset);
+> +
+> +       writel(val, gpio_base + GPIO_DAT);
+> +}
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
