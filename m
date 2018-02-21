@@ -1,21 +1,211 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Feb 2018 18:03:19 +0100
-Subject: [PATCH v2 07/19] ARM64: Add Renesas R-Car M3-N config symbol
-In-Reply-To: <1519139541-18783-8-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-8-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180221170319.3w2ylymp5dtjxxqg@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Feb 2018 18:04:34 +0100
+Subject: [PATCH v2 1/8] [PATCH 1/8] drivers/peci: Add support for PECI
+ bus driver core
+In-Reply-To: <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180221170434.GF29204@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 04:12:09PM +0100, Jacopo Mondi wrote:
-> Add configuration option for the R-Car M3-N (R8A77965) SoC.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> +static int peci_locked_xfer(struct peci_adapter *adapter,
+> +			    struct peci_xfer_msg *msg,
+> +			    bool do_retry,
+> +			    bool has_aw_fcs)
+> +{
+> +	ktime_t start, end;
+> +	s64 elapsed_ms;
+> +	int rc = 0;
+> +
+> +	if (!adapter->xfer) {
+> +		dev_dbg(&adapter->dev, "PECI level transfers not supported\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (in_atomic() || irqs_disabled()) {
 
-Thanks, I have applied this after updating the subject to:
+Hi Jae
 
-arm64: add Renesas R8A77965 support
+Is there a real need to do transfers in atomic context, or with
+interrupts disabled? 
 
-Please use "arm64" rather than ARM64 as a prefix.
-(But "ARM" rather than "arm"!).
+> +		rt_mutex_trylock(&adapter->bus_lock);
+> +		if (!rc)
+> +			return -EAGAIN; /* PECI activity is ongoing */
+> +	} else {
+> +		rt_mutex_lock(&adapter->bus_lock);
+> +	}
+> +
+> +	if (do_retry)
+> +		start = ktime_get();
+> +
+> +	do {
+> +		rc = adapter->xfer(adapter, msg);
+> +
+> +		if (!do_retry)
+> +			break;
+> +
+> +		/* Per the PECI spec, need to retry commands that return 0x8x */
+> +		if (!(!rc && ((msg->rx_buf[0] & DEV_PECI_CC_RETRY_ERR_MASK) ==
+> +			      DEV_PECI_CC_TIMEOUT)))
+> +			break;
+> +
+> +		/* Set the retry bit to indicate a retry attempt */
+> +		msg->tx_buf[1] |= DEV_PECI_RETRY_BIT;
+> +
+> +		/* Recalculate the AW FCS if it has one */
+> +		if (has_aw_fcs)
+> +			msg->tx_buf[msg->tx_len - 1] = 0x80 ^
+> +						peci_aw_fcs((u8 *)msg,
+> +							    2 + msg->tx_len);
+> +
+> +		/* Retry for at least 250ms before returning an error */
+> +		end = ktime_get();
+> +		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
+> +		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
+> +			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
+> +			break;
+> +		}
+> +	} while (true);
+
+So you busy loop to 1/4 second? How about putting a sleep in here so
+other things can be done between each retry.
+
+And should it not return -ETIMEDOUT after that 1/4 second?
+
+> +static int peci_scan_cmd_mask(struct peci_adapter *adapter)
+> +{
+> +	struct peci_xfer_msg msg;
+> +	u32 dib;
+> +	int rc = 0;
+> +
+> +	/* Update command mask just once */
+> +	if (adapter->cmd_mask & BIT(PECI_CMD_PING))
+> +		return 0;
+> +
+> +	msg.addr      = PECI_BASE_ADDR;
+> +	msg.tx_len    = GET_DIB_WR_LEN;
+> +	msg.rx_len    = GET_DIB_RD_LEN;
+> +	msg.tx_buf[0] = GET_DIB_PECI_CMD;
+> +
+> +	rc = peci_xfer(adapter, &msg);
+> +	if (rc < 0) {
+> +		dev_dbg(&adapter->dev, "PECI xfer error, rc : %d\n", rc);
+> +		return rc;
+> +	}
+> +
+> +	dib = msg.rx_buf[0] | (msg.rx_buf[1] << 8) |
+> +	      (msg.rx_buf[2] << 16) | (msg.rx_buf[3] << 24);
+> +
+> +	/* Check special case for Get DIB command */
+> +	if (dib == 0x00) {
+> +		dev_dbg(&adapter->dev, "DIB read as 0x00\n");
+> +		return -1;
+> +	}
+> +
+> +	if (!rc) {
+> +		/**
+> +		 * setting up the supporting commands based on minor rev#
+> +		 * see PECI Spec Table 3-1
+> +		 */
+> +		dib = (dib >> 8) & 0xF;
+> +
+> +		if (dib >= 0x1) {
+> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PKG_CFG);
+> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PKG_CFG);
+> +		}
+> +
+> +		if (dib >= 0x2)
+> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSR);
+> +
+> +		if (dib >= 0x3) {
+> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG_LOCAL);
+> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG_LOCAL);
+> +		}
+> +
+> +		if (dib >= 0x4)
+> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG);
+> +
+> +		if (dib >= 0x5)
+> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG);
+> +
+> +		if (dib >= 0x6)
+> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_IA_MSR);
+
+Lots of magic numbers here. Can they be replaced with #defines.  Also,
+it looks like a switch statement could be used, with fall through.
+
+> +
+> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_TEMP);
+> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_DIB);
+> +		adapter->cmd_mask |= BIT(PECI_CMD_PING);
+> +	} else {
+> +		dev_dbg(&adapter->dev, "Error reading DIB, rc : %d\n", rc);
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+
+> +static int peci_ioctl_get_temp(struct peci_adapter *adapter, void *vmsg)
+> +{
+> +	struct peci_get_temp_msg *umsg = vmsg;
+> +	struct peci_xfer_msg msg;
+> +	int rc;
+> +
+
+Is this getting the temperature?
+
+> +	rc = peci_cmd_support(adapter, PECI_CMD_GET_TEMP);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	msg.addr      = umsg->addr;
+> +	msg.tx_len    = GET_TEMP_WR_LEN;
+> +	msg.rx_len    = GET_TEMP_RD_LEN;
+> +	msg.tx_buf[0] = GET_TEMP_PECI_CMD;
+> +
+> +	rc = peci_xfer(adapter, &msg);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	umsg->temp_raw = msg.rx_buf[0] | (msg.rx_buf[1] << 8);
+> +
+> +	return 0;
+> +}
+
+
+
+> +static long peci_ioctl(struct file *file, unsigned int iocmd, unsigned long arg)
+> +{
+> +	struct peci_adapter *adapter = file->private_data;
+> +	void __user *argp = (void __user *)arg;
+> +	unsigned int msg_len;
+> +	enum peci_cmd cmd;
+> +	u8 *msg;
+> +	int rc = 0;
+> +
+> +	dev_dbg(&adapter->dev, "ioctl, cmd=0x%x, arg=0x%lx\n", iocmd, arg);
+> +
+> +	switch (iocmd) {
+> +	case PECI_IOC_PING:
+> +	case PECI_IOC_GET_DIB:
+> +	case PECI_IOC_GET_TEMP:
+> +	case PECI_IOC_RD_PKG_CFG:
+> +	case PECI_IOC_WR_PKG_CFG:
+> +	case PECI_IOC_RD_IA_MSR:
+> +	case PECI_IOC_RD_PCI_CFG:
+> +	case PECI_IOC_RD_PCI_CFG_LOCAL:
+> +	case PECI_IOC_WR_PCI_CFG_LOCAL:
+> +		cmd = _IOC_TYPE(iocmd) - PECI_IOC_BASE;
+> +		msg_len = _IOC_SIZE(iocmd);
+> +		break;
+
+Adding new ioctl calls is pretty frowned up. Can you export this info
+via /sysfs?
+
+Also, should there be some permission checks here? Or is any user
+allowed to call these ioctls?
+
+	Andrew
