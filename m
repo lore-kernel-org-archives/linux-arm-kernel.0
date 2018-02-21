@@ -1,35 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 21 Feb 2018 10:40:09 +0100
-Subject: [PATCH 1/4] dt-bindings: at24: sort manufacturers alphabetically
-In-Reply-To: <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
-References: <20180116160618.27859-1-peda@axentia.se>
- <20180116160618.27859-2-peda@axentia.se>
- <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
- <CAMRc=Mcqj36KP7dG71dzSn_7cxw-Tru5kNtXdr5-SiH=jbCfMA@mail.gmail.com>
- <20180221091130.4sdfnalrng4sd77i@ninjato>
- <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
-Message-ID: <20180221094009.2zql6gbzkcklbakk@ninjato>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Feb 2018 10:44:27 +0100
+Subject: [PATCH 3/7] [HACK] pass endianess flag to LTO linker
+In-Reply-To: <nycvar.YSQ.7.76.1802202213560.31644@knanqh.ubzr>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-4-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1802202213560.31644@knanqh.ubzr>
+Message-ID: <CAK8P3a1Tnq=FgkqWhK7FKMSLyBrRxLhbQVP7o3hwBVa-Yx7A3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 21, 2018 at 4:15 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 20 Feb 2018, Arnd Bergmann wrote:
+>
+>> We need some way to pass -mbig-endian to the linker during the
+>> LTO link stage, otherwise we get a waning like
+>>
+>> arm-linux-gnueabi/bin/ld: arch/arm/lib/clearbit.o: compiled for a big endian system and target is little endian
+>>
+>> for each file we link in.
+>>
+>> There is probably a better method of passing that flag, I'm just
+>> adding it to a different hack that I added earlier for x86 LTO
+>> here.
+>
+> Didn't the patch below fix it for you already?
 
-> Will do. What about this (http://patchwork.ozlabs.org/patch/867169/)
-> one? It's part of a bigger series, do you want me to apply it to my
-> tree and provide you with an immutable branch?
+I think the problem here is that -mbig-endian is part of KBUILD_CPPFLAGS,
+not KBUILD_CFLAGS. We add the latter to the gcc-ld command line, but not
+the former.
 
-Well, I would accept it for 4.16 using the "plain new id" rule. So, if
-you add it on top of Peter's sorting patch, totally fine by me.
-
-If you want it in v4.17, ok, too. I'd think an immutable branch is not
-needed. There is a fallback property in the DTS. So at worst, there will
-be a DTS warning during the merge window which will be fixed at rc1 time.
-
-Unless I overlooked something.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/cc305d42/attachment.sig>
+      Arnd
