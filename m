@@ -1,63 +1,30 @@
 From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Wed, 21 Feb 2018 09:59:59 +0100
-Subject: [PATCH v2 7/8] ARM: dts: artpec: add disabled node for PCIe endpoint
- mode
-In-Reply-To: <20180221090000.18091-1-niklas.cassel@axis.com>
-References: <20180221090000.18091-1-niklas.cassel@axis.com>
-Message-ID: <20180221090000.18091-8-niklas.cassel@axis.com>
+Date: Wed, 21 Feb 2018 09:59:52 +0100
+Subject: [PATCH v2 0/8] ARTPEC-6 ARM SoC device tree updates
+Message-ID: <20180221090000.18091-1-niklas.cassel@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe controller in the artpec6 SoC supports both root complex and
-endpoint mode, however, the controller can only be used in one of the
-modes.
+Hello,
 
-Both pci nodes are disabled by default. A DTS file can enable one of
-them, depending on what mode it wants to run.
+Here comes some ARTPEC-6 ARM SoC device tree updates.
 
-Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
----
-Changes since V1:
-removed unused properties "interrupts" and "interrupt-names"
+Regards,
+Niklas
 
- arch/arm/boot/dts/artpec6.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Niklas Cassel (8):
+  ARM: dts: artpec: disable Accelerator Coherency Port
+  ARM: dts: artpec: use 1 GiB RAM
+  ARM: dts: artpec: remove 0x prefix from clkctrl unit address
+  ARM: dts: artpec: migrate ethernet to stmmac binding
+  ARM: dts: artpec: add and utilize artpec6 pin controller
+  ARM: dts: artpec: add and utilize nbpfaxi DMA controllers
+  ARM: dts: artpec: add disabled node for PCIe endpoint mode
+  ARM: dts: artpec: add node for hardware crypto accelerator
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 1c46df0c03ce..b7720be8afb1 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -154,6 +154,10 @@
- 		interrupt-affinity = <&cpu0>, <&cpu1>;
- 	};
- 
-+	/*
-+	 * Both pci nodes cannot be enabled at the same time,
-+	 * leave the unwanted node as disabled.
-+	 */
- 	pcie: pcie at f8050000 {
- 		compatible = "axis,artpec6-pcie", "snps,dw-pcie";
- 		reg = <0xf8050000 0x2000
-@@ -181,6 +185,20 @@
- 		status = "disabled";
- 	};
- 
-+	pcie_ep: pcie_ep@f8050000 {
-+		compatible = "axis,artpec6-pcie-ep", "snps,dw-pcie";
-+		reg = <0xf8050000 0x2000
-+		       0xf8051000 0x2000
-+		       0xf8040000 0x1000
-+		       0xc0000000 0x20000000>;
-+		reg-names = "dbi", "dbi2", "phy", "addr_space";
-+		num-ib-windows = <6>;
-+		num-ob-windows = <2>;
-+		num-lanes = <2>;
-+		axis,syscon-pcie = <&syscon>;
-+		status = "disabled";
-+	};
-+
- 	pinctrl: pinctrl at f801d000 {
- 		compatible = "axis,artpec6-pinctrl";
- 		reg = <0xf801d000 0x400>;
+ arch/arm/boot/dts/artpec6-devboard.dts |   3 +-
+ arch/arm/boot/dts/artpec6.dtsi         | 163 +++++++++++++++++++++++++++++++--
+ 2 files changed, 155 insertions(+), 11 deletions(-)
+
 -- 
 2.14.2
