@@ -1,42 +1,35 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 21 Feb 2018 21:26:50 +0900
-Subject: [PATCH 1/2] ASoC: add DT bindings documentation for ROHM BD28623
- codec
-In-Reply-To: <20180221121354.GG8334@sirena.org.uk>
-References: <20180221043311.25840-1-suzuki.katsuhiro@socionext.com>
- <20180221043311.25840-2-suzuki.katsuhiro@socionext.com>
- <20180221121354.GG8334@sirena.org.uk>
-Message-ID: <001801d3ab0f$3fe07490$bfa15db0$@socionext.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 21 Feb 2018 13:57:02 +0100
+Subject: [PATCH 2/3] drm/sun4i: rgb: Fix potential division by zero
+In-Reply-To: <20180221125703.4595-1-maxime.ripard@bootlin.com>
+References: <20180221125703.4595-1-maxime.ripard@bootlin.com>
+Message-ID: <20180221125703.4595-2-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+In the case where mode_valid callback of our RGB connector was called
+before mode_set was being called, the range of dividers would not be set,
+resulting in a division by zero later on in the clk_round_rate logic.
 
-Thank you for your review.
+Set the range of dividers before calling clk_round_rate to fix this.
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Wednesday, February 21, 2018 9:14 PM
-> To: Suzuki, Katsuhiro <suzuki.katsuhiro@socionext.com>
-> Cc: alsa-devel at alsa-project.org; Rob Herring <robh+dt@kernel.org>; devicetree at vger.kernel.org; Masami Hiramatsu
-> <masami.hiramatsu@linaro.org>; Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 1/2] ASoC: add DT bindings documentation for ROHM BD28623 codec
-> 
-> On Wed, Feb 21, 2018 at 01:33:10PM +0900, Katsuhiro Suzuki wrote:
-> 
-> > +Optional properties:
-> > +- VCCA-supply : regulator phandle for the VCCA supply
-> > +- VCCP1-supply: regulator phandle for the VCCP1 supply
-> > +- VCCP2-supply: regulator phandle for the VCCP2 supply
-> 
-> These should be documented as mandatory unless the device genuinely
-> operates without power which seems unlikely.
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Indeed, this IC does not work correctly if VCC power supply is lost.
-It's not optional. I'll fix it and send V2.
-
-
-Regards,
---
-Katsuhiro Suzuki
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 832f8f9bc47f..b8da5a50a61d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -92,6 +92,8 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 
+ 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+ 
++	tcon->dclk_min_div = 6;
++	tcon->dclk_max_div = 127;
+ 	rounded_rate = clk_round_rate(tcon->dclk, rate);
+ 	if (rounded_rate < rate)
+ 		return MODE_CLOCK_LOW;
+-- 
+2.14.3
