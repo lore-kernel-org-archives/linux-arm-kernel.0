@@ -1,73 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 20 Feb 2018 22:26:22 -0500 (EST)
-Subject: [PATCH 5/7] ARM: fix __inflate_kernel_data stack warning for LTO
-In-Reply-To: <20180220215954.4092811-6-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-6-arnd@arndb.de>
-Message-ID: <nycvar.YSQ.7.76.1802202218240.31644@knanqh.ubzr>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 21 Feb 2018 09:05:51 +0530
+Subject: [PATCH] cpufreq: scpi: invoke frequency-invariance setter function
+In-Reply-To: <20180220111057.14756-1-dietmar.eggemann@arm.com>
+References: <20180220111057.14756-1-dietmar.eggemann@arm.com>
+Message-ID: <20180221033551.GN28462@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Feb 2018, Arnd Bergmann wrote:
-
-> Commit ca8b5d97d6bf ("ARM: XIP kernel: store .data compressed in ROM")
-> moved the decompressor workspace to the stack and added a compiler
-> flag to avoid the stack size warning.
+On 20-02-18, 11:10, Dietmar Eggemann wrote:
+> Commit 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
+> changed the cpufreq driver on juno from arm_big_little to scpi.
 > 
-> With LTO, that warning comes back. Moving the workspace into an initdata
-> variable avoids that warning but presumably also undoes the optimization.
-
-Not only that, but it will probably crash at run time. What this code 
-does is uncompressing initialized data to memory, _including_ initdata. 
-So you'll end up overwriting your inflate_state while decompressing.
-
-> We could also try disabling the warning locally in that file with
-> _Pragma("GCC disagnostic"), but we lack a little bit of infrastructure
-> to do that nicely.
-
-Your patch #1/7 showed issues with the final part of this feature 
-anyway, so my suggestion for that patch will take care of this one too 
-for the time being.
-
+> The scpi set_target function does not call the frequency-invariance
+> setter function arch_set_freq_scale() like the arm_big_little set_target
+> function does. As a result the task scheduler load and utilization
+> signals are not frequency-invariant on this platform anymore.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fix this by adding a call to arch_set_freq_scale() into
+> scpi_cpufreq_set_target().
+> 
+> Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  arch/arm/kernel/Makefile            | 3 ---
->  arch/arm/kernel/head-inflate-data.c | 3 ++-
->  2 files changed, 2 insertions(+), 4 deletions(-)
+>  drivers/cpufreq/scpi-cpufreq.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index b59ac4bf82b8..2e8d40d442a2 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -88,9 +88,6 @@ head-y			:= head$(MMUEXT).o
->  obj-$(CONFIG_DEBUG_LL)	+= debug.o
->  obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
->  
-> -# This is executed very early using a temporary stack when no memory allocator
-> -# nor global data is available. Everything has to be allocated on the stack.
-> -CFLAGS_head-inflate-data.o := $(call cc-option,-Wframe-larger-than=10240)
->  obj-$(CONFIG_XIP_DEFLATED_DATA) += head-inflate-data.o
->  
->  obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-> diff --git a/arch/arm/kernel/head-inflate-data.c b/arch/arm/kernel/head-inflate-data.c
-> index 6dd0ce5e6058..b208c4541bd1 100644
-> --- a/arch/arm/kernel/head-inflate-data.c
-> +++ b/arch/arm/kernel/head-inflate-data.c
-> @@ -35,10 +35,11 @@ extern char _sdata[];
->   * stack then there is no need to clean up before returning.
->   */
->  
-> +static __initdata struct inflate_state state;
-> +
->  int __init __inflate_kernel_data(void)
+> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+> index c32a833e1b00..3101d4e9c2de 100644
+> --- a/drivers/cpufreq/scpi-cpufreq.c
+> +++ b/drivers/cpufreq/scpi-cpufreq.c
+> @@ -51,13 +51,19 @@ static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
+>  static int
+>  scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
 >  {
->  	struct z_stream_s stream, *strm = &stream;
-> -	struct inflate_state state;
->  	char *in = __data_loc;
->  	int rc;
+> +	unsigned long freq = policy->freq_table[index].frequency;
+>  	struct scpi_data *priv = policy->driver_data;
+> -	u64 rate = policy->freq_table[index].frequency * 1000;
+> +	u64 rate = freq * 1000;
+>  	int ret;
 >  
-> -- 
-> 2.9.0
-> 
-> 
+>  	ret = clk_set_rate(priv->clk, rate);
+> -	if (!ret && (clk_get_rate(priv->clk) != rate))
+> -		ret = -EIO;
+> +	if (!ret) {
+> +		if (clk_get_rate(priv->clk) != rate)
+> +			ret = -EIO;
+> +
+> +		arch_set_freq_scale(policy->related_cpus, freq,
+> +				    policy->cpuinfo.max_freq);
+> +	}
+>  
+>  	return ret;
+>  }
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
