@@ -1,54 +1,86 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 21 Feb 2018 19:05:57 +0100
-Subject: [PATCH 05/10] dt-bindings: gpio: Add gpio nodes for Actions S900
- SoC
-In-Reply-To: <20180221145821.bhoxjndibp3bqfxi@linaro.org>
-References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
- <20180217204433.3095-6-manivannan.sadhasivam@linaro.org>
- <20180219203523.rhvbnym7oomzahwi@rob-hp-laptop>
- <20180221145821.bhoxjndibp3bqfxi@linaro.org>
-Message-ID: <ac193690-220e-4160-5dd5-6ddeaea4d5d0@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Feb 2018 18:11:33 +0000
+Subject: [PATCH v4 32/40] KVM: arm64: Directly call VHE and non-VHE FPSIMD
+ enabled functions
+In-Reply-To: <20180215210332.8648-33-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-33-christoffer.dall@linaro.org>
+Message-ID: <86y3jmjjqi.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.02.2018 um 15:58 schrieb Manivannan Sadhasivam:
-> Hi Rob,
-> On Mon, Feb 19, 2018 at 02:35:23PM -0600, Rob Herring wrote:
->> On Sun, Feb 18, 2018 at 02:14:28AM +0530, Manivannan Sadhasivam wrote:
->>> Add gpio nodes for Actions Semi S900 SoC.
->>>
->>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->>> ---
->>>  .../devicetree/bindings/gpio/actions,owl-gpio.txt         | 15 +++++++++++++++
->>>  1 file changed, 15 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->>> new file mode 100644
->>> index 000000000000..4cd4cb7bfd1b
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
->>> @@ -0,0 +1,15 @@
->>> +* Actions Semi OWL GPIO controller bindings
->>> +
->>> +- compatible      : Should be "actions,s900-gpio"
->>> +- reg             : Address and range of the GPIO controller registers.
->>> +- gpio-controller : Marks the device node as a GPIO controller.
->>> +- #gpio-cells     : Should be <2>. The first cell is the gpio number and
->>> +                    the second cell is used to specify optional parameters.
->>
->> Doesn't do interrupts?
->>
-> Interrupt support will be added once this base driver gets in.
-> One step at a time ;-)
+On Thu, 15 Feb 2018 21:03:24 +0000,
+Christoffer Dall wrote:
+> 
+> There is no longer a need for an alternative to choose the right
+> function to tell us whether or not FPSIMD was enabled for the VM,
+> because we can simply cann the appropriate functions directly fromwithin
 
-Rob rejected that step-by-step approach for my RDA Micro bindings, which
-is why it is currently stuck. ;)
+from within
 
-Regards,
-Andreas
+> the _vhe and _nvhe run functions.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v3:
+>      - New patch since we no longer defer FPSIMD handling to load/put
+> 
+>  arch/arm64/kvm/hyp/switch.c | 15 +++------------
+>  1 file changed, 3 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 17e3c6f26a34..9c40e203bd09 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -33,20 +33,11 @@ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+>  	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+>  }
+>  
+> -static bool __hyp_text __fpsimd_enabled_vhe(void)
+> +static bool fpsimd_enabled_vhe(void)
+>  {
+>  	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
+>  }
+>  
+> -static hyp_alternate_select(__fpsimd_is_enabled,
+> -			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
+> -			    ARM64_HAS_VIRT_HOST_EXTN);
+> -
+> -bool __hyp_text __fpsimd_enabled(void)
+> -{
+> -	return __fpsimd_is_enabled()();
+> -}
+> -
+>  /* Save the 32-bit only FPSIMD system register state */
+>  static inline void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
+>  {
+> @@ -413,7 +404,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  		/* And we're baaack! */
+>  	} while (fixup_guest_exit(vcpu, &exit_code));
+>  
+> -	fp_enabled = __fpsimd_enabled();
+> +	fp_enabled = fpsimd_enabled_vhe();
+>  
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+>  	__vgic_save_state(vcpu);
+> @@ -478,7 +469,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  			__qcom_hyp_sanitize_btac_predictors();
+>  	}
+>  
+> -	fp_enabled = __fpsimd_enabled();
+> +	fp_enabled = __fpsimd_enabled_nvhe();
+>  
+>  	__sysreg_save_state_nvhe(guest_ctxt);
+>  	__sysreg32_save_state(vcpu);
+> -- 
+> 2.14.2
+> 
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Jazz is not dead, it just smell funny.
