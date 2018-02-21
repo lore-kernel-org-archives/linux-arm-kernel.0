@@ -1,64 +1,55 @@
-From: jacob.jun.pan@linux.intel.com (Jacob Pan)
-Date: Tue, 20 Feb 2018 15:19:33 -0800
-Subject: [PATCH 09/37] iommu/fault: Let handler return a fault response
-In-Reply-To: <20180212183352.22730-10-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-10-jean-philippe.brucker@arm.com>
-Message-ID: <20180220151933.022f1036@jacob-builder>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Wed, 21 Feb 2018 00:34:40 +0000
+Subject: [RFC patch] ioremap: don't set up huge I/O mappings when
+ p4d/pud/pmd is zero
+In-Reply-To: <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
+References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+ <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
+Message-ID: <1519175992.16384.121.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Feb 2018 18:33:24 +0000
-Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
+On Tue, 2018-02-20 at 14:54 +0530, Chintan Pandya wrote:
+> 
+> On 12/28/2017 4:54 PM, Hanjun Guo wrote:
+> > From: Hanjun Guo <hanjun.guo@linaro.org>
+> > 
+> > When we using iounmap() to free the 4K mapping, it just clear the PTEs
+> > but leave P4D/PUD/PMD unchanged, also will not free the memory of page
+> > tables.
+> > 
+> > This will cause issues on ARM64 platform (not sure if other archs have
+> > the same issue) for this case:
+> > 
+> > 1. ioremap a 4K size, valid page table will build,
+> > 2. iounmap it, pte0 will set to 0;
+> > 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
+> >     then set the a new value for pmd;
+> > 4. pte0 is leaked;
+> > 5. CPU may meet exception because the old pmd is still in TLB,
+> >     which will lead to kernel panic.
+> > 
+> > Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
+> > zero.
+> > 
+> 
+> One obvious problem I see here is, once any 2nd level entry has 3rd 
+> level mapping, this entry can't map 2M section ever in future. This way, 
+> we will fragment entire virtual space over time.
+> 
+> The code you are changing is common between 32-bit systems as well (I 
+> think). And running out of section mapping would be a reality in 
+> practical terms.
+> 
+> So, if we can do the following as a fix up, we would be saved.
+> 1) Invalidate 2nd level entry from TLB, and
+> 2) Free the page which holds last level page table
+> 
+> BTW, is there any further discussion going on this topic which I am 
+> missing ?
 
->  
-> +/**
-> + * enum page_response_code - Return status of fault handlers,
-> telling the IOMMU
-> + * driver how to proceed with the fault.
-> + *
-> + * @IOMMU_FAULT_STATUS_HANDLED: Stop processing the fault, and do
-> not send a
-> + *	reply to the device.
-> + * @IOMMU_FAULT_STATUS_CONTINUE: Fault was not handled. Call the
-> next handler,
-> + *	or terminate.
-> + * @IOMMU_FAULT_STATUS_SUCCESS: Fault has been handled and the page
-> tables
-> + *	populated, retry the access. This is "Success" in PCI PRI.
-> + * @IOMMU_FAULT_STATUS_FAILURE: General error. Drop all subsequent
-> faults from
-> + *	this device if possible. This is "Response Failure" in PCI
-> PRI.
-> + * @IOMMU_FAULT_STATUS_INVALID: Could not handle this fault, don't
-> retry the
-> + *	access. This is "Invalid Request" in PCI PRI.
-> + */
-> +enum page_response_code {
-> +	IOMMU_PAGE_RESP_HANDLED = 0,
-> +	IOMMU_PAGE_RESP_CONTINUE,
-> +	IOMMU_PAGE_RESP_SUCCESS,
-> +	IOMMU_PAGE_RESP_INVALID,
-> +	IOMMU_PAGE_RESP_FAILURE,
-> +};
-it seems to me two things are mixed here:
-1. driver handler response status (HANDLED, CONTINUE)
-2. PCI standard page response code (the rest)
-Can we leave them separate? then we don't have to convert this enum
-to/from PCI ATS page response code.
+Yes, I suggested to free up a pte table in my last reply.
+https://patchwork.kernel.org/patch/10134581/
 
-> +
->  /**
->   * Generic page response information based on PCI ATS and PASID spec.
->   * @addr: servicing page address
-> @@ -202,12 +225,7 @@ enum page_response_type {
->  struct page_response_msg {
->  	u64 addr;
->  	u32 pasid;
-> -	u32 resp_code:4;
-> -#define IOMMU_PAGE_RESP_SUCCESS	0
-> -#define IOMMU_PAGE_RESP_INVALID	1
-> -#define IOMMU_PAGE_RESP_HANDLED	2
-> -#define IOMMU_PAGE_RESP_FAILURE	0xF
-> -
-[Jacob Pan]
+Thanks,
+-Toshi
