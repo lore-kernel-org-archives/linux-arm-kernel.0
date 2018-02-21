@@ -1,122 +1,78 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 21 Feb 2018 09:55:36 +0100
-Subject: [PATCH v4 1/6] dt-bindings: add bindings for USB physical connector
+Date: Wed, 21 Feb 2018 09:55:37 +0100
+Subject: [PATCH v4 2/6] dt-bindings: add bindings for Samsung micro-USB
+ 11-pin connector
 In-Reply-To: <20180221085541.14556-1-a.hajda@samsung.com>
 References: <20180221085541.14556-1-a.hajda@samsung.com>
- <CGME20180221085604eucas1p11aa066a1e106d9f9850731a5171dce8b@eucas1p1.samsung.com>
-Message-ID: <20180221085541.14556-2-a.hajda@samsung.com>
+ <CGME20180221085605eucas1p164d6a334353cf34c4c6f203bf7dec6ae@eucas1p1.samsung.com>
+Message-ID: <20180221085541.14556-3-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These bindings allow to describe most known standard USB connectors
-and it should be possible to extend it if necessary.
-USB connectors, beside USB can be used to route other protocols,
-for example UART, Audio, MHL. In such case every device passing data
-through the connector should have appropriate graph bindings.
+Samsung micro-USB 11-pin connector beside standard micro-USB pins,
+has pins dedicated to route MHL traffic.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 v4:
-- improved 'type' description (Rob),
-- improved description of 2nd example (Rob).
-v3:
-- removed MHL port (samsung connector will have separate bindings),
-- added 2nd example for USB-C,
-- improved formatting.
-v2:
-- moved connector type(A,B,C) to compatible string (Rob),
-- renamed size property to type (Rob),
-- changed type description to be less confusing (Laurent),
-- removed vendor specific compatibles (implied by graph port number),
-- added requirement of connector being a child of IC (Rob),
-- removed max-mode (subtly suggested by Rob, it should be detected anyway
-  by USB Controller in runtime, downside is that device is not able to
-  report its real capabilities, maybe better would be to make it optional(?)),
-- assigned port numbers to data buses (Rob).
-
-Regards
-Andrzej
+- removed description of property inherited from usb-connector (Rob),
+- fixed example description.
 ---
- .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+ .../connector/samsung,usb-connector-11pin.txt      | 49 ++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
 
-diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+diff --git a/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
 new file mode 100644
-index 000000000000..e1463f14af38
+index 000000000000..22256e295a7a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
-@@ -0,0 +1,75 @@
-+USB Connector
-+=============
++++ b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
+@@ -0,0 +1,49 @@
++Samsung micro-USB 11-pin connector
++==================================
 +
-+USB connector node represents physical USB connector. It should be
-+a child of USB interface controller.
++Samsung micro-USB 11-pin connector is an extension of micro-USB connector.
++It is present in multiple Samsung mobile devices.
++It has additional pins to route MHL traffic simultanously with USB.
++
++The bindings are superset of usb-connector bindings for micro-USB connector[1].
 +
 +Required properties:
-+- compatible: describes type of the connector, must be one of:
-+    "usb-a-connector",
-+    "usb-b-connector",
-+    "usb-c-connector".
-+
-+Optional properties:
-+- label: symbolic name for the connector,
-+- type: size of the connector, should be specified in case of USB-A, USB-B
-+  non-fullsize connectors: "mini", "micro".
++- compatible: must be: "samsung,usb-connector-11pin", "usb-b-connector",
++- type: must be "micro".
 +
 +Required nodes:
 +- any data bus to the connector should be modeled using the OF graph bindings
 +  specified in bindings/graph.txt, unless the bus is between parent node and
 +  the connector. Since single connector can have multpile data buses every bus
 +  has assigned OF graph port number as follows:
-+    0: High Speed (HS), present in all connectors,
-+    1: Super Speed (SS), present in SS capable connectors,
-+    2: Sideband use (SBU), present in USB-C.
++    0: High Speed (HS),
++    3: Mobile High-Definition Link (MHL), specific to 11-pin Samsung micro-USB.
 +
-+Examples
-+--------
++[1]: bindings/connector/usb-connector.txt
 +
-+1. Micro-USB connector with HS lines routed via controller (MUIC):
++Example
++-------
++
++Micro-USB connector with HS lines routed via controller (MUIC) and MHL lines
++connected to HDMI-MHL bridge (sii8620):
 +
 +muic-max77843 at 66 {
 +	...
 +	usb_con: connector {
-+		compatible = "usb-b-connector";
++		compatible = "samsung,usb-connector-11pin", "usb-b-connector";
 +		label = "micro-USB";
 +		type = "micro";
-+	};
-+};
-+
-+2. USB-C connector attached to CC controller (s2mm005), HS lines routed
-+to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
-+DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
-+
-+ccic: s2mm005 at 33 {
-+	...
-+	usb_con: connector {
-+		compatible = "usb-c-connector";
-+		label = "USB-C";
 +
 +		ports {
 +			#address-cells = <1>;
 +			#size-cells = <0>;
 +
-+			port at 0 {
-+				reg = <0>;
-+				usb_con_hs: endpoint {
-+					remote-endpoint = <&max77865_usbc_hs>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				usb_con_ss: endpoint {
-+					remote-endpoint = <&usbdrd_phy_ss>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <2>;
-+				usb_con_sbu: endpoint {
-+					remote-endpoint = <&dp_aux>;
++			port at 3 {
++				reg = <3>;
++				usb_con_mhl: endpoint {
++					remote-endpoint = <&sii8620_mhl>;
 +				};
 +			};
 +		};
