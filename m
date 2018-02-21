@@ -1,15 +1,15 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 21 Feb 2018 16:11:22 +0100
+Date: Wed, 21 Feb 2018 16:12:28 +0100
 Subject: [PATCH 2/2] ARM: pinctrl: stm32: Optimizes and enhances stm32gpio
  irqchip
 In-Reply-To: <1519221027-4028-3-git-send-email-radoslaw.pietrzyk@gmail.com>
 References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
  <1519221027-4028-3-git-send-email-radoslaw.pietrzyk@gmail.com>
-Message-ID: <c7b7066a-001a-4a4f-d68b-e143ede411a5@st.com>
+Message-ID: <ef3296cf-f0ed-e7a8-2b90-17defbf157db@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radoslaw,
+Maybe you could remove ARM from commit header.
 
 On 02/21/2018 02:50 PM, Radoslaw Pietrzyk wrote:
 > 	- removes unneeded irq_chip.irq_eoi callback
@@ -34,11 +34,6 @@ On 02/21/2018 02:50 PM, Radoslaw Pietrzyk wrote:
 >   	.irq_unmask     = irq_chip_unmask_parent,
 >   	.irq_set_type   = irq_chip_set_type_parent,
 > +	.irq_set_wake   = irq_chip_set_wake_parent,
-Thanks, this one was in my backlog.
-
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
-
-
 >   	.irq_request_resources = stm32_gpio_irq_request_resources,
 >   	.irq_release_resources = stm32_gpio_irq_release_resources,
 >   };
