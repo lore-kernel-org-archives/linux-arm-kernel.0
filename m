@@ -1,38 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Feb 2018 11:57:58 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUkZDIHBhdGNoXSBp?= =?utf-8?Q?oremap?=
- =?utf-8?Q?=3A?= don't set up huge I/O mappings when p4d/pud/pmd is zero
-In-Reply-To: <etPan.5a8d2180.1dbfd272.49b8@localhost>
-References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
- <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
- <1519175992.16384.121.camel@hpe.com>
- <etPan.5a8d2180.1dbfd272.49b8@localhost>
-Message-ID: <20180221115758.GA7614@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 21 Feb 2018 13:01:44 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v7_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
+ <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
+Message-ID: <CAMRc=Mf_pumyTZPn9T=sG7Ab95YS3KqKc2bT0evhESTRRFeiuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[sorry, trying to deal with top-posting here]
+2018-02-20 19:39 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 02/20/2018 07:33 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>
+>>> This series converts mach-davinci to use the common clock framework.
+>>>
+>>>
+>>
+>> Hi David,
+>>
+>> just some quick results from today's playing with v7.
+>>
+>> I started out with da850-lcdk with my standard rootfs over NFS. I was
+>> not able to boot to console so far. The first problem is that mdio
+>> fails to probe:
+>>
+>> libphy: Fixed MDIO Bus: probed
+>> davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
+>> davinci_mdio 1e24000.mdio: no live phy, scanning all
+>> davinci_mdio: probe of 1e24000.mdio failed with error -5> After some
+>> digging I noticed that the supplied clock rate differs
+>> between mainline (114000000Hz) vs common-clock-v7 (18000000). Since
+>> we're not setting the rate in mdio, using LPSC_SET_RATE_PARENT would
+>> not help like with lcdc.
+>
+>
+> Can you post the output of this command so that I can see how your
+> clocks are setup:
+>
+> cat /sys/kernel/debug/clk/clk_summary
+>
+>
+>>
+>> After that, the boot just hangs without ever getting to emac's probe.
+>
+>
+> Using your workaround, can you run:
+>
+> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>
+> If you see:
+>   1e27000.clock-controller: emac  off-0
+>
+> then genpd is not working like it is supposed to. You should see something
+> like this for device that are working:
+>           1e27000.clock-controller: uart2  on
+>     /devices/platform/soc at 1c00000/1d0d000.serial        active
+>
+>
+>>
+>> Once I set the emac clock to always enabled (a workaround that was
+>> necessary with v6, but could be dropped with my first
+>> genpd-in-a-separate-driver attempt), I'm getting a rather strange NULL
+>> pointer dereference:
+>
+>
+> I noticed this too when adding the power-domains property to some device
+> tree nodes. This is part of the reason why I didn't add it everywhere.
+> I wasn't able to figure out the cause of this yet. As a work around
+> though, please try removing the power-domains property from the emac
+> and mdio nodes and use your previous workaround of having an always
+> enabled clock.
+>
+>
 
-On Wed, Feb 21, 2018 at 07:36:34AM +0000, Wangxuefeng (E) wrote:
->      The old flow of reuse the 4k page as 2M page does not follow the BBM flow
-> for page table reconstruction?not only the memory leak problems.  If BBM flow
-> is not followed?the speculative prefetch of tlb will made false tlb entries
-> cached in MMU, the false address will be got? panic will happen.
+When I use any of the workarounds I just keep getting more problems
+(e.g. [1] from blk and pinctrl). I only had a couple hours today to
+play with it but it seems to me we have some memory corruption
+somewhere. I'll check the initialization order of all the frameworks
+involved tomorrow.
 
-If I understand Toshi's suggestion correctly, he's saying that the PMD can
-be cleared when unmapping the last PTE (like try_to_free_pte_page). In this
-case, there's no issue with the TLB because this is exactly BBM -- the PMD
-is cleared and TLB invalidation is issued before the PTE table is freed. A
-subsequent 2M map request will see an empty PMD and put down a block
-mapping.
+Best regards,
+Bartosz
 
-The downside is that freeing becomes more expensive as the last level table
-becomes more sparsely populated and you need to ensure you don't have any
-concurrent maps going on for the same table when you're unmapping. I also
-can't see a neat way to fit this into the current vunmap code. Perhaps we
-need an iounmap_page_range.
-
-In the meantime, the code in lib/ioremap.c looks totally broken so I think
-we should deselect CONFIG_HAVE_ARCH_HUGE_VMAP on arm64 until it's fixed.
-
-Will
+[1] https://pastebin.com/75mkkuJL
