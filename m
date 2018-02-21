@@ -1,49 +1,50 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 22 Feb 2018 08:42:32 +0900
-Subject: [PATCH] ASoC: uniphier: evea: fix lisence comment style
-Message-ID: <20180221234232.5252-1-suzuki.katsuhiro@socionext.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 21 Feb 2018 17:52:23 -0600
+Subject: [PATCH 05/10] dt-bindings: gpio: Add gpio nodes for Actions S900
+ SoC
+In-Reply-To: <20180221145821.bhoxjndibp3bqfxi@linaro.org>
+References: <20180217204433.3095-1-manivannan.sadhasivam@linaro.org>
+ <20180217204433.3095-6-manivannan.sadhasivam@linaro.org>
+ <20180219203523.rhvbnym7oomzahwi@rob-hp-laptop>
+ <20180221145821.bhoxjndibp3bqfxi@linaro.org>
+Message-ID: <CAL_JsqK+586zyvsZ0b9i+x78V5NDnAput6Ygfw0qFXu=B-hb9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes lisence comment style from C to C++.
-And use SPDX instead of boiler plate of GPLv2, as same as
-other audio codec drivers.
+On Wed, Feb 21, 2018 at 8:58 AM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+> Hi Rob,
+> On Mon, Feb 19, 2018 at 02:35:23PM -0600, Rob Herring wrote:
+>> On Sun, Feb 18, 2018 at 02:14:28AM +0530, Manivannan Sadhasivam wrote:
+>> > Add gpio nodes for Actions Semi S900 SoC.
+>> >
+>> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+>> > ---
+>> >  .../devicetree/bindings/gpio/actions,owl-gpio.txt         | 15 +++++++++++++++
+>> >  1 file changed, 15 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+>> > new file mode 100644
+>> > index 000000000000..4cd4cb7bfd1b
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+>> > @@ -0,0 +1,15 @@
+>> > +* Actions Semi OWL GPIO controller bindings
+>> > +
+>> > +- compatible      : Should be "actions,s900-gpio"
+>> > +- reg             : Address and range of the GPIO controller registers.
+>> > +- gpio-controller : Marks the device node as a GPIO controller.
+>> > +- #gpio-cells     : Should be <2>. The first cell is the gpio number and
+>> > +                    the second cell is used to specify optional parameters.
+>>
+>> Doesn't do interrupts?
+>>
+> Interrupt support will be added once this base driver gets in.
+> One step at a time ;-)
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- sound/soc/uniphier/evea.c | 22 ++++------------------
- 1 file changed, 4 insertions(+), 18 deletions(-)
+Binding are separate from the driver. Drivers can evolve, but h/w
+doesn't (for a given piece of Si). It is not a high bar to list
+#interrupt-cells and interrupt-controller.
 
-diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
-index ac2d30b55fb6..439f14f91b23 100644
---- a/sound/soc/uniphier/evea.c
-+++ b/sound/soc/uniphier/evea.c
-@@ -1,22 +1,8 @@
- // SPDX-License-Identifier: GPL-2.0
--/*
-- * Socionext UniPhier EVEA ADC/DAC codec driver.
-- *
-- * Copyright (c) 2016-2017 Socionext Inc.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; version 2
-- * of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, see <http://www.gnu.org/licenses/>.
-- */
-+//
-+// Socionext UniPhier EVEA ADC/DAC codec driver.
-+//
-+// Copyright (c) 2016-2017 Socionext Inc.
- 
- #include <linux/clk.h>
- #include <linux/module.h>
--- 
-2.16.1
+Rob
