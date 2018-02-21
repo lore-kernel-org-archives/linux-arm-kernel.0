@@ -1,53 +1,73 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 20 Feb 2018 22:15:23 -0500 (EST)
-Subject: [PATCH 3/7] [HACK] pass endianess flag to LTO linker
-In-Reply-To: <20180220215954.4092811-4-arnd@arndb.de>
+Date: Tue, 20 Feb 2018 22:26:22 -0500 (EST)
+Subject: [PATCH 5/7] ARM: fix __inflate_kernel_data stack warning for LTO
+In-Reply-To: <20180220215954.4092811-6-arnd@arndb.de>
 References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-4-arnd@arndb.de>
-Message-ID: <nycvar.YSQ.7.76.1802202213560.31644@knanqh.ubzr>
+ <20180220215954.4092811-6-arnd@arndb.de>
+Message-ID: <nycvar.YSQ.7.76.1802202218240.31644@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 20 Feb 2018, Arnd Bergmann wrote:
 
-> We need some way to pass -mbig-endian to the linker during the
-> LTO link stage, otherwise we get a waning like
+> Commit ca8b5d97d6bf ("ARM: XIP kernel: store .data compressed in ROM")
+> moved the decompressor workspace to the stack and added a compiler
+> flag to avoid the stack size warning.
 > 
-> arm-linux-gnueabi/bin/ld: arch/arm/lib/clearbit.o: compiled for a big endian system and target is little endian
+> With LTO, that warning comes back. Moving the workspace into an initdata
+> variable avoids that warning but presumably also undoes the optimization.
+
+Not only that, but it will probably crash at run time. What this code 
+does is uncompressing initialized data to memory, _including_ initdata. 
+So you'll end up overwriting your inflate_state while decompressing.
+
+> We could also try disabling the warning locally in that file with
+> _Pragma("GCC disagnostic"), but we lack a little bit of infrastructure
+> to do that nicely.
+
+Your patch #1/7 showed issues with the final part of this feature 
+anyway, so my suggestion for that patch will take care of this one too 
+for the time being.
+
 > 
-> for each file we link in.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/kernel/Makefile            | 3 ---
+>  arch/arm/kernel/head-inflate-data.c | 3 ++-
+>  2 files changed, 2 insertions(+), 4 deletions(-)
 > 
-> There is probably a better method of passing that flag, I'm just
-> adding it to a different hack that I added earlier for x86 LTO
-> here.
-
-Didn't the patch below fix it for you already?
-
------ >8
-Date: Fri, 1 Sep 2017 18:37:52 -0400
-Subject: [PATCH] scripts/gcc-ld: LTO on ARM needs arch specific gcc flags
-
-Otherwise the final link where code generation happens produces code
-for the wrong ISA when the default CPU configured into gcc is not the
-one we need.
-
-Also display the actual command when invoked with "make V=1".
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/scripts/gcc-ld b/scripts/gcc-ld
-index d95dd0be38..fa53be2a34 100755
---- a/scripts/gcc-ld
-+++ b/scripts/gcc-ld
-@@ -27,4 +27,10 @@ while [ "$1" != "" ] ; do
- 	shift
- done
- 
--exec $CC $ARGS
-+case "${KBUILD_VERBOSE}" in
-+*1*)
-+	set -x
-+	;;
-+esac
-+
-+exec $CC $KBUILD_CFLAGS $ARGS
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index b59ac4bf82b8..2e8d40d442a2 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -88,9 +88,6 @@ head-y			:= head$(MMUEXT).o
+>  obj-$(CONFIG_DEBUG_LL)	+= debug.o
+>  obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+>  
+> -# This is executed very early using a temporary stack when no memory allocator
+> -# nor global data is available. Everything has to be allocated on the stack.
+> -CFLAGS_head-inflate-data.o := $(call cc-option,-Wframe-larger-than=10240)
+>  obj-$(CONFIG_XIP_DEFLATED_DATA) += head-inflate-data.o
+>  
+>  obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+> diff --git a/arch/arm/kernel/head-inflate-data.c b/arch/arm/kernel/head-inflate-data.c
+> index 6dd0ce5e6058..b208c4541bd1 100644
+> --- a/arch/arm/kernel/head-inflate-data.c
+> +++ b/arch/arm/kernel/head-inflate-data.c
+> @@ -35,10 +35,11 @@ extern char _sdata[];
+>   * stack then there is no need to clean up before returning.
+>   */
+>  
+> +static __initdata struct inflate_state state;
+> +
+>  int __init __inflate_kernel_data(void)
+>  {
+>  	struct z_stream_s stream, *strm = &stream;
+> -	struct inflate_state state;
+>  	char *in = __data_loc;
+>  	int rc;
+>  
+> -- 
+> 2.9.0
+> 
+> 
