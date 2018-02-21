@@ -1,65 +1,27 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 21 Feb 2018 12:07:34 +0000
-Subject: [PATCH v2 0/8] drm/rockchip: hdmi support for rk3328
-In-Reply-To: <20180216204158.29839-1-heiko@sntech.de>
-References: <20180216204158.29839-1-heiko@sntech.de>
-Message-ID: <1f50b49e-d402-3621-c2e8-9e0a96e859f9@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 21 Feb 2018 12:13:54 +0000
+Subject: [PATCH 1/2] ASoC: add DT bindings documentation for ROHM BD28623
+ codec
+In-Reply-To: <20180221043311.25840-2-suzuki.katsuhiro@socionext.com>
+References: <20180221043311.25840-1-suzuki.katsuhiro@socionext.com>
+ <20180221043311.25840-2-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180221121354.GG8334@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/18 20:41, Heiko Stuebner wrote:
-> The rk3228/rk3229 and rk3328 socs started using a new type of hdmi-phy
-> from Innosilicon that resides completely separate from the dw-hdmi block
-> and gets accessed via mmio.
-> 
-> Additionally the rk3328 dw-hdmi does not report the vendor-phy type
-> but a different one instead, so add the possibility to override the
-> phy type when the glue driver knows better than the ip block itself.
-> 
-> 
-> I've put both the phy driver and dw-hdmi changes into one series just
-> to showcase how everything comes together, but would of course still
-> expect things to go through the separate phy and drm trees once deemed
-> ready.
-> 
-> So patches 1+2 are expected to go through the phy-tree and the rest
-> should go through the drm tree.
+On Wed, Feb 21, 2018 at 01:33:10PM +0900, Katsuhiro Suzuki wrote:
 
-For patches 2, 3, 4, 6, 7, 8,
+> +Optional properties:
+> +- VCCA-supply : regulator phandle for the VCCA supply
+> +- VCCP1-supply: regulator phandle for the VCCP1 supply
+> +- VCCP2-supply: regulator phandle for the VCCP2 supply
 
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-
-> changes in v2:
-> - phy: prevent overflow in tmdsclk calculation
->    as reported by Martin Cerveny
-> - phy: use unsigned long for all tmdsclk rate uses
-> - phy: simplify tmds rate calculation
-> 
-> - dropped patch exporting some dw-hdmi phy functions
->    as a similar patch entered drm-misc already
-> 
-> Heiko Stuebner (6):
->    drm/bridge: dw-hdmi: allow overriding of phy-type reading
->    drm/rockchip: dw_hdmi: Allow outputs that don't need output switching
->    dt-bindings: allow optional phys in Rockchip dw_hdmi binding
->    drm/rockchip: dw_hdmi: allow including external phys
->    drm/rockchip: dw_hdmi: store rockchip_hdmi reference in phy_data
->      object
->    drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328
-> 
-> Zheng Yang (2):
->    dt-bindings: add binding for Rockchip hdmi phy using an Innosilicon IP
->    phy: add Rockchip Innosilicon hdmi phy
-> 
->   .../bindings/display/rockchip/dw_hdmi-rockchip.txt |    3 +
->   .../bindings/phy/phy-rockchip-inno-hdmi.txt        |   42 +
->   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |    4 +-
->   drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  130 ++-
->   drivers/phy/rockchip/Kconfig                       |    7 +
->   drivers/phy/rockchip/Makefile                      |    1 +
->   drivers/phy/rockchip/phy-rockchip-inno-hdmi.c      | 1209 ++++++++++++++++++++
->   include/drm/bridge/dw_hdmi.h                       |    1 +
->   8 files changed, 1393 insertions(+), 4 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
->   create mode 100644 drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
-> 
+These should be documented as mandatory unless the device genuinely
+operates without power which seems unlikely.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180221/385276bc/attachment.sig>
