@@ -1,24 +1,110 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 21 Feb 2018 18:44:51 +0100
-Subject: [PATCH v4 18/40] KVM: arm64: Rewrite sysreg alternatives to
- static keys
-In-Reply-To: <20180215210332.8648-19-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-19-christoffer.dall@linaro.org>
-Message-ID: <20180221174451.4p24h2aqbymrjfqs@kamzik.brq.redhat.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 21 Feb 2018 18:46:28 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v7_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <ebc57f3b-4f5d-612f-5b63-ddda4dd25031@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
+ <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
+ <CAMRc=Mf_pumyTZPn9T=sG7Ab95YS3KqKc2bT0evhESTRRFeiuQ@mail.gmail.com>
+ <ebc57f3b-4f5d-612f-5b63-ddda4dd25031@lechnology.com>
+Message-ID: <CAMRc=MdQy-Y3mDh++sfFPhV3o544J-K_P9DMuzWZq9XCfESH5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 10:03:10PM +0100, Christoffer Dall wrote:
-> As we are about to move calls around in the sysreg save/restore logic,
-> let's first rewrite the alternative function callers, because it is
-> going to make the next patches much easier to read.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/hyp/sysreg-sr.c | 17 ++++-------------
->  1 file changed, 4 insertions(+), 13 deletions(-)
+2018-02-21 18:05 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 02/21/2018 06:01 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-02-20 19:39 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>
+>>> On 02/20/2018 07:33 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>>>
+>>>>>
+>>>>> This series converts mach-davinci to use the common clock framework.
+>>>>>
+>>>>>
+>>>>
+>>>> Hi David,
+>>>>
+>>>> just some quick results from today's playing with v7.
+>>>>
+>>>> I started out with da850-lcdk with my standard rootfs over NFS. I was
+>>>> not able to boot to console so far. The first problem is that mdio
+>>>> fails to probe:
+>>>>
+>>>> libphy: Fixed MDIO Bus: probed
+>>>> davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
+>>>> davinci_mdio 1e24000.mdio: no live phy, scanning all
+>>>> davinci_mdio: probe of 1e24000.mdio failed with error -5> After some
+>>>> digging I noticed that the supplied clock rate differs
+>>>> between mainline (114000000Hz) vs common-clock-v7 (18000000). Since
+>>>> we're not setting the rate in mdio, using LPSC_SET_RATE_PARENT would
+>>>> not help like with lcdc.
+>>>
+>>>
+>>>
+>>> Can you post the output of this command so that I can see how your
+>>> clocks are setup:
+>>>
+>>> cat /sys/kernel/debug/clk/clk_summary
+>>>
+>>>
+>>>>
+>>>> After that, the boot just hangs without ever getting to emac's probe.
+>>>
+>>>
+>>>
+>>> Using your workaround, can you run:
+>>>
+>>> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>>>
+>>> If you see:
+>>>    1e27000.clock-controller: emac  off-0
+>>>
+>>> then genpd is not working like it is supposed to. You should see
+>>> something
+>>> like this for device that are working:
+>>>            1e27000.clock-controller: uart2  on
+>>>      /devices/platform/soc at 1c00000/1d0d000.serial        active
+>>>
+>>>
+>>>>
+>>>> Once I set the emac clock to always enabled (a workaround that was
+>>>> necessary with v6, but could be dropped with my first
+>>>> genpd-in-a-separate-driver attempt), I'm getting a rather strange NULL
+>>>> pointer dereference:
+>>>
+>>>
+>>>
+>>> I noticed this too when adding the power-domains property to some device
+>>> tree nodes. This is part of the reason why I didn't add it everywhere.
+>>> I wasn't able to figure out the cause of this yet. As a work around
+>>> though, please try removing the power-domains property from the emac
+>>> and mdio nodes and use your previous workaround of having an always
+>>> enabled clock.
+>>>
+>>>
+>>
+>> When I use any of the workarounds I just keep getting more problems
+>> (e.g. [1] from blk and pinctrl). I only had a couple hours today to
+>> play with it but it seems to me we have some memory corruption
+>> somewhere. I'll check the initialization order of all the frameworks
+>> involved tomorrow.
+>>
+>> Best regards,
+>> Bartosz
+>>
+>> [1] https://pastebin.com/75mkkuJL
+>>
+>
+> I wonder if we need to delete all of the __init and __initconst attributes
+> now that this has been converted to platform devices.
 >
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Duh... Of course we do. IIRC everything in the init section gets
+removed after late_initcall. I'll test that tomorrow.
+
+Bart
