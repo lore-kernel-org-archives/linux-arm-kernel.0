@@ -1,55 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 21 Feb 2018 23:38:33 +0100
-Subject: [PATCH v2 08/10] gpio: Add gpio driver for Actions OWL S900 SoC
-In-Reply-To: <CAHp75VfLkmZp7HwX-du4EYdtJ8h=y59OrSbu53Ltf-_kFfpczg@mail.gmail.com>
-References: <20180221160044.15089-1-manivannan.sadhasivam@linaro.org>
- <20180221160044.15089-9-manivannan.sadhasivam@linaro.org>
- <CAHp75VfLkmZp7HwX-du4EYdtJ8h=y59OrSbu53Ltf-_kFfpczg@mail.gmail.com>
-Message-ID: <aa4ce18d-fd83-c7f1-22fc-59538881ea51@suse.de>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Wed, 21 Feb 2018 15:59:11 -0700
+Subject: [PATCH 01/14] iommu: Add DOMAIN_ATTR_ENABLE_TTBR1
+In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
+References: <20180221225924.30737-1-jcrouse@codeaurora.org>
+Message-ID: <20180221225924.30737-2-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.02.2018 um 20:13 schrieb Andy Shevchenko:
-> On Wed, Feb 21, 2018 at 6:00 PM, Manivannan Sadhasivam
-> <manivannan.sadhasivam@linaro.org> wrote:
->> Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
->> controlling the gpio shares the same register range with pinctrl block.
->>
->> GPIO registers are organized as 6 banks and each bank controls the
->> maximum of 32 gpios.
-> 
->> +static void owl_gpio_set_reg(void __iomem *base, unsigned int pin, int flag)
->> +{
->> +       u32 val;
->> +
->> +       if (flag) {
->> +               val = readl(base);
->> +               val |= BIT(pin);
->> +               writel(val, base);
->> +       } else {
->> +               val = readl(base);
->> +               val &= ~BIT(pin);
->> +               writel(val, base);
->> +       }
->> +}
-> 
-> Why not to use the same pattern as below?
-> 
-> readl()
-> if ()
->  ...
-> else
-> ...
-> writel()
-> 
-> ?
+Add a new domain attribute to enable the TTBR1 pagetable for drivers
+and devices that support it.  This will enabled using a TTBR1 (otherwise
+known as a "global" or "system" pagetable for devices that support a split
+pagetable scheme for switching pagetables quickly and safely.
 
-And shouldn't that be readl_relaxed() and writel_relaxed()?
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards,
-Andreas
-
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 641aaf0f1b81..e2c49e583d8d 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -153,6 +153,7 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+ 	DOMAIN_ATTR_FSL_PAMUV1,
+ 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
++	DOMAIN_ATTR_ENABLE_TTBR1,
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.16.1
