@@ -1,62 +1,93 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 21 Feb 2018 15:59:17 -0700
-Subject: [PATCH 07/14] drm/msm: Enable 64 bit mode by default
+Date: Wed, 21 Feb 2018 15:59:22 -0700
+Subject: [PATCH 12/14] drm/msm: Add support for per-instance address spaces
 In-Reply-To: <20180221225924.30737-1-jcrouse@codeaurora.org>
 References: <20180221225924.30737-1-jcrouse@codeaurora.org>
-Message-ID: <20180221225924.30737-8-jcrouse@codeaurora.org>
+Message-ID: <20180221225924.30737-13-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A5XX GPUs can be run in either 32 or 64 bit mode. The GPU registers
-and the microcode use 64 bit virtual addressing in either case but the
-upper 32 bits are ignored if the GPU is in 32 bit mode. There is no
-performance disadvantage to remaining in 64 bit mode even if we are
-only generating 32 bit addresses so switch over now to prepare for
-using addresses above 4G for targets that support them.
+Add a function to allocate a new pasid from a existing
+MMU domain and create a per-instance address space.
 
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- drivers/gpu/drm/msm/adreno/a5xx_gpu.c | 14 ++++++++++++++
- drivers/gpu/drm/msm/msm_iommu.c       |  2 +-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/msm/msm_drv.h     |  3 +++
+ drivers/gpu/drm/msm/msm_gem_vma.c | 36 +++++++++++++++++++++++++++++++-----
+ 2 files changed, 34 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
-index 7e09d44e4a15..c106606887e2 100644
---- a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
-+++ b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
-@@ -695,6 +695,20 @@ static int a5xx_hw_init(struct msm_gpu *gpu)
- 		REG_A5XX_RBBM_SECVID_TSB_TRUSTED_BASE_HI, 0x00000000);
- 	gpu_write(gpu, REG_A5XX_RBBM_SECVID_TSB_TRUSTED_SIZE, 0x00000000);
+diff --git a/drivers/gpu/drm/msm/msm_drv.h b/drivers/gpu/drm/msm/msm_drv.h
+index 0499b1708f52..4fbc3188d776 100644
+--- a/drivers/gpu/drm/msm/msm_drv.h
++++ b/drivers/gpu/drm/msm/msm_drv.h
+@@ -178,6 +178,9 @@ void msm_gem_address_space_put(struct msm_gem_address_space *aspace);
+ struct msm_gem_address_space *
+ msm_gem_address_space_create(struct device *dev, struct iommu_domain *domain,
+ 		const char *name);
++struct msm_gem_address_space *
++msm_gem_address_space_create_instance(struct msm_mmu *parent, const char *name,
++		u64 start, u64 end);
  
-+	/* Put the GPU into 64 bit by default */
-+	gpu_write(gpu, REG_A5XX_CP_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_VSC_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_GRAS_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_RB_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_PC_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_HLSQ_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_VFD_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_VPC_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_UCHE_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_SP_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_TPL1_ADDR_MODE_CNTL, 0x1);
-+	gpu_write(gpu, REG_A5XX_RBBM_SECVID_TSB_ADDR_MODE_CNTL, 0x1);
-+
- 	ret = adreno_hw_init(gpu);
- 	if (ret)
- 		return ret;
-diff --git a/drivers/gpu/drm/msm/msm_iommu.c b/drivers/gpu/drm/msm/msm_iommu.c
-index b23d33622f37..fdbe1a8372f0 100644
---- a/drivers/gpu/drm/msm/msm_iommu.c
-+++ b/drivers/gpu/drm/msm/msm_iommu.c
-@@ -30,7 +30,7 @@ static int msm_fault_handler(struct iommu_domain *domain, struct device *dev,
- 	struct msm_iommu *iommu = arg;
- 	if (iommu->base.handler)
- 		return iommu->base.handler(iommu->base.arg, iova, flags);
--	pr_warn_ratelimited("*** fault: iova=%08lx, flags=%d\n", iova, flags);
-+	pr_warn_ratelimited("*** fault: iova=%16lx, flags=%d\n", iova, flags);
- 	return 0;
+ void msm_gem_submit_free(struct msm_gem_submit *submit);
+ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
+diff --git a/drivers/gpu/drm/msm/msm_gem_vma.c b/drivers/gpu/drm/msm/msm_gem_vma.c
+index d34e331554f3..ef33026f593f 100644
+--- a/drivers/gpu/drm/msm/msm_gem_vma.c
++++ b/drivers/gpu/drm/msm/msm_gem_vma.c
+@@ -92,10 +92,11 @@ msm_gem_map_vma(struct msm_gem_address_space *aspace,
  }
  
+ struct msm_gem_address_space *
+-msm_gem_address_space_create(struct device *dev, struct iommu_domain *domain,
+-		const char *name)
++msm_gem_address_space_new(struct msm_mmu *mmu, const char *name,
++		u64 start, u64 end)
+ {
+ 	struct msm_gem_address_space *aspace;
++	u64 size = end - start;
+ 
+ 	aspace = kzalloc(sizeof(*aspace), GFP_KERNEL);
+ 	if (!aspace)
+@@ -103,12 +104,37 @@ msm_gem_address_space_create(struct device *dev, struct iommu_domain *domain,
+ 
+ 	spin_lock_init(&aspace->lock);
+ 	aspace->name = name;
+-	aspace->mmu = msm_iommu_new(dev, domain);
++	aspace->mmu = mmu;
+ 
+-	drm_mm_init(&aspace->mm, (domain->geometry.aperture_start >> PAGE_SHIFT),
+-			(domain->geometry.aperture_end >> PAGE_SHIFT) - 1);
++	drm_mm_init(&aspace->mm, (start >> PAGE_SHIFT), size >> PAGE_SHIFT);
+ 
+ 	kref_init(&aspace->kref);
+ 
+ 	return aspace;
+ }
++
++struct msm_gem_address_space *
++msm_gem_address_space_create(struct device *dev, struct iommu_domain *domain,
++		const char *name)
++{
++	struct msm_mmu *mmu = msm_iommu_new(dev, domain);
++
++	if (IS_ERR(mmu))
++		return ERR_CAST(mmu);
++
++	return msm_gem_address_space_new(mmu, name,
++		domain->geometry.aperture_start,
++		domain->geometry.aperture_end);
++}
++
++struct msm_gem_address_space *
++msm_gem_address_space_create_instance(struct msm_mmu *parent, const char *name,
++		u64 start, u64 end)
++{
++	struct msm_mmu *instance = msm_iommu_pasid_new(parent);
++
++	if (IS_ERR(instance))
++		return ERR_CAST(instance);
++
++	return msm_gem_address_space_new(instance, name, start, end);
++}
 -- 
 2.16.1
