@@ -1,162 +1,38 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 22 Feb 2018 15:32:23 +0000
-Subject: [PATCH 2/6] mfd: Add ST Multi-Function eXpander core driver
-In-Reply-To: <CACRpkdbcEv3PyqjhzteKhx9pDfoJntKReVT2kBNY+-HSpaXh2A@mail.gmail.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
- <CACRpkdbcEv3PyqjhzteKhx9pDfoJntKReVT2kBNY+-HSpaXh2A@mail.gmail.com>
-Message-ID: <5bc0dc54-7a63-3b37-2785-ff1460683620@st.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 22 Feb 2018 16:33:25 +0100
+Subject: [PATCH v3 8/8] drm/sun4i: backend: Remove ARGB spoofing
+In-Reply-To: <CAGb2v658h+MKv--py2cZdUp_iDje9MBSe8vOXBfgyoHRPyz_5g@mail.gmail.com>
+References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+ <965180afd8169ccaa848f061d16a2c1a9ec4d289.1518802627.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v658h+MKv--py2cZdUp_iDje9MBSe8vOXBfgyoHRPyz_5g@mail.gmail.com>
+Message-ID: <20180222153325.vbkpbscghlqcbnjc@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 22, 2018 at 10:15:07PM +0800, Chen-Yu Tsai wrote:
+> On Sat, Feb 17, 2018 at 1:39 AM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > We've had some code for quite some time to prevent the alpha bug from
+> > happening on the lowest primary plane. Since we now check for this in our
+> > atomic_check, we can simply remove it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
+Applied the patches 4, 5, 6 and 8 with your reviewed-by.
 
-On 02/22/2018 02:44 PM, Linus Walleij wrote:
-> On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
-> 
-> Thanks for working on this complex expander driver.
-> It is a bit daunting. Sorry if there are lots of comments and
-> considerations, but it reflects the complexity of the hardware.
-> 
->> +enum mfx_block {
->> +       MFX_BLOCK_GPIO          = BIT(0),
->> +       MFX_BLOCK_TS            = BIT(1),
->> +       MFX_BLOCK_IDD           = BIT(2),
->> +       MFX_BLOCK_ALTGPIO       = BIT(3),
->> +};
-> 
-> This looks suspiciously similar to this:
-> 
-> enum stmpe_block {
->          STMPE_BLOCK_GPIO        = 1 << 0,
->          STMPE_BLOCK_KEYPAD      = 1 << 1,
->          STMPE_BLOCK_TOUCHSCREEN = 1 << 2,
->          STMPE_BLOCK_ADC         = 1 << 3,
->          STMPE_BLOCK_PWM         = 1 << 4,
->          STMPE_BLOCK_ROTATOR     = 1 << 5,
-> };
-> 
-> Apparently the same hardware designers are involved.
-> 
+Thanks!
+Maxime
 
-Or the firmware developers were heavely inspired by STMPE!
-
->> +int mfx_reg_write(struct mfx *mfx, u8 reg, u8 data);
->> +int mfx_reg_read(struct mfx *mfx, u8 reg);
->> +int mfx_block_read(struct mfx *mfx, u8 reg, u8 length, u8 *values);
->> +int mfx_block_write(struct mfx *mfx, u8 reg, u8 length, const u8 *values);
->> +int mfx_set_bits(struct mfx *mfx, u8 reg, u8 mask, u8 val);
-> 
-> Do you need this? Can't you just use regmap and pass
-> around a struct regmap *map to access registers?
-> 
-> You don't necessarily need to use the default I2C regmap
-> (like, e.g. drivers/mfd/stw481x.c) but even if a more
-> complex access pattern is used to read/write registers
-> I am pretty sure you can use regmap for it.
-> 
-
-Yes, Lee has also raised this point.
-
->> +int mfx_enable(struct mfx *mfx, unsigned int blocks);
->> +int mfx_disable(struct mfx *mfx, unsigned int blocks);
-> 
-> This is similar to
-> extern int stmpe_enable(struct stmpe *stmpe, unsigned int blocks);
-> extern int stmpe_disable(struct stmpe *stmpe, unsigned int blocks);
-> 
-> So again I am suspicious about duplication of driver code.
-> 
-> It even looks a bit like this driver started as a copy of
-> the STMPE driver, which is not a good sign. It might be
-> that it was copied from there because the hardware is
-> actually very similar.
-> 
-
-HW is different, FW looks like similar.
-
->> +/* General */
->> +#define MFX_REG_CHIP_ID                        0x00 /* R */
->> +#define MFX_REG_FW_VERSION_MSB         0x01 /* R */
->> +#define MFX_REG_FW_VERSION_LSB         0x02 /* R */
->> +#define MFX_REG_SYS_CTRL               0x40 /* RW */
-> 
-> The STMPE driver defines enumerated registers in
-> include/linux/mfd/stmpe.h
-> then assign each variant using the model specifics in
-> drivers/mfd/stmpe.h
-> 
-> This doesn't seem super much different.
-> 
-> Even if the old STMPE driver may be a bad fit, is is better
-> to improve that (e.g. migrate it to use regmap and rewrite the
-> stmpe-gpio.c driver to use pin control) and use also for this
-> driver, or write a new driver from scratch like this?
-> 
-> I'm not so sure.
-> 
-> I do know that developers not always like to take out old
-> hardware and old development boards and start hacking
-> away before they can get some nice new hardware going
-> but I am worried that this may be one of those cases where
-> a serious cleanup of the aging STMPE driver may be a
-> first necessary step.
-> 
-Just looking at [1], we see that the STMPE remaining active are the 
-STMPE1600 and STMPE1801. All the others are obsolete.
-
-[1] 
-http://www.st.com/en/interfaces-and-transceivers/i-o-expanders.html?querycriteria=productId=SC1027
-
->> +/* IRQ output management */
->> +#define MFX_REG_IRQ_OUT_PIN            0x41 /* RW */
->> +#define MFX_REG_IRQ_SRC_EN             0x42 /* RW */
->> +#define MFX_REG_IRQ_PENDING            0x08 /* R */
->> +#define MFX_REG_IRQ_ACK                        0x44 /* RW */
-> 
-> Very similar to STMPE it seems.
-> 
-
-IRQ_OUT_PIN is different (edge not supported, open drain or push pull 
-output) and IRQ_ACK new.
-
->> +/* MFX_REG_SYS_CTRL bitfields */
->> +#define MFX_REG_SYS_CTRL_GPIO_EN       BIT(0)
->> +#define MFX_REG_SYS_CTRL_TS_EN         BIT(1)
->> +#define MFX_REG_SYS_CTRL_IDD_EN                BIT(2)
->> +#define MFX_REG_SYS_CTRL_ALTGPIO_EN    BIT(3)
-> 
-> I guess these blocks works the same as with STMPE,
-> that you can only use one of them at the time?
-> 
-> What is altgpio?
-> 
-
-ALTGPIO enables the use of GPIO[23:16] only if IDD and/or TS is/are 
-disabled. TS and IDD have priority, if IDD and TS are enabled, ALTGPIO 
-is forced to 0 by MFX FW.
-When IDD is used GPIO[19:16] can be used as GPIO.
-When TS is used GPIO[24:20] can be used as GPIO.
-
->> +/* MFX_REG_IRQ_OUT_PIN bitfields */
->> +#define MFX_REG_IRQ_OUT_PIN_TYPE       BIT(0) /* 0-OD 1-PP */
->> +#define MFX_REG_IRQ_OUT_PIN_POL                BIT(1) /* 0-active LOW 1-active HIGH */
-> 
-> I have not read the patch yet. But just for notice:
-> This output IRQ type needs to be handled as well.
-> 
-> Check the code in
-> drivers/iio/common/st_sensors/st_sensors_trigger.c
-> 
-> To see how you can detect the properties of an IRQ
-> to set the right polarity, and handling of open drain
-> IRQ lines.
-> 
-
-Thanks, I will have a look on this driver.
-Regards,
-Amelie
-
-> Yours,
-> Linus Walleij
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/f31d1447/attachment.sig>
