@@ -1,66 +1,66 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 22 Feb 2018 21:15:10 +0900
-Subject: [PATCH v3 0/5] linux/const.h: cleanups of macros such as UL(),
- _BITUL(), BIT() etc.
-Message-ID: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 22 Feb 2018 21:15:15 +0900
+Subject: [PATCH v3 5/5] linux/const.h: move BIT(_ULL) to linux/const.h for use
+ in assembly
+In-Reply-To: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 2fc016c5bd8a ("linux/const.h: Add _BITUL() and _BITULL()")
+introduced _BITUL() and _BITULL().  Its git-log says the difference
+from the already existing BIT() are:
 
-ARM, ARM64, UniCore32 define UL() as a shorthand of _AC(..., UL).
-More architectures may introduce it in the future.
+  1. The namespace is such that they can be used in uapi definitions.
+  2. The type is set with the _AC() macro to allow it to be used in
+     assembly.
+  3. The type is explicitly specified to be UL or ULL.
 
-UL() is arch-agnostic, and useful. So let's move it to
-include/linux/const.h
+However, I found _BITUL() is mostly used in kernel-space since it is
+handy to share headers between C and assembly.  If we only need '2.',
+we can improve the existing BIT() for use in assembly, allowing us to
+avoid unnecessary underscore prefixes.
 
-Currently, <asm/memory.h> must be included to use UL().
-It pulls in more bloats just for defining some bit macros.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+V2: https://patchwork.kernel.org/patch/9498271/
 
-I posted V2 one year ago.
+Changes in v3: None
+Changes in v2: None
 
-The previous posts are:
-https://patchwork.kernel.org/patch/9498273/
-https://patchwork.kernel.org/patch/9498275/
-https://patchwork.kernel.org/patch/9498269/
-https://patchwork.kernel.org/patch/9498271/
+ include/linux/bitops.h | 3 +--
+ include/linux/const.h  | 3 +++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-At that time, what blocked this series was a comment from
-David Howells:
-  You need to be very careful doing this.  Some userspace stuff
-  depends on the guard macro names on the kernel header files.
-
-(https://patchwork.kernel.org/patch/9498275/)
-
-Looking at the code closer, I noticed this is not a problem.
-
-See the following line.
-https://github.com/torvalds/linux/blob/v4.16-rc2/scripts/headers_install.sh#L40
-
-scripts/headers_install.sh rips off _UAPI prefix from guard macro names.
-
-I ran "make headers_install" and confirmed the result is what I expect.
-
-So, we can prefix the include guard of include/uapi/linux/const.h,
-and add a new include/linux/const.h.
-
-
-
-Masahiro Yamada (5):
-  linux/const.h: prefix include guard of uapi/linux/const.h with _UAPI
-  m68k: rename UL() to TO_UL()
-  linux/const.h: move UL() macro to include/linux/const.h
-  linux/const.h: refactor _BITUL and _BITULL a bit
-  linux/const.h: move BIT(_ULL) to linux/const.h for use in assembly
-
- arch/arm/include/asm/memory.h       |  6 ------
- arch/arm64/include/asm/memory.h     |  6 ------
- arch/m68k/mm/init.c                 |  6 +++---
- arch/unicore32/include/asm/memory.h |  6 ------
- include/linux/bitops.h              |  3 +--
- include/linux/const.h               | 12 ++++++++++++
- include/uapi/linux/const.h          | 13 ++++++++-----
- 7 files changed, 24 insertions(+), 28 deletions(-)
- create mode 100644 include/linux/const.h
-
+diff --git a/include/linux/bitops.h b/include/linux/bitops.h
+index 4cac4e1..8a856be 100644
+--- a/include/linux/bitops.h
++++ b/include/linux/bitops.h
+@@ -1,11 +1,10 @@
+ /* SPDX-License-Identifier: GPL-2.0 */
+ #ifndef _LINUX_BITOPS_H
+ #define _LINUX_BITOPS_H
++#include <linux/const.h>
+ #include <asm/types.h>
+ 
+ #ifdef	__KERNEL__
+-#define BIT(nr)			(1UL << (nr))
+-#define BIT_ULL(nr)		(1ULL << (nr))
+ #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+ #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+ #define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+diff --git a/include/linux/const.h b/include/linux/const.h
+index 7b55a55..200892d 100644
+--- a/include/linux/const.h
++++ b/include/linux/const.h
+@@ -6,4 +6,7 @@
+ #define UL(x)		(_UL(x))
+ #define ULL(x)		(_ULL(x))
+ 
++#define BIT(x)		(_BITUL(x))
++#define BIT_ULL(x)	(_BITULL(x))
++
+ #endif /* _LINUX_CONST_H */
 -- 
 2.7.4
