@@ -1,40 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Feb 2018 17:45:09 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.16 (#1)
-In-Reply-To: <87wozemtva.fsf@bootlin.com>
-References: <87wozemtva.fsf@bootlin.com>
-Message-ID: <CAK8P3a2KyOYYY4RSDueYUv7gGo9McT+v+FBXmJscV5Hw3_6_JA@mail.gmail.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 22 Feb 2018 19:42:29 +0200
+Subject: [PATCH v3 06/10] pwm: add PWM modes
+In-Reply-To: <CAHp75Ver6GuKSDooAr2DW+eqt=B3p8O+X6+rOSWNgfhHxgVqNQ@mail.gmail.com>
+References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
+ <1519300881-8136-7-git-send-email-claudiu.beznea@microchip.com>
+ <CAHp75Ver6GuKSDooAr2DW+eqt=B3p8O+X6+rOSWNgfhHxgVqNQ@mail.gmail.com>
+Message-ID: <e5090740-520a-34c0-6b52-09cc8ada11b1@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:26 AM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
-> Hi,
->
-> Here is the first pull request for fixes for mvebu for v4.16.
->
-> Gregory
->
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the Git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.16-1
->
-> for you to fetch changes up to 8aa36a8dcde3183d84db7b0d622ffddcebb61077:
->
->   ARM: mvebu: Fix broken PL310_ERRATA_753970 selects (2018-02-13 16:39:51 +0100)
->
-> ----------------------------------------------------------------
-> mvebu fixes for 4.16 (part 1)
->
-> - Updating my emails address (from free-electrons to bootlin)
-> - Adding back the selection of the PL310 Errata fix for the Cortex A9
->   based Armada SoCs (Armada 375 and 38x)
->
 
-Pulled into fixes, thanks!
 
-       Arnd
+On 22.02.2018 19:28, Andy Shevchenko wrote:
+> On Thu, Feb 22, 2018 at 2:01 PM, Claudiu Beznea
+> <claudiu.beznea@microchip.com> wrote:
+>> Add PWM normal and complementary modes.
+> 
+>> +- PWM_DTMODE_COMPLEMENTARY: PWM complementary working mode (for PWM
+>> +channels two outputs); if not specified, the default for PWM channel will
+>> +be used
+> 
+> What DT stands for?
+It stands for Device Tree. It remained this way from the previous version. In
+the previous version I had modes described in an enum, to be used by PWM core,
+as follows:
+enum pwm_mode {
+	PWM_MODE_NORMAL,
+	PWM_MODE_COMPLEMENTARY,
+};
+
+and, to avoid conflict b/w these defines and the one from
+include/dt-bindings/pwm/pwm.h I introduced this DT in the define names from
+dt-bindings. But now the DT might be removed since I've changed the way the PWM
+mode is identified in PWM core. I will remove the DT in the next version, if not
+requested otherwise.
+
+Thank you,
+Claudiu Benea
