@@ -1,123 +1,205 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Fri, 23 Feb 2018 02:02:32 +0800
-Subject: [PATCH] arm64: rename the function arm64_is_ras_serror() to avoid
- confusion
-Message-ID: <1519322552-7374-1-git-send-email-gengdongjiu@huawei.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 22 Feb 2018 10:03:42 +0000
+Subject: [PATCH v3 01/25] dt-bindings: soc: qcom: Add bindings for APR bus
+In-Reply-To: <CAL_JsqK3KFBGqpHRaURSrHew1HhObUvFYxuhND-FOQ4tCUaAHg@mail.gmail.com>
+References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
+ <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
+ <20180213231244.ama4bwsehzuh5sr7@rob-hp-laptop>
+ <ae65a9c8-85a3-5494-f4cc-1038fd8c9bd1@linaro.org>
+ <20180218230414.dkd6kb6kd35arcyv@rob-hp-laptop>
+ <636d4ac2-3bc2-7290-1645-0451c089cb8a@linaro.org>
+ <CAL_JsqK3KFBGqpHRaURSrHew1HhObUvFYxuhND-FOQ4tCUaAHg@mail.gmail.com>
+Message-ID: <465a2ca7-9f74-8977-37ea-29fe3944c27c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RAS SError Syndrome can be Implementation-Defined,
-arm64_is_ras_serror() is used to judge whether it is RAS SError,
-but arm64_is_ras_serror() does not include this judgement. In order
-to avoid function name confusion, we rename the arm64_is_ras_serror()
-to arm64_is_categorized_ras_serror(), this function is used to
-judge whether it is categorized RAS Serror.
 
-Change some code notes, unrecoverable RAS errors is imprecise, but
-Recoverable RAS errors is precise.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
- arch/arm64/include/asm/traps.h | 20 ++++++++------------
- arch/arm64/kernel/traps.c      |  9 +++++----
- arch/arm64/kvm/handle_exit.c   |  3 ++-
- 3 files changed, 15 insertions(+), 17 deletions(-)
+On 22/02/18 00:14, Rob Herring wrote:
+> On Tue, Feb 20, 2018 at 3:33 AM, Srinivas Kandagatla
+> <srinivas.kandagatla@linaro.org> wrote:
+>> Thanks for your review comments,
+>>
+>>
+>> On 18/02/18 23:04, Rob Herring wrote:
+>>>
+>>> On Wed, Feb 14, 2018 at 09:13:23AM +0000, Srinivas Kandagatla wrote:
+>>>>
+>>>> Thanks for the review,
+>>>>
+>>>> On 13/02/18 23:12, Rob Herring wrote:
+>>>>>
+>>>>> On Tue, Feb 13, 2018 at 04:58:13PM +0000, srinivas.kandagatla at linaro.org
+>>>>> wrote:
+>>>>>>
+>>>>>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>>>>>
+>>>>>> This patch add dt bindings for Qualcomm APR (Asynchronous Packet
+>>>>>> Router)
+>>>>>> bus driver. This bus is used for communicating with DSP which provides
+>>>>>> audio and various other services to cpu.
+>>>>>>
+>>>>>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>>>>> ---
+>>>>>>     .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 83
+>>>>>> ++++++++++++++++++++++
+>>>>>>     1 file changed, 83 insertions(+)
+>>>>>>     create mode 100644
+>>>>>> Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+>>>>>> b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+>>>>>> new file mode 100644
+>>>>>> index 000000000000..1b95fbfed348
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+>>>>>> @@ -0,0 +1,83 @@
+>>>>>> +Qualcomm APR (Asynchronous Packet Router) binding
+>>>>>> +
+>>>>>> +This binding describes the Qualcomm APR. APR is a IPC protocol for
+>>>>>> +communication between Application processor and QDSP. APR is mainly
+>>>>>> +used for audio/voice services on the QDSP.
+>>>>>> +
+...
+>>>>>
+>>>>>
+>>>>> It's not a good design generally to mix different types of nodes at one
+>>>>> level.
+>>>>
+>>>>
+>>>> I agree, may be I can split the services and devices into different
+>>>> subnodes
+>>>> like below, which should avoid mixing different types of nodes.
+>>>>
+>>>> Does this sound good to you?
+>>>
+>>>
+>>> Seems your original example wasn't so complete...
+>>>
+>> Yep, I will fix it in next version.
+>>>
+>>> I don't see why you need all these nodes in the first place. For a
+>>> single SoC, how much does all this vary?
+>>>
+>> It might not vary for a given SoC, but It does vary across the SoCs.
+>> Also the versions of each service are independent to each other.
+> 
+> Not sure I follow the last statement. Meaning firmware updates change
+> the services?
+Sorry for not being clear, so the services like AFE, ASM, ADM have 
+different version numbers for a given SoC/firmware.
 
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 178e338..2a02b64 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -72,18 +72,23 @@ static inline int in_entry_text(unsigned long ptr)
-  * CPUs with the RAS extensions have an Implementation-Defined-Syndrome bit
-  * to indicate whether this ESR has a RAS encoding. CPUs without this feature
-  * have a ISS-Valid bit in the same position.
-- * If this bit is set, we know its not a RAS SError.
-+ * If this bit is set, we know it is not a categorized RAS SError.
-  * If its clear, we need to know if the CPU supports RAS. Uncategorized RAS
-  * errors share the same encoding as an all-zeros encoding from a CPU that
-  * doesn't support RAS.
-  */
--static inline bool arm64_is_ras_serror(u32 esr)
-+static inline bool arm64_is_categorized_ras_serror(u32 esr)
- {
- 	WARN_ON(preemptible());
- 
-+	/* This is Implementation-Defined Syndrome */
- 	if (esr & ESR_ELx_IDS)
- 		return false;
- 
-+	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)
-+		/* No severity information : Uncategorized */
-+		return false;
-+
- 	if (this_cpu_has_cap(ARM64_HAS_RAS_EXTN))
- 		return true;
- 	else
-@@ -101,20 +106,11 @@ static inline u32 arm64_ras_serror_get_severity(u32 esr)
- {
- 	u32 aet = esr & ESR_ELx_AET;
- 
--	if (!arm64_is_ras_serror(esr)) {
-+	if (!arm64_is_categorized_ras_serror(esr)) {
- 		/* Not a RAS error, we can't interpret the ESR. */
- 		return ESR_ELx_AET_UC;
- 	}
- 
--	/*
--	 * AET is RES0 if 'the value returned in the DFSC field is not
--	 * [ESR_ELx_FSC_SERROR]'
--	 */
--	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR) {
--		/* No severity information : Uncategorized */
--		return ESR_ELx_AET_UC;
--	}
--
- 	return aet;
- }
- 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index bbb0fde..e88096a 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -689,12 +689,12 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
- 		 * a more severe error.
- 		 */
- 		return false;
--
-+	/* The exception has been imprecise */
- 	case ESR_ELx_AET_UEU:	/* Uncorrected Unrecoverable */
-+	/* The exception is precise */
- 	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
- 		/*
--		 * The CPU can't make progress. The exception may have
--		 * been imprecise.
-+		 * The CPU can't make progress.
- 		 */
- 		return true;
- 
-@@ -710,7 +710,8 @@ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
- 	nmi_enter();
- 
- 	/* non-RAS errors are not containable */
--	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
-+	if (!arm64_is_categorized_ras_serror(esr) ||
-+			arm64_is_fatal_ras_serror(regs, esr))
- 		arm64_serror_panic(regs, esr);
- 
- 	nmi_exit();
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index e5e741b..913c19e 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -40,7 +40,8 @@
- 
- static void kvm_handle_guest_serror(struct kvm_vcpu *vcpu, u32 esr)
- {
--	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(NULL, esr))
-+	if (!arm64_is_categorized_ras_serror(esr) ||
-+			arm64_is_fatal_ras_serror(NULL, esr))
- 		kvm_inject_vabt(vcpu);
- }
- 
--- 
-1.9.1
+Not 100% sure if firmware updates would change the service version 
+number, even if it does, it can be queried dynamically on new B family 
+SoCs, and on older A Family SoCs I have not seen the firmware updates in 
+last 4 years.
+
+> I don't see any versioning of services here.
+
+Yes, Plan is that it will be part of the compatible string in cases 
+where version query is not supported on older QCOM A family SoCs.
+On B Family SoCs we can query the version dynamically.
+
+> 
+>>
+>>>>
+>>>> apr {
+>>>>           compatible = "qcom,apr-v2";
+>>>>           qcom,smd-channels = "apr_audio_svc";
+>>>>           qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>;
+>>>>
+>>>>           apr-services {
+>>>>                   q6core {
+>>>>                           qcom,apr-svc-name = "CORE";
+>>>>                           qcom,apr-svc-id = <APR_SVC_ADSP_CORE>;
+>>>>                           compatible = "qcom,q6core";
+>>>>                   };
+>>>>
+>>>>                   q6afe: q6afe {
+>>>>                           compatible = "qcom,q6afe";
+>>>>                           qcom,apr-svc-name = "AFE";
+>>>>                           qcom,apr-svc-id = <APR_SVC_AFE>;
+>>>>                           #sound-dai-cells = <1>;
+>>>>                   };
+>>>>
+>>>>                   q6asm: q6asm {
+>>>>                           compatible = "qcom,q6asm";
+>>>>                           qcom,apr-svc-name = "ASM";
+>>>>                           qcom,apr-svc-id = <APR_SVC_ASM>;
+>>>>                           #sound-dai-cells = <1>;
+>>>>                   };
+>>>>
+>>>>                   q6adm: q6adm {
+>>>>                           compatible = "qcom,q6adm";
+>>>>                           qcom,apr-svc-name = "ADM";
+>>>>                           qcom,apr-svc-id = <APR_SVC_ADM>;
+>>>>                           #sound-dai-cells = <0>;
+>>>>                   };
+>>>
+>>>
+>>> All these DAI nodes could be a single node and the cell value be the
+>>> svc-id?
+>>
+So we will have 2 cell values, one representing the apr service and 
+other the dai.
+
+>> No, DAI's here are both backends and frontends, and some of the services
+>> like core, USM are not DAI's
+>>
+>> Are you also saying that we should have a single driver entity for all these
+>> services?
+> 
+> DT nodes do not equate driver entities. A driver can instantiate other drivers.
+> 
+> Am I saying a single DT node for this? Yes, perhaps.
+Yes, I will give that a go.
+
+So we will endup having something like this in DT for one frontend and 
+backend dailink:
+
+apr {
+	compatible = "qcom,apr-v2";
+	qcom,smd-channels = "apr_audio_svc";
+	qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>
+
+	q6audio: audiosvc {
+		compatible = "qcom,q6audio-svc";
+		qcom,apr-svcs = <APR_SVC_CORE APR_SVC_AFE APR_SVC_ASM>;
+		qcom,apr-svc-names = "CORE", "AFE", "ASM";
+	};
+
+	sndcard {
+		compatible = "qcom,msm8996-snd-card"
+		qcom,model = "DB820c";
+		qcom,audio-routing =
+                 	"RX_BIAS", "MCLK";
+		fe at 1 {
+                 	is-fe;
+                         link-name = "MultiMedia1";
+                         cpu {
+                         	sound-dai = <&q6audio  APR_SVC_ASM MM1>	
+			};
+                         platform {
+                         	sound-dai = <&q6audio APR_SVC_ASM MM1>;
+                         };
+                  };
+
+		be at 1 {
+                 	link-name = "HDMI Playback";
+			cpu {
+                         	sound-dai = <&q6audio APR_SVC_AFE HDMI>;
+                         };
+
+                         platform {
+	                        sound-dai = <&q6audio ARP_SVC_ADM>;
+                         };
+
+                         codec {
+                         	sound-dai = <&hdmi 0>;
+			};
+             	};
+	};
+};	
+
+Thanks,
+Srini
