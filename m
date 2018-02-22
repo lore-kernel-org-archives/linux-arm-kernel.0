@@ -1,25 +1,54 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 22 Feb 2018 19:09:46 +1030
-Subject: [PATCH] MAINTAINERS: Update ASPEED entry with details
-In-Reply-To: <20180222050324.21531-1-joel@jms.id.au>
-References: <20180222050324.21531-1-joel@jms.id.au>
-Message-ID: <1519288786.101739.1279390200.1CD3EC51@webmail.messagingengine.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 22 Feb 2018 09:42:31 +0100
+Subject: [PATCH] KVM: arm/arm64: No need to zero CNTVOFF in
+ kvm_timer_vcpu_put() for VHE
+In-Reply-To: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
+References: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20180222084231.GA29376@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shanker,
 
+On Mon, Feb 19, 2018 at 09:38:07AM -0600, Shanker Donthineni wrote:
+> In AArch64/AArch32, the virtual counter uses a fixed virtual offset
+> of zero in the following situations as per ARMv8 specifications:
+> 
+> 1) HCR_EL2.E2H is 1, and CNTVCT_EL0/CNTVCT are read from EL2.
+> 2) HCR_EL2.{E2H, TGE} is {1, 1}, and either:
+>    ? CNTVCT_EL0 is read from Non-secure EL0 or EL2.
+>    ? CNTVCT is read from Non-secure EL0.
+> 
+> So, no need to zero CNTVOFF_EL2/CNTVOFF for VHE case.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 70268c0..86eca324 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -541,9 +541,11 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  	 * The kernel may decide to run userspace after calling vcpu_put, so
+>  	 * we reset cntvoff to 0 to ensure a consistent read between user
+>  	 * accesses to the virtual counter and kernel access to the physical
+> -	 * counter.
+> +	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
+> +	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
+>  	 */
+> -	set_cntvoff(0);
+> +	if (!has_vhe())
+> +		set_cntvoff(0);
+>  }
+>  
+>  /*
 
-On Thu, 22 Feb 2018, at 15:33, Joel Stanley wrote:
-> I am interested in all ASPEED drivers, and the previous match wasn't
-> grabbing files in nested directories. Use N instead.
-> 
-> Add the arm kernel mailing list so that patches get reviewed there, and
-> the linux-aspeed list which exists only so I can use patchwork to track
-> patches.
-> 
-> Add Andrew as a reviewer, because he is involved in reviewing ASPEED
-> stuff.
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+I'm okay with this change.  I don't think there's a huge gain here
+though.
 
-Acked-by: Andrew Jeffery <andrew@aj.id.au>
+Marc, any thoughts or concerns?
+
+Thanks,
+-Christoffer
