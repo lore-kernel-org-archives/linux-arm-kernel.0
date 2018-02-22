@@ -1,90 +1,58 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 22 Feb 2018 12:38:39 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180222113352.oeedj7upx3zxvdcc@lakrids.cambridge.arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A8E2BCE.3050509@codeaurora.org>
- <20180222113352.oeedj7upx3zxvdcc@lakrids.cambridge.arm.com>
-Message-ID: <5A8F2A4F.5020105@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 22 Feb 2018 12:30:54 -0800
+Subject: [PATCH 3/3] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <20180206121854.4407-4-linus.walleij@linaro.org>
+References: <20180206121854.4407-1-linus.walleij@linaro.org>
+ <20180206121854.4407-4-linus.walleij@linaro.org>
+Message-ID: <87k1v4sr5t.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2018 03:33 AM, Mark Rutland wrote:
-> On Wed, Feb 21, 2018 at 06:32:46PM -0800, Saravana Kannan wrote:
->> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
->>> +static int dsu_pmu_event_init(struct perf_event *event)
->>> +{
->>> +	struct dsu_pmu *dsu_pmu = to_dsu_pmu(event->pmu);
->>> +
->>> +	if (event->attr.type != event->pmu->type)
->>> +		return -ENOENT;
->>
->> You are checking if the caller set the attr.type "correctly".
->
-> This is necessary for the case where perf_init_event() falls back to
-> iterating over the list of PMUs, if event->attr.type wasn't found in the
-> idr.
->
-> Without this, we'd erroneously check events intended for other PMUs.
-> So this is correct, and necessary.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Right, I'm aware of this. Which is why I also mentioned below that we 
-can't just blindly delete this.
+> We were previously selecting 1024x768 and 32BPP as the default
+> set-up for the PL111 consumers.
+>
+> This does not work on elder systems: the device tree bindings
+> support a property "max-memory-bandwidth" in bytes/second that
+> states that if you exceed this the memory bus will saturate.
+> The result is flickering and unstable images.
+>
+> Parse the "max-memory-bandwidth" and respect it when
+> intializing the driver. On the RealView PB11MP, Versatile and
+> Integrator/CP we get a nice console as default with this code.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Exploit the new .mode_valid() callback we added to the
+>   simple KMS helper.
+> - Use the hardcoded bits per pixel per variant instead of
+>   trying to be heuristic about this setting for now.
+> ---
+>  drivers/gpu/drm/pl111/pl111_display.c | 30 ++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/pl111/pl111_drm.h     |  1 +
+>  drivers/gpu/drm/pl111/pl111_drv.c     |  6 ++++++
+>  3 files changed, 37 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+> index d75923896609..a1ca9e1ffe15 100644
+> --- a/drivers/gpu/drm/pl111/pl111_display.c
+> +++ b/drivers/gpu/drm/pl111/pl111_display.c
 
->>> +static int dsu_pmu_device_probe(struct platform_device *pdev)
->
->>> +	rc = perf_pmu_register(&dsu_pmu->pmu, name, -1);
->>
->> You are passing in -1 here. Which means the event type is assigned by the
->> perf framework. perf framework uses idr_alloc(&pmu_idr, ...) to get the id.
->> So the id assigned is going to depend on the probe order among the different
->> PMU drivers in the board/platform. So, this seems pretty random.
->
-> The dynamic IDs are supposed to by looked up by name.
->
-> Each PMU has a folder: /sys/bus/event_source/devices/$PMU
->
-> ... with /sys/bus/event_source/devices/$PMU/type giving the type.
->
->> How is the caller supposed to know what to set the "type" to?
->
-> The perf tools understand this already. If you do:
->
-> perf stat -e $PMU/config=0xf00/
->
-> ... they will look up the type for that PMU and use it automatically.
->
+> +	if (bw > priv->memory_bw) {
+> +		DRM_DEBUG("%d x %d @ %d Hz, %d cpp, bw %llu too fast\n",
+> +			  mode->hdisplay, mode->vdisplay, mode->clock, cpp, bw);
+> +
+> +		return MODE_BAD;
+> +	}
 
-Ah, thanks! This finally explains how this is supposed to work from 
-userspace.
-
->> You also can't just delete the check in dsu_pmu_event_init() because the
->> event numbers you expose overlap with the per-CPU event numbers.
->
-> The type check is necessary and cannot be deleted. It provides a
-> namespace for the event IDs.
-
-Right. Which is my point too.
-
->> I'm not exactly sure if we can add entries to perf_type_id. If that's
->> allowed maybe we need to add something line PERF_TYPE_DSU and use that?
->>
->> Or if that's not allowed then would it be better to offset the DSU PMU
->> events by some number (say 0x1000) and then delete the event type check or
->> pass PERF_TYPE_RAW to perf_pmu_register()?
->
-> As above, neither of these should be necessary.
->
-
-For the userspace interface. How about the kernel interface though?
-perf_event_create_kernel_counter() takes attr.type as an input. But 
-there's no way to look up the DSU PMU's "type".
-
-Thanks,
-Saravana
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Oh, hey, on platforms with no memory-bandwidth property, we should make
+sure not to reject all modes :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/15494b96/attachment.sig>
