@@ -1,87 +1,107 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Feb 2018 18:02:02 -0600
-Subject: [PATCH v3 3/7] watchdog: sirfsoc: allow setting timeout in
- devicetree
-In-Reply-To: <e318fd7a-f855-d0c0-ae6f-86bd48f58e1f@roeck-us.net>
-References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
- <20180211200847.25000-3-marcus.folkesson@gmail.com>
- <20180219000735.i5i3gne4idzzhxot@rob-hp-laptop>
- <e318fd7a-f855-d0c0-ae6f-86bd48f58e1f@roeck-us.net>
-Message-ID: <CAL_Jsq+kQza8ouKCreOapno42iSBiG0SwLjJqziv_23cmFxJxw@mail.gmail.com>
+Date: Wed, 21 Feb 2018 18:06:42 -0600
+Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander
+ driver
+In-Reply-To: <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
+ <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
+ <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
+Message-ID: <CAL_JsqJdqd9rpSy9Vra4tjGcAWMLyiXmEmquCUDn8dTXj1YWGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 18, 2018 at 7:07 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 02/18/2018 04:07 PM, Rob Herring wrote:
->>
->> On Sun, Feb 11, 2018 at 09:08:43PM +0100, Marcus Folkesson wrote:
+On Mon, Feb 19, 2018 at 9:59 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+>
+>
+> On 02/19/2018 12:19 AM, Rob Herring wrote:
+>> On Thu, Feb 08, 2018 at 03:27:32PM +0100, Amelie Delaunay wrote:
+>>> This patch adds documentation of device tree bindings for the
+>>> STMicroelectronics Multi-Function eXpander (MFX).
 >>>
->>> watchdog_init_timeout() will allways pick timeout_param since it
->>> defaults to a valid timeout.
->>>
->>> By following best practice described in
->>> Documentation/watchdog/watchdog-kernel-api.txt, it also
->>> let us to set timout-sec property in devicetree.
->>
->>
->> typo
->>
->>>
->>> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
->>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 >>> ---
->>>   Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt | 4 ++++
->>>   drivers/watchdog/sirfsoc_wdt.c                             | 2 +-
->>>   2 files changed, 5 insertions(+), 1 deletion(-)
+>>>   Documentation/devicetree/bindings/mfd/st-mfx.txt | 51 ++++++++++++++++++++++++
+>>>   1 file changed, 51 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/mfd/st-mfx.txt
 >>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
->>> b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
->>> index 9cbc76c89b2b..0dce5e3100b4 100644
->>> --- a/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
->>> +++ b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
->>> @@ -5,10 +5,14 @@ Required properties:
->>>   - reg: Address range of tick timer/WDT register set
->>>   - interrupts: interrupt number to the cpu
->>>   +Optional properties:
->>> +- timeout-sec : Contains the watchdog timeout in seconds
+>>> diff --git a/Documentation/devicetree/bindings/mfd/st-mfx.txt b/Documentation/devicetree/bindings/mfd/st-mfx.txt
+>>> new file mode 100644
+>>> index 0000000..423d800
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mfd/st-mfx.txt
+>>> @@ -0,0 +1,51 @@
+>>> +STMicroelectronics Multi-Function eXpander
 >>> +
->>>   Example:
->>>     timer at b0020000 {
->>>         compatible = "sirf,prima2-tick";
->>>         reg = <0xb0020000 0x1000>;
->>>         interrupts = <0>;
->>> +       timeout-sec = <30>;
->>>   };
->>> diff --git a/drivers/watchdog/sirfsoc_wdt.c
->>> b/drivers/watchdog/sirfsoc_wdt.c
->>> index 4eea351e09b0..ac0c9d2c4aee 100644
->>> --- a/drivers/watchdog/sirfsoc_wdt.c
->>> +++ b/drivers/watchdog/sirfsoc_wdt.c
->>> @@ -29,7 +29,7 @@
->>>   #define SIRFSOC_WDT_MAX_TIMEOUT               (10 * 60)       /* 10
->>> mins */
->>>   #define SIRFSOC_WDT_DEFAULT_TIMEOUT   30              /* 30 secs */
->>>   -static unsigned int timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT;
->>> +static unsigned int timeout;
+>>> +ST Multi-Function eXpander (MFX) is a slave controller using I2C for
+>>> +communication with the main MCU. Its main features are gpio expansion, main
+>>> +MCU IDD measurement (IDD is the amount of current that flows through VDD)
+>>> +and resistive touchscreen controller.
 >>
+>> You don't have to implement all the drivers now, but please completely
+>> describe the device. As is, there is no reason to have a child GPIO
+>> node.
 >>
->> If you have an old dtb, then you still need the default.
+> The MFD driver will be abandoned as only GPIO part is used. I'll send a
+> V2 soon.
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "st,mfx"
 >>
->
-> No. It is optional to start with, and the driver already has
->
-> static struct watchdog_device sirfsoc_wdd = {
->         .info = &sirfsoc_wdt_ident,
->         .ops = &sirfsoc_wdt_ops,
->         .timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT,                 <------
->         .min_timeout = SIRFSOC_WDT_MIN_TIMEOUT,
->         .max_timeout = SIRFSOC_WDT_MAX_TIMEOUT,
-> };
+>> Kind of generic. Only 1 single version ever?
+>>
+> "st-mfx" compatible will disappear in V2 (we keep only GPIO driver). MFX
+> version can be read in MFX FW_VERSION register. So do I keep
+> "st,mfx-gpio" compatible or you want to see mfx version ?
 
-Okay, then:
+That sounds a bit worrying. The other functions will *never* get
+accessed? The DT should reflect the h/w including any future needs,
+not just what you have a driver for today.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+>>> +- reg: I2C address of the device
+>>> +- interrupts: interrupt triggered by MFX_IRQ_OUT signal
+>>> +- interrupt-parent: interrupt controller MFX is connected to
+>>> +- interrupt-controller: marks the device as an interrupt controller
+>>> +- #interrupt-cells: should be <1>, index of the interrupt within the
+>>> +  controller, in accordance with the "one cell" variant of
+>>> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
+>>> +
+>>> +Optional nodes:
+>>> +
+>>> +* GPIO eXpander
+>>> +MFX provides 16 programmable GPIOs, and it is also possible to recover 8
+>>> +alternate GPIOs if the main functions are not used (touchscreen controller and
+>>> +IDD measurement not enabled).
+>>> +
+>>> +Required properties:
+>>> +- compatible : must be "st,mfx-gpio"
+>>> +- interrupt-parent : must be <&mfx>
+>>
+>> Not necessary. A parent node with 'interrupt-controller' property is the
+>> interrupt's parent.
+>>
+> I will keep it in mind.
+>>> +- interrupts = must be <0>
+>>> +- gpio-controller: marks the device node as a GPIO controller
+>>> +- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
+>>> +  controller, the second cell is the gpio flags in accordance with
+>>> +  <dt-bindings/gpio/st-mfx-gpio.h>.
+>>
+>> Custom flags? Use standard flags.
+>>
+>> DT binding headers should be part of this patch.
+>>
+> Custom flags because MFX GPIOs have several types:
+> - Output open drain with internal pull-up resistor
+> - Output open drain without internal pull-up resistor
+> - Output push pull without internal pull resistor
+> - Input with internal pull-up resistor
+> - Input with internal pull-down resistor
+> - Input floating
+> - Input analog.
+> Standard flags don't have pull up or down information. That's why I am
+> using custom flags, they overloads standard flags.
 
-for the lot.
+I'll leave this one to Linus to comment on.
 
-Rob
+> I will add DT bindings header in this patch V2.
