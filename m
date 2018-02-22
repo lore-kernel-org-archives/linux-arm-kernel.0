@@ -1,35 +1,90 @@
-From: gabriel.matni@exfo.com (Gabriel Matni)
-Date: Thu, 22 Feb 2018 20:30:56 +0000
-Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
-Message-ID: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 22 Feb 2018 12:38:39 -0800
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <20180222113352.oeedj7upx3zxvdcc@lakrids.cambridge.arm.com>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A8E2BCE.3050509@codeaurora.org>
+ <20180222113352.oeedj7upx3zxvdcc@lakrids.cambridge.arm.com>
+Message-ID: <5A8F2A4F.5020105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Matni <gabriel.matni@exfo.com>
+On 02/22/2018 03:33 AM, Mark Rutland wrote:
+> On Wed, Feb 21, 2018 at 06:32:46PM -0800, Saravana Kannan wrote:
+>> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
+>>> +static int dsu_pmu_event_init(struct perf_event *event)
+>>> +{
+>>> +	struct dsu_pmu *dsu_pmu = to_dsu_pmu(event->pmu);
+>>> +
+>>> +	if (event->attr.type != event->pmu->type)
+>>> +		return -ENOENT;
+>>
+>> You are checking if the caller set the attr.type "correctly".
+>
+> This is necessary for the case where perf_init_event() falls back to
+> iterating over the list of PMUs, if event->attr.type wasn't found in the
+> idr.
+>
+> Without this, we'd erroneously check events intended for other PMUs.
+> So this is correct, and necessary.
 
-Fixes missing characters on kernel console at low baud rates (i.e.9600).
-The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
-transmitter holding is ready to receive a new byte. Polling TX_EMPTY isn't
-enough as the hardware buffer can become empty but not yet ready for CPU to
-write the next byte.
+Right, I'm aware of this. Which is why I also mentioned below that we 
+can't just blindly delete this.
 
-Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
----
-drivers/tty/serial/mvebu-uart.c | 2 +-
-1 file changed, 1 insertion(+), 1 deletion(-)
+>>> +static int dsu_pmu_device_probe(struct platform_device *pdev)
+>
+>>> +	rc = perf_pmu_register(&dsu_pmu->pmu, name, -1);
+>>
+>> You are passing in -1 here. Which means the event type is assigned by the
+>> perf framework. perf framework uses idr_alloc(&pmu_idr, ...) to get the id.
+>> So the id assigned is going to depend on the probe order among the different
+>> PMU drivers in the board/platform. So, this seems pretty random.
+>
+> The dynamic IDs are supposed to by looked up by name.
+>
+> Each PMU has a folder: /sys/bus/event_source/devices/$PMU
+>
+> ... with /sys/bus/event_source/devices/$PMU/type giving the type.
+>
+>> How is the caller supposed to know what to set the "type" to?
+>
+> The perf tools understand this already. If you do:
+>
+> perf stat -e $PMU/config=0xf00/
+>
+> ... they will look up the type for that PMU and use it automatically.
+>
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index a100e98259d7..f0df0640208e 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
-   u32 val;
+Ah, thanks! This finally explains how this is supposed to work from 
+userspace.
 
-   readl_poll_timeout_atomic(port->membase + UART_STAT, val,
--             (val & STAT_TX_EMP), 1, 10000);
-+             (val & STAT_TX_RDY(port)), 1, 10000);
-}
+>> You also can't just delete the check in dsu_pmu_event_init() because the
+>> event numbers you expose overlap with the per-CPU event numbers.
+>
+> The type check is necessary and cannot be deleted. It provides a
+> namespace for the event IDs.
 
-static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
---
-2.7.4
+Right. Which is my point too.
+
+>> I'm not exactly sure if we can add entries to perf_type_id. If that's
+>> allowed maybe we need to add something line PERF_TYPE_DSU and use that?
+>>
+>> Or if that's not allowed then would it be better to offset the DSU PMU
+>> events by some number (say 0x1000) and then delete the event type check or
+>> pass PERF_TYPE_RAW to perf_pmu_register()?
+>
+> As above, neither of these should be necessary.
+>
+
+For the userspace interface. How about the kernel interface though?
+perf_event_create_kernel_counter() takes attr.type as an input. But 
+there's no way to look up the DSU PMU's "type".
+
+Thanks,
+Saravana
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
