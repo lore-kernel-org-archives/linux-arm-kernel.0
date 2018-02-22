@@ -1,148 +1,207 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 22 Feb 2018 17:02:00 +0100
-Subject: [PATCH v4 38/40] KVM: arm/arm64: Handle VGICv3 save/restore from
- the main VGIC code on VHE
-In-Reply-To: <86o9khjcg2.wl-marc.zyngier@arm.com>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-39-christoffer.dall@linaro.org>
- <3de7e88c-e7a2-f9b5-41f7-3b6886459806@arm.com>
- <20180222144227.GO29376@cbox> <86o9khjcg2.wl-marc.zyngier@arm.com>
-Message-ID: <20180222160200.GT29376@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Feb 2018 16:06:38 +0000
+Subject: [PATCH] arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache line
+ size)
+Message-ID: <20180222160638.16162-1-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 03:01:17PM +0000, Marc Zyngier wrote:
-> On Thu, 22 Feb 2018 14:42:27 +0000,
-> Christoffer Dall wrote:
-> > 
-> > On Thu, Feb 22, 2018 at 12:32:11PM +0000, Marc Zyngier wrote:
-> > > On 15/02/18 21:03, Christoffer Dall wrote:
-> > > > Just like we can program the GICv2 hypervisor control interface directly
-> > > > from the core vgic code, we can do the same for the GICv3 hypervisor
-> > > > control interface on VHE systems.
-> > > > 
-> > > > We do this by simply calling the save/restore functions when we have VHE
-> > > > and we can then get rid of the save/restore function calls from the VHE
-> > > > world switch function.
-> > > > 
-> > > > One caveat is that we now write GICv3 system register state before the
-> > > > potential early exit path in the run loop, and because we sync back
-> > > > state in the early exit path, we have to ensure that we read a
-> > > > consistent GIC state from the sync path, even though we have never
-> > > > actually run the guest with the newly written GIC state.  We solve this
-> > > > by inserting an ISB in the early exit path.
-> > > > 
-> > > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > ---
-> > > > 
-> > > > Notes:
-> > > >     Changes since v2:
-> > > >      - Added ISB in the early exit path in the run loop as explained
-> > > >        in the commit message.
-> > > > 
-> > > >  arch/arm64/kvm/hyp/switch.c | 3 ---
-> > > >  virt/kvm/arm/arm.c          | 1 +
-> > > >  virt/kvm/arm/vgic/vgic.c    | 5 +++++
-> > > >  3 files changed, 6 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > > > index cbafc27a617b..466cfcdbcaf3 100644
-> > > > --- a/arch/arm64/kvm/hyp/switch.c
-> > > > +++ b/arch/arm64/kvm/hyp/switch.c
-> > > > @@ -399,8 +399,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
-> > > >  	__activate_traps(vcpu);
-> > > >  	__activate_vm(vcpu->kvm);
-> > > >  
-> > > > -	__vgic_restore_state(vcpu);
-> > > > -
-> > > >  	sysreg_restore_guest_state_vhe(guest_ctxt);
-> > > >  	__debug_switch_to_guest(vcpu);
-> > > >  
-> > > > @@ -414,7 +412,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
-> > > >  	fp_enabled = fpsimd_enabled_vhe();
-> > > >  
-> > > >  	sysreg_save_guest_state_vhe(guest_ctxt);
-> > > > -	__vgic_save_state(vcpu);
-> > > >  
-> > > >  	__deactivate_traps(vcpu);
-> > > >  
-> > > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > > > index 5bd879c78951..6de7641f3ff2 100644
-> > > > --- a/virt/kvm/arm/arm.c
-> > > > +++ b/virt/kvm/arm/arm.c
-> > > > @@ -717,6 +717,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> > > >  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
-> > > >  		    kvm_request_pending(vcpu)) {
-> > > >  			vcpu->mode = OUTSIDE_GUEST_MODE;
-> > > > +			isb(); /* Ensure work in x_flush_hwstate is committed */
-> > > >  			kvm_pmu_sync_hwstate(vcpu);
-> > > >  			if (static_branch_unlikely(&userspace_irqchip_in_use))
-> > > >  				kvm_timer_sync_hwstate(vcpu);
-> > > > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > > > index 12e2a28f437e..d0a19a8c196a 100644
-> > > > --- a/virt/kvm/arm/vgic/vgic.c
-> > > > +++ b/virt/kvm/arm/vgic/vgic.c
-> > > > @@ -19,6 +19,7 @@
-> > > >  #include <linux/list_sort.h>
-> > > >  #include <linux/interrupt.h>
-> > > >  #include <linux/irq.h>
-> > > > +#include <asm/kvm_hyp.h>
-> > > >  
-> > > >  #include "vgic.h"
-> > > >  
-> > > > @@ -753,6 +754,8 @@ static inline void vgic_save_state(struct kvm_vcpu *vcpu)
-> > > >  {
-> > > >  	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-> > > >  		vgic_v2_save_state(vcpu);
-> > > > +	else if (has_vhe())
-> > > > +		__vgic_v3_save_state(vcpu);
-> > > >  }
-> > > >  
-> > > >  /* Sync back the hardware VGIC state into our emulation after a guest's run. */
-> > > > @@ -777,6 +780,8 @@ static inline void vgic_restore_state(struct kvm_vcpu *vcpu)
-> > > >  {
-> > > >  	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-> > > >  		vgic_v2_restore_state(vcpu);
-> > > > +	else if (has_vhe())
-> > > > +		__vgic_v3_restore_state(vcpu);
-> > > >  }
-> > > >  
-> > > >  /* Flush our emulation state into the GIC hardware before entering the guest. */
-> > > > 
-> > > 
-> > > I'm slowly wrapping my brain around this thing again. If I grasp the
-> > > general idea, we end up with two cases:
-> > > 
-> > > (1) The GIC is accessible from the kernel, and we save/restore it
-> > > outside of the HYP code.
-> > > 
-> > > (2) The GIC is only accessible from the HYP code, and we do it there.
-> > > 
-> > > Maybe we should bite the bullet and introduce that primitive instead?
-> > > 
-> > 
-> > You mean something the following?
-> > 
-> > static inline bool can_access_vgic_from_kernel(void)
-> > {
-> > 	/*
-> > 	 * GICv2 can always be accessed from the kernel because it is
-> > 	 * memory-mapped, and VHE systems can access GICv3 EL2 system
-> > 	 * registers.
-> > 	 */
-> > 	return !static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif) || has_vhe();
-> > }
-> 
-> Yes. I think this would go a long way in making this code easy to
-> understand. 
+Commit 97303480753e ("arm64: Increase the max granular size") increased
+the cache line size to 128 to match Cavium ThunderX, apparently for some
+performance benefit which could not be confirmed. This change, however,
+has an impact on the network packets allocation in certain
+circumstances, requiring slightly over a 4K page with a significant
+performance degradation.
 
-I'll give it a go on the next respin.
+This patch reverts L1_CACHE_SHIFT back to 6 (64-byte cache line) while
+keeping ARCH_DMA_MINALIGN at 128. The cache_line_size() function was
+changed to default to ARCH_DMA_MINALIGN in the absence of a meaningful
+CTR_EL0.CWG bit field.
 
-> It also mean that we can have a unified save/restore
-> function that picks the right GIC back-end, resulting in less
-> code duplication.
-> 
-Not sure I understand hat you mean here?
+In addition, if a system with ARCH_DMA_MINALIGN < CTR_EL0.CWG is
+detected, the kernel will force swiotlb bounce buffering for all
+non-coherent devices since DMA cache maintenance on sub-CWG ranges is
+not safe, leading to data corruption.
 
-Thanks,
--Christoffer
+Cc: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+Cc: Timur Tabi <timur@codeaurora.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/include/asm/cache.h      |  6 +++---
+ arch/arm64/include/asm/dma-direct.h | 43 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpufeature.c      |  9 ++------
+ arch/arm64/mm/dma-mapping.c         | 15 +++++++++++++
+ arch/arm64/mm/init.c                |  3 ++-
+ 6 files changed, 66 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/dma-direct.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb7ef8e..655c0e99d9fa 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -17,6 +17,7 @@ config ARM64
+ 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
++	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_STRICT_KERNEL_RWX
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index ea9bb4e0e9bb..b2e6ece23713 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -29,7 +29,7 @@
+ #define ICACHE_POLICY_VIPT	2
+ #define ICACHE_POLICY_PIPT	3
+ 
+-#define L1_CACHE_SHIFT		7
++#define L1_CACHE_SHIFT		(6)
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+ /*
+@@ -39,7 +39,7 @@
+  * cache before the transfer is done, causing old data to be seen by
+  * the CPU.
+  */
+-#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
++#define ARCH_DMA_MINALIGN	(128)
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -73,7 +73,7 @@ static inline u32 cache_type_cwg(void)
+ static inline int cache_line_size(void)
+ {
+ 	u32 cwg = cache_type_cwg();
+-	return cwg ? 4 << cwg : L1_CACHE_BYTES;
++	return cwg ? 4 << cwg : ARCH_DMA_MINALIGN;
+ }
+ 
+ #endif	/* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/dma-direct.h b/arch/arm64/include/asm/dma-direct.h
+new file mode 100644
+index 000000000000..abb1b40ec751
+--- /dev/null
++++ b/arch/arm64/include/asm/dma-direct.h
+@@ -0,0 +1,43 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __ASM_DMA_DIRECT_H
++#define __ASM_DMA_DIRECT_H
++
++#include <linux/jump_label.h>
++#include <linux/swiotlb.h>
++
++#include <asm/cache.h>
++
++DECLARE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
++
++static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
++{
++	dma_addr_t dev_addr = (dma_addr_t)paddr;
++
++	return dev_addr - ((dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
++}
++
++static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
++{
++	phys_addr_t paddr = (phys_addr_t)dev_addr;
++
++	return paddr + ((phys_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
++}
++
++static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
++{
++	if (!dev->dma_mask)
++		return false;
++
++	/*
++	 * Force swiotlb buffer bouncing when ARCH_DMA_MINALIGN < CWG. The
++	 * swiotlb bounce buffers are aligned to (1 << IO_TLB_SHIFT).
++	 */
++	if (static_branch_unlikely(&swiotlb_noncoherent_bounce) &&
++	    !is_device_dma_coherent(dev) &&
++	    !is_swiotlb_buffer(dma_to_phys(dev, addr)))
++		return false;
++
++	return addr + size - 1 <= *dev->dma_mask;
++}
++
++#endif /* __ASM_DMA_DIRECT_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 29b1f873e337..ac4c12f8cd7c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1383,7 +1383,6 @@ bool this_cpu_has_cap(unsigned int cap)
+ void __init setup_cpu_features(void)
+ {
+ 	u32 cwg;
+-	int cls;
+ 
+ 	/* Set the CPU feature capabilies */
+ 	setup_feature_capabilities();
+@@ -1403,13 +1402,9 @@ void __init setup_cpu_features(void)
+ 	 * Check for sane CTR_EL0.CWG value.
+ 	 */
+ 	cwg = cache_type_cwg();
+-	cls = cache_line_size();
+ 	if (!cwg)
+-		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
+-			cls);
+-	if (L1_CACHE_BYTES < cls)
+-		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+-			L1_CACHE_BYTES, cls);
++		pr_warn("No Cache Writeback Granule information, assuming %d\n",
++			ARCH_DMA_MINALIGN);
+ }
+ 
+ static bool __maybe_unused
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index a96ec0181818..36deb34dd956 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -33,6 +33,7 @@
+ #include <asm/cacheflush.h>
+ 
+ static int swiotlb __ro_after_init;
++DEFINE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
+ 
+ static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
+ 				 bool coherent)
+@@ -882,6 +883,20 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 			const struct iommu_ops *iommu, bool coherent)
+ {
++	/*
++	 * Enable swiotlb for buffer bouncing if ARCH_DMA_MINALIGN < CWG.
++	 * dma_capable() forces the actual bounce if the device is
++	 * non-coherent.
++	 */
++	if (WARN_TAINT_ONCE(!coherent && ARCH_DMA_MINALIGN < cache_line_size(),
++			    TAINT_CPU_OUT_OF_SPEC,
++			    "ARCH_DMA_MINALIGN smaller than CTR_EL0.CWG (%d < %d)",
++			    ARCH_DMA_MINALIGN, cache_line_size())) {
++		static_branch_enable(&swiotlb_noncoherent_bounce);
++		swiotlb = 1;
++		iommu = NULL;
++	}
++
+ 	if (!dev->dma_ops)
+ 		dev->dma_ops = &arm64_swiotlb_dma_ops;
+ 
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9f3c47acf8ff..664acf177799 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -586,7 +586,8 @@ static void __init free_unused_memmap(void)
+ void __init mem_init(void)
+ {
+ 	if (swiotlb_force == SWIOTLB_FORCE ||
+-	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
++	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT) ||
++	    ARCH_DMA_MINALIGN < cache_line_size())
+ 		swiotlb_init(1);
+ 	else
+ 		swiotlb_force = SWIOTLB_NO_FORCE;
