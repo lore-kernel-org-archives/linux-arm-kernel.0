@@ -1,44 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Feb 2018 10:32:18 -0800
-Subject: [PATCH] ARM: OMAP: Fix dmtimer init for omap1
-Message-ID: <20180222183218.32996-1-tony@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Feb 2018 18:34:54 +0000
+Subject: [PATCH] arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache
+ line size)
+In-Reply-To: <486469c2-cc8a-d76b-6ad4-47347de627f8@arm.com>
+References: <20180222160638.16162-1-catalin.marinas@arm.com>
+ <486469c2-cc8a-d76b-6ad4-47347de627f8@arm.com>
+Message-ID: <20180222183454.z7cibd2xionw6emk@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to enable PM runtime on omap1 also as otherwise we
-will get errors:
+On Thu, Feb 22, 2018 at 05:51:15PM +0000, Robin Murphy wrote:
+> On 22/02/18 16:06, Catalin Marinas wrote:
+> [...]
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index a96ec0181818..36deb34dd956 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -33,6 +33,7 @@
+> >   #include <asm/cacheflush.h>
+> >   static int swiotlb __ro_after_init;
+> > +DEFINE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
+> >   static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
+> >   				 bool coherent)
+> > @@ -882,6 +883,20 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> >   void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> >   			const struct iommu_ops *iommu, bool coherent)
+> >   {
+> > +	/*
+> > +	 * Enable swiotlb for buffer bouncing if ARCH_DMA_MINALIGN < CWG.
+> > +	 * dma_capable() forces the actual bounce if the device is
+> > +	 * non-coherent.
+> > +	 */
+> > +	if (WARN_TAINT_ONCE(!coherent && ARCH_DMA_MINALIGN < cache_line_size(),
+> > +			    TAINT_CPU_OUT_OF_SPEC,
+> > +			    "ARCH_DMA_MINALIGN smaller than CTR_EL0.CWG (%d < %d)",
+> > +			    ARCH_DMA_MINALIGN, cache_line_size())) {
+> > +		static_branch_enable(&swiotlb_noncoherent_bounce);
+> > +		swiotlb = 1;
+> 
+> I think it's possible (if a little contrived) for the first non-coherent
+> device to only appear after loading a module from userspace, wherein this
+> would fall foul of __ro_after_init. That said, it would be nice to keep the
+> logic in arm64_dma_init() consistent with its mirror in mem_init() (i.e. add
+> the GWC check there as below), at which point the aforementioned problem no
+> longer applies anyway.
 
-omap_timer omap_timer.1: omap_dm_timer_probe: pm_runtime_get_sync failed!
-omap_timer: probe of omap_timer.1 failed with error -13
-...
+That's a good point actually. As discovered, with DT we will get at
+least one call to arch_setup_dma_ops() with coherent == false even when
+the device does not intend to do any DMA at all. So moving it to
+arm64_dma_init() wouldn't make any functional difference (but fixing
+__ro_after_init).
 
-We are checking for OMAP_TIMER_NEEDS_RESET flag elsewhere so this is
-safe to do.
+We still force bouncing according to whether the device is coherent or
+not.
 
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Keerthy <j-keerthy@ti.com>
-Cc: Ladislav Michl <ladis@linux-mips.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/plat-omap/dmtimer.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -888,11 +888,8 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	timer->irq = irq->start;
- 	timer->pdev = pdev;
- 
--	/* Skip pm_runtime_enable for OMAP1 */
--	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
--		pm_runtime_enable(dev);
--		pm_runtime_irq_safe(dev);
--	}
-+	pm_runtime_enable(dev);
-+	pm_runtime_irq_safe(dev);
- 
- 	if (!timer->reserved) {
- 		ret = pm_runtime_get_sync(dev);
 -- 
-2.16.2
+Catalin
