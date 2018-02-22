@@ -1,90 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Feb 2018 14:00:55 +0000
-Subject: [PATCH 7/9] arm64: signal: Call arm64_notify_segfault when failing to
- deliver signal
+Date: Thu, 22 Feb 2018 14:00:56 +0000
+Subject: [PATCH 8/9] arm64: Move show_unhandled_signals_ratelimited into
+ traps.c
 In-Reply-To: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
 References: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1519308057-4953-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1519308057-4953-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to deliver a signal due to taking an unhandled fault on the
-stackframe, we can all arm64_notify_segfault to deliver a SEGV can deal
-with printing any unhandled signal messages for us, rather than roll our
-own printing code.
-
-A side-effect of this change is that we now deliver the frame address
-in si_addr along with an si_code of SEGV_{ACC,MAP}ERR, rather than an
-si_addr of 0 and an si_code of SI_KERNEL as before.
+show_unhandled_signals_ratelimited is only called in traps.c, so move it
+out of its macro in the dreaded system_misc.h and into a static function
+in traps.c
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/signal.c   |  7 ++-----
- arch/arm64/kernel/signal32.c | 13 +++----------
- 2 files changed, 5 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/system_misc.h | 11 -----------
+ arch/arm64/kernel/traps.c            |  7 +++++++
+ 2 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index f60c052e8d1c..e5c656d0e316 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -40,6 +40,7 @@
- #include <asm/fpsimd.h>
- #include <asm/ptrace.h>
- #include <asm/signal32.h>
-+#include <asm/traps.h>
- #include <asm/vdso.h>
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 07aa8e3c5630..28893a0b141d 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -45,17 +45,6 @@ extern void __show_regs(struct pt_regs *);
  
- /*
-@@ -565,11 +566,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return regs->regs[0];
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
  
- badframe:
--	if (show_unhandled_signals)
--		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
--				    current->comm, task_pid_nr(current), __func__,
--				    regs->pc, regs->sp);
--	force_sig(SIGSEGV, current);
-+	arm64_notify_segfault(regs->sp);
- 	return 0;
+-#define show_unhandled_signals_ratelimited()				\
+-({									\
+-	static DEFINE_RATELIMIT_STATE(_rs,				\
+-				      DEFAULT_RATELIMIT_INTERVAL,	\
+-				      DEFAULT_RATELIMIT_BURST);		\
+-	bool __show_ratelimited = false;				\
+-	if (show_unhandled_signals && __ratelimit(&_rs))		\
+-		__show_ratelimited = true;				\
+-	__show_ratelimited;						\
+-})
+-
+ int handle_guest_sea(phys_addr_t addr, unsigned int esr);
+ 
+ #endif	/* __ASSEMBLY__ */
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 637ae3702950..4231488a5a9f 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -223,6 +223,13 @@ void die(const char *str, struct pt_regs *regs, int err)
+ 		do_exit(SIGSEGV);
  }
  
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 79feb861929b..68f5e07b592b 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -26,6 +26,7 @@
- #include <asm/esr.h>
- #include <asm/fpsimd.h>
- #include <asm/signal32.h>
-+#include <asm/traps.h>
- #include <linux/uaccess.h>
- #include <asm/unistd.h>
- 
-@@ -307,11 +308,7 @@ asmlinkage int compat_sys_sigreturn(struct pt_regs *regs)
- 	return regs->regs[0];
- 
- badframe:
--	if (show_unhandled_signals)
--		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
--				    current->comm, task_pid_nr(current), __func__,
--				    regs->pc, regs->compat_sp);
--	force_sig(SIGSEGV, current);
-+	arm64_notify_segfault(regs->compat_sp);
- 	return 0;
- }
- 
-@@ -344,11 +341,7 @@ asmlinkage int compat_sys_rt_sigreturn(struct pt_regs *regs)
- 	return regs->regs[0];
- 
- badframe:
--	if (show_unhandled_signals)
--		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
--				    current->comm, task_pid_nr(current), __func__,
--				    regs->pc, regs->compat_sp);
--	force_sig(SIGSEGV, current);
-+	arm64_notify_segfault(regs->compat_sp);
- 	return 0;
- }
- 
++static bool show_unhandled_signals_ratelimited(void)
++{
++	static DEFINE_RATELIMIT_STATE(rs, DEFAULT_RATELIMIT_INTERVAL,
++				      DEFAULT_RATELIMIT_BURST);
++	return show_unhandled_signals && __ratelimit(&rs);
++}
++
+ void arm64_force_sig_info(struct siginfo *info, const char *str,
+ 			  struct task_struct *tsk)
+ {
 -- 
 2.1.4
