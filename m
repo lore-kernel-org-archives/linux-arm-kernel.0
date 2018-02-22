@@ -1,43 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Feb 2018 17:49:14 +0100
-Subject: [PATCH] ARM: orion: fix orion_ge00_switch_board_info
- initialization
-In-Reply-To: <20180222133043.GC23008@lunn.ch>
-References: <20180221121856.3241260-1-arnd@arndb.de>
- <20180222133043.GC23008@lunn.ch>
-Message-ID: <CAK8P3a1tkeyLN1qg1yFMXbBgRvsT3xELrdbFbMd1EmOW5tGmQg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 22 Feb 2018 16:53:12 +0000
+Subject: [PATCH v4] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <20180222163330.o5lqant4fjenapcz@lakrids.cambridge.arm.com>
+References: <1519311090-19998-1-git-send-email-shankerd@codeaurora.org>
+ <20180222152244.zozx2tlptgnnfu6b@lakrids.cambridge.arm.com>
+ <32c8cfd3-2883-177b-7736-1bb6ab679df4@arm.com>
+ <20180222163330.o5lqant4fjenapcz@lakrids.cambridge.arm.com>
+Message-ID: <2d4e89d3-f930-bf99-1cf6-e989bd88fa00@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 2:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Feb 21, 2018 at 01:18:49PM +0100, Arnd Bergmann wrote:
->> A section type mismatch warning shows up when building with LTO,
->> since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
->> const itself:
+On 22/02/18 16:33, Mark Rutland wrote:
+> On Thu, Feb 22, 2018 at 04:28:03PM +0000, Robin Murphy wrote:
+>> [Apologies to keep elbowing in, and if I'm being thick here...]
 >>
->> include/linux/of.h: In function 'spear_setup_of_timer':
->> arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
->>  static const struct of_device_id timer_of_match[] __initconst = {
->>                                   ^
->> arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
->>  static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
->>                                 ^
+>> On 22/02/18 15:22, Mark Rutland wrote:
+>>> On Thu, Feb 22, 2018 at 08:51:30AM -0600, Shanker Donthineni wrote:
+>>>> +#define CTR_B31_SHIFT		31
+>>>
+>>> Since this is just a RES1 bit, I think we don't need a mnemonic for it,
+>>> but I'll defer to Will and Catalin on that.
+>>>
+>>>>    ENTRY(invalidate_icache_range)
+>>>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>>>> +alternative_if ARM64_HAS_CACHE_DIC
+>>>> +	mov	x0, xzr
+>>>> +	dsb	ishst
+>>>> +	isb
+>>>> +	ret
+>>>> +alternative_else_nop_endif
+>>>> +#endif
+>>>
+>>> As commented on v3, I don't believe you need the DSB here. If prior
+>>> stores haven't been completed at this point, the existing implementation
+>>> would not work correctly here.
 >>
->> As pointed out by Andrew Lunn, it should in fact be 'const' but not
->> '__initconst' because the string is never copied but may be accessed
->> after the init sections are freed. To fix that, I get rid of the
->> extra symbol and rewrite the initialization in a simpler way that
->> assigns both the bus_id and modalias statically.
->>
->> I spotted another theoretical bug in the same place, where d->netdev[i]
->> may be an out of bounds access, this can be fixed by moving the device
->> assignment into the loop.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>> True in terms of ordering between stores prior to entry and the IC IVAU
+>> itself, but what about the DSH ISH currently issued *after* the IC IVAU
+>> before returning? Is provably impossible that existing callers might be
+>> relying on that ordering *anything*, or would we risk losing something
+>> subtle by effectively removing it?
+> 
+> AFAIK, the only caller of this is KVM, before page table updates occur
+> to add execute permissions to the page this is applied to.
+> 
+> At least in that case, I do not beleive there would be breakage.
+> 
+> If we're worried about subtleties in callers, then we'd need to stick
+> with DSB ISH rather than optimising to DSH ISHST.
 
-Thanks, applied into fixes branch with your Reviewed-by tag now.
+Hmm, I probably am just squawking needlessly. It is indeed hard to 
+imagine how callers could be relying on the invalidating the I-cache for 
+ordering unless doing something unreasonably stupid, and if the current 
+caller is clearly OK then there should be nothing to worry about.
 
-        Arnd
+This *has* helped me realise that I was indeed being somewhat thick 
+before, because the existing barrier is of course not about memory 
+ordering per se, but about completing the maintenance operation. Hooray 
+for overloaded semantics...
+
+On a different track, I'm now wondering whether the extra complexity of 
+these alternatives might justify removing some obvious duplication and 
+letting __flush_cache_user_range() branch directly into 
+invalidate_icache_range(), or might that adversely affect the user fault 
+fixup path?
+
+Robin.
