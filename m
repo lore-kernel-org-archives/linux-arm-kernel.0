@@ -1,33 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 22 Feb 2018 01:37:20 +0100
-Subject: [PATCH v2 7/8] [PATCH 7/8] drivers/hwmon: Add a generic PECI
- hwmon client driver
-In-Reply-To: <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-8-jae.hyun.yoo@linux.intel.com>
- <20180221182608.GA11635@roeck-us.net>
- <618f34cd-ee43-d8e4-4fb0-3c23bf03835f@linux.intel.com>
- <20180221214859.GA30263@roeck-us.net>
- <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
-Message-ID: <20180222003720.GA25250@lunn.ch>
+From: justin.chen@broadcom.com (Justin Chen)
+Date: Wed, 21 Feb 2018 17:15:55 -0800
+Subject: [PATCH] rtc: brcmstb-waketimer: Set wktmr prescaler
+Message-ID: <1519262155-15580-1-git-send-email-justin.chen@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> But even with this change, it still needs to use delayed creation
-> because BMC side kernel doesn't know how many DIMMs are populated on
-> a remote server before the remote server completes its memory
-> training and testing in BIOS, but it needs to check the remote
-> server's CPU temperature as immediate as possible to make
-> appropriate thermal control based on the remote CPU's temperature to
-> avoid any critical thermal issue. What would be a better solution in
-> this case?
+The HW default is one tick per second, however instead of assuming this,
+lets make sure the waketimer is actually one tick per second before
+arming the alarm.
 
-You could change this driver so that it supports one DIMM.  Move the
-'hotplug' part into another driver which creates and destroys
-instances of the hwmon DIMM device as the DIMMS come and go.
+Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+---
+ drivers/rtc/rtc-brcmstb-waketimer.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Also, do you need to handle CPU hotplug? You could split the CPU
-temperature part into a separate hwmon driver? And again create and
-destroy devices as CPUs come and go?
-
-	Andrew
+diff --git a/drivers/rtc/rtc-brcmstb-waketimer.c b/drivers/rtc/rtc-brcmstb-waketimer.c
+index 796ac79..46116b7 100644
+--- a/drivers/rtc/rtc-brcmstb-waketimer.c
++++ b/drivers/rtc/rtc-brcmstb-waketimer.c
+@@ -60,6 +60,10 @@ static void brcmstb_waketmr_set_alarm(struct brcmstb_waketmr *timer,
+ {
+ 	brcmstb_waketmr_clear_alarm(timer);
+ 
++	/* Make sure we are actually counting in seconds */
++	writel_relaxed(BRCMSTB_WKTMR_DEFAULT_FREQ,
++			timer->base + BRCMSTB_WKTMR_PRESCALER);
++
+ 	writel_relaxed(secs + 1, timer->base + BRCMSTB_WKTMR_ALARM);
+ }
+ 
+-- 
+2.7.4
