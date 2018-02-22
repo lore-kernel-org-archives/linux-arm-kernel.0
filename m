@@ -1,64 +1,38 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 22 Feb 2018 21:15:11 +0900
-Subject: [PATCH v3 1/5] linux/const.h: prefix include guard of
- uapi/linux/const.h with _UAPI
+Date: Thu, 22 Feb 2018 21:15:14 +0900
+Subject: [PATCH v3 4/5] linux/const.h: refactor _BITUL and _BITULL a bit
 In-Reply-To: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1519301715-31798-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1519301715-31798-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am going to add include/linux/const.h for the kernel space.
-
-Add _UAPI to the include guard of include/uapi/linux/const.h to
-prepare for that.
-
-Please notice the guard name of the exported one will be kept as-is.
-So, this commit has no impact to the userspace even if some userspace
-stuff depends on the guard macro names.
-
-scripts/headers_install.sh processes exported headers by SED, and
-rips off "_UAPI" from guard macro names.
-
-  #ifndef _UAPI_LINUX_CONST_H
-  #define _UAPI_LINUX_CONST_H
-
-will be turned into
-
-  #ifndef _LINUX_CONST_H
-  #define _LINUX_CONST_H
+Minor cleanups available by _UL and _ULL.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
+V2: https://patchwork.kernel.org/patch/9498269/
 
-Changes in v3:
-  - Split out as a prerequisite patch and describe detailed information
 
+Changes in v3: None
 Changes in v2: None
 
- include/uapi/linux/const.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ include/uapi/linux/const.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
-index 9253775..c5a60eb 100644
+index 09bc0e0..5ed721a 100644
 --- a/include/uapi/linux/const.h
 +++ b/include/uapi/linux/const.h
-@@ -1,8 +1,8 @@
- /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
- /* const.h: Macros for dealing with constants.  */
+@@ -25,7 +25,7 @@
+ #define _UL(x)		(_AC(x, UL))
+ #define _ULL(x)		(_AC(x, ULL))
  
--#ifndef _LINUX_CONST_H
--#define _LINUX_CONST_H
-+#ifndef _UAPI_LINUX_CONST_H
-+#define _UAPI_LINUX_CONST_H
+-#define _BITUL(x)	(_AC(1,UL) << (x))
+-#define _BITULL(x)	(_AC(1,ULL) << (x))
++#define _BITUL(x)	(_UL(1) << (x))
++#define _BITULL(x)	(_ULL(1) << (x))
  
- /* Some constant macros are used in both assembler and
-  * C code.  Therefore we cannot annotate them always with
-@@ -25,4 +25,4 @@
- #define _BITUL(x)	(_AC(1,UL) << (x))
- #define _BITULL(x)	(_AC(1,ULL) << (x))
- 
--#endif /* !(_LINUX_CONST_H) */
-+#endif /* _UAPI_LINUX_CONST_H */
+ #endif /* _UAPI_LINUX_CONST_H */
 -- 
 2.7.4
