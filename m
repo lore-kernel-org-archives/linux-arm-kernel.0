@@ -1,40 +1,160 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 22 Feb 2018 15:34:50 +0100
-Subject: [PATCH v3 7/8] drm/sun4i: Add support for plane alpha
-In-Reply-To: <CAGb2v66W0W1V8_SaRn2nvkptPht5nYXEvJThf1hY5qJPo+zPwA@mail.gmail.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <76eeabd20aeff78f2cd434eb25a0d2a37528ea57.1518802627.git-series.maxime.ripard@bootlin.com>
- <CAGb2v66W0W1V8_SaRn2nvkptPht5nYXEvJThf1hY5qJPo+zPwA@mail.gmail.com>
-Message-ID: <20180222143450.gr3tom2ahdimdurd@flea.lan>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 22 Feb 2018 15:35:06 +0100
+Subject: [PATCH v4 30/40] KVM: arm64: Defer saving/restoring 32-bit
+ sysregs to vcpu load/put
+In-Reply-To: <20180215210332.8648-31-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-31-christoffer.dall@linaro.org>
+Message-ID: <20180222143506.n2yehyorgwy2wcdc@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 10:17:38PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Feb 17, 2018 at 1:39 AM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > Our backend supports a per-plane alpha property. Support it through our new
-> > helper.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On Thu, Feb 15, 2018 at 10:03:22PM +0100, Christoffer Dall wrote:
+> When running a 32-bit VM (EL1 in AArch32), the AArch32 system registers
+> can be deferred to vcpu load/put on VHE systems because neither
+> the host kernel nor host userspace uses these registers.
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Note that we can not defer saving DBGVCR32_EL2 conditionally based
+> on the state of the debug dirty flag on VHE, but since we do the
+> load/put pretty rarely, this comes out as a win anyway.
 > 
-> Though, not having a graphics background, does alpha = 255 mean fully
-> transparent and thus can be skipped? Or no alpha at all?
+> We can also not defer saving FPEXC32_32 because this register only holds
+> a guest-valid value for 32-bit guests during the exit path when the
+> guest has used FPSIMD registers and restored the register in the early
+> assembly handler from taking the EL2 fault, and therefore we have to
+> check if fpsimd is enabled for the guest in the exit path and save the
+> register then, for both VHE and non-VHE guests.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v3:
+>      - Rework the FPEXC32 save/restore logic to no longer attempt to
+>        save/restore this register lazily.
+>     
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm64/kvm/hyp/switch.c    | 17 +++++++++++------
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 15 ++++++++++-----
+>  2 files changed, 21 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 22e77deb8e2e..909aa3fe9196 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -47,6 +47,15 @@ bool __hyp_text __fpsimd_enabled(void)
+>  	return __fpsimd_is_enabled()();
+>  }
+>  
+> +/* Save the 32-bit only FPSIMD system register state */
+> +static inline void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
+> +{
+> +	if (!vcpu_el1_is_32bit(vcpu))
+> +		return;
+> +
+> +	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+> +}
+> +
 
-It means that it's fully opaque, and therefore we are in the same
-situation than if we had no alpha channel at all.
+I realize it's much more convenient to have this function here, but it
+feels a bit out of place, being a _save_ function. Its logical place is
+an -sr file.
 
-Maxime
+>  static void __hyp_text __activate_traps_vhe(void)
+>  {
+>  	u64 val;
+> @@ -380,11 +389,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	__vgic_restore_state(vcpu);
+>  
+> -	/*
+> -	 * We must restore the 32-bit state before the sysregs, thanks
+> -	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> -	 */
+> -	__sysreg32_restore_state(vcpu);
+>  	sysreg_restore_guest_state_vhe(guest_ctxt);
+>  	__debug_switch_to_guest(vcpu);
+>  
+> @@ -398,7 +402,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  	fp_enabled = __fpsimd_enabled();
+>  
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+> -	__sysreg32_save_state(vcpu);
+>  	__vgic_save_state(vcpu);
+>  
+>  	__deactivate_traps(vcpu);
+> @@ -408,6 +411,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  	if (fp_enabled) {
+>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +		__fpsimd_save_fpexc32(vcpu);
+>  	}
+>  
+>  	__debug_switch_to_host(vcpu);
+> @@ -475,6 +479,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  	if (fp_enabled) {
+>  		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>  		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +		__fpsimd_save_fpexc32(vcpu);
+>  	}
+>  
+>  	/*
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 9c60b8062724..aacba4636871 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -196,10 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+>  	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+>  	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+>  
+> -	if (__fpsimd_enabled())
+> -		sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+> -
+> -	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> +	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
+>  }
+>  
+> @@ -221,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>  	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
+>  	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+>  
+> -	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> +	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+>  }
+>  
+> @@ -246,6 +243,13 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_save_user_state(host_ctxt);
+>  
+> +	/*
+> +	 * Load guest EL1 and user state
+> +	 *
+> +	 * We must restore the 32-bit state before the sysregs, thanks
+> +	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> +	 */
+> +	__sysreg32_restore_state(vcpu);
+>  	__sysreg_restore_user_state(guest_ctxt);
+>  	__sysreg_restore_el1_state(guest_ctxt);
+>  
+> @@ -273,6 +277,7 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_save_el1_state(guest_ctxt);
+>  	__sysreg_save_user_state(guest_ctxt);
+> +	__sysreg32_save_state(vcpu);
+>  
+>  	/* Restore host user state */
+>  	__sysreg_restore_user_state(host_ctxt);
+> -- 
+> 2.14.2
+>
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/d903d0bf/attachment.sig>
+Besides the function location being a bit debatable, it looks good to me
+
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+
+Thanks,
+drew
