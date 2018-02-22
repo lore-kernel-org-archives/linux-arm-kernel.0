@@ -1,95 +1,59 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 22 Feb 2018 11:55:47 +0100
-Subject: [1/2] ARM: irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
-References: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
-Message-ID: <d007f880-0509-e30c-4c28-94117d2f8037@st.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Thu, 22 Feb 2018 11:57:13 +0100
+Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
+In-Reply-To: <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
+References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
+ <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180222105713.GA30885@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radek
-
-I've tested your change on stm32h743i-eval.dts board
-and gpio-keys tests are not functional.
-No interrupt occurs when we push or release button
-(cat /proc/interrupt).
-
-Board: stm32h743i-eval.dts
-Test description: gpio-keys (gpioc 13 => exti 13), with gpio or 
-interrupt property.
-
-comment below
-
-On 02/21/2018 02:50 PM, radek wrote:
-> - allocates generic chip with handle_simple_irq
-> 	which simplifies irq_domain_ops.alloc callback
-> 	- removes ack register from generic chip which is not used for
-> 	handle_simple_irq as acking is done in a chained handler
-> 	- removes unneeded irq_domain_ops.xlate callback
+On Thu, Feb 15, 2018 at 11:31:45AM +0530, Keerthy wrote:
+> Replace architecture specific guard with clocksource guard.
 > 
-> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Replace architecture specific defines with clocksource
+
+This looks like a bit unussual commit log. Also, what about merging
+it with previous patch?
+
+Btw, I tested whole serie again on the top of today's -next and it is
+still working fine. What is preventing these patches from being merged?
+
+Thank you,
+	ladis
+
 > ---
->   drivers/irqchip/irq-stm32-exti.c | 10 +---------
->   1 file changed, 1 insertion(+), 9 deletions(-)
+>  include/clocksource/timer-ti-dm.h | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index 36f0fbe..42e74e3 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
-> @@ -176,16 +176,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
->   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
->   			    unsigned int nr_irqs, void *data)
->   {
-> -	struct irq_chip_generic *gc;
->   	struct irq_fwspec *fwspec = data;
->   	irq_hw_number_t hwirq;
->   
->   	hwirq = fwspec->param[0];
-> -	gc = irq_get_domain_generic_chip(d, hwirq);
->   
->   	irq_map_generic_chip(d, virq, hwirq);
-> -	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
-> -			    handle_simple_irq, NULL, NULL);
->   
->   	return 0;
->   }
-> @@ -200,7 +196,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
->   
->   struct irq_domain_ops irq_exti_domain_ops = {
->   	.map	= irq_map_generic_chip,
-> -	.xlate	= irq_domain_xlate_onetwocell,
->   	.alloc  = stm32_exti_alloc,
->   	.free	= stm32_exti_free,
->   };
-> @@ -231,7 +226,7 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
->   	}
->   
->   	ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1, "exti",
-> -					     handle_edge_irq, clr, 0, 0);
-> +					     handle_simple_irq, clr, 0, 0);
-
-EXTI hardware block is trigged on pulse event rising or failing edge.
-Why do you change to handle_simple_irq ?
-
->   	if (ret) {
->   		pr_err("%pOF: Could not allocate generic interrupt chip.\n",
->   			node);
-> @@ -246,13 +241,10 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
->   
->   		gc->reg_base = base;
->   		gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
-> -		gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
->   		gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
->   		gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
->   		gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
->   		gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
-> -		gc->chip_types->regs.ack = stm32_bank->pr_ofst;
-> -		gc->chip_types->regs.mask = stm32_bank->imr_ofst;
->   		gc->private = (void *)stm32_bank;
->   
->   		/* Determine number of irqs supported */
-> 
-
-BR
-Ludo
+> diff --git a/include/clocksource/timer-ti-dm.h b/include/clocksource/timer-ti-dm.h
+> index 831174f..4f31095 100644
+> --- a/include/clocksource/timer-ti-dm.h
+> +++ b/include/clocksource/timer-ti-dm.h
+> @@ -1,6 +1,4 @@
+>  /*
+> - * arch/arm/plat-omap/include/plat/dmtimer.h
+> - *
+>   * OMAP Dual-Mode Timers
+>   *
+>   * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+> @@ -36,8 +34,8 @@
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+>  
+> -#ifndef __ASM_ARCH_DMTIMER_H
+> -#define __ASM_ARCH_DMTIMER_H
+> +#ifndef __CLOCKSOURCE_DMTIMER_H
+> +#define __CLOCKSOURCE_DMTIMER_H
+>  
+>  /* clock sources */
+>  #define OMAP_TIMER_SRC_SYS_CLK			0x00
+> @@ -426,4 +424,4 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
+>  	writel_relaxed(value, timer->irq_stat);
+>  }
+>  #endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
+> -#endif /* __ASM_ARCH_DMTIMER_H */
+> +#endif /* __CLOCKSOURCE_DMTIMER_H */
+> -- 
+> 1.9.1
