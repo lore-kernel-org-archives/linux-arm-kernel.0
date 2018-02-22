@@ -1,72 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 14:22:44 +0100
-Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander
- driver
-In-Reply-To: <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
- <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
- <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
-Message-ID: <CACRpkdYfHgjAu=By-4pbtpYrbBjRLGEKJhzXobnM6RFYYgjaRw@mail.gmail.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 22 Feb 2018 15:23:40 +0200
+Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
+In-Reply-To: <20180222130131.46fcuurp4h6dc7wb@gofer.mess.org>
+References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
+ <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
+ <20180222130131.46fcuurp4h6dc7wb@gofer.mess.org>
+Message-ID: <8d0f25e6-3bbf-cbbc-7eef-abde0127f2bc@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 4:59 PM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
-> On 02/19/2018 12:19 AM, Rob Herring wrote:
->> On Thu, Feb 08, 2018 at 03:27:32PM +0100, Amelie Delaunay wrote:
 
->>> +- interrupts = must be <0>
->>> +- gpio-controller: marks the device node as a GPIO controller
->>> +- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
->>> +  controller, the second cell is the gpio flags in accordance with
->>> +  <dt-bindings/gpio/st-mfx-gpio.h>.
+
+On 22.02.2018 15:01, Sean Young wrote:
+> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
+>> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
+>> were adapted to this change.
 >>
->> Custom flags? Use standard flags.
->>
->> DT binding headers should be part of this patch.
->>
-> Custom flags because MFX GPIOs have several types:
-> - Output open drain with internal pull-up resistor
-> - Output open drain without internal pull-up resistor
-> - Output push pull without internal pull resistor
-> - Input with internal pull-up resistor
-> - Input with internal pull-down resistor
-> - Input floating
-> - Input analog.
-> Standard flags don't have pull up or down information. That's why I am
-> using custom flags, they overloads standard flags.
+>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>> ---
+> 
+> -snip-
+> 
+>> diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
+>> index 49265f02e772..a971b02ea021 100644
+>> --- a/drivers/media/rc/ir-rx51.c
+>> +++ b/drivers/media/rc/ir-rx51.c
+>> @@ -55,10 +55,13 @@ static int init_timing_params(struct ir_rx51 *ir_rx51)
+>>  {
+>>  	struct pwm_device *pwm = ir_rx51->pwm;
+>>  	int duty, period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, ir_rx51->freq);
+>> +	struct pwm_caps caps = { };
+>>  
+>>  	duty = DIV_ROUND_CLOSEST(ir_rx51->duty_cycle * period, 100);
+>>  
+>> -	pwm_config(pwm, duty, period);
+>> +	pwm_get_caps(pwm->chip, pwm, &caps);
+>> +
+>> +	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
+>>  
+>>  	return 0;
+>>  }
+>> diff --git a/drivers/media/rc/pwm-ir-tx.c b/drivers/media/rc/pwm-ir-tx.c
+>> index 27d0f5837a76..c630e1b450a3 100644
+>> --- a/drivers/media/rc/pwm-ir-tx.c
+>> +++ b/drivers/media/rc/pwm-ir-tx.c
+>> @@ -61,6 +61,7 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
+>>  {
+>>  	struct pwm_ir *pwm_ir = dev->priv;
+>>  	struct pwm_device *pwm = pwm_ir->pwm;
+>> +	struct pwm_caps caps = { };
+>>  	int i, duty, period;
+>>  	ktime_t edge;
+>>  	long delta;
+>> @@ -68,7 +69,9 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
+>>  	period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, pwm_ir->carrier);
+>>  	duty = DIV_ROUND_CLOSEST(pwm_ir->duty_cycle * period, 100);
+>>  
+>> -	pwm_config(pwm, duty, period);
+>> +	pwm_get_caps(pwm->chip, pwm, &caps);
+>> +
+>> +	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
+>>  
+>>  	edge = ktime_get();
+>>  
+> 
+> The two PWM rc-core drivers need PWM_MODE(NORMAL), not the first available
+> mode that the device supports. If mode normal is not supported, then probe
+> should fail.
+OK, thank you for your inputs. I will address this in next version.
 
-This is because pull up/down and tristate/high z (floating)
-also known as PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
-is controlled by the pin control subsystem, not GPIO.
 
-If your hardware does even more pin control (like multiplexing)
-then I suggest that you create a pin control driver back-end for
-this and put the resulting driver in drivers/pinctrl.
-
-Some recent additions of expanders in drivers/pinctrl makes
-for great inspiration for this work. See for example:
-drivers/pinctrl/pinctrl-sx150x.c
-drivers/pinctrl/pinctrl-mcp23s08.c
-
-These are both combined pin control and GPIO drivers that
-we moved from drivers/gpio because we concluded that they
-do more than just GPIO. The GPIO lines are matches to
-pins using the GPIO ranges from the call to
-gpiochip_add_pin_range() and using gpiochip_generic_config()
-as the gpiochip .set_config() callback.
-
-It has been discussed to expose subsets of pin config to
-GPIO. Indeed, we already handle open drain/source and
-debounce by simply calling into the pin control back-end
-or handling it directly in the GPIO driver using the standard
-pin config properties.
-
-I am reluctant about this, I think the split of responsibilities
-is pretty nice.
-
-I'd recommend looking at the sx150x pin control driver and
-check if you can maybe take this direction with the patch?
-
-Yours,
-Linus Walleij
+Thank you,
+Claudiu Beznea
+> 
+> 
+> Sean
+> 
