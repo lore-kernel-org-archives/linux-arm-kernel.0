@@ -1,58 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Feb 2018 18:34:54 +0000
-Subject: [PATCH] arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache
- line size)
-In-Reply-To: <486469c2-cc8a-d76b-6ad4-47347de627f8@arm.com>
-References: <20180222160638.16162-1-catalin.marinas@arm.com>
- <486469c2-cc8a-d76b-6ad4-47347de627f8@arm.com>
-Message-ID: <20180222183454.z7cibd2xionw6emk@armageddon.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Feb 2018 10:45:42 -0800
+Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
+In-Reply-To: <20180222105713.GA30885@lenoch>
+References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
+ <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
+ <20180222105713.GA30885@lenoch>
+Message-ID: <20180222184541.GB5184@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 05:51:15PM +0000, Robin Murphy wrote:
-> On 22/02/18 16:06, Catalin Marinas wrote:
-> [...]
-> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> > index a96ec0181818..36deb34dd956 100644
-> > --- a/arch/arm64/mm/dma-mapping.c
-> > +++ b/arch/arm64/mm/dma-mapping.c
-> > @@ -33,6 +33,7 @@
-> >   #include <asm/cacheflush.h>
-> >   static int swiotlb __ro_after_init;
-> > +DEFINE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
-> >   static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
-> >   				 bool coherent)
-> > @@ -882,6 +883,20 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >   			const struct iommu_ops *iommu, bool coherent)
-> >   {
-> > +	/*
-> > +	 * Enable swiotlb for buffer bouncing if ARCH_DMA_MINALIGN < CWG.
-> > +	 * dma_capable() forces the actual bounce if the device is
-> > +	 * non-coherent.
-> > +	 */
-> > +	if (WARN_TAINT_ONCE(!coherent && ARCH_DMA_MINALIGN < cache_line_size(),
-> > +			    TAINT_CPU_OUT_OF_SPEC,
-> > +			    "ARCH_DMA_MINALIGN smaller than CTR_EL0.CWG (%d < %d)",
-> > +			    ARCH_DMA_MINALIGN, cache_line_size())) {
-> > +		static_branch_enable(&swiotlb_noncoherent_bounce);
-> > +		swiotlb = 1;
+* Ladislav Michl <ladis@linux-mips.org> [180222 10:58]:
+> On Thu, Feb 15, 2018 at 11:31:45AM +0530, Keerthy wrote:
+> > Replace architecture specific guard with clocksource guard.
+> > 
+> > Signed-off-by: Keerthy <j-keerthy@ti.com>
+> > Replace architecture specific defines with clocksource
 > 
-> I think it's possible (if a little contrived) for the first non-coherent
-> device to only appear after loading a module from userspace, wherein this
-> would fall foul of __ro_after_init. That said, it would be nice to keep the
-> logic in arm64_dma_init() consistent with its mirror in mem_init() (i.e. add
-> the GWC check there as below), at which point the aforementioned problem no
-> longer applies anyway.
+> This looks like a bit unussual commit log. Also, what about merging
+> it with previous patch?
 
-That's a good point actually. As discovered, with DT we will get at
-least one call to arch_setup_dma_ops() with coherent == false even when
-the device does not intend to do any DMA at all. So moving it to
-arm64_dma_init() wouldn't make any functional difference (but fixing
-__ro_after_init).
+I'll just remove that line locally to avoid yet another set
+of patches being posted :)
 
-We still force bouncing according to whether the device is coherent or
-not.
+> Btw, I tested whole serie again on the top of today's -next and it is
+> still working fine. What is preventing these patches from being merged?
 
--- 
-Catalin
+Well I noticed we need a fix for omap1 that I just posted.
+And patch 4/10 needs the following select for omap16xx that
+I'll fold in.
+
+I'll push it all to omap-for-v4.17/timer and will merge into
+my for-next after some more testing. It seems any further
+patching can be done after move to drivers.
+
+Regards,
+
+Tony
+
+8< -----------------
+--- a/arch/arm/mach-omap1/Kconfig
++++ b/arch/arm/mach-omap1/Kconfig
+@@ -30,6 +30,7 @@ config ARCH_OMAP16XX
+ 	bool "OMAP16xx Based System"
+ 	select ARCH_OMAP_OTG
+ 	select CPU_ARM926T
++	select OMAP_DM_TIMER
+ 
+ config OMAP_MUX
+ 	bool "OMAP multiplexing support"
