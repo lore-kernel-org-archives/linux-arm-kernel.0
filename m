@@ -1,43 +1,21 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 21 Feb 2018 17:29:27 -0800
-Subject: [PATCH v2 7/8] [PATCH 7/8] drivers/hwmon: Add a generic PECI
- hwmon client driver
-In-Reply-To: <20180222003720.GA25250@lunn.ch>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-8-jae.hyun.yoo@linux.intel.com>
- <20180221182608.GA11635@roeck-us.net>
- <618f34cd-ee43-d8e4-4fb0-3c23bf03835f@linux.intel.com>
- <20180221214859.GA30263@roeck-us.net>
- <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
- <20180222003720.GA25250@lunn.ch>
-Message-ID: <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 21 Feb 2018 17:35:24 -0800
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <3b76d238-e10a-9abf-c9cb-6d3738eb7896@redhat.com>
+References: <20180221011303.20392-1-labbott@redhat.com>
+ <20180221011303.20392-3-labbott@redhat.com>
+ <20180221153850.ywpzsigfnz3etoun@salmiak>
+ <3b76d238-e10a-9abf-c9cb-6d3738eb7896@redhat.com>
+Message-ID: <572af610-c20f-e826-f124-8df47680795b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/21/2018 4:37 PM, Andrew Lunn wrote:
->> But even with this change, it still needs to use delayed creation
->> because BMC side kernel doesn't know how many DIMMs are populated on
->> a remote server before the remote server completes its memory
->> training and testing in BIOS, but it needs to check the remote
->> server's CPU temperature as immediate as possible to make
->> appropriate thermal control based on the remote CPU's temperature to
->> avoid any critical thermal issue. What would be a better solution in
->> this case?
+On 02/21/2018 03:53 PM, Laura Abbott wrote:
+>> I *think* this should happen in finish_ret_to_user a few lines down, since we
+>> can call C code if we branch to work_pending, dirtying the stack.
+>>
 > 
-> You could change this driver so that it supports one DIMM.  Move the
-> 'hotplug' part into another driver which creates and destroys
-> instances of the hwmon DIMM device as the DIMMS come and go.
-> 
-> Also, do you need to handle CPU hotplug? You could split the CPU
-> temperature part into a separate hwmon driver? And again create and
-> destroy devices as CPUs come and go?
-> 
-> 	Andrew
-> 
+> I think you're right but this didn't immediately work when I tried it.
+> I'll have to dig into this some more.
 
-That seems like a possible option. I'll rewrite the hwmon driver again 
-like that.
-
-Thanks for the good idea. :)
-
-Jae
+Okay I figured this out. Not corrupting registers works wonders.
