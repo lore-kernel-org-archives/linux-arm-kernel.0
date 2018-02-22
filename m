@@ -1,69 +1,54 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 22 Feb 2018 16:53:12 +0000
-Subject: [PATCH v4] arm64: Add support for new control bits CTR_EL0.DIC
- and CTR_EL0.IDC
-In-Reply-To: <20180222163330.o5lqant4fjenapcz@lakrids.cambridge.arm.com>
-References: <1519311090-19998-1-git-send-email-shankerd@codeaurora.org>
- <20180222152244.zozx2tlptgnnfu6b@lakrids.cambridge.arm.com>
- <32c8cfd3-2883-177b-7736-1bb6ab679df4@arm.com>
- <20180222163330.o5lqant4fjenapcz@lakrids.cambridge.arm.com>
-Message-ID: <2d4e89d3-f930-bf99-1cf6-e989bd88fa00@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 22 Feb 2018 16:58:05 +0000
+Subject: [PATCH 9/9] arm64: Use arm64_force_sig_info instead of
+ force_sig_info
+In-Reply-To: <20180222154821.rikapebcj3nvp775@lakrids.cambridge.arm.com>
+References: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
+ <1519308057-4953-10-git-send-email-will.deacon@arm.com>
+ <20180222154821.rikapebcj3nvp775@lakrids.cambridge.arm.com>
+Message-ID: <20180222165805.GA18421@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/18 16:33, Mark Rutland wrote:
-> On Thu, Feb 22, 2018 at 04:28:03PM +0000, Robin Murphy wrote:
->> [Apologies to keep elbowing in, and if I'm being thick here...]
->>
->> On 22/02/18 15:22, Mark Rutland wrote:
->>> On Thu, Feb 22, 2018 at 08:51:30AM -0600, Shanker Donthineni wrote:
->>>> +#define CTR_B31_SHIFT		31
->>>
->>> Since this is just a RES1 bit, I think we don't need a mnemonic for it,
->>> but I'll defer to Will and Catalin on that.
->>>
->>>>    ENTRY(invalidate_icache_range)
->>>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
->>>> +alternative_if ARM64_HAS_CACHE_DIC
->>>> +	mov	x0, xzr
->>>> +	dsb	ishst
->>>> +	isb
->>>> +	ret
->>>> +alternative_else_nop_endif
->>>> +#endif
->>>
->>> As commented on v3, I don't believe you need the DSB here. If prior
->>> stores haven't been completed at this point, the existing implementation
->>> would not work correctly here.
->>
->> True in terms of ordering between stores prior to entry and the IC IVAU
->> itself, but what about the DSH ISH currently issued *after* the IC IVAU
->> before returning? Is provably impossible that existing callers might be
->> relying on that ordering *anything*, or would we risk losing something
->> subtle by effectively removing it?
+On Thu, Feb 22, 2018 at 03:48:21PM +0000, Mark Rutland wrote:
+> On Thu, Feb 22, 2018 at 02:00:57PM +0000, Will Deacon wrote:
+> > Using arm64_force_sig_info means that printing messages about unhandled
+> > signals is dealt with for us, so use that in preference to force_sig_info
+> > and remove any homebrew printing code.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/debug-monitors.c | 3 ++-
+> >  arch/arm64/kernel/ptrace.c         | 2 +-
+> >  arch/arm64/kernel/traps.c          | 9 ++-------
+> >  3 files changed, 5 insertions(+), 9 deletions(-)
+
+[...]
+
+> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> > index 4231488a5a9f..cb5ad77524f3 100644
+> > --- a/arch/arm64/kernel/traps.c
+> > +++ b/arch/arm64/kernel/traps.c
+> > @@ -633,11 +633,6 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+> >  {
+> >  	siginfo_t info;
+> >  	void __user *pc = (void __user *)instruction_pointer(regs);
+> > -	console_verbose();
+> > -
+> > -	pr_crit("Bad EL0 synchronous exception detected on CPU%d, code 0x%08x -- %s\n",
+> > -		smp_processor_id(), esr, esr_get_class_string(esr));
+> > -	__show_regs(regs);
 > 
-> AFAIK, the only caller of this is KVM, before page table updates occur
-> to add execute permissions to the page this is applied to.
+> Here we dump the CPU so that a developer can figure out which
+> microarchitecture the exception was taken on (e.g. to allow them to
+> decode an IMP DEF SError). We added that in commit:
 > 
-> At least in that case, I do not beleive there would be breakage.
+>   8051f4d16ef1d037 ("arm64: report CPU number in bad_mode")
 > 
-> If we're worried about subtleties in callers, then we'd need to stick
-> with DSB ISH rather than optimising to DSH ISHST.
+> However, in arm64_force_sig_info() we don't dump the CPU, and I guess
+> that may be preemptible in cases other than bad_el0_sync().
 
-Hmm, I probably am just squawking needlessly. It is indeed hard to 
-imagine how callers could be relying on the invalidating the I-cache for 
-ordering unless doing something unreasonably stupid, and if the current 
-caller is clearly OK then there should be nothing to worry about.
+__show_regs prints the CPU number already. If we're preemptible, then it
+could be inaccurate.
 
-This *has* helped me realise that I was indeed being somewhat thick 
-before, because the existing barrier is of course not about memory 
-ordering per se, but about completing the maintenance operation. Hooray 
-for overloaded semantics...
-
-On a different track, I'm now wondering whether the extra complexity of 
-these alternatives might justify removing some obvious duplication and 
-letting __flush_cache_user_range() branch directly into 
-invalidate_icache_range(), or might that adversely affect the user fault 
-fixup path?
-
-Robin.
+Will
