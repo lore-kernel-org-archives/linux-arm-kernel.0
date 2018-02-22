@@ -1,29 +1,35 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 22 Feb 2018 12:12:23 -0800
-Subject: [PATCH v4] ARM: dts: bcm283x: Fix pin function of JTAG pins
-In-Reply-To: <1516243293-25010-1-git-send-email-henryzhang62@gmail.com>
-References: <1516243293-25010-1-git-send-email-henryzhang62@gmail.com>
-Message-ID: <87y3jk942g.fsf@anholt.net>
+From: gabriel.matni@exfo.com (Gabriel Matni)
+Date: Thu, 22 Feb 2018 20:30:56 +0000
+Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
+Message-ID: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-henryzhang62 at gmail.com writes:
+From: Gabriel Matni <gabriel.matni@exfo.com>
 
-> From: Henry Zhang <henryzhang62@gmail.com>
->
-> BCM2835 ARM Peripherals doc shows gpio pins 4, 5, 6, 12 and 13
-> carry altenate function, ALT5 for ARM JTAG
->
-> Fixes: 21ff843931b2 ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
->
-> Signed-off-by: Henry Zhang <henryzhang62@gmail.com>
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes missing characters on kernel console at low baud rates (i.e.9600).
+The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
+transmitter holding is ready to receive a new byte. Polling TX_EMPTY isn't
+enough as the hardware buffer can become empty but not yet ready for CPU to
+write the next byte.
 
-Applied to bcm2835-dt-next.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/18c0cc5c/attachment.sig>
+Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
+---
+drivers/tty/serial/mvebu-uart.c | 2 +-
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index a100e98259d7..f0df0640208e 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+   u32 val;
+
+   readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+-             (val & STAT_TX_EMP), 1, 10000);
++             (val & STAT_TX_RDY(port)), 1, 10000);
+}
+
+static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+--
+2.7.4
