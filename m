@@ -1,123 +1,54 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 22 Feb 2018 21:15:13 +0900
-Subject: [PATCH v3 3/5] linux/const.h: move UL() macro to include/linux/const.h
-In-Reply-To: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1519301715-31798-4-git-send-email-yamada.masahiro@socionext.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 22 Feb 2018 12:14:17 +0000
+Subject: [PATCH 1/3] signal: Add FPE_FLTUNK si_code for undiagnosable
+ fp exceptions
+In-Reply-To: <1519228960-10883-2-git-send-email-Dave.Martin@arm.com>
+References: <1519228960-10883-1-git-send-email-Dave.Martin@arm.com>
+ <1519228960-10883-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <5A8EB419.1020508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM, ARM64 and UniCore32 duplicate the definition of UL():
+Hi Dave,
 
-  #define UL(x) _AC(x, UL)
+On 21/02/18 16:02, Dave Martin wrote:
+> Some architectures cannot always report accurately what kind of
+> floating-point exception triggered a floating-point exception trap.
+> 
+> This can occur with fp exceptions occuring on lanes in a vector
 
-This is not actually arch-specific, so it will be useful to move it
-to a common header.  Currently, we only have the uapi variant for
-linux/const.h, so I am creating include/linux/const.h.
+(Nit: occurring)
 
-I also added _UL(), _ULL() and ULL() because _AC() is mostly used in
-the form either _AC(..., UL) or _AC(..., ULL).  I expect they will be
-replaced in follow-up cleanups.  The underscore-prefixed ones should
-be used for exported headers.
+> instruction on arm64 for example.
+> 
+> Rather than have every architecture come up with its own way of
+> descrbing such a condition, this patch adds a common FPE_FLTUNK do
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-V2: https://patchwork.kernel.org/patch/9498275/
+(Nits: describing; 'to report')
+
+> report that an fp exception caused a trap but we cannot be certain
+> which kind of fp exception it was.
 
 
-Changes in v3: None
-Changes in v2: None
+> diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> index 85dc965..10304de 100644
+> --- a/include/uapi/asm-generic/siginfo.h
+> +++ b/include/uapi/asm-generic/siginfo.h
+> @@ -229,7 +229,8 @@ typedef struct siginfo {
+>  # define __FPE_INVASC	12	/* invalid ASCII digit */
+>  # define __FPE_INVDEC	13	/* invalid decimal digit */
+>  #endif
+> -#define NSIGFPE		13
+> +#define FPE_FLTUNK	14	/* undiagnosed floating-point exception */
+> +#define NSIGFPE		14
 
- arch/arm/include/asm/memory.h       | 6 ------
- arch/arm64/include/asm/memory.h     | 6 ------
- arch/unicore32/include/asm/memory.h | 6 ------
- include/linux/const.h               | 9 +++++++++
- include/uapi/linux/const.h          | 3 +++
- 5 files changed, 12 insertions(+), 18 deletions(-)
- create mode 100644 include/linux/const.h
+It looks like x86's compat relies on this value not changing:
+| arch/x86/kernel/signal_compat.c:        BUILD_BUG_ON(NSIGFPE  != 13);
+| include/uapi/asm-generic/siginfo.h:#define NSIGFPE              13
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 4966677..ed8fd0d 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -22,12 +22,6 @@
- #include <mach/memory.h>
- #endif
- 
--/*
-- * Allow for constants defined here to be used from assembly code
-- * by prepending the UL suffix only with actual C code compilation.
-- */
--#define UL(x) _AC(x, UL)
--
- /* PAGE_OFFSET - the virtual address of the start of the kernel image */
- #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
- 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 50fa96a..49d9921 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -29,12 +29,6 @@
- #include <asm/sizes.h>
- 
- /*
-- * Allow for constants defined here to be used from assembly code
-- * by prepending the UL suffix only with actual C code compilation.
-- */
--#define UL(x) _AC(x, UL)
--
--/*
-  * Size of the PCI I/O space. This must remain a power of two so that
-  * IO_SPACE_LIMIT acts as a mask for the low bits of I/O addresses.
-  */
-diff --git a/arch/unicore32/include/asm/memory.h b/arch/unicore32/include/asm/memory.h
-index 3bb0a29..66bb9f6 100644
---- a/arch/unicore32/include/asm/memory.h
-+++ b/arch/unicore32/include/asm/memory.h
-@@ -20,12 +20,6 @@
- #include <mach/memory.h>
- 
- /*
-- * Allow for constants defined here to be used from assembly code
-- * by prepending the UL suffix only with actual C code compilation.
-- */
--#define UL(x) _AC(x, UL)
--
--/*
-  * PAGE_OFFSET - the virtual address of the start of the kernel image
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
-diff --git a/include/linux/const.h b/include/linux/const.h
-new file mode 100644
-index 0000000..7b55a55
---- /dev/null
-+++ b/include/linux/const.h
-@@ -0,0 +1,9 @@
-+#ifndef _LINUX_CONST_H
-+#define _LINUX_CONST_H
-+
-+#include <uapi/linux/const.h>
-+
-+#define UL(x)		(_UL(x))
-+#define ULL(x)		(_ULL(x))
-+
-+#endif /* _LINUX_CONST_H */
-diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
-index c5a60eb..09bc0e0 100644
---- a/include/uapi/linux/const.h
-+++ b/include/uapi/linux/const.h
-@@ -22,6 +22,9 @@
- #define _AT(T,X)	((T)(X))
- #endif
- 
-+#define _UL(x)		(_AC(x, UL))
-+#define _ULL(x)		(_AC(x, ULL))
-+
- #define _BITUL(x)	(_AC(1,UL) << (x))
- #define _BITULL(x)	(_AC(1,ULL) << (x))
- 
--- 
-2.7.4
+(from v4.16-rc2)
+
+
+Thanks,
+
+James
