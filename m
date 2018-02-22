@@ -1,59 +1,43 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Thu, 22 Feb 2018 11:57:13 +0100
-Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
-In-Reply-To: <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
-References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
- <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180222105713.GA30885@lenoch>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Thu, 22 Feb 2018 16:30:59 +0530
+Subject: [alsa-devel] [PATCH v3 24/25] ASoC: qcom: apq8096: Add db820c
+ machine driver
+In-Reply-To: <20180213165837.1620-25-srinivas.kandagatla@linaro.org>
+References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
+ <20180213165837.1620-25-srinivas.kandagatla@linaro.org>
+Message-ID: <2d646729-9bb2-86e5-22f5-19aaf009c0cc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:31:45AM +0530, Keerthy wrote:
-> Replace architecture specific guard with clocksource guard.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Replace architecture specific defines with clocksource
 
-This looks like a bit unussual commit log. Also, what about merging
-it with previous patch?
 
-Btw, I tested whole serie again on the top of today's -next and it is
-still working fine. What is preventing these patches from being merged?
-
-Thank you,
-	ladis
-
+On 2/13/2018 10:28 PM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> This patch adds support to DB820c machine driver.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  include/clocksource/timer-ti-dm.h | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/include/clocksource/timer-ti-dm.h b/include/clocksource/timer-ti-dm.h
-> index 831174f..4f31095 100644
-> --- a/include/clocksource/timer-ti-dm.h
-> +++ b/include/clocksource/timer-ti-dm.h
-> @@ -1,6 +1,4 @@
->  /*
-> - * arch/arm/plat-omap/include/plat/dmtimer.h
-> - *
->   * OMAP Dual-Mode Timers
->   *
->   * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
-> @@ -36,8 +34,8 @@
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
->  
-> -#ifndef __ASM_ARCH_DMTIMER_H
-> -#define __ASM_ARCH_DMTIMER_H
-> +#ifndef __CLOCKSOURCE_DMTIMER_H
-> +#define __CLOCKSOURCE_DMTIMER_H
->  
->  /* clock sources */
->  #define OMAP_TIMER_SRC_SYS_CLK			0x00
-> @@ -426,4 +424,4 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
->  	writel_relaxed(value, timer->irq_stat);
->  }
->  #endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
-> -#endif /* __ASM_ARCH_DMTIMER_H */
-> +#endif /* __CLOCKSOURCE_DMTIMER_H */
-> -- 
-> 1.9.1
+>   sound/soc/qcom/Kconfig   |   8 +++
+>   sound/soc/qcom/apq8096.c | 173 +++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 181 insertions(+)
+>   create mode 100644 sound/soc/qcom/apq8096.c
+>
+> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> index 8c2d65e0a28e..fa4b575c086c 100644
+> --- a/sound/soc/qcom/Kconfig
+> +++ b/sound/soc/qcom/Kconfig
+> @@ -77,3 +77,11 @@ config SND_SOC_QDSP6
+>   	 This will enable sound soc platform specific
+>   	 audio drivers. This includes q6asm, q6adm,
+>   	 q6afe interfaces to DSP using apr.
+> +
+> +config SND_SOC_MSM8996
+> +	tristate "SoC Machine driver for MSM8996 and APQ8096 boards"
+> +	depends on QCOM_APR
+> +	select SND_SOC_QDSP6V2
+should be select SND_SOC_QDSP6, V2 is not defined
+> +	default n
+> +	help
+> +	 To add support for SoC audio on MSM8996 and APQ8096 boards
+>
