@@ -1,217 +1,72 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 22 Feb 2018 15:21:19 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <20180222123308.mypx2r7n6o63mj5z@oak.lan>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180222123308.mypx2r7n6o63mj5z@oak.lan>
-Message-ID: <27bab524-3c94-1149-e3de-880cd7dde352@microchip.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Feb 2018 14:22:44 +0100
+Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander
+ driver
+In-Reply-To: <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
+ <20180218231938.goeht7tomfkab6uu@rob-hp-laptop>
+ <b08ab2cd-d6a0-b5da-e33e-ad150370776b@st.com>
+Message-ID: <CACRpkdYfHgjAu=By-4pbtpYrbBjRLGEKJhzXobnM6RFYYgjaRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 19, 2018 at 4:59 PM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+> On 02/19/2018 12:19 AM, Rob Herring wrote:
+>> On Thu, Feb 08, 2018 at 03:27:32PM +0100, Amelie Delaunay wrote:
 
-
-On 22.02.2018 14:33, Daniel Thompson wrote:
-> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
->> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
->> were adapted to this change.
+>>> +- interrupts = must be <0>
+>>> +- gpio-controller: marks the device node as a GPIO controller
+>>> +- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
+>>> +  controller, the second cell is the gpio flags in accordance with
+>>> +  <dt-bindings/gpio/st-mfx-gpio.h>.
 >>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
->>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->>  drivers/bus/ts-nbus.c                |  2 +-
->>  drivers/clk/clk-pwm.c                |  3 ++-
->>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->>  drivers/hwmon/pwm-fan.c              |  2 +-
->>  drivers/input/misc/max77693-haptic.c |  2 +-
->>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->>  drivers/leds/leds-pwm.c              |  5 ++++-
->>  drivers/media/rc/ir-rx51.c           |  5 ++++-
->>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->>  include/linux/pwm.h                  |  6 ++++--
->>  16 files changed, 70 insertions(+), 21 deletions(-)
+>> Custom flags? Use standard flags.
 >>
->> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
->> index 2030a6b77a09..696fa25dafd2 100644
->> --- a/drivers/video/backlight/lm3630a_bl.c
->> +++ b/drivers/video/backlight/lm3630a_bl.c
->> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
->>  {
->>  	unsigned int period = pchip->pdata->pwm_period;
->>  	unsigned int duty = br * period / br_max;
->> +	struct pwm_caps caps = { };
->>  
->> -	pwm_config(pchip->pwmd, duty, period);
->> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
->> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
-> 
-> Well... I admit I've only really looked at the patches that impact 
-> backlight but dispersing this really odd looking bit twiddling 
-> throughout the kernel doesn't strike me a great API design.>
-> IMHO callers should not be required to find the first set bit in
-> some specially crafted set of capability bits simply to get sane 
-> default behaviour.
-Thank you for your inputs. I will try to have a fix for this in next version.
-
-The idea with this was to locate first available PWM mode of PWM channel. If the
-driver hasn't registered any PWM capabilities related ops the default
-capabilities will include only PWM normal mode. In case the PWM channel will
-register different capabilities taking the first available mode from caps.modes
-and passing it as argument to pwm_config() will ensure the pwm_apply_state()
-will not fail.
-
-Thank you,
-Claudiu Beznea
-
-> 
-> 
-> Daniel.
-> 
-> 
-> 
-> 
->>  	if (duty)
->>  		pwm_enable(pchip->pwmd);
->>  	else
->> diff --git a/drivers/video/backlight/lp855x_bl.c b/drivers/video/backlight/lp855x_bl.c
->> index 939f057836e1..3d274c604862 100644
->> --- a/drivers/video/backlight/lp855x_bl.c
->> +++ b/drivers/video/backlight/lp855x_bl.c
->> @@ -240,6 +240,7 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
->>  	unsigned int period = lp->pdata->period_ns;
->>  	unsigned int duty = br * period / max_br;
->>  	struct pwm_device *pwm;
->> +	struct pwm_caps caps = { };
->>  
->>  	/* request pwm device with the consumer name */
->>  	if (!lp->pwm) {
->> @@ -256,7 +257,8 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
->>  		pwm_apply_args(pwm);
->>  	}
->>  
->> -	pwm_config(lp->pwm, duty, period);
->> +	pwm_get_caps(lp->pwm->chip, lp->pwm, &caps);
->> +	pwm_config(lp->pwm, duty, period, BIT(ffs(caps.modes) - 1));
->>  	if (duty)
->>  		pwm_enable(lp->pwm);
->>  	else
->> diff --git a/drivers/video/backlight/lp8788_bl.c b/drivers/video/backlight/lp8788_bl.c
->> index cf869ec90cce..06de3163650d 100644
->> --- a/drivers/video/backlight/lp8788_bl.c
->> +++ b/drivers/video/backlight/lp8788_bl.c
->> @@ -128,6 +128,7 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
->>  	unsigned int duty;
->>  	struct device *dev;
->>  	struct pwm_device *pwm;
->> +	struct pwm_caps caps = { };
->>  
->>  	if (!bl->pdata)
->>  		return;
->> @@ -153,7 +154,9 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
->>  		pwm_apply_args(pwm);
->>  	}
->>  
->> -	pwm_config(bl->pwm, duty, period);
->> +	pwm_get_caps(bl->pwm->chip, bl->pwm, &caps);
->> +
->> +	pwm_config(bl->pwm, duty, period, BIT(ffs(caps.modes) - 1));
->>  	if (duty)
->>  		pwm_enable(bl->pwm);
->>  	else
->> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
->> index 1c2289ddd555..706a9ab053a7 100644
->> --- a/drivers/video/backlight/pwm_bl.c
->> +++ b/drivers/video/backlight/pwm_bl.c
->> @@ -63,10 +63,14 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
->>  
->>  static void pwm_backlight_power_off(struct pwm_bl_data *pb)
->>  {
->> +	struct pwm_caps caps = { };
->> +
->>  	if (!pb->enabled)
->>  		return;
->>  
->> -	pwm_config(pb->pwm, 0, pb->period);
->> +	pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
->> +
->> +	pwm_config(pb->pwm, 0, pb->period, BIT(ffs(caps.modes) - 1));
->>  	pwm_disable(pb->pwm);
->>  
->>  	if (pb->enable_gpio)
->> @@ -96,6 +100,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
->>  {
->>  	struct pwm_bl_data *pb = bl_get_data(bl);
->>  	int brightness = bl->props.brightness;
->> +	struct pwm_caps caps = { };
->>  	int duty_cycle;
->>  
->>  	if (bl->props.power != FB_BLANK_UNBLANK ||
->> @@ -108,7 +113,9 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
->>  
->>  	if (brightness > 0) {
->>  		duty_cycle = compute_duty_cycle(pb, brightness);
->> -		pwm_config(pb->pwm, duty_cycle, pb->period);
->> +		pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
->> +		pwm_config(pb->pwm, duty_cycle, pb->period,
->> +			   BIT(ffs(caps.modes) - 1));
->>  		pwm_backlight_power_on(pb, brightness);
->>  	} else
->>  		pwm_backlight_power_off(pb);
->> diff --git a/drivers/video/fbdev/ssd1307fb.c b/drivers/video/fbdev/ssd1307fb.c
->> index f599520374dd..4b57dcb5799a 100644
->> --- a/drivers/video/fbdev/ssd1307fb.c
->> +++ b/drivers/video/fbdev/ssd1307fb.c
->> @@ -308,7 +308,8 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
->>  
->>  		par->pwm_period = pargs.period;
->>  		/* Enable the PWM */
->> -		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
->> +		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period,
->> +			   pargs.mode);
->>  		pwm_enable(par->pwm);
->>  
->>  		dev_dbg(&par->client->dev, "Using PWM%d with a %dns period.\n",
->> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
->> index e62349f48129..0ba416ab2772 100644
->> --- a/include/linux/pwm.h
->> +++ b/include/linux/pwm.h
->> @@ -357,11 +357,12 @@ int pwm_adjust_config(struct pwm_device *pwm);
->>   * @pwm: PWM device
->>   * @duty_ns: "on" time (in nanoseconds)
->>   * @period_ns: duration (in nanoseconds) of one cycle
->> + * @mode: PWM mode
->>   *
->>   * Returns: 0 on success or a negative error code on failure.
->>   */
->>  static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
->> -			     int period_ns)
->> +			     int period_ns, unsigned long mode)
->>  {
->>  	struct pwm_state state;
->>  
->> @@ -377,6 +378,7 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
->>  
->>  	state.duty_cycle = duty_ns;
->>  	state.period = period_ns;
->> +	state.mode = mode;
->>  	return pwm_apply_state(pwm, &state);
->>  }
->>  
->> @@ -537,7 +539,7 @@ static inline int pwm_adjust_config(struct pwm_device *pwm)
->>  }
->>  
->>  static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
->> -			     int period_ns)
->> +			     int period_ns, unsigned long mode)
->>  {
->>  	return -EINVAL;
->>  }
->> -- 
->> 2.7.4
+>> DT binding headers should be part of this patch.
 >>
-> 
+> Custom flags because MFX GPIOs have several types:
+> - Output open drain with internal pull-up resistor
+> - Output open drain without internal pull-up resistor
+> - Output push pull without internal pull resistor
+> - Input with internal pull-up resistor
+> - Input with internal pull-down resistor
+> - Input floating
+> - Input analog.
+> Standard flags don't have pull up or down information. That's why I am
+> using custom flags, they overloads standard flags.
+
+This is because pull up/down and tristate/high z (floating)
+also known as PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
+is controlled by the pin control subsystem, not GPIO.
+
+If your hardware does even more pin control (like multiplexing)
+then I suggest that you create a pin control driver back-end for
+this and put the resulting driver in drivers/pinctrl.
+
+Some recent additions of expanders in drivers/pinctrl makes
+for great inspiration for this work. See for example:
+drivers/pinctrl/pinctrl-sx150x.c
+drivers/pinctrl/pinctrl-mcp23s08.c
+
+These are both combined pin control and GPIO drivers that
+we moved from drivers/gpio because we concluded that they
+do more than just GPIO. The GPIO lines are matches to
+pins using the GPIO ranges from the call to
+gpiochip_add_pin_range() and using gpiochip_generic_config()
+as the gpiochip .set_config() callback.
+
+It has been discussed to expose subsets of pin config to
+GPIO. Indeed, we already handle open drain/source and
+debounce by simply calling into the pin control back-end
+or handling it directly in the GPIO driver using the standard
+pin config properties.
+
+I am reluctant about this, I think the split of responsibilities
+is pretty nice.
+
+I'd recommend looking at the sx150x pin control driver and
+check if you can maybe take this direction with the patch?
+
+Yours,
+Linus Walleij
