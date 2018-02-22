@@ -1,32 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Feb 2018 12:13:01 +0000
-Subject: [PATCH] perf: arm_spe: include linux/vmalloc.h for vmap()
-In-Reply-To: <20180222114716.1356279-1-arnd@arndb.de>
-References: <20180222114716.1356279-1-arnd@arndb.de>
-Message-ID: <20180222121301.GA1591@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 22 Feb 2018 21:15:11 +0900
+Subject: [PATCH v3 1/5] linux/const.h: prefix include guard of
+ uapi/linux/const.h with _UAPI
+In-Reply-To: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1519301715-31798-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 12:47:05PM +0100, Arnd Bergmann wrote:
-> On linux-next, I get a build failure in some configurations:
-> 
-> drivers/perf/arm_spe_pmu.c: In function 'arm_spe_pmu_setup_aux':
-> drivers/perf/arm_spe_pmu.c:857:14: error: implicit declaration of function 'vmap'; did you mean 'swap'? [-Werror=implicit-function-declaration]
->   buf->base = vmap(pglist, nr_pages, VM_MAP, PAGE_KERNEL);
->               ^~~~
->               swap
-> drivers/perf/arm_spe_pmu.c:857:37: error: 'VM_MAP' undeclared (first use in this function); did you mean 'VM_MPX'?
->   buf->base = vmap(pglist, nr_pages, VM_MAP, PAGE_KERNEL);
->                                      ^~~~~~
->                                      VM_MPX
-> drivers/perf/arm_spe_pmu.c:857:37: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/perf/arm_spe_pmu.c: In function 'arm_spe_pmu_free_aux':
-> drivers/perf/arm_spe_pmu.c:878:2: error: implicit declaration of function 'vunmap'; did you mean 'iounmap'? [-Werror=implicit-function-declaration]
-> 
-> vmap() is declared in linux/vmalloc.h, so we should include that header file.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+I am going to add include/linux/const.h for the kernel space.
 
-Thanks, Arnd. I'll pick this up for 4.17.
+Add _UAPI to the include guard of include/uapi/linux/const.h to
+prepare for that.
 
-Will
+Please notice the guard name of the exported one will be kept as-is.
+So, this commit has no impact to the userspace even if some userspace
+stuff depends on the guard macro names.
+
+scripts/headers_install.sh processes exported headers by SED, and
+rips off "_UAPI" from guard macro names.
+
+  #ifndef _UAPI_LINUX_CONST_H
+  #define _UAPI_LINUX_CONST_H
+
+will be turned into
+
+  #ifndef _LINUX_CONST_H
+  #define _LINUX_CONST_H
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+Changes in v3:
+  - Split out as a prerequisite patch and describe detailed information
+
+Changes in v2: None
+
+ include/uapi/linux/const.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/include/uapi/linux/const.h b/include/uapi/linux/const.h
+index 9253775..c5a60eb 100644
+--- a/include/uapi/linux/const.h
++++ b/include/uapi/linux/const.h
+@@ -1,8 +1,8 @@
+ /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+ /* const.h: Macros for dealing with constants.  */
+ 
+-#ifndef _LINUX_CONST_H
+-#define _LINUX_CONST_H
++#ifndef _UAPI_LINUX_CONST_H
++#define _UAPI_LINUX_CONST_H
+ 
+ /* Some constant macros are used in both assembler and
+  * C code.  Therefore we cannot annotate them always with
+@@ -25,4 +25,4 @@
+ #define _BITUL(x)	(_AC(1,UL) << (x))
+ #define _BITULL(x)	(_AC(1,ULL) << (x))
+ 
+-#endif /* !(_LINUX_CONST_H) */
++#endif /* _UAPI_LINUX_CONST_H */
+-- 
+2.7.4
