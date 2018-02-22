@@ -1,17 +1,17 @@
 From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 22 Feb 2018 15:45:10 +0530
-Subject: [PATCH 1/2][v2][RESEND] ARM: dts: Add big-endian for IFC on LS1021A
+Date: Thu, 22 Feb 2018 15:45:11 +0530
+Subject: [PATCH 2/2][v2][RESEND] ARM: dts: ls1021aqds: Add nand node for ifc
+ controller
 In-Reply-To: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
 References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180222101511.29631-6-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180222101511.29631-7-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the patch to update struct map_info's swap field based on device
-characteristics defined in device tree, big-endian parameter is added
-for LS1021A.
+LS1021AQDS support NAND flash on IFC chip-select 2.
 
-Signed-off-by: Alison Wang <alison.wang@nxp.com>
+So add NAND node in device tree for IFC controller.
+
 Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
 Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 ---
@@ -20,20 +20,24 @@ this patch is now independent of flash propoerty. So resending.
 
 Resending as all patches of patchset never reaches to patchwork.
 
- arch/arm/boot/dts/ls1021a.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/ls1021a-qds.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9319e1f0f1d8..babb086ad94f 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -145,6 +145,7 @@
- 		ifc: ifc at 1530000 {
- 			compatible = "fsl,ifc", "simple-bus";
- 			reg = <0x0 0x1530000 0x0 0x10000>;
-+			big-endian;
- 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+index 8a383d37884a..fe352ff60b35 100644
+--- a/arch/arm/boot/dts/ls1021a-qds.dts
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -240,6 +240,11 @@
+ 		big-endian;
+ 	};
  
++	nand at 2,0 {
++		compatible = "fsl,ifc-nand";
++		reg = <0x2 0x0 0x10000>;
++	};
++
+ 	fpga: board-control at 3,0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.14.1
