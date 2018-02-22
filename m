@@ -1,104 +1,35 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Thu, 22 Feb 2018 20:06:06 +0100
-Subject: [PATCH 2/6] arm64: dts: renesas: r8a77965: Add #address-cells and
- #size-cells
+Date: Thu, 22 Feb 2018 20:06:08 +0100
+Subject: [PATCH 4/6] arm64: dts: renesas: r8a77965: Add #phy-cells property
 In-Reply-To: <1519326370-15805-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519326370-15805-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519326370-15805-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1519326370-15805-5-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "#address-cells" and "#size-cells" properties to all place-holder nodes
-that have children nodes defined by salvator-x[s].dtsi device tree.
+Add "#phy-cells" property to "usb-phy at e65ee000" device node.
 
-This silences the following DTC compiler warnings:
-Warning (reg_format): "reg" property in /soc/.. has invalid length (4 bytes)
-(#address-cells == 2, #size-cells == 1)
-Warning (avoid_default_addr_size): Relying on default #address-cells
-value for /soc/...
-Warning (avoid_default_addr_size): Relying on default #size-cells value
-for /soc/...
+This silences the following DTC compiler warning:
+Warning (phys_property): Missing property '#phy-cells' in node
+/soc/usb-phy at e65ee000 or bad phandle (referred from
+/soc/usb at ee020000:phys[0])
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 4d9bba9..ab46cd2 100644
+index be4f25c..cd12176 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -521,6 +521,9 @@
- 		};
+@@ -795,6 +795,7 @@
  
- 		avb: ethernet at e6800000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
- 			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+ 		usb3_phy0: usb-phy at e65ee000 {
+ 			reg = <0 0xe65ee000 0 0x90>;
++			#phy-cells = <0>;
  			/* placeholder */
  		};
-@@ -528,11 +531,21 @@
- 		csi20: csi2 at fea80000 {
- 			reg = <0 0xfea80000 0 0x10000>;
- 			/* placeholder */
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
  
- 		csi40: csi2 at feaa0000 {
- 			reg = <0 0xfeaa0000 0 0x10000>;
- 			/* placeholder */
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
- 
- 		vin0: video at e6ef0000 {
-@@ -611,6 +624,9 @@
- 		};
- 
- 		i2c2: i2c at e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
- 			reg = <0 0xe6510000 0 0x40>;
- 			/* placeholder */
- 		};
-@@ -621,6 +637,9 @@
- 		};
- 
- 		i2c4: i2c at e66d8000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
- 			reg = <0 0xe66d8000 0 0x40>;
- 			/* placeholder */
- 		};
-@@ -636,6 +655,9 @@
- 		};
- 
- 		i2c_dvfs: i2c at e60b0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
- 			reg = <0 0xe60b0000 0 0x425>;
- 			/* placeholder */
- 		};
-@@ -681,6 +703,9 @@
- 			/* placeholder */
- 
- 			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
- 				port at 0 {
- 					reg = <0>;
- 					du_out_rgb: endpoint {
 -- 
 2.7.4
