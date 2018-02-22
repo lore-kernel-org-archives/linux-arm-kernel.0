@@ -1,84 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 22 Feb 2018 14:28:46 +0100
-Subject: [PATCH v2 09/19] ARM64: dts: Add R-Car Salvator-x M3-N support
-In-Reply-To: <CAK8P3a30pgOXvLLHe3Hb-ubPz6QeUiZKFqMZLm8Qp_7KRr7QuA@mail.gmail.com>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
- <20180221171504.dac7yikrqfnjiiog@verge.net.au>
- <CAK8P3a30pgOXvLLHe3Hb-ubPz6QeUiZKFqMZLm8Qp_7KRr7QuA@mail.gmail.com>
-Message-ID: <CAMuHMdXJcHLee3mn56pSpUkFie_rQFZEPf=+6MWHe+W-+bMxgQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 22 Feb 2018 14:30:43 +0100
+Subject: [PATCH] ARM: orion: fix orion_ge00_switch_board_info
+ initialization
+In-Reply-To: <20180221121856.3241260-1-arnd@arndb.de>
+References: <20180221121856.3241260-1-arnd@arndb.de>
+Message-ID: <20180222133043.GC23008@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Feb 21, 2018 at 01:18:49PM +0100, Arnd Bergmann wrote:
+> A section type mismatch warning shows up when building with LTO,
+> since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
+> const itself:
+> 
+> include/linux/of.h: In function 'spear_setup_of_timer':
+> arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
+>  static const struct of_device_id timer_of_match[] __initconst = {
+>                                   ^
+> arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
+>  static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+>                                 ^
+> 
+> As pointed out by Andrew Lunn, it should in fact be 'const' but not
+> '__initconst' because the string is never copied but may be accessed
+> after the init sections are freed. To fix that, I get rid of the
+> extra symbol and rewrite the initialization in a simpler way that
+> assigns both the bus_id and modalias statically.
+> 
+> I spotted another theoretical bug in the same place, where d->netdev[i]
+> may be an out of bounds access, this can be fixed by moving the device
+> assignment into the loop.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On Thu, Feb 22, 2018 at 12:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Feb 21, 2018 at 6:15 PM, Simon Horman <horms@verge.net.au> wrote:
->> On Tue, Feb 20, 2018 at 04:46:23PM +0100, Geert Uytterhoeven wrote:
->>> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
->>> > Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
->>> >
->>> > Based on original work from:
->>> > Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>> > Magnus Damm <damm+renesas@opensource.se>
->>> >
->>> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->>>
->>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Thanks, applied with prefix updated to
->>
->> "arm64: dts: renesas:"
->>
->> There was some fuzz applying this patch, the result is as follows.
->>
->> From: Jacopo Mondi <jacopo+renesas@jmondi.org>
->> Subject: [PATCH] arm64: dts: renesas: Add R-Car Salvator-x M3-N support
->>
->> Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
->>
->> Based on original work from:
->> Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Magnus Damm <damm+renesas@opensource.se>
->>
->> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Something went wrong with this patch, I suspect it's missing some prerequisites
-> that fill in a few more device nodes to avoid these warnings in linux-next:
->
-> arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dtb: Warning
-> (reg_format): "reg" property in /soc/ethernet at e6800000/ethernet-phy at 0
-> has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-[...]
-
-> Maybe just take out the patch adding the .dts file for the time being until
-> the important nodes are all in place?
-
-Removing the .dts file removes the ability to boot the newly added board...
-
-The issue here is that we are sharing board .dtsi for boards that can be
-equipped with different pin-compatible SiPs (Ri-Car H3, M3-W, M3-N), while
-not all SoC support has been enabled and/or tested. As the board .dtsi
-references on-SoC devices using phandles, the new r8a77965.dtsi declares
-placeholders for the devices that are not yet enabled/tested.
-This worked fine for r8a7796.dtsi before, but causes dtc warnings due to
-recent improvements in DT validation.
-
-I think the simplest way to fix this is to add reg properties to the
-placeholders, as Simon did for the last two placeholders in r8a7796.dtsi in
-commit 4316989537a6ed53 ("arm64: dts: renesas: r8a7796: add reg properties to
-pciec[01] nodes").
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+    Andrew
