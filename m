@@ -1,78 +1,123 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 22 Feb 2018 15:23:40 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <20180222130131.46fcuurp4h6dc7wb@gofer.mess.org>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180222130131.46fcuurp4h6dc7wb@gofer.mess.org>
-Message-ID: <8d0f25e6-3bbf-cbbc-7eef-abde0127f2bc@microchip.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Feb 2018 13:26:01 +0000
+Subject: [PATCH v4 24/40] KVM: arm64: Rewrite system register accessors to
+ read/write functions
+In-Reply-To: <20180222111005.GL29376@cbox>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-25-christoffer.dall@linaro.org>
+ <86a7w2lb7m.wl-marc.zyngier@arm.com> <20180222092237.GI29376@cbox>
+ <86po4xjo5x.wl-marc.zyngier@arm.com> <20180222111005.GL29376@cbox>
+Message-ID: <58899246-54d1-77e8-2d7a-395cd6dcdfca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22.02.2018 15:01, Sean Young wrote:
-> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
->> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
->> were adapted to this change.
+On 22/02/18 11:10, Christoffer Dall wrote:
+> On Thu, Feb 22, 2018 at 10:48:10AM +0000, Marc Zyngier wrote:
+>> On Thu, 22 Feb 2018 09:22:37 +0000,
+>> Christoffer Dall wrote:
+>>>
+>>> On Wed, Feb 21, 2018 at 01:32:45PM +0000, Marc Zyngier wrote:
+>>>> On Thu, 15 Feb 2018 21:03:16 +0000,
+>>>> Christoffer Dall wrote:
+>>>>>
+>>>>> From: Christoffer Dall <cdall@cs.columbia.edu>
+>>>>>
+>>>>> Currently we access the system registers array via the vcpu_sys_reg()
+>>>>> macro.  However, we are about to change the behavior to some times
+>>>>> modify the register file directly, so let's change this to two
+>>>>> primitives:
+>>>>>
+>>>>>  * Accessor macros vcpu_write_sys_reg() and vcpu_read_sys_reg()
+>>>>>  * Direct array access macro __vcpu_sys_reg()
+>>>>>
+>>>>> The first primitive should be used in places where the code needs to
+>>>>> access the currently loaded VCPU's state as observed by the guest.  For
+>>>>> example, when trapping on cache related registers, a write to a system
+>>>>> register should go directly to the VCPU version of the register.
+>>>>>
+>>>>> The second primitive can be used in places where the VCPU is known to
+>>>>> never be running (for example userspace access) or for registers which
+>>>>> are never context switched (for example all the PMU system registers).
+>>>>>
+>>>>> This rewrites all users of vcpu_sys_regs to one of the two primitives
+>>>>> above.
+>>>>>
+>>>>> No functional change.
+>>>>>
+>>>>> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+>>>>> ---
+>>>>>
+>>>>> Notes:
+>>>>>     Changes since v2:
+>>>>>      - New patch (deferred register handling has been reworked)
+>>>>>
+>>>>>  arch/arm64/include/asm/kvm_emulate.h | 13 ++++---
+>>>>>  arch/arm64/include/asm/kvm_host.h    | 13 ++++++-
+>>>>>  arch/arm64/include/asm/kvm_mmu.h     |  2 +-
+>>>>>  arch/arm64/kvm/debug.c               | 27 +++++++++-----
+>>>>>  arch/arm64/kvm/inject_fault.c        |  8 ++--
+>>>>>  arch/arm64/kvm/sys_regs.c            | 71 ++++++++++++++++++------------------
+>>>>>  arch/arm64/kvm/sys_regs.h            |  4 +-
+>>>>>  arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
+>>>>>  virt/kvm/arm/pmu.c                   | 37 ++++++++++---------
+>>>>>  9 files changed, 102 insertions(+), 77 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>>>>> index 3cc535591bdf..d313aaae5c38 100644
+>>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>>>> @@ -290,15 +290,18 @@ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+>>>>>  
+>>>>>  static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+>>>>>  {
+>>>>> -	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+>>>>> +	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+>>>>>  }
+>>>>>  
+>>>>>  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+>>>>>  {
+>>>>> -	if (vcpu_mode_is_32bit(vcpu))
+>>>>> +	if (vcpu_mode_is_32bit(vcpu)) {
+>>>>>  		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
+>>>>> -	else
+>>>>> -		vcpu_sys_reg(vcpu, SCTLR_EL1) |= (1 << 25);
+>>>>> +	} else {
+>>>>> +		u64 sctlr = vcpu_read_sys_reg(vcpu, SCTLR_EL1);
+>>>>> +		sctlr |= (1 << 25);
+>>>>> +		vcpu_write_sys_reg(vcpu, SCTLR_EL1, sctlr);
+>>>>
+>>>> General comment: it is slightly annoying that vcpu_write_sys_reg takes
+>>>> its parameters in an order different from that of write_sysreg
+>>>> (register followed with value, instead of value followed with
+>>>> register). Not a deal breaker, but slightly confusing.
+>>>>
+>>>
+>>> Ah, I didn't compare to write_sysreg, I was thinking that
+>>>
+>>>   vcpu_read_sys_reg(vcpu, SCTLR_EL1);
+>>>   vcpu_write_sys_reg(vcpu, SCTLR_EL1, val);
+>>>
+>>> looked more symmetrical because the write just takes an extra value, but
+>>> I can see your argument as well.
+>>>
+>>> I don't mind changing it if it matters to you?
 >>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
+>> I'd like to see that changed, but it doesn't have to be as part of
+>> this series if it is going to cause a refactoring mess. We can address
+>> it as a blanket fix after this series.
+>>
 > 
-> -snip-
+> I think it's reasonably self-contained.
 > 
->> diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
->> index 49265f02e772..a971b02ea021 100644
->> --- a/drivers/media/rc/ir-rx51.c
->> +++ b/drivers/media/rc/ir-rx51.c
->> @@ -55,10 +55,13 @@ static int init_timing_params(struct ir_rx51 *ir_rx51)
->>  {
->>  	struct pwm_device *pwm = ir_rx51->pwm;
->>  	int duty, period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, ir_rx51->freq);
->> +	struct pwm_caps caps = { };
->>  
->>  	duty = DIV_ROUND_CLOSEST(ir_rx51->duty_cycle * period, 100);
->>  
->> -	pwm_config(pwm, duty, period);
->> +	pwm_get_caps(pwm->chip, pwm, &caps);
->> +
->> +	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
->>  
->>  	return 0;
->>  }
->> diff --git a/drivers/media/rc/pwm-ir-tx.c b/drivers/media/rc/pwm-ir-tx.c
->> index 27d0f5837a76..c630e1b450a3 100644
->> --- a/drivers/media/rc/pwm-ir-tx.c
->> +++ b/drivers/media/rc/pwm-ir-tx.c
->> @@ -61,6 +61,7 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
->>  {
->>  	struct pwm_ir *pwm_ir = dev->priv;
->>  	struct pwm_device *pwm = pwm_ir->pwm;
->> +	struct pwm_caps caps = { };
->>  	int i, duty, period;
->>  	ktime_t edge;
->>  	long delta;
->> @@ -68,7 +69,9 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
->>  	period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, pwm_ir->carrier);
->>  	duty = DIV_ROUND_CLOSEST(pwm_ir->duty_cycle * period, 100);
->>  
->> -	pwm_config(pwm, duty, period);
->> +	pwm_get_caps(pwm->chip, pwm, &caps);
->> +
->> +	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
->>  
->>  	edge = ktime_get();
->>  
+> Just so I'm sure, are these the primitives you'd like to see?
 > 
-> The two PWM rc-core drivers need PWM_MODE(NORMAL), not the first available
-> mode that the device supports. If mode normal is not supported, then probe
-> should fail.
-OK, thank you for your inputs. I will address this in next version.
+> vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
+> vcpu_write_sys_reg(struct kvm_vcpu *vcpu, u64 val, int reg);
 
+That'd be my preference indeed.
 
-Thank you,
-Claudiu Beznea
-> 
-> 
-> Sean
-> 
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
