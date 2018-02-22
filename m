@@ -1,80 +1,25 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 22 Feb 2018 16:38:42 +0100
-Subject: [PATCH v4 32/40] KVM: arm64: Directly call VHE and non-VHE
- FPSIMD enabled functions
-In-Reply-To: <20180215210332.8648-33-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-33-christoffer.dall@linaro.org>
-Message-ID: <20180222153842.mdqlaxnxizqfhfnq@kamzik.brq.redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Feb 2018 17:42:09 +0100
+Subject: [GIT PULL] ZTE ZX fixes for 4.16
+In-Reply-To: <20180222025723.GB3217@dragon>
+References: <20180222025723.GB3217@dragon>
+Message-ID: <CAK8P3a1rEvz-R5Up_V4xY09=UCU=X=joAwZd_waMX1BD2Asn_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 10:03:24PM +0100, Christoffer Dall wrote:
-> There is no longer a need for an alternative to choose the right
-> function to tell us whether or not FPSIMD was enabled for the VM,
-> because we can simply cann the appropriate functions directly fromwithin
-
-s/cann/call/
-s/fromwithin/from within/
-
-> the _vhe and _nvhe run functions.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> 
-> Notes:
->     Changes since v3:
->      - New patch since we no longer defer FPSIMD handling to load/put
-> 
->  arch/arm64/kvm/hyp/switch.c | 15 +++------------
->  1 file changed, 3 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 17e3c6f26a34..9c40e203bd09 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -33,20 +33,11 @@ static bool __hyp_text __fpsimd_enabled_nvhe(void)
->  	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
->  }
->  
-> -static bool __hyp_text __fpsimd_enabled_vhe(void)
-> +static bool fpsimd_enabled_vhe(void)
->  {
->  	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
->  }
->  
-> -static hyp_alternate_select(__fpsimd_is_enabled,
-> -			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> -
-> -bool __hyp_text __fpsimd_enabled(void)
-> -{
-> -	return __fpsimd_is_enabled()();
-> -}
-> -
->  /* Save the 32-bit only FPSIMD system register state */
->  static inline void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
->  {
-> @@ -413,7 +404,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  		/* And we're baaack! */
->  	} while (fixup_guest_exit(vcpu, &exit_code));
->  
-> -	fp_enabled = __fpsimd_enabled();
-> +	fp_enabled = fpsimd_enabled_vhe();
->  
->  	sysreg_save_guest_state_vhe(guest_ctxt);
->  	__vgic_save_state(vcpu);
-> @@ -478,7 +469,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  			__qcom_hyp_sanitize_btac_predictors();
->  	}
->  
-> -	fp_enabled = __fpsimd_enabled();
-> +	fp_enabled = __fpsimd_enabled_nvhe();
->  
->  	__sysreg_save_state_nvhe(guest_ctxt);
->  	__sysreg32_save_state(vcpu);
-> -- 
-> 2.14.2
+On Thu, Feb 22, 2018 at 3:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Hi Arnd, Olof,
 >
+> It contains only a fix for ZTE ZX296702 device tree, which has been
+> overlooked in 4.16 merge window [1].  So please consider to merge it for
+> 4.16-rc as a fix.  Thanks.
+>
+> Shawn
+>
+> [1] https://lkml.org/lkml/2018/2/21/1571
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Thanks for picking it up. I just went through old pull requests and
+patches starting
+with the oldest one and applied the patch before I saw the pull request.
+
+      Arnd
