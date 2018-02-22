@@ -1,21 +1,58 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 21 Feb 2018 17:35:24 -0800
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <3b76d238-e10a-9abf-c9cb-6d3738eb7896@redhat.com>
-References: <20180221011303.20392-1-labbott@redhat.com>
- <20180221011303.20392-3-labbott@redhat.com>
- <20180221153850.ywpzsigfnz3etoun@salmiak>
- <3b76d238-e10a-9abf-c9cb-6d3738eb7896@redhat.com>
-Message-ID: <572af610-c20f-e826-f124-8df47680795b@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 22 Feb 2018 10:19:44 +0800
+Subject: [PATCH 16/25] arm: zx: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <CAL_JsqL02_v46mxqF2cFerC82fNPQAEpm0vfjr2F_78i3fVM7Q@mail.gmail.com>
+References: <20171215124649.30692-1-malat@debian.org>
+ <20171226080312.GE23070@X250>
+ <CAL_JsqL02_v46mxqF2cFerC82fNPQAEpm0vfjr2F_78i3fVM7Q@mail.gmail.com>
+Message-ID: <20180222021943.GA3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2018 03:53 PM, Laura Abbott wrote:
->> I *think* this should happen in finish_ret_to_user a few lines down, since we
->> can call C code if we branch to work_pending, dirtying the stack.
->>
+On Tue, Feb 13, 2018 at 09:37:12AM -0600, Rob Herring wrote:
+> On Tue, Dec 26, 2017 at 2:03 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Fri, Dec 15, 2017 at 01:46:48PM +0100, Mathieu Malaterre wrote:
+> >> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> >> following dtc warnings:
+> >>
+> >> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> >>
+> >> and
+> >>
+> >> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> >>
+> >> Converted using the following command:
+> >>
+> >> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> >>
+> >> For simplicity, two sed expressions were used to solve each warnings separately.
+> >>
+> >> To make the regex expression more robust a few other issues were resolved,
+> >> namely setting unit-address to lower case, and adding a whitespace before the
+> >> the opening curly brace:
+> >>
+> >> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> >>
+> >> This will solve as a side effect warning:
+> >>
+> >> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> >>
+> >> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> >>
+> >> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> >> Suggested-by: Rob Herring <robh@kernel.org>
+> >> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> >
+> > Hi Arnd, Olof,
+> >
+> > I do not have any other ZTE ZX platform patches to send you.  Is it okay
+> > to send this one using IMX branch, or can you apply it to arm-soc
+> > directly?
 > 
-> I think you're right but this didn't immediately work when I tried it.
-> I'll have to dig into this some more.
+> Ping. This one didn't make it into 4.16.
 
-Okay I figured this out. Not corrupting registers works wonders.
+Sorry about that.  I will send a pull request to arm-soc folks for this
+one, and hopefully it can still be merged for 4.16 as a fix.
+
+Shawn
