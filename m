@@ -1,60 +1,51 @@
 From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 22 Feb 2018 15:45:07 +0530
-Subject: [PATCH 2/4][v4][RESEND] driver: mtd: update struct map_info's swap as
- per map requirement
+Date: Thu, 22 Feb 2018 15:45:08 +0530
+Subject: [PATCH 3/4][v4][RESEND] ARM: dts: Add NOR connection type with IFC
 In-Reply-To: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
 References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180222101511.29631-3-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180222101511.29631-4-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-Maps device can be Big endian or little endian.
+Connection between IFC and NOR flash is of big-endian type.
 
-Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
+So add big-endian property in flash node to reflect the same.
 
-Now update struct map_info's swap field based on device characteristics
-defined in device tree.
-
-Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
 Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 ---
-Changes for v2: Incorporated review comments from Boris Brezillon
-http://patchwork.ozlabs.org/patch/758381/
+Changes for v2: None
 Changes for v3: None
-Changes for v4: Updated code as per new defined binding of physmap.txt
+Changes for v4: Updated device tree as per new binding
 
 Resending as all patches of patchset never reaches to patchwork.
 
- drivers/mtd/maps/physmap_of_core.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/ls1021a-qds.dts | 1 +
+ arch/arm/boot/dts/ls1021a-twr.dts | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/mtd/maps/physmap_of_core.c b/drivers/mtd/maps/physmap_of_core.c
-index b1bd4faecfb2..6eee160dfb3d 100644
---- a/drivers/mtd/maps/physmap_of_core.c
-+++ b/drivers/mtd/maps/physmap_of_core.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/concat.h>
-+#include <linux/mtd/cfi_endian.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -233,6 +234,13 @@ static int of_flash_probe(struct platform_device *dev)
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
- 		info->list[i].map.device_node = dp;
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+index 940875316d0f..8a383d37884a 100644
+--- a/arch/arm/boot/dts/ls1021a-qds.dts
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -237,6 +237,7 @@
+ 		reg = <0x0 0x0 0x8000000>;
+ 		bank-width = <2>;
+ 		device-width = <1>;
++		big-endian;
+ 	};
  
-+		if (of_property_read_bool(dp, "big-endian"))
-+			info->list[i].map.swap = CFI_BIG_ENDIAN;
-+		else if (of_property_read_bool(dp, "little-endian"))
-+			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-+		else
-+			info->list[i].map.swap = CFI_HOST_ENDIAN;
-+
- 		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
- 		if (err)
- 			goto err_out;
+ 	fpga: board-control at 3,0 {
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index a8b148ad1dd2..2056d30df020 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -205,6 +205,7 @@
+ 		reg = <0x0 0x0 0x8000000>;
+ 		bank-width = <2>;
+ 		device-width = <1>;
++		big-endian;
+ 	};
+ };
+ 
 -- 
 2.14.1
