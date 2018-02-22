@@ -1,27 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 13:41:11 +0100
-Subject: [PATCH 0/2] I2C-Nomadik: Adjustments for nmk_i2c_probe()
-In-Reply-To: <97f41346-6abb-1c14-f536-ad12bbcb4c60@users.sourceforge.net>
-References: <97f41346-6abb-1c14-f536-ad12bbcb4c60@users.sourceforge.net>
-Message-ID: <CACRpkdbeK282zbJPerxvuXLupMj_iJ_pRaBuDSYU2F+bYNr6AA@mail.gmail.com>
+Date: Thu, 22 Feb 2018 13:43:25 +0100
+Subject: [PATCH v2 0/6] Initial Allwinner H6 support
+In-Reply-To: <20180203154942.63566-1-icenowy@aosc.io>
+References: <20180203154942.63566-1-icenowy@aosc.io>
+Message-ID: <CACRpkda5nyVTChNkbNdTT4kZVfa07c-vKbN7hqrvhqKWqBNPvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 2, 2018 at 4:38 PM, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
+On Sat, Feb 3, 2018 at 4:49 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Fri, 2 Feb 2018 16:34:56 +0100
->
-> Two update suggestions were taken into account
-> from static source code analysis.
->
-> Markus Elfring (2):
->   Delete an error message for a failed memory allocation
->   Improve a size determination
+> This patchset adds initial support for the Allwinner H6 SoC.
 
-Those look OK.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+I see there are still a few comments from Maxime and Andr?
+so I'm waiting for a new patch set. I need their ACKs to proceed.
 
 Yours,
 Linus Walleij
