@@ -1,218 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Feb 2018 10:48:10 +0000
-Subject: [PATCH v4 24/40] KVM: arm64: Rewrite system register accessors to
- read/write functions
-In-Reply-To: <20180222092237.GI29376@cbox>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-25-christoffer.dall@linaro.org>
- <86a7w2lb7m.wl-marc.zyngier@arm.com> <20180222092237.GI29376@cbox>
-Message-ID: <86po4xjo5x.wl-marc.zyngier@arm.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Thu, 22 Feb 2018 11:55:47 +0100
+Subject: [1/2] ARM: irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
+In-Reply-To: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
+References: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
+Message-ID: <d007f880-0509-e30c-4c28-94117d2f8037@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Feb 2018 09:22:37 +0000,
-Christoffer Dall wrote:
-> 
-> On Wed, Feb 21, 2018 at 01:32:45PM +0000, Marc Zyngier wrote:
-> > On Thu, 15 Feb 2018 21:03:16 +0000,
-> > Christoffer Dall wrote:
-> > > 
-> > > From: Christoffer Dall <cdall@cs.columbia.edu>
-> > > 
-> > > Currently we access the system registers array via the vcpu_sys_reg()
-> > > macro.  However, we are about to change the behavior to some times
-> > > modify the register file directly, so let's change this to two
-> > > primitives:
-> > > 
-> > >  * Accessor macros vcpu_write_sys_reg() and vcpu_read_sys_reg()
-> > >  * Direct array access macro __vcpu_sys_reg()
-> > > 
-> > > The first primitive should be used in places where the code needs to
-> > > access the currently loaded VCPU's state as observed by the guest.  For
-> > > example, when trapping on cache related registers, a write to a system
-> > > register should go directly to the VCPU version of the register.
-> > > 
-> > > The second primitive can be used in places where the VCPU is known to
-> > > never be running (for example userspace access) or for registers which
-> > > are never context switched (for example all the PMU system registers).
-> > > 
-> > > This rewrites all users of vcpu_sys_regs to one of the two primitives
-> > > above.
-> > > 
-> > > No functional change.
-> > > 
-> > > Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
-> > > ---
-> > > 
-> > > Notes:
-> > >     Changes since v2:
-> > >      - New patch (deferred register handling has been reworked)
-> > > 
-> > >  arch/arm64/include/asm/kvm_emulate.h | 13 ++++---
-> > >  arch/arm64/include/asm/kvm_host.h    | 13 ++++++-
-> > >  arch/arm64/include/asm/kvm_mmu.h     |  2 +-
-> > >  arch/arm64/kvm/debug.c               | 27 +++++++++-----
-> > >  arch/arm64/kvm/inject_fault.c        |  8 ++--
-> > >  arch/arm64/kvm/sys_regs.c            | 71 ++++++++++++++++++------------------
-> > >  arch/arm64/kvm/sys_regs.h            |  4 +-
-> > >  arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
-> > >  virt/kvm/arm/pmu.c                   | 37 ++++++++++---------
-> > >  9 files changed, 102 insertions(+), 77 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> > > index 3cc535591bdf..d313aaae5c38 100644
-> > > --- a/arch/arm64/include/asm/kvm_emulate.h
-> > > +++ b/arch/arm64/include/asm/kvm_emulate.h
-> > > @@ -290,15 +290,18 @@ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
-> > >  
-> > >  static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
-> > >  {
-> > > -	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
-> > > +	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
-> > >  }
-> > >  
-> > >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> > >  {
-> > > -	if (vcpu_mode_is_32bit(vcpu))
-> > > +	if (vcpu_mode_is_32bit(vcpu)) {
-> > >  		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
-> > > -	else
-> > > -		vcpu_sys_reg(vcpu, SCTLR_EL1) |= (1 << 25);
-> > > +	} else {
-> > > +		u64 sctlr = vcpu_read_sys_reg(vcpu, SCTLR_EL1);
-> > > +		sctlr |= (1 << 25);
-> > > +		vcpu_write_sys_reg(vcpu, SCTLR_EL1, sctlr);
-> > 
-> > General comment: it is slightly annoying that vcpu_write_sys_reg takes
-> > its parameters in an order different from that of write_sysreg
-> > (register followed with value, instead of value followed with
-> > register). Not a deal breaker, but slightly confusing.
-> > 
-> 
-> Ah, I didn't compare to write_sysreg, I was thinking that
-> 
->   vcpu_read_sys_reg(vcpu, SCTLR_EL1);
->   vcpu_write_sys_reg(vcpu, SCTLR_EL1, val);
-> 
-> looked more symmetrical because the write just takes an extra value, but
-> I can see your argument as well.
-> 
-> I don't mind changing it if it matters to you?
+Hi Radek
 
-I'd like to see that changed, but it doesn't have to be as part of
-this series if it is going to cause a refactoring mess. We can address
-it as a blanket fix after this series.
+I've tested your change on stm32h743i-eval.dts board
+and gpio-keys tests are not functional.
+No interrupt occurs when we push or release button
+(cat /proc/interrupt).
 
+Board: stm32h743i-eval.dts
+Test description: gpio-keys (gpioc 13 => exti 13), with gpio or 
+interrupt property.
+
+comment below
+
+On 02/21/2018 02:50 PM, radek wrote:
+> - allocates generic chip with handle_simple_irq
+> 	which simplifies irq_domain_ops.alloc callback
+> 	- removes ack register from generic chip which is not used for
+> 	handle_simple_irq as acking is done in a chained handler
+> 	- removes unneeded irq_domain_ops.xlate callback
 > 
-> > > +	}
-> > >  }
-> > >  
-> > >  static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> > > @@ -306,7 +309,7 @@ static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> > >  	if (vcpu_mode_is_32bit(vcpu))
-> > >  		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
-> > >  
-> > > -	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
-> > > +	return !!(vcpu_read_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
-> > >  }
-> > >  
-> > >  static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
-> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > > index f2a6f39aec87..68398bf7882f 100644
-> > > --- a/arch/arm64/include/asm/kvm_host.h
-> > > +++ b/arch/arm64/include/asm/kvm_host.h
-> > > @@ -287,7 +287,18 @@ struct kvm_vcpu_arch {
-> > >  };
-> > >  
-> > >  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-> > > -#define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-> > > +
-> > > +/*
-> > > + * Only use __vcpu_sys_reg if you know you want the memory backed version of a
-> > > + * register, and not the one most recently accessed by a runnning VCPU.  For
-> > > + * example, for userpace access or for system registers that are never context
-> > > + * switched, but only emulated.
-> > > + */
-> > > +#define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-> > > +
-> > > +#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
-> > > +#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
-> > > +
-> > >  /*
-> > >   * CP14 and CP15 live in the same array, as they are backed by the
-> > >   * same system registers.
-> > > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > > index 9679067a1574..95f46e73c4dc 100644
-> > > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > > @@ -249,7 +249,7 @@ struct kvm;
-> > >  
-> > >  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
-> > >  {
-> > > -	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
-> > > +	return (vcpu_read_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
-> > >  }
-> > >  
-> > >  static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
-> > > diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> > > index feedb877cff8..db32d10a56a1 100644
-> > > --- a/arch/arm64/kvm/debug.c
-> > > +++ b/arch/arm64/kvm/debug.c
-> > > @@ -46,7 +46,8 @@ static DEFINE_PER_CPU(u32, mdcr_el2);
-> > >   */
-> > >  static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
-> > >  {
-> > > -	vcpu->arch.guest_debug_preserved.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
-> > > +	vcpu->arch.guest_debug_preserved.mdscr_el1 =
-> > > +		vcpu_read_sys_reg(vcpu, MDSCR_EL1);
-> > >  
-> > >  	trace_kvm_arm_set_dreg32("Saved MDSCR_EL1",
-> > >  				vcpu->arch.guest_debug_preserved.mdscr_el1);
-> > > @@ -54,10 +55,11 @@ static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
-> > >  
-> > >  static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
-> > >  {
-> > > -	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_preserved.mdscr_el1;
-> > > +	vcpu_write_sys_reg(vcpu, MDSCR_EL1,
-> > > +			   vcpu->arch.guest_debug_preserved.mdscr_el1);
-> > >  
-> > >  	trace_kvm_arm_set_dreg32("Restored MDSCR_EL1",
-> > > -				vcpu_sys_reg(vcpu, MDSCR_EL1));
-> > > +				vcpu_read_sys_reg(vcpu, MDSCR_EL1));
-> > >  }
-> > >  
-> > >  /**
-> > > @@ -108,6 +110,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
-> > >  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
-> > >  {
-> > >  	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
-> > > +	unsigned long mdscr;
-> > >  
-> > >  	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
-> > >  
-> > > @@ -152,9 +155,13 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
-> > >  		 */
-> > >  		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> > >  			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-> > > -			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
-> > > +			mdscr = vcpu_read_sys_reg(vcpu, MDSCR_EL1);
-> > > +			mdscr |= DBG_MDSCR_SS;
-> > > +			vcpu_write_sys_reg(vcpu, MDSCR_EL1, mdscr);
-> > 
-> > I have the feeling that we're going to need some clearbits/setbits
-> > variants of vcpu_write_sysreg at some point.
-> > 
+> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+> ---
+>   drivers/irqchip/irq-stm32-exti.c | 10 +---------
+>   1 file changed, 1 insertion(+), 9 deletions(-)
 > 
-> I can introduce these now if you prefer?
+> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+> index 36f0fbe..42e74e3 100644
+> --- a/drivers/irqchip/irq-stm32-exti.c
+> +++ b/drivers/irqchip/irq-stm32-exti.c
+> @@ -176,16 +176,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
+>   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
+>   			    unsigned int nr_irqs, void *data)
+>   {
+> -	struct irq_chip_generic *gc;
+>   	struct irq_fwspec *fwspec = data;
+>   	irq_hw_number_t hwirq;
+>   
+>   	hwirq = fwspec->param[0];
+> -	gc = irq_get_domain_generic_chip(d, hwirq);
+>   
+>   	irq_map_generic_chip(d, virq, hwirq);
+> -	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
+> -			    handle_simple_irq, NULL, NULL);
+>   
+>   	return 0;
+>   }
+> @@ -200,7 +196,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
+>   
+>   struct irq_domain_ops irq_exti_domain_ops = {
+>   	.map	= irq_map_generic_chip,
+> -	.xlate	= irq_domain_xlate_onetwocell,
+>   	.alloc  = stm32_exti_alloc,
+>   	.free	= stm32_exti_free,
+>   };
+> @@ -231,7 +226,7 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
+>   	}
+>   
+>   	ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1, "exti",
+> -					     handle_edge_irq, clr, 0, 0);
+> +					     handle_simple_irq, clr, 0, 0);
 
-Probably not yet. There is a number of places where we could do a
-batter job at dealing with bitfields, the GICv3 cpuif emulation code
-being a primary offender. If we start having these kind of primitives,
-we can derive sysreg accessors from them in the long run.
+EXTI hardware block is trigged on pulse event rising or failing edge.
+Why do you change to handle_simple_irq ?
 
-Thanks,
+>   	if (ret) {
+>   		pr_err("%pOF: Could not allocate generic interrupt chip.\n",
+>   			node);
+> @@ -246,13 +241,10 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
+>   
+>   		gc->reg_base = base;
+>   		gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
+> -		gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
+>   		gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
+>   		gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
+>   		gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
+>   		gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
+> -		gc->chip_types->regs.ack = stm32_bank->pr_ofst;
+> -		gc->chip_types->regs.mask = stm32_bank->imr_ofst;
+>   		gc->private = (void *)stm32_bank;
+>   
+>   		/* Determine number of irqs supported */
+> 
 
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+BR
+Ludo
