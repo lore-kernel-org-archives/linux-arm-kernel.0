@@ -1,18 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 13:43:25 +0100
-Subject: [PATCH v2 0/6] Initial Allwinner H6 support
-In-Reply-To: <20180203154942.63566-1-icenowy@aosc.io>
-References: <20180203154942.63566-1-icenowy@aosc.io>
-Message-ID: <CACRpkda5nyVTChNkbNdTT4kZVfa07c-vKbN7hqrvhqKWqBNPvg@mail.gmail.com>
+Date: Thu, 22 Feb 2018 13:47:19 +0100
+Subject: [PATCH v5 1/5] ARM: bcm2835: sync firmware properties with
+ downstream
+In-Reply-To: <e7d1f1d0789f11d37957a8998bee23d035115aeb.1519128054.git.baruch@tkos.co.il>
+References: <cover.1519128054.git.baruch@tkos.co.il>
+ <e7d1f1d0789f11d37957a8998bee23d035115aeb.1519128054.git.baruch@tkos.co.il>
+Message-ID: <CACRpkdZb79XBS-sZjJqx7bbphzRM1phM6-h8wRMBmiCe1VVnbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 3, 2018 at 4:49 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Tue, Feb 20, 2018 at 1:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> This patchset adds initial support for the Allwinner H6 SoC.
+> Add latest firmware property tags from the latest Raspberry Pi downstream
+> kernel. This is needed for the GPIO tags, so we can control the GPIO
+> multiplexor lines.
+>
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> v4: No change
 
-I see there are still a few comments from Maxime and Andr?
-so I'm waiting for a new patch set. I need their ACKs to proceed.
+Patch applied to the GPIO tree for v4.17.
+
+But I changed the subject from ARM: to soc:
 
 Yours,
 Linus Walleij
