@@ -1,44 +1,29 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 22 Feb 2018 14:45:24 +1030
-Subject: [PATCH] ARM: dts: aspeed-palmetto: Enable rear UART
-Message-ID: <20180222041524.17867-1-joel@jms.id.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 22 Feb 2018 10:02:59 +0530
+Subject: [PATCH] arm64: Fix compilation error while accessing
+ MPIDR_HWID_BITMASK from .S files
+In-Reply-To: <CAK8P3a2v9s8A8u+aRYgkQJL+TBmEauwuyFzPb_gnvU=1ZkntRA@mail.gmail.com>
+References: <1519022394-11326-1-git-send-email-bhsharma@redhat.com>
+ <CAK8P3a2v9s8A8u+aRYgkQJL+TBmEauwuyFzPb_gnvU=1ZkntRA@mail.gmail.com>
+Message-ID: <CAOh2x=kyFCmvMTx=YwSv-bnQb6uiTzwHuJzNKigu6FyThEGxHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Palmetto BMC has a UART connected to a RS-232 transceiver designed
-to be used as a serial console for the host processor. It appears as a
-D-sub connector on the back of the chassis.
+On Mon, Feb 19, 2018 at 4:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Note that when referencing a commit, it's best to abbreviate the commit
+> ID to the first 12 characters like "e1a50de37860". You can also a line like
+>
+> Fixes: e1a50de37860 ("arm64: cputype: Silence Sparse warnings")
+>
+> which is the standard format to describe such regressions.
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Right and this can be automated a bit as well. The procedure is
+described in:
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index bbddfe1d1cc8..b7d3d1825b93 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -82,6 +82,21 @@
- 			&pinctrl_ddcclk_default &pinctrl_ddcdat_default>;
- };
- 
-+&uart1 {
-+	/* Rear RS-232 connector */
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_txd1_default
-+			&pinctrl_rxd1_default
-+			&pinctrl_nrts1_default
-+			&pinctrl_ndtr1_default
-+			&pinctrl_ndsr1_default
-+			&pinctrl_ncts1_default
-+			&pinctrl_ndcd1_default
-+			&pinctrl_nri1_default>;
-+};
-+
- &uart5 {
- 	status = "okay";
- };
--- 
-2.15.1
+Documentation/process/submitting-patches.rst
+
+You can update your .gitconfig file and then use the --pretty=<...>
+argument to `git log` or `git show` commands.
+
+--
+viresh
