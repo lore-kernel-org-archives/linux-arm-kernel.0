@@ -1,41 +1,23 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 22 Feb 2018 09:25:02 -0800
-Subject: [RFC PATCH] drivers/peci: peci_match_id() can be static
-In-Reply-To: <20180222070111.GA22310@lkp-ne02>
-References: <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
- <20180222070111.GA22310@lkp-ne02>
-Message-ID: <f5f9afd0-a5ce-346f-772a-e8dec78bd872@linux.intel.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 22 Feb 2018 19:28:03 +0200
+Subject: [PATCH v3 06/10] pwm: add PWM modes
+In-Reply-To: <1519300881-8136-7-git-send-email-claudiu.beznea@microchip.com>
+References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
+ <1519300881-8136-7-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <CAHp75Ver6GuKSDooAr2DW+eqt=B3p8O+X6+rOSWNgfhHxgVqNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/21/2018 11:01 PM, kbuild test robot wrote:
-> 
-> Fixes: 99f5d2b99ecd ("drivers/peci: Add support for PECI bus driver core")
-> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
-> ---
->   peci-core.c |    4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/peci/peci-core.c b/drivers/peci/peci-core.c
-> index d976c73..4709b8c 100644
-> --- a/drivers/peci/peci-core.c
-> +++ b/drivers/peci/peci-core.c
-> @@ -770,8 +770,8 @@ peci_of_match_device(const struct of_device_id *matches,
->   }
->   #endif
->   
-> -const struct peci_device_id *peci_match_id(const struct peci_device_id *id,
-> -					   struct peci_client *client)
-> +static const struct peci_device_id *peci_match_id(const struct peci_device_id *id,
-> +						  struct peci_client *client)
->   {
->   	if (!(id && client))
->   		return NULL;
-> 
+On Thu, Feb 22, 2018 at 2:01 PM, Claudiu Beznea
+<claudiu.beznea@microchip.com> wrote:
+> Add PWM normal and complementary modes.
 
-Hi Fengguang,
+> +- PWM_DTMODE_COMPLEMENTARY: PWM complementary working mode (for PWM
+> +channels two outputs); if not specified, the default for PWM channel will
+> +be used
 
-Thanks a lot for the fix. I'll merge your patch in v3 submission.
+What DT stands for?
 
-BR,
-Jae
+-- 
+With Best Regards,
+Andy Shevchenko
