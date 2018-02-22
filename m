@@ -1,27 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 14:47:39 +0100
-Subject: [PATCH 3/6] gpio: Add GPIO support for the ST Multi-Function
- eXpander
-In-Reply-To: <1518100057-23234-4-git-send-email-amelie.delaunay@st.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-4-git-send-email-amelie.delaunay@st.com>
-Message-ID: <CACRpkdaeFXuB1Qv-vqNpf4pHsAysiYh03_gfNoRdHBh1pN_Amw@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 22 Feb 2018 14:49:04 +0100
+Subject: [PATCH v4 26/40] KVM: arm/arm64: Prepare to handle deferred
+ save/restore of SPSR_EL1
+In-Reply-To: <20180215210332.8648-27-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-27-christoffer.dall@linaro.org>
+Message-ID: <20180222134904.vwbdauxzdca53psq@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
-
-> ST Multi-Function eXpander (MFX) can be used as GPIO expander.
-> It has 16 fast GPIOs and can have 8 extra alternate GPIOs
-> when other MFX features are not enabled.
+On Thu, Feb 15, 2018 at 10:03:18PM +0100, Christoffer Dall wrote:
+> SPSR_EL1 is not used by a VHE host kernel and can be deferred, but we
+> need to rework the accesses to this register to access the latest value
+> depending on whether or not guest system registers are loaded on the CPU
+> or only reside in memory.
+> 
+> The handling of accessing the various banked SPSRs for 32-bit VMs is a
+> bit clunky, but this will be improved in following patches which will
+> first prepare and subsequently implement deferred save/restore of the
+> 32-bit registers, including the 32-bit SPSRs.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm/include/asm/kvm_emulate.h   | 12 ++++++++++-
+>  arch/arm/kvm/emulate.c               |  2 +-
+>  arch/arm64/include/asm/kvm_emulate.h | 41 +++++++++++++++++++++++++++++++-----
+>  arch/arm64/kvm/inject_fault.c        |  4 ++--
+>  virt/kvm/arm/aarch32.c               |  2 +-
+>  5 files changed, 51 insertions(+), 10 deletions(-)
 >
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 
-As mentioned I think this driver needs to:
-
-- Move to drivers/pinctrl/pinctrl-stmfx.c similar to the sx150x controller.
-- Pass a regmap around instead of the custom accessor functions.
-- Maybe refactor and reuse STMPE infrastructure
-
-Yours,
-Linus Walleij
+Reviewed-by: Andrew Jones <drjones@redhat.com>
