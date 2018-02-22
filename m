@@ -1,44 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 22 Feb 2018 09:48:06 +0000
-Subject: [PATCH v5 19/20] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
-In-Reply-To: <20180222085936.GA2290@e108498-lin.cambridge.arm.com>
-References: <1518461124-17371-1-git-send-email-sudeep.holla@arm.com>
- <1518461124-17371-20-git-send-email-sudeep.holla@arm.com>
- <20180222085936.GA2290@e108498-lin.cambridge.arm.com>
-Message-ID: <1f04bbaf-83ae-6351-dbc9-82d27af030e1@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 22 Feb 2018 10:49:06 +0100
+Subject: [PATCH v4 03/40] KVM: arm64: Avoid storing the vcpu pointer on
+ the stack
+In-Reply-To: <20180222090248.GC29376@cbox>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-4-christoffer.dall@linaro.org>
+ <86fu5ulgpc.wl-marc.zyngier@arm.com> <20180222090248.GC29376@cbox>
+Message-ID: <20180222094906.6k2tr5cgxpvgtdxb@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/02/18 09:04, Quentin Perret wrote:
-> Hi Sudeep,
+On Thu, Feb 22, 2018 at 10:02:48AM +0100, Christoffer Dall wrote:
+> On Wed, Feb 21, 2018 at 11:34:07AM +0000, Marc Zyngier wrote:
+> > On Thu, 15 Feb 2018 21:02:55 +0000,
+> > Christoffer Dall wrote:
+> > > @@ -138,13 +138,15 @@ alternative_else_nop_endif
+> > >  
+> > >  el1_irq:
+> > >  	stp     x0, x1, [sp, #-16]!
+> > > -	ldr	x1, [sp, #16 + 8]
+> > > +	get_host_ctxt	x0, x1
+> > > +	get_vcpu	x1, x0
+> > >  	mov	x0, #ARM_EXCEPTION_IRQ
+> > >  	b	__guest_exit
+> > >  
+> > >  el1_error:
+> > >  	stp     x0, x1, [sp, #-16]!
+> > > -	ldr	x1, [sp, #16 + 8]
+> > > +	get_host_ctxt	x0, x1
+> > > +	get_vcpu	x1, x0
+> > 
+> > Given how frequent this construct is, would there be a benefit in
+> > having something like "get_vcpu_ptr" that conflates the two macros? We
+> > don't seem to have a single case of using get_vcpu on its own.
+> > 
 > 
-> On Monday 12 Feb 2018 at 18:45:23 (+0000), Sudeep Holla wrote:
-> [...]
->> +/*
->> + * perf_ops->freq_set is not a synchronous, the actual OPP change will
->> + * happen asynchronously and can get notified if the events are
->> + * subscribed for by the SCMI firmware
->> + */
->> +static int
->> +scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->> +{
->> +	struct scmi_data *priv = policy->driver_data;
->> +	struct scmi_perf_ops *perf_ops = handle->perf_ops;
->> +	u64 freq = policy->freq_table[index].frequency * 1000;
->> +
->> +	return perf_ops->freq_set(handle, priv->domain_id, freq, false);
->> +}
-> 
-> Is arch_set_freq_scale() needed in this function ?
-> 
+> I think my intention was to make it obvious how we get to the vcpu
+> pointer, but looking at it now I don't think this adds anything, so I'm
+> happy to adjust.  How about adding a get_vcpu_ptr macro which calls the
+> other two macros?
+>
 
-Yes indeed, already added locally[1] after Dietmar started the discussion.
+Do we really need three macros, if get_vcpu is never used independently?
+In the first round of reviews I suggested redefining get_vcpu like this
 
--- 
-Regards,
-Sudeep
+"""
+ .macro get_vcpu vcpu, tmp
+     get_host_ctxt \tmp, \vcpu
+     ldr     \vcpu, [\tmp, #HOST_CONTEXT_VCPU]
+     kern_hyp_va     \vcpu
+ .endm
 
-[1] https://git.kernel.org/sudeep.holla/linux/h/for-list/new_arm_scmi
+ which also has the side-effect of tmp being ctxt after the call.
+"""
+
+Thanks,
+drew
