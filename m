@@ -1,52 +1,44 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 22 Feb 2018 20:49:16 +0100
-Subject: [PATCH v4 28/40] KVM: arm64: Defer saving/restoring 64-bit
- sysregs to vcpu load/put on VHE
-In-Reply-To: <40a10d77-85c8-9c74-c94c-57e4f8854fef@arm.com>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-29-christoffer.dall@linaro.org>
- <ece29cf2-4c60-dc3d-b2a9-e7e06380f860@arm.com>
- <40a10d77-85c8-9c74-c94c-57e4f8854fef@arm.com>
-Message-ID: <20180222194916.GA29376@cbox>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 22 Feb 2018 12:06:50 -0800
+Subject: [PATCH v5 5/5] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+In-Reply-To: <CACRpkdaOv8yH2M8DVy-owY3zFGwAo52YCFksxEchjQyK3h47=A@mail.gmail.com>
+References: <cover.1519128054.git.baruch@tkos.co.il>
+ <a6d59692dc4847e0b1639a26542e28c95ad5240f.1519128054.git.baruch@tkos.co.il>
+ <CACRpkdaOv8yH2M8DVy-owY3zFGwAo52YCFksxEchjQyK3h47=A@mail.gmail.com>
+Message-ID: <87bmggaiw5.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 06:31:08PM +0000, Julien Grall wrote:
-> 
-> 
-> On 22/02/18 18:30, Julien Grall wrote:
-> >Hi Christoffer,
-> >
-> >On 15/02/18 21:03, Christoffer Dall wrote:
-> >>Some system registers do not affect the host kernel's execution and can
-> >>therefore be loaded when we are about to run a VCPU and we don't have to
-> >>restore the host state to the hardware before the time when we are
-> >>actually about to return to userspace or schedule out the VCPU thread.
-> >>
-> >>The EL1 system registers and the userspace state registers only
-> >>affecting EL0 execution do not need to be saved and restored on every
-> >>switch between the VM and the host, because they don't affect the host
-> >>kernel's execution.
-> >>
-> >>We mark all registers which are now deffered as such in the
-> >
-> >NIT: s/deffered/deferred/ I think.
-> >
-> >>vcpu_{read,write}_sys_reg accessors in sys-regs.c to ensure the most
-> >>up-to-date copy is always accessed.
-> >>
-> >>Note MPIDR_EL1 (controlled via VMPIDR_EL2) is accessed from other vcpu
-> >>threads, for example via the GIC emulation, and therefore must be
-> >>declared as immediate, which is fine as the guest cannot modify this
-> >>value.
-> 
-> I forgot to comment on this. I missed this paragraph at the first read and
-> was wondering why MPIDR_EL1 was not accessed using sysreg in
-> vcpu_{read,write}_sys_reg. It might be worth considering a comment in those
-> functions.
-> 
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Hmmm, yeah, probably.  I'll see if I can stick it somewhere suitable.
+> On Tue, Feb 20, 2018 at 1:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+>
+>> Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
+>>
+>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> ---
+>> v5:
+>>   * Drop the 'firmware' property
+>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Please funnel this patch through the ARM SoC tree.
 
-Thanks,
--Christoffer
+Picked up the reviews and applied these last 2 to bcm2835-dt-next.  I
+didn't see the gpio tree's for-next updated, so I didn't integration
+test it personally, but hopefully our branches can come together in
+-next soon.
+
+(FWIW, I was looking at
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git for
+gpio)
+
+Thanks for pushing this to completion, Baruch!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/f4ec0701/attachment.sig>
