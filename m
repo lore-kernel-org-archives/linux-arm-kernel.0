@@ -1,27 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 13:49:31 +0100
-Subject: [PATCH v5 2/5] dt-bindings: gpio: add raspberry pi GPIO expander
- binding
-In-Reply-To: <f400b48cbcd8a138c39d4e8f63d6c1f569090dcc.1519128054.git.baruch@tkos.co.il>
+Date: Thu, 22 Feb 2018 13:50:50 +0100
+Subject: [PATCH v5 3/5] gpio: raspberrypi-exp: Driver for RPi3 GPIO
+ expander via mailbox service
+In-Reply-To: <8c34f287ee72b340fa9d693aa0e304b25541c74c.1519128054.git.baruch@tkos.co.il>
 References: <cover.1519128054.git.baruch@tkos.co.il>
- <f400b48cbcd8a138c39d4e8f63d6c1f569090dcc.1519128054.git.baruch@tkos.co.il>
-Message-ID: <CACRpkdbRk3u+KWLLJFx1wB2BDb50d2QJ3b68wvrer1VOZ0tWQQ@mail.gmail.com>
+ <8c34f287ee72b340fa9d693aa0e304b25541c74c.1519128054.git.baruch@tkos.co.il>
+Message-ID: <CACRpkdbJyS6K_JKTVRkQjj9AhKO0UegrAt2o2zeQkJCGBLgTHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 1:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
-> I2C. The firmware mailbox interface allows the ARM core to control the
-> GPIO lines.
+> From: Dave Stevenson <dave.stevenson@raspberrypi.org>
 >
+> Pi3 and Compute Module 3 have a GPIO expander that the
+> VPU communicates with.
+> There is a mailbox service that now allows control of this
+> expander, so add a kernel driver that can make use of it.
+>
+> Reviewed-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Dave Stevenson <dave.stevenson@raspberrypi.org>
 > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
 > v5:
->   * Remove the 'firmware' property
->   * Note that the gpio node is a child of the firmware node
+>   * Use the parent node to find the firmware
 
-This v5 patch applied to the GPIO tree for v4.17 with Rob's ACK.
+This v5 version applied to the GPIO tree for v4.17.
 
 Yours,
 Linus Walleij
