@@ -1,17 +1,19 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 22 Feb 2018 23:11:38 +0800
-Subject: [PATCH] crypto: arm/aes-cipher - move S-box to .rodata section
-In-Reply-To: <20180212135237.GA3011@pjb1027-Latitude-E5410>
-References: <20180212135237.GA3011@pjb1027-Latitude-E5410>
-Message-ID: <20180222151138.GC29815@gondor.apana.org.au>
+Date: Thu, 22 Feb 2018 23:11:49 +0800
+Subject: [PATCH] hwrng: bcm2835: Handle deferred clock properly
+In-Reply-To: <1518466296-30161-1-git-send-email-stefan.wahren@i2se.com>
+References: <1518466296-30161-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180222151149.GD29815@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 10:52:37PM +0900, Jinbum Park wrote:
-> Move the AES inverse S-box to the .rodata section
-> where it is safe from abuse by speculation.
+On Mon, Feb 12, 2018 at 09:11:36PM +0100, Stefan Wahren wrote:
+> In case the probe of the clock is deferred, we would assume it is
+> optional. This is wrong, so defer the probe of this driver until
+> the clock is available.
 > 
-> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+> Fixes: 791af4f4907a ("hwrng: bcm2835 - Manage an optional clock")
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
 Patch applied.  Thanks.
 -- 
