@@ -1,47 +1,60 @@
 From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 22 Feb 2018 15:45:06 +0530
-Subject: [PATCH 1/4][v4][RESEND] dt-bindings: mtd-physmap: Add endianness
- supports
+Date: Thu, 22 Feb 2018 15:45:07 +0530
+Subject: [PATCH 2/4][v4][RESEND] driver: mtd: update struct map_info's swap as
+ per map requirement
 In-Reply-To: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
 References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180222101511.29631-2-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180222101511.29631-3-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Connection between flash and controller is not necessary to be always
-of same type. It may varies from platform to platform.
+It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
+Maps device can be Big endian or little endian.
 
-Adding endianness (optional) property to provide connection type
-information.
+Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
+CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
 
+Now update struct map_info's swap field based on device characteristics
+defined in device tree.
+
+Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
 Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes for v2: updated subject
-Changes for v3: fixed typo for "big-endian"
-Changes for v4: Moved binding definition in mtd-physmap.txt
-as discussed at https://patchwork.ozlabs.org/patch/842543/
+Changes for v2: Incorporated review comments from Boris Brezillon
+http://patchwork.ozlabs.org/patch/758381/
+Changes for v3: None
+Changes for v4: Updated code as per new defined binding of physmap.txt
 
 Resending as all patches of patchset never reaches to patchwork.
 
- Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mtd/maps/physmap_of_core.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-index 4a0a48bf4ecb..961a8eed9d0d 100644
---- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-@@ -41,6 +41,11 @@ additional (optional) property is defined:
+diff --git a/drivers/mtd/maps/physmap_of_core.c b/drivers/mtd/maps/physmap_of_core.c
+index b1bd4faecfb2..6eee160dfb3d 100644
+--- a/drivers/mtd/maps/physmap_of_core.c
++++ b/drivers/mtd/maps/physmap_of_core.c
+@@ -20,6 +20,7 @@
+ #include <linux/mtd/map.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/concat.h>
++#include <linux/mtd/cfi_endian.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+@@ -233,6 +234,13 @@ static int of_flash_probe(struct platform_device *dev)
+ 		info->list[i].map.bankwidth = be32_to_cpup(width);
+ 		info->list[i].map.device_node = dp;
  
-  - erase-size : The chip's physical erase block size in bytes.
- 
-+ The device tree may optionally contain endianness property.
-+ little-endian or big-endian : It represents connection between controller and
-+			flash. If this property is absent, flash is considered
-+			to be host-endian.
++		if (of_property_read_bool(dp, "big-endian"))
++			info->list[i].map.swap = CFI_BIG_ENDIAN;
++		else if (of_property_read_bool(dp, "little-endian"))
++			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
++		else
++			info->list[i].map.swap = CFI_HOST_ENDIAN;
 +
- The device tree may optionally contain sub-nodes describing partitions of the
- address space. See partition.txt for more detail.
- 
+ 		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
+ 		if (err)
+ 			goto err_out;
 -- 
 2.14.1
