@@ -1,41 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 22 Feb 2018 10:57:24 +0800
-Subject: [GIT PULL] ZTE ZX fixes for 4.16
-Message-ID: <20180222025723.GB3217@dragon>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 22 Feb 2018 10:57:28 +0800
+Subject: [PATCH v4 4/6] arm64: dts: exynos: add OF graph between MHL and
+ USB connector
+In-Reply-To: <20180221085541.14556-5-a.hajda@samsung.com>
+References: <20180221085541.14556-5-a.hajda@samsung.com>
+Message-ID: <201802221029.DemtGxRD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Andrzej,
 
-It contains only a fix for ZTE ZX296702 device tree, which has been
-overlooked in 4.16 merge window [1].  So please consider to merge it for
-4.16-rc as a fix.  Thanks.
+I love your patch! Yet something to improve:
 
-Shawn
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.16-rc2 next-20180221]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-[1] https://lkml.org/lkml/2018/2/21/1571
+url:    https://github.com/0day-ci/linux/commits/Andrzej-Hajda/dt-bindings-add-bindings-for-USB-physical-connector/20180221-185759
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
+All errors (new ones prefixed by >>):
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>> Error: arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi:864.1-2 syntax error
+   FATAL ERROR: Unable to parse input tree
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-fixes-4.16
-
-for you to fetch changes up to c469943e87f6ec4617e69db7e5cea7e8f6dca586:
-
-  arm: zx: dts: Remove leading 0x and 0s from bindings notation (2018-02-22 10:34:52 +0800)
-
-----------------------------------------------------------------
-ZTE ZX fixes for 4.16:
- - Remove all the leading "0x" and zeros from ZX296702 device tree to
-   fix the dtc warnings.
-
-----------------------------------------------------------------
-Mathieu Malaterre (1):
-      arm: zx: dts: Remove leading 0x and 0s from bindings notation
-
- arch/arm/boot/dts/zx296702.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38172 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/f896efce/attachment-0001.gz>
