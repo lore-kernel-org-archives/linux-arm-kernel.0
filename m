@@ -1,84 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Feb 2018 13:16:08 +0000
-Subject: Applied "ASoC: uniphier: evea: fix lisence comment style" to the asoc
- tree
-In-Reply-To: <20180221234232.5252-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1eoqjI-0006Aq-Rz@debutante>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 22 Feb 2018 14:20:53 +0100
+Subject: [PATCH v3 2/5] m68k: rename UL() to TO_UL()
+In-Reply-To: <1519301715-31798-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+ <1519301715-31798-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAMuHMdXsobaUdxMO-3=B56_2pQ2MzG7vxOqt+GzG_OC1T5bL7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Yamada-san,
 
-   ASoC: uniphier: evea: fix lisence comment style
+On Thu, Feb 22, 2018 at 1:15 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> ARM, ARM64 and UniCore32 define UL(x) like follows:
+>   #define UL(x) _AC(x, UL)
+>
+> While, M68K defines it differently:
+>   #define UL(x) ((unsigned long) (x))
+>
+> I want to move the former to a common header.  Beforehand, this
+> commit renames the latter to avoid name conflict.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> ---
+> V2: https://patchwork.kernel.org/patch/9498273/
+>
+> Changes in v3: None
+> Changes in v2:
+>  - Split out as a prerequisite patch
+>
+>  arch/m68k/mm/init.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/m68k/mm/init.c b/arch/m68k/mm/init.c
+> index e85acd1..583a8e5 100644
+> --- a/arch/m68k/mm/init.c
+> +++ b/arch/m68k/mm/init.c
+> @@ -122,9 +122,9 @@ void free_initmem(void)
+>
+>  void __init print_memmap(void)
+>  {
+> -#define UL(x) ((unsigned long) (x))
+> -#define MLK(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 10
+> -#define MLM(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 20
+> +#define TO_UL(x) ((unsigned long) (x))
+> +#define MLK(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 10
+> +#define MLM(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 20
+>  #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), 1024)
 
-has been applied to the asoc tree at
+Please note that this code patch is scheduled for removal in v4.17, cfr.
+"[PATCH] m68k/mm: Stop printing the virtual memory layout"
+(https://lkml.org/lkml/2018/2/12/97).
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Gr{oetje,eeting}s,
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+                        Geert
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 24745dca8e7e17c20b6cf2bfb94a9acd09dce1b9 Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Thu, 22 Feb 2018 08:42:32 +0900
-Subject: [PATCH] ASoC: uniphier: evea: fix lisence comment style
-
-This patch changes lisence comment style from C to C++.
-And use SPDX instead of boiler plate of GPLv2, as same as
-other audio codec drivers.
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/uniphier/evea.c | 22 ++++------------------
- 1 file changed, 4 insertions(+), 18 deletions(-)
-
-diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
-index ac2d30b55fb6..439f14f91b23 100644
---- a/sound/soc/uniphier/evea.c
-+++ b/sound/soc/uniphier/evea.c
-@@ -1,22 +1,8 @@
- // SPDX-License-Identifier: GPL-2.0
--/*
-- * Socionext UniPhier EVEA ADC/DAC codec driver.
-- *
-- * Copyright (c) 2016-2017 Socionext Inc.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; version 2
-- * of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, see <http://www.gnu.org/licenses/>.
-- */
-+//
-+// Socionext UniPhier EVEA ADC/DAC codec driver.
-+//
-+// Copyright (c) 2016-2017 Socionext Inc.
- 
- #include <linux/clk.h>
- #include <linux/module.h>
--- 
-2.16.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
