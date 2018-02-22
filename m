@@ -1,74 +1,28 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 22 Feb 2018 17:40:48 +0000
-Subject: [PATCH v4 25/40] KVM: arm64: Introduce framework for accessing
- deferred sysregs
-In-Reply-To: <20180215210332.8648-26-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-26-christoffer.dall@linaro.org>
-Message-ID: <b9edba7e-bc31-b101-5bcc-8233547e731a@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Feb 2018 17:43:38 +0100
+Subject: [PATCH 3/3] ARM: davinci: mark spi_board_info arrays as const
+In-Reply-To: <20180220162519.1498223-3-arnd@arndb.de>
+References: <20180220162519.1498223-1-arnd@arndb.de>
+ <20180220162519.1498223-3-arnd@arndb.de>
+Message-ID: <CAK8P3a2gWP-i0X=3dom4aCMfKgmf41a27Huj9919Epnwg26JoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Tue, Feb 20, 2018 at 5:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Building with LTO revealed that three spi_board_info arrays are marked
+> __initconst, but not const:
+>
+> arch/arm/mach-davinci/board-dm365-evm.c: In function 'dm365_evm_init':
+> arch/arm/mach-davinci/board-dm365-evm.c:729:30: error: 'dm365_evm_spi_info' causes a section type conflict with 'dm646x_edma_device'
+>  static struct spi_board_info dm365_evm_spi_info[] __initconst = {
+>                               ^
+> arch/arm/mach-davinci/dm646x.c:603:42: note: 'dm646x_edma_device' was declared here
+>  static const struct platform_device_info dm646x_edma_device __initconst = {
+>
+> This marks them const as well, as was originally intended.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On 15/02/18 21:03, Christoffer Dall wrote:
-> We are about to defer saving and restoring some groups of system
-> registers to vcpu_put and vcpu_load on supported systems.  This means
-> that we need some infrastructure to access system registes which
+I applied this to the fixes branch now.
 
-NIT: s/registes/registers/
-
-> supports either accessing the memory backing of the register or directly
-> accessing the system registers, depending on the state of the system
-> when we access the register.
-> 
-> We do this by defining read/write accessor functions, which can handle
-> both "immediate" and "deferrable" system registers.  Immediate registers
-> are always saved/restored in the world-switch path, but deferrable
-> registers are only saved/restored in vcpu_put/vcpu_load when supported
-> and sysregs_loaded_on_cpu will be set in that case.
-> 
-> Note that we don't use the deferred mechanism yet in this patch, but only
-> introduce infrastructure.  This is to improve convenience of review in
-
-NIT: double space after the period.
-
-> the subsequent patches where it is clear which registers become
-> deferred.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> 
-> Notes:
->      Changes since v3:
->       - Changed to a switch-statement based approach to improve
->         readability.
->      
->      Changes since v2:
->       - New patch (deferred register handling has been reworked)
-> 
->   arch/arm64/include/asm/kvm_host.h |  8 ++++++--
->   arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
->   2 files changed, 39 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 68398bf7882f..b463b5e28959 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
->   
->   	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
->   	u64 vsesr_el2;
-> +
-> +	/* True when deferrable sysregs are loaded on the physical CPU,
-> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-
-NIT: I think the preferred style comment is
-/*
-  * Foo
-  */
-
-Cheers,
-
--- 
-Julien Grall
+      Arnd
