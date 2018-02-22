@@ -1,31 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Feb 2018 17:47:48 +0100
-Subject: [GIT PULL 2/2] Rockchip dts64 fixes for 4.16
-In-Reply-To: <1708943.A4pxJccnVY@phil>
-References: <2137280.MWbT8y5lbZ@phil> <1708943.A4pxJccnVY@phil>
-Message-ID: <CAK8P3a2QXnUCaj1vDa6PePWWJAcyvMe-fRAhVqLd3QdFKEWRLg@mail.gmail.com>
+Date: Thu, 22 Feb 2018 17:49:14 +0100
+Subject: [PATCH] ARM: orion: fix orion_ge00_switch_board_info
+ initialization
+In-Reply-To: <20180222133043.GC23008@lunn.ch>
+References: <20180221121856.3241260-1-arnd@arndb.de>
+ <20180222133043.GC23008@lunn.ch>
+Message-ID: <CAK8P3a1tkeyLN1qg1yFMXbBgRvsT3xELrdbFbMd1EmOW5tGmQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 18, 2018 at 4:41 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On Thu, Feb 22, 2018 at 2:30 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Wed, Feb 21, 2018 at 01:18:49PM +0100, Arnd Bergmann wrote:
+>> A section type mismatch warning shows up when building with LTO,
+>> since orion_ge00_mvmdio_bus_name was put in __initconst but not marked
+>> const itself:
+>>
+>> include/linux/of.h: In function 'spear_setup_of_timer':
+>> arch/arm/mach-spear/time.c:207:34: error: 'timer_of_match' causes a section type conflict with 'orion_ge00_mvmdio_bus_name'
+>>  static const struct of_device_id timer_of_match[] __initconst = {
+>>                                   ^
+>> arch/arm/plat-orion/common.c:475:32: note: 'orion_ge00_mvmdio_bus_name' was declared here
+>>  static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+>>                                 ^
+>>
+>> As pointed out by Andrew Lunn, it should in fact be 'const' but not
+>> '__initconst' because the string is never copied but may be accessed
+>> after the init sections are freed. To fix that, I get rid of the
+>> extra symbol and rewrite the initialization in a simpler way that
+>> assigns both the bus_id and modalias statically.
+>>
+>> I spotted another theoretical bug in the same place, where d->netdev[i]
+>> may be an out of bounds access, this can be fixed by moving the device
+>> assignment into the loop.
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.16-rockchip-dts64fixes-1
->
-> for you to fetch changes up to ca9eee95a2decc6f60bed65b5b836a26bff825c1:
->
->   arm64: dts: rockchip: Fix DWMMC clocks (2018-02-16 10:30:25 +0100)
->
-> ----------------------------------------------------------------
-> Fixes of dwmmc tuning clocks that may make probing HS cards fail,
-> adding the grf-vio clock to the edp so that it can also be build
-> as module, correct pcie ep-gpio on the sapphire board and finally
-> a fix that makes the gmac work at gigabit speeds on the rk3328-rock64.
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Pulled into fixes, thanks!
+Thanks, applied into fixes branch with your Reviewed-by tag now.
 
-     Arnd
+        Arnd
