@@ -1,54 +1,44 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 22 Feb 2018 09:42:31 +0100
-Subject: [PATCH] KVM: arm/arm64: No need to zero CNTVOFF in
- kvm_timer_vcpu_put() for VHE
-In-Reply-To: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
-References: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20180222084231.GA29376@cbox>
+Date: Thu, 22 Feb 2018 09:43:21 +0100
+Subject: [PATCH v4 03/40] KVM: arm64: Avoid storing the vcpu pointer on
+ the stack
+In-Reply-To: <d00629e8-da68-a536-dc22-b8c26e962b85@arm.com>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-4-christoffer.dall@linaro.org>
+ <d00629e8-da68-a536-dc22-b8c26e962b85@arm.com>
+Message-ID: <20180222084321.GB29376@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
-
-On Mon, Feb 19, 2018 at 09:38:07AM -0600, Shanker Donthineni wrote:
-> In AArch64/AArch32, the virtual counter uses a fixed virtual offset
-> of zero in the following situations as per ARMv8 specifications:
+On Mon, Feb 19, 2018 at 03:50:20PM +0000, Julien Grall wrote:
+> Hi Christoffer,
 > 
-> 1) HCR_EL2.E2H is 1, and CNTVCT_EL0/CNTVCT are read from EL2.
-> 2) HCR_EL2.{E2H, TGE} is {1, 1}, and either:
->    ? CNTVCT_EL0 is read from Non-secure EL0 or EL2.
->    ? CNTVCT is read from Non-secure EL0.
+> On 15/02/18 21:02, Christoffer Dall wrote:
+> >We already have the percpu area for the host cpu state, which points to
+> >the VCPU, so there's no need to store the VCPU pointer on the stack on
+> >every context switch.  We can be a little more clever and just use
+> >tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+> >context.
+> >
+> >This does require us to calculate the percpu offset without including
+> >the offset from the kernel mapping of the percpu array to the linear
+> >mapping of the array (which is what we store in tpidr_el1), because a
+> >PC-relative generated address in EL2 is already giving us the hyp alias
+> >of the linear mapping of a kernel address.  We do this in
+> >__cpu_init_hyp_mode() by using kvm_ksym_ref().
+> >
+> >This change also requires us to have a scratch register, so we take the
+> >chance to rearrange some of the el1_sync code to only look at the
+> >vttbr_el2 to determine if this is a trap from the guest or an HVC from
+> >the host.  We do add an extra check to call the panic code if the kernel
+> >is configured with debugging enabled and we saw a trap from the host
+> >which wasn't an HVC, indicating that we left some EL2 trap configured by
+> >mistake.
 > 
-> So, no need to zero CNTVOFF_EL2/CNTVOFF for VHE case.
+> You might want to remove this paragraph as you don't seem to have rework
+> that part of the code in this version.
 > 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 70268c0..86eca324 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -541,9 +541,11 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->  	 * The kernel may decide to run userspace after calling vcpu_put, so
->  	 * we reset cntvoff to 0 to ensure a consistent read between user
->  	 * accesses to the virtual counter and kernel access to the physical
-> -	 * counter.
-> +	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
-> +	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
->  	 */
-> -	set_cntvoff(0);
-> +	if (!has_vhe())
-> +		set_cntvoff(0);
->  }
->  
->  /*
-
-I'm okay with this change.  I don't think there's a huge gain here
-though.
-
-Marc, any thoughts or concerns?
+Yes, will do.
 
 Thanks,
 -Christoffer
