@@ -1,46 +1,49 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 22 Feb 2018 15:33:24 +1030
-Subject: [PATCH] MAINTAINERS: Update ASPEED entry with details
-Message-ID: <20180222050324.21531-1-joel@jms.id.au>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 22 Feb 2018 14:14:18 +0900
+Subject: [PATCH] PM / devfreq: exynos-ppmu: Delete an error message
+ for a failed memory allocation in exynos_ppmu_probe()
+In-Reply-To: <5A8364F8.8050801@samsung.com>
+References: <5A8364F8.8050801@samsung.com>
+ <e4d3a870-f420-5a06-1665-59152c1924a3@users.sourceforge.net>
+ <CGME20180213211754epcas1p12c743dac97dbc187c46206bc2fa16c78@epcms1p5>
+Message-ID: <20180222051418epcms1p515085d1b1fabaf50983ff2ecb3442c02@epcms1p5>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am interested in all ASPEED drivers, and the previous match wasn't
-grabbing files in nested directories. Use N instead.
+> On 2018? 02? 14? 06:17, SF Markus Elfring wrote:
+> > From: Markus Elfring <elfring@users.sourceforge.net>
+> > Date: Tue, 13 Feb 2018 22:10:42 +0100
+> > 
+> > Omit an extra message for a memory allocation failure in this function.
+> > 
+> > This issue was detected by using the Coccinelle software.
+> > 
+> > Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> > ---
+> >  drivers/devfreq/event/exynos-ppmu.c | 6 ++----
+> >  1 file changed, 2 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+> > index d96e3dc71cf8..72ac9113500d 100644
+> > --- a/drivers/devfreq/event/exynos-ppmu.c
+> > +++ b/drivers/devfreq/event/exynos-ppmu.c
+> > @@ -627,11 +627,9 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
+> >  
+> >  	size = sizeof(struct devfreq_event_dev *) * info->num_events;
+> >  	info->edev = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+> > -	if (!info->edev) {
+> > -		dev_err(&pdev->dev,
+> > -			"failed to allocate memory devfreq-event devices\n");
+> > +	if (!info->edev)
+> >  		return -ENOMEM;
+> > -	}
+> > +
+> >  	edev = info->edev;
+> >  	platform_set_drvdata(pdev, info);
+> >  
+> > 
+> 
+> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
 
-Add the arm kernel mailing list so that patches get reviewed there, and
-the linux-aspeed list which exists only so I can use patchwork to track
-patches.
-
-Add Andrew as a reviewer, because he is involved in reviewing ASPEED
-stuff.
-
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- MAINTAINERS | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9a7f76eadae9..1ebf49797175 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1226,10 +1226,15 @@ F:	Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
- 
- ARM/ASPEED MACHINE SUPPORT
- M:	Joel Stanley <joel@jms.id.au>
--S:	Maintained
-+R:	Andrew Jeffery <andrew@aj.id.au>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-aspeed at lists.ozlabs.org (moderated for non-subscribers)
-+Q:	https://patchwork.ozlabs.org/project/linux-aspeed/list/
-+S:	Supported
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
- F:	arch/arm/mach-aspeed/
- F:	arch/arm/boot/dts/aspeed-*
--F:	drivers/*/*aspeed*
-+N:	aspeed
- 
- ARM/ATMEL AT91 Clock Support
- M:	Boris Brezillon <boris.brezillon@free-electrons.com>
--- 
-2.15.1
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
