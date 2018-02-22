@@ -1,58 +1,53 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 22 Feb 2018 11:28:14 +0100
-Subject: [PATCH 0/4][v4][RESEND] dt-bindings: mtd-physmap: Add
- endianness supports
-In-Reply-To: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
+Date: Thu, 22 Feb 2018 11:31:47 +0100
+Subject: [PATCH 1/2][v2][RESEND] ARM: dts: Add big-endian for IFC on
+ LS1021A
+In-Reply-To: <20180222101511.29631-6-prabhakar.kushwaha@nxp.com>
 References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180222112814.3717af47@bbrezillon>
+ <20180222101511.29631-6-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180222113147.2cce0f92@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
-
-On Thu, 22 Feb 2018 15:45:05 +0530
+On Thu, 22 Feb 2018 15:45:10 +0530
 Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
 
-> Connection between flash and controller is not necessary to be always
-> of same type. It may varies from platform to platform.
+> For the patch to update struct map_info's swap field based on device
+> characteristics defined in device tree, big-endian parameter is added
+> for LS1021A.
 > 
-> Adding endianness (optional) property to provide connection type
-> information. This endianness property is checked in physmap_of_core.c
-> to decide swap type. 
-> 
-> This patch also set "big-endian" property for ls1021a, ls1043a
-> and ls1046a device tree. here connection between IFC controller
-> and NOR flash is big-endian.
-> 
-> Prabhakar Kushwaha (4):
->   dt-bindings: mtd-physmap: Add endianness supports
->   driver: mtd: update struct map_info's swap as per map requirement
->   ARM: dts: Add NOR connection type with IFC
->   ARM64: dts: Add NOR connection type with IFC
-
-First of all, can you stop sending dts changes until we've agreed on
-the dt-bindings/driver changes.
-
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> ---
+> Due to patch series http://patchwork.ozlabs.org/project/linux-mtd/list/?series=28735
+> this patch is now independent of flash propoerty. So resending.
 > 
 > Resending as all patches of patchset never reaches to patchwork.
 
-Hm, I think they reached patchwork, it's just that dts changes won't
-be applied to the MTD tree, so I mark them as 'Not applicable'.
+Again, that's not the case, I just marked them as "Not applicable" (see
+my previous reply).
 
-Regards,
-
-Boris
+Also, according to the cover letter this patch should not be part of
+"dt-bindings: mtd-physmap: Add endianness supports", so why are you
+sending it here?
 
 > 
->  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
->  arch/arm/boot/dts/ls1021a-qds.dts                     | 1 +
->  arch/arm/boot/dts/ls1021a-twr.dts                     | 1 +
->  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts     | 1 +
->  arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts     | 1 +
->  arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts     | 1 +
->  drivers/mtd/maps/physmap_of_core.c                    | 8 ++++++++
->  7 files changed, 18 insertions(+)
+>  arch/arm/boot/dts/ls1021a.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 9319e1f0f1d8..babb086ad94f 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -145,6 +145,7 @@
+>  		ifc: ifc at 1530000 {
+>  			compatible = "fsl,ifc", "simple-bus";
+>  			reg = <0x0 0x1530000 0x0 0x10000>;
+> +			big-endian;
+>  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
 
 
 
