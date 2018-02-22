@@ -1,123 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Feb 2018 13:26:01 +0000
-Subject: [PATCH v4 24/40] KVM: arm64: Rewrite system register accessors to
- read/write functions
-In-Reply-To: <20180222111005.GL29376@cbox>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-25-christoffer.dall@linaro.org>
- <86a7w2lb7m.wl-marc.zyngier@arm.com> <20180222092237.GI29376@cbox>
- <86po4xjo5x.wl-marc.zyngier@arm.com> <20180222111005.GL29376@cbox>
-Message-ID: <58899246-54d1-77e8-2d7a-395cd6dcdfca@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 22 Feb 2018 14:28:46 +0100
+Subject: [PATCH v2 09/19] ARM64: dts: Add R-Car Salvator-x M3-N support
+In-Reply-To: <CAK8P3a30pgOXvLLHe3Hb-ubPz6QeUiZKFqMZLm8Qp_7KRr7QuA@mail.gmail.com>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-10-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdVDCga8htL+UD3P0Kzt9-OQ6hof+szGOiV9d0gwxGExqQ@mail.gmail.com>
+ <20180221171504.dac7yikrqfnjiiog@verge.net.au>
+ <CAK8P3a30pgOXvLLHe3Hb-ubPz6QeUiZKFqMZLm8Qp_7KRr7QuA@mail.gmail.com>
+Message-ID: <CAMuHMdXJcHLee3mn56pSpUkFie_rQFZEPf=+6MWHe+W-+bMxgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/18 11:10, Christoffer Dall wrote:
-> On Thu, Feb 22, 2018 at 10:48:10AM +0000, Marc Zyngier wrote:
->> On Thu, 22 Feb 2018 09:22:37 +0000,
->> Christoffer Dall wrote:
+Hi Arnd,
+
+On Thu, Feb 22, 2018 at 12:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Feb 21, 2018 at 6:15 PM, Simon Horman <horms@verge.net.au> wrote:
+>> On Tue, Feb 20, 2018 at 04:46:23PM +0100, Geert Uytterhoeven wrote:
+>>> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+>>> > Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
+>>> >
+>>> > Based on original work from:
+>>> > Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>> > Magnus Damm <damm+renesas@opensource.se>
+>>> >
+>>> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 >>>
->>> On Wed, Feb 21, 2018 at 01:32:45PM +0000, Marc Zyngier wrote:
->>>> On Thu, 15 Feb 2018 21:03:16 +0000,
->>>> Christoffer Dall wrote:
->>>>>
->>>>> From: Christoffer Dall <cdall@cs.columbia.edu>
->>>>>
->>>>> Currently we access the system registers array via the vcpu_sys_reg()
->>>>> macro.  However, we are about to change the behavior to some times
->>>>> modify the register file directly, so let's change this to two
->>>>> primitives:
->>>>>
->>>>>  * Accessor macros vcpu_write_sys_reg() and vcpu_read_sys_reg()
->>>>>  * Direct array access macro __vcpu_sys_reg()
->>>>>
->>>>> The first primitive should be used in places where the code needs to
->>>>> access the currently loaded VCPU's state as observed by the guest.  For
->>>>> example, when trapping on cache related registers, a write to a system
->>>>> register should go directly to the VCPU version of the register.
->>>>>
->>>>> The second primitive can be used in places where the VCPU is known to
->>>>> never be running (for example userspace access) or for registers which
->>>>> are never context switched (for example all the PMU system registers).
->>>>>
->>>>> This rewrites all users of vcpu_sys_regs to one of the two primitives
->>>>> above.
->>>>>
->>>>> No functional change.
->>>>>
->>>>> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
->>>>> ---
->>>>>
->>>>> Notes:
->>>>>     Changes since v2:
->>>>>      - New patch (deferred register handling has been reworked)
->>>>>
->>>>>  arch/arm64/include/asm/kvm_emulate.h | 13 ++++---
->>>>>  arch/arm64/include/asm/kvm_host.h    | 13 ++++++-
->>>>>  arch/arm64/include/asm/kvm_mmu.h     |  2 +-
->>>>>  arch/arm64/kvm/debug.c               | 27 +++++++++-----
->>>>>  arch/arm64/kvm/inject_fault.c        |  8 ++--
->>>>>  arch/arm64/kvm/sys_regs.c            | 71 ++++++++++++++++++------------------
->>>>>  arch/arm64/kvm/sys_regs.h            |  4 +-
->>>>>  arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
->>>>>  virt/kvm/arm/pmu.c                   | 37 ++++++++++---------
->>>>>  9 files changed, 102 insertions(+), 77 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->>>>> index 3cc535591bdf..d313aaae5c38 100644
->>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
->>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
->>>>> @@ -290,15 +290,18 @@ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
->>>>>  
->>>>>  static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
->>>>>  {
->>>>> -	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
->>>>> +	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
->>>>>  }
->>>>>  
->>>>>  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
->>>>>  {
->>>>> -	if (vcpu_mode_is_32bit(vcpu))
->>>>> +	if (vcpu_mode_is_32bit(vcpu)) {
->>>>>  		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
->>>>> -	else
->>>>> -		vcpu_sys_reg(vcpu, SCTLR_EL1) |= (1 << 25);
->>>>> +	} else {
->>>>> +		u64 sctlr = vcpu_read_sys_reg(vcpu, SCTLR_EL1);
->>>>> +		sctlr |= (1 << 25);
->>>>> +		vcpu_write_sys_reg(vcpu, SCTLR_EL1, sctlr);
->>>>
->>>> General comment: it is slightly annoying that vcpu_write_sys_reg takes
->>>> its parameters in an order different from that of write_sysreg
->>>> (register followed with value, instead of value followed with
->>>> register). Not a deal breaker, but slightly confusing.
->>>>
->>>
->>> Ah, I didn't compare to write_sysreg, I was thinking that
->>>
->>>   vcpu_read_sys_reg(vcpu, SCTLR_EL1);
->>>   vcpu_write_sys_reg(vcpu, SCTLR_EL1, val);
->>>
->>> looked more symmetrical because the write just takes an extra value, but
->>> I can see your argument as well.
->>>
->>> I don't mind changing it if it matters to you?
+>>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 >>
->> I'd like to see that changed, but it doesn't have to be as part of
->> this series if it is going to cause a refactoring mess. We can address
->> it as a blanket fix after this series.
+>> Thanks, applied with prefix updated to
 >>
-> 
-> I think it's reasonably self-contained.
-> 
-> Just so I'm sure, are these the primitives you'd like to see?
-> 
-> vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
-> vcpu_write_sys_reg(struct kvm_vcpu *vcpu, u64 val, int reg);
+>> "arm64: dts: renesas:"
+>>
+>> There was some fuzz applying this patch, the result is as follows.
+>>
+>> From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>> Subject: [PATCH] arm64: dts: renesas: Add R-Car Salvator-x M3-N support
+>>
+>> Add basic support for R-Car Salvator-X M3-N (R8A77965) board.
+>>
+>> Based on original work from:
+>> Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Magnus Damm <damm+renesas@opensource.se>
+>>
+>> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Something went wrong with this patch, I suspect it's missing some prerequisites
+> that fill in a few more device nodes to avoid these warnings in linux-next:
+>
+> arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dtb: Warning
+> (reg_format): "reg" property in /soc/ethernet at e6800000/ethernet-phy at 0
+> has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
 
-That'd be my preference indeed.
+[...]
 
-Thanks,
+> Maybe just take out the patch adding the .dts file for the time being until
+> the important nodes are all in place?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Removing the .dts file removes the ability to boot the newly added board...
+
+The issue here is that we are sharing board .dtsi for boards that can be
+equipped with different pin-compatible SiPs (Ri-Car H3, M3-W, M3-N), while
+not all SoC support has been enabled and/or tested. As the board .dtsi
+references on-SoC devices using phandles, the new r8a77965.dtsi declares
+placeholders for the devices that are not yet enabled/tested.
+This worked fine for r8a7796.dtsi before, but causes dtc warnings due to
+recent improvements in DT validation.
+
+I think the simplest way to fix this is to add reg properties to the
+placeholders, as Simon did for the last two placeholders in r8a7796.dtsi in
+commit 4316989537a6ed53 ("arm64: dts: renesas: r8a7796: add reg properties to
+pciec[01] nodes").
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
