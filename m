@@ -1,27 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Feb 2018 09:20:29 -0800
-Subject: [PATCH] ARM: OMAP2+: hwmod_core: enable optional clocks before
- main clock
-In-Reply-To: <f3425037-659b-238a-c77b-357c7363074d@ti.com>
-References: <1513934763-23966-1-git-send-email-t-kristo@ti.com>
- <f9fea9e3-7ebb-9a78-92fc-85b7afe3a525@ti.com>
- <20171222185118.GA3875@atomide.com>
- <f3425037-659b-238a-c77b-357c7363074d@ti.com>
-Message-ID: <20180222171452.GA5184@atomide.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 22 Feb 2018 09:20:47 -0800
+Subject: [PATCH v2 1/8] [PATCH 1/8] drivers/peci: Add support for PECI bus
+ driver core
+In-Reply-To: <20180222065455.GA2428@kroah.com>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
+ <20180221175853.GA22320@kroah.com>
+ <7f152459-a232-e62a-3c34-e995f8c85d63@linux.intel.com>
+ <20180222065455.GA2428@kroah.com>
+Message-ID: <9bd825f4-8497-4e2a-b8ea-56888df754e7@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180220 11:21]:
-> I think this missed the merge for some reason? Can you queue this up as a
-> fix as its still needed?
+On 2/21/2018 10:54 PM, Greg KH wrote:
+> On Wed, Feb 21, 2018 at 12:42:30PM -0800, Jae Hyun Yoo wrote:
+>> On 2/21/2018 9:58 AM, Greg KH wrote:
+>>> On Wed, Feb 21, 2018 at 08:15:59AM -0800, Jae Hyun Yoo wrote:
+>>>> This commit adds driver implementation for PECI bus into linux
+>>>> driver framework.
+>>>>
+>>>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>>>> ---
+>>>
+>>> Why is there no other Intel developers willing to review and sign off on
+>>> this patch?  Please get their review first before asking us to do their
+>>> work for them :)
+>>>
+>>> thanks,
+>>>
+>>> greg k-h
+>>>
+>>
+>> Hi Greg,
+>>
+>> This patch set got our internal review process. Sorry if it's code quality
+>> is under your expectation but it's the reason why I'm asking you to review
+>> the code. Could you please share your time to review it?
+> 
+> Nope.  If no other Intel developer thinks it is good enough to put their
+> name on it as part of their review process, why should I?
+> 
+> Again, please use the resources you have, to fix the obvious problems in
+> your code, BEFORE asking the community to do that work for you.
+> 
+> greg k-h
+> 
 
-Yes sorry I noticed too it missed the merge window. I sent
-a pull request for that last week in the fixes:
+Okay. I'll take our internal review process again on this patch set and 
+collect more credit tags before submitting v3.
 
-[GIT PULL] omap fixes for v4.16-rc cycle
+Thanks for your advice!
 
-So it should get there hopefully this week.
-
-Regards,
-
-Tony
+Jae
