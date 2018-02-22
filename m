@@ -1,38 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 22 Feb 2018 16:33:25 +0100
-Subject: [PATCH v3 8/8] drm/sun4i: backend: Remove ARGB spoofing
-In-Reply-To: <CAGb2v658h+MKv--py2cZdUp_iDje9MBSe8vOXBfgyoHRPyz_5g@mail.gmail.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <965180afd8169ccaa848f061d16a2c1a9ec4d289.1518802627.git-series.maxime.ripard@bootlin.com>
- <CAGb2v658h+MKv--py2cZdUp_iDje9MBSe8vOXBfgyoHRPyz_5g@mail.gmail.com>
-Message-ID: <20180222153325.vbkpbscghlqcbnjc@flea.lan>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 22 Feb 2018 15:33:31 +0000
+Subject: [PATCH 3/6] gpio: Add GPIO support for the ST Multi-Function
+ eXpander
+In-Reply-To: <CACRpkdaeFXuB1Qv-vqNpf4pHsAysiYh03_gfNoRdHBh1pN_Amw@mail.gmail.com>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-4-git-send-email-amelie.delaunay@st.com>
+ <CACRpkdaeFXuB1Qv-vqNpf4pHsAysiYh03_gfNoRdHBh1pN_Amw@mail.gmail.com>
+Message-ID: <2440a092-507d-bc39-6ed6-4a4ee094da7a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 10:15:07PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Feb 17, 2018 at 1:39 AM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > We've had some code for quite some time to prevent the alpha bug from
-> > happening on the lowest primary plane. Since we now check for this in our
-> > atomic_check, we can simply remove it.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+
+On 02/22/2018 02:47 PM, Linus Walleij wrote:
+> On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> ST Multi-Function eXpander (MFX) can be used as GPIO expander.
+>> It has 16 fast GPIOs and can have 8 extra alternate GPIOs
+>> when other MFX features are not enabled.
+>>
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> 
+> As mentioned I think this driver needs to:
+> 
+> - Move to drivers/pinctrl/pinctrl-stmfx.c similar to the sx150x controller.
+> - Pass a regmap around instead of the custom accessor functions.
 
-Applied the patches 4, 5, 6 and 8 with your reviewed-by.
+I study this right now!
+Thanks,
+Amelie
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180222/f31d1447/attachment.sig>
+> - Maybe refactor and reuse STMPE infrastructure
+> 
+> Yours,
+> Linus Walleij
+> 
