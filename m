@@ -1,119 +1,144 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 22 Feb 2018 14:36:36 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v7_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <CAMRc=MdQy-Y3mDh++sfFPhV3o544J-K_P9DMuzWZq9XCfESH5A@mail.gmail.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <CAMRc=MdT5Vd68eoWfJGv=5_uzD0L5m3Y+wi6r7N6O8y6HZrQSg@mail.gmail.com>
- <6142ab0d-85b1-84da-3a35-bdd8733bebd9@lechnology.com>
- <CAMRc=Mf_pumyTZPn9T=sG7Ab95YS3KqKc2bT0evhESTRRFeiuQ@mail.gmail.com>
- <ebc57f3b-4f5d-612f-5b63-ddda4dd25031@lechnology.com>
- <CAMRc=MdQy-Y3mDh++sfFPhV3o544J-K_P9DMuzWZq9XCfESH5A@mail.gmail.com>
-Message-ID: <CAMRc=MeeAH0ObZS6kMNZnVj27Yjb+C7PCp+EyC8Tz1G9zwNo1g@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 22 Feb 2018 14:40:52 +0100
+Subject: [PATCH v4 25/40] KVM: arm64: Introduce framework for accessing
+ deferred sysregs
+In-Reply-To: <20180215210332.8648-26-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-26-christoffer.dall@linaro.org>
+Message-ID: <20180222134052.fej4yyf5fq57kk3g@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-21 18:46 GMT+01:00 Bartosz Golaszewski <brgl@bgdev.pl>:
-> 2018-02-21 18:05 GMT+01:00 David Lechner <david@lechnology.com>:
->> On 02/21/2018 06:01 AM, Bartosz Golaszewski wrote:
->>>
->>> 2018-02-20 19:39 GMT+01:00 David Lechner <david@lechnology.com>:
->>>>
->>>> On 02/20/2018 07:33 AM, Bartosz Golaszewski wrote:
->>>>>
->>>>>
->>>>> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
->>>>>>
->>>>>>
->>>>>> This series converts mach-davinci to use the common clock framework.
->>>>>>
->>>>>>
->>>>>
->>>>> Hi David,
->>>>>
->>>>> just some quick results from today's playing with v7.
->>>>>
->>>>> I started out with da850-lcdk with my standard rootfs over NFS. I was
->>>>> not able to boot to console so far. The first problem is that mdio
->>>>> fails to probe:
->>>>>
->>>>> libphy: Fixed MDIO Bus: probed
->>>>> davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
->>>>> davinci_mdio 1e24000.mdio: no live phy, scanning all
->>>>> davinci_mdio: probe of 1e24000.mdio failed with error -5> After some
->>>>> digging I noticed that the supplied clock rate differs
->>>>> between mainline (114000000Hz) vs common-clock-v7 (18000000). Since
->>>>> we're not setting the rate in mdio, using LPSC_SET_RATE_PARENT would
->>>>> not help like with lcdc.
->>>>
->>>>
->>>>
->>>> Can you post the output of this command so that I can see how your
->>>> clocks are setup:
->>>>
->>>> cat /sys/kernel/debug/clk/clk_summary
->>>>
->>>>
->>>>>
->>>>> After that, the boot just hangs without ever getting to emac's probe.
->>>>
->>>>
->>>>
->>>> Using your workaround, can you run:
->>>>
->>>> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->>>>
->>>> If you see:
->>>>    1e27000.clock-controller: emac  off-0
->>>>
->>>> then genpd is not working like it is supposed to. You should see
->>>> something
->>>> like this for device that are working:
->>>>            1e27000.clock-controller: uart2  on
->>>>      /devices/platform/soc at 1c00000/1d0d000.serial        active
->>>>
->>>>
->>>>>
->>>>> Once I set the emac clock to always enabled (a workaround that was
->>>>> necessary with v6, but could be dropped with my first
->>>>> genpd-in-a-separate-driver attempt), I'm getting a rather strange NULL
->>>>> pointer dereference:
->>>>
->>>>
->>>>
->>>> I noticed this too when adding the power-domains property to some device
->>>> tree nodes. This is part of the reason why I didn't add it everywhere.
->>>> I wasn't able to figure out the cause of this yet. As a work around
->>>> though, please try removing the power-domains property from the emac
->>>> and mdio nodes and use your previous workaround of having an always
->>>> enabled clock.
->>>>
->>>>
->>>
->>> When I use any of the workarounds I just keep getting more problems
->>> (e.g. [1] from blk and pinctrl). I only had a couple hours today to
->>> play with it but it seems to me we have some memory corruption
->>> somewhere. I'll check the initialization order of all the frameworks
->>> involved tomorrow.
->>>
->>> Best regards,
->>> Bartosz
->>>
->>> [1] https://pastebin.com/75mkkuJL
->>>
->>
->> I wonder if we need to delete all of the __init and __initconst attributes
->> now that this has been converted to platform devices.
->>
->
-> Duh... Of course we do. IIRC everything in the init section gets
-> removed after late_initcall. I'll test that tomorrow.
->
-> Bart
+On Thu, Feb 15, 2018 at 10:03:17PM +0100, Christoffer Dall wrote:
+> We are about to defer saving and restoring some groups of system
+> registers to vcpu_put and vcpu_load on supported systems.  This means
+> that we need some infrastructure to access system registes which
+> supports either accessing the memory backing of the register or directly
+> accessing the system registers, depending on the state of the system
+> when we access the register.
+> 
+> We do this by defining read/write accessor functions, which can handle
+> both "immediate" and "deferrable" system registers.  Immediate registers
+> are always saved/restored in the world-switch path, but deferrable
+> registers are only saved/restored in vcpu_put/vcpu_load when supported
+> and sysregs_loaded_on_cpu will be set in that case.
+> 
+> Note that we don't use the deferred mechanism yet in this patch, but only
+> introduce infrastructure.  This is to improve convenience of review in
+> the subsequent patches where it is clear which registers become
+> deferred.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v3:
+>      - Changed to a switch-statement based approach to improve
+>        readability.
+>     
+>     Changes since v2:
+>      - New patch (deferred register handling has been reworked)
+> 
+>  arch/arm64/include/asm/kvm_host.h |  8 ++++++--
+>  arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
+>  2 files changed, 39 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 68398bf7882f..b463b5e28959 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
+>  
+>  	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
+>  	u64 vsesr_el2;
+> +
+> +	/* True when deferrable sysregs are loaded on the physical CPU,
+> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
+> +	bool sysregs_loaded_on_cpu;
+>  };
+>  
+>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+> @@ -296,8 +300,8 @@ struct kvm_vcpu_arch {
+>   */
+>  #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+>  
+> -#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
+> -#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
+> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
+> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
+>  
+>  /*
+>   * CP14 and CP15 live in the same array, as they are backed by the
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index a05d2c01c786..b3c3f014aa61 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -35,6 +35,7 @@
+>  #include <asm/kvm_coproc.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+> +#include <asm/kvm_hyp.h>
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/perf_event.h>
+>  #include <asm/sysreg.h>
+> @@ -76,6 +77,38 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
+>  	return false;
+>  }
+>  
+> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
+> +{
+> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> +		goto immediate_read;
+> +
+> +	/*
+> +	 * All system registers listed in the switch are not saved on every
+> +	 * exit from the guest but are only saved on vcpu_put.
 
-It's not that. Not only anyway as it doesn't fix anything, I'm getting
-the exact same panics. I tried to play with various settings, like
-initializing the platform driver later in the boot sequence etc. but
-haven't yet figured out what's going on.
+The "All ... are not" doesn't flow well for me. How about
 
-Bart
+ /*
+  * None of the system registers listed in the switch are saved on guest
+  * exit. These registers are only saved on vcpu_put.
+  */
+
+> +	 */
+> +	switch (reg) {
+> +	}
+> +
+> +immediate_read:
+> +	return __vcpu_sys_reg(vcpu, reg);
+> +}
+> +
+> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
+> +{
+> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> +		goto immediate_write;
+> +
+> +	/*
+> +	 * All system registers listed in the switch are not restored on every
+> +	 * entry to the guest but are only restored on vcpu_load.
+> +	 */
+
+ /*
+  * None of the system registers listed in the switch are restored on
+  * guest entry. If these registers were saved due to a vcpu_put, then
+  * they will be restored by vcpu_load.
+  */
+
+> +	switch (reg) {
+> +	}
+> +
+> +immediate_write:
+> +	 __vcpu_sys_reg(vcpu, reg) = val;
+> +}
+> +
+>  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+>  static u32 cache_levels;
+>  
+> -- 
+> 2.14.2
+>
+
+Otherwise
+
+Reviewed-by: Andrew Jones <drjones@redhat.com>
