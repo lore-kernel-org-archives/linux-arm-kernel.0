@@ -1,52 +1,35 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 22 Feb 2018 15:35:28 +0000
-Subject: [PATCH 5/6] ARM: dts: stm32: add joystick support on
- stm32746g-eval
-In-Reply-To: <CACRpkdbaFpLNdxZThVTO5V4y8wzekVpXoFJ_6EOOsKCD_h59cA@mail.gmail.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-6-git-send-email-amelie.delaunay@st.com>
- <CACRpkdbaFpLNdxZThVTO5V4y8wzekVpXoFJ_6EOOsKCD_h59cA@mail.gmail.com>
-Message-ID: <f8d91cc7-66aa-72bf-c1ed-8e95d39388ba@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Feb 2018 15:39:44 +0000
+Subject: [PATCH 3/9] arm64: Introduce arm64_force_sig_info and hook up in
+ arm64_notify_die
+In-Reply-To: <1519308057-4953-4-git-send-email-will.deacon@arm.com>
+References: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
+ <1519308057-4953-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20180222153944.v4ensqk2w3omr4u3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 22, 2018 at 02:00:51PM +0000, Will Deacon wrote:
+> +void arm64_force_sig_info(struct siginfo *info, const char *str,
+> +			  struct task_struct *tsk)
+> +{
+> +	unsigned int esr = tsk->thread.fault_code;
+> +	struct pt_regs *regs = task_pt_regs(tsk);
+> +
+> +	if (!unhandled_signal(tsk, info->si_signo))
+> +		goto send_sig;
+> +
+> +	if (!show_unhandled_signals_ratelimited())
+> +		goto send_sig;
+> +
+> +	pr_info("%s[%d]: unhandled exception: ", tsk->comm, task_pid_nr(tsk));
+> +	if (esr)
+> +		pr_cont("%s, ESR 0x%03x, ", esr_get_class_string(esr), esr);
 
+Can we make that 0x%08x please? ESR_ELx.EC occupies bits 31-26...
 
-On 02/22/2018 02:52 PM, Linus Walleij wrote:
-> Hi Amelie,
-> 
-> thanks for your patch.
-> 
-> On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
-> 
->> The joystick on stm32746g-eval uses gpios on MFX gpio expander.
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> (...)
->> +       joystick {
->> +               compatible = "gpio-keys";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               button at 1 {
->> +                       label = "JoySel";
->> +                       linux,code = <KEY_ENTER>;
->> +                       gpios = <&mfxgpio 0 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
->> +               };
-> 
-> As I think this should not all be handled by GPIO, the joystick on
-> gpio-keys needs a pin control handle pointing back to pin control
-> states on the respective pins in the pin control/GPIO driver,
-> where it can set up these properties.
-> 
-> For the individual lines the pushing and pulling flags should be
-> removed.
-> 
+I guess this was copied from __do_user_fault, and it's odd there, as
+wherever that's called the EC is non-zero.
 
-Sure! I keep this in mind, thanks!
-
-Regards,
-Amelie
-
-> Yours,
-> Linus Walleij
-> 
+Thanks,
+Mark.
