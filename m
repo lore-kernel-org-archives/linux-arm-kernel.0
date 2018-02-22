@@ -1,90 +1,317 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Feb 2018 01:58:29 +0900
-Subject: [PATCH v3 2/5] m68k: rename UL() to TO_UL()
-In-Reply-To: <CAMuHMdXsobaUdxMO-3=B56_2pQ2MzG7vxOqt+GzG_OC1T5bL7w@mail.gmail.com>
-References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
- <1519301715-31798-3-git-send-email-yamada.masahiro@socionext.com>
- <CAMuHMdXsobaUdxMO-3=B56_2pQ2MzG7vxOqt+GzG_OC1T5bL7w@mail.gmail.com>
-Message-ID: <CAK7LNASRtGPOopLkkSf0gx8NaRyak=oEdTfuyxtaZ3gNmCeK7A@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 22 Feb 2018 14:16:35 -0300
+Subject: [PATCH] ARM: dts: imx6: Pass memory unit-adress
+Message-ID: <1519319795-18161-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-2018-02-22 22:20 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> Hi Yamada-san,
->
-> On Thu, Feb 22, 2018 at 1:15 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> ARM, ARM64 and UniCore32 define UL(x) like follows:
->>   #define UL(x) _AC(x, UL)
->>
->> While, M68K defines it differently:
->>   #define UL(x) ((unsigned long) (x))
->>
->> I want to move the former to a common header.  Beforehand, this
->> commit renames the latter to avoid name conflict.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->> ---
->> V2: https://patchwork.kernel.org/patch/9498273/
->>
->> Changes in v3: None
->> Changes in v2:
->>  - Split out as a prerequisite patch
->>
->>  arch/m68k/mm/init.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/m68k/mm/init.c b/arch/m68k/mm/init.c
->> index e85acd1..583a8e5 100644
->> --- a/arch/m68k/mm/init.c
->> +++ b/arch/m68k/mm/init.c
->> @@ -122,9 +122,9 @@ void free_initmem(void)
->>
->>  void __init print_memmap(void)
->>  {
->> -#define UL(x) ((unsigned long) (x))
->> -#define MLK(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 10
->> -#define MLM(b, t) UL(b), UL(t), (UL(t) - UL(b)) >> 20
->> +#define TO_UL(x) ((unsigned long) (x))
->> +#define MLK(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 10
->> +#define MLM(b, t) TO_UL(b), TO_UL(t), (TO_UL(t) - TO_UL(b)) >> 20
->>  #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), 1024)
->
-> Please note that this code patch is scheduled for removal in v4.17, cfr.
-> "[PATCH] m68k/mm: Stop printing the virtual memory layout"
-> (https://lkml.org/lkml/2018/2/12/97).
->
+Pass the memory unit-adress to fix the following build warnings with W=1:
 
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-I see, but I do not see it in linux-next as of writing.
+There are cases where dts passes an empty memory node, which will be filled
+by the bootloader. Passing the memory base address still allows the 
+bootloader to fill the memory size.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts   | 4 ++--
+ arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts     | 4 ++--
+ arch/arm/boot/dts/imx6dl-ts4900.dts            | 4 ++--
+ arch/arm/boot/dts/imx6dl-ts7970.dts            | 4 ++--
+ arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts      | 4 ++--
+ arch/arm/boot/dts/imx6q-h100.dts               | 4 ++--
+ arch/arm/boot/dts/imx6q-novena.dts             | 4 ++--
+ arch/arm/boot/dts/imx6q-ts4900.dts             | 4 ++--
+ arch/arm/boot/dts/imx6q-ts7970.dts             | 4 ++--
+ arch/arm/boot/dts/imx6q-zii-rdu2.dts           | 4 ++--
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi          | 4 ++--
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 4 ++--
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 4 ++--
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi   | 4 ++--
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi             | 4 ++--
+ arch/arm/boot/dts/imx6qp-zii-rdu2.dts          | 4 ++--
+ arch/arm/boot/dts/imx6ul-tx6ul.dtsi            | 4 ++--
+ arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi | 2 +-
+ arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi    | 2 +-
+ 19 files changed, 36 insertions(+), 36 deletions(-)
 
-Without this prerequisite, 3/5 would cause a build error.
-So, I needed to include it in this series.
-
-I am hoping this series will be picked up by Andrew Morton.
-In my understanding, he applies patches on top of the linux-next.
-
-
-I think either will happen:
-
-[1] If your patch appears in linux-next first,
-    my 2/5 will be skipped, and the rest of the series will be applied.
-
-[2] If my series is applied first,
-    Andrew will drop 2/5 when your patch appears in linux-next
-        (this is simply detected by patch conflict)
-
-
-Andrew, please correct me if I am wrong.
-
-
-Thanks!
-
-
+diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+index 700e129..d565d32 100644
+--- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+@@ -54,8 +54,8 @@
+ 		     "fsl,imx6dl";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	aliases {
+diff --git a/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
+index c195ad6..89384cb 100644
+--- a/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
++++ b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
+@@ -22,7 +22,7 @@
+ 	compatible = "dfi,fs700-m60-6dl", "dfi,fs700e-m60", "fsl,imx6dl";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6dl-ts4900.dts b/arch/arm/boot/dts/imx6dl-ts4900.dts
+index e23f789..cc01a7a 100644
+--- a/arch/arm/boot/dts/imx6dl-ts4900.dts
++++ b/arch/arm/boot/dts/imx6dl-ts4900.dts
+@@ -48,7 +48,7 @@
+ 	compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6dl-ts7970.dts b/arch/arm/boot/dts/imx6dl-ts7970.dts
+index cae3313..82435d5 100644
+--- a/arch/arm/boot/dts/imx6dl-ts7970.dts
++++ b/arch/arm/boot/dts/imx6dl-ts7970.dts
+@@ -49,7 +49,7 @@
+ 	compatible = "technologic,imx6dl-ts7970", "fsl,imx6dl";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
+index a266fe6..ad12d76 100644
+--- a/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
++++ b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
+@@ -22,7 +22,7 @@
+ 	compatible = "dfi,fs700-m60-6qd", "dfi,fs700e-m60", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
+index dd24b46..714e09e0 100644
+--- a/arch/arm/boot/dts/imx6q-h100.dts
++++ b/arch/arm/boot/dts/imx6q-h100.dts
+@@ -50,8 +50,8 @@
+ 	compatible = "auvidea,h100", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	aliases {
+diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
+index 43a0c32..52f3937 100644
+--- a/arch/arm/boot/dts/imx6q-novena.dts
++++ b/arch/arm/boot/dts/imx6q-novena.dts
+@@ -56,8 +56,8 @@
+ 	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/imx6q-ts4900.dts b/arch/arm/boot/dts/imx6q-ts4900.dts
+index 9cf7b37..e655107 100644
+--- a/arch/arm/boot/dts/imx6q-ts4900.dts
++++ b/arch/arm/boot/dts/imx6q-ts4900.dts
+@@ -48,8 +48,8 @@
+ 	compatible = "technologic,imx6q-ts4900", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-ts7970.dts b/arch/arm/boot/dts/imx6q-ts7970.dts
+index fd84fc5..c615ac4 100644
+--- a/arch/arm/boot/dts/imx6q-ts7970.dts
++++ b/arch/arm/boot/dts/imx6q-ts7970.dts
+@@ -49,8 +49,8 @@
+ 	compatible = "technologic,imx6q-ts7970", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-zii-rdu2.dts b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+index fe8b12f..7da6dde 100644
+--- a/arch/arm/boot/dts/imx6q-zii-rdu2.dts
++++ b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+@@ -49,7 +49,7 @@
+ 	compatible = "zii,imx6q-zii-rdu2", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index bd658db..8206683 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+@@ -48,8 +48,8 @@
+ 	compatible = "toradex,apalis_imx6q", "fsl,imx6q";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	backlight: backlight {
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index 4c5f513..9332a31 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -43,8 +43,8 @@
+ 
+ / {
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	ir_recv: ir-receiver {
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index 52eeeed..6684b37 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -41,8 +41,8 @@
+ 
+ / {
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+index e68e7db..bfbf663 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+@@ -41,8 +41,8 @@
+ 
+ / {
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index 6abb66c..f015e2d 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -61,8 +61,8 @@
+ 		sdhc1 = &usdhc2;
+ 	};
+ 
+-	memory {
+-		reg = <0 0>; /* will be filled by U-Boot */
++	memory at 10000000 {
++		reg = <0x10000000 0>; /* will be filled by U-Boot */
+ 	};
+ 
+ 	clocks {
+diff --git a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+index 96ab983..de5b50d 100644
+--- a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
++++ b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+@@ -49,7 +49,7 @@
+ 	compatible = "zii,imx6qp-zii-rdu2", "fsl,imx6qp";
+ 
+ 	/* Will be filled by the bootloader */
+-	memory {
+-		reg = <0 0>;
++	memory at 10000000 {
++		reg = <0x10000000 0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+index 65111f98..f678d18 100644
+--- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+@@ -70,8 +70,8 @@
+ 		stdout-path = &uart1;
+ 	};
+ 
+-	memory {
+-		reg = <0 0>; /* will be filled by U-Boot */
++	memory at 80000000 {
++		reg = <0x80000000 0>; /* will be filled by U-Boot */
+ 	};
+ 
+ 	clocks {
+diff --git a/arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi b/arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi
+index cfda666..10ab469 100644
+--- a/arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi
++++ b/arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi
+@@ -6,7 +6,7 @@
+ #include "imx6ull-colibri.dtsi"
+ 
+ / {
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x10000000>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi b/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
+index f48291b..3dffbcd 100644
+--- a/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
++++ b/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
+@@ -6,7 +6,7 @@
+ #include "imx6ull-colibri.dtsi"
+ 
+ / {
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
+ 
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
