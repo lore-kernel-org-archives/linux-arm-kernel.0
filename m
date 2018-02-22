@@ -1,28 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Feb 2018 17:43:38 +0100
-Subject: [PATCH 3/3] ARM: davinci: mark spi_board_info arrays as const
-In-Reply-To: <20180220162519.1498223-3-arnd@arndb.de>
-References: <20180220162519.1498223-1-arnd@arndb.de>
- <20180220162519.1498223-3-arnd@arndb.de>
-Message-ID: <CAK8P3a2gWP-i0X=3dom4aCMfKgmf41a27Huj9919Epnwg26JoA@mail.gmail.com>
+Date: Thu, 22 Feb 2018 17:45:09 +0100
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.16 (#1)
+In-Reply-To: <87wozemtva.fsf@bootlin.com>
+References: <87wozemtva.fsf@bootlin.com>
+Message-ID: <CAK8P3a2KyOYYY4RSDueYUv7gGo9McT+v+FBXmJscV5Hw3_6_JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 5:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Building with LTO revealed that three spi_board_info arrays are marked
-> __initconst, but not const:
+On Thu, Feb 15, 2018 at 11:26 AM, Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
+> Hi,
 >
-> arch/arm/mach-davinci/board-dm365-evm.c: In function 'dm365_evm_init':
-> arch/arm/mach-davinci/board-dm365-evm.c:729:30: error: 'dm365_evm_spi_info' causes a section type conflict with 'dm646x_edma_device'
->  static struct spi_board_info dm365_evm_spi_info[] __initconst = {
->                               ^
-> arch/arm/mach-davinci/dm646x.c:603:42: note: 'dm646x_edma_device' was declared here
->  static const struct platform_device_info dm646x_edma_device __initconst = {
+> Here is the first pull request for fixes for mvebu for v4.16.
 >
-> This marks them const as well, as was originally intended.
+> Gregory
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.16-1
+>
+> for you to fetch changes up to 8aa36a8dcde3183d84db7b0d622ffddcebb61077:
+>
+>   ARM: mvebu: Fix broken PL310_ERRATA_753970 selects (2018-02-13 16:39:51 +0100)
+>
+> ----------------------------------------------------------------
+> mvebu fixes for 4.16 (part 1)
+>
+> - Updating my emails address (from free-electrons to bootlin)
+> - Adding back the selection of the PL310 Errata fix for the Cortex A9
+>   based Armada SoCs (Armada 375 and 38x)
+>
 
-I applied this to the fixes branch now.
+Pulled into fixes, thanks!
 
-      Arnd
+       Arnd
