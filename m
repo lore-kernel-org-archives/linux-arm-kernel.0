@@ -1,89 +1,54 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 22 Feb 2018 10:49:33 +0100
-Subject: [PATCH v2] media: stm32-dcmi: rework overrun/error case
-Message-ID: <1519292973-19808-1-git-send-email-hugues.fruchet@st.com>
+Date: Thu, 22 Feb 2018 10:51:27 +0100
+Subject: [PATCH] media: stm32-dcmi: fix unnecessary parentheses
+Message-ID: <1519293087-19984-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not stop/restart dma on overrun or errors.
-Dma will be restarted on current frame transfer
-completion. Frame transfer completion is ensured
-even if overrun or error occurs by DCMI continuous
-capture mode which restarts data transfer at next
-frame sync.
-Do no warn on overrun while in irq thread, this slows down
-system and lead to more overrun errors. Use a counter
-instead and log errors at stop streaming.
+Fix unnecessary parentheses in if conditions.
+Detected by checkpatch.pl --strict.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
-version 2:
-  - Minor: remove extra line at end of dcmi_stop_streaming()
-
-  drivers/media/platform/stm32/stm32-dcmi.c | 29 +++++++++++------------------
- 1 file changed, 11 insertions(+), 18 deletions(-)
+ drivers/media/platform/stm32/stm32-dcmi.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 5de18ad..536c0d5 100644
+index 536c0d5..269e963 100644
 --- a/drivers/media/platform/stm32/stm32-dcmi.c
 +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -160,6 +160,7 @@ struct stm32_dcmi {
- 	dma_cookie_t			dma_cookie;
- 	u32				misr;
- 	int				errors_count;
-+	int				overrun_count;
- 	int				buffers_count;
- };
+@@ -477,7 +477,7 @@ static void dcmi_buf_queue(struct vb2_buffer *vb)
  
-@@ -373,23 +374,9 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
- 	}
+ 	spin_lock_irq(&dcmi->irqlock);
  
- 	if ((dcmi->misr & IT_OVR) || (dcmi->misr & IT_ERR)) {
--		/*
--		 * An overflow or an error has been detected,
--		 * stop current DMA transfert & restart it
--		 */
--		dev_warn(dcmi->dev, "%s: Overflow or error detected\n",
--			 __func__);
--
- 		dcmi->errors_count++;
--		dev_dbg(dcmi->dev, "Restarting capture after DCMI error\n");
--
--		spin_unlock_irq(&dcmi->irqlock);
--		dmaengine_terminate_all(dcmi->dma_chan);
--
--		if (dcmi_start_capture(dcmi))
--			dev_err(dcmi->dev, "%s: Cannot restart capture on overflow or error\n",
--				__func__);
--		return IRQ_HANDLED;
-+		if (dcmi->misr & IT_OVR)
-+			dcmi->overrun_count++;
- 	}
+-	if ((dcmi->state == RUNNING) && (!dcmi->active)) {
++	if (dcmi->state == RUNNING && !dcmi->active) {
+ 		dcmi->active = buf;
  
- 	spin_unlock_irq(&dcmi->irqlock);
-@@ -572,6 +559,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 		dev_dbg(dcmi->dev, "Starting capture on buffer[%d] queued\n",
+@@ -730,7 +730,7 @@ static void __find_outer_frame_size(struct stm32_dcmi *dcmi,
+ 		int h_err = (fsize->height - pix->height);
+ 		int err = w_err + h_err;
  
- 	dcmi->sequence = 0;
- 	dcmi->errors_count = 0;
-+	dcmi->overrun_count = 0;
- 	dcmi->buffers_count = 0;
- 	dcmi->active = NULL;
+-		if ((w_err >= 0) && (h_err >= 0) && (err < min_err)) {
++		if (w_err >= 0 && h_err >= 0 && err < min_err) {
+ 			min_err = err;
+ 			match = fsize;
+ 		}
+@@ -1065,10 +1065,10 @@ static int dcmi_s_selection(struct file *file, void *priv,
+ 	r.top  = clamp_t(s32, r.top, 0, pix.height - r.height);
+ 	r.left = clamp_t(s32, r.left, 0, pix.width - r.width);
  
-@@ -682,8 +670,13 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 
- 	clk_disable(dcmi->mclk);
- 
--	dev_dbg(dcmi->dev, "Stop streaming, errors=%d buffers=%d\n",
--		dcmi->errors_count, dcmi->buffers_count);
-+	if (dcmi->errors_count)
-+		dev_warn(dcmi->dev, "Some errors found while streaming: errors=%d (overrun=%d), buffers=%d\n",
-+			 dcmi->errors_count, dcmi->overrun_count,
-+			 dcmi->buffers_count);
-+	dev_dbg(dcmi->dev, "Stop streaming, errors=%d (overrun=%d), buffers=%d\n",
-+		dcmi->errors_count, dcmi->overrun_count,
-+		dcmi->buffers_count);
- }
- 
- static const struct vb2_ops dcmi_video_qops = {
+-	if (!((r.top == dcmi->sd_bounds.top) &&
+-	      (r.left == dcmi->sd_bounds.left) &&
+-	      (r.width == dcmi->sd_bounds.width) &&
+-	      (r.height == dcmi->sd_bounds.height))) {
++	if (!(r.top == dcmi->sd_bounds.top &&
++	      r.left == dcmi->sd_bounds.left &&
++	      r.width == dcmi->sd_bounds.width &&
++	      r.height == dcmi->sd_bounds.height)) {
+ 		/* Crop if request is different than sensor resolution */
+ 		dcmi->do_crop = true;
+ 		dcmi->crop = r;
 -- 
 1.9.1
