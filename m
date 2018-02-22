@@ -1,144 +1,126 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 22 Feb 2018 14:40:52 +0100
-Subject: [PATCH v4 25/40] KVM: arm64: Introduce framework for accessing
- deferred sysregs
-In-Reply-To: <20180215210332.8648-26-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-26-christoffer.dall@linaro.org>
-Message-ID: <20180222134052.fej4yyf5fq57kk3g@kamzik.brq.redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Feb 2018 14:44:14 +0100
+Subject: [PATCH 2/6] mfd: Add ST Multi-Function eXpander core driver
+In-Reply-To: <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <CACRpkdbcEv3PyqjhzteKhx9pDfoJntKReVT2kBNY+-HSpaXh2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 10:03:17PM +0100, Christoffer Dall wrote:
-> We are about to defer saving and restoring some groups of system
-> registers to vcpu_put and vcpu_load on supported systems.  This means
-> that we need some infrastructure to access system registes which
-> supports either accessing the memory backing of the register or directly
-> accessing the system registers, depending on the state of the system
-> when we access the register.
-> 
-> We do this by defining read/write accessor functions, which can handle
-> both "immediate" and "deferrable" system registers.  Immediate registers
-> are always saved/restored in the world-switch path, but deferrable
-> registers are only saved/restored in vcpu_put/vcpu_load when supported
-> and sysregs_loaded_on_cpu will be set in that case.
-> 
-> Note that we don't use the deferred mechanism yet in this patch, but only
-> introduce infrastructure.  This is to improve convenience of review in
-> the subsequent patches where it is clear which registers become
-> deferred.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> 
-> Notes:
->     Changes since v3:
->      - Changed to a switch-statement based approach to improve
->        readability.
->     
->     Changes since v2:
->      - New patch (deferred register handling has been reworked)
-> 
->  arch/arm64/include/asm/kvm_host.h |  8 ++++++--
->  arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
->  2 files changed, 39 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 68398bf7882f..b463b5e28959 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
->  
->  	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
->  	u64 vsesr_el2;
-> +
-> +	/* True when deferrable sysregs are loaded on the physical CPU,
-> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-> +	bool sysregs_loaded_on_cpu;
->  };
->  
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-> @@ -296,8 +300,8 @@ struct kvm_vcpu_arch {
->   */
->  #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
->  
-> -#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
-> -#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
-> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
-> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
->  
->  /*
->   * CP14 and CP15 live in the same array, as they are backed by the
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a05d2c01c786..b3c3f014aa61 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -35,6 +35,7 @@
->  #include <asm/kvm_coproc.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_host.h>
-> +#include <asm/kvm_hyp.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/perf_event.h>
->  #include <asm/sysreg.h>
-> @@ -76,6 +77,38 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
->  	return false;
->  }
->  
-> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-> +{
-> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> +		goto immediate_read;
-> +
-> +	/*
-> +	 * All system registers listed in the switch are not saved on every
-> +	 * exit from the guest but are only saved on vcpu_put.
+On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
 
-The "All ... are not" doesn't flow well for me. How about
+Thanks for working on this complex expander driver.
+It is a bit daunting. Sorry if there are lots of comments and
+considerations, but it reflects the complexity of the hardware.
 
- /*
-  * None of the system registers listed in the switch are saved on guest
-  * exit. These registers are only saved on vcpu_put.
-  */
+> +enum mfx_block {
+> +       MFX_BLOCK_GPIO          = BIT(0),
+> +       MFX_BLOCK_TS            = BIT(1),
+> +       MFX_BLOCK_IDD           = BIT(2),
+> +       MFX_BLOCK_ALTGPIO       = BIT(3),
+> +};
 
-> +	 */
-> +	switch (reg) {
-> +	}
-> +
-> +immediate_read:
-> +	return __vcpu_sys_reg(vcpu, reg);
-> +}
-> +
-> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-> +{
-> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> +		goto immediate_write;
-> +
-> +	/*
-> +	 * All system registers listed in the switch are not restored on every
-> +	 * entry to the guest but are only restored on vcpu_load.
-> +	 */
+This looks suspiciously similar to this:
 
- /*
-  * None of the system registers listed in the switch are restored on
-  * guest entry. If these registers were saved due to a vcpu_put, then
-  * they will be restored by vcpu_load.
-  */
+enum stmpe_block {
+        STMPE_BLOCK_GPIO        = 1 << 0,
+        STMPE_BLOCK_KEYPAD      = 1 << 1,
+        STMPE_BLOCK_TOUCHSCREEN = 1 << 2,
+        STMPE_BLOCK_ADC         = 1 << 3,
+        STMPE_BLOCK_PWM         = 1 << 4,
+        STMPE_BLOCK_ROTATOR     = 1 << 5,
+};
 
-> +	switch (reg) {
-> +	}
-> +
-> +immediate_write:
-> +	 __vcpu_sys_reg(vcpu, reg) = val;
-> +}
-> +
->  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
->  static u32 cache_levels;
->  
-> -- 
-> 2.14.2
->
+Apparently the same hardware designers are involved.
 
-Otherwise
+> +int mfx_reg_write(struct mfx *mfx, u8 reg, u8 data);
+> +int mfx_reg_read(struct mfx *mfx, u8 reg);
+> +int mfx_block_read(struct mfx *mfx, u8 reg, u8 length, u8 *values);
+> +int mfx_block_write(struct mfx *mfx, u8 reg, u8 length, const u8 *values);
+> +int mfx_set_bits(struct mfx *mfx, u8 reg, u8 mask, u8 val);
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Do you need this? Can't you just use regmap and pass
+around a struct regmap *map to access registers?
+
+You don't necessarily need to use the default I2C regmap
+(like, e.g. drivers/mfd/stw481x.c) but even if a more
+complex access pattern is used to read/write registers
+I am pretty sure you can use regmap for it.
+
+> +int mfx_enable(struct mfx *mfx, unsigned int blocks);
+> +int mfx_disable(struct mfx *mfx, unsigned int blocks);
+
+This is similar to
+extern int stmpe_enable(struct stmpe *stmpe, unsigned int blocks);
+extern int stmpe_disable(struct stmpe *stmpe, unsigned int blocks);
+
+So again I am suspicious about duplication of driver code.
+
+It even looks a bit like this driver started as a copy of
+the STMPE driver, which is not a good sign. It might be
+that it was copied from there because the hardware is
+actually very similar.
+
+> +/* General */
+> +#define MFX_REG_CHIP_ID                        0x00 /* R */
+> +#define MFX_REG_FW_VERSION_MSB         0x01 /* R */
+> +#define MFX_REG_FW_VERSION_LSB         0x02 /* R */
+> +#define MFX_REG_SYS_CTRL               0x40 /* RW */
+
+The STMPE driver defines enumerated registers in
+include/linux/mfd/stmpe.h
+then assign each variant using the model specifics in
+drivers/mfd/stmpe.h
+
+This doesn't seem super much different.
+
+Even if the old STMPE driver may be a bad fit, is is better
+to improve that (e.g. migrate it to use regmap and rewrite the
+stmpe-gpio.c driver to use pin control) and use also for this
+driver, or write a new driver from scratch like this?
+
+I'm not so sure.
+
+I do know that developers not always like to take out old
+hardware and old development boards and start hacking
+away before they can get some nice new hardware going
+but I am worried that this may be one of those cases where
+a serious cleanup of the aging STMPE driver may be a
+first necessary step.
+
+> +/* IRQ output management */
+> +#define MFX_REG_IRQ_OUT_PIN            0x41 /* RW */
+> +#define MFX_REG_IRQ_SRC_EN             0x42 /* RW */
+> +#define MFX_REG_IRQ_PENDING            0x08 /* R */
+> +#define MFX_REG_IRQ_ACK                        0x44 /* RW */
+
+Very similar to STMPE it seems.
+
+> +/* MFX_REG_SYS_CTRL bitfields */
+> +#define MFX_REG_SYS_CTRL_GPIO_EN       BIT(0)
+> +#define MFX_REG_SYS_CTRL_TS_EN         BIT(1)
+> +#define MFX_REG_SYS_CTRL_IDD_EN                BIT(2)
+> +#define MFX_REG_SYS_CTRL_ALTGPIO_EN    BIT(3)
+
+I guess these blocks works the same as with STMPE,
+that you can only use one of them at the time?
+
+What is altgpio?
+
+> +/* MFX_REG_IRQ_OUT_PIN bitfields */
+> +#define MFX_REG_IRQ_OUT_PIN_TYPE       BIT(0) /* 0-OD 1-PP */
+> +#define MFX_REG_IRQ_OUT_PIN_POL                BIT(1) /* 0-active LOW 1-active HIGH */
+
+I have not read the patch yet. But just for notice:
+This output IRQ type needs to be handled as well.
+
+Check the code in
+drivers/iio/common/st_sensors/st_sensors_trigger.c
+
+To see how you can detect the properties of an IRQ
+to set the right polarity, and handling of open drain
+IRQ lines.
+
+Yours,
+Linus Walleij
