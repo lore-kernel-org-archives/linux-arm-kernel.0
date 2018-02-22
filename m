@@ -1,28 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 13:47:19 +0100
-Subject: [PATCH v5 1/5] ARM: bcm2835: sync firmware properties with
- downstream
-In-Reply-To: <e7d1f1d0789f11d37957a8998bee23d035115aeb.1519128054.git.baruch@tkos.co.il>
+Date: Thu, 22 Feb 2018 13:49:31 +0100
+Subject: [PATCH v5 2/5] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <f400b48cbcd8a138c39d4e8f63d6c1f569090dcc.1519128054.git.baruch@tkos.co.il>
 References: <cover.1519128054.git.baruch@tkos.co.il>
- <e7d1f1d0789f11d37957a8998bee23d035115aeb.1519128054.git.baruch@tkos.co.il>
-Message-ID: <CACRpkdZb79XBS-sZjJqx7bbphzRM1phM6-h8wRMBmiCe1VVnbw@mail.gmail.com>
+ <f400b48cbcd8a138c39d4e8f63d6c1f569090dcc.1519128054.git.baruch@tkos.co.il>
+Message-ID: <CACRpkdbRk3u+KWLLJFx1wB2BDb50d2QJ3b68wvrer1VOZ0tWQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 20, 2018 at 1:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> Add latest firmware property tags from the latest Raspberry Pi downstream
-> kernel. This is needed for the GPIO tags, so we can control the GPIO
-> multiplexor lines.
+> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+> I2C. The firmware mailbox interface allows the ARM core to control the
+> GPIO lines.
 >
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
-> v4: No change
+> v5:
+>   * Remove the 'firmware' property
+>   * Note that the gpio node is a child of the firmware node
 
-Patch applied to the GPIO tree for v4.17.
-
-But I changed the subject from ARM: to soc:
+This v5 patch applied to the GPIO tree for v4.17 with Rob's ACK.
 
 Yours,
 Linus Walleij
