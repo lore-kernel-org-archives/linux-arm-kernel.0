@@ -1,86 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Feb 2018 12:33:20 +0000
-Subject: [PATCH v4 37/40] KVM: arm/arm64: Move arm64-only vgic-v2-sr.c
- file to arm64
-In-Reply-To: <20180215210332.8648-38-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-38-christoffer.dall@linaro.org>
-Message-ID: <3d76ca96-f8c1-0965-f166-ba10fb5b2b08@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Feb 2018 13:41:11 +0100
+Subject: [PATCH 0/2] I2C-Nomadik: Adjustments for nmk_i2c_probe()
+In-Reply-To: <97f41346-6abb-1c14-f536-ad12bbcb4c60@users.sourceforge.net>
+References: <97f41346-6abb-1c14-f536-ad12bbcb4c60@users.sourceforge.net>
+Message-ID: <CACRpkdbeK282zbJPerxvuXLupMj_iJ_pRaBuDSYU2F+bYNr6AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/18 21:03, Christoffer Dall wrote:
-> The vgic-v2-sr.c file now only contains the logic to replay unaligned
-> accesses to the virtual CPU interface on 16K and 64K page systems, which
-> is only relevant on 64-bit platforms.  Therefore move this file to the
-> arm64 KVM tree, remove the compile directive from the 32-bit side
-> makefile, and remove the ifdef in the C file.
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/kvm/hyp/Makefile                         | 1 -
->  arch/arm64/kvm/hyp/Makefile                       | 2 +-
->  {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c | 2 --
->  3 files changed, 1 insertion(+), 4 deletions(-)
->  rename {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c (98%)
-> 
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index 5638ce0c9524..1964111c984a 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -7,7 +7,6 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
->  
->  KVM=../../../../virt/kvm
->  
-> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
->  
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index f04400d494b7..7e8d41210288 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -7,10 +7,10 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
->  
->  KVM=../../../../virt/kvm
->  
-> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
->  
-> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+On Fri, Feb 2, 2018 at 4:38 PM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
 
-How about renaming the file to vgic-v2-cpuif-proxy.c? It doesn't have
-anything to do with save/restore anymore...
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Fri, 2 Feb 2018 16:34:56 +0100
+>
+> Two update suggestions were taken into account
+> from static source code analysis.
+>
+> Markus Elfring (2):
+>   Delete an error message for a failed memory allocation
+>   Improve a size determination
 
->  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-> diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> similarity index 98%
-> rename from virt/kvm/arm/hyp/vgic-v2-sr.c
-> rename to arch/arm64/kvm/hyp/vgic-v2-sr.c
-> index 0bbafdfd4adb..97f357ea9c72 100644
-> --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> @@ -23,7 +23,6 @@
->  #include <asm/kvm_hyp.h>
->  #include <asm/kvm_mmu.h>
->  
-> -#ifdef CONFIG_ARM64
->  /*
->   * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
->   *				     guest.
-> @@ -77,4 +76,3 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  
->  	return 1;
->  }
-> -#endif
-> 
+Those look OK.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Otherwise looks good.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yours,
+Linus Walleij
