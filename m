@@ -1,48 +1,65 @@
-From: haiyue.wang@linux.intel.com (Wang, Haiyue)
-Date: Thu, 22 Feb 2018 16:50:17 +0800
-Subject: [PATCH] MAINTAINERS: Update ASPEED entry with details
-In-Reply-To: <1519288786.101739.1279390200.1CD3EC51@webmail.messagingengine.com>
-References: <20180222050324.21531-1-joel@jms.id.au>
- <1519288786.101739.1279390200.1CD3EC51@webmail.messagingengine.com>
-Message-ID: <23b668f1-ab4b-7ef3-ba1e-f252fbba4d1b@linux.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Feb 2018 08:58:10 +0000
+Subject: [PATCH] KVM: arm/arm64: No need to zero CNTVOFF in
+ kvm_timer_vcpu_put() for VHE
+In-Reply-To: <20180222084231.GA29376@cbox>
+References: <1519054687-14405-1-git-send-email-shankerd@codeaurora.org>
+ <20180222084231.GA29376@cbox>
+Message-ID: <86tvu9jt99.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew & Joel,
+On Thu, 22 Feb 2018 08:42:31 +0000,
+Christoffer Dall wrote:
+> 
+> Hi Shanker,
+> 
+> On Mon, Feb 19, 2018 at 09:38:07AM -0600, Shanker Donthineni wrote:
+> > In AArch64/AArch32, the virtual counter uses a fixed virtual offset
+> > of zero in the following situations as per ARMv8 specifications:
+> > 
+> > 1) HCR_EL2.E2H is 1, and CNTVCT_EL0/CNTVCT are read from EL2.
+> > 2) HCR_EL2.{E2H, TGE} is {1, 1}, and either:
+> >    ? CNTVCT_EL0 is read from Non-secure EL0 or EL2.
+> >    ? CNTVCT is read from Non-secure EL0.
+> > 
+> > So, no need to zero CNTVOFF_EL2/CNTVOFF for VHE case.
+> > 
+> > Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> > ---
+> >  virt/kvm/arm/arch_timer.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> > index 70268c0..86eca324 100644
+> > --- a/virt/kvm/arm/arch_timer.c
+> > +++ b/virt/kvm/arm/arch_timer.c
+> > @@ -541,9 +541,11 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+> >  	 * The kernel may decide to run userspace after calling vcpu_put, so
+> >  	 * we reset cntvoff to 0 to ensure a consistent read between user
+> >  	 * accesses to the virtual counter and kernel access to the physical
+> > -	 * counter.
+> > +	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
+> > +	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
+> >  	 */
+> > -	set_cntvoff(0);
+> > +	if (!has_vhe())
+> > +		set_cntvoff(0);
+> >  }
+> >  
+> >  /*
+> 
+> I'm okay with this change.  I don't think there's a huge gain here
+> though.
+> 
+> Marc, any thoughts or concerns?
 
-Since you are ASPEED BMC experts, any time and interest in eSPI code 
-review ? I've sent
+None. I don't think this brings any visible performance gain, but hey,
+why not.
 
-it before, but no more response. Intel recommends eSPI bus than LPC as I 
-know. I just kept
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-the minimal eSPI code which is approved to work well in our real server 
-boards for two more
+	M.
 
-years. Other part of eSPI driver from ASPEED's SDK? has been removed, 
-because ePSI is a new
-
-thing, we only use a small feature set like booting host.
-
-We Intel submit this eSPI patch for openbmc upstreaming, hope for your 
-response. :-)
-
-https://patchwork.kernel.org/patch/10166577/
-
-
-
-On 2018-02-22 16:39, Andrew Jeffery wrote:
->
-> On Thu, 22 Feb 2018, at 15:33, Joel Stanley wrote:
->> I am interested in all ASPEED drivers, and the previous match wasn't
->> grabbing files in nested directories. Use N instead.
->>
->> Add the arm kernel mailing list so that patches get reviewed there, and
->> the linux-aspeed list which exists only so I can use patchwork to track
->> patches.
->>
->> Add Andrew as a reviewer, because he is involved in reviewing ASPEED
->> stuff.
->>
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> Acked-by: Andrew Jeffery <andrew@aj.id.au>
+-- 
+Jazz is not dead, it just smell funny.
