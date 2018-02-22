@@ -1,41 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 15:01:30 +0100
-Subject: [PATCH v3 7/7] watchdog: coh901327: make use of timeout-secs
- provided in devicetree
-In-Reply-To: <20180211200847.25000-7-marcus.folkesson@gmail.com>
-References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
- <20180211200847.25000-7-marcus.folkesson@gmail.com>
-Message-ID: <CACRpkdZzw+3DPvS7VOUzghmSgDTgDeCZ2i+FE=DCE+R5i1qycQ@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 22 Feb 2018 15:04:36 +0100
+Subject: [PATCH v4 28/40] KVM: arm64: Defer saving/restoring 64-bit
+ sysregs to vcpu load/put on VHE
+In-Reply-To: <20180215210332.8648-29-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-29-christoffer.dall@linaro.org>
+Message-ID: <20180222140436.jzk2fa7mzsasu64a@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 11, 2018 at 9:08 PM, Marcus Folkesson
-<marcus.folkesson@gmail.com> wrote:
-
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
->
-> Following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt to make use of
-> the parameter logic.
->
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+On Thu, Feb 15, 2018 at 10:03:20PM +0100, Christoffer Dall wrote:
+> Some system registers do not affect the host kernel's execution and can
+> therefore be loaded when we are about to run a VCPU and we don't have to
+> restore the host state to the hardware before the time when we are
+> actually about to return to userspace or schedule out the VCPU thread.
+> 
+> The EL1 system registers and the userspace state registers only
+> affecting EL0 execution do not need to be saved and restored on every
+> switch between the VM and the host, because they don't affect the host
+> kernel's execution.
+> 
+> We mark all registers which are now deffered as such in the
+> vcpu_{read,write}_sys_reg accessors in sys-regs.c to ensure the most
+> up-to-date copy is always accessed.
+> 
+> Note MPIDR_EL1 (controlled via VMPIDR_EL2) is accessed from other vcpu
+> threads, for example via the GIC emulation, and therefore must be
+> declared as immediate, which is fine as the guest cannot modify this
+> value.
+> 
+> The 32-bit sysregs can also be deferred but we do this in a separate
+> patch as it requires a bit more infrastructure.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->
+> 
 > Notes:
->     v3:
->         - Reformat and use coh901327_wdt.timeout instead of margin when print out
->           timout in probe function.
+>     Changes since v3:
+>      - Changed to switch-based sysreg approach
+> 
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 39 +++++++++++++++++++++++++++++++--------
+>  arch/arm64/kvm/sys_regs.c      | 40 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 71 insertions(+), 8 deletions(-)
 >
->     v2:
->         - Set .timeout in coh901327_wdt structure declaration.
->         - Set .min_timeout to 1 instead of 0. I could not find a datasheet
->           for coh901327, so I'm not sure if 0 is valid. However, 0 seems
->           wrong to me and most driver has 1 as min value. If it should
->           be 0, please let me know and I have to set another initial
->           value for margin.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Reviewed-by: Andrew Jones <drjones@redhat.com>
