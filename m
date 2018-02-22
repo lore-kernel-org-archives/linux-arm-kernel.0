@@ -1,68 +1,89 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 22 Feb 2018 09:05:25 +0100
-Subject: [PATCH v4 10/40] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <37712e4f-7f47-2101-71f5-d024a7993f13@arm.com>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-11-christoffer.dall@linaro.org>
- <20180221173903.xlpwnlrnjlpatm5s@kamzik.brq.redhat.com>
- <37712e4f-7f47-2101-71f5-d024a7993f13@arm.com>
-Message-ID: <20180222080525.jjqtggrpyjdsltic@kamzik.brq.redhat.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 22 Feb 2018 10:20:07 +0200
+Subject: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for
+ ZynqMP Platform
+In-Reply-To: <SN1PR0201MB1791863A71475E3F0D896DD0C1CE0@SN1PR0201MB1791.namprd02.prod.outlook.com>
+References: <1517336073-18142-1-git-send-email-mnarani@xilinx.com>
+ <608309c3-fc4d-25a2-f0a9-21c0f3e2db46@intel.com>
+ <SN1PR0201MB1791863A71475E3F0D896DD0C1CE0@SN1PR0201MB1791.namprd02.prod.outlook.com>
+Message-ID: <ce9efad6-b007-4cd9-18e7-a7932835846c@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 05:52:41PM +0000, Marc Zyngier wrote:
-> On 21/02/18 17:39, Andrew Jones wrote:
-> > On Thu, Feb 15, 2018 at 10:03:02PM +0100, Christoffer Dall wrote:
-> >> The debug save/restore functions can be improved by using the has_vhe()
-> >> static key instead of the instruction alternative.  Using the static key
-> >> uses the same paradigm as we're going to use elsewhere, it makes the
-> >> code more readable, and it generates slightly better code (no
-> >> stack setups and function calls unless necessary).
-> >>
-> >> We also use a static key on the restore path, because it will be
-> >> marginally faster than loading a value from memory.
-> >>
-> >> Finally, we don't have to conditionally clear the debug dirty flag if
-> >> it's set, we can just clear it.
-> >>
-> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> ---
-> >>
-> >> Notes:
-> >>     Changes since v1:
-> >>      - Change dot to comma in comment
-> >>      - Rename __debug_restore_spe to __debug_restore_spe_nvhe
-> >>
-> >>  arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
-> >>  1 file changed, 12 insertions(+), 14 deletions(-)
-> >>
-> > 
-> > Maybe after this series is merged, if there are any hyp_alternate_select's
-> > left, we can replace all the remaining ones with has_vhe() and then just
-> > completely remove hyp_alternate_select.
+On 21/02/18 17:00, Manish Narani wrote:
+> Hi Adrian,
 > 
-> Note that older compilers (such as GCC 4.8) will generate horrible code
-> with static keys, as they do not support "asm goto". Not that I want to
-> preserve the home brew hyp_alternate_select mechanism, but I just want
-> to make it plain that some distros will definitely suffer from the
-> transition.
+>> -----Original Message-----
+>> From: Manish Narani
+>> Sent: Wednesday, February 21, 2018 11:39 AM
+>> To: Adrian Hunter <adrian.hunter@intel.com>; michal.simek at xilinx.com;
+>> ulf.hansson at linaro.org; linux-arm-kernel at lists.infradead.org; linux-
+>> mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+>> devicetree at vger.kernel.org; mark.rutland at arm.com; robh+dt at kernel.org
+>> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+>> <sgoud@xilinx.com>
+>> Subject: RE: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for
+>> ZynqMP Platform
+>>
+>> Hi Adrian,
+>>
+>>
+>>> -----Original Message-----
+>>> From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+>>> Sent: Friday, February 16, 2018 7:37 PM
+>>> To: Manish Narani <MNARANI@xilinx.com>; michal.simek at xilinx.com;
+>>> ulf.hansson at linaro.org; linux-arm-kernel at lists.infradead.org; linux-
+>>> mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+>>> devicetree at vger.kernel.org; mark.rutland at arm.com; robh+dt at kernel.org
+>>> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+>>> <sgoud@xilinx.com>; Manish Narani <MNARANI@xilinx.com>
+>>> Subject: Re: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support
+>>> for ZynqMP Platform
+>>>
+>>> On 30/01/18 20:14, Manish Narani wrote:
+>>>> This patch adds support of SD auto tuning for ZynqMP platform. Auto
+>>>> tuning sequence sends tuning block to card when operating in UHS-1
+>>>> modes. This resets the DLL and sends CMD19/CMD21 as a part of the
+>>>> auto tuning process. Once the auto tuning process gets completed,
+>>>> reset the DLL to load the newly obtained SDHC tuned tap value.
+>>>
+>>> How is this different from:
+>>> 	1. reset the dll
+>>> 	2. call sdhci_execute_tuning
+>>> 	3. reset the dll
+>>>
+> Below is my take on your above comments:
+> - 'Reset the dll' is a platform specific call inside 'arasan_zynqmp_execute_tuning' which is implemented in sdhci-of-arasan.c 
+> - 'arasan_zynqmp_execute_tuning' is called from 'sdhci_execute_tuning' as a platform_execute_tuning routine
+> - So to keep 'DLL reset' routine called from sdhci-of-arasan.c, I have implemented the execute_tuning in sdhci-of-arasan.c
 
-Yeah, I've seen that. I even wrote some patches to try and deal with
-it once, because RHEL currently has gcc 4.8, and static keys are now
-used in kernel hot paths for kpti, and I knew this series was coming.
-My patches didn't seem like something usptream would care about, so
-I never posted them. Indeed, I see here[*] that at least x86 is saying
-that at some point (soon?) asm-goto will be a hard requirement.
+I meant something like:
 
-I just checked Christoffer's branch. The only hyp_alternate_select,
-that couldn't be changed to a has_vhe is __check_arm_834220, but
-that one can just be changed to
-cpus_have_const_cap(ARM64_WORKAROUND_834220), since it's just acting
-as a boolean anyway.
+	if (of_device_is_compatible(pdev->dev.of_node, "xlnx,zynqmp-8.9a"))
+		host->mmc_host_ops.execute_tuning = arasan_zynqmp_execute_tuning;
 
-Thanks,
-drew
 
-[*] https://lkml.org/lkml/2018/2/20/51
+static int arasan_zynqmp_execute_tuning(struct mmc_host *mmc, u32 opcode)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+	int err;
+
+	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
+
+	err = sdhci_execute_tuning(mmc, opcode);
+	if (err)
+		return err;
+
+	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
+
+	return 0;
+}
+
+> 
+> Alternative way (Please review):
+> - Define a host->quirk2 bit (SDHCI_QUIRK2_DLL_RESET_NEEDED) in sdhci-of-arasan.c indicating DLL reset needed while tuning operation
+> - Call 'dll reset' routine before and after __sdhci_execute_tuning() in sdhci.c when a host->quirk2 bit (SDHCI_QUIRK2_DLL_RESET_NEEDED) is set
+
+We should try to avoid quirks.
