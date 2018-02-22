@@ -1,111 +1,84 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Feb 2018 14:00:53 +0000
-Subject: [PATCH 5/9] arm64: Pass user fault info to arm64_notify_die instead
- of printing it
+Date: Thu, 22 Feb 2018 14:00:57 +0000
+Subject: [PATCH 9/9] arm64: Use arm64_force_sig_info instead of force_sig_info
 In-Reply-To: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
 References: <1519308057-4953-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1519308057-4953-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1519308057-4953-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need for callers of arm64_notify_die to print information
-about user faults. Instead, they can pass a string to arm64_notify_die
-which will be printed subject to show_unhandled_signals.
+Using arm64_force_sig_info means that printing messages about unhandled
+signals is dealt with for us, so use that in preference to force_sig_info
+and remove any homebrew printing code.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/fault.c | 30 ++++++++----------------------
- 1 file changed, 8 insertions(+), 22 deletions(-)
+ arch/arm64/kernel/debug-monitors.c | 3 ++-
+ arch/arm64/kernel/ptrace.c         | 2 +-
+ arch/arm64/kernel/traps.c          | 9 ++-------
+ 3 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index bff11553eb05..fd5928afd9cd 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -582,8 +582,6 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 	const struct fault_info *inf;
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 53781f5687c5..06ca574495af 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -33,6 +33,7 @@
+ #include <asm/daifflags.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
++#include <asm/traps.h>
  
- 	inf = esr_to_fault_info(esr);
--	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
--		inf->name, esr, addr);
- 
- 	/*
- 	 * Synchronous aborts may interrupt code which had interrupts masked.
-@@ -607,7 +605,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 		info.si_addr = NULL;
- 	else
- 		info.si_addr  = (void __user *)addr;
--	arm64_notify_die("", regs, &info, esr);
-+	arm64_notify_die(inf->name, regs, &info, esr);
- 
- 	return 0;
- }
-@@ -698,19 +696,17 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	if (!inf->fn(addr, esr, regs))
- 		return;
- 
--	pr_alert("Unhandled fault: %s at 0x%016lx\n",
--		 inf->name, addr);
--
--	mem_abort_decode(esr);
--
--	if (!user_mode(regs))
-+	if (!user_mode(regs)) {
-+		pr_alert("Unhandled fault at 0x%016lx\n", addr);
-+		mem_abort_decode(esr);
- 		show_pte(addr);
-+	}
- 
- 	info.si_signo = inf->sig;
- 	info.si_errno = 0;
- 	info.si_code  = inf->code;
- 	info.si_addr  = (void __user *)addr;
--	arm64_notify_die("", regs, &info, esr);
-+	arm64_notify_die(inf->name, regs, &info, esr);
- }
- 
- asmlinkage void __exception do_el0_irq_bp_hardening(void)
-@@ -741,7 +737,6 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
- 					   struct pt_regs *regs)
- {
- 	struct siginfo info;
--	struct task_struct *tsk = current;
- 
- 	if (user_mode(regs)) {
- 		if (instruction_pointer(regs) > TASK_SIZE)
-@@ -749,17 +744,11 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
+@@ -223,7 +224,7 @@ static void send_user_sigtrap(int si_code)
+ 	if (interrupts_enabled(regs))
  		local_irq_enable();
- 	}
  
--	if (show_unhandled_signals && unhandled_signal(tsk, SIGBUS))
--		pr_info_ratelimited("%s[%d]: %s exception: pc=%p sp=%p\n",
--				    tsk->comm, task_pid_nr(tsk),
--				    esr_get_class_string(esr), (void *)regs->pc,
--				    (void *)regs->sp);
--
- 	info.si_signo = SIGBUS;
- 	info.si_errno = 0;
- 	info.si_code  = BUS_ADRALN;
- 	info.si_addr  = (void __user *)addr;
--	arm64_notify_die("Oops - SP/PC alignment exception", regs, &info, esr);
-+	arm64_notify_die("SP/PC alignment exception", regs, &info, esr);
+-	force_sig_info(SIGTRAP, &info, current);
++	arm64_force_sig_info(&info, "User debug trap", current);
  }
  
- int __init early_brk64(unsigned long addr, unsigned int esr,
-@@ -814,14 +803,11 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	if (!inf->fn(addr, esr, regs)) {
- 		rv = 1;
- 	} else {
--		pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
--			 inf->name, esr, addr);
--
- 		info.si_signo = inf->sig;
- 		info.si_errno = 0;
- 		info.si_code  = inf->code;
- 		info.si_addr  = (void __user *)addr;
--		arm64_notify_die("", regs, &info, 0);
-+		arm64_notify_die(inf->name, regs, &info, esr);
- 		rv = 0;
+ static int single_step_handler(unsigned long addr, unsigned int esr,
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6618036ae6d4..dd359ee02e2b 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -209,7 +209,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
+ 		force_sig_ptrace_errno_trap(si_errno, (void __user *)bkpt->trigger);
  	}
+ #endif
+-	force_sig_info(SIGTRAP, &info, current);
++	arm64_force_sig_info(&info, "Hardware breakpoint trap (ptrace)", current);
+ }
  
+ /*
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 4231488a5a9f..cb5ad77524f3 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -633,11 +633,6 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+ {
+ 	siginfo_t info;
+ 	void __user *pc = (void __user *)instruction_pointer(regs);
+-	console_verbose();
+-
+-	pr_crit("Bad EL0 synchronous exception detected on CPU%d, code 0x%08x -- %s\n",
+-		smp_processor_id(), esr, esr_get_class_string(esr));
+-	__show_regs(regs);
+ 
+ 	info.si_signo = SIGILL;
+ 	info.si_errno = 0;
+@@ -645,9 +640,9 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+ 	info.si_addr  = pc;
+ 
+ 	current->thread.fault_address = 0;
+-	current->thread.fault_code = 0;
++	current->thread.fault_code = esr;
+ 
+-	force_sig_info(info.si_signo, &info, current);
++	arm64_force_sig_info(&info, "Bad EL0 synchronous exception", current);
+ }
+ 
+ #ifdef CONFIG_VMAP_STACK
 -- 
 2.1.4
