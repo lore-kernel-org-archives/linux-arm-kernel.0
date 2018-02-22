@@ -1,201 +1,86 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 22 Feb 2018 12:33:08 +0000
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20180222123308.mypx2r7n6o63mj5z@oak.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Feb 2018 12:33:20 +0000
+Subject: [PATCH v4 37/40] KVM: arm/arm64: Move arm64-only vgic-v2-sr.c
+ file to arm64
+In-Reply-To: <20180215210332.8648-38-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-38-christoffer.dall@linaro.org>
+Message-ID: <3d76ca96-f8c1-0965-f166-ba10fb5b2b08@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
-> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
-> were adapted to this change.
+On 15/02/18 21:03, Christoffer Dall wrote:
+> The vgic-v2-sr.c file now only contains the logic to replay unaligned
+> accesses to the virtual CPU interface on 16K and 64K page systems, which
+> is only relevant on 64-bit platforms.  Therefore move this file to the
+> arm64 KVM tree, remove the compile directive from the 32-bit side
+> makefile, and remove the ifdef in the C file.
 > 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->  drivers/bus/ts-nbus.c                |  2 +-
->  drivers/clk/clk-pwm.c                |  3 ++-
->  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->  drivers/hwmon/pwm-fan.c              |  2 +-
->  drivers/input/misc/max77693-haptic.c |  2 +-
->  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->  drivers/leds/leds-pwm.c              |  5 ++++-
->  drivers/media/rc/ir-rx51.c           |  5 ++++-
->  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->  include/linux/pwm.h                  |  6 ++++--
->  16 files changed, 70 insertions(+), 21 deletions(-)
+>  arch/arm/kvm/hyp/Makefile                         | 1 -
+>  arch/arm64/kvm/hyp/Makefile                       | 2 +-
+>  {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c | 2 --
+>  3 files changed, 1 insertion(+), 4 deletions(-)
+>  rename {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c (98%)
 > 
-> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
-> index 2030a6b77a09..696fa25dafd2 100644
-> --- a/drivers/video/backlight/lm3630a_bl.c
-> +++ b/drivers/video/backlight/lm3630a_bl.c
-> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
->  {
->  	unsigned int period = pchip->pdata->pwm_period;
->  	unsigned int duty = br * period / br_max;
-> +	struct pwm_caps caps = { };
+> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+> index 5638ce0c9524..1964111c984a 100644
+> --- a/arch/arm/kvm/hyp/Makefile
+> +++ b/arch/arm/kvm/hyp/Makefile
+> @@ -7,7 +7,6 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
 >  
-> -	pwm_config(pchip->pwmd, duty, period);
-> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
-> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
+>  KVM=../../../../virt/kvm
+>  
+> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+>  
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index f04400d494b7..7e8d41210288 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -7,10 +7,10 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+>  
+>  KVM=../../../../virt/kvm
+>  
+> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+>  
+> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
 
-Well... I admit I've only really looked at the patches that impact 
-backlight but dispersing this really odd looking bit twiddling 
-throughout the kernel doesn't strike me a great API design.
+How about renaming the file to vgic-v2-cpuif-proxy.c? It doesn't have
+anything to do with save/restore anymore...
 
-IMHO callers should not be required to find the first set bit in
-some specially crafted set of capability bits simply to get sane 
-default behaviour.
-
-
-Daniel.
-
-
-
-
->  	if (duty)
->  		pwm_enable(pchip->pwmd);
->  	else
-> diff --git a/drivers/video/backlight/lp855x_bl.c b/drivers/video/backlight/lp855x_bl.c
-> index 939f057836e1..3d274c604862 100644
-> --- a/drivers/video/backlight/lp855x_bl.c
-> +++ b/drivers/video/backlight/lp855x_bl.c
-> @@ -240,6 +240,7 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
->  	unsigned int period = lp->pdata->period_ns;
->  	unsigned int duty = br * period / max_br;
->  	struct pwm_device *pwm;
-> +	struct pwm_caps caps = { };
+>  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+> diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> similarity index 98%
+> rename from virt/kvm/arm/hyp/vgic-v2-sr.c
+> rename to arch/arm64/kvm/hyp/vgic-v2-sr.c
+> index 0bbafdfd4adb..97f357ea9c72 100644
+> --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
+> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> @@ -23,7 +23,6 @@
+>  #include <asm/kvm_hyp.h>
+>  #include <asm/kvm_mmu.h>
 >  
->  	/* request pwm device with the consumer name */
->  	if (!lp->pwm) {
-> @@ -256,7 +257,8 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
->  		pwm_apply_args(pwm);
->  	}
+> -#ifdef CONFIG_ARM64
+>  /*
+>   * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+>   *				     guest.
+> @@ -77,4 +76,3 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
 >  
-> -	pwm_config(lp->pwm, duty, period);
-> +	pwm_get_caps(lp->pwm->chip, lp->pwm, &caps);
-> +	pwm_config(lp->pwm, duty, period, BIT(ffs(caps.modes) - 1));
->  	if (duty)
->  		pwm_enable(lp->pwm);
->  	else
-> diff --git a/drivers/video/backlight/lp8788_bl.c b/drivers/video/backlight/lp8788_bl.c
-> index cf869ec90cce..06de3163650d 100644
-> --- a/drivers/video/backlight/lp8788_bl.c
-> +++ b/drivers/video/backlight/lp8788_bl.c
-> @@ -128,6 +128,7 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
->  	unsigned int duty;
->  	struct device *dev;
->  	struct pwm_device *pwm;
-> +	struct pwm_caps caps = { };
->  
->  	if (!bl->pdata)
->  		return;
-> @@ -153,7 +154,9 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
->  		pwm_apply_args(pwm);
->  	}
->  
-> -	pwm_config(bl->pwm, duty, period);
-> +	pwm_get_caps(bl->pwm->chip, bl->pwm, &caps);
-> +
-> +	pwm_config(bl->pwm, duty, period, BIT(ffs(caps.modes) - 1));
->  	if (duty)
->  		pwm_enable(bl->pwm);
->  	else
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index 1c2289ddd555..706a9ab053a7 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -63,10 +63,14 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
->  
->  static void pwm_backlight_power_off(struct pwm_bl_data *pb)
->  {
-> +	struct pwm_caps caps = { };
-> +
->  	if (!pb->enabled)
->  		return;
->  
-> -	pwm_config(pb->pwm, 0, pb->period);
-> +	pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
-> +
-> +	pwm_config(pb->pwm, 0, pb->period, BIT(ffs(caps.modes) - 1));
->  	pwm_disable(pb->pwm);
->  
->  	if (pb->enable_gpio)
-> @@ -96,6 +100,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
->  {
->  	struct pwm_bl_data *pb = bl_get_data(bl);
->  	int brightness = bl->props.brightness;
-> +	struct pwm_caps caps = { };
->  	int duty_cycle;
->  
->  	if (bl->props.power != FB_BLANK_UNBLANK ||
-> @@ -108,7 +113,9 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
->  
->  	if (brightness > 0) {
->  		duty_cycle = compute_duty_cycle(pb, brightness);
-> -		pwm_config(pb->pwm, duty_cycle, pb->period);
-> +		pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
-> +		pwm_config(pb->pwm, duty_cycle, pb->period,
-> +			   BIT(ffs(caps.modes) - 1));
->  		pwm_backlight_power_on(pb, brightness);
->  	} else
->  		pwm_backlight_power_off(pb);
-> diff --git a/drivers/video/fbdev/ssd1307fb.c b/drivers/video/fbdev/ssd1307fb.c
-> index f599520374dd..4b57dcb5799a 100644
-> --- a/drivers/video/fbdev/ssd1307fb.c
-> +++ b/drivers/video/fbdev/ssd1307fb.c
-> @@ -308,7 +308,8 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
->  
->  		par->pwm_period = pargs.period;
->  		/* Enable the PWM */
-> -		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
-> +		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period,
-> +			   pargs.mode);
->  		pwm_enable(par->pwm);
->  
->  		dev_dbg(&par->client->dev, "Using PWM%d with a %dns period.\n",
-> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> index e62349f48129..0ba416ab2772 100644
-> --- a/include/linux/pwm.h
-> +++ b/include/linux/pwm.h
-> @@ -357,11 +357,12 @@ int pwm_adjust_config(struct pwm_device *pwm);
->   * @pwm: PWM device
->   * @duty_ns: "on" time (in nanoseconds)
->   * @period_ns: duration (in nanoseconds) of one cycle
-> + * @mode: PWM mode
->   *
->   * Returns: 0 on success or a negative error code on failure.
->   */
->  static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-> -			     int period_ns)
-> +			     int period_ns, unsigned long mode)
->  {
->  	struct pwm_state state;
->  
-> @@ -377,6 +378,7 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
->  
->  	state.duty_cycle = duty_ns;
->  	state.period = period_ns;
-> +	state.mode = mode;
->  	return pwm_apply_state(pwm, &state);
+>  	return 1;
 >  }
->  
-> @@ -537,7 +539,7 @@ static inline int pwm_adjust_config(struct pwm_device *pwm)
->  }
->  
->  static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-> -			     int period_ns)
-> +			     int period_ns, unsigned long mode)
->  {
->  	return -EINVAL;
->  }
-> -- 
-> 2.7.4
+> -#endif
 > 
+
+Otherwise looks good.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
