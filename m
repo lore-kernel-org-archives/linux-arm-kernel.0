@@ -1,40 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Feb 2018 14:54:31 +0100
-Subject: [PATCH 4/6] ARM: dts: stm32: add MFX support on I2C1 on
- stm32746g-eval
-In-Reply-To: <1518100057-23234-5-git-send-email-amelie.delaunay@st.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <1518100057-23234-5-git-send-email-amelie.delaunay@st.com>
-Message-ID: <CACRpkdZFrRXEBW6KnqZ=h_7BxYn-RaAzhP4ovwC_DQSbAGZCVw@mail.gmail.com>
+Date: Thu, 22 Feb 2018 14:59:44 +0100
+Subject: [PATCH] watchdog: coh901327: make license text and module licence
+ match
+In-Reply-To: <20180210092702.4393-1-marcus.folkesson@gmail.com>
+References: <20180210092702.4393-1-marcus.folkesson@gmail.com>
+Message-ID: <CACRpkdaGeqCOhSwzNZh4AObEB16SHgY+X9eB8G4chSdytbVv_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 8, 2018 at 3:27 PM, Amelie Delaunay <amelie.delaunay@st.com> wrote:
+On Sat, Feb 10, 2018 at 10:27 AM, Marcus Folkesson
+<marcus.folkesson@gmail.com> wrote:
 
-> MFX is used as gpio expander on stm32746g-eval.
+> Licence text is specifying "GPLv2" but the MODULE_LICENSE is set to "GPLv2
+> or later".
 >
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> See include/linux/module.h:
+> "GPL"                           [GNU Public License v2 or later]
+> "GPL v2"                        [GNU Public License v2]
+>
+> When on it, add SPDX identifier tag.
+>
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 
-(...)
-> +       mfx: mfx at 42 {
-> +               compatible = "st,mfx";
-> +               reg = <0x42>;
-> +               interrupts = <8 1>;
-> +               interrupt-parent = <&gpioi>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +
-> +               mfxgpio: mfx_gpio {
-> +                       compatible = "st,mfx-gpio";
-> +                       interrupts = <0>;
-> +                       interrupt-parent = <&mfx>;
-> +                       gpio-controller;
-> +                       #gpio-cells = <2>;
-
-So I think this node should contain some pin config states
-that can  be referenced by the drivers to set up push/pull
-etc. Probably it can use just standard pin config properties
-like sx150x.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
