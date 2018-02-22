@@ -1,116 +1,83 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 22 Feb 2018 20:17:20 +0900
-Subject: [PATCH v8 01/13] resource: add walk_system_ram_res_rev()
+Date: Thu, 22 Feb 2018 20:17:21 +0900
+Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
 In-Reply-To: <20180222111732.23051-1-takahiro.akashi@linaro.org>
 References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
-Message-ID: <20180222111732.23051-2-takahiro.akashi@linaro.org>
+Message-ID: <20180222111732.23051-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function, being a variant of walk_system_ram_res() introduced in
-commit 8c86e70acead ("resource: provide new functions to walk through
-resources"), walks through a list of all the resources of System RAM
-in reversed order, i.e., from higher to lower.
-
-It will be used in kexec_file implementation on arm64.
+On arm64, no trampline code between old kernel and new kernel will be
+required in kexec_file implementation. This patch introduces a new
+configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
+compiled in only if necessary.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Dave Young <dyoung@redhat.com>
 Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Baoquan He <bhe@redhat.com>
 ---
- include/linux/ioport.h |  3 +++
- kernel/resource.c      | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
+ arch/powerpc/Kconfig | 3 +++
+ arch/x86/Kconfig     | 3 +++
+ kernel/kexec_file.c  | 6 ++++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-index da0ebaec25f0..f12d95fe038b 100644
---- a/include/linux/ioport.h
-+++ b/include/linux/ioport.h
-@@ -277,6 +277,9 @@ extern int
- walk_system_ram_res(u64 start, u64 end, void *arg,
- 		    int (*func)(struct resource *, void *));
- extern int
-+walk_system_ram_res_rev(u64 start, u64 end, void *arg,
-+			int (*func)(struct resource *, void *));
-+extern int
- walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
- 		    void *arg, int (*func)(struct resource *, void *));
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 73ce5dd07642..c32a181a7cbb 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -552,6 +552,9 @@ config KEXEC_FILE
+ 	  for kernel and initramfs as opposed to a list of segments as is the
+ 	  case for the older kexec call.
  
-diff --git a/kernel/resource.c b/kernel/resource.c
-index e270b5048988..bdaa93407f4c 100644
---- a/kernel/resource.c
-+++ b/kernel/resource.c
-@@ -23,6 +23,8 @@
- #include <linux/pfn.h>
- #include <linux/mm.h>
- #include <linux/resource_ext.h>
-+#include <linux/string.h>
-+#include <linux/vmalloc.h>
- #include <asm/io.h>
++config ARCH_HAS_KEXEC_PURGATORY
++	def_bool KEXEC_FILE
++
+ config RELOCATABLE
+ 	bool "Build a relocatable kernel"
+ 	depends on PPC64 || (FLATMEM && (44x || FSL_BOOKE))
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index c1236b187824..f031c3efe47e 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -2019,6 +2019,9 @@ config KEXEC_FILE
+ 	  for kernel and initramfs as opposed to list of segments as
+ 	  accepted by previous system call.
  
++config ARCH_HAS_KEXEC_PURGATORY
++	def_bool KEXEC_FILE
++
+ config KEXEC_VERIFY_SIG
+ 	bool "Verify kernel signature during kexec_file_load() syscall"
+ 	depends on KEXEC_FILE
+diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+index e5bcd94c1efb..990adae52151 100644
+--- a/kernel/kexec_file.c
++++ b/kernel/kexec_file.c
+@@ -26,7 +26,11 @@
+ #include <linux/vmalloc.h>
+ #include "kexec_internal.h"
  
-@@ -486,6 +488,61 @@ int walk_mem_res(u64 start, u64 end, void *arg,
- 				     arg, func);
++#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+ static int kexec_calculate_store_digests(struct kimage *image);
++#else
++static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
++#endif
+ 
+ /* Architectures can provide this probe function */
+ int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+@@ -520,6 +524,7 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
+ 	return 0;
  }
  
-+int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
-+				int (*func)(struct resource *, void *))
-+{
-+	struct resource res, *rams;
-+	int rams_size = 16, i;
-+	int ret = -1;
-+
-+	/* create a list */
-+	rams = vmalloc(sizeof(struct resource) * rams_size);
-+	if (!rams)
-+		return ret;
-+
-+	res.start = start;
-+	res.end = end;
-+	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-+	i = 0;
-+	while ((res.start < res.end) &&
-+		(!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
-+		if (i >= rams_size) {
-+			/* re-alloc */
-+			struct resource *rams_new;
-+			int rams_new_size;
-+
-+			rams_new_size = rams_size + 16;
-+			rams_new = vmalloc(sizeof(struct resource)
-+							* rams_new_size);
-+			if (!rams_new)
-+				goto out;
-+
-+			memcpy(rams_new, rams,
-+					sizeof(struct resource) * rams_size);
-+			vfree(rams);
-+			rams = rams_new;
-+			rams_size = rams_new_size;
-+		}
-+
-+		rams[i].start = res.start;
-+		rams[i++].end = res.end;
-+
-+		res.start = res.end + 1;
-+		res.end = end;
-+	}
-+
-+	/* go reverse */
-+	for (i--; i >= 0; i--) {
-+		ret = (*func)(&rams[i], arg);
-+		if (ret)
-+			break;
-+	}
-+
-+out:
-+	vfree(rams);
-+	return ret;
-+}
-+
- #if !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
++#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+ /* Calculate and store the digest of segments */
+ static int kexec_calculate_store_digests(struct kimage *image)
+ {
+@@ -1022,3 +1027,4 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
  
- /*
+ 	return 0;
+ }
++#endif /* CONFIG_ARCH_HAS_KEXEC_PURGATORY */
 -- 
 2.16.2
