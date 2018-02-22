@@ -1,19 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Feb 2018 22:15:07 +0800
-Subject: [PATCH v3 8/8] drm/sun4i: backend: Remove ARGB spoofing
-In-Reply-To: <965180afd8169ccaa848f061d16a2c1a9ec4d289.1518802627.git-series.maxime.ripard@bootlin.com>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <965180afd8169ccaa848f061d16a2c1a9ec4d289.1518802627.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v658h+MKv--py2cZdUp_iDje9MBSe8vOXBfgyoHRPyz_5g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Feb 2018 15:27:35 +0100
+Subject: [PATCH 8/9] ARM: dts: Ux500: Fix "debounce-interval" property
+ misspelling
+In-Reply-To: <1518531335-5170-9-git-send-email-geert+renesas@glider.be>
+References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
+ <1518531335-5170-9-git-send-email-geert+renesas@glider.be>
+Message-ID: <CACRpkdZaKyg8kDoxqLN0SXJCPb=qisTbE-bf8gkqFG4ufRh=SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 17, 2018 at 1:39 AM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> We've had some code for quite some time to prevent the alpha bug from
-> happening on the lowest primary plane. Since we now check for this in our
-> atomic_check, we can simply remove it.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On Tue, Feb 13, 2018 at 3:15 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> "debounce_interval" was never supported.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Please apply to your tree when appropriate.
+
+Patch applied.
+
+Yours,
+Linus Walleij
