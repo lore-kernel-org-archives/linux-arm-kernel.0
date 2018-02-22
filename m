@@ -1,30 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 22 Feb 2018 11:26:31 +0530
-Subject: [PATCH] cpufreq: mediatek: Convert pr_warn() to pr_debug()
-Message-ID: <5bc4db542fa521c32d295f490a1ad1dadf715098.1519278976.git.viresh.kumar@linaro.org>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 22 Feb 2018 11:42:06 +0530
+Subject: [PATCH v5 2/4] dt-bindings: qcom: Add SDM845 bindings
+In-Reply-To: <20180222061208.2031-1-rnayak@codeaurora.org>
+References: <20180222061208.2031-1-rnayak@codeaurora.org>
+Message-ID: <20180222061208.2031-3-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With multi-platform build images, this shows a message on non mediatek
-platforms, which is unnecessary. Convert pr_warn() to pr_debug() here.
+Add a SoC string 'sdm845' for the qualcomm SDM845 SoC
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/cpufreq/mediatek-cpufreq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/qcom.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-index 8c04dddd3c28..84d658d57029 100644
---- a/drivers/cpufreq/mediatek-cpufreq.c
-+++ b/drivers/cpufreq/mediatek-cpufreq.c
-@@ -578,7 +578,7 @@ static int __init mtk_cpufreq_driver_init(void)
- 	match = of_match_node(mtk_cpufreq_machines, np);
- 	of_node_put(np);
- 	if (!match) {
--		pr_warn("Machine is not compatible with mtk-cpufreq\n");
-+		pr_debug("Machine is not compatible with mtk-cpufreq\n");
- 		return -ENODEV;
- 	}
+diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+index 0ed4d39d7fe1..ee532e705d6c 100644
+--- a/Documentation/devicetree/bindings/arm/qcom.txt
++++ b/Documentation/devicetree/bindings/arm/qcom.txt
+@@ -26,6 +26,7 @@ The 'SoC' element must be one of the following strings:
+ 	msm8996
+ 	mdm9615
+ 	ipq8074
++	sdm845
+ 
+ The 'board' element must be one of the following strings:
  
 -- 
-2.15.0.194.g9af6a3dea062
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
