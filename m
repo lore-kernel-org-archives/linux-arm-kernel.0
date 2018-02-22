@@ -1,31 +1,90 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Feb 2018 22:37:02 +0800
-Subject: [PATCH v3 7/8] drm/sun4i: Add support for plane alpha
-In-Reply-To: <20180222143450.gr3tom2ahdimdurd@flea.lan>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <76eeabd20aeff78f2cd434eb25a0d2a37528ea57.1518802627.git-series.maxime.ripard@bootlin.com>
- <CAGb2v66W0W1V8_SaRn2nvkptPht5nYXEvJThf1hY5qJPo+zPwA@mail.gmail.com>
- <20180222143450.gr3tom2ahdimdurd@flea.lan>
-Message-ID: <CAGb2v65VdiuikE7YRTkcYgAvX75=OcTRtOKrWWCtn3dsOOk2jw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 22 Feb 2018 15:37:57 +0100
+Subject: [PATCH v4 37/40] KVM: arm/arm64: Move arm64-only vgic-v2-sr.c
+ file to arm64
+In-Reply-To: <3d76ca96-f8c1-0965-f166-ba10fb5b2b08@arm.com>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-38-christoffer.dall@linaro.org>
+ <3d76ca96-f8c1-0965-f166-ba10fb5b2b08@arm.com>
+Message-ID: <20180222143757.GN29376@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 10:34 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Thu, Feb 22, 2018 at 10:17:38PM +0800, Chen-Yu Tsai wrote:
->> On Sat, Feb 17, 2018 at 1:39 AM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > Our backend supports a per-plane alpha property. Support it through our new
->> > helper.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->>
->> Though, not having a graphics background, does alpha = 255 mean fully
->> transparent and thus can be skipped? Or no alpha at all?
->
-> It means that it's fully opaque, and therefore we are in the same
-> situation than if we had no alpha channel at all.
+On Thu, Feb 22, 2018 at 12:33:20PM +0000, Marc Zyngier wrote:
+> On 15/02/18 21:03, Christoffer Dall wrote:
+> > The vgic-v2-sr.c file now only contains the logic to replay unaligned
+> > accesses to the virtual CPU interface on 16K and 64K page systems, which
+> > is only relevant on 64-bit platforms.  Therefore move this file to the
+> > arm64 KVM tree, remove the compile directive from the 32-bit side
+> > makefile, and remove the ifdef in the C file.
+> > 
+> > Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm/kvm/hyp/Makefile                         | 1 -
+> >  arch/arm64/kvm/hyp/Makefile                       | 2 +-
+> >  {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c | 2 --
+> >  3 files changed, 1 insertion(+), 4 deletions(-)
+> >  rename {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c (98%)
+> > 
+> > diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+> > index 5638ce0c9524..1964111c984a 100644
+> > --- a/arch/arm/kvm/hyp/Makefile
+> > +++ b/arch/arm/kvm/hyp/Makefile
+> > @@ -7,7 +7,6 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+> >  
+> >  KVM=../../../../virt/kvm
+> >  
+> > -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+> >  
+> > diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> > index f04400d494b7..7e8d41210288 100644
+> > --- a/arch/arm64/kvm/hyp/Makefile
+> > +++ b/arch/arm64/kvm/hyp/Makefile
+> > @@ -7,10 +7,10 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+> >  
+> >  KVM=../../../../virt/kvm
+> >  
+> > -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+> >  
+> > +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> 
+> How about renaming the file to vgic-v2-cpuif-proxy.c? It doesn't have
+> anything to do with save/restore anymore...
+> 
 
-Right. Then the code makes sense. Thanks for the explanation.
+Yes, good idea.
+
+> >  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+> > diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > similarity index 98%
+> > rename from virt/kvm/arm/hyp/vgic-v2-sr.c
+> > rename to arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > index 0bbafdfd4adb..97f357ea9c72 100644
+> > --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
+> > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > @@ -23,7 +23,6 @@
+> >  #include <asm/kvm_hyp.h>
+> >  #include <asm/kvm_mmu.h>
+> >  
+> > -#ifdef CONFIG_ARM64
+> >  /*
+> >   * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+> >   *				     guest.
+> > @@ -77,4 +76,3 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+> >  
+> >  	return 1;
+> >  }
+> > -#endif
+> > 
+> 
+> Otherwise looks good.
+> 
+Thanks,
+-Christoffer
