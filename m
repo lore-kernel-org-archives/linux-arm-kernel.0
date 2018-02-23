@@ -1,57 +1,72 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 23 Feb 2018 15:40:26 +0100
-Subject: [PATCH v2 4/8] arm64: zynqmp: Add support for Xilinx zcu104-revA
+Date: Fri, 23 Feb 2018 15:40:29 +0100
+Subject: [PATCH v2 7/8] arm64: zynqmp: Add support for Xilinx zc12XX boards
 In-Reply-To: <cover.1519396753.git.michal.simek@xilinx.com>
 References: <cover.1519396753.git.michal.simek@xilinx.com>
-Message-ID: <68acadbb82fb0a8ac5abb9b1e156b9a9cf5b0f11.1519396753.git.michal.simek@xilinx.com>
+Message-ID: <10883c083dfe48fe5349292f78e47143d87c0a15.1519396753.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xilinx zcu104 is another customer board. It is sort of zcu102 clone
-with some differences.
+These 3 boards requires minimal support to get Linux up and running.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v2:
-- Remove i2c mw u-boot commands
 - Record compatible string to xilinx.txt
 
- Documentation/devicetree/bindings/arm/xilinx.txt  |   3 +
- arch/arm64/boot/dts/xilinx/Makefile               |   1 +
- arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts | 197 ++++++++++++++++++++++
- 3 files changed, 201 insertions(+)
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
+ Documentation/devicetree/bindings/arm/xilinx.txt  |  9 ++++
+ arch/arm64/boot/dts/xilinx/Makefile               |  3 ++
+ arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts | 54 +++++++++++++++++++++++
+ arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts | 42 ++++++++++++++++++
+ arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts | 42 ++++++++++++++++++
+ 5 files changed, 150 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-index 2b922ec3c82a..a9ce08a68711 100644
+index c2bc75774010..aceccf2bf43b 100644
 --- a/Documentation/devicetree/bindings/arm/xilinx.txt
 +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-@@ -26,3 +26,6 @@ Additional compatible strings:
-   "xlnx,zynqmp-zcu102-revA", "xlnx,zynqmp-zcu102"
-   "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102"
-   "xlnx,zynqmp-zcu102-rev1.0", "xlnx,zynqmp-zcu102"
+@@ -19,6 +19,15 @@ Required root node properties:
+ 
+ Additional compatible strings:
+ 
++- Xilinx internal board zc1232
++  "xlnx,zynqmp-zc1232-revA", "xlnx,zynqmp-zc1232"
 +
-+- Xilinx evaluation board zcu104
-+  "xlnx,zynqmp-zcu104-revA", "xlnx,zynqmp-zcu104"
++- Xilinx internal board zc1254
++  "xlnx,zynqmp-zc1254-revA", "xlnx,zynqmp-zc1254"
++
++- Xilinx internal board zc1275
++  "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275"
++
+ - Xilinx 96boards compatible board zcu100
+   "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100"
+ 
 diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-index 24e3ce801304..1c039e59c7c3 100644
+index d15c9dc1d8f2..bdda451afaad 100644
 --- a/arch/arm64/boot/dts/xilinx/Makefile
 +++ b/arch/arm64/boot/dts/xilinx/Makefile
-@@ -4,3 +4,4 @@ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
+@@ -1,5 +1,8 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
++dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
++dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
++dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
+ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-rev1.0.dtb
-+dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu104-revA.dtb
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
 new file mode 100644
-index 000000000000..89d26f56514b
+index 000000000000..0f7b4cf6078e
 --- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
-@@ -0,0 +1,197 @@
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
+@@ -0,0 +1,54 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
-+ * dts file for Xilinx ZynqMP ZCU104
++ * dts file for Xilinx ZynqMP ZC1232
 + *
 + * (C) Copyright 2017 - 2018, Xilinx, Inc.
 + *
@@ -62,22 +77,14 @@ index 000000000000..89d26f56514b
 +
 +#include "zynqmp.dtsi"
 +#include "zynqmp-clk.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "ZynqMP ZCU104 RevA";
-+	compatible = "xlnx,zynqmp-zcu104-revA", "xlnx,zynqmp-zcu104", "xlnx,zynqmp";
++	model = "ZynqMP ZC1232 RevA";
++	compatible = "xlnx,zynqmp-zc1232-revA", "xlnx,zynqmp-zc1232", "xlnx,zynqmp";
 +
 +	aliases {
-+		ethernet0 = &gem3;
-+		gpio0 = &gpio;
-+		i2c0 = &i2c1;
-+		mmc0 = &sdhci1;
-+		rtc0 = &rtc;
 +		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &dcc;
-+		usb0 = &usb0;
++		serial1 = &dcc;
 +	};
 +
 +	chosen {
@@ -91,122 +98,7 @@ index 000000000000..89d26f56514b
 +	};
 +};
 +
-+&can1 {
-+	status = "okay";
-+};
-+
 +&dcc {
-+	status = "okay";
-+};
-+
-+&gem3 {
-+	status = "okay";
-+	phy-handle = <&phy0>;
-+	phy-mode = "rgmii-id";
-+	phy0: phy at c {
-+		reg = <0xc>;
-+		ti,rx-internal-delay = <0x8>;
-+		ti,tx-internal-delay = <0xa>;
-+		ti,fifo-depth = <0x1>;
-+	};
-+};
-+
-+&gpio {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	/* Another connection to this bus via PL i2c via PCA9306 - u45 */
-+	i2cswitch at 74 { /* u34 */
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x74>;
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			/*
-+			 * IIC_EEPROM 1kB memory which uses 256B blocks
-+			 * where every block has different address.
-+			 *    0 - 256B address 0x54
-+			 * 256B - 512B address 0x55
-+			 * 512B - 768B address 0x56
-+			 * 768B - 1024B address 0x57
-+			 */
-+			eeprom at 54 { /* u23 */
-+				compatible = "atmel,24c08";
-+				reg = <0x54>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+			};
-+		};
-+
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			clock_8t49n287: clock-generator at 6c { /* 8T49N287 - u182 */
-+				reg = <0x6c>;
-+			};
-+		};
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+			irps5401_43: irps54012 at 43 { /* IRPS5401 - u175 */
-+				reg = <0x43>;
-+			};
-+			irps5401_4d: irps54012 at 4d { /* IRPS5401 - u180 */
-+				reg = <0x4d>;
-+			};
-+		};
-+
-+		i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+			tca6416_u97: gpio at 21 {
-+				compatible = "ti,tca6416";
-+				reg = <0x21>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				/*
-+				 * IRQ not connected
-+				 * Lines:
-+				 * 0 - IRPS5401_ALERT_B
-+				 * 1 - HDMI_8T49N241_INT_ALM
-+				 * 2 - MAX6643_OT_B
-+				 * 3 - MAX6643_FANFAIL_B
-+				 * 5 - IIC_MUX_RESET_B
-+				 * 6 - GEM3_EXP_RESET_B
-+				 * 7 - FMC_LPC_PRSNT_M2C_B
-+				 * 4, 10 - 17 - not connected
-+				 */
-+			};
-+		};
-+
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+		};
-+
-+		i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+		};
-+
-+		/* 3, 6 not connected */
-+	};
-+};
-+
-+&rtc {
 +	status = "okay";
 +};
 +
@@ -223,27 +115,103 @@ index 000000000000..89d26f56514b
 +	ceva,p1-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
 +};
 +
-+/* SD1 with level shifter */
-+&sdhci1 {
++&uart0 {
 +	status = "okay";
-+	no-1-8-v;
-+	disable-wp;
++};
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
+new file mode 100644
+index 000000000000..9092828f92ec
+--- /dev/null
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
+@@ -0,0 +1,42 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * dts file for Xilinx ZynqMP ZC1254
++ *
++ * (C) Copyright 2015 - 2018, Xilinx, Inc.
++ *
++ * Michal Simek <michal.simek@xilinx.com>
++ * Siva Durga Prasad Paladugu <sivadur@xilinx.com>
++ */
++
++/dts-v1/;
++
++#include "zynqmp.dtsi"
++#include "zynqmp-clk.dtsi"
++
++/ {
++	model = "ZynqMP ZC1254 RevA";
++	compatible = "xlnx,zynqmp-zc1254-revA", "xlnx,zynqmp-zc1254", "xlnx,zynqmp";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &dcc;
++	};
++
++	chosen {
++		bootargs = "earlycon";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++};
++
++&dcc {
++	status = "okay";
 +};
 +
 +&uart0 {
 +	status = "okay";
 +};
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
+new file mode 100644
+index 000000000000..4f404c580eec
+--- /dev/null
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
+@@ -0,0 +1,42 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * dts file for Xilinx ZynqMP ZC1275
++ *
++ * (C) Copyright 2017 - 2018, Xilinx, Inc.
++ *
++ * Michal Simek <michal.simek@xilinx.com>
++ * Siva Durga Prasad Paladugu <sivadur@xilinx.com>
++ */
 +
-+&uart1 {
++/dts-v1/;
++
++#include "zynqmp.dtsi"
++#include "zynqmp-clk.dtsi"
++
++/ {
++	model = "ZynqMP ZC1275 RevA";
++	compatible = "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275", "xlnx,zynqmp";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &dcc;
++	};
++
++	chosen {
++		bootargs = "earlycon";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++};
++
++&dcc {
 +	status = "okay";
 +};
 +
-+/* ULPI SMSC USB3320 */
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&watchdog0 {
++&uart0 {
 +	status = "okay";
 +};
 -- 
