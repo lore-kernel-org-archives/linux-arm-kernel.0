@@ -1,51 +1,43 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 23 Feb 2018 12:11:00 +0100
-Subject: [PATCH] dt-bindings: iio: adc: stm32-dfsdm: fix types,
- add missing pinctrl
-Message-ID: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 23 Feb 2018 19:31:20 +0800
+Subject: [GIT PULL] Allwinner clock fixes for 4.16
+Message-ID: <20180223113120.GA2659@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Add missing pinctrl description. Support is made optional as dfsdm
-  may use internal sources (e.g. via registers)
-- Fix typo in IIO STM32 DFSDM filter "MANCH_F" description.
-Basically, this should be "falling edge = logic 0", not "1" that applies
-to "MANCH_R".
-BTW, make the description complete by describing both rising/falling
-edges as described in reference manuals.
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Fixes: 6c82f947fc97 ("IIO: add DT bindings for stm32 DFSDM filter")
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+are available in the Git repository at:
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-index 911492da..ed7520d 100644
---- a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-@@ -32,6 +32,10 @@ Optional properties:
- 		  to "clock" property. Frequency must be a multiple of the rcc
- 		  clock frequency. If not, SPI CLKOUT frequency will not be
- 		  accurate.
-+- pinctrl-names:	Set to "default".
-+- pinctrl-0:		List of phandles pointing to pin configuration
-+			nodes to set pins in mode of operation for dfsdm
-+			on external pin.
- 
- Contents of a STM32 DFSDM child nodes:
- --------------------------------------
-@@ -68,8 +72,8 @@ Optional properties:
- - st,adc-channel-types:	Single-ended channel input type.
- 			- "SPI_R": SPI with data on rising edge (default)
- 			- "SPI_F": SPI with data on falling edge
--			- "MANCH_R": manchester codec, rising edge = logic 0
--			- "MANCH_F": manchester codec, falling edge = logic 1
-+			- "MANCH_R": manchester codec, rising edge = logic 0, falling edge = logic 1
-+			- "MANCH_F": manchester codec, rising edge = logic 1, falling edge = logic 0
- - st,adc-channel-clk-src: Conversion clock source.
- 			  - "CLKIN": external SPI clock (CLKIN x)
- 			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
--- 
-1.9.1
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.16
+
+for you to fetch changes up to 5682e268350f9eccdbb04006605c1b7068a7b323:
+
+  clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops (2018-02-19 08:59:50 +0100)
+
+----------------------------------------------------------------
+Allwinner clock fixes for 4.16
+
+A critical fix for the A31 sunxi-ng clock driver. The CLK_OUT clocks
+had definitions paired with the incorrect type of clk ops. This results
+in a serious oops starting with commit 946797aa3f08 ("clk: sunxi-ng:
+Support fixed post-dividers on MP style clocks"), which exposed the
+incorrect clk ops when it added a new field to the data structures,
+which then nudged the underlying (compatible but incorrect) data
+structures out of alignment.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops
+
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/23efdda1/attachment.sig>
