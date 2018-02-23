@@ -1,78 +1,64 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 23 Feb 2018 14:37:42 +0100
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+Date: Fri, 23 Feb 2018 14:37:41 +0100
+Subject: [PATCH v4 09/10] ARM: sunxi: smp: Move cpu_resume assembly entry into
+ file
 In-Reply-To: <20180223133742.26044-1-mylene.josserand@bootlin.com>
 References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
-Message-ID: <20180223133742.26044-11-mylene.josserand@bootlin.com>
+Message-ID: <20180223133742.26044-10-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
-It should be done by the bootloader but it is currently not the case,
-even for boot CPU because this SoC is booting in secure mode.
-It leads to an random offset value meaning that each CPU will have a
-different time, which isn't working very well.
-
-Add assembly code used for boot CPU and secondary CPU cores to make
-sure that the CNTVOFF register is initialized.
+Move the CPU resume assembly function into the assembly file
+to remove all assembly code from C code.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
- arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c   |  4 ++++
- 2 files changed, 25 insertions(+)
+ arch/arm/mach-sunxi/headsmp.S |  5 +++++
+ arch/arm/mach-sunxi/mc_smp.c  | 11 +----------
+ 2 files changed, 6 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-index d5c97e945e69..605896251927 100644
+index 4f5957a6e188..d5c97e945e69 100644
 --- a/arch/arm/mach-sunxi/headsmp.S
 +++ b/arch/arm/mach-sunxi/headsmp.S
-@@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
- 	first: .word sunxi_mc_smp_first_comer - .
- ENDPROC(sunxi_mc_smp_cluster_cache_enable)
- 
-+ENTRY(sunxi_init_cntvoff)
-+	/*
-+	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-+	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-+	 * then it should be handled by the secure code
-+	 */
-+	cps	#MON_MODE
-+	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-+	orr	r0, r1, #1
-+	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-+	instr_sync
-+	mov	r0, #0
-+	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-+	instr_sync
-+	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-+	instr_sync
-+	cps	#SVC_MODE
-+	ret	lr
-+ENDPROC(sunxi_init_cntvoff)
-+
- #ifdef CONFIG_SMP
- ENTRY(sunxi_boot)
+@@ -70,4 +70,9 @@ ENTRY(sunxi_boot)
  	bl	sunxi_mc_smp_cluster_cache_enable
-+	bl	sunxi_init_cntvoff
  	b	secondary_startup
  ENDPROC(sunxi_boot)
- 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 5e9602ce1573..4bb041492b54 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
- };
- 
- extern void __init sun6i_reset_init(void);
-+extern void sunxi_init_cntvoff(void);
 +
- static void __init sun6i_timer_init(void)
++ENTRY(sunxi_mc_smp_resume)
++	bl	sunxi_mc_smp_cluster_cache_enable
++	b	cpu_resume
++ENDPROC(sunxi_mc_smp_resume)
+ #endif
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index 4e807cc11a0f..f1ad425a469c 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -84,6 +84,7 @@ static bool is_sun9i;
+ 
+ extern void sunxi_boot(void);
+ extern void sunxi_cluster_cache_enable(void);
++extern void sunxi_mc_smp_resume(void);
+ 
+ static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
  {
-+	sunxi_init_cntvoff();
-+
- 	of_clk_init(NULL);
- 	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
- 		sun6i_reset_init();
+@@ -641,16 +642,6 @@ static bool __init sunxi_mc_smp_cpu_table_init(void)
+  */
+ typedef typeof(cpu_reset) phys_reset_t;
+ 
+-static void __init __naked sunxi_mc_smp_resume(void)
+-{
+-	asm volatile(
+-		"bl	sunxi_mc_smp_cluster_cache_enable\n"
+-		"b	cpu_resume"
+-		/* Let compiler know about sunxi_mc_smp_cluster_cache_enable */
+-		:: "i" (sunxi_mc_smp_cluster_cache_enable)
+-	);
+-}
+-
+ static int __init nocache_trampoline(unsigned long __unused)
+ {
+ 	phys_reset_t phys_reset;
 -- 
 2.11.0
