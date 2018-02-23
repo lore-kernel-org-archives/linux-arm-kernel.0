@@ -1,47 +1,95 @@
-From: stefan@the2masters.de (Stefan Hellermann)
-Date: Fri, 23 Feb 2018 17:36:30 +0100
-Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
-In-Reply-To: <20180223155104.GB6052@lunn.ch>
-References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
- <20180222214237.GH28112@lunn.ch>
- <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
- <20180222233457.GA6052@lunn.ch>
- <1519380573.10722.94.camel@linux.intel.com> <20180223150147.GA17857@lunn.ch>
- <1519399128.10722.111.camel@linux.intel.com> <20180223155104.GB6052@lunn.ch>
-Message-ID: <CAANYUdAzmJdwPH+kOJufG9NDVJVQr32qs-uWiy9Q5+moFCdBzw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Feb 2018 17:45:17 +0100
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
+References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
+Message-ID: <20180223164517.aboazzeuujgtkh7q@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-23 16:51 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
->> > Hi Andy
->> >
->> > Thanks for pointing this patch out.
->> >
->> > What is the advantage of doing to the strnlen()? As Stefan says, the
->> > code which follows will detect a short string, in that a NULL is not
->> > in [0-9a-f], nor a : .
->>
->> I'm not sure, but my understanding is that, the strchr() call in the
->> original code or isxdigit() in the follow up change will trash a cache a
->> bit. Besides that some of the users are (often?) supplying empty strings
->> to convert from, and in this case makes sense to bail out fast.
->
-> Is this function being called on a hot path? In the case which is
-> crashing, it is during early boot, and it gets called ~ 40 times, in
-> quick succession. The first call to isxdigit() will need to fetch part
-> of the _ctype array into cache, but since the caller is only walking
-> memory, i hope it is still in cache for the next call to mac_pton().
->
->         Andrew
+On Sun, Feb 18, 2018 at 04:07:51PM +0100, Geert Uytterhoeven wrote:
+> Hi Marek,
+> 
+> CC Steve Twiss
+> 
+> On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+> > one DA9063 and one DA9210 on Porter, the only difference from
+> > the other boards is that DA9063 is at I2C address 0x5a rather
+> > than 0x58 .
+> >
+> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> 
+> Thanks for your patch!
+> 
+> > --- a/arch/arm/boot/dts/r8a7791-porter.dts
+> > +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+> > @@ -354,10 +354,47 @@
+> >         clock-frequency = <400000>;
+> >  };
+> >
+> > +&i2c6 {
+> > +       status = "okay";
+> > +       clock-frequency = <100000>;
+> > +
+> > +       pmic at 5a {
+> > +               compatible = "dlg,da9063";
+> 
+> Does it matter that this is a DA9063L ("Variant 6B")?
+> Do we need a new compatible value, or can this be detected at runtime?
 
-In my case mac_pton is not called on a hot path, the slow sata disks
-in the NAS dominate the boot time. For me code size matters, and on my
-device it's rarely called on a zero string. It's probably slower with
-the strnlen as without it. I think if there are users out there
-calling it in a hot path on a zero string, they should check the zero
-string themselves, this is not the common use case.
+Hi Marek,
 
-Should I send a patch to netdev, can I get some Acked-by: ?
+could you follow up on this?
 
-    Stefan
+> > +               reg = <0x5a>;
+> > +               interrupt-parent = <&irqc0>;
+> > +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+> > +               interrupt-controller;
+> > +
+> > +               rtc {
+> > +                       compatible = "dlg,da9063-rtc";
+> > +               };
+> > +
+> > +               wdt {
+> > +                       compatible = "dlg,da9063-watchdog";
+> > +               };
+> > +       };
+> > +
+> > +       vdd_dvfs: regulator at 68 {
+> > +               compatible = "dlg,da9210";
+> > +               reg = <0x68>;
+> > +               interrupt-parent = <&irqc0>;
+> > +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+> > +
+> > +               regulator-min-microvolt = <1000000>;
+> > +               regulator-max-microvolt = <1000000>;
+> > +               regulator-boot-on;
+> > +               regulator-always-on;
+> > +       };
+> > +};
+> > +
+> >  &sata0 {
+> >         status = "okay";
+> >  };
+> >
+> > +&cpu0 {
+> > +       cpu0-supply = <&vdd_dvfs>;
+> > +};
+> > +
+> >  /* composite video input */
+> >  &vin0 {
+> >         status = "okay";
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
