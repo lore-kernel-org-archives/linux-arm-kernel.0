@@ -1,368 +1,194 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Feb 2018 15:53:47 +0530
-Subject: [PATCH V7 08/13] boot_constraint: Manage deferrable constraints
-In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
-Message-ID: <f2455a9b6a51dbdea0a573523857f36a3654055c.1519380923.git.viresh.kumar@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Feb 2018 11:02:38 +0000
+Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-12-jeremy.linton@arm.com>
+ <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
+ <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+Message-ID: <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible that some of the resources aren't available at the time
-constraints are getting set and the boot constraints core will return
--EPROBE_DEFER for them. In order to retry adding the constraints at a
-later point of time (after the resource is added and before any of its
-users come up), this patch proposes two things:
+On Thu, Jan 25, 2018 at 09:56:30AM -0600, Jeremy Linton wrote:
+> Hi,
+> 
+> On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
+> >Hi Jeremy,
+> >
+> >I have tested the patch with the newest UEFI. It prints the below error:
+> >
+> >[    4.017371] BUG: arch topology borken
+> >[    4.021069] BUG: arch topology borken
+> >[    4.024764] BUG: arch topology borken
+> >[    4.028460] BUG: arch topology borken
+> >[    4.032153] BUG: arch topology borken
+> >[    4.035849] BUG: arch topology borken
+> >[    4.039543] BUG: arch topology borken
+> >[    4.043239] BUG: arch topology borken
+> >[    4.046932] BUG: arch topology borken
+> >[    4.050629] BUG: arch topology borken
+> >[    4.054322] BUG: arch topology borken
+> >
+> >I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
+> >the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
+> 
+> I commented about that on the EDK2 mailing list. While the current spec
+> doesn't explicitly ban having the flag set multiple times between the leaf
+> and the root I consider it a "bug" and there is an effort to clarify the
+> spec and the use of that flag.
+> >
+> >When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
+> >and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
+> >sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
+> 
+> Right. I've mentioned this problem a couple of times.
+> 
+> At at the moment, the spec isn't clear about how the proximity domain is
+> detected/located within the PPTT topology (a node with a 1:1 correspondence
+> isn't even required). As you can see from this patch set, we are making the
+> general assumption that the proximity domains are at the same level as the
+> physical socket. This isn't ideal for NUMA topologies, like the D05, that
+> don't align with the physical socket.
+> 
+> There are efforts underway to clarify and expand upon the specification to
+> deal with this general problem. The simple solution is another flag (say
+> PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to
+> find nodes with 1:1 correspondence. At that point we could add a fairly
+> trivial patch to correct just the scheduler topology without affecting the
+> rest of the system topology code.
 
-- Each constraint is represented by a virtual platform device, so that
-  it is re-probed again until the time all the dependencies aren't met.
-  The platform device is removed along with the constraint, with help of
-  the free_resources() callback.
+I think Morten asked already but isn't this the same end result we end
+up having if we remove the DIE level if NUMA-within-package is detected
+(instead of using the default_topology[]) and we create our own ARM64
+domain hierarchy (with DIE level removed) through set_sched_topology()
+accordingly ?
 
-- Enable early defer probing support by calling
-  driver_enable_deferred_probe(), so that the core retries probing
-  deferred devices every time any device is bound to a driver. This
-  makes sure that the constraint is set before any of the users of the
-  resources come up.
+Put it differently: do we really need to rely on another PPTT flag to
+collect this information ?
 
-This is tested on ARM64 Hikey board where probe was deferred for a
-device.
+I can't merge code that breaks a platform with legitimate firmware
+bindings.
 
-Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/dd.c                       |  12 ++
- drivers/bootconstraint/Makefile         |   2 +-
- drivers/bootconstraint/deferrable_dev.c | 241 ++++++++++++++++++++++++++++++++
- include/linux/boot_constraint.h         |  27 ++++
- 4 files changed, 281 insertions(+), 1 deletion(-)
- create mode 100644 drivers/bootconstraint/deferrable_dev.c
+Thanks,
+Lorenzo
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 777267aa1710..482d971ceac6 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -227,6 +227,18 @@ void device_unblock_probing(void)
- 	driver_deferred_probe_trigger();
- }
- 
-+/**
-+ * driver_enable_deferred_probe() - Enable probing of deferred devices
-+ *
-+ * We don't want to get in the way when the bulk of drivers are getting probed
-+ * and so deferred probe is disabled in the beginning. Enable it now because we
-+ * need it.
-+ */
-+void driver_enable_deferred_probe(void)
-+{
-+	driver_deferred_probe_enable = true;
-+}
-+
- /**
-  * deferred_probe_initcall() - Enable probing of deferred devices
-  *
-diff --git a/drivers/bootconstraint/Makefile b/drivers/bootconstraint/Makefile
-index b7ade1a7afb5..a765094623a3 100644
---- a/drivers/bootconstraint/Makefile
-+++ b/drivers/bootconstraint/Makefile
-@@ -1,3 +1,3 @@
- # Makefile for device boot constraints
- 
--obj-y := clk.o core.o pm.o supply.o
-+obj-y := clk.o deferrable_dev.o core.o pm.o supply.o
-diff --git a/drivers/bootconstraint/deferrable_dev.c b/drivers/bootconstraint/deferrable_dev.c
-new file mode 100644
-index 000000000000..34c493812869
---- /dev/null
-+++ b/drivers/bootconstraint/deferrable_dev.c
-@@ -0,0 +1,241 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/idr.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#include "core.h"
-+
-+static DEFINE_IDA(pdev_index);
-+
-+void driver_enable_deferred_probe(void);
-+
-+struct boot_constraint_pdata {
-+	struct device *dev;
-+	struct dev_boot_constraint constraint;
-+	int probe_failed;
-+	int index;
-+};
-+
-+static void boot_constraint_remove(void *data)
-+{
-+	struct platform_device *pdev = data;
-+	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
-+
-+	ida_simple_remove(&pdev_index, pdata->index);
-+	kfree(pdata->constraint.data);
-+	platform_device_unregister(pdev);
-+}
-+
-+/*
-+ * A platform device is added for each and every constraint, to handle
-+ * -EPROBE_DEFER properly.
-+ */
-+static int boot_constraint_probe(struct platform_device *pdev)
-+{
-+	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
-+	struct dev_boot_constraint_info info;
-+	int ret;
-+
-+	if (WARN_ON(!pdata))
-+		return -EINVAL;
-+
-+	info.constraint = pdata->constraint;
-+	info.free_resources = boot_constraint_remove;
-+	info.free_resources_data = pdev;
-+
-+	ret = dev_boot_constraint_add(pdata->dev, &info);
-+	if (ret) {
-+		if (ret == -EPROBE_DEFER)
-+			driver_enable_deferred_probe();
-+		else
-+			pdata->probe_failed = ret;
-+	}
-+
-+	return ret;
-+}
-+
-+static struct platform_driver boot_constraint_driver = {
-+	.driver = {
-+		.name = "boot-constraints-dev",
-+	},
-+	.probe = boot_constraint_probe,
-+};
-+
-+static int __init boot_constraint_init(void)
-+{
-+	return platform_driver_register(&boot_constraint_driver);
-+}
-+core_initcall(boot_constraint_init);
-+
-+static int boot_constraint_add_dev(struct device *dev,
-+				   struct dev_boot_constraint *constraint)
-+{
-+	struct boot_constraint_pdata pdata = {
-+		.dev = dev,
-+		.constraint.type = constraint->type,
-+	};
-+	struct platform_device *pdev;
-+	struct boot_constraint_pdata *pdev_pdata;
-+	int size, ret;
-+
-+	switch (constraint->type) {
-+	case DEV_BOOT_CONSTRAINT_CLK:
-+		size = sizeof(struct dev_boot_constraint_clk_info);
-+		break;
-+	case DEV_BOOT_CONSTRAINT_PM:
-+		size = 0;
-+		break;
-+	case DEV_BOOT_CONSTRAINT_SUPPLY:
-+		size = sizeof(struct dev_boot_constraint_supply_info);
-+		break;
-+	default:
-+		dev_err(dev, "%s: Constraint type (%d) not supported\n",
-+			__func__, constraint->type);
-+		return -EINVAL;
-+	}
-+
-+	/* Will be freed from boot_constraint_remove() */
-+	pdata.constraint.data = kmemdup(constraint->data, size, GFP_KERNEL);
-+	if (!pdata.constraint.data)
-+		return -ENOMEM;
-+
-+	ret = ida_simple_get(&pdev_index, 0, 256, GFP_KERNEL);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to allocate index (%d)\n", ret);
-+		goto free;
-+	}
-+
-+	pdata.index = ret;
-+
-+	pdev = platform_device_register_data(NULL, "boot-constraints-dev", ret,
-+					     &pdata, sizeof(pdata));
-+	if (IS_ERR(pdev)) {
-+		dev_err(dev, "%s: Failed to create pdev (%ld)\n", __func__,
-+			PTR_ERR(pdev));
-+		ret = PTR_ERR(pdev);
-+		goto ida_remove;
-+	}
-+
-+	/* Release resources if probe has failed */
-+	pdev_pdata = dev_get_platdata(&pdev->dev);
-+	if (pdev_pdata->probe_failed) {
-+		ret = pdev_pdata->probe_failed;
-+		goto remove_pdev;
-+	}
-+
-+	return 0;
-+
-+remove_pdev:
-+	platform_device_unregister(pdev);
-+ida_remove:
-+	ida_simple_remove(&pdev_index, pdata.index);
-+free:
-+	kfree(pdata.constraint.data);
-+
-+	return ret;
-+}
-+
-+static int dev_boot_constraint_add_deferrable(struct device *dev,
-+			struct dev_boot_constraint *constraints, int count)
-+{
-+	int ret, i;
-+
-+	for (i = 0; i < count; i++) {
-+		ret = boot_constraint_add_dev(dev, &constraints[i]);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/* This only creates platform devices for now */
-+static void add_deferrable_of_single(struct device_node *np,
-+				     struct dev_boot_constraint *constraints,
-+				     int count)
-+{
-+	struct device *dev;
-+	int ret;
-+
-+	if (!of_device_is_available(np))
-+		return;
-+
-+	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
-+	if (ret)
-+		return;
-+
-+	dev = of_find_any_device_by_node(np);
-+	if (!dev) {
-+		pr_err("Boot Constraints: Failed to find dev: %pOF\n", np);
-+		return;
-+	}
-+
-+	ret = dev_boot_constraint_add_deferrable(dev, constraints, count);
-+	if (ret)
-+		dev_err(dev, "Failed to add boot constraint (%d)\n", ret);
-+}
-+
-+/* Not all compatible device nodes may have boot constraints */
-+static bool node_has_boot_constraints(struct device_node *np,
-+				      struct dev_boot_constraint_of *oconst)
-+{
-+	int i;
-+
-+	if (!oconst->dev_names)
-+		return true;
-+
-+	for (i = 0; i < oconst->dev_names_count; i++) {
-+		if (!strcmp(oconst->dev_names[i], kbasename(np->full_name)))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+/**
-+ * dev_boot_constraint_add_deferrable_of: Adds all constraints for a platform.
-+ *
-+ * @oconst: This is an array of 'struct dev_boot_constraint_of', where each
-+ * entry of the array is used to add one or more boot constraints across one or
-+ * more devices having the same compatibility in the device tree.
-+ * @count: Size of the 'oconst' array.
-+ *
-+ * This helper routine provides an easy way to add all boot constraints for a
-+ * machine or platform. Just like dev_boot_constraint_add(), this must be called
-+ * before the devices (to which we want to add constraints) are probed by their
-+ * drivers, otherwise the boot constraint will never get removed for those
-+ * devices and may result in unwanted behavior of the hardware. The boot
-+ * constraints are removed by the driver core automatically after the devices
-+ * are probed (successfully or unsuccessfully).
-+ *
-+ * This adds the boot constraints in a deferrable way and the caller need not
-+ * worry about the availability of the resources required by the constraint.
-+ * This routine will return successfully and the constraint will be added by the
-+ * boot constraint core as soon as the resource is available at a later point in
-+ * time.
-+ */
-+void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
-+					   int count)
-+{
-+	struct device_node *np;
-+	int i;
-+
-+	for (i = 0; i < count; i++) {
-+		for_each_compatible_node(np, NULL, oconst[i].compat) {
-+			if (!node_has_boot_constraints(np, &oconst[i]))
-+				continue;
-+
-+			add_deferrable_of_single(np, oconst[i].constraints,
-+						 oconst[i].count);
-+		}
-+	}
-+}
-+EXPORT_SYMBOL_GPL(dev_boot_constraint_add_deferrable_of);
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index fbccb62f423d..91cbcc66b2c3 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -79,16 +79,43 @@ struct dev_boot_constraint_info {
- 	void *free_resources_data;
- };
- 
-+/**
-+ * struct dev_boot_constraint_of - This is used to add one or more boot
-+ * constraints across one or more devices having the same compatibility in the
-+ * device tree.
-+ *
-+ * @compat: This must match the compatible string of the devices to which we
-+ * want to apply constraints.
-+ * @constraints: This points to one or more boot constraints.
-+ * @count: This contains the number of boot constraints pointed by the
-+ * 'constraints' field.
-+ * @dev_names: This is used to limit the application of boot constraints to only
-+ * a subset of devices with matching compatibility.
-+ * @dev_names_count: This is the number of devices pointed by the 'dev_names'
-+ * array.
-+ */
-+struct dev_boot_constraint_of {
-+	const char *compat;
-+	struct dev_boot_constraint *constraints;
-+	unsigned int count;
-+
-+	const char * const *dev_names;
-+	unsigned int dev_names_count;
-+};
-+
- #ifdef CONFIG_DEV_BOOT_CONSTRAINT
- int dev_boot_constraint_add(struct device *dev,
- 			    struct dev_boot_constraint_info *info);
- void dev_boot_constraints_remove(struct device *dev);
-+void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
-+					   int count);
- #else
- static inline
- int dev_boot_constraint_add(struct device *dev,
- 			    struct dev_boot_constraint_info *info)
- { return 0; }
- static inline void dev_boot_constraints_remove(struct device *dev) {}
-+static inline void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst, int count) {}
- #endif /* CONFIG_DEV_BOOT_CONSTRAINT */
- 
- #endif /* _LINUX_BOOT_CONSTRAINT_H */
--- 
-2.15.0.194.g9af6a3dea062
+> 
+> >
+> >If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
+> >within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
+> >the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
+> >If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
+> >to record which cores are in each cluster.
+> 
+> The problem is that there isn't a generic way to identify which level of
+> cache sharing is the "correct" top layer MC domain. For one system cluster
+> might be appropriate, for another it might be the highest caching level
+> within a socket, for another is might be a something in between or a group
+> of clusters or LLCs..
+> 
+> Hence the effort to standardize/guarantee a PPTT node that exactly matches a
+> SRAT domain. With that, each SOC/system provider has clearly defined method
+> for communicating where they want the proximity domain information to begin.
+> 
+> Thanks,
+> 
+> >
+> >
+> >Thanks,
+> >Xiongfeng
+> >
+> >On 2018/1/13 8:59, Jeremy Linton wrote:
+> >>Propagate the topology information from the PPTT tree to the
+> >>cpu_topology array. We can get the thread id, core_id and
+> >>cluster_id by assuming certain levels of the PPTT tree correspond
+> >>to those concepts. The package_id is flagged in the tree and can be
+> >>found by calling find_acpi_cpu_topology_package() which terminates
+> >>its search when it finds an ACPI node flagged as the physical
+> >>package. If the tree doesn't contain enough levels to represent
+> >>all of the requested levels then the root node will be returned
+> >>for all subsequent levels.
+> >>
+> >>Cc: Juri Lelli <juri.lelli@arm.com>
+> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >>---
+> >>  arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 45 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> >>index 7b06e263fdd1..ce8ec7fd6b32 100644
+> >>--- a/arch/arm64/kernel/topology.c
+> >>+++ b/arch/arm64/kernel/topology.c
+> >>@@ -11,6 +11,7 @@
+> >>   * for more details.
+> >>   */
+> >>+#include <linux/acpi.h>
+> >>  #include <linux/arch_topology.h>
+> >>  #include <linux/cpu.h>
+> >>  #include <linux/cpumask.h>
+> >>@@ -22,6 +23,7 @@
+> >>  #include <linux/sched.h>
+> >>  #include <linux/sched/topology.h>
+> >>  #include <linux/slab.h>
+> >>+#include <linux/smp.h>
+> >>  #include <linux/string.h>
+> >>  #include <asm/cpu.h>
+> >>@@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
+> >>  	}
+> >>  }
+> >>+#ifdef CONFIG_ACPI
+> >>+/*
+> >>+ * Propagate the topology information of the processor_topology_node tree to the
+> >>+ * cpu_topology array.
+> >>+ */
+> >>+static int __init parse_acpi_topology(void)
+> >>+{
+> >>+	bool is_threaded;
+> >>+	int cpu, topology_id;
+> >>+
+> >>+	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+> >>+
+> >>+	for_each_possible_cpu(cpu) {
+> >>+		topology_id = find_acpi_cpu_topology(cpu, 0);
+> >>+		if (topology_id < 0)
+> >>+			return topology_id;
+> >>+
+> >>+		if (is_threaded) {
+> >>+			cpu_topology[cpu].thread_id = topology_id;
+> >>+			topology_id = find_acpi_cpu_topology(cpu, 1);
+> >>+			cpu_topology[cpu].core_id   = topology_id;
+> >>+			topology_id = find_acpi_cpu_topology_package(cpu);
+> >>+			cpu_topology[cpu].package_id = topology_id;
+> >>+		} else {
+> >>+			cpu_topology[cpu].thread_id  = -1;
+> >>+			cpu_topology[cpu].core_id    = topology_id;
+> >>+			topology_id = find_acpi_cpu_topology_package(cpu);
+> >>+			cpu_topology[cpu].package_id = topology_id;
+> >>+		}
+> >>+	}
+> >>+
+> >>+	return 0;
+> >>+}
+> >>+
+> >>+#else
+> >>+static inline int __init parse_acpi_topology(void)
+> >>+{
+> >>+	return -EINVAL;
+> >>+}
+> >>+#endif
+> >>  void __init init_cpu_topology(void)
+> >>  {
+> >>@@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
+> >>  	 * Discard anything that was parsed if we hit an error so we
+> >>  	 * don't use partial information.
+> >>  	 */
+> >>-	if (of_have_populated_dt() && parse_dt_topology())
+> >>+	if ((!acpi_disabled) && parse_acpi_topology())
+> >>+		reset_cpu_topology();
+> >>+	else if (of_have_populated_dt() && parse_dt_topology())
+> >>  		reset_cpu_topology();
+> >>  }
+> >>
+> >
+> 
