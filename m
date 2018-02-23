@@ -1,21 +1,57 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 23 Feb 2018 17:24:12 +0530
-Subject: [PATCH v2 2/2] ARM: davinci_all_defconfig: enable
- SYSCON_REBOOT_MODE
-In-Reply-To: <1515724191-30499-3-git-send-email-david@lechnology.com>
-References: <1515724191-30499-1-git-send-email-david@lechnology.com>
- <1515724191-30499-3-git-send-email-david@lechnology.com>
-Message-ID: <ce54ca3f-2bef-8001-19d9-6e493f92fed9@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Feb 2018 13:02:44 +0100
+Subject: [PATCH 6/6] arm64: dts: renesas: r8a77965: Add #interrupt-cells
+ property
+In-Reply-To: <20180223100607.GO7203@w540>
+References: <1519326370-15805-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519326370-15805-7-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdUSS_kFU+Zg40UHvtJ=PteftQW_tvViAr-d4r+jmVNfNQ@mail.gmail.com>
+ <20180223100607.GO7203@w540>
+Message-ID: <20180223120244.ftzw72a3a6w45pi3@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 January 2018 07:59 AM, David Lechner wrote:
-> This enables SYSCON_REBOOT_MODE as a module. This is used by LEGO
-> MINDSTORMS EV3 to reboot into a special firmware update mode.
+On Fri, Feb 23, 2018 at 11:06:07AM +0100, jacopo mondi wrote:
+> Hi Geert,
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> On Fri, Feb 23, 2018 at 10:27:16AM +0100, Geert Uytterhoeven wrote:
+> > On Thu, Feb 22, 2018 at 8:06 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> > > Add "#interrupt-cells" property and "interrupt-controller" label to
+> > > "interrupt-controller at e61c0000" device node.
+> > >
+> > > This silences the following DTC compiler warnings:
+> > > Warning (interrupts_property): Missing interrupt-controller or
+> > > interrupt-map property in /soc/interrupt-controller at e61c0000
+> > > Warning (interrupts_property): Missing #interrupt-cells in
+> > > interrupt-parent /soc/interrupt-controller at e61c000
+> > >
+> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > > --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> > > +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> > > @@ -316,6 +316,8 @@
+> > >                 };
+> > >
+> > >                 intc_ex: interrupt-controller at e61c0000 {
+> > > +                       #interrupt-cells = <2>;
+> > > +                       interrupt-controller;
+> > >                         reg = <0 0xe61c0000 0 0x200>;
+> > >                         /* placeholder */
+> >
+> > (bikeshedding) Should the placeholder be at the top of the node?
+> 
+> I would like it more too, but in M3-W dtsi:
+> 
+> 		pciec0: pcie at fe000000 {
+> 			reg = <0 0xfe000000 0 0x80000>;
+> 			/* placeholder */
+> 		};
+> 
+> So I kept using the same style everywhere here.
+> 
+> I can change it everywhere in this series to have placeholder at the
+> beginning of the node definition if you agree with that!
 
-Applied to v4.17/defconfig
-
-Thanks,
-Sekhar
+Either way is fine by me. But if we do change it lets change it everywhere.
