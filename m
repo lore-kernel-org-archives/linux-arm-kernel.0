@@ -1,15 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Feb 2018 10:19:45 +0100
-Subject: [PATCH] arm64: defconfig: enable R8A77965 SoC
-In-Reply-To: <20180223085115.13782-1-horms+renesas@verge.net.au>
-References: <20180223085115.13782-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVsOzXz+pU_7bDaQgs371zozy6Za8eDDiauV8qu03ckmw@mail.gmail.com>
+Date: Fri, 23 Feb 2018 10:20:00 +0100
+Subject: [PATCH] arm64: renesas_defconfig: enable R8A77965 SoC
+In-Reply-To: <20180223085157.13876-1-horms+renesas@verge.net.au>
+References: <20180223085157.13876-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV+4V1wbCrC9jdTR8_BXENkw8djuc1+J8gAahY2TJbsmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Feb 23, 2018 at 9:51 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 defconfig.
+> Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 renesas_defconfig.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
