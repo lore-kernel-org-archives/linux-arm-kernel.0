@@ -1,66 +1,83 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 23 Feb 2018 18:16:28 +0800
-Subject: [PATCH v1 08/19] arm: dts: mt7623: enable three available UARTs on
- bananapi-r2
-In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <f2e72b8c9f5755ee8943dd7be7f9b9ec50f52c9b.1519378872.git.sean.wang@mediatek.com>
+Date: Fri, 23 Feb 2018 18:16:20 +0800
+Subject: [PATCH v1 00/19] refactor dts and add support for more boards
+Message-ID: <cover.1519378871.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-On bpi-r2 board, totally there're four UARTs which we usually called
-uart[0-3] helpful to extend slow-I/O devices. Among those ones, uart2 has
-dedicated pin slot which is used to console log. uart[0-1] appear at the
-40-pins connector and uart3 has no pinout, but just has test points (TP47
-for TX and TP48 for RX, respectively) nearby uart2, but we don't enable
-uart3 in the patch. The missing pinctrl is also being supplemented for
-those newly added devices.
+The series is to refactor current .dts for allowing more boards can properly
+join and reuse almost the same device node definitions.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Before we're doing that, some works about enhancements and fixups are being
+made on the dt-binding document and .dts files. In addition, the series has to
+depend on the patch [1][2]. Otherwise, certain build failure would have an
+occurrence.
 
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 8ef91d6..6b760be 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -470,6 +470,13 @@
- 				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
- 		};
- 	};
-+
-+	uart2_pins_a: uart at 2 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
-+				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
-+		};
-+	};
- };
- 
- &pwm {
-@@ -515,16 +522,18 @@
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--	status = "disabled";
-+	status = "okay";
- };
- 
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_a>;
--	status = "disabled";
-+	status = "okay";
- };
- 
- &uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
- 	status = "okay";
- };
- 
+[1] arm: dts: mt7623: add PCIe related nodes
+http://lists.infradead.org/pipermail/linux-mediatek/2018-February/012053.html
+
+[2] dt-bindings: soc: add header files required for MT7623A SCPSYS dt-binding
+http://lists.infradead.org/pipermail/linux-mediatek/2018-February/011930.html
+
+Sean Wang (19):
+  dt-bindings: pinctrl: mediatek: use - instead of _ in examples
+  dt-bindings: cpufreq: mediatek: use - instead of _ in examples
+  dt-bindings: pinctrl: mediatek: add bindings for I2C2 and SPI2 on
+    MT7623
+  dt-bindings: arm: mediatek: add support for more mt7623 reference
+    boards
+  arm: dts: mt7623: add BTIF, HSDMA and SPI-NOR device nodes
+  arm: dts: mt7623: fix USB initialization fails on bananapi-r2
+  arm: dts: mt7623: fix the regulators mmc should use on bananapi-r2
+  arm: dts: mt7623: enable three available UARTs on bananapi-r2
+  arm: dts: mt7623: add related clock properties to cpu[1-3] nodes
+  arm: dts: mt7623: remove useless property pinctrl-names at node
+    switch at 0
+  arm: dts: mt7623: use - instead of _ in DT node name
+  arm: dts: mt7623: fix all Warnings (unit_address_vs_reg)
+  arm: dts: mt7623: move node mt6323 leds to mt6323.dtsi
+  arm: dts: mt7623: extend common file to unify all boards with MT7623
+    SoCs
+  arm: dts: mt7623: add SPI[1,2], I2C2 and sound related nodes to
+    reference board
+  arm: dts: mt7623: fixup available memory size on bananapi-r2
+  arm: dts: mt7623: add MT7623N reference board with eMMC
+  arm: dts: mt7623: add MT7623A reference boards
+  arm: dts: mediatek: converted to using SPDX identifiers
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   9 +
+ .../bindings/cpufreq/cpufreq-mediatek.txt          |   6 +-
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |   4 +-
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/mt2701-evb.dts                   |   9 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |   9 +-
+ arch/arm/boot/dts/mt6323.dtsi                      |  34 +-
+ arch/arm/boot/dts/mt6580-evbp1.dts                 |   9 +-
+ arch/arm/boot/dts/mt6580.dtsi                      |   9 +-
+ arch/arm/boot/dts/mt6589-aquaris5.dts              |  10 +-
+ arch/arm/boot/dts/mt6589.dtsi                      |  12 +-
+ arch/arm/boot/dts/mt6592-evb.dts                   |   9 +-
+ arch/arm/boot/dts/mt6592.dtsi                      |   9 +-
+ arch/arm/boot/dts/mt7623.dtsi                      |  70 ++-
+ arch/arm/boot/dts/mt7623a-rfb-emmc.dts             |  22 +
+ arch/arm/boot/dts/mt7623a-rfb-nand.dts             |  26 +
+ arch/arm/boot/dts/mt7623a-rfb.dtsi                 |  84 +++
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 462 +--------------
+ arch/arm/boot/dts/mt7623n-rfb-emmc.dts             |  37 ++
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 100 +---
+ arch/arm/boot/dts/mt7623n-rfb.dtsi                 | 652 ++++++++++++++++++++-
+ arch/arm/boot/dts/mt8127-moose.dts                 |   9 +-
+ arch/arm/boot/dts/mt8127.dtsi                      |   9 +-
+ arch/arm/boot/dts/mt8135-evbp1.dts                 |   9 +-
+ arch/arm/boot/dts/mt8135.dtsi                      |   9 +-
+ include/dt-bindings/pinctrl/mt7623-pinfunc.h       |  24 +
+ 26 files changed, 966 insertions(+), 679 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt7623a-rfb-emmc.dts
+ create mode 100644 arch/arm/boot/dts/mt7623a-rfb-nand.dts
+ create mode 100644 arch/arm/boot/dts/mt7623a-rfb.dtsi
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-emmc.dts
+
 -- 
 2.7.4
