@@ -1,62 +1,91 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 23 Feb 2018 12:09:33 +0200
-Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
-In-Reply-To: <20180222233457.GA6052@lunn.ch>
-References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
- <20180222214237.GH28112@lunn.ch>
- <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
- <20180222233457.GA6052@lunn.ch>
-Message-ID: <1519380573.10722.94.camel@linux.intel.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Fri, 23 Feb 2018 11:12:54 +0100
+Subject: [PATCH 0/6] Implement event capture for OMAP (draft)
+Message-ID: <20180223101254.GA5746@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-02-23 at 00:34 +0100, Andrew Lunn wrote:
-> > But: On the 27th block is a large file (1,5kB) without 0 bytes
-> > inside.
-> > The code in qnap_tsx09_find_mac_addr() maps 1kB into memory (not a
-> > whole
-> > file or the whole 384kB) and then calls qnap_tsx09_check_mac_addr()
-> > ->
-> > mac_pton() -> strlen() on this memory block. as there is no 0 byte
-> > in the
-> > file on the 27th block, strlen runs into bad memory and the machine
-> > panics.
-> > The old code had no strlen().
-> 
-> Yes, that sounds look a good explanation. 
-> 
-> > I changed mac_pton() to use strnlen(), and now the panic is gone. I
-> > don't
-> > know why strlen is actually needed in mac_pton. The string is
-> > checked in the
-> > following loop, if there is a zero byte somewhere, the loop will be
-> > returned
-> > immediately. So I think the strlen() superfluous. Is the following
-> > patch
-> > correct?
-> 
-> The patch has been corrupted by you email client. But otherwise, yes.
-> 
-> Please take a look at:
-> 
-> https://www.kernel.org/doc/html/v4.12/process/submitting-patches.html
-> 
-> It will give you hits about correctly formatting the patch. In
-> addition it should have:
-> 
-> Fixes: 4cd5773a2ae6 ("net: core: move mac_pton() to lib/net_utils.c")
-> 
-> before the --- line, to indicate what it is fixing.
-> 
-> This patch should be against
-> git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git,
-> since it is a fix, and sent to <netdev@vger.kernel.org>.
+Hi,
 
-Guys, consider this one instead:
-https://patchwork.ozlabs.org/patch/851008/
+this patchset based on next-20180223 first cleans up playground (patches
+1-4 which I'd appreciate to be reviewed and merged eventually) and then
+adds event capture functionality which is just good for doing:
+$ echo 0 > /sys/class/pwm/pwmchip4/export
+$ cat /sys/class/pwm/pwmchip4/pwm0/capture 
+1000000 500000
+$ cat /sys/class/pwm/pwmchip4/pwm0/capture 
+100000 50000
+$ cat /sys/class/pwm/pwmchip4/pwm0/capture 
+100000 75000
 
+Above measured frequencies are 1kHz and 10kHz with 50% duty cycle,
+the last one is with 75% duty cycle. However with 100kHz it sometimes
+ends with:
+$ cat /sys/class/pwm/pwmchip4/pwm0/capture 
+omap_dm_timer_read_status: timer not available or enabled.
+12462 6231
+
+So locking is probably not done right, therefore patches 5 and 6 are sent
+only for reference, as there's also another fundamental problem:
+
+Hardware can be told to capture both edges, but there's no way to tell it
+which one should be captured first. Other posibility would be first
+configure for rising edge and reconfigure in interrupt for falling one.
+Here we meet latency problem again:
+https://www.spinics.net/lists/linux-omap/msg140081.html
+Attached test patch shows average diff around 150us (sometimes over 300us)
+which pretty much limits maximum measurable frequency.
+
+I tried to misuse PM_QOS_CPU_DMA_LATENCY to overcome latency issue, but
+with no luck.
+
+Ladislav Michl (6):
+  clocksource: timer-ti-dm: Make unexported functions static
+  clocksource: timer-ti-dm: Consolidate set source
+  clocksource: timer-ti-dm: Check prescaler value
+  pwm: pwm-omap-dmtimer: Fix frequency when using prescaler
+  clocksource: timer-ti-dm: Add event capture
+  pwm: pwm-omap-dmtimer: Add capture functionality
+
+ drivers/clocksource/timer-ti-dm.c          | 263 ++++++++++++++++-------------
+ drivers/pwm/pwm-omap-dmtimer.c             | 220 +++++++++++++++++++-----
+ include/clocksource/timer-ti-dm.h          |  33 ----
+ include/linux/platform_data/dmtimer-omap.h |   8 +
+ 4 files changed, 340 insertions(+), 184 deletions(-)
+
+Latency test patch:
+
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 5a2fc0e0a1c5..c1a94740079a 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -46,7 +46,7 @@ struct pwm_omap_dmtimer_chip {
+ 	const struct omap_dm_timer_ops *pdata;
+ 	struct platform_device *dm_timer_pdev;
+ 	unsigned long freq;
+-	unsigned int ev_cnt, overflow, width;
++	unsigned int ev_cnt, overflow, width, counter_irq, counter_captured;
+ };
+ 
+ static inline struct pwm_omap_dmtimer_chip *
+@@ -280,6 +280,8 @@ static int pwm_omap_dmtimer_capture(struct pwm_chip *chip,
+ 		omap->ev_cnt = omap->width = 0;
+ 		spin_unlock_irqrestore(&omap->lock, flags);
+ 
++		printk("diff: %d\n", pwm_omap_dmtimer_ticks_to_ns(omap, omap->counter_irq - omap->counter_captured));
++
+ 		res = wait_event_interruptible_timeout(omap->wait,
+ 						       omap->width > 0,
+ 						       timeout);
+@@ -317,6 +319,8 @@ static irqreturn_t pwm_omap_dmtimer_irq(int irq, void *dev_id)
+ 	if (l & OMAP_TIMER_INT_CAPTURE) {
+ 		if (!omap->width && omap->ev_cnt == 1) {
+ 			omap->pdata->read_capture(omap->dm_timer, &c1, &c2);
++			omap->counter_irq = omap->pdata->read_counter(omap->dm_timer);
++			omap->counter_captured = c2;
+ 			omap->width = pwm_omap_dmtimer_get_width(omap, c1, c2);
+ 			wake_up(&omap->wait);
+ 		}
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.16.1
