@@ -1,55 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Feb 2018 18:06:59 +0000
-Subject: [PATCH] arm64: mm: fix thinko in non-global page table attribute
- check
-In-Reply-To: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
-References: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_YvEf4isLfAnk9jLV+2RY5O5DS29_Dx_v=gOk-4qpq2w@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 23 Feb 2018 19:07:54 +0100
+Subject: [PATCH 01/11] ACPI / APEI: Move the estatus queue code up, and
+ under its own ifdef
+In-Reply-To: <5A90572D.9010704@arm.com>
+References: <20180215185606.26736-1-james.morse@arm.com>
+ <20180215185606.26736-2-james.morse@arm.com>
+ <20180220192852.GB24320@pd.tnic> <5A90572D.9010704@arm.com>
+Message-ID: <20180223180754.GI4981@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(corrected Nicolas's email address - beware when replying)
+On Fri, Feb 23, 2018 at 06:02:21PM +0000, James Morse wrote:
+> Sure. I reckon your English grammar is better than mine, is this better?:
 
-On 23 February 2018 at 18:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The routine pgattr_change_is_safe() was extended in commit 4e6020565596
-> ("arm64: mm: Permit transitioning from Global to Non-Global without BBM")
-> to permit changing the nG attribute from not set to set, but did so in a
-> way that inadvertently disallows such changes if other permitted attribute
-> changes take place at the same time. So update the code to take this into
-> account.
->
-> Fixes: 4e6020565596 ("arm64: mm: Permit transitioning from Global to ...")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/mmu.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 451f96f3377c..5bdc2c4db9ad 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
->          * The following mapping attributes may be updated in live
->          * kernel mappings without the need for break-before-make.
->          */
-> -       static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
-> +       static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE | PTE_NG;
->
->         /* creating or taking down mappings is always safe */
->         if (old == 0 || new == 0)
-> @@ -117,9 +117,9 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
->         if ((old | new) & PTE_CONT)
->                 return false;
->
-> -       /* Transitioning from Global to Non-Global is safe */
-> -       if (((old ^ new) == PTE_NG) && (new & PTE_NG))
-> -               return true;
-> +       /* Transitioning from Non-Global to Global is unsafe */
-> +       if (old & ~new & PTE_NG)
-> +               return false;
->
->         return ((old ^ new) & ~mask) == 0;
->  }
-> --
-> 2.11.0
->
+Bah, you must be joking :-)
+
+> | In any NMI-like handler, memory from ghes_estatus_pool is used to save
+> | estatus, and added to the ghes_estatus_llist. irq_work_queue() causes
+> | ghes_proc_in_irq() to run in IRQ context where each estatus in
+> | ghes_estatus_llist are processed. Each NMI-like error source must grow
+
+s/are/is/ reads better to me, for some reason :)
+
+> | the ghes_estatus_pool to ensure memory is available.
+
+Other than that, yap, much better!
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
