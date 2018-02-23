@@ -1,110 +1,164 @@
-From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
-Date: Fri, 23 Feb 2018 18:37:04 +0100
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
-References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
-Message-ID: <CAFvLkMTzaFODziZC3fFGYu+F=RuMBx5tFgA1q2UFSk4KyfuU5A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Feb 2018 18:02:53 +0100
+Subject: [RFC PATCH 0.9/2] arm64: fpsimd: Expose CPU / FPSIMD state
+ association helpers
+In-Reply-To: <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
+References: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
+ <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180223170253.GA7396@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't fully get it to be honest. If interrupt is pending it must
-have been enabled (unmasked) and requires to be handled acked. It will
-be acked by irq_chip.irq_ack handler within the edge handler.
-Therefore this additional acking is meaningless.
+On Fri, Feb 16, 2018 at 06:39:30PM +0000, Dave Martin wrote:
+> Oops, forgot to post this patch that goes before patch 1 in the series.
+> 
+> --8<--
+> 
+> Expose an interface for associating an FPSIMD context with a CPU and
+> checking the association, for use by KVM.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/asm/fpsimd.h |  5 +++++
+>  arch/arm64/kernel/fpsimd.c      | 42 +++++++++++++++++++++++++++++------------
+>  2 files changed, 35 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index 8857a0f..f4ce4d6 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -23,6 +23,7 @@
+>  
+>  #include <linux/cache.h>
+>  #include <linux/stddef.h>
+> +#include <linux/types.h>
+>  
+>  /*
+>   * FP/SIMD storage area has:
+> @@ -62,6 +63,8 @@ struct fpsimd_state {
+>  
+>  struct task_struct;
+>  
+> +extern bool fpsimd_foreign_fpstate(struct fpsimd_state const *state);
+> +
+>  extern void fpsimd_save_state(struct fpsimd_state *state);
+>  extern void fpsimd_load_state(struct fpsimd_state *state);
+>  
+> @@ -76,6 +79,8 @@ extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
+>  extern void fpsimd_flush_task_state(struct task_struct *target);
+>  extern void sve_flush_cpu_state(void);
+>  
+> +extern void fpsimd_bind_state_to_cpu(struct fpsimd_state *state);
+> +
+>  /* Maximum VL that SVE VL-agnostic software can transparently support */
+>  #define SVE_VL_ARCH_MAX 0x100
+>  
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index e7226c4..138efaf 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -38,6 +38,7 @@
+>  #include <linux/signal.h>
+>  #include <linux/slab.h>
+>  #include <linux/sysctl.h>
+> +#include <linux/types.h>
+>  
+>  #include <asm/fpsimd.h>
+>  #include <asm/cputype.h>
+> @@ -121,6 +122,14 @@ struct fpsimd_last_state_struct {
+>  
+>  static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+>  
+> +bool fpsimd_foreign_fpstate(struct fpsimd_state const *st)
+> +{
+> +	WARN_ON(!in_softirq() && !irqs_disabled());
+> +
+> +	return st->cpu != smp_processor_id() ||
+> +		st != __this_cpu_read(fpsimd_last_state.st);
+> +}
+> +
+>  /* Default VL for tasks that don't set it explicitly: */
+>  static int sve_default_vl = -1;
+>  
+> @@ -908,13 +917,10 @@ void fpsimd_thread_switch(struct task_struct *next)
+>  		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+>  		 * upon the next return to userland.
+>  		 */
+> -		struct fpsimd_state *st = &next->thread.fpsimd_state;
+> -
+> -		if (__this_cpu_read(fpsimd_last_state.st) == st
+> -		    && st->cpu == smp_processor_id())
+> -			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+> -		else
+> +		if (fpsimd_foreign_fpstate(&current->thread.fpsimd_state))
+>  			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+> +		else
+> +			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+>  	}
+>  }
+>  
+> @@ -996,19 +1002,31 @@ void fpsimd_signal_preserve_current_state(void)
+>  		sve_to_fpsimd(current);
+>  }
+>  
+> +static void __fpsimd_bind_to_cpu(struct fpsimd_last_state_struct *last,
+> +				 struct fpsimd_state *st)
+> +{
+> +	WARN_ON(!in_softirq() || !irqs_disabled());
 
-2018-02-23 16:46 GMT+01:00 Ludovic BARRE <ludovic.barre@st.com>:
-> hi Radoslaw
->
-> The gpio-keys tests it's now functional on H7, great.
-> However the gpio-key test only the bank1 (like stm32f429).
-> Like the H7 introduce the multi-bank management,
-> we must perform complementary test.
->
-> comment below about ack in handler
->
->
-> On 02/23/2018 09:31 AM, Radoslaw Pietrzyk wrote:
->>
->> - discards setting handle_simple_irq handler for hierarchy interrupts
->> - removes acking in chained irq handler as this is done by
->> irq_chip itself inside handle_edge_irq
->> - removes unneeded irq_domain_ops.xlate callback
->>
->> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->> ---
->>   drivers/irqchip/irq-stm32-exti.c | 13 -------------
->>   1 file changed, 13 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-stm32-exti.c
->> b/drivers/irqchip/irq-stm32-exti.c
->> index 36f0fbe..8013a87 100644
->> --- a/drivers/irqchip/irq-stm32-exti.c
->> +++ b/drivers/irqchip/irq-stm32-exti.c
->> @@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct
->> irq_chip_generic *gc)
->>         return irq_reg_readl(gc, stm32_bank->pr_ofst);
->>   }
->>   -static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
->> -{
->> -       const struct stm32_exti_bank *stm32_bank = gc->private;
->> -
->> -       irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
->> -}
->> -
->>   static void stm32_irq_handler(struct irq_desc *desc)
->>   {
->>         struct irq_domain *domain = irq_desc_get_handler_data(desc);
->> @@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
->>                         for_each_set_bit(n, &pending, IRQS_PER_BANK) {
->>                                 virq = irq_find_mapping(domain, irq_base +
->> n);
->>                                 generic_handle_irq(virq);
->> -                               stm32_exti_irq_ack(gc, BIT(n));
->
->
-> the while loop " while ((pending = " has been introduce while original
-> upstream of this driver in V2 to V3
-> https://patchwork.ozlabs.org/patch/604190/
-> https://patchwork.ozlabs.org/patch/665242/
->
-> the "ack" is needed to acknowledge the irq which are handled and which is
-> not the original irq for which we enter.
->
->>                         }
->>                 }
->>         }
->> @@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data *data,
->> unsigned int on)
->>   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
->>                             unsigned int nr_irqs, void *data)
->>   {
->> -       struct irq_chip_generic *gc;
->>         struct irq_fwspec *fwspec = data;
->>         irq_hw_number_t hwirq;
->>         hwirq = fwspec->param[0];
->> -       gc = irq_get_domain_generic_chip(d, hwirq);
->>         irq_map_generic_chip(d, virq, hwirq);
->> -       irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
->> -                           handle_simple_irq, NULL, NULL);
->
->
-> I see if it is not disturb the multi-bank.
->
->>         return 0;
->>   }
->> @@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d,
->> unsigned int virq,
->>     struct irq_domain_ops irq_exti_domain_ops = {
->>         .map    = irq_map_generic_chip,
->> -       .xlate  = irq_domain_xlate_onetwocell,
->>         .alloc  = stm32_exti_alloc,
->>         .free   = stm32_exti_free,
->>   };
->>
->
-> BR
-> Ludo
+You meant && here, right?
+
+Currently this makes my box explode.
+
+Thanks,
+-Christoffer
+
+> +
+> +	last->st = st;
+> +	st->cpu = smp_processor_id();
+> +}
+> +
+> +void fpsimd_bind_state_to_cpu(struct fpsimd_state *st)
+> +{
+> +	__fpsimd_bind_to_cpu(this_cpu_ptr(&fpsimd_last_state), st);
+> +}
+> +
+>  /*
+>   * Associate current's FPSIMD context with this cpu
+>   * Preemption must be disabled when calling this function.
+>   */
+> -static void fpsimd_bind_to_cpu(void)
+> +static void fpsimd_bind_task_to_cpu(void)
+>  {
+>  	struct fpsimd_last_state_struct *last =
+>  		this_cpu_ptr(&fpsimd_last_state);
+> -	struct fpsimd_state *st = &current->thread.fpsimd_state;
+>  
+> -	last->st = st;
+> +	__fpsimd_bind_to_cpu(last, &current->thread.fpsimd_state);
+>  	last->sve_in_use = test_thread_flag(TIF_SVE);
+> -	st->cpu = smp_processor_id();
+>  }
+>  
+>  /*
+> @@ -1025,7 +1043,7 @@ void fpsimd_restore_current_state(void)
+>  
+>  	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>  		task_fpsimd_load();
+> -		fpsimd_bind_to_cpu();
+> +		fpsimd_bind_task_to_cpu();
+>  	}
+>  
+>  	local_bh_enable();
+> @@ -1050,7 +1068,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+>  	task_fpsimd_load();
+>  
+>  	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
+> -		fpsimd_bind_to_cpu();
+> +		fpsimd_bind_task_to_cpu();
+>  
+>  	local_bh_enable();
+>  }
+> -- 
+> 2.1.4
+> 
