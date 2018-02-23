@@ -1,73 +1,114 @@
-From: radoslaw.pietrzyk@gmail.com (Radoslaw Pietrzyk)
-Date: Fri, 23 Feb 2018 09:31:44 +0100
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
+From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
+Date: Fri, 23 Feb 2018 09:34:12 +0100
+Subject: [1/2] ARM: irqchip: stm32: Optimizes and cleans up stm32-exti
  irq_domain
-In-Reply-To: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
-References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
-Message-ID: <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+In-Reply-To: <CAFvLkMSa5rQUS7xboNFZO_0x0unPmd6JKyROCjv4L-KgXbXzWg@mail.gmail.com>
+References: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <d007f880-0509-e30c-4c28-94117d2f8037@st.com>
+ <CAFvLkMSa5rQUS7xboNFZO_0x0unPmd6JKyROCjv4L-KgXbXzWg@mail.gmail.com>
+Message-ID: <CAFvLkMT9YpzTRoN8f3NCpH_qGeDzyDcvZLeWpOoDL1xqje+VaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- discards setting handle_simple_irq handler for hierarchy interrupts
-- removes acking in chained irq handler as this is done by
-irq_chip itself inside handle_edge_irq
-- removes unneeded irq_domain_ops.xlate callback
+Hi Ludovic,
+Please check latest v2 patches series and let me know if it works on
+stm32h7 as it does on stm32f4
 
-Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
----
- drivers/irqchip/irq-stm32-exti.c | 13 -------------
- 1 file changed, 13 deletions(-)
-
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 36f0fbe..8013a87 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
- 	return irq_reg_readl(gc, stm32_bank->pr_ofst);
- }
- 
--static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
--{
--	const struct stm32_exti_bank *stm32_bank = gc->private;
--
--	irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
--}
--
- static void stm32_irq_handler(struct irq_desc *desc)
- {
- 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
-@@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
- 			for_each_set_bit(n, &pending, IRQS_PER_BANK) {
- 				virq = irq_find_mapping(domain, irq_base + n);
- 				generic_handle_irq(virq);
--				stm32_exti_irq_ack(gc, BIT(n));
- 			}
- 		}
- 	}
-@@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
- static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
- 			    unsigned int nr_irqs, void *data)
- {
--	struct irq_chip_generic *gc;
- 	struct irq_fwspec *fwspec = data;
- 	irq_hw_number_t hwirq;
- 
- 	hwirq = fwspec->param[0];
--	gc = irq_get_domain_generic_chip(d, hwirq);
- 
- 	irq_map_generic_chip(d, virq, hwirq);
--	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
--			    handle_simple_irq, NULL, NULL);
- 
- 	return 0;
- }
-@@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
- 
- struct irq_domain_ops irq_exti_domain_ops = {
- 	.map	= irq_map_generic_chip,
--	.xlate	= irq_domain_xlate_onetwocell,
- 	.alloc  = stm32_exti_alloc,
- 	.free	= stm32_exti_free,
- };
--- 
-1.9.1
+2018-02-22 12:01 GMT+01:00 Rados?aw Pietrzyk <radoslaw.pietrzyk@gmail.com>:
+> Hi Ludovic,
+> I have tested on stm32f429-disco and it works without a problem.
+> handle_edge_irq is not used in current implementation because it is
+> substituted by handle_simple_irq in an alloc callback either way which
+> causes that irq_ack callback is not invoked as well (acking is done in
+> chained handler).
+>
+> 2018-02-22 11:55 GMT+01:00 Ludovic BARRE <ludovic.barre@st.com>:
+>> Hi Radek
+>>
+>> I've tested your change on stm32h743i-eval.dts board
+>> and gpio-keys tests are not functional.
+>> No interrupt occurs when we push or release button
+>> (cat /proc/interrupt).
+>>
+>> Board: stm32h743i-eval.dts
+>> Test description: gpio-keys (gpioc 13 => exti 13), with gpio or interrupt
+>> property.
+>>
+>> comment below
+>>
+>>
+>> On 02/21/2018 02:50 PM, radek wrote:
+>>>
+>>> - allocates generic chip with handle_simple_irq
+>>>         which simplifies irq_domain_ops.alloc callback
+>>>         - removes ack register from generic chip which is not used for
+>>>         handle_simple_irq as acking is done in a chained handler
+>>>         - removes unneeded irq_domain_ops.xlate callback
+>>>
+>>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>>> ---
+>>>   drivers/irqchip/irq-stm32-exti.c | 10 +---------
+>>>   1 file changed, 1 insertion(+), 9 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-stm32-exti.c
+>>> b/drivers/irqchip/irq-stm32-exti.c
+>>> index 36f0fbe..42e74e3 100644
+>>> --- a/drivers/irqchip/irq-stm32-exti.c
+>>> +++ b/drivers/irqchip/irq-stm32-exti.c
+>>> @@ -176,16 +176,12 @@ static int stm32_irq_set_wake(struct irq_data *data,
+>>> unsigned int on)
+>>>   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
+>>>                             unsigned int nr_irqs, void *data)
+>>>   {
+>>> -       struct irq_chip_generic *gc;
+>>>         struct irq_fwspec *fwspec = data;
+>>>         irq_hw_number_t hwirq;
+>>>         hwirq = fwspec->param[0];
+>>> -       gc = irq_get_domain_generic_chip(d, hwirq);
+>>>         irq_map_generic_chip(d, virq, hwirq);
+>>> -       irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
+>>> -                           handle_simple_irq, NULL, NULL);
+>>>         return 0;
+>>>   }
+>>> @@ -200,7 +196,6 @@ static void stm32_exti_free(struct irq_domain *d,
+>>> unsigned int virq,
+>>>     struct irq_domain_ops irq_exti_domain_ops = {
+>>>         .map    = irq_map_generic_chip,
+>>> -       .xlate  = irq_domain_xlate_onetwocell,
+>>>         .alloc  = stm32_exti_alloc,
+>>>         .free   = stm32_exti_free,
+>>>   };
+>>> @@ -231,7 +226,7 @@ __init stm32_exti_init(const struct stm32_exti_bank
+>>> **stm32_exti_banks,
+>>>         }
+>>>         ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1,
+>>> "exti",
+>>> -                                            handle_edge_irq, clr, 0, 0);
+>>> +                                            handle_simple_irq, clr, 0,
+>>> 0);
+>>
+>>
+>> EXTI hardware block is trigged on pulse event rising or failing edge.
+>> Why do you change to handle_simple_irq ?
+>>
+>>>         if (ret) {
+>>>                 pr_err("%pOF: Could not allocate generic interrupt
+>>> chip.\n",
+>>>                         node);
+>>> @@ -246,13 +241,10 @@ __init stm32_exti_init(const struct stm32_exti_bank
+>>> **stm32_exti_banks,
+>>>                 gc->reg_base = base;
+>>>                 gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
+>>> -               gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
+>>>                 gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
+>>>                 gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
+>>>                 gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
+>>>                 gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
+>>> -               gc->chip_types->regs.ack = stm32_bank->pr_ofst;
+>>> -               gc->chip_types->regs.mask = stm32_bank->imr_ofst;
+>>>                 gc->private = (void *)stm32_bank;
+>>>                 /* Determine number of irqs supported */
+>>>
+>>
+>> BR
+>> Ludo
