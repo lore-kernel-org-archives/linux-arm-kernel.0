@@ -1,44 +1,66 @@
-From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
-Date: Fri, 23 Feb 2018 10:05:35 +0100
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
-References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
-Message-ID: <CAFvLkMQzj51vgQrFvqDkTtGgT2mrXf4xekLewZ71owWai-_nMA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 23 Feb 2018 10:19:21 +0100
+Subject: [PATCH 1/6] arm64: dts: renesas: r8a77965: Add "reg" properties
+In-Reply-To: <1519326370-15805-2-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519326370-15805-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519326370-15805-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdWGYpeOMJQKcT8=wm1YzQoB+vpK5H99Kg_pJ_HeBUw8Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think the HW is fairly simple and straightforward comparing to other
-irq chips so it's rather a logic that concerned me the most i.e. why
-gpio irqs were handled in a "simple" manner whereas the rest of
-interrupts in "edge" manner. According to specification all interrupts
-are edge driven and that's how are they treated in set_type callback.
-First I thought that all can be handled as simple but then I realized
-it makes more sense in handling all of them as edge as they should
-according to specification. I will prepare a v3 series with more
-detailed explanation in it.
+Hi Jacopo,
 
-2018-02-23 9:42 GMT+01:00 Thomas Gleixner <tglx@linutronix.de>:
-> Radoslaw,
+On Thu, Feb 22, 2018 at 8:06 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Add "reg" properties to place-holder nodes with unit address defined for
+> R-Car M3-N SoC.
 >
-> On Fri, 23 Feb 2018, Radoslaw Pietrzyk wrote:
+> This silences the following DTC compiler warning:
+> Warning (unit_address_vs_reg): Node /soc/... has a unit name,
+> but no reg property
 >
->> - discards setting handle_simple_irq handler for hierarchy interrupts
->> - removes acking in chained irq handler as this is done by
->> irq_chip itself inside handle_edge_irq
->> - removes unneeded irq_domain_ops.xlate callback
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+
+A few minor nits below...
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+
+> @@ -520,130 +521,163 @@
+>                 };
 >
-> if that's all functionally correct, then this is a nice cleanup. Though
-> from the above changelog its hard to tell because it merily tells WHAT the
-> patch does, but not WHY. The WHY is the important information for a
-> reviewer who is not familiar with the particular piece of code/hardware.
+>                 avb: ethernet at e6800000 {
+> +                       reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+
+The first reg part would be sufficient for a placeholder.
+I think even setting the size to zero would work...
+
+>                 du: display at feb00000 {
+> +                       reg = <0 0xfeb00000 0 0x70000>,
+
+Unlike M3-W, the M3-N DU has a third channel, so the size is too small.
+
+> +                             <0 0xfeb90000 0 0x14>;
+>                         /* placeholder */
+
+> @@ -703,38 +745,47 @@
+>                 };
 >
-> Can you please amend the changelog with proper explanations why a
-> particular piece of code is not needed or has to be changed to something
-> else?
->
-> Thanks,
->
->         tglx
+>                 usb2_phy1: usb-phy at ee0a0200 {
+> +                       reg = <0 0xee0a0200 0 0x700>;
+>                         /* placeholder */
+>                 };
+
+To be moved up, next to the other usb2 devices?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
