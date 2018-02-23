@@ -1,63 +1,91 @@
-From: adobriyan@gmail.com (Alexey Dobriyan)
-Date: Fri, 23 Feb 2018 21:20:06 +0300
-Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
-In-Reply-To: <1519399128.10722.111.camel@linux.intel.com>
-References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
- <20180222214237.GH28112@lunn.ch>
- <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
- <20180222233457.GA6052@lunn.ch>
- <1519380573.10722.94.camel@linux.intel.com>
- <20180223150147.GA17857@lunn.ch>
- <1519399128.10722.111.camel@linux.intel.com>
-Message-ID: <20180223182006.GA2116@avx2>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 23 Feb 2018 18:21:31 +0000
+Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
+ add/remove and notify code
+In-Reply-To: <87sh9vzfdn.fsf@e105922-lin.cambridge.arm.com>
+References: <20180215185606.26736-1-james.morse@arm.com>	<20180215185606.26736-3-james.morse@arm.com>
+ <87sh9vzfdn.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <5A905BAB.2060007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 05:18:48PM +0200, Andy Shevchenko wrote:
-> +Cc Alexey
-> 
-> On Fri, 2018-02-23 at 16:01 +0100, Andrew Lunn wrote:
-> > > > The patch has been corrupted by you email client. But otherwise,
-> > > > yes.
-> > > > 
-> > > > Please take a look at:
-> > > > 
-> > > > https://www.kernel.org/doc/html/v4.12/process/submitting-patches.h
-> > > > tml
-> > > > 
-> > > > It will give you hits about correctly formatting the patch. In
-> > > > addition it should have:
-> > > > 
-> > > > Fixes: 4cd5773a2ae6 ("net: core: move mac_pton() to
-> > > > lib/net_utils.c")
-> > > > 
-> > > > before the --- line, to indicate what it is fixing.
-> > > > 
-> > > > This patch should be against
-> > > > git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git,
-> > > > since it is a fix, and sent to <netdev@vger.kernel.org>.
-> > > 
-> > > Guys, consider this one instead:
-> > > https://patchwork.ozlabs.org/patch/851008/
-> > 
-> > Hi Andy
-> > 
-> > Thanks for pointing this patch out.
-> > 
-> > What is the advantage of doing to the strnlen()? As Stefan says, the
-> > code which follows will detect a short string, in that a NULL is not
-> > in [0-9a-f], nor a : .
-> 
-> I'm not sure, but my understanding is that, the strchr() call in the
-> original code or isxdigit() in the follow up change will trash a cache a
-> bit. Besides that some of the users are (often?) supplying empty strings
-> to convert from, and in this case makes sense to bail out fast.
-> 
-> Alexey, can you shed a light here?
+Hi Punit,
 
-I went for the simplest code.
-map_pton() is never on the fastpath, so code size matters more.
+On 20/02/18 18:26, Punit Agrawal wrote:
+> James Morse <james.morse@arm.com> writes:
+> 
+>> To support asynchronous NMI-like notifications on arm64 we need to use
+>> the estatus-queue. These patches refactor it to allow multiple APEI
+>> notification types to use it.
+>>
+>> Refactor the estatus queue's pool grow/shrink code and notification
+>> routine from NOTIFY_NMI's handlers. This will allow another notification
+>> method to use the estatus queue without duplicating this code.
+>>
+>> This patch adds rcu_read_lock()/rcu_read_unlock() around the list
+>> list_for_each_entry_rcu() walker. These aren't strictly necessary as
+>> the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
+>> critical section.
+>>
+>> Keep the oops_begin() call for x86, arm64 doesn't have one of these,
+>> and APEI is the only thing outside arch code calling this..
+>>
+>> The existing ghes_estatus_pool_shrink() is folded into the new
+>> ghes_estatus_queue_shrink_pool() as only the queue uses it.
+>>
+>> _in_nmi_notify_one() is separate from the rcu-list walker for a later
+>> caller that doesn't need to walk a list.
 
-In this sense, conversion to mac_pton() should be done, and strnlen()
-probably should not.
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index e42b587c509b..d3cc5bd5b496 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -749,6 +749,54 @@ static void __process_error(struct ghes *ghes)
+>>  #endif
+>>  }
+>>  
+>> +static int _in_nmi_notify_one(struct ghes *ghes)
+>> +{
+>> +	int sev;
+>> +	int ret = -ENOENT;
+> 
+> If ret is initialised to 0 ...
+> 
+>> +
+>> +	if (ghes_read_estatus(ghes, 1)) {
+>> +		ghes_clear_estatus(ghes);
+>> +		return ret;
+> 
+> and return -ENOENT here...
+> 
+>> +	} else {
+>> +		ret = 0;
+>> +	}
+> 
+> ... then the else block can be dropped.
+
+
+Good point, this happened because I was trying to keep the same shape as the
+existing notify_nmi() code as far as possible.
+
+
+>> +
+>> +	sev = ghes_severity(ghes->estatus->error_severity);
+>> +	if (sev >= GHES_SEV_PANIC) {
+>> +#ifdef CONFIG_X86
+>> +		oops_begin();
+>> +#endif
+> 
+> Can you use IS_ENABLED() here as well?
+
+I didn't think that would build without an empty declaration for arm64, I
+assumed it would generate an implicit-declaration-of warning. But, I've tried
+it, and evidently today's toolchain does dead-code elimination before generating
+implicit-declaration-of warnings...
+I'd prefer to leave this (ugly as it is), to avoid warnings on a different
+version of the compiler.
+
+
+Thanks,
+
+James
