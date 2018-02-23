@@ -1,58 +1,44 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 23 Feb 2018 13:09:20 -0800
-Subject: [PATCH 1/4] ARM: Allow this header to be included by assembly files
+Date: Fri, 23 Feb 2018 13:09:21 -0800
+Subject: [PATCH 2/4] ARM: add Broadcom Brahma-B53 main ID definition
 In-Reply-To: <20180223210923.544-1-f.fainelli@gmail.com>
 References: <20180223210923.544-1-f.fainelli@gmail.com>
-Message-ID: <20180223210923.544-2-f.fainelli@gmail.com>
+Message-ID: <20180223210923.544-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Doug Berger <opendmb@gmail.com>
 
-The constants defined in this file are equally useful in assembly and C
-source files. The arm64 architecture version of this file allows
-inclusion in both assembly and C source files, so this this commit adds
-that capability to the arm architecture version so that the constants
-don't need to be defined in multiple places.
+This commit allows a Broadcom Brahma-B53 core to be detected when executing
+an arm architecture kernel in aarch32 state.
 
 Signed-off-by: Doug Berger <opendmb@gmail.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/include/asm/cputype.h | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/cputype.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..e7632f536633 100644
+index e7632f536633..6d1c7b22faea 100644
 --- a/arch/arm/include/asm/cputype.h
 +++ b/arch/arm/include/asm/cputype.h
-@@ -2,9 +2,6 @@
- #ifndef __ASM_ARM_CPUTYPE_H
- #define __ASM_ARM_CPUTYPE_H
+@@ -59,6 +59,7 @@
+ 	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
  
--#include <linux/stringify.h>
--#include <linux/kernel.h>
--
- #define CPUID_ID	0
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
-@@ -98,6 +95,11 @@
- /* Qualcomm implemented cores */
- #define ARM_CPU_PART_SCORPION		0x510002d0
+ #define ARM_CPU_IMP_ARM			0x41
++#define ARM_CPU_IMP_BRCM		0x42
+ #define ARM_CPU_IMP_DEC			0x44
+ #define ARM_CPU_IMP_INTEL		0x69
  
-+#ifndef __ASSEMBLY__
+@@ -76,6 +77,9 @@
+ #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
+ #define ARM_CPU_PART_MASK		0xff00fff0
+ 
++/* Broadcom implemented processors */
++#define ARM_CPU_PART_BRAHMA_B53		0x42001000
 +
-+#include <linux/stringify.h>
-+#include <linux/kernel.h>
-+
- extern unsigned int processor_id;
+ /* DEC implemented cores */
+ #define ARM_CPU_PART_SA1100		0x4400a110
  
- #ifdef CONFIG_CPU_CP15
-@@ -326,4 +328,6 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
- #define cpuid_feature_extract(reg, field) \
- 	cpuid_feature_extract_field(read_cpuid_ext(reg), field)
- 
-+#endif /* __ASSEMBLY__ */
-+
- #endif
 -- 
 2.14.1
