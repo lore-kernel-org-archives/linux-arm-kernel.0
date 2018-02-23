@@ -1,66 +1,303 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 23 Feb 2018 09:38:40 +0530
-Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
-In-Reply-To: <20180222184541.GB5184@atomide.com>
-References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
- <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
- <20180222105713.GA30885@lenoch> <20180222184541.GB5184@atomide.com>
-Message-ID: <44e7cb7c-aafa-ad10-fc11-6417066fb6e9@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 23 Feb 2018 06:32:42 +0200
+Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180223034652.GM3217@dragon>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-3-l.stach@pengutronix.de>
+ <20180205072438.nxvhlqk54d7firbz@sapphire.tkos.co.il>
+ <1517829046.3175.9.camel@pengutronix.de>
+ <20180223034652.GM3217@dragon>
+Message-ID: <20180223043242.wkrlckws73kwu6xb@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sawn,
 
-
-On Friday 23 February 2018 12:15 AM, Tony Lindgren wrote:
-> * Ladislav Michl <ladis@linux-mips.org> [180222 10:58]:
->> On Thu, Feb 15, 2018 at 11:31:45AM +0530, Keerthy wrote:
->>> Replace architecture specific guard with clocksource guard.
->>>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> Replace architecture specific defines with clocksource
->>
->> This looks like a bit unussual commit log. Also, what about merging
->> it with previous patch?
+On Fri, Feb 23, 2018 at 11:46:53AM +0800, Shawn Guo wrote:
+> On Mon, Feb 05, 2018 at 12:10:46PM +0100, Lucas Stach wrote:
+> > I've pushed a branch with all the MX8M work to:
+> > https://git.pengutronix.de/git/lst/linux mx8-work
 > 
-> I'll just remove that line locally to avoid yet another set
-> of patches being posted :)
+> I have some problem to boot the kernel (and dtb) built from this branch.
+> I'm running an U-Boot from NXP which works fine with NXP kernel for
+> sure.  But using this U-Boot to load your kernel gives me nothing on
+> serial, even if I put 'earlycon=ec_imx6q,0x30860000' on kernel
+> cmdline.  Anything I'm missing here?  Thanks.
 
-Thanks!
+FWIW, I tested these patches on the i.MX8 EVK with the attached defconfig.
 
-> 
->> Btw, I tested whole serie again on the top of today's -next and it is
->> still working fine. What is preventing these patches from being merged?
+Hope this helps,
+baruch
 
-Ladis,
-
-Thanks once again.
-
-
-> 
-> Well I noticed we need a fix for omap1 that I just posted.
-> And patch 4/10 needs the following select for omap16xx that
-> I'll fold in.
-> 
-> I'll push it all to omap-for-v4.17/timer and will merge into
-> my for-next after some more testing. It seems any further
-> patching can be done after move to drivers.
-
-Yes that would be great.
-
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< -----------------
-> --- a/arch/arm/mach-omap1/Kconfig
-> +++ b/arch/arm/mach-omap1/Kconfig
-> @@ -30,6 +30,7 @@ config ARCH_OMAP16XX
->  	bool "OMAP16xx Based System"
->  	select ARCH_OMAP_OTG
->  	select CPU_ARM926T
-> +	select OMAP_DM_TIMER
->  
->  config OMAP_MUX
->  	bool "OMAP multiplexing support"
-> 
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+-------------- next part --------------
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_NO_HZ_IDLE=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_IRQ_TIME_ACCOUNTING=y
+CONFIG_BSD_PROCESS_ACCT=y
+CONFIG_BSD_PROCESS_ACCT_V3=y
+CONFIG_TASKSTATS=y
+CONFIG_TASK_DELAY_ACCT=y
+CONFIG_TASK_XACCT=y
+CONFIG_TASK_IO_ACCOUNTING=y
+# CONFIG_CPU_ISOLATION is not set
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+# CONFIG_UTS_NS is not set
+# CONFIG_IPC_NS is not set
+# CONFIG_PID_NS is not set
+# CONFIG_NET_NS is not set
+CONFIG_BLK_DEV_INITRD=y
+# CONFIG_RD_BZIP2 is not set
+# CONFIG_RD_LZMA is not set
+# CONFIG_RD_XZ is not set
+# CONFIG_RD_LZO is not set
+# CONFIG_RD_LZ4 is not set
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_KALLSYMS_ALL=y
+# CONFIG_COMPAT_BRK is not set
+CONFIG_PROFILING=y
+CONFIG_JUMP_LABEL=y
+CONFIG_BLK_DEV_INTEGRITY=y
+# CONFIG_IOSCHED_DEADLINE is not set
+CONFIG_ARCH_MXC=y
+CONFIG_PCI=y
+CONFIG_PCIEPORTBUS=y
+CONFIG_PCI_HOST_GENERIC=y
+CONFIG_ARM64_VA_BITS_48=y
+CONFIG_SCHED_MC=y
+CONFIG_PREEMPT=y
+CONFIG_KSM=y
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_CMA=y
+# CONFIG_ARM64_SVE is not set
+# CONFIG_EFI is not set
+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+CONFIG_COMPAT=y
+CONFIG_HIBERNATION=y
+CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+CONFIG_CPU_FREQ=y
+CONFIG_CPUFREQ_DT=y
+CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_MULTICAST=y
+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+# CONFIG_INET_XFRM_MODE_BEET is not set
+# CONFIG_IPV6 is not set
+CONFIG_NETFILTER=y
+CONFIG_NF_CONNTRACK=y
+CONFIG_NF_CONNTRACK_EVENTS=y
+CONFIG_NETFILTER_XT_TARGET_CHECKSUM=y
+CONFIG_NETFILTER_XT_TARGET_LOG=y
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+CONFIG_NF_CONNTRACK_IPV4=y
+CONFIG_IP_NF_IPTABLES=y
+CONFIG_IP_NF_FILTER=y
+CONFIG_IP_NF_TARGET_REJECT=y
+CONFIG_IP_NF_NAT=y
+CONFIG_IP_NF_TARGET_MASQUERADE=y
+CONFIG_IP_NF_MANGLE=y
+CONFIG_DNS_RESOLVER=y
+# CONFIG_WIRELESS is not set
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_DMA_CMA=y
+CONFIG_BRCMSTB_GISB_ARB=y
+CONFIG_VEXPRESS_CONFIG=y
+CONFIG_BLK_DEV_LOOP=y
+# CONFIG_VEXPRESS_SYSCFG is not set
+CONFIG_SCSI=y
+# CONFIG_SCSI_PROC_FS is not set
+CONFIG_BLK_DEV_SD=y
+CONFIG_SCSI_SAS_LIBSAS=y
+# CONFIG_SCSI_LOWLEVEL is not set
+CONFIG_NETDEVICES=y
+# CONFIG_NET_VENDOR_3COM is not set
+# CONFIG_NET_VENDOR_ADAPTEC is not set
+# CONFIG_NET_VENDOR_AGERE is not set
+# CONFIG_NET_VENDOR_ALACRITECH is not set
+# CONFIG_NET_VENDOR_ALTEON is not set
+# CONFIG_NET_VENDOR_AMAZON is not set
+# CONFIG_NET_VENDOR_AMD is not set
+# CONFIG_NET_VENDOR_AQUANTIA is not set
+# CONFIG_NET_VENDOR_ARC is not set
+# CONFIG_NET_VENDOR_ATHEROS is not set
+# CONFIG_NET_CADENCE is not set
+# CONFIG_NET_VENDOR_BROADCOM is not set
+# CONFIG_NET_VENDOR_BROCADE is not set
+# CONFIG_NET_VENDOR_CAVIUM is not set
+# CONFIG_NET_VENDOR_CHELSIO is not set
+# CONFIG_NET_VENDOR_CISCO is not set
+# CONFIG_NET_VENDOR_DEC is not set
+# CONFIG_NET_VENDOR_DLINK is not set
+# CONFIG_NET_VENDOR_EMULEX is not set
+# CONFIG_NET_VENDOR_EZCHIP is not set
+# CONFIG_NET_VENDOR_EXAR is not set
+CONFIG_FEC=y
+# CONFIG_NET_VENDOR_HISILICON is not set
+# CONFIG_NET_VENDOR_HP is not set
+# CONFIG_NET_VENDOR_HUAWEI is not set
+# CONFIG_NET_VENDOR_INTEL is not set
+# CONFIG_NET_VENDOR_MARVELL is not set
+# CONFIG_NET_VENDOR_MELLANOX is not set
+# CONFIG_NET_VENDOR_MICREL is not set
+# CONFIG_NET_VENDOR_MICROCHIP is not set
+# CONFIG_NET_VENDOR_MYRI is not set
+# CONFIG_NET_VENDOR_NATSEMI is not set
+# CONFIG_NET_VENDOR_NETRONOME is not set
+# CONFIG_NET_VENDOR_NVIDIA is not set
+# CONFIG_NET_VENDOR_OKI is not set
+# CONFIG_NET_PACKET_ENGINE is not set
+# CONFIG_NET_VENDOR_QLOGIC is not set
+# CONFIG_NET_VENDOR_QUALCOMM is not set
+# CONFIG_NET_VENDOR_REALTEK is not set
+# CONFIG_NET_VENDOR_RENESAS is not set
+# CONFIG_NET_VENDOR_RDC is not set
+# CONFIG_NET_VENDOR_ROCKER is not set
+# CONFIG_NET_VENDOR_SAMSUNG is not set
+# CONFIG_NET_VENDOR_SEEQ is not set
+# CONFIG_NET_VENDOR_SILAN is not set
+# CONFIG_NET_VENDOR_SIS is not set
+# CONFIG_NET_VENDOR_SOLARFLARE is not set
+# CONFIG_NET_VENDOR_SMSC is not set
+# CONFIG_NET_VENDOR_STMICRO is not set
+# CONFIG_NET_VENDOR_SUN is not set
+# CONFIG_NET_VENDOR_TEHUTI is not set
+# CONFIG_NET_VENDOR_TI is not set
+# CONFIG_NET_VENDOR_VIA is not set
+# CONFIG_NET_VENDOR_WIZNET is not set
+# CONFIG_NET_VENDOR_SYNOPSYS is not set
+CONFIG_AT803X_PHY=y
+CONFIG_MICREL_PHY=y
+CONFIG_REALTEK_PHY=y
+# CONFIG_USB_NET_DRIVERS is not set
+# CONFIG_WLAN is not set
+CONFIG_INPUT_POLLDEV=y
+CONFIG_INPUT_MATRIXKMAP=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_KEYBOARD_GPIO=y
+CONFIG_INPUT_MISC=y
+# CONFIG_SERIO_SERPORT is not set
+CONFIG_SERIO_AMBAKMI=y
+CONFIG_VT_HW_CONSOLE_BINDING=y
+CONFIG_LEGACY_PTY_COUNT=16
+CONFIG_SERIAL_IMX=y
+CONFIG_SERIAL_IMX_CONSOLE=y
+# CONFIG_HW_RANDOM_CAVIUM is not set
+# CONFIG_DEVPORT is not set
+CONFIG_I2C=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_MUX=y
+CONFIG_I2C_MUX_PCA954x=y
+CONFIG_I2C_IMX=y
+CONFIG_SPI=y
+CONFIG_SPI_SPIDEV=y
+CONFIG_PINCTRL=y
+CONFIG_PINCTRL_IMX8MQ=y
+CONFIG_GPIOLIB=y
+CONFIG_GPIO_SYSFS=y
+CONFIG_GPIO_GENERIC_PLATFORM=y
+CONFIG_THERMAL=y
+CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+CONFIG_CPU_THERMAL=y
+CONFIG_THERMAL_EMULATION=y
+CONFIG_WATCHDOG=y
+CONFIG_IMX2_WDT=y
+CONFIG_MFD_SYSCON=y
+# CONFIG_MFD_VEXPRESS_SYSREG is not set
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_REGULATOR_GPIO=y
+CONFIG_REGULATOR_PFUZE100=y
+# CONFIG_HID_A4TECH is not set
+# CONFIG_HID_APPLE is not set
+# CONFIG_HID_BELKIN is not set
+# CONFIG_HID_CHERRY is not set
+# CONFIG_HID_CHICONY is not set
+# CONFIG_HID_CYPRESS is not set
+# CONFIG_HID_EZKEY is not set
+# CONFIG_HID_ITE is not set
+# CONFIG_HID_KENSINGTON is not set
+# CONFIG_HID_LOGITECH is not set
+# CONFIG_HID_MICROSOFT is not set
+# CONFIG_HID_MONTEREY is not set
+# CONFIG_USB_HID is not set
+CONFIG_USB=y
+# CONFIG_USB_PCI is not set
+CONFIG_USB_OTG=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_XHCI_PLATFORM=y
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_MXC=y
+CONFIG_USB_EHCI_HCD_PLATFORM=y
+CONFIG_USB_STORAGE=y
+CONFIG_NOP_USB_XCEIV=y
+CONFIG_USB_ULPI=y
+CONFIG_MMC=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_ESDHC_IMX=y
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_GPIO=y
+CONFIG_LEDS_PWM=y
+CONFIG_LEDS_SYSCON=y
+CONFIG_LEDS_TRIGGERS=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_LEDS_TRIGGER_CPU=y
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+CONFIG_RTC_CLASS=y
+# CONFIG_COMMON_CLK_XGENE is not set
+CONFIG_ARM_TIMER_SP804=y
+# CONFIG_IOMMU_SUPPORT is not set
+CONFIG_SOC_IMX8MQ=y
+CONFIG_PWM=y
+CONFIG_PWM_IMX=y
+CONFIG_RESET_CONTROLLER=y
+# CONFIG_ARM_PMU is not set
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_FANOTIFY=y
+CONFIG_VFAT_FS=y
+CONFIG_TMPFS=y
+# CONFIG_MISC_FILESYSTEMS is not set
+# CONFIG_NETWORK_FILESYSTEMS is not set
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_PRINTK_TIME=y
+CONFIG_DEBUG_INFO=y
+CONFIG_DEBUG_FS=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_DEBUG_KERNEL=y
+# CONFIG_SCHED_DEBUG is not set
+# CONFIG_DEBUG_PREEMPT is not set
+# CONFIG_FTRACE is not set
+CONFIG_MEMTEST=y
+CONFIG_KEYS=y
+# CONFIG_CRYPTO_ECHAINIV is not set
+CONFIG_CRYPTO_SHA256=y
+# CONFIG_CRYPTO_HW is not set
+CONFIG_ARM64_CRYPTO=y
+CONFIG_CRYPTO_SHA512_ARM64=y
+CONFIG_CRYPTO_SHA1_ARM64_CE=y
+CONFIG_CRYPTO_SHA2_ARM64_CE=y
+CONFIG_CRYPTO_GHASH_ARM64_CE=y
+CONFIG_CRYPTO_CRCT10DIF_ARM64_CE=y
+CONFIG_CRYPTO_CRC32_ARM64_CE=y
+CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+CONFIG_CRYPTO_CHACHA20_NEON=y
+CONFIG_CRYPTO_AES_ARM64_BS=y
+CONFIG_CRC_ITU_T=y
+CONFIG_CRC7=y
