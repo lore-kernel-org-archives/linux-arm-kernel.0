@@ -1,47 +1,78 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 23 Feb 2018 14:38:31 +0100
-Subject: [PATCH v2 3/9] serial: imx: Fix out-of-bounds access through serial
- port index
-In-Reply-To: <1519393117-31998-1-git-send-email-geert+renesas@glider.be>
-References: <1519393117-31998-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1519393117-31998-4-git-send-email-geert+renesas@glider.be>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Fri, 23 Feb 2018 14:37:42 +0100
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+Message-ID: <20180223133742.26044-11-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx_ports[] array is indexed using a value derived from the
-"serialN" alias in DT, or from platform data, which may lead to an
-out-of-bounds access.
+On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
+It should be done by the bootloader but it is currently not the case,
+even for boot CPU because this SoC is booting in secure mode.
+It leads to an random offset value meaning that each CPU will have a
+different time, which isn't working very well.
 
-Fix this by adding a range check.
+Add assembly code used for boot CPU and secondary CPU cores to make
+sure that the CNTVOFF register is initialized.
 
-Fixes: ff05967a07225ab6 ("serial/imx: add of_alias_get_id() reference back")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
-v2:
-  - Fix Fixes reference,
-  - Add blank line,
-  - Use ARRAY_SIZE(),
-  - Update patch description for platform data.
----
- drivers/tty/serial/imx.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.c   |  4 ++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 1d7ca382bc12b238..7c9bdc8e34ac9109 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -2042,6 +2042,12 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	else if (ret < 0)
- 		return ret;
+diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+index d5c97e945e69..605896251927 100644
+--- a/arch/arm/mach-sunxi/headsmp.S
++++ b/arch/arm/mach-sunxi/headsmp.S
+@@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
+ 	first: .word sunxi_mc_smp_first_comer - .
+ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
  
-+	if (sport->port.line >= ARRAY_SIZE(imx_ports)) {
-+		dev_err(&pdev->dev, "serial%d out of range\n",
-+			sport->port.line);
-+		return -EINVAL;
-+	}
++ENTRY(sunxi_init_cntvoff)
++	/*
++	 * CNTVOFF has to be initialized either from non-secure Hypervisor
++	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
++	 * then it should be handled by the secure code
++	 */
++	cps	#MON_MODE
++	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
++	orr	r0, r1, #1
++	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
++	instr_sync
++	mov	r0, #0
++	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
++	instr_sync
++	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
++	instr_sync
++	cps	#SVC_MODE
++	ret	lr
++ENDPROC(sunxi_init_cntvoff)
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(base))
+ #ifdef CONFIG_SMP
+ ENTRY(sunxi_boot)
+ 	bl	sunxi_mc_smp_cluster_cache_enable
++	bl	sunxi_init_cntvoff
+ 	b	secondary_startup
+ ENDPROC(sunxi_boot)
+ 
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 5e9602ce1573..4bb041492b54 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
+ };
+ 
+ extern void __init sun6i_reset_init(void);
++extern void sunxi_init_cntvoff(void);
++
+ static void __init sun6i_timer_init(void)
+ {
++	sunxi_init_cntvoff();
++
+ 	of_clk_init(NULL);
+ 	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
+ 		sun6i_reset_init();
 -- 
-2.7.4
+2.11.0
