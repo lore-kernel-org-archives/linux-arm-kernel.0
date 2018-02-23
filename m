@@ -1,9 +1,9 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 23 Feb 2018 14:36:04 +0100
-Subject: [RESEND PATCH 2/3] pwm: stm32: LPTimer: use 3 cells xlate
+Date: Fri, 23 Feb 2018 14:36:03 +0100
+Subject: [RESEND PATCH 1/3] dt-bindings: pwm-stm32-lp: add #pwm-cells
 In-Reply-To: <1519392965-28235-1-git-send-email-fabrice.gasnier@st.com>
 References: <1519392965-28235-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1519392965-28235-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1519392965-28235-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,22 +14,31 @@ PWM number, period and polarity.
 
 Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/pwm/pwm-stm32-lp.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
-index 1ac9e43..346b7bd 100644
---- a/drivers/pwm/pwm-stm32-lp.c
-+++ b/drivers/pwm/pwm-stm32-lp.c
-@@ -203,6 +203,8 @@ static int stm32_pwm_lp_probe(struct platform_device *pdev)
- 	priv->chip.dev = &pdev->dev;
- 	priv->chip.ops = &stm32_pwm_lp_ops;
- 	priv->chip.npwm = 1;
-+	priv->chip.of_xlate = of_pwm_xlate_with_flags;
-+	priv->chip.of_pwm_n_cells = 3;
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
+index f8338d1..bd23302 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
+@@ -7,6 +7,8 @@ See ../mfd/stm32-lptimer.txt for details about the parent node.
  
- 	ret = pwmchip_add(&priv->chip);
- 	if (ret < 0)
+ Required parameters:
+ - compatible:		Must be "st,stm32-pwm-lp".
++- #pwm-cells:		Should be set to 3. This PWM chip uses the default 3 cells
++			bindings defined in pwm.txt.
+ 
+ Optional properties:
+ - pinctrl-names: 	Set to "default".
+@@ -18,6 +20,7 @@ Example:
+ 		...
+ 		pwm {
+ 			compatible = "st,stm32-pwm-lp";
++			#pwm-cells = <3>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&lppwm1_pins>;
+ 		};
 -- 
 1.9.1
