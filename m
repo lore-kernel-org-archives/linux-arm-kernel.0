@@ -1,169 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Feb 2018 15:53:44 +0530
-Subject: [PATCH V7 05/13] boot_constraint: Add support for clk constraints
-In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
-Message-ID: <dd89f2db943280098b7cec1ef0055520bb3a6858.1519380923.git.viresh.kumar@linaro.org>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 23 Feb 2018 18:16:37 +0800
+Subject: [PATCH v1 17/19] arm: dts: mt7623: add MT7623N reference board with
+ eMMC
+In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+Message-ID: <45572848513719fd4099c0f3564b06743b1be27b.1519378872.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the clk constraint type.
+From: Sean Wang <sean.wang@mediatek.com>
 
-The constraint is set by enabling the clk for the device. Once the
-device is probed, the clk is disabled and the constraint is removed.
+Add MT7623N reference board with eMMC. On the board, there is additional
+external PHY which is ICPlus IP1001 transceiver available by port 5 on the
+MDIO bus connectted with GMAC2.
 
-We may want to do clk_set_rate() from here, but lets wait for some real
-users that really want it.
-
-Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/bootconstraint/Makefile |  2 +-
- drivers/bootconstraint/clk.c    | 67 +++++++++++++++++++++++++++++++++++++++++
- drivers/bootconstraint/core.c   |  4 +++
- drivers/bootconstraint/core.h   |  3 ++
- include/linux/boot_constraint.h | 11 +++++++
- 5 files changed, 86 insertions(+), 1 deletion(-)
- create mode 100644 drivers/bootconstraint/clk.c
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/mt7623n-rfb-emmc.dts | 37 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-emmc.dts
 
-diff --git a/drivers/bootconstraint/Makefile b/drivers/bootconstraint/Makefile
-index a45616f0c3b0..3424379fd1e4 100644
---- a/drivers/bootconstraint/Makefile
-+++ b/drivers/bootconstraint/Makefile
-@@ -1,3 +1,3 @@
- # Makefile for device boot constraints
- 
--obj-y := core.o supply.o
-+obj-y := clk.o core.o supply.o
-diff --git a/drivers/bootconstraint/clk.c b/drivers/bootconstraint/clk.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ade7a38..5af6fce 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1122,6 +1122,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt6580-evbp1.dtb \
+ 	mt6589-aquaris5.dtb \
+ 	mt6592-evb.dtb \
++	mt7623n-rfb-emmc.dtb \
+ 	mt7623n-rfb-nand.dtb \
+ 	mt7623n-bananapi-bpi-r2.dtb \
+ 	mt8127-moose.dtb \
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-emmc.dts b/arch/arm/boot/dts/mt7623n-rfb-emmc.dts
 new file mode 100644
-index 000000000000..90262fe9057c
+index 0000000..0db75bc
 --- /dev/null
-+++ b/drivers/bootconstraint/clk.c
-@@ -0,0 +1,67 @@
++++ b/arch/arm/boot/dts/mt7623n-rfb-emmc.dts
+@@ -0,0 +1,37 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Copyright (C) 2018 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
-+
-+#include "core.h"
-+
-+struct constraint_clk {
-+	struct dev_boot_constraint_clk_info clk_info;
-+	struct clk *clk;
-+};
-+
-+int constraint_clk_add(struct constraint *constraint, void *data)
-+{
-+	struct dev_boot_constraint_clk_info *clk_info = data;
-+	struct constraint_clk *cclk;
-+	struct device *dev = constraint->cdev->dev;
-+	int ret;
-+
-+	cclk = kzalloc(sizeof(*cclk), GFP_KERNEL);
-+	if (!cclk)
-+		return -ENOMEM;
-+
-+	cclk->clk = clk_get(dev, clk_info->name);
-+	if (IS_ERR(cclk->clk)) {
-+		ret = PTR_ERR(cclk->clk);
-+		if (ret != -EPROBE_DEFER) {
-+			dev_err(dev, "clk_get() failed for %s (%d)\n",
-+				clk_info->name, ret);
-+		}
-+		goto free;
-+	}
-+
-+	ret = clk_prepare_enable(cclk->clk);
-+	if (ret) {
-+		dev_err(dev, "clk_prepare_enable() %s failed (%d)\n",
-+			clk_info->name, ret);
-+		goto put_clk;
-+	}
-+
-+	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
-+	constraint->private = cclk;
-+
-+	return 0;
-+
-+put_clk:
-+	clk_put(cclk->clk);
-+free:
-+	kfree(cclk);
-+
-+	return ret;
-+}
-+
-+void constraint_clk_remove(struct constraint *constraint)
-+{
-+	struct constraint_clk *cclk = constraint->private;
-+
-+	kfree_const(cclk->clk_info.name);
-+	clk_disable_unprepare(cclk->clk);
-+	clk_put(cclk->clk);
-+	kfree(cclk);
-+}
-diff --git a/drivers/bootconstraint/core.c b/drivers/bootconstraint/core.c
-index 2973f8dd9094..a73744c5d599 100644
---- a/drivers/bootconstraint/core.c
-+++ b/drivers/bootconstraint/core.c
-@@ -91,6 +91,10 @@ static struct constraint *constraint_allocate(struct constraint_dev *cdev,
- 	void (*remove)(struct constraint *constraint);
- 
- 	switch (type) {
-+	case DEV_BOOT_CONSTRAINT_CLK:
-+		add = constraint_clk_add;
-+		remove = constraint_clk_remove;
-+		break;
- 	case DEV_BOOT_CONSTRAINT_SUPPLY:
- 		add = constraint_supply_add;
- 		remove = constraint_supply_remove;
-diff --git a/drivers/bootconstraint/core.h b/drivers/bootconstraint/core.h
-index 44c219716be5..09a6176541d7 100644
---- a/drivers/bootconstraint/core.h
-+++ b/drivers/bootconstraint/core.h
-@@ -29,6 +29,9 @@ struct constraint {
- };
- 
- /* Forward declarations of constraint specific callbacks */
-+int constraint_clk_add(struct constraint *constraint, void *data);
-+void constraint_clk_remove(struct constraint *constraint);
-+
- int constraint_supply_add(struct constraint *constraint, void *data);
- void constraint_supply_remove(struct constraint *constraint);
- 
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index 736fe09a8589..4685ff55fff8 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -16,12 +16,23 @@ struct device;
- /**
-  * enum dev_boot_constraint_type - This defines different boot constraint types.
-  *
-+ * @DEV_BOOT_CONSTRAINT_CLK: This represents a clock boot constraint.
-  * @DEV_BOOT_CONSTRAINT_SUPPLY: This represents a power supply boot constraint.
-  */
- enum dev_boot_constraint_type {
-+	DEV_BOOT_CONSTRAINT_CLK,
- 	DEV_BOOT_CONSTRAINT_SUPPLY,
- };
- 
-+/**
-+ * struct dev_boot_constraint_clk_info - Clock boot constraint information.
++ * Copyright (c) 2017-2018 MediaTek Inc.
++ * Author: Sean Wang <sean.wang@mediatek.com>
 + *
-+ * @name: This must match the connection-id of the clock for the device.
 + */
-+struct dev_boot_constraint_clk_info {
-+	const char *name;
++
++/dts-v1/;
++#include "mt7623n-rfb.dtsi"
++
++/ {
++	model = "MediaTek MT7623N with eMMC reference board";
++	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
++
++	chosen {
++		bootargs = "console=ttyS2,115200n8 earlyprintk";
++	};
 +};
 +
- /**
-  * struct dev_boot_constraint_supply_info - Power supply boot constraint
-  * information.
++&eth {
++	gmac1: mac at 1 {
++		compatible = "mediatek,eth-mac";
++		reg = <1>;
++		phy-handle = <&phy5>;
++	};
++};
++
++&mdio {
++	phy5: ethernet-phy at 5 {
++		reg = <5>;
++		phy-mode = "rgmii-rxid";
++	};
++};
++
++&mmc0 {
++	status = "okay";
++};
 -- 
-2.15.0.194.g9af6a3dea062
+2.7.4
