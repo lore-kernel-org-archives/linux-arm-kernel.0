@@ -1,250 +1,148 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Feb 2018 15:53:48 +0530
-Subject: [PATCH V7 09/13] boot_constraint: Add support for Hisilicon platforms
+Date: Fri, 23 Feb 2018 15:53:52 +0530
+Subject: [PATCH V7 13/13] boot_constraint: Add documentation
 In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
 References: <cover.1519380923.git.viresh.kumar@linaro.org>
-Message-ID: <0fc2fdf3744e1a0215a42c87759598db4160b659.1519380923.git.viresh.kumar@linaro.org>
+Message-ID: <6b17ffecd9917ff4a1fad848839ea667e92d715f.1519380923.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds boot constraint support for Hisilicon platforms. Currently
-only one use case is supported: earlycon. One of the UART is enabled by
-the bootloader and is used for early console in the kernel. The boot
-constraint core handles it properly and removes constraints once the
-serial device is probed by its driver.
+This adds boot constraint documentation.
 
-This is tested on hi6220-hikey 96board.
-
-Cc: Wei Xu <xuwei5@hisilicon.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/soc/Kconfig                     |   1 +
- drivers/soc/Makefile                    |   1 +
- drivers/soc/hisilicon/Kconfig           |  15 +++
- drivers/soc/hisilicon/Makefile          |   3 +
- drivers/soc/hisilicon/boot_constraint.c | 158 ++++++++++++++++++++++++++++++++
- 5 files changed, 178 insertions(+)
- create mode 100644 drivers/soc/hisilicon/Kconfig
- create mode 100644 drivers/soc/hisilicon/Makefile
- create mode 100644 drivers/soc/hisilicon/boot_constraint.c
+ .../driver-api/boot-constraint/constraints.rst     | 98 ++++++++++++++++++++++
+ Documentation/driver-api/boot-constraint/index.rst |  4 +
+ Documentation/driver-api/index.rst                 |  1 +
+ 3 files changed, 103 insertions(+)
+ create mode 100644 Documentation/driver-api/boot-constraint/constraints.rst
+ create mode 100644 Documentation/driver-api/boot-constraint/index.rst
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index c07b4a85253f..7fd6d59f15bd 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -5,6 +5,7 @@ source "drivers/soc/amlogic/Kconfig"
- source "drivers/soc/atmel/Kconfig"
- source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/fsl/Kconfig"
-+source "drivers/soc/hisilicon/Kconfig"
- source "drivers/soc/imx/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 40523577bdaa..2daf7c1a52ee 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
- obj-$(CONFIG_ARCH_GEMINI)	+= gemini/
-+obj-$(CONFIG_ARCH_HISI)		+= hisilicon/
- obj-$(CONFIG_ARCH_MXC)		+= imx/
- obj-$(CONFIG_SOC_XWAY)		+= lantiq/
- obj-y				+= mediatek/
-diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
+diff --git a/Documentation/driver-api/boot-constraint/constraints.rst b/Documentation/driver-api/boot-constraint/constraints.rst
 new file mode 100644
-index 000000000000..7247b13a60a2
+index 000000000000..6da2df33f2c9
 --- /dev/null
-+++ b/drivers/soc/hisilicon/Kconfig
-@@ -0,0 +1,15 @@
-+#
-+# Hisilicon Soc drivers
-+#
++++ b/Documentation/driver-api/boot-constraint/constraints.rst
+@@ -0,0 +1,98 @@
++.. include:: <isonum.txt>
 +
-+menu "Hisilicon SoC drivers"
++=========================
++Boot Constraint Subsystem
++=========================
 +
-+config HISI_BOOT_CONSTRAINT
-+	bool "Hisilicon Boot Constraints"
-+	depends on ARCH_HISI
-+	select DEV_BOOT_CONSTRAINT
-+	default y
-+	help
-+	  Say y here to enable Boot Constraints on Hisilicon platforms.
++:Copyright: |copy| 2017 Viresh Kumar <vireshk@kernel.org>, Linaro Ltd.
 +
-+endmenu
-diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
++Introduction
++============
++
++A lot of devices are configured and powered ON by the bootloader before passing
++on control to the operating system, Linux in our case.  It is important for some
++of them to keep working until the time a Linux device driver probes the device
++and reconfigure it.
++
++A typical example of that can be the LCD controller, which is used by the
++bootloaders to show image(s) while the platform boots Linux.  The LCD controller
++can be using resources like clk, regulators, etc, that are shared with other
++devices. These shared resources should be configured in such a way that they
++satisfy need of all the user devices.  If another device's (X) driver gets
++probed before the LCD controller driver, then it may end up disabling or
++reconfiguring these resources to ranges satisfying only the current user (device
++X) and that may make the LCD screen unstable and present a bad user experience.
++
++Another case can be a debug serial port (earlycon) enabled from the bootloader,
++which may be used to debug early kernel oops.
++
++There are also cases where the resources may not be shared, but the kernel will
++disable them forcefully as no users may have appeared until a certain point in
++the kernel boot.
++
++Of course we can have more complex cases where the same resource is getting used
++by multiple devices while the kernel boots and the order in which the devices
++get probed wouldn't matter as the other devices may break because of the chosen
++configuration of the first probed device.
++
++Adding boot constraints
++=======================
++
++A boot constraint defines a configuration requirement set for the device by the
++boot loader. For example, if a clock is enabled for a device by the bootloader
++and we want the device to be working as is until the time the device is probed
++by its driver, then keeping this clock enabled is one of the boot constraint.
++
++Following are the different type of boot constraints supported currently by the
++core:
++
++.. kernel-doc:: include/linux/boot_constraint.h
++   :functions: dev_boot_constraint_type
++
++
++A single boot constraint can be added using the following helper:
++
++.. kernel-doc:: drivers/bootconstraint/core.c
++   :functions: dev_boot_constraint_add
++
++
++The second parameter to this routine describes the constraint to add and is
++represented by following structures:
++
++.. kernel-doc:: include/linux/boot_constraint.h
++   :functions: dev_boot_constraint dev_boot_constraint_info
++
++The power domain boot constraint doesn't need any data, while the clock and
++power supply boot constraint specific data is represented by following
++structures:
++
++.. kernel-doc:: include/linux/boot_constraint.h
++   :functions: dev_boot_constraint_supply_info dev_boot_constraint_clk_info
++
++
++In order to simplify adding multiple boot constraints for a platform, the boot
++constraints core supplies another helper which can be used to add all
++constraints for the platform.
++
++.. kernel-doc:: drivers/bootconstraint/deferrable_dev.c
++   :functions: dev_boot_constraint_add_deferrable_of
++
++
++The argument of this routine is described by following structure:
++
++.. kernel-doc:: include/linux/boot_constraint.h
++   :functions: dev_boot_constraint_of
++
++
++Removing boot constraints
++=========================
++
++Once the boot constraints are added, they will be honored by the boot constraint
++core until the time a driver tries to probe the device. The constraints are
++removed by the driver core if either the driver successfully probed the device
++or failed with an error value other than -EPROBE_DEFER. The constraints are kept
++as is for deferred probe. The driver core removes the constraints using the
++following helper, which must not be called directly by the platforms:
++
++.. kernel-doc:: drivers/bootconstraint/core.c
++   :functions: dev_boot_constraints_remove
+diff --git a/Documentation/driver-api/boot-constraint/index.rst b/Documentation/driver-api/boot-constraint/index.rst
 new file mode 100644
-index 000000000000..c63cb9b17bed
+index 000000000000..d6fce17626a2
 --- /dev/null
-+++ b/drivers/soc/hisilicon/Makefile
-@@ -0,0 +1,3 @@
-+# SPDX-License-Identifier: GPL-2.0
++++ b/Documentation/driver-api/boot-constraint/index.rst
+@@ -0,0 +1,4 @@
++.. toctree::
++   :maxdepth: 1
 +
-+obj-$(CONFIG_HISI_BOOT_CONSTRAINT) += boot_constraint.o
-diff --git a/drivers/soc/hisilicon/boot_constraint.c b/drivers/soc/hisilicon/boot_constraint.c
-new file mode 100644
-index 000000000000..fa0b25d6ab8e
---- /dev/null
-+++ b/drivers/soc/hisilicon/boot_constraint.c
-@@ -0,0 +1,158 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * This takes care of Hisilicon boot time device constraints, normally set by
-+ * the Bootloader.
-+ *
-+ * Copyright (c) 2018 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ */
-+
-+#include <linux/boot_constraint.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+
-+static bool earlycon_boot_constraints_enabled __initdata;
-+
-+static int __init enable_earlycon_boot_constraints(char *str)
-+{
-+	earlycon_boot_constraints_enabled = true;
-+
-+	return 0;
-+}
-+
-+__setup_param("earlycon", boot_constraint_earlycon,
-+	      enable_earlycon_boot_constraints, 0);
-+__setup_param("earlyprintk", boot_constraint_earlyprintk,
-+	      enable_earlycon_boot_constraints, 0);
-+
-+
-+struct hikey_machine_constraints {
-+	struct dev_boot_constraint_of *dev_constraints;
-+	unsigned int count;
-+};
-+
-+static struct dev_boot_constraint_clk_info uart_iclk_info = {
-+	.name = "uartclk",
-+};
-+
-+static struct dev_boot_constraint_clk_info uart_pclk_info = {
-+	.name = "apb_pclk",
-+};
-+
-+static struct dev_boot_constraint hikey3660_uart_constraints[] = {
-+	{
-+		.type = DEV_BOOT_CONSTRAINT_CLK,
-+		.data = &uart_iclk_info,
-+	}, {
-+		.type = DEV_BOOT_CONSTRAINT_CLK,
-+		.data = &uart_pclk_info,
-+	},
-+};
-+
-+static const char * const uarts_hikey3660[] = {
-+	"serial at fff32000",	/* UART 6 */
-+};
-+
-+static struct dev_boot_constraint_of hikey3660_dev_constraints[] = {
-+	{
-+		.compat = "arm,pl011",
-+		.constraints = hikey3660_uart_constraints,
-+		.count = ARRAY_SIZE(hikey3660_uart_constraints),
-+
-+		.dev_names = uarts_hikey3660,
-+		.dev_names_count = ARRAY_SIZE(uarts_hikey3660),
-+	},
-+};
-+
-+static struct hikey_machine_constraints hikey3660_constraints = {
-+	.dev_constraints = hikey3660_dev_constraints,
-+	.count = ARRAY_SIZE(hikey3660_dev_constraints),
-+};
-+
-+static const char * const uarts_hikey6220[] = {
-+	"uart at f7113000",	/* UART 3 */
-+};
-+
-+static struct dev_boot_constraint_of hikey6220_dev_constraints[] = {
-+	{
-+		.compat = "arm,pl011",
-+		.constraints = hikey3660_uart_constraints,
-+		.count = ARRAY_SIZE(hikey3660_uart_constraints),
-+
-+		.dev_names = uarts_hikey6220,
-+		.dev_names_count = ARRAY_SIZE(uarts_hikey6220),
-+	},
-+};
-+
-+static struct hikey_machine_constraints hikey6220_constraints = {
-+	.dev_constraints = hikey6220_dev_constraints,
-+	.count = ARRAY_SIZE(hikey6220_dev_constraints),
-+};
-+
-+static struct dev_boot_constraint hikey3798cv200_uart_constraints[] = {
-+	{
-+		.type = DEV_BOOT_CONSTRAINT_CLK,
-+		.data = &uart_pclk_info,
-+	},
-+};
-+
-+static const char * const uarts_hikey3798cv200[] = {
-+	"serial at 8b00000",	/* UART 0 */
-+};
-+
-+static struct dev_boot_constraint_of hikey3798cv200_dev_constraints[] = {
-+	{
-+		.compat = "arm,pl011",
-+		.constraints = hikey3798cv200_uart_constraints,
-+		.count = ARRAY_SIZE(hikey3798cv200_uart_constraints),
-+
-+		.dev_names = uarts_hikey3798cv200,
-+		.dev_names_count = ARRAY_SIZE(uarts_hikey3798cv200),
-+	},
-+};
-+
-+static struct hikey_machine_constraints hikey3798cv200_constraints = {
-+	.dev_constraints = hikey3798cv200_dev_constraints,
-+	.count = ARRAY_SIZE(hikey3798cv200_dev_constraints),
-+};
-+
-+static const struct of_device_id machines[] __initconst = {
-+	{ .compatible = "hisilicon,hi3660", .data = &hikey3660_constraints },
-+	{ .compatible = "hisilicon,hi3798cv200", .data = &hikey3798cv200_constraints },
-+	{ .compatible = "hisilicon,hi6220", .data = &hikey6220_constraints },
-+	{ }
-+};
-+
-+static int __init hikey_constraints_init(void)
-+{
-+	const struct hikey_machine_constraints *constraints;
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+
-+	if (!earlycon_boot_constraints_enabled)
-+		return 0;
-+
-+	np = of_find_node_by_path("/");
-+	if (!np)
-+		return -ENODEV;
-+
-+	match = of_match_node(machines, np);
-+	of_node_put(np);
-+
-+	if (!match)
-+		return 0;
-+
-+	constraints = match->data;
-+
-+	dev_boot_constraint_add_deferrable_of(constraints->dev_constraints,
-+					      constraints->count);
-+
-+	return 0;
-+}
-+
-+/*
-+ * The amba-pl011 driver registers itself from arch_initcall level. Setup the
-+ * serial boot constraints before that in order not to miss any boot messages.
-+ */
-+postcore_initcall_sync(hikey_constraints_init);
++   constraints
+diff --git a/Documentation/driver-api/index.rst b/Documentation/driver-api/index.rst
+index e9b41b1634f3..f982e71efb73 100644
+--- a/Documentation/driver-api/index.rst
++++ b/Documentation/driver-api/index.rst
+@@ -49,6 +49,7 @@ available subsections can be seen below.
+    dmaengine/index
+    slimbus
+    soundwire/index
++   boot-constraint/index
+ 
+ .. only::  subproject and html
+ 
 -- 
 2.15.0.194.g9af6a3dea062
