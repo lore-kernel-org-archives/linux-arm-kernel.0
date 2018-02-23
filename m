@@ -1,131 +1,60 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Fri, 23 Feb 2018 11:16:29 +0100
-Subject: [PATCH 5/6] clocksource: timer-ti-dm: Add event capture
-In-Reply-To: <20180223101254.GA5746@lenoch>
-References: <20180223101254.GA5746@lenoch>
-Message-ID: <20180223101629.GF5746@lenoch>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 23 Feb 2018 18:16:22 +0800
+Subject: [PATCH v1 02/19] dt-bindings: cpufreq: mediatek: use - instead of _
+ in examples
+In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+Message-ID: <fd1fc4c6760ab8fcbf7518df1cecf3837ab18d2c.1519378871.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement event capture functions.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+It should be good that no use "_" is in examples. Consequently,
+those nodes in certain files which have an inappropriate name containing
+"_" are all being replaced with "-".
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-pm at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 ---
- drivers/clocksource/timer-ti-dm.c          | 47 ++++++++++++++++++++++++++++--
- include/linux/platform_data/dmtimer-omap.h |  8 +++++
- 2 files changed, 53 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/timer-ti-dm.c b/drivers/clocksource/timer-ti-dm.c
-index b57e875b74ca..c227d62794a0 100644
---- a/drivers/clocksource/timer-ti-dm.c
-+++ b/drivers/clocksource/timer-ti-dm.c
-@@ -576,8 +576,8 @@ static int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
- }
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+index d36f07e..38cfbb5 100644
+--- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
++++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+@@ -26,7 +26,7 @@ Optional properties:
  
- /* Optimized set_load which removes costly spin wait in timer_start */
--int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
--                            unsigned int load)
-+static int omap_dm_timer_set_load_start(struct omap_dm_timer *timer,
-+					int autoreload, unsigned int load)
- {
- 	u32 l;
+ Example 1 (MT7623 SoC):
  
-@@ -627,6 +627,30 @@ static int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
- 	return 0;
- }
+-	cpu_opp_table: opp_table {
++	cpu_opp_table: opp-table {
+ 		compatible = "operating-points-v2";
+ 		opp-shared;
  
-+static int omap_dm_timer_set_capture(struct omap_dm_timer *timer,
-+				     int captmode, int edges)
-+{
-+	u32 l;
-+
-+	if (unlikely(!timer))
-+		return -EINVAL;
-+
-+	omap_dm_timer_enable(timer);
-+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	l &= ~(OMAP_TIMER_CTRL_CAPTMODE | OMAP_TIMER_CTRL_SCPWM |
-+	       OMAP_TIMER_CTRL_PT | OMAP_TIMER_CTRL_TCM_BOTHEDGES);
-+	l |= OMAP_TIMER_CTRL_GPOCFG;
-+	if (captmode)
-+		l |= OMAP_TIMER_CTRL_CAPTMODE;
-+	l |= edges << 8;
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+
-+	/* Save the context */
-+	timer->context.tclr = l;
-+	omap_dm_timer_disable(timer);
-+	return 0;
-+}
-+
- static int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
- 				 int toggle, int trigger)
- {
-@@ -785,6 +809,22 @@ int omap_dm_timers_active(void)
- 	return 0;
- }
+@@ -86,7 +86,7 @@ Example 1 (MT7623 SoC):
+ 	};
  
-+static int omap_dm_timer_read_capture(struct omap_dm_timer *timer,
-+					unsigned int *reg,
-+					unsigned int *reg2)
-+{
-+	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
-+		pr_err("%s: timer not available or enabled.\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	*reg = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE_REG);
-+	if (reg2)
-+		*reg2 = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE2_REG);
-+
-+	return 0;
-+}
-+
- static const struct of_device_id omap_timer_match[];
+ Example 2 (MT8173 SoC):
+-	cpu_opp_table_a: opp_table_a {
++	cpu_opp_table_a: opp-table-a {
+ 		compatible = "operating-points-v2";
+ 		opp-shared;
  
- /**
-@@ -930,11 +970,14 @@ const static struct omap_dm_timer_ops dmtimer_ops = {
- 	.start = omap_dm_timer_start,
- 	.stop = omap_dm_timer_stop,
- 	.set_load = omap_dm_timer_set_load,
-+	.set_load_start = omap_dm_timer_set_load_start,
- 	.set_match = omap_dm_timer_set_match,
-+	.set_capture = omap_dm_timer_set_capture,
- 	.set_pwm = omap_dm_timer_set_pwm,
- 	.set_prescaler = omap_dm_timer_set_prescaler,
- 	.read_counter = omap_dm_timer_read_counter,
- 	.write_counter = omap_dm_timer_write_counter,
-+	.read_capture = omap_dm_timer_read_capture,
- 	.read_status = omap_dm_timer_read_status,
- 	.write_status = omap_dm_timer_write_status,
- };
-diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
-index 757a0f9e26f9..7502f130b213 100644
---- a/include/linux/platform_data/dmtimer-omap.h
-+++ b/include/linux/platform_data/dmtimer-omap.h
-@@ -43,8 +43,12 @@ struct omap_dm_timer_ops {
+@@ -131,7 +131,7 @@ Example 2 (MT8173 SoC):
+ 		};
+ 	};
  
- 	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
- 			    unsigned int value);
-+	int	(*set_load_start)(struct omap_dm_timer *timer, int autoreload,
-+				  unsigned int value);
- 	int	(*set_match)(struct omap_dm_timer *timer, int enable,
- 			     unsigned int match);
-+	int	(*set_capture)(struct omap_dm_timer *timer, int captmode,
-+			       int edges);
- 	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
- 			   int toggle, int trigger);
- 	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
-@@ -52,6 +56,10 @@ struct omap_dm_timer_ops {
- 	unsigned int (*read_counter)(struct omap_dm_timer *timer);
- 	int	(*write_counter)(struct omap_dm_timer *timer,
- 				 unsigned int value);
-+
-+	int	(*read_capture)(struct omap_dm_timer *timer, unsigned int *reg,
-+				unsigned int *reg2);
-+
- 	unsigned int (*read_status)(struct omap_dm_timer *timer);
- 	int	(*write_status)(struct omap_dm_timer *timer,
- 				unsigned int value);
+-	cpu_opp_table_b: opp_table_b {
++	cpu_opp_table_b: opp-table-b {
+ 		compatible = "operating-points-v2";
+ 		opp-shared;
+ 
 -- 
-2.16.1
+2.7.4
