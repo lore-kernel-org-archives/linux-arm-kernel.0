@@ -1,14 +1,14 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Feb 2018 18:16:02 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Feb 2018 18:18:41 +0000
 Subject: [PATCH] arm64: mm: fix thinko in non-global page table attribute
  check
 In-Reply-To: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
 References: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180223181601.5obiyh45kmuxsh4x@lakrids.cambridge.arm.com>
+Message-ID: <85e1e087-66c6-5b90-28a5-cd1edeee38d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 06:04:48PM +0000, Ard Biesheuvel wrote:
+On 23/02/18 18:04, Ard Biesheuvel wrote:
 > The routine pgattr_change_is_safe() was extended in commit 4e6020565596
 > ("arm64: mm: Permit transitioning from Global to Non-Global without BBM")
 > to permit changing the nG attribute from not set to set, but did so in a
@@ -18,13 +18,6 @@ On Fri, Feb 23, 2018 at 06:04:48PM +0000, Ard Biesheuvel wrote:
 > 
 > Fixes: 4e6020565596 ("arm64: mm: Permit transitioning from Global to ...")
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
 > ---
 >  arch/arm64/mm/mmu.c | 8 ++++----
 >  1 file changed, 4 insertions(+), 4 deletions(-)
@@ -55,6 +48,12 @@ Mark.
 >  
 >  	return ((old ^ new) & ~mask) == 0;
 >  }
-> -- 
-> 2.11.0
 > 
+
+Nice one.
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
