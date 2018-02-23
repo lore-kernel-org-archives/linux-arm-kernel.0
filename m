@@ -1,28 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Feb 2018 12:59:16 +0000
-Subject: Build failure on arm64 defconfig for linux-next recently
-In-Reply-To: <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
-References: <06af01b0-7d95-35e2-3b21-b54f7ed65efc@rock-chips.com>
- <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
-Message-ID: <20180223125916.k2yp7bfes2lrnwrb@armageddon.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Feb 2018 14:06:52 +0100
+Subject: [PATCH] drm/sun4i: link in front-end code if needed
+Message-ID: <20180223131112.715992-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 11:54:19AM +0000, Robin Murphy wrote:
-> On 23/02/18 08:03, Shawn Lin wrote:
-> > I failed to build the arm64 kernel for linux-20180222 and I confirm it
-> > works for linux-20180206. It seems there was some patches for head.S
-> > got merged. Is it a known issue? Or a fix is coming?
-> 
-> Yes, I broke it, sorry!
-> 
-> There's a fix queued in arm64/fixes/core already (04c4927359b1). Using a
-> different toolchain is another option, since the one I'm currently using
-> (gcc-linaro-7.2.1-2017.11) builds it just fine, which is how I managed to
-> create this mess in the first place ;)
+When the base sun4i DRM driver is built-in but the back-end is
+a loadable module, we run into a link error:
 
-Pull request to go out today. I forgot that arm64 fixes/core doesn't get
-pulled into -next (maybe we should fix this).
+drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
+sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
 
+The dependency is a bit tricky, the best workaround I have come up
+with is to use a Makefile hack to to interpret both
+CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
+as a directive to build the front-end the same way as the main module.
+
+Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/sun4i/Makefile | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 582607c0c488..db14e023256b 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
+ 
+-obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
++obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
++ifdef CONFIG_DRM_SUN4I_BACKEND
++obj-$(CONFIG_DRM_SUN4I)		+= sun4i-frontend.o
++endif
+ obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
 -- 
-Catalin
+2.9.0
