@@ -1,375 +1,70 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 23 Feb 2018 16:23:35 +0000
-Subject: [PATCH v6 05/20] firmware: arm_scmi: add scmi protocol bus to
- enumerate protocol devices
+Date: Fri, 23 Feb 2018 16:23:50 +0000
+Subject: [PATCH v6 20/20] cpufreq: scmi: add support for fast frequency
+ switching
 In-Reply-To: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
 References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1519403030-21189-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1519403030-21189-21-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCMI specification encompasses various protocols. However, not every
-protocol has to be present on a given platform/implementation as not
-every protocol is relevant for it.
+The cpufreq core provides option for drivers to implement fast_switch
+callback which is invoked for frequency switching from interrupt context.
 
-Furthermore, the platform chooses which protocols it exposes to a given
-agent. The only protocol that must be implemented is the base protocol.
-The base protocol is used by an agent to discover which protocols are
-available to it.
+This patch adds support for fast_switch callback in SCMI cpufreq driver
+by making use of polling based SCMI transfer. It also sets the flag
+fast_switch_possible.
 
-In order to enumerate the discovered implemented protocols, this patch
-adds support for a separate scmi protocol bus. It also adds mechanism to
-register support for different protocols.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-pm at vger.kernel.org
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/Makefile |   3 +-
- drivers/firmware/arm_scmi/bus.c    | 232 +++++++++++++++++++++++++++++++++++++
- drivers/firmware/arm_scmi/common.h |   1 +
- include/linux/scmi_protocol.h      |  64 ++++++++++
- 4 files changed, 299 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/bus.c
+ drivers/cpufreq/scmi-cpufreq.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 5d9c7ef35f0f..5f4ec2613db6 100644
---- a/drivers/firmware/arm_scmi/Makefile
-+++ b/drivers/firmware/arm_scmi/Makefile
-@@ -1,3 +1,4 @@
--obj-y	= scmi-driver.o scmi-protocols.o
-+obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
-+scmi-bus-y = bus.o
- scmi-driver-y = driver.o
- scmi-protocols-y = base.o
-diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
-new file mode 100644
-index 000000000000..58bb4f46fde1
---- /dev/null
-+++ b/drivers/firmware/arm_scmi/bus.c
-@@ -0,0 +1,232 @@
-+/*
-+ * System Control and Management Interface (SCMI) Message Protocol bus layer
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/types.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+
-+#include "common.h"
-+
-+static DEFINE_IDA(scmi_bus_id);
-+static DEFINE_IDR(scmi_protocols);
-+static DEFINE_SPINLOCK(protocol_lock);
-+
-+static const struct scmi_device_id *
-+scmi_dev_match_id(struct scmi_device *scmi_dev, struct scmi_driver *scmi_drv)
-+{
-+	const struct scmi_device_id *id = scmi_drv->id_table;
-+
-+	if (!id)
-+		return NULL;
-+
-+	for (; id->protocol_id; id++)
-+		if (id->protocol_id == scmi_dev->protocol_id)
-+			return id;
-+
-+	return NULL;
-+}
-+
-+static int scmi_dev_match(struct device *dev, struct device_driver *drv)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(drv);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+	const struct scmi_device_id *id;
-+
-+	id = scmi_dev_match_id(scmi_dev, scmi_drv);
-+	if (id)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int scmi_protocol_init(int protocol_id, struct scmi_handle *handle)
-+{
-+	scmi_prot_init_fn_t fn = idr_find(&scmi_protocols, protocol_id);
-+
-+	if (unlikely(!fn))
-+		return -EINVAL;
-+	return fn(handle);
-+}
-+
-+static int scmi_dev_probe(struct device *dev)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(dev->driver);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+	const struct scmi_device_id *id;
-+	int ret;
-+
-+	id = scmi_dev_match_id(scmi_dev, scmi_drv);
-+	if (!id)
-+		return -ENODEV;
-+
-+	if (!scmi_dev->handle)
-+		return -EPROBE_DEFER;
-+
-+	ret = scmi_protocol_init(scmi_dev->protocol_id, scmi_dev->handle);
-+	if (ret)
-+		return ret;
-+
-+	return scmi_drv->probe(scmi_dev);
-+}
-+
-+static int scmi_dev_remove(struct device *dev)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(dev->driver);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+
-+	if (scmi_drv->remove)
-+		scmi_drv->remove(scmi_dev);
-+
-+	return 0;
-+}
-+
-+static struct bus_type scmi_bus_type = {
-+	.name =	"scmi_protocol",
-+	.match = scmi_dev_match,
-+	.probe = scmi_dev_probe,
-+	.remove = scmi_dev_remove,
-+};
-+
-+int scmi_driver_register(struct scmi_driver *driver, struct module *owner,
-+			 const char *mod_name)
-+{
-+	int retval;
-+
-+	driver->driver.bus = &scmi_bus_type;
-+	driver->driver.name = driver->name;
-+	driver->driver.owner = owner;
-+	driver->driver.mod_name = mod_name;
-+
-+	retval = driver_register(&driver->driver);
-+	if (!retval)
-+		pr_debug("registered new scmi driver %s\n", driver->name);
-+
-+	return retval;
-+}
-+EXPORT_SYMBOL_GPL(scmi_driver_register);
-+
-+void scmi_driver_unregister(struct scmi_driver *driver)
-+{
-+	driver_unregister(&driver->driver);
-+}
-+EXPORT_SYMBOL_GPL(scmi_driver_unregister);
-+
-+struct scmi_device *
-+scmi_device_create(struct device_node *np, struct device *parent, int protocol)
-+{
-+	int id, retval;
-+	struct scmi_device *scmi_dev;
-+
-+	id = ida_simple_get(&scmi_bus_id, 1, 0, GFP_KERNEL);
-+	if (id < 0)
-+		return NULL;
-+
-+	scmi_dev = kzalloc(sizeof(*scmi_dev), GFP_KERNEL);
-+	if (!scmi_dev)
-+		goto no_mem;
-+
-+	scmi_dev->id = id;
-+	scmi_dev->protocol_id = protocol;
-+	scmi_dev->dev.parent = parent;
-+	scmi_dev->dev.of_node = np;
-+	scmi_dev->dev.bus = &scmi_bus_type;
-+	dev_set_name(&scmi_dev->dev, "scmi_dev.%d", id);
-+
-+	retval = device_register(&scmi_dev->dev);
-+	if (!retval)
-+		return scmi_dev;
-+
-+	put_device(&scmi_dev->dev);
-+	kfree(scmi_dev);
-+no_mem:
-+	ida_simple_remove(&scmi_bus_id, id);
-+	return NULL;
-+}
-+
-+void scmi_device_destroy(struct scmi_device *scmi_dev)
-+{
-+	scmi_handle_put(scmi_dev->handle);
-+	device_unregister(&scmi_dev->dev);
-+	ida_simple_remove(&scmi_bus_id, scmi_dev->id);
-+	kfree(scmi_dev);
-+}
-+
-+void scmi_set_handle(struct scmi_device *scmi_dev)
-+{
-+	scmi_dev->handle = scmi_handle_get(&scmi_dev->dev);
-+}
-+
-+int scmi_protocol_register(int protocol_id, scmi_prot_init_fn_t fn)
-+{
-+	int ret;
-+
-+	spin_lock(&protocol_lock);
-+	ret = idr_alloc(&scmi_protocols, fn, protocol_id, protocol_id + 1,
-+			GFP_ATOMIC);
-+	if (ret != protocol_id)
-+		pr_err("unable to allocate SCMI idr slot, err %d\n", ret);
-+	spin_unlock(&protocol_lock);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(scmi_protocol_register);
-+
-+void scmi_protocol_unregister(int protocol_id)
-+{
-+	spin_lock(&protocol_lock);
-+	idr_remove(&scmi_protocols, protocol_id);
-+	spin_unlock(&protocol_lock);
-+}
-+EXPORT_SYMBOL_GPL(scmi_protocol_unregister);
-+
-+static int __scmi_devices_unregister(struct device *dev, void *data)
-+{
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+
-+	scmi_device_destroy(scmi_dev);
-+	return 0;
-+}
-+
-+static void scmi_devices_unregister(void)
-+{
-+	bus_for_each_dev(&scmi_bus_type, NULL, NULL, __scmi_devices_unregister);
-+}
-+
-+static int __init scmi_bus_init(void)
-+{
-+	int retval;
-+
-+	retval = bus_register(&scmi_bus_type);
-+	if (retval)
-+		pr_err("scmi protocol bus register failed (%d)\n", retval);
-+
-+	return retval;
-+}
-+subsys_initcall(scmi_bus_init);
-+
-+static void __exit scmi_bus_exit(void)
-+{
-+	scmi_devices_unregister();
-+	bus_unregister(&scmi_bus_type);
-+	ida_destroy(&scmi_bus_id);
-+}
-+module_exit(scmi_bus_exit);
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-index bc767f4997e0..f1eeacaef57b 100644
---- a/drivers/firmware/arm_scmi/common.h
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -107,6 +107,7 @@ int scmi_one_xfer_init(const struct scmi_handle *h, u8 msg_id, u8 prot_id,
- 		       size_t tx_size, size_t rx_size, struct scmi_xfer **p);
- int scmi_handle_put(const struct scmi_handle *handle);
- struct scmi_handle *scmi_handle_get(struct device *dev);
-+void scmi_set_handle(struct scmi_device *scmi_dev);
- int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
- void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
- 				     u8 *prot_imp);
-diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index 664da3d763f2..db995126134d 100644
---- a/include/linux/scmi_protocol.h
-+++ b/include/linux/scmi_protocol.h
-@@ -15,6 +15,7 @@
-  * You should have received a copy of the GNU General Public License along with
-  * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <linux/device.h>
- #include <linux/types.h>
+diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+index 3745dc5fe2a8..ec0c58ddc1ed 100644
+--- a/drivers/cpufreq/scmi-cpufreq.c
++++ b/drivers/cpufreq/scmi-cpufreq.c
+@@ -69,6 +69,22 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	return ret;
+ }
  
- #define SCMI_MAX_STR_SIZE	16
-@@ -62,3 +63,66 @@ enum scmi_std_protocol {
- 	SCMI_PROTOCOL_CLOCK = 0x14,
- 	SCMI_PROTOCOL_SENSOR = 0x15,
- };
-+
-+struct scmi_device {
-+	u32 id;
-+	u8 protocol_id;
-+	struct device dev;
-+	struct scmi_handle *handle;
-+};
-+
-+#define to_scmi_dev(d) container_of(d, struct scmi_device, dev)
-+
-+struct scmi_device *
-+scmi_device_create(struct device_node *np, struct device *parent, int protocol);
-+void scmi_device_destroy(struct scmi_device *scmi_dev);
-+
-+struct scmi_device_id {
-+	u8 protocol_id;
-+};
-+
-+struct scmi_driver {
-+	const char *name;
-+	int (*probe)(struct scmi_device *sdev);
-+	void (*remove)(struct scmi_device *sdev);
-+	const struct scmi_device_id *id_table;
-+
-+	struct device_driver driver;
-+};
-+
-+#define to_scmi_driver(d) container_of(d, struct scmi_driver, driver)
-+
-+#ifdef CONFIG_ARM_SCMI_PROTOCOL
-+int scmi_driver_register(struct scmi_driver *driver,
-+			 struct module *owner, const char *mod_name);
-+void scmi_driver_unregister(struct scmi_driver *driver);
-+#else
-+static inline int
-+scmi_driver_register(struct scmi_driver *driver, struct module *owner,
-+		     const char *mod_name)
++static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
++					     unsigned int target_freq)
 +{
-+	return -EINVAL;
++	struct scmi_data *priv = policy->driver_data;
++	struct scmi_perf_ops *perf_ops = handle->perf_ops;
++
++	if (!perf_ops->freq_set(handle, priv->domain_id,
++				target_freq * 1000, true)) {
++		arch_set_freq_scale(policy->related_cpus, target_freq,
++				    policy->cpuinfo.max_freq);
++		return target_freq;
++	}
++
++	return 0;
 +}
 +
-+static inline void scmi_driver_unregister(struct scmi_driver *driver) {}
-+#endif /* CONFIG_ARM_SCMI_PROTOCOL */
-+
-+#define scmi_register(driver) \
-+	scmi_driver_register(driver, THIS_MODULE, KBUILD_MODNAME)
-+#define scmi_unregister(driver) \
-+	scmi_driver_unregister(driver)
-+
-+/**
-+ * module_scmi_driver() - Helper macro for registering a scmi driver
-+ * @__scmi_driver: scmi_driver structure
-+ *
-+ * Helper macro for scmi drivers to set up proper module init / exit
-+ * functions.  Replaces module_init() and module_exit() and keeps people from
-+ * printing pointless things to the kernel log when their driver is loaded.
-+ */
-+#define module_scmi_driver(__scmi_driver)	\
-+	module_driver(__scmi_driver, scmi_register, scmi_unregister)
-+
-+typedef int (*scmi_prot_init_fn_t)(struct scmi_handle *);
-+int scmi_protocol_register(int protocol_id, scmi_prot_init_fn_t fn);
-+void scmi_protocol_unregister(int protocol_id);
+ static int
+ scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
+ {
+@@ -168,6 +184,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	policy->cpuinfo.transition_latency = latency;
+ 
++	policy->fast_switch_possible = true;
+ 	return 0;
+ 
+ out_free_cpufreq_table:
+@@ -206,6 +223,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+ 	.attr	= cpufreq_generic_attr,
+ 	.target_index	= scmi_cpufreq_set_target,
++	.fast_switch	= scmi_cpufreq_fast_switch,
+ 	.get	= scmi_cpufreq_get_rate,
+ 	.init	= scmi_cpufreq_init,
+ 	.exit	= scmi_cpufreq_exit,
 -- 
 2.7.4
