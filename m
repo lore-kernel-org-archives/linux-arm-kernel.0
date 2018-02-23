@@ -1,32 +1,51 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 23 Feb 2018 17:29:35 +0800
-Subject: [PATCH v2 1/4] dt-bindings: add binding for i.MX8MQ CCM
-In-Reply-To: <20180222141246.GL3217@dragon>
-References: <20180201175412.9480-1-l.stach@pengutronix.de>
- <20180222035518.GG3217@dragon> <20180222141246.GL3217@dragon>
-Message-ID: <20180223092934.GS3217@dragon>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Fri, 23 Feb 2018 18:24:40 +0900
+Subject: [PATCH] [BUGFIX] arm: kprobes: Fix to use get_kprobe_ctlblk after
+ irq-disabed
+Message-ID: <151937788067.22527.14819753928851623471.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 10:12:48PM +0800, Shawn Guo wrote:
-> On Thu, Feb 22, 2018 at 11:55:20AM +0800, Shawn Guo wrote:
-> > On Thu, Feb 01, 2018 at 06:54:09PM +0100, Lucas Stach wrote:
-> > > This adds the binding for the i.MX8MQ Clock Controller Module.
-> > > 
-> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > > Reviewed-by: Rob Herring <robh@kernel.org>
-> > 
-> > Applied all, thanks.
-> 
-> I decided to hold it a bit, as I found something which needs a bit more
-> discussion.  Will reply to individual patch tomorrow.
+Since get_kprobe_ctlblk() uses smp_processor_id() to access
+per-cpu variable, it hits smp_processor_id sanity check as below.
 
-Besides the comments I put on individual patches, please also go through
-the checkpatch results.  We ignore MAINTAINERS updating and line over
-80 characters warnings, but I see the following ones which I think we
-should fix.
+[    7.006928] BUG: using smp_processor_id() in preemptible [00000000] code: swapper/0/1
+[    7.007859] caller is debug_smp_processor_id+0x20/0x24
+[    7.008438] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1-00192-g4eb17253e4b5 #1
+[    7.008890] Hardware name: Generic DT based system
+[    7.009917] [<c0313f0c>] (unwind_backtrace) from [<c030e6d8>] (show_stack+0x20/0x24)
+[    7.010473] [<c030e6d8>] (show_stack) from [<c0c64694>] (dump_stack+0x84/0x98)
+[    7.010990] [<c0c64694>] (dump_stack) from [<c071ca5c>] (check_preemption_disabled+0x138/0x13c)
+[    7.011592] [<c071ca5c>] (check_preemption_disabled) from [<c071ca80>] (debug_smp_processor_id+0x20/0x24)
+[    7.012214] [<c071ca80>] (debug_smp_processor_id) from [<c03335e0>] (optimized_callback+0x2c/0xe4)
+[    7.013077] [<c03335e0>] (optimized_callback) from [<bf0021b0>] (0xbf0021b0)
 
- - ERROR: code indent should use tabs where possible
- - WARNING: please, no space before tabs
+To fix this issue, call get_kprobe_ctlblk() right after
+irq-disabled since that disables preemption.
 
-Shawn
+Fixes: 0dc016dbd820 ("ARM: kprobes: enable OPTPROBES for ARM 32")
+Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+---
+ arch/arm/probes/kprobes/opt-arm.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+index bcdecc25461b..ddc5a82eb10d 100644
+--- a/arch/arm/probes/kprobes/opt-arm.c
++++ b/arch/arm/probes/kprobes/opt-arm.c
+@@ -165,13 +165,14 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+ {
+ 	unsigned long flags;
+ 	struct kprobe *p = &op->kp;
+-	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
++	struct kprobe_ctlblk *kcb;
+ 
+ 	/* Save skipped registers */
+ 	regs->ARM_pc = (unsigned long)op->kp.addr;
+ 	regs->ARM_ORIG_r0 = ~0UL;
+ 
+ 	local_irq_save(flags);
++	kcb = get_kprobe_ctlblk();
+ 
+ 	if (kprobe_running()) {
+ 		kprobes_inc_nmissed_count(&op->kp);
