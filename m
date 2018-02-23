@@ -1,67 +1,99 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 23 Feb 2018 16:46:09 +0100
-Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <201802231630.45460.jbe@pengutronix.de>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-3-l.stach@pengutronix.de>
- <20180223150352.GU3217@dragon> <201802231630.45460.jbe@pengutronix.de>
-Message-ID: <1519400769.8609.3.camel@pengutronix.de>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 23 Feb 2018 16:46:51 +0100
+Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
+In-Reply-To: <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+Message-ID: <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 23.02.2018, 16:30 +0100 schrieb Juergen Borleis:
-> On Friday 23 February 2018 16:03:53 Shawn Guo wrote:
-> > On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
-> > > +&usdhc1 {
-> > > +???pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> > > +???pinctrl-0 = <&pinctrl_usdhc1_cd_reset>,
-> <&pinctrl_usdhc1_clk_strobe>,
-> > > +?????????????? <&pinctrl_usdhc1_data>;
-> > > +???pinctrl-1 = <&pinctrl_usdhc1_cd_reset>,
-> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_100mhz>,
-> > > +?????????????? <&pinctrl_usdhc1_data_100mhz>;
-> > > +???pinctrl-2 = <&pinctrl_usdhc1_cd_reset>,
-> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_200mhz>,
-> > > +?????????????? <&pinctrl_usdhc1_data_200mhz>;
-> > > +???vqmmc-supply = <&sw4_reg>;
-> > > +???bus-width = <8>;
-> > > +???non-removable;
-> > > +???no-sd;
-> > > +???no-sdio;
-> > > +???status = "okay";
-> > > +};
-> >
-> > I'm not sure it can be enabled right now.? Per my testing, eMMC is
-> not
-> > working yet.
-> >
-> > [??? 0.879756] mmc0: Switching to 3.3V signalling voltage failed
-> > [??? 0.913587] mmc0: SDHCI controller on 30b40000.usdhc
-> [30b40000.usdhc]
-> > using ADMA ...
-> > [??? 1.007628] mmc0: switch to high-speed from hs200 failed, err:-
-> 110
-> > [??? 1.013873] mmc0: error -110 whilst initialising MMC card
-> > [??? 1.020639] mmc0: Switching to 3.3V signalling voltage failed
-> > ...
-> > [??? 1.132462] mmc0: switch to high-speed from hs200 failed, err:-
-> 110
-> > [??? 1.138674] mmc0: error -110 whilst initialising MMC card
-> > [??? 1.145394] mmc0: Switching to 3.3V signalling voltage failed
-> > [??? 1.268367] mmc0: switch to high-speed from hs200 failed, err:-
-> 110
-> > [??? 1.274576] mmc0: error -110 whilst initialising MMC card
-> > [??? 1.281291] mmc0: Switching to 3.3V signalling voltage failed
-> > [??? 1.440708] mmc0: switch to high-speed from hs200 failed, err:-
-> 110
-> > [??? 1.446919] mmc0: error -110 whilst initialising MMC card
-> >
-> > Or am I missing anything?
+hi Radoslaw
+
+The gpio-keys tests it's now functional on H7, great.
+However the gpio-key test only the bank1 (like stm32f429).
+Like the H7 introduce the multi-bank management,
+we must perform complementary test.
+
+comment below about ack in handler
+
+On 02/23/2018 09:31 AM, Radoslaw Pietrzyk wrote:
+> - discards setting handle_simple_irq handler for hierarchy interrupts
+> - removes acking in chained irq handler as this is done by
+> irq_chip itself inside handle_edge_irq
+> - removes unneeded irq_domain_ops.xlate callback
 > 
-> Property "no-1-8-v;" if no 1.8 V is available?
+> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+> ---
+>   drivers/irqchip/irq-stm32-exti.c | 13 -------------
+>   1 file changed, 13 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+> index 36f0fbe..8013a87 100644
+> --- a/drivers/irqchip/irq-stm32-exti.c
+> +++ b/drivers/irqchip/irq-stm32-exti.c
+> @@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
+>   	return irq_reg_readl(gc, stm32_bank->pr_ofst);
+>   }
+>   
+> -static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
+> -{
+> -	const struct stm32_exti_bank *stm32_bank = gc->private;
+> -
+> -	irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
+> -}
+> -
+>   static void stm32_irq_handler(struct irq_desc *desc)
+>   {
+>   	struct irq_domain *domain = irq_desc_get_handler_data(desc);
+> @@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
+>   			for_each_set_bit(n, &pending, IRQS_PER_BANK) {
+>   				virq = irq_find_mapping(domain, irq_base + n);
+>   				generic_handle_irq(virq);
+> -				stm32_exti_irq_ack(gc, BIT(n));
 
-The issue is the other way around: the eMMC is hardwired to 1.8V IO
-voltage (which is fine per eMMC spec), so it can't switch to 3.3V mode.
+the while loop " while ((pending = " has been introduce while original
+upstream of this driver in V2 to V3
+https://patchwork.ozlabs.org/patch/604190/
+https://patchwork.ozlabs.org/patch/665242/
 
-Regards,
-Lucas
+the "ack" is needed to acknowledge the irq which are handled and which 
+is not the original irq for which we enter.
+
+>   			}
+>   		}
+>   	}
+> @@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
+>   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
+>   			    unsigned int nr_irqs, void *data)
+>   {
+> -	struct irq_chip_generic *gc;
+>   	struct irq_fwspec *fwspec = data;
+>   	irq_hw_number_t hwirq;
+>   
+>   	hwirq = fwspec->param[0];
+> -	gc = irq_get_domain_generic_chip(d, hwirq);
+>   
+>   	irq_map_generic_chip(d, virq, hwirq);
+> -	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
+> -			    handle_simple_irq, NULL, NULL);
+
+I see if it is not disturb the multi-bank.
+
+>   
+>   	return 0;
+>   }
+> @@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
+>   
+>   struct irq_domain_ops irq_exti_domain_ops = {
+>   	.map	= irq_map_generic_chip,
+> -	.xlate	= irq_domain_xlate_onetwocell,
+>   	.alloc  = stm32_exti_alloc,
+>   	.free	= stm32_exti_free,
+>   };
+> 
+
+BR
+Ludo
