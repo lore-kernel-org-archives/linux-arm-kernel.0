@@ -1,34 +1,31 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Feb 2018 08:52:20 +0100
-Subject: [PATCH 1/4] dt-bindings: at24: sort manufacturers alphabetically
-In-Reply-To: <20180221094009.2zql6gbzkcklbakk@ninjato>
-References: <20180116160618.27859-1-peda@axentia.se>
- <20180116160618.27859-2-peda@axentia.se>
- <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
- <CAMRc=Mcqj36KP7dG71dzSn_7cxw-Tru5kNtXdr5-SiH=jbCfMA@mail.gmail.com>
- <20180221091130.4sdfnalrng4sd77i@ninjato>
- <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
- <20180221094009.2zql6gbzkcklbakk@ninjato>
-Message-ID: <CAMRc=MdE_LX276mjXCHaNgAthKyzaKPW-eWBfEuCcG187X7wvQ@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 23 Feb 2018 16:03:34 +0800
+Subject: Build failure on arm64 defconfig for linux-next recently
+Message-ID: <06af01b0-7d95-35e2-3b21-b54f7ed65efc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-21 10:40 GMT+01:00 Wolfram Sang <wsa@the-dreams.de>:
->
->> Will do. What about this (http://patchwork.ozlabs.org/patch/867169/)
->> one? It's part of a bigger series, do you want me to apply it to my
->> tree and provide you with an immutable branch?
->
-> Well, I would accept it for 4.16 using the "plain new id" rule. So, if
-> you add it on top of Peter's sorting patch, totally fine by me.
->
-> If you want it in v4.17, ok, too. I'd think an immutable branch is not
-> needed. There is a fallback property in the DTS. So at worst, there will
-> be a DTS warning during the merge window which will be fixed at rc1 time.
->
-> Unless I overlooked something.
->
+Hi folks,
 
-Ok, I'll have some time during the weekend, so I'll send a PR for rc3.
+I failed to build the arm64 kernel for linux-20180222 and I confirm it
+works for linux-20180206. It seems there was some patches for head.S
+got merged. Is it a known issue? Or a fix is coming?
 
-Bart
+make ARCH=arm64 defconfig
+
+make 
+CROSS_COMPILE=gcc-linaro-6.3.1-aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu- 
+  ARCH=arm64 -j32
+
+
+arch/arm64/kernel/head.S: Assembler messages:
+arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+arch/arm64/kernel/head.S:677: Error: junk at end of line, first 
+unrecognized character is `L'
+arch/arm64/kernel/head.S:677: Error: unexpected characters following 
+instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
+arch/arm64/kernel/head.S:677: Error: unexpected characters following 
+instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
+make[1]: *** [arch/arm64/kernel/head.o] Error 1
