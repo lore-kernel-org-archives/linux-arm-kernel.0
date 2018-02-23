@@ -1,49 +1,28 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 23 Feb 2018 13:50:57 +0100
-Subject: [PATCH 3/7] iio: adc: stm32-dfsdm: fix clock source selection
-In-Reply-To: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1519390261-25453-4-git-send-email-fabrice.gasnier@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Feb 2018 12:59:16 +0000
+Subject: Build failure on arm64 defconfig for linux-next recently
+In-Reply-To: <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
+References: <06af01b0-7d95-35e2-3b21-b54f7ed65efc@rock-chips.com>
+ <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
+Message-ID: <20180223125916.k2yp7bfes2lrnwrb@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing clock source selection. In case "audio" clock is provided,
-it's unused currently: "dfsdm" clock is wrongly used by default.
+On Fri, Feb 23, 2018 at 11:54:19AM +0000, Robin Murphy wrote:
+> On 23/02/18 08:03, Shawn Lin wrote:
+> > I failed to build the arm64 kernel for linux-20180222 and I confirm it
+> > works for linux-20180206. It seems there was some patches for head.S
+> > got merged. Is it a known issue? Or a fix is coming?
+> 
+> Yes, I broke it, sorry!
+> 
+> There's a fix queued in arm64/fixes/core already (04c4927359b1). Using a
+> different toolchain is another option, since the one I'm currently using
+> (gcc-linaro-7.2.1-2017.11) builds it just fine, which is how I managed to
+> create this mess in the first place ;)
 
-Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
+Pull request to go out today. I forgot that arm64 fixes/core doesn't get
+pulled into -next (maybe we should fix this).
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-dfsdm-core.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-index 0635f93..e50efdc 100644
---- a/drivers/iio/adc/stm32-dfsdm-core.c
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -83,7 +83,7 @@ int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm)
- {
- 	struct dfsdm_priv *priv = container_of(dfsdm, struct dfsdm_priv, dfsdm);
- 	struct device *dev = &priv->pdev->dev;
--	unsigned int clk_div = priv->spi_clk_out_div;
-+	unsigned int clk_div = priv->spi_clk_out_div, clk_src;
- 	int ret;
- 
- 	if (atomic_inc_return(&priv->n_active_ch) == 1) {
-@@ -100,6 +100,14 @@ int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm)
- 			}
- 		}
- 
-+		/* select clock source, e.g. 0 for "dfsdm" or 1 for "audio" */
-+		clk_src = priv->aclk ? 1 : 0;
-+		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
-+					 DFSDM_CHCFGR1_CKOUTSRC_MASK,
-+					 DFSDM_CHCFGR1_CKOUTSRC(clk_src));
-+		if (ret < 0)
-+			goto disable_aclk;
-+
- 		/* Output the SPI CLKOUT (if clk_div == 0 clock if OFF) */
- 		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
- 					 DFSDM_CHCFGR1_CKOUTDIV_MASK,
 -- 
-1.9.1
+Catalin
