@@ -1,83 +1,123 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 23 Feb 2018 08:20:22 +0100
-Subject: [PATCH] ARM: dts: imx6: Pass memory unit-adress
-In-Reply-To: <1519319795-18161-1-git-send-email-festevam@gmail.com>
-References: <1519319795-18161-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180223082022.17d7b8a2@karo-electronics.de>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Fri, 23 Feb 2018 07:27:01 +0000
+Subject: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for
+ ZynqMP Platform
+In-Reply-To: <ce9efad6-b007-4cd9-18e7-a7932835846c@intel.com>
+References: <1517336073-18142-1-git-send-email-mnarani@xilinx.com>
+ <608309c3-fc4d-25a2-f0a9-21c0f3e2db46@intel.com>
+ <SN1PR0201MB1791863A71475E3F0D896DD0C1CE0@SN1PR0201MB1791.namprd02.prod.outlook.com>
+ <ce9efad6-b007-4cd9-18e7-a7932835846c@intel.com>
+Message-ID: <SN1PR0201MB17913D8B20DD68ECD39C1164C1CC0@SN1PR0201MB1791.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Adrian,
 
-On Thu, 22 Feb 2018 14:16:35 -0300 Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+> -----Original Message-----
+> From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+> Sent: Thursday, February 22, 2018 1:50 PM
+> To: Manish Narani <MNARANI@xilinx.com>; michal.simek at xilinx.com;
+> ulf.hansson at linaro.org; linux-arm-kernel at lists.infradead.org; linux-
+> mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; mark.rutland at arm.com; robh+dt at kernel.org
+> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> <sgoud@xilinx.com>
+> Subject: Re: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for
+> ZynqMP Platform
 > 
-> Pass the memory unit-adress to fix the following build warnings with W=1:
+> On 21/02/18 17:00, Manish Narani wrote:
+> > Hi Adrian,
+> >
+> >> -----Original Message-----
+> >> From: Manish Narani
+> >> Sent: Wednesday, February 21, 2018 11:39 AM
+> >> To: Adrian Hunter <adrian.hunter@intel.com>; michal.simek at xilinx.com;
+> >> ulf.hansson at linaro.org; linux-arm-kernel at lists.infradead.org; linux-
+> >> mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+> >> devicetree at vger.kernel.org; mark.rutland at arm.com;
+> robh+dt at kernel.org
+> >> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> >> <sgoud@xilinx.com>
+> >> Subject: RE: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning
+> >> support for ZynqMP Platform
+> >>
+> >> Hi Adrian,
+> >>
+> >>
+> >>> -----Original Message-----
+> >>> From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+> >>> Sent: Friday, February 16, 2018 7:37 PM
+> >>> To: Manish Narani <MNARANI@xilinx.com>; michal.simek at xilinx.com;
+> >>> ulf.hansson at linaro.org; linux-arm-kernel at lists.infradead.org; linux-
+> >>> mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+> >>> devicetree at vger.kernel.org; mark.rutland at arm.com;
+> robh+dt at kernel.org
+> >>> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> >>> <sgoud@xilinx.com>; Manish Narani <MNARANI@xilinx.com>
+> >>> Subject: Re: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning
+> >>> support for ZynqMP Platform
+> >>>
+> >>> On 30/01/18 20:14, Manish Narani wrote:
+> >>>> This patch adds support of SD auto tuning for ZynqMP platform. Auto
+> >>>> tuning sequence sends tuning block to card when operating in UHS-1
+> >>>> modes. This resets the DLL and sends CMD19/CMD21 as a part of the
+> >>>> auto tuning process. Once the auto tuning process gets completed,
+> >>>> reset the DLL to load the newly obtained SDHC tuned tap value.
+> >>>
+> >>> How is this different from:
+> >>> 	1. reset the dll
+> >>> 	2. call sdhci_execute_tuning
+> >>> 	3. reset the dll
+> >>>
+> > Below is my take on your above comments:
+> > - 'Reset the dll' is a platform specific call inside
+> > 'arasan_zynqmp_execute_tuning' which is implemented in
+> > sdhci-of-arasan.c
+> > - 'arasan_zynqmp_execute_tuning' is called from 'sdhci_execute_tuning'
+> > as a platform_execute_tuning routine
+> > - So to keep 'DLL reset' routine called from sdhci-of-arasan.c, I have
+> > implemented the execute_tuning in sdhci-of-arasan.c
 > 
-> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> I meant something like:
 > 
-> There are cases where dts passes an empty memory node, which will be filled
-> by the bootloader. Passing the memory base address still allows the 
-> bootloader to fill the memory size.
+> 	if (of_device_is_compatible(pdev->dev.of_node, "xlnx,zynqmp-
+> 8.9a"))
+> 		host->mmc_host_ops.execute_tuning =
+> arasan_zynqmp_execute_tuning;
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts   | 4 ++--
->  arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts     | 4 ++--
->  arch/arm/boot/dts/imx6dl-ts4900.dts            | 4 ++--
->  arch/arm/boot/dts/imx6dl-ts7970.dts            | 4 ++--
->  arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts      | 4 ++--
->  arch/arm/boot/dts/imx6q-h100.dts               | 4 ++--
->  arch/arm/boot/dts/imx6q-novena.dts             | 4 ++--
->  arch/arm/boot/dts/imx6q-ts4900.dts             | 4 ++--
->  arch/arm/boot/dts/imx6q-ts7970.dts             | 4 ++--
->  arch/arm/boot/dts/imx6q-zii-rdu2.dts           | 4 ++--
->  arch/arm/boot/dts/imx6qdl-apalis.dtsi          | 4 ++--
->  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 4 ++--
->  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 4 ++--
->  arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi   | 4 ++--
->  arch/arm/boot/dts/imx6qdl-tx6.dtsi             | 4 ++--
->  arch/arm/boot/dts/imx6qp-zii-rdu2.dts          | 4 ++--
->  arch/arm/boot/dts/imx6ul-tx6ul.dtsi            | 4 ++--
->  arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi | 2 +-
->  arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi    | 2 +-
->  19 files changed, 36 insertions(+), 36 deletions(-)
-> 
-[...]
-> diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> index 6abb66c..f015e2d 100644
-> --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> @@ -61,8 +61,8 @@
->  		sdhc1 = &usdhc2;
->  	};
->  
-> -	memory {
-> -		reg = <0 0>; /* will be filled by U-Boot */
-> +	memory at 10000000 {
-> +		reg = <0x10000000 0>; /* will be filled by U-Boot */
->  	};
->  
->  	clocks {
-[...]
-> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> index 65111f98..f678d18 100644
-> --- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> @@ -70,8 +70,8 @@
->  		stdout-path = &uart1;
->  	};
->  
-> -	memory {
-> -		reg = <0 0>; /* will be filled by U-Boot */
-> +	memory at 80000000 {
-> +		reg = <0x80000000 0>; /* will be filled by U-Boot */
->  	};
->  
->  	clocks {
->
-For those two:
-Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
+This will need the removal of 'const' from 
+static const struct mmc_host_ops sdhci_ops = {}
+in sdhci.c file. Please confirm.
 
+Thanks,
+Manish
 
-Lothar Wa?mann
+> 
+> static int arasan_zynqmp_execute_tuning(struct mmc_host *mmc, u32
+> opcode) {
+> 	struct sdhci_host *host = mmc_priv(mmc);
+> 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> 	struct sdhci_arasan_data *sdhci_arasan =
+> sdhci_pltfm_priv(pltfm_host);
+> 	int err;
+> 
+> 	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
+> 
+> 	err = sdhci_execute_tuning(mmc, opcode);
+> 	if (err)
+> 		return err;
+> 
+> 	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
+> 
+> 	return 0;
+> }
+> 
+> >
+> > Alternative way (Please review):
+> > - Define a host->quirk2 bit (SDHCI_QUIRK2_DLL_RESET_NEEDED) in
+> > sdhci-of-arasan.c indicating DLL reset needed while tuning operation
+> > - Call 'dll reset' routine before and after __sdhci_execute_tuning()
+> > in sdhci.c when a host->quirk2 bit (SDHCI_QUIRK2_DLL_RESET_NEEDED) is
+> > set
+> 
+> We should try to avoid quirks.
