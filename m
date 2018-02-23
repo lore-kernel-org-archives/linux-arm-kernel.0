@@ -1,43 +1,38 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 15:56:50 +0100
-Subject: [PATCH v4 02/10] ARM: sun9i: smp: Rename clusters's power-off
- register
-In-Reply-To: <20180223133742.26044-3-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-3-mylene.josserand@bootlin.com>
-Message-ID: <20180223145650.dzhdhh2cprqioq5m@flea.lan>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Fri, 23 Feb 2018 15:57:17 +0100
+Subject: [RFC PATCH] ARM: dts: ls1021a: add size-cells and address-cells
+ to scfg and dcfg nodes
+In-Reply-To: <20180223133114.7091-1-rasmus.villemoes@prevas.dk>
+References: <20180223133114.7091-1-rasmus.villemoes@prevas.dk>
+Message-ID: <ad7dde07-9a11-09fb-61c0-8ec97e35bb63@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 02:37:34PM +0100, Myl?ne Josserand wrote:
-> To prepare the support for sun8i-a83t, rename the variable name
-> that handles the power-off of clusters because it is different from
-> sun9i-a80 to sun8i-a83t.
->
-> The power off register for clusters are different from SUN9I and SUN8I
+On 2018-02-23 14:31, Rasmus Villemoes wrote:
+> A single u32 is sufficient to specify a register in the Device
+> Configuration Unit/Supplemental Configuration Unit. Moreover, they only
+> consist of 32 bit registers (for the DCFG we even have "These registers
+> only support 32-bit accesses." according to the reference manual), so no
+> size specification is needed.
+> 
+> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+> ---
+> None of the in-tree .dts files using ls1021a.dtsi currently define a
+> subnode of either node. It is possible, though somewhat unlikely, that
+> some out-of-tree .dts file is built against the in-tree ls1021a.dtsi,
+> and I don't know if such files are treated the same as out-of-tree
+> modules (i.e., they get to fix the breakage).
+> 
+> The reason I'm proposing to add these is that I'm about to add a subnode
+> of scfg with a reg property, and if possible I'd like to avoid the
+> somewhat clumsy
+> 
+>   reg = <0 0x1ac 0 4>;
 
-This is just a nitpick, and I see you use them everywhere, but sun8i
-and sun9i are the family of SoCs, and A80 and A83t the name of SoCs
-within their respective families.
+Ah, apparently I've misunderstood how address-cells/size-cells worked; I
+thought they would be taken from the nearest ancestor node specifying
+them, so that 2/2 would apply to scfg. But it seems they have to be
+present in the parent node itself, otherwise defaulting to 2/1. So the
+above should be <0 0x1ac 4>, which is still clumsier than needed.
 
-So in your commit log, you want to support the A83t because it's
-different than the A80, and the sun9i and sun8i mentionned in your
-last sentence is not really meaningful.
-
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/88cf636f/attachment.sig>
+Rasmus
