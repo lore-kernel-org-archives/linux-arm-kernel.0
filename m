@@ -1,95 +1,68 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 15:54:23 +0100
-Subject: [PATCH v4 01/10] ARM: sun9i: smp: Add sun9i dt parsing function
-In-Reply-To: <20180223133742.26044-2-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-2-mylene.josserand@bootlin.com>
-Message-ID: <20180223145423.5og5bdhtznu5qlw7@flea.lan>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 23 Feb 2018 22:56:27 +0800
+Subject: [PATCH v2 1/4] arm64: add basic Kconfig symbols for i.MX8
+In-Reply-To: <20180201183126.32384-1-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+Message-ID: <20180223145625.GT3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Feb 23, 2018 at 02:37:33PM +0100, Myl?ne Josserand wrote:
-> To prepare the support for sun8i-a83t, create a new function
-> that handles all the resources needed on sun9i-a80 (because
-> it will be different from sun8i-a83t).
+On Thu, Feb 01, 2018 at 07:31:23PM +0100, Lucas Stach wrote:
+> Add basic Kconfig symbols to make the MXC architecture available
+> in the ARM64 world.
 > 
-> All the parsing of device tree is moved into this new function:
-> sun9i_dt_parsing. Create also a function to release the resources
-> retrieved during the dt parsing in case there is an error in init
-> function.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
->  arch/arm/mach-sunxi/mc_smp.c | 99 ++++++++++++++++++++++++++------------------
->  1 file changed, 58 insertions(+), 41 deletions(-)
+> v2: fix "enabled" typo.
+> ---
+>  arch/arm64/Kconfig.platforms |  6 ++++++
+>  drivers/soc/imx/Kconfig      | 12 ++++++++++++
+>  2 files changed, 18 insertions(+)
 > 
-> diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> index 11e46c6efb90..650a2ad4398f 100644
-> --- a/arch/arm/mach-sunxi/mc_smp.c
-> +++ b/arch/arm/mach-sunxi/mc_smp.c
-> @@ -684,35 +684,22 @@ static int __init sunxi_mc_smp_lookback(void)
->  	return ret;
->  }
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 2401373565ff..ae3be0d2cdb5 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -131,6 +131,12 @@ config ARCH_MVEBU
+>  	   - Armada 7K SoC Family
+>  	   - Armada 8K SoC Family
 >  
-> -static int __init sunxi_mc_smp_init(void)
-> +static int sun9i_dt_parsing(struct resource res)
-
-Like I told you in the previous version, this should be _parse_dt, and
-not _dt_parsing.
-
-Also, I'm not sure why you are passing by copy the resource structure?
-
->  {
-> -	struct device_node *cpucfg_node, *sram_node, *node;
-> -	struct resource res;
-> +	struct device_node *prcm_node, *cpucfg_node, *sram_node;
->  	int ret;
+> +config ARCH_MXC
+> +	bool "ARMv8 based NXP i.MX SoC family"
+> +	help
+> +	  This enables support for the ARMv8 based SoCs in the
+> +	  NXP i.MX family.
+> +
+>  config ARCH_QCOM
+>  	bool "Qualcomm Platforms"
+>  	select GPIOLIB
+> diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
+> index a5b86a28f343..8c9f04440896 100644
+> --- a/drivers/soc/imx/Kconfig
+> +++ b/drivers/soc/imx/Kconfig
+> @@ -8,3 +8,15 @@ config IMX7_PM_DOMAINS
+>  	default y if SOC_IMX7D
 >  
-> -	if (!of_machine_is_compatible("allwinner,sun9i-a80"))
-> -		return -ENODEV;
-> -
-> -	if (!sunxi_mc_smp_cpu_table_init())
-> -		return -EINVAL;
-> -
-> -	if (!cci_probed()) {
-> -		pr_err("%s: CCI-400 not available\n", __func__);
-> -		return -ENODEV;
-> -	}
-> -
-> -	node = of_find_compatible_node(NULL, NULL, "allwinner,sun9i-a80-prcm");
-> -	if (!node) {
-> -		pr_err("%s: PRCM not available\n", __func__);
-> +	prcm_node = of_find_compatible_node(NULL, NULL,
-> +				       "allwinner,sun9i-a80-prcm");
-> +	if (!prcm_node)
->  		return -ENODEV;
-> -	}
->  
->  	/*
->  	 * Unfortunately we can not request the I/O region for the PRCM.
->  	 * It is shared with the PRCM clock.
->  	 */
-> -	prcm_base = of_iomap(node, 0);
-> -	of_node_put(node);
-> +	prcm_base = of_iomap(prcm_node, 0);
+>  endmenu
+> +
+> +if ARCH_MXC
+> +
+> +if ARM64
+> +
+> +config SOC_IMX8MQ
+> +	bool "i.MX8MQ support"
+> +	help
+> +	  This enables support for the i.MX8MQ SoC.
+> +endif
+> +
+> +endif
 
-So it does more a bit more than just parsing the DT?
+I do not feel it's so idiomatic to select a platform SoC in drivers/soc
+folder.  The options in this folder are used to select SoC level drivers
+not the SoC itself.  Can we just use ARCH_MXC for all IMX ARMv8 SoCs?
+Or if we really want individual SoC option, can we do something similar
+to Renesas platform, having sub-select under "ARMv8 based NXP i.MX SoC
+family"?
 
-Can you maybe just fill the DT nodes and have the common part map the
-memory regions if the pointer is not NULL?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/3898813c/attachment.sig>
+Shawn
