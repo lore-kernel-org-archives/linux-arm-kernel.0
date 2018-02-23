@@ -1,45 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Feb 2018 09:38:28 +0530
-Subject: [PATCH] cpufreq: s3c24xx: Fix broken s3c_cpufreq_init()
-Message-ID: <6b737a9c285840b4b2036fa51b692ee835664ec8.1519358505.git.viresh.kumar@linaro.org>
+From: j-keerthy@ti.com (Keerthy)
+Date: Fri, 23 Feb 2018 09:38:40 +0530
+Subject: [PATCH v11 04/10] clocksource: timer-ti-dm: Replace architecture
+In-Reply-To: <20180222184541.GB5184@atomide.com>
+References: <1518674511-26421-1-git-send-email-j-keerthy@ti.com>
+ <1518674511-26421-5-git-send-email-j-keerthy@ti.com>
+ <20180222105713.GA30885@lenoch> <20180222184541.GB5184@atomide.com>
+Message-ID: <44e7cb7c-aafa-ad10-fc11-6417066fb6e9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit a307a1e6bc0d ("cpufreq: s3c: use cpufreq_generic_init()")
-accidentally broke cpufreq on s3c2410 and s3c2412. These two platforms
-don't have a CPU frequency table and used to skip calling
-cpufreq_table_validate_and_show() for them. But with the above commit,
-we started calling it unconditionally and that will eventually fail as
-the frequency table pointer is NULL.
 
-Fix this by calling cpufreq_table_validate_and_show() conditionally
-again.
 
-Cc: stable at vger.kernel.org # v3.13+
-Fixes: a307a1e6bc0d ("cpufreq: s3c: use cpufreq_generic_init()")
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/s3c24xx-cpufreq.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+On Friday 23 February 2018 12:15 AM, Tony Lindgren wrote:
+> * Ladislav Michl <ladis@linux-mips.org> [180222 10:58]:
+>> On Thu, Feb 15, 2018 at 11:31:45AM +0530, Keerthy wrote:
+>>> Replace architecture specific guard with clocksource guard.
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> Replace architecture specific defines with clocksource
+>>
+>> This looks like a bit unussual commit log. Also, what about merging
+>> it with previous patch?
+> 
+> I'll just remove that line locally to avoid yet another set
+> of patches being posted :)
 
-diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
-index 7b596fa38ad2..6bebc1f9f55a 100644
---- a/drivers/cpufreq/s3c24xx-cpufreq.c
-+++ b/drivers/cpufreq/s3c24xx-cpufreq.c
-@@ -351,7 +351,13 @@ struct clk *s3c_cpufreq_clk_get(struct device *dev, const char *name)
- static int s3c_cpufreq_init(struct cpufreq_policy *policy)
- {
- 	policy->clk = clk_arm;
--	return cpufreq_generic_init(policy, ftab, cpu_cur.info->latency);
-+
-+	policy->cpuinfo.transition_latency = cpu_cur.info->latency;
-+
-+	if (ftab)
-+		return cpufreq_table_validate_and_show(policy, ftab);
-+
-+	return 0;
- }
- 
- static int __init s3c_cpufreq_initclks(void)
--- 
-2.15.0.194.g9af6a3dea062
+Thanks!
+
+> 
+>> Btw, I tested whole serie again on the top of today's -next and it is
+>> still working fine. What is preventing these patches from being merged?
+
+Ladis,
+
+Thanks once again.
+
+
+> 
+> Well I noticed we need a fix for omap1 that I just posted.
+> And patch 4/10 needs the following select for omap16xx that
+> I'll fold in.
+> 
+> I'll push it all to omap-for-v4.17/timer and will merge into
+> my for-next after some more testing. It seems any further
+> patching can be done after move to drivers.
+
+Yes that would be great.
+
+> 
+> Regards,
+> 
+> Tony
+> 
+> 8< -----------------
+> --- a/arch/arm/mach-omap1/Kconfig
+> +++ b/arch/arm/mach-omap1/Kconfig
+> @@ -30,6 +30,7 @@ config ARCH_OMAP16XX
+>  	bool "OMAP16xx Based System"
+>  	select ARCH_OMAP_OTG
+>  	select CPU_ARM926T
+> +	select OMAP_DM_TIMER
+>  
+>  config OMAP_MUX
+>  	bool "OMAP multiplexing support"
+> 
