@@ -1,67 +1,76 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 23 Feb 2018 22:23:57 +0800
-Subject: Build failure on arm64 defconfig for linux-next recently
-In-Reply-To: <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
-References: <06af01b0-7d95-35e2-3b21-b54f7ed65efc@rock-chips.com>
- <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
-Message-ID: <9c8fef61-d2b7-3bb4-038a-0038c072036b@rock-chips.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Fri, 23 Feb 2018 14:30:54 +0000
+Subject: [PATCH v4 31/40] KVM: arm64: Move common VHE/non-VHE trap config
+ in separate functions
+In-Reply-To: <20180215210332.8648-32-christoffer.dall@linaro.org>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-32-christoffer.dall@linaro.org>
+Message-ID: <833c8ef7-dfd8-6b01-cab5-c97c86b705f3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Christoffer,
 
-On 2018/2/23 19:54, Robin Murphy wrote:
-> Hi Shawn,
-> 
-> On 23/02/18 08:03, Shawn Lin wrote:
->> Hi folks,
->>
->> I failed to build the arm64 kernel for linux-20180222 and I confirm it
->> works for linux-20180206. It seems there was some patches for head.S
->> got merged. Is it a known issue? Or a fix is coming?
-> 
-> Yes, I broke it, sorry!
-> 
-> There's a fix queued in arm64/fixes/core already (04c4927359b1). Using a 
+On 15/02/18 21:03, Christoffer Dall wrote:
+> @@ -85,37 +123,14 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>   {
+>   	u64 hcr = vcpu->arch.hcr_el2;
+>   
+> -	/*
+> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> -	 * register accesses to EL2, however, the ARM ARM clearly states that
+> -	 * traps are only taken to EL2 if the operation would not otherwise
+> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> -	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+> -	 * it will cause an exception.
+> -	 */
+> -	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
+> -		write_sysreg(1 << 30, fpexc32_el2);
+> -		isb();
+> -	}
+> +	write_sysreg(hcr, hcr_el2);
+>   
+>   	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
+>   		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
+>   
+> -	write_sysreg(hcr, hcr_el2);
 
-Good to know that! Thanks for help.
+OOI, any reason to move the write to HCR_EL2 just before the if?
 
-> different toolchain is another option, since the one I'm currently using 
-> (gcc-linaro-7.2.1-2017.11) builds it just fine, which is how I managed 
-> to create this mess in the first place ;)
-> 
-> Thanks,
-> Robin.
-> 
->> make ARCH=arm64 defconfig
->>
->> make 
->> CROSS_COMPILE=gcc-linaro-6.3.1-aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu- 
->> ??ARCH=arm64 -j32
->>
->>
->> arch/arm64/kernel/head.S: Assembler messages:
->> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
->> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
->> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
->> arch/arm64/kernel/head.S:677: Error: junk at end of line, first 
->> unrecognized character is `L'
->> arch/arm64/kernel/head.S:677: Error: unexpected characters following 
->> instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
->> arch/arm64/kernel/head.S:677: Error: unexpected characters following 
->> instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
->> make[1]: *** [arch/arm64/kernel/head.o] Error 1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+> -
+> -	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+> -	write_sysreg(1 << 15, hstr_el2);
+> -	/*
+> -	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
+> -	 * PMSELR_EL0 to make sure it never contains the cycle
+> -	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF at
+> -	 * EL1 instead of being trapped to EL2.
+> -	 */
+> -	write_sysreg(0, pmselr_el0);
+> -	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+> -	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+> -	__activate_traps_arch()();
+> +	__activate_traps_fpsimd32(vcpu);
+> +	__activate_traps_common(vcpu);
+> +	__activate_traps_arch()(vcpu);
+>   }
+>   
+>   static void __hyp_text __deactivate_traps_vhe(void)
+> @@ -160,9 +175,8 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>   	if (vcpu->arch.hcr_el2 & HCR_VSE)
+>   		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+>   
+> +	__deactivate_traps_common();
+>   	__deactivate_traps_arch()();
+> -	write_sysreg(0, hstr_el2);
+> -	write_sysreg(0, pmuserenr_el0);
+>   }
+>   
+>   static void __hyp_text __activate_vm(struct kvm *kvm)
 > 
 
+Cheers,
 
 -- 
-Best Regards
-Shawn Lin
+Julien Grall
