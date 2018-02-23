@@ -1,135 +1,59 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 23 Feb 2018 15:12:26 +0200
-Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
-References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
- <20180222191647.4727-3-ard.biesheuvel@linaro.org>
- <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
- <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
-Message-ID: <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Fri, 23 Feb 2018 14:31:14 +0100
+Subject: [RFC PATCH] ARM: dts: ls1021a: add size-cells and address-cells to
+ scfg and dcfg nodes
+Message-ID: <20180223133114.7091-1-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> This is a cleaned up version of the I2C controller driver for
->>> the Fujitsu F_I2C IP, which was never supported upstream, and
->>> has now been incorporated into the Socionext SynQuacer SoC.
+A single u32 is sufficient to specify a register in the Device
+Configuration Unit/Supplemental Configuration Unit. Moreover, they only
+consist of 32 bit registers (for the DCFG we even have "These registers
+only support 32-bit accesses." according to the reference manual), so no
+size specification is needed.
 
->>> +       return DIV_ROUND_UP((bit_count * 9 + 10 * num) * 3, 200) + 10;
->>
->> When I suggested to drop parens, I also suggested to swap second pair
->> arguments (b/c I was thinking that parens to prevent confusion + vs
->> *), like
->>
->> 9 * bit_count + 10 * num, or
->> bit_count * 9 + num * 10.
->>
->> Though, it is up to you, I still consider that + vs. * operator
->> precedence is quite obvious.
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+None of the in-tree .dts files using ls1021a.dtsi currently define a
+subnode of either node. It is possible, though somewhat unlikely, that
+some out-of-tree .dts file is built against the in-tree ls1021a.dtsi,
+and I don't know if such files are treated the same as out-of-tree
+modules (i.e., they get to fix the breakage).
 
-> I can change it if you like.
+The reason I'm proposing to add these is that I'm about to add a subnode
+of scfg with a reg property, and if possible I'd like to avoid the
+somewhat clumsy
 
-I guess slightly better to change, thanks.
+  reg = <0 0x1ac 0 4>;
 
+when reg = <0x1ac>; would convey the same information. But if the
+#address-cells and #size-cells properties are set in stone once the
+.dtsi is in mainline, I'll just accept the clumsiness.
 
->>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
->>> +                                      &speed_khz);
->>> +       if (ret) {
->>> +               dev_err(&pdev->dev,
->>> +                       "Missing clock-frequency property\n");
->>> +               return -EINVAL;
->>> +       }
->>> +       speed_khz /= 1000;
+arch/arm/boot/dts/ls1021a.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->>> +       if (dev_of_node(&pdev->dev)) {
->>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
->>> +               if (IS_ERR(i2c->clk)) {
->>> +                       dev_err(&pdev->dev, "cannot get clock\n");
->>> +                       return PTR_ERR(i2c->clk);
->>> +               }
->>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
->>> +
->>> +               i2c->clkrate = clk_get_rate(i2c->clk);
->>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
->>> +               clk_prepare_enable(i2c->clk);
->>> +       } else {
->>> +               ret = device_property_read_u32(&pdev->dev,
->>> +                                              "socionext,pclk-rate",
->>> +                                              &i2c->clkrate);
->>> +               if (ret)
->>> +                       return ret;
->>> +       }
->>
->> Okay, I got this case. It's more likely the one in 8250_dw.c.
->>
->> Can you do the similar way?
-
-> Could you elaborate?
-
---- 8< --- 8< --- 8< ---
-        device_property_read_u32(dev, "clock-frequency", &p->uartclk);
-
-       /* If there is separate baudclk, get the rate from it. */
-       data->clk = devm_clk_get(dev, "baudclk");
-...
-       if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
-               return -EPROBE_DEFER;
-       if (!IS_ERR_OR_NULL(data->clk)) {
-               err = clk_prepare_enable(data->clk);
-               if (err)
-                       dev_warn(dev, "could not enable optional baudclk: %d\n",
-                                err);
-               else
-                       p->uartclk = clk_get_rate(data->clk);
-       }
-
-       /* If no clock rate is defined, fail. */
-       if (!p->uartclk) {
-               dev_err(dev, "clock rate not defined\n");
-               err = -EINVAL;
-               goto err_clk;
---- 8< --- 8< --- 8< ---
-
-Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
-above and you are almost done.
-
->>> +       i2c->irq = platform_get_irq(pdev, 0);
->>> +       if (i2c->irq <= 0) {
->>
->> < 0 ?
->>
->> On some platforms IRQ == 0 might be valid.
-
-> Are you sure about that?
-
-Yes. I fixed some cases on one of a such.
-
-> http://yarchive.net/comp/linux/no_irq.html
-
-I agree with Linus from software IRQ (and nowadays luckily we are
-using IRQ descriptors), but I disagree with him from hardware
-prospective.
-0 is totally valid HW IRQ line. In hardware there is no descriptor
-(except, yes, MSI and alike cases), it's just a wire with an index.
-
-So, while drivers are getting better in code prospective (though I
-don't see many of them comparing this to 0), the IRQ framework is
-changing itself as well.
-
-At which circumstances we might get 0 in the first place?
-
-Second question, doesn't request_irq() fail on irq==0 if it's not
-supported as valid by platform?
-
->>> +               dev_err(&pdev->dev, "no IRQ resource found\n");
->>> +               return -ENODEV;
->>> +       }
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index c31dad98f989..3c9fadcd611d 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -159,6 +159,8 @@
+ 		dcfg: dcfg at 1ee0000 {
+ 			compatible = "fsl,ls1021a-dcfg", "syscon";
+ 			reg = <0x0 0x1ee0000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			big-endian;
+ 		};
+ 
+@@ -202,6 +204,8 @@
+ 		scfg: scfg at 1570000 {
+ 			compatible = "fsl,ls1021a-scfg", "syscon";
+ 			reg = <0x0 0x1570000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			big-endian;
+ 		};
+ 
 -- 
-With Best Regards,
-Andy Shevchenko
+2.15.1
