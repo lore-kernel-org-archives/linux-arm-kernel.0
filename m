@@ -1,99 +1,262 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 23 Feb 2018 16:46:51 +0100
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
-References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
-Message-ID: <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 23 Feb 2018 09:43:54 -0600
+Subject: [PATCH v5 1/4] ARM: OMAP2+: Introduce low-level suspend code for
+ AM33XX
+In-Reply-To: <20180223154357.23504-1-d-gerlach@ti.com>
+References: <20180223154357.23504-1-d-gerlach@ti.com>
+Message-ID: <20180223154357.23504-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Radoslaw
+In preparation for suspend-resume support for AM33XX, add
+the assembly file with the code which is copied to internal
+memory (OCMC RAM) during bootup and runs from there.
 
-The gpio-keys tests it's now functional on H7, great.
-However the gpio-key test only the bank1 (like stm32f429).
-Like the H7 introduce the multi-bank management,
-we must perform complementary test.
+As part of the low power entry (DeepSleep0 mode in AM33XX TRM),
+the code running from OCMC RAM does the following
+1. Calls routine to store the EMIF configuration
+2. Calls routine to place external memory in self-refresh
+3. Disables EMIF clock
+4. Executes WFI after writing to MPU_CLKCTRL register.
 
-comment below about ack in handler
+If no interrupts have come, WFI execution on MPU gets registered
+as an interrupt with the WKUP-M3. WKUP-M3 takes care of disabling
+some clocks which MPU should not (L3, L4, OCMC RAM etc) and takes
+care of clockdomain and powerdomain transitions as part of the
+DeepSleep0 mode entry.
 
-On 02/23/2018 09:31 AM, Radoslaw Pietrzyk wrote:
-> - discards setting handle_simple_irq handler for hierarchy interrupts
-> - removes acking in chained irq handler as this is done by
-> irq_chip itself inside handle_edge_irq
-> - removes unneeded irq_domain_ops.xlate callback
-> 
-> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
-> ---
->   drivers/irqchip/irq-stm32-exti.c | 13 -------------
->   1 file changed, 13 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index 36f0fbe..8013a87 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
-> @@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
->   	return irq_reg_readl(gc, stm32_bank->pr_ofst);
->   }
->   
-> -static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
-> -{
-> -	const struct stm32_exti_bank *stm32_bank = gc->private;
-> -
-> -	irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
-> -}
-> -
->   static void stm32_irq_handler(struct irq_desc *desc)
->   {
->   	struct irq_domain *domain = irq_desc_get_handler_data(desc);
-> @@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
->   			for_each_set_bit(n, &pending, IRQS_PER_BANK) {
->   				virq = irq_find_mapping(domain, irq_base + n);
->   				generic_handle_irq(virq);
-> -				stm32_exti_irq_ack(gc, BIT(n));
+In case a late interrupt comes in, WFI ends up as a NOP and MPU
+continues execution from internal memory. The 'abort path' code
+undoes whatever was done as part of the low power entry and indicates
+a suspend failure by passing a non-zero value to the cpu_resume routine.
 
-the while loop " while ((pending = " has been introduce while original
-upstream of this driver in V2 to V3
-https://patchwork.ozlabs.org/patch/604190/
-https://patchwork.ozlabs.org/patch/665242/
+The 'resume path' code is similar to the 'abort path' with the key
+difference of MMU being enabled in the 'abort path' but being
+disabled in the 'resume path' due to MPU getting powered off.
 
-the "ack" is needed to acknowledge the irq which are handled and which 
-is not the original irq for which we enter.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/sleep33xx.S | 212 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 212 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/sleep33xx.S
 
->   			}
->   		}
->   	}
-> @@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
->   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
->   			    unsigned int nr_irqs, void *data)
->   {
-> -	struct irq_chip_generic *gc;
->   	struct irq_fwspec *fwspec = data;
->   	irq_hw_number_t hwirq;
->   
->   	hwirq = fwspec->param[0];
-> -	gc = irq_get_domain_generic_chip(d, hwirq);
->   
->   	irq_map_generic_chip(d, virq, hwirq);
-> -	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
-> -			    handle_simple_irq, NULL, NULL);
-
-I see if it is not disturb the multi-bank.
-
->   
->   	return 0;
->   }
-> @@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
->   
->   struct irq_domain_ops irq_exti_domain_ops = {
->   	.map	= irq_map_generic_chip,
-> -	.xlate	= irq_domain_xlate_onetwocell,
->   	.alloc  = stm32_exti_alloc,
->   	.free	= stm32_exti_free,
->   };
-> 
-
-BR
-Ludo
+diff --git a/arch/arm/mach-omap2/sleep33xx.S b/arch/arm/mach-omap2/sleep33xx.S
+new file mode 100644
+index 000000000000..04015f98b6e3
+--- /dev/null
++++ b/arch/arm/mach-omap2/sleep33xx.S
+@@ -0,0 +1,212 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Low level suspend code for AM33XX SoCs
++ *
++ * Copyright (C) 2012-2018 Texas Instruments Incorporated - http://www.ti.com/
++ *	Dave Gerlach, Vaibhav Bedia
++ */
++
++#include <linux/linkage.h>
++#include <linux/ti-emif-sram.h>
++#include <asm/assembler.h>
++#include <asm/memory.h>
++
++#include "iomap.h"
++#include "cm33xx.h"
++
++#define AM33XX_CM_CLKCTRL_MODULESTATE_DISABLED			0x00030000
++#define AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE			0x0003
++#define AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE			0x0002
++
++	.arm
++	.align 3
++
++ENTRY(am33xx_do_wfi)
++	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
++
++	/*
++	 * Flush all data from the L1 and L2 data cache before disabling
++	 * SCTLR.C bit.
++	 */
++	ldr	r1, kernel_flush
++	blx	r1
++
++	/*
++	 * Clear the SCTLR.C bit to prevent further data cache
++	 * allocation. Clearing SCTLR.C would make all the data accesses
++	 * strongly ordered and would not hit the cache.
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #(1 << 2)	@ Disable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++
++	/*
++	 * Invalidate L1 and L2 data cache.
++	 */
++	ldr	r1, kernel_flush
++	blx	r1
++
++	adr	r9, am33xx_emif_sram_table
++
++	ldr	r3, [r9, #EMIF_PM_ENTER_SR_OFFSET]
++	blx	r3
++
++	ldr	r3, [r9, #EMIF_PM_SAVE_CONTEXT_OFFSET]
++	blx	r3
++
++	/* Disable EMIF */
++	ldr     r1, virt_emif_clkctrl
++	ldr     r2, [r1]
++	bic     r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
++	str     r2, [r1]
++
++	ldr	r1, virt_emif_clkctrl
++wait_emif_disable:
++	ldr	r2, [r1]
++	mov	r3, #AM33XX_CM_CLKCTRL_MODULESTATE_DISABLED
++	cmp	r2, r3
++	bne	wait_emif_disable
++
++	/*
++	 * For the MPU WFI to be registered as an interrupt
++	 * to WKUP_M3, MPU_CLKCTRL.MODULEMODE needs to be set
++	 * to DISABLED
++	 */
++	ldr	r1, virt_mpu_clkctrl
++	ldr	r2, [r1]
++	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
++	str	r2, [r1]
++
++	/*
++	 * Execute an ISB instruction to ensure that all of the
++	 * CP15 register changes have been committed.
++	 */
++	isb
++
++	/*
++	 * Execute a barrier instruction to ensure that all cache,
++	 * TLB and branch predictor maintenance operations issued
++	 * have completed.
++	 */
++	dsb
++	dmb
++
++	/*
++	 * Execute a WFI instruction and wait until the
++	 * STANDBYWFI output is asserted to indicate that the
++	 * CPU is in idle and low power state. CPU can specualatively
++	 * prefetch the instructions so add NOPs after WFI. Thirteen
++	 * NOPs as per Cortex-A8 pipeline.
++	 */
++	wfi
++
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++
++	/* We come here in case of an abort due to a late interrupt */
++
++	/* Set MPU_CLKCTRL.MODULEMODE back to ENABLE */
++	ldr	r1, virt_mpu_clkctrl
++	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r2, [r1]
++
++	/* Re-enable EMIF */
++	ldr	r1, virt_emif_clkctrl
++	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r2, [r1]
++wait_emif_enable:
++	ldr	r3, [r1]
++	cmp	r2, r3
++	bne	wait_emif_enable
++
++
++	ldr	r1, [r9, #EMIF_PM_ABORT_SR_OFFSET]
++	blx	r1
++
++	/*
++	 * Set SCTLR.C bit to allow data cache allocation
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	orr	r0, r0, #(1 << 2)	@ Enable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++
++	/* Let the suspend code know about the abort */
++	mov	r0, #1
++	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
++ENDPROC(am33xx_do_wfi)
++
++	.align
++ENTRY(am33xx_resume_offset)
++	.word . - am33xx_do_wfi
++
++ENTRY(am33xx_resume_from_deep_sleep)
++	/* Re-enable EMIF */
++	ldr	r0, phys_emif_clkctrl
++	mov	r1, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r1, [r0]
++wait_emif_enable1:
++	ldr	r2, [r0]
++	cmp	r1, r2
++	bne	wait_emif_enable1
++
++	adr	r9, am33xx_emif_sram_table
++
++	ldr	r1, [r9, #EMIF_PM_RESTORE_CONTEXT_OFFSET]
++	blx	r1
++
++	ldr	r1, [r9, #EMIF_PM_EXIT_SR_OFFSET]
++	blx	r1
++
++resume_to_ddr:
++	/* We are back. Branch to the common CPU resume routine */
++	mov	r0, #0
++	ldr	pc, resume_addr
++ENDPROC(am33xx_resume_from_deep_sleep)
++
++/*
++ * Local variables
++ */
++	.align
++resume_addr:
++	.word	cpu_resume - PAGE_OFFSET + 0x80000000
++kernel_flush:
++	.word   v7_flush_dcache_all
++virt_mpu_clkctrl:
++	.word	AM33XX_CM_MPU_MPU_CLKCTRL
++virt_emif_clkctrl:
++	.word	AM33XX_CM_PER_EMIF_CLKCTRL
++phys_emif_clkctrl:
++	.word	(AM33XX_CM_BASE + AM33XX_CM_PER_MOD + \
++		AM33XX_CM_PER_EMIF_CLKCTRL_OFFSET)
++
++.align 3
++/* DDR related defines */
++am33xx_emif_sram_table:
++	.space EMIF_PM_FUNCTIONS_SIZE
++
++ENTRY(am33xx_pm_sram)
++	.word am33xx_do_wfi
++	.word am33xx_do_wfi_sz
++	.word am33xx_resume_offset
++	.word am33xx_emif_sram_table
++	.word am33xx_pm_ro_sram_data
++
++.align 3
++ENTRY(am33xx_pm_ro_sram_data)
++	.space AMX3_PM_RO_SRAM_DATA_SIZE
++
++ENTRY(am33xx_do_wfi_sz)
++	.word	. - am33xx_do_wfi
+-- 
+2.16.1
