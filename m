@@ -1,945 +1,699 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 23 Feb 2018 14:27:41 +0200
-Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <20180222191647.4727-3-ard.biesheuvel@linaro.org>
-References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
- <20180222191647.4727-3-ard.biesheuvel@linaro.org>
-Message-ID: <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 23 Feb 2018 20:25:48 +0800
+Subject: [PATCH v3 3/7] pinctrl: sunxi: add support for the Allwinner H6 main
+ pin controller
+In-Reply-To: <20180223122552.58049-1-icenowy@aosc.io>
+References: <20180223122552.58049-1-icenowy@aosc.io>
+Message-ID: <20180223122552.58049-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> This is a cleaned up version of the I2C controller driver for
-> the Fujitsu F_I2C IP, which was never supported upstream, and
-> has now been incorporated into the Socionext SynQuacer SoC.
->
+The Allwinner H6 SoC has two pin controllers, one main controller
+(called CPUX-PORT in user manual) and one controller in CPUs power
+domain (called CPUS-PORT in user manual).
 
-Thanks for an update.
-My comments below.
+This commit introduces support for the main pin controller on H6.
 
-In case you address them, feel free to add
+The pin bank A and B are not wired out and hidden from the SoC's
+documents, however it's shown that the "ATE" (an AC200 chip
+co-packaged with the H6 die) is connected to the main SoC die via these
+pin banks. The information about these banks is just copied from the BSP
+pinctrl driver, but re-formatted to fit the mainline pinctrl driver
+format. The GPIO functions are dropped, as they're impossible to use --
+except a GPIO&IRQ only pin (PB20) which might be the IRQ of ATE.
 
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v3:
+- SPDX license identifier fix.
+- Dropped most GPIO functionality at PA/PB.
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/i2c/busses/Kconfig         |  11 +
->  drivers/i2c/busses/Makefile        |   1 +
->  drivers/i2c/busses/i2c-synquacer.c | 796 ++++++++++++++++++++
->  3 files changed, 808 insertions(+)
->
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index a9805c7cb305..9001dbaeb60a 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -995,6 +995,17 @@ config I2C_SUN6I_P2WI
->           This interface is used to connect to specific PMIC devices (like the
->           AXP221).
->
-> +config I2C_SYNQUACER
-> +       tristate "Socionext SynQuacer I2C controller"
-> +       depends on ARCH_SYNQUACER || COMPILE_TEST
+Changes in v2:
+- Dropped without_bus_gate description.
+- Switched to SPDX license identifier.
 
-> +       depends on OF || ACPI
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          | 614 +++++++++++++++++++++
+ 4 files changed, 620 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
 
-Does it make any sense?
-
-> +       help
-> +         Say Y here to include support for the I2C controller used in some
-> +         Fujitsu and Socionext SoCs.
-> +
-> +         This driver can also be built as a module. If so, the module
-> +         will be called i2c-synquacer.
-> +
->  config I2C_TEGRA
->         tristate "NVIDIA Tegra internal I2C controller"
->         depends on ARCH_TEGRA
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 2ce8576540a2..40ab7bfc3458 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -98,6 +98,7 @@ obj-$(CONFIG_I2C_STM32F4)     += i2c-stm32f4.o
->  obj-$(CONFIG_I2C_STM32F7)      += i2c-stm32f7.o
->  obj-$(CONFIG_I2C_STU300)       += i2c-stu300.o
->  obj-$(CONFIG_I2C_SUN6I_P2WI)   += i2c-sun6i-p2wi.o
-> +obj-$(CONFIG_I2C_SYNQUACER)    += i2c-synquacer.o
->  obj-$(CONFIG_I2C_TEGRA)                += i2c-tegra.o
->  obj-$(CONFIG_I2C_TEGRA_BPMP)   += i2c-tegra-bpmp.o
->  obj-$(CONFIG_I2C_UNIPHIER)     += i2c-uniphier.o
-> diff --git a/drivers/i2c/busses/i2c-synquacer.c b/drivers/i2c/busses/i2c-synquacer.c
-> new file mode 100644
-> index 000000000000..25329f65f35f
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-synquacer.c
-> @@ -0,0 +1,796 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2012 FUJITSU SEMICONDUCTOR LIMITED
-> + */
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/errno.h>
-> +#include <linux/i2c.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/sched.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define WAIT_PCLK(n, rate)     \
-> +       ndelay(DIV_ROUND_UP(DIV_ROUND_UP(1000000000, rate), n) + 10)
-> +
-> +/* I2C register adress definitions */
-> +#define SYNQUACER_I2C_REG_BSR          (0x00 << 2) // Bus Status
-> +#define SYNQUACER_I2C_REG_BCR          (0x01 << 2) // Bus Control
-> +#define SYNQUACER_I2C_REG_CCR          (0x02 << 2) // Clock Control
-> +#define SYNQUACER_I2C_REG_ADR          (0x03 << 2) // Address
-> +#define SYNQUACER_I2C_REG_DAR          (0x04 << 2) // Data
-> +#define SYNQUACER_I2C_REG_CSR          (0x05 << 2) // Expansion CS
-> +#define SYNQUACER_I2C_REG_FSR          (0x06 << 2) // Bus Clock Freq
-> +#define SYNQUACER_I2C_REG_BC2R         (0x07 << 2) // Bus Control 2
-> +
-> +/* I2C register bit definitions */
-> +#define SYNQUACER_I2C_BSR_FBT          BIT(0)  // First Byte Transfer
-> +#define SYNQUACER_I2C_BSR_GCA          BIT(1)  // General Call Address
-> +#define SYNQUACER_I2C_BSR_AAS          BIT(2)  // Address as Slave
-> +#define SYNQUACER_I2C_BSR_TRX          BIT(3)  // Transfer/Receive
-> +#define SYNQUACER_I2C_BSR_LRB          BIT(4)  // Last Received Bit
-> +#define SYNQUACER_I2C_BSR_AL           BIT(5)  // Arbitration Lost
-> +#define SYNQUACER_I2C_BSR_RSC          BIT(6)  // Repeated Start Cond.
-> +#define SYNQUACER_I2C_BSR_BB           BIT(7)  // Bus Busy
-> +
-> +#define SYNQUACER_I2C_BCR_INT          BIT(0)  // Interrupt
-> +#define SYNQUACER_I2C_BCR_INTE         BIT(1)  // Interrupt Enable
-> +#define SYNQUACER_I2C_BCR_GCAA         BIT(2)  // Gen. Call Access Ack.
-> +#define SYNQUACER_I2C_BCR_ACK          BIT(3)  // Acknowledge
-> +#define SYNQUACER_I2C_BCR_MSS          BIT(4)  // Master Slave Select
-> +#define SYNQUACER_I2C_BCR_SCC          BIT(5)  // Start Condition Cont.
-> +#define SYNQUACER_I2C_BCR_BEIE         BIT(6)  // Bus Error Int Enable
-> +#define SYNQUACER_I2C_BCR_BER          BIT(7)  // Bus Error
-> +
-> +#define SYNQUACER_I2C_CCR_CS_MASK      (0x1f)  // CCR Clock Period Sel.
-> +#define SYNQUACER_I2C_CCR_EN           BIT(5)  // Enable
-> +#define SYNQUACER_I2C_CCR_FM           BIT(6)  // Speed Mode Select
-> +
-> +#define SYNQUACER_I2C_CSR_CS_MASK      (0x3f)  // CSR Clock Period Sel.
-> +
-> +#define SYNQUACER_I2C_BC2R_SCLL                BIT(0)  // SCL Low Drive
-> +#define SYNQUACER_I2C_BC2R_SDAL                BIT(1)  // SDA Low Drive
-> +#define SYNQUACER_I2C_BC2R_SCLS                BIT(4)  // SCL Status
-> +#define SYNQUACER_I2C_BC2R_SDAS                BIT(5)  // SDA Status
-> +
-> +/* PCLK frequency */
-> +#define SYNQUACER_I2C_BUS_CLK_FR(rate) (((rate) / 20000000) + 1)
-> +
-> +/* STANDARD MODE frequency */
-> +#define SYNQUACER_I2C_CLK_MASTER_STD(rate)                     \
-> +       DIV_ROUND_UP(DIV_ROUND_UP((rate), 100000) - 2, 2)
-> +/* FAST MODE frequency */
-> +#define SYNQUACER_I2C_CLK_MASTER_FAST(rate)                    \
-> +       DIV_ROUND_UP((DIV_ROUND_UP((rate), 400000) - 2) * 2, 3)
-> +
-> +/* (clkrate <= 18000000) */
-> +/* calculate the value of CS bits in CCR register on standard mode */
-> +#define SYNQUACER_I2C_CCR_CS_STD_MAX_18M(rate)                 \
-> +          ((SYNQUACER_I2C_CLK_MASTER_STD(rate) - 65)           \
-> +                                       & SYNQUACER_I2C_CCR_CS_MASK)
-> +
-> +/* calculate the value of CS bits in CSR register on standard mode */
-> +#define SYNQUACER_I2C_CSR_CS_STD_MAX_18M(rate)         0x00
-> +
-> +/* calculate the value of CS bits in CCR register on fast mode */
-> +#define SYNQUACER_I2C_CCR_CS_FAST_MAX_18M(rate)                        \
-> +          ((SYNQUACER_I2C_CLK_MASTER_FAST(rate) - 1)           \
-> +                                       & SYNQUACER_I2C_CCR_CS_MASK)
-> +
-> +/* calculate the value of CS bits in CSR register on fast mode */
-> +#define SYNQUACER_I2C_CSR_CS_FAST_MAX_18M(rate)                0x00
-> +
-> +/* (clkrate > 18000000) */
-> +/* calculate the value of CS bits in CCR register on standard mode */
-> +#define SYNQUACER_I2C_CCR_CS_STD_MIN_18M(rate)                 \
-> +          ((SYNQUACER_I2C_CLK_MASTER_STD(rate) - 1)            \
-> +                                       & SYNQUACER_I2C_CCR_CS_MASK)
-> +
-> +/* calculate the value of CS bits in CSR register on standard mode */
-> +#define SYNQUACER_I2C_CSR_CS_STD_MIN_18M(rate)                 \
-> +          (((SYNQUACER_I2C_CLK_MASTER_STD(rate) - 1) >> 5)     \
-> +                                       & SYNQUACER_I2C_CSR_CS_MASK)
-> +
-> +/* calculate the value of CS bits in CCR register on fast mode */
-> +#define SYNQUACER_I2C_CCR_CS_FAST_MIN_18M(rate)                        \
-> +          ((SYNQUACER_I2C_CLK_MASTER_FAST(rate) - 1)           \
-> +                                       & SYNQUACER_I2C_CCR_CS_MASK)
-> +
-> +/* calculate the value of CS bits in CSR register on fast mode */
-> +#define SYNQUACER_I2C_CSR_CS_FAST_MIN_18M(rate)                        \
-> +          (((SYNQUACER_I2C_CLK_MASTER_FAST(rate) - 1) >> 5)    \
-> +                                       & SYNQUACER_I2C_CSR_CS_MASK)
-> +
-> +/* min I2C clock frequency 14M */
-> +#define SYNQUACER_I2C_MIN_CLK_RATE     (14 * 1000000)
-> +/* max I2C clock frequency 200M */
-> +#define SYNQUACER_I2C_MAX_CLK_RATE     (200 * 1000000)
-> +/* I2C clock frequency 18M */
-> +#define SYNQUACER_I2C_CLK_RATE_18M     (18 * 1000000)
-> +
-> +#define SYNQUACER_I2C_SPEED_FM         400     // Fast Mode
-> +#define SYNQUACER_I2C_SPEED_SM         100     // Standard Mode
-> +
-> +enum i2c_state {
-> +       STATE_IDLE,
-> +       STATE_START,
-> +       STATE_READ,
-> +       STATE_WRITE
-> +};
-> +
-> +struct synquacer_i2c {
-> +       struct completion       completion;
-> +
-> +       struct i2c_msg          *msg;
-> +       u32                     msg_num;
-> +       u32                     msg_idx;
-> +       u32                     msg_ptr;
-> +
-> +       u32                     irq;
-> +       struct device           *dev;
-> +       void __iomem            *base;
-> +       struct clk              *clk;
-> +       u32                     clkrate;
-> +       u32                     speed_khz;
-> +       u32                     timeout_ms;
-> +       enum i2c_state          state;
-> +       struct i2c_adapter      adapter;
-> +
-> +       bool                    is_suspended;
-> +};
-> +
-> +static inline int is_lastmsg(struct synquacer_i2c *i2c)
-> +{
-> +       return i2c->msg_idx >= (i2c->msg_num - 1);
-> +}
-> +
-> +static inline int is_msglast(struct synquacer_i2c *i2c)
-> +{
-> +       return i2c->msg_ptr == (i2c->msg->len - 1);
-> +}
-> +
-> +static inline int is_msgend(struct synquacer_i2c *i2c)
-> +{
-> +       return i2c->msg_ptr >= i2c->msg->len;
-> +}
-> +
-> +static inline unsigned long calc_timeout_ms(struct synquacer_i2c *i2c,
-> +                                           struct i2c_msg *msgs,
-> +                                           int num)
-> +{
-> +       unsigned long bit_count = 0;
-> +       int i;
-> +
-> +       for (i = 0; i < num; i++, msgs++)
-> +               bit_count += msgs->len;
-> +
-> +       return DIV_ROUND_UP((bit_count * 9 + 10 * num) * 3, 200) + 10;
-
-When I suggested to drop parens, I also suggested to swap second pair
-arguments (b/c I was thinking that parens to prevent confusion + vs
-*), like
-
-9 * bit_count + 10 * num, or
-bit_count * 9 + num * 10.
-
-Though, it is up to you, I still consider that + vs. * operator
-precedence is quite obvious.
-
-> +}
-> +
-> +static void synquacer_i2c_stop(struct synquacer_i2c *i2c, int ret)
-> +{
-> +       /*
-> +        * clear IRQ (INT=0, BER=0)
-> +        * set Stop Condition (MSS=0)
-> +        * Interrupt Disable
-> +        */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BCR);
-> +
-> +       i2c->state = STATE_IDLE;
-> +
-> +       i2c->msg_ptr = 0;
-> +       i2c->msg = NULL;
-> +       i2c->msg_idx++;
-> +       i2c->msg_num = 0;
-> +       if (ret)
-> +               i2c->msg_idx = ret;
-> +
-> +       complete(&i2c->completion);
-> +}
-> +
-> +static void synquacer_i2c_hw_init(struct synquacer_i2c *i2c)
-> +{
-> +       unsigned char ccr_cs, csr_cs;
-> +       u32 rt = i2c->clkrate;
-> +
-> +       /* Set own Address */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_ADR);
-> +
-> +       /* Set PCLK frequency */
-> +       writeb(SYNQUACER_I2C_BUS_CLK_FR(i2c->clkrate),
-> +              i2c->base + SYNQUACER_I2C_REG_FSR);
-> +
-> +       switch (i2c->speed_khz) {
-> +       case SYNQUACER_I2C_SPEED_FM:
-> +               if (i2c->clkrate <= SYNQUACER_I2C_CLK_RATE_18M) {
-> +                       ccr_cs = SYNQUACER_I2C_CCR_CS_FAST_MAX_18M(rt);
-> +                       csr_cs = SYNQUACER_I2C_CSR_CS_FAST_MAX_18M(rt);
-> +               } else {
-> +                       ccr_cs = SYNQUACER_I2C_CCR_CS_FAST_MIN_18M(rt);
-> +                       csr_cs = SYNQUACER_I2C_CSR_CS_FAST_MIN_18M(rt);
-> +               }
-> +
-> +               /* Set Clock and enable, Set fast mode */
-> +               writeb(ccr_cs | SYNQUACER_I2C_CCR_FM |
-> +                      SYNQUACER_I2C_CCR_EN,
-> +                      i2c->base + SYNQUACER_I2C_REG_CCR);
-> +               writeb(csr_cs, i2c->base + SYNQUACER_I2C_REG_CSR);
-> +               break;
-> +       case SYNQUACER_I2C_SPEED_SM:
-> +               if (i2c->clkrate <= SYNQUACER_I2C_CLK_RATE_18M) {
-> +                       ccr_cs = SYNQUACER_I2C_CCR_CS_STD_MAX_18M(rt);
-> +                       csr_cs = SYNQUACER_I2C_CSR_CS_STD_MAX_18M(rt);
-> +               } else {
-> +                       ccr_cs = SYNQUACER_I2C_CCR_CS_STD_MIN_18M(rt);
-> +                       csr_cs = SYNQUACER_I2C_CSR_CS_STD_MIN_18M(rt);
-> +               }
-> +
-> +               /* Set Clock and enable, Set standard mode */
-> +               writeb(ccr_cs | SYNQUACER_I2C_CCR_EN,
-> +                     i2c->base + SYNQUACER_I2C_REG_CCR);
-> +               writeb(csr_cs, i2c->base + SYNQUACER_I2C_REG_CSR);
-> +               break;
-> +       default:
-> +               WARN_ON(1);
-> +       }
-> +
-> +       /* clear IRQ (INT=0, BER=0), Interrupt Disable */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +}
-> +
-> +static void synquacer_i2c_hw_reset(struct synquacer_i2c *i2c)
-> +{
-> +       /* Disable clock */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_CCR);
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_CSR);
-> +
-> +       WAIT_PCLK(100, i2c->clkrate);
-> +
-> +       synquacer_i2c_hw_init(i2c);
-> +}
-> +
-> +static int synquacer_i2c_master_start(struct synquacer_i2c *i2c,
-> +                                     struct i2c_msg *pmsg)
-> +{
-> +       unsigned char bsr, bcr;
-> +
-> +       if (pmsg->flags & I2C_M_RD)
-> +               writeb((pmsg->addr << 1) | 1,
-> +                      i2c->base + SYNQUACER_I2C_REG_DAR);
-> +       else
-> +               writeb(pmsg->addr << 1,
-> +                      i2c->base + SYNQUACER_I2C_REG_DAR);
-> +
-> +       dev_dbg(i2c->dev, "slave:0x%02x\n", pmsg->addr);
-> +
-> +       /* Generate Start Condition */
-> +       bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +       bcr = readb(i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       dev_dbg(i2c->dev, "bsr:0x%02x, bcr:0x%02x\n", bsr, bcr);
-> +
-> +       if ((bsr & SYNQUACER_I2C_BSR_BB) &&
-> +           !(bcr & SYNQUACER_I2C_BCR_MSS)) {
-> +               dev_dbg(i2c->dev, "bus is busy");
-> +               return -EBUSY;
-> +       }
-> +
-> +       if (bsr & SYNQUACER_I2C_BSR_BB) { /* Bus is busy */
-> +               dev_dbg(i2c->dev, "Continuous Start");
-> +               writeb(bcr | SYNQUACER_I2C_BCR_SCC,
-> +                      i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       } else {
-> +               if (bcr & SYNQUACER_I2C_BCR_MSS) {
-> +                       dev_dbg(i2c->dev, "not in master mode");
-> +                       return -EAGAIN;
-> +               }
-> +               dev_dbg(i2c->dev, "Start Condition");
-> +               /* Start Condition + Enable Interrupts */
-> +               writeb(bcr | SYNQUACER_I2C_BCR_MSS |
-> +                      SYNQUACER_I2C_BCR_INTE | SYNQUACER_I2C_BCR_BEIE,
-> +                      i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       }
-> +
-> +       WAIT_PCLK(10, i2c->clkrate);
-> +
-> +       /* get bsr&bcr register */
-> +       bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +       bcr = readb(i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       dev_dbg(i2c->dev, "bsr:0x%02x, bcr:0x%02x\n", bsr, bcr);
-> +
-> +       if ((bsr & SYNQUACER_I2C_BSR_AL) ||
-> +           !(bcr & SYNQUACER_I2C_BCR_MSS)) {
-> +               dev_dbg(i2c->dev, "arbitration lost\n");
-> +               return -EAGAIN;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int synquacer_i2c_master_recover(struct synquacer_i2c *i2c)
-> +{
-> +       unsigned int count = 0;
-> +       unsigned char bc2r;
-> +
-> +       /* Disable interrupts */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BCR);
-> +
-> +       /* monitor SDA, SCL */
-> +       bc2r = readb(i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +       dev_dbg(i2c->dev, "bc2r:0x%02x\n", bc2r);
-> +
-
-> +       while (count <= 100) {
-> +               WAIT_PCLK(20, i2c->clkrate);
-> +               bc2r = readb(i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +
-> +               /* another master is running */
-> +               if ((bc2r & SYNQUACER_I2C_BC2R_SDAS) ||
-> +                   !(bc2r & SYNQUACER_I2C_BC2R_SCLS)) {
-> +                       dev_dbg(i2c->dev, "another master is running?\n");
-> +                       return -EAGAIN;
-> +               }
-> +               count++;
-> +       }
-
-I still consider do {} while not only taking less LOCs, but more
-readable and understanble
-
-unsigned int count = 100;
-
-do {
-...
-} while (--count);
-
-> +
-> +       /* Force to make one clock pulse */
-
-> +       for (count = 1;; count++) {
-> +               /* SCL = L->H */
-> +               writeb(SYNQUACER_I2C_BC2R_SCLL,
-> +                      i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +               WAIT_PCLK(20, i2c->clkrate);
-> +               writeb(0, i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +
-> +               WAIT_PCLK(10, i2c->clkrate);
-> +
-> +               bc2r = readb(i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +
-> +               WAIT_PCLK(5, i2c->clkrate);
-> +
-> +               if (bc2r & SYNQUACER_I2C_BC2R_SDAS)
-> +                       break;
-> +               WAIT_PCLK(10, i2c->clkrate);
-
-> +               if (count > 9) {
-> +                       dev_err(i2c->dev, "count: %i, bc2r: 0x%x\n", count,
-> +                               bc2r);
-> +                       return -EIO;
-> +               }
-
-(1)
-
-> +       }
-
-Ditto. More over in case (1) it's an invariant to the loop, so, it
-shouldn't be there in any case.
-
-> +
-> +       /* force to make bus-error phase */
-> +       /* SDA = L */
-> +       writeb(SYNQUACER_I2C_BC2R_SDAL,
-> +              i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +       WAIT_PCLK(10, i2c->clkrate);
-> +       /* SDA = H */
-> +       writeb(0, i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +       WAIT_PCLK(10, i2c->clkrate);
-> +
-> +       /* Both SDA & SDL should be H */
-> +       bc2r = readb(i2c->base + SYNQUACER_I2C_REG_BC2R);
-> +       if ((bc2r & (SYNQUACER_I2C_BC2R_SDAS | SYNQUACER_I2C_BC2R_SCLS))
-> +           != (SYNQUACER_I2C_BC2R_SDAS | SYNQUACER_I2C_BC2R_SCLS)) {
-> +               dev_err(i2c->dev, "bc2r: 0x%x\n", bc2r);
-> +               return -EIO;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int synquacer_i2c_doxfer(struct synquacer_i2c *i2c,
-> +                               struct i2c_msg *msgs, int num)
-> +{
-> +       unsigned char bsr;
-> +       unsigned long timeout, bb_timeout;
-> +       int ret;
-> +
-> +       if (i2c->is_suspended)
-> +               return -EBUSY;
-> +
-> +       synquacer_i2c_hw_init(i2c);
-> +       bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +       if (bsr & SYNQUACER_I2C_BSR_BB) {
-> +               dev_err(i2c->dev, "cannot get bus (bus busy)\n");
-> +               return -EBUSY;
-> +       }
-> +
-> +       init_completion(&i2c->completion);
-> +
-> +       i2c->msg = msgs;
-> +       i2c->msg_num = num;
-> +       i2c->msg_ptr = 0;
-> +       i2c->msg_idx = 0;
-> +       i2c->state = STATE_START;
-> +
-> +       ret = synquacer_i2c_master_start(i2c, i2c->msg);
-> +       if (ret < 0) {
-> +               dev_dbg(i2c->dev, "Address failed: (%d)\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       timeout = wait_for_completion_timeout(&i2c->completion,
-> +                                       msecs_to_jiffies(i2c->timeout_ms));
-> +       if (timeout <= 0) {
-> +               dev_dbg(i2c->dev, "timeout\n");
-> +               return -EAGAIN;
-> +       }
-> +
-> +       ret = i2c->msg_idx;
-> +       if (ret != num) {
-> +               dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
-> +               return -EAGAIN;
-> +       }
-> +
-> +       /* ensure the stop has been through the bus */
-> +       bb_timeout = jiffies + HZ;
-> +       do {
-> +               bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +       } while ((bsr & SYNQUACER_I2C_BSR_BB) &&
-> +                time_before(jiffies, bb_timeout));
-
-I would rather do split timeout exit path with main condition, i.e.
-
-bsr = ...
-if (bsr & ...)
- break; // return 0; ?
-} while (...);
-
-return 0; // return -ETIMEDOUT; ?
-
-> +
-
-> +       return ret;
-
-return 0; ?
-
-> +}
-> +
-> +static irqreturn_t synquacer_i2c_isr(int irq, void *dev_id)
-> +{
-> +       struct synquacer_i2c *i2c = dev_id;
-> +
-> +       unsigned char byte;
-> +       unsigned char bsr, bcr;
-> +       int ret = 0;
-> +
-> +       bcr = readb(i2c->base + SYNQUACER_I2C_REG_BCR);
-> +       bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +       dev_dbg(i2c->dev, "bsr:0x%02x, bcr:0x%02x\n", bsr, bcr);
-> +
-> +       if (bcr & SYNQUACER_I2C_BCR_BER) {
-> +               dev_err(i2c->dev, "bus error\n");
-> +               synquacer_i2c_stop(i2c, -EAGAIN);
-> +               goto out;
-> +       }
-> +       if ((bsr & SYNQUACER_I2C_BSR_AL) ||
-> +           !(bcr & SYNQUACER_I2C_BCR_MSS)) {
-> +               dev_dbg(i2c->dev, "arbitration lost\n");
-> +               synquacer_i2c_stop(i2c, -EAGAIN);
-> +               goto out;
-> +       }
-> +
-> +       switch (i2c->state) {
-> +
-> +       case STATE_START:
-> +               if (bsr & SYNQUACER_I2C_BSR_LRB) {
-> +                       dev_dbg(i2c->dev, "ack was not received\n");
-> +                       synquacer_i2c_stop(i2c, -EAGAIN);
-> +                       goto out;
-> +               }
-> +
-> +               if (i2c->msg->flags & I2C_M_RD)
-> +                       i2c->state = STATE_READ;
-> +               else
-> +                       i2c->state = STATE_WRITE;
-> +
-> +               if (is_lastmsg(i2c) && i2c->msg->len == 0) {
-> +                       synquacer_i2c_stop(i2c, 0);
-> +                       goto out;
-> +               }
-> +
-> +               if (i2c->state == STATE_READ)
-> +                       goto prepare_read;
-> +
-> +               /* fallthru */
-> +
-> +       case STATE_WRITE:
-> +               if (bsr & SYNQUACER_I2C_BSR_LRB) {
-> +                       dev_dbg(i2c->dev, "WRITE: No Ack\n");
-> +                       synquacer_i2c_stop(i2c, -EAGAIN);
-> +                       goto out;
-> +               }
-> +
-> +               if (!is_msgend(i2c)) {
-> +                       writeb(i2c->msg->buf[i2c->msg_ptr++],
-> +                              i2c->base + SYNQUACER_I2C_REG_DAR);
-> +
-> +                       /* clear IRQ, and continue */
-> +                       writeb(SYNQUACER_I2C_BCR_BEIE |
-> +                              SYNQUACER_I2C_BCR_MSS |
-> +                              SYNQUACER_I2C_BCR_INTE,
-> +                              i2c->base + SYNQUACER_I2C_REG_BCR);
-> +                       break;
-> +               }
-> +               if (is_lastmsg(i2c)) {
-> +                       synquacer_i2c_stop(i2c, 0);
-> +                       break;
-> +               }
-> +               dev_dbg(i2c->dev, "WRITE: Next Message\n");
-> +
-> +               i2c->msg_ptr = 0;
-> +               i2c->msg_idx++;
-> +               i2c->msg++;
-> +
-> +               /* send the new start */
-> +               ret = synquacer_i2c_master_start(i2c, i2c->msg);
-> +               if (ret < 0) {
-> +                       dev_dbg(i2c->dev, "restart error (%d)\n", ret);
-> +                       synquacer_i2c_stop(i2c, -EAGAIN);
-> +                       break;
-> +               }
-> +               i2c->state = STATE_START;
-> +               break;
-> +
-> +       case STATE_READ:
-> +               if (!(bsr & SYNQUACER_I2C_BSR_FBT)) { /* data */
-> +                       byte = readb(i2c->base + SYNQUACER_I2C_REG_DAR);
-> +                       i2c->msg->buf[i2c->msg_ptr++] = byte;
-> +               } else /* address */
-> +                       dev_dbg(i2c->dev, "address:0x%02x. ignore it.\n",
-> +                               readb(i2c->base + SYNQUACER_I2C_REG_DAR));
-> +
-> +prepare_read:
-> +               if (is_msglast(i2c)) {
-> +                       writeb(SYNQUACER_I2C_BCR_MSS |
-> +                              SYNQUACER_I2C_BCR_BEIE |
-> +                              SYNQUACER_I2C_BCR_INTE,
-> +                              i2c->base + SYNQUACER_I2C_REG_BCR);
-> +                       break;
-> +               }
-> +               if (!is_msgend(i2c)) {
-> +                       writeb(SYNQUACER_I2C_BCR_MSS |
-> +                              SYNQUACER_I2C_BCR_BEIE |
-> +                              SYNQUACER_I2C_BCR_INTE |
-> +                              SYNQUACER_I2C_BCR_ACK,
-> +                              i2c->base + SYNQUACER_I2C_REG_BCR);
-> +                       break;
-> +               }
-> +               if (is_lastmsg(i2c)) {
-> +                       /* last message, send stop and complete */
-> +                       dev_dbg(i2c->dev, "READ: Send Stop\n");
-> +                       synquacer_i2c_stop(i2c, 0);
-> +                       break;
-> +               }
-> +               dev_dbg(i2c->dev, "READ: Next Transfer\n");
-> +
-> +               i2c->msg_ptr = 0;
-> +               i2c->msg_idx++;
-> +               i2c->msg++;
-> +
-> +               ret = synquacer_i2c_master_start(i2c, i2c->msg);
-> +               if (ret < 0) {
-> +                       dev_dbg(i2c->dev, "restart error (%d)\n", ret);
-> +                       synquacer_i2c_stop(i2c, -EAGAIN);
-> +               } else
-> +                       i2c->state = STATE_START;
-> +               break;
-> +       default:
-> +               dev_err(i2c->dev, "called in err STATE (%d)\n", i2c->state);
-> +               break;
-> +       }
-> +
-> +out:
-> +       WAIT_PCLK(10, i2c->clkrate);
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static int synquacer_i2c_xfer(struct i2c_adapter *adap,
-> +                             struct i2c_msg *msgs, int num)
-> +{
-> +       struct synquacer_i2c *i2c;
-> +       int retry;
-
-> +       int ret = 0;
-
-Redundant assignment.
-
-> +
-> +       if (!msgs)
-> +               return -EINVAL;
-> +       if (num <= 0)
-> +               return -EINVAL;
-> +
-> +       i2c = i2c_get_adapdata(adap);
-> +       i2c->timeout_ms = calc_timeout_ms(i2c, msgs, num);
-> +
-> +       dev_dbg(i2c->dev, "calculated timeout %d ms\n",
-> +               i2c->timeout_ms);
-> +
-> +       for (retry = 0; retry < adap->retries; retry++) {
-> +
-> +               ret = synquacer_i2c_doxfer(i2c, msgs, num);
-> +               if (ret != -EAGAIN)
-> +                       return ret;
-> +
-> +               dev_dbg(i2c->dev, "Retrying transmission (%d)\n",
-> +                       retry);
-> +
-> +               synquacer_i2c_master_recover(i2c);
-> +               synquacer_i2c_hw_reset(i2c);
-> +       }
-> +       return -EIO;
-> +}
-> +
-> +static u32 synquacer_i2c_functionality(struct i2c_adapter *adap)
-> +{
-> +       return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-> +}
-> +
-> +static const struct i2c_algorithm synquacer_i2c_algo = {
-> +       .master_xfer    = synquacer_i2c_xfer,
-> +       .functionality  = synquacer_i2c_functionality,
-> +};
-> +
-> +static struct i2c_adapter synquacer_i2c_ops = {
-> +       .owner          = THIS_MODULE,
-> +       .name           = "synquacer_i2c-adapter",
-> +       .algo           = &synquacer_i2c_algo,
-> +       .retries        = 5,
-> +};
-> +
-> +static int synquacer_i2c_probe(struct platform_device *pdev)
-> +{
-> +       struct synquacer_i2c *i2c;
-> +       struct resource *r;
-> +       int speed_khz;
-> +       int ret;
-> +
-> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
-> +                                      &speed_khz);
-> +       if (ret) {
-> +               dev_err(&pdev->dev,
-> +                       "Missing clock-frequency property\n");
-> +               return -EINVAL;
-> +       }
-> +       speed_khz /= 1000;
-> +
-> +       i2c = devm_kzalloc(&pdev->dev, sizeof(*i2c), GFP_KERNEL);
-> +       if (!i2c)
-> +               return -ENOMEM;
-> +
-
-> +       if (dev_of_node(&pdev->dev)) {
-> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
-> +               if (IS_ERR(i2c->clk)) {
-> +                       dev_err(&pdev->dev, "cannot get clock\n");
-> +                       return PTR_ERR(i2c->clk);
-> +               }
-> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
-> +
-> +               i2c->clkrate = clk_get_rate(i2c->clk);
-> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
-> +               clk_prepare_enable(i2c->clk);
-> +       } else {
-> +               ret = device_property_read_u32(&pdev->dev,
-> +                                              "socionext,pclk-rate",
-> +                                              &i2c->clkrate);
-> +               if (ret)
-> +                       return ret;
-> +       }
-
-Okay, I got this case. It's more likely the one in 8250_dw.c.
-
-Can you do the similar way?
-
-> +
-> +       if (i2c->clkrate < SYNQUACER_I2C_MIN_CLK_RATE ||
-> +           i2c->clkrate > SYNQUACER_I2C_MAX_CLK_RATE) {
-> +               dev_err(&pdev->dev, "PCLK rate out of range (%d)\n",
-> +                       i2c->clkrate);
-> +               return -EINVAL;
-> +       }
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       i2c->base = devm_ioremap_resource(&pdev->dev, r);
-> +       if (IS_ERR(i2c->base))
-> +               return PTR_ERR(i2c->base);
-> +
-
-> +       dev_dbg(&pdev->dev, "registers %p (%p)\n", i2c->base, r);
-
-This one is achievable via /proc/iomem, isn't it?
-
-> +
-> +       i2c->irq = platform_get_irq(pdev, 0);
-> +       if (i2c->irq <= 0) {
-
-< 0 ?
-
-On some platforms IRQ == 0 might be valid.
-
-> +               dev_err(&pdev->dev, "no IRQ resource found\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       ret = devm_request_irq(&pdev->dev, i2c->irq, synquacer_i2c_isr,
-> +                              0, dev_name(&pdev->dev), i2c);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
-> +               return ret;
-> +       }
-> +
-> +       i2c->state = STATE_IDLE;
-> +       i2c->dev = &pdev->dev;
-> +       i2c->speed_khz = SYNQUACER_I2C_SPEED_SM;
-> +       if (speed_khz == SYNQUACER_I2C_SPEED_FM)
-> +               i2c->speed_khz = SYNQUACER_I2C_SPEED_FM;
-> +
-> +       synquacer_i2c_hw_init(i2c);
-> +
-> +       i2c->adapter = synquacer_i2c_ops;
-> +       i2c_set_adapdata(&i2c->adapter, i2c);
-> +       i2c->adapter.dev.parent = &pdev->dev;
-> +       i2c->adapter.nr = pdev->id;
-> +
-> +       ret = i2c_add_numbered_adapter(&i2c->adapter);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to add bus to i2c core\n");
-> +               return ret;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, i2c);
-> +
-> +       dev_info(&pdev->dev, "%s: synquacer_i2c adapter\n",
-> +                               dev_name(&i2c->adapter.dev));
-> +
-> +       return 0;
-> +}
-> +
-> +static int synquacer_i2c_remove(struct platform_device *pdev)
-> +{
-> +       struct synquacer_i2c *i2c = platform_get_drvdata(pdev);
-> +
-> +       platform_set_drvdata(pdev, NULL);
-> +       i2c_del_adapter(&i2c->adapter);
-> +       clk_disable_unprepare(i2c->clk);
-> +
-> +       return 0;
-> +};
-> +
-> +static int __maybe_unused synquacer_i2c_suspend(struct device *dev)
-> +{
-> +       struct synquacer_i2c *i2c = dev_get_drvdata(dev);
-> +
-> +       i2c_lock_adapter(&i2c->adapter);
-> +       i2c->is_suspended = true;
-> +       i2c_unlock_adapter(&i2c->adapter);
-> +
-> +       clk_disable_unprepare(i2c->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int __maybe_unused synquacer_i2c_resume(struct device *dev)
-> +{
-> +       struct synquacer_i2c *i2c = dev_get_drvdata(dev);
-> +       int ret;
-> +
-> +       i2c_lock_adapter(&i2c->adapter);
-> +
-> +       ret = clk_prepare_enable(i2c->clk);
-> +       if (!ret)
-> +               i2c->is_suspended = false;
-> +
-> +       i2c_unlock_adapter(&i2c->adapter);
-> +
-> +       return ret;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(synquacer_i2c_pm, synquacer_i2c_suspend,
-> +                        synquacer_i2c_resume);
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id synquacer_i2c_dt_ids[] = {
-> +       { .compatible = "socionext,synquacer-i2c" },
-> +       { /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, synquacer_i2c_dt_ids);
-> +#endif
-> +
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id synquacer_i2c_acpi_ids[] = {
-> +       { "SCX0003" },
-> +       { /* sentinel */ }
-> +};
-> +#endif
-> +
-> +static struct platform_driver synquacer_i2c_driver = {
-> +       .probe  = synquacer_i2c_probe,
-> +       .remove = synquacer_i2c_remove,
-> +       .driver = {
-> +               .name = "synquacer_i2c",
-> +               .of_match_table = of_match_ptr(synquacer_i2c_dt_ids),
-> +               .acpi_match_table = ACPI_PTR(synquacer_i2c_acpi_ids),
-> +               .pm = &synquacer_i2c_pm,
-> +       },
-> +};
-> +module_platform_driver(synquacer_i2c_driver);
-> +
-> +MODULE_AUTHOR("Fujitsu Semiconductor Ltd");
-> +MODULE_DESCRIPTION("Socionext SynQuacer I2C Driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.11.0
->
-
-
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 09789fdfa749..ed5eb547afc8 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -27,6 +27,7 @@ Required properties:
+   "allwinner,sun50i-a64-pinctrl"
+   "allwinner,sun50i-a64-r-pinctrl"
+   "allwinner,sun50i-h5-pinctrl"
++  "allwinner,sun50i-h6-pinctrl"
+   "nextthing,gr8-pinctrl"
+ 
+ - reg: Should contain the register physical address and length for the
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index bfce99d86dfc..5de1f63b07bb 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -77,4 +77,8 @@ config PINCTRL_SUN50I_H5
+ 	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
++config PINCTRL_SUN50I_H6
++	def_bool ARM64 && ARCH_SUNXI
++	select PINCTRL_SUNXI
++
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index 12a752e836ef..3c4aec6611e9 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -18,5 +18,6 @@ obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
+ obj-$(CONFIG_PINCTRL_SUN8I_H3_R)	+= pinctrl-sun8i-h3-r.o
+ obj-$(CONFIG_PINCTRL_SUN8I_V3S)		+= pinctrl-sun8i-v3s.o
+ obj-$(CONFIG_PINCTRL_SUN50I_H5)		+= pinctrl-sun50i-h5.o
++obj-$(CONFIG_PINCTRL_SUN50I_H6)		+= pinctrl-sun50i-h6.o
+ obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
+ obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+new file mode 100644
+index 000000000000..aa8b58125568
+--- /dev/null
++++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+@@ -0,0 +1,614 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Allwinner H6 SoC pinctrl driver.
++ *
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
++
++#include "pinctrl-sunxi.h"
++
++static const struct sunxi_desc_pin h6_pins[] = {
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 0),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ERXD1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 1),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ERXD0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 2),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ECRS_DV */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 3),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ERXERR */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 4),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ETXD1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 5),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ETXD0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 6),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ETXCK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 7),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* ETXEN */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 8),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* EMDC */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 9),
++		  SUNXI_FUNCTION(0x2, "emac")),		/* EMDIO */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 1),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DE */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* HSYNC */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* VSYNC */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 4),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO0 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 5),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO1 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO2 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 7),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO3 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 8),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO4 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 9),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO5 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 10),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO6 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 11),
++		  SUNXI_FUNCTION(0x2, "ccir"),		/* DO7 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 12),
++		  SUNXI_FUNCTION(0x2, "i2s3"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "h_i2s3"),	/* SYNC */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
++		  SUNXI_FUNCTION(0x2, "i2s3"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "h_i2s3"),	/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 13)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 14),
++		  SUNXI_FUNCTION(0x2, "i2s3"),		/* DOUT */
++		  SUNXI_FUNCTION(0x4, "h_i2s3"),	/* DOUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 14)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 15),
++		  SUNXI_FUNCTION(0x2, "i2s3"),		/* DIN */
++		  SUNXI_FUNCTION(0x4, "h_i2s3"),	/* DIN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 16),
++		  SUNXI_FUNCTION(0x2, "i2s3"),		/* MCLK */
++		  SUNXI_FUNCTION(0x4, "h_i2s3"),	/* MCLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 17),
++		  SUNXI_FUNCTION(0x2, "i2c3"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 18),
++		  SUNXI_FUNCTION(0x2, "i2c3"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 19),
++		  SUNXI_FUNCTION(0x2, "pwm1"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 19)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 20),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 20)),
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* WE */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* CLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* ALE */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* DS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* CLE */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* MOSI */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* CE0 */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* MISO */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* RE */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* CLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* RB0 */
++		  SUNXI_FUNCTION(0x3, "mmc2"),		/* CMD */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* CS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ0 */
++		  SUNXI_FUNCTION(0x3, "mmc2"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* HOLD */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ1 */
++		  SUNXI_FUNCTION(0x3, "mmc2"),		/* D1 */
++		  SUNXI_FUNCTION(0x4, "spi0")),		/* WP */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ2 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ3 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ4 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ5 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 13),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
++		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0")),	/* CE1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "nand0")),	/* RB1 */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D2 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* PCLK */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXD3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D3 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* ERR */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* MCLK */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXD2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D4 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* HSYNC */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXD1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D5 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* DVLD */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* VSYNC */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXD0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D6 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D0 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXCK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D7 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D1 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D1 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ERXCTL */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D10 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D2 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D2 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ENULL */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D11 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D3 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D3 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXD3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D12 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D4 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D4 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXD2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D13 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D5 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D5 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXD1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D14 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D6 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D6 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXD0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D15 */
++		  SUNXI_FUNCTION(0x3, "ts0"),		/* D7 */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* D7 */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXCK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D18 */
++		  SUNXI_FUNCTION(0x3, "ts1"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* SCK */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ETXCTL */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 13),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D19 */
++		  SUNXI_FUNCTION(0x3, "ts1"),		/* ERR */
++		  SUNXI_FUNCTION(0x4, "csi"),		/* SDA */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* ECLKIN */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 14),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D20 */
++		  SUNXI_FUNCTION(0x3, "ts1"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
++		  SUNXI_FUNCTION(0x5, "csi")),		/* D8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 15),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D21 */
++		  SUNXI_FUNCTION(0x3, "ts1"),		/* DVLD */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* DATA0 */
++		  SUNXI_FUNCTION(0x5, "csi")),		/* D9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 16),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D22 */
++		  SUNXI_FUNCTION(0x3, "ts1"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "dmic")),		/* DATA1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 17),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D23 */
++		  SUNXI_FUNCTION(0x3, "ts2"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "dmic")),		/* DATA2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 18),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "ts2"),		/* ERR */
++		  SUNXI_FUNCTION(0x4, "dmic")),		/* DATA3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 19),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* DE */
++		  SUNXI_FUNCTION(0x3, "ts2"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "uart2"),		/* TX */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* EMDC */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 20),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* HSYNC */
++		  SUNXI_FUNCTION(0x3, "ts2"),		/* DVLD */
++		  SUNXI_FUNCTION(0x4, "uart2"),		/* RX */
++		  SUNXI_FUNCTION(0x5, "emac")),		/* EMDIO */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 21),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd0"),		/* VSYNC */
++		  SUNXI_FUNCTION(0x3, "ts2"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "uart2")),	/* RTS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 22),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "pwm"),		/* PWM0 */
++		  SUNXI_FUNCTION(0x3, "ts3"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "uart2")),	/* CTS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 23),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2c2"),		/* SCK */
++		  SUNXI_FUNCTION(0x3, "ts3"),		/* ERR */
++		  SUNXI_FUNCTION(0x4, "uart3"),		/* TX */
++		  SUNXI_FUNCTION(0x5, "jtag")),		/* MS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 24),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2c2"),		/* SDA */
++		  SUNXI_FUNCTION(0x3, "ts3"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "uart3"),		/* RX */
++		  SUNXI_FUNCTION(0x5, "jtag")),		/* CK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 25),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
++		  SUNXI_FUNCTION(0x3, "ts3"),		/* DVLD */
++		  SUNXI_FUNCTION(0x4, "uart3"),		/* RTS */
++		  SUNXI_FUNCTION(0x5, "jtag")),		/* DO */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 26),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SDA */
++		  SUNXI_FUNCTION(0x3, "ts3"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "uart3"),		/* CTS */
++		  SUNXI_FUNCTION(0x5, "jtag")),		/* DI */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D1 */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* MS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),	/* PF_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D0 */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* DI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),	/* PF_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "uart0"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2)),	/* PF_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CMD */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* DO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),	/* PF_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D3 */
++		  SUNXI_FUNCTION(0x3, "uart0"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PF_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D2 */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* CK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PF_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 6)),	/* PF_EINT6 */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 0)),	/* PG_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CMD */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 1)),	/* PG_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D0 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 2)),	/* PG_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D1 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 3)),	/* PG_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D2 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 4)),	/* PG_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D3 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 5)),	/* PG_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 6)),	/* PG_EINT6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 7)),	/* PG_EINT7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* VPPEN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 8)),	/* PG_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* VPPPP */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 9)),	/* PG_EINT9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s2"),		/* SYNC */
++		  SUNXI_FUNCTION(0x3, "h_i2s2"),	/* SYNC */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* PWREN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 10)),	/* PG_EINT10 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s2"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "h_i2s2"),	/* CLK */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 11)),	/* PG_EINT11 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s2"),		/* DOUT */
++		  SUNXI_FUNCTION(0x3, "h_i2s2"),	/* DOUT */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* DATA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 12)),	/* PG_EINT12 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 13),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s2"),		/* DIN */
++		  SUNXI_FUNCTION(0x3, "h_i2s2"),	/* DIN */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* RST */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 13)),	/* PG_EINT13 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 14),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s2"),		/* MCLK */
++		  SUNXI_FUNCTION(0x3, "h_i2s2"),	/* MCLK */
++		  SUNXI_FUNCTION(0x4, "sim0"),		/* DET */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 14)),	/* PG_EINT14 */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart0"),		/* TX */
++		  SUNXI_FUNCTION(0x3, "i2s0"),		/* SYNC */
++		  SUNXI_FUNCTION(0x4, "h_i2s0"),	/* SYNC */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* VPPEN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 0)),	/* PH_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "uart0"),		/* RX */
++		  SUNXI_FUNCTION(0x3, "i2s0"),		/* CLK */
++		  SUNXI_FUNCTION(0x4, "h_i2s0"),	/* CLK */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* VPPPP */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 1)),	/* PH_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "ir_tx"),
++		  SUNXI_FUNCTION(0x3, "i2s0"),		/* DOUT */
++		  SUNXI_FUNCTION(0x4, "h_i2s0"),	/* DOUT */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* PWREN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 2)),	/* PH_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS */
++		  SUNXI_FUNCTION(0x3, "i2s0"),		/* DIN */
++		  SUNXI_FUNCTION(0x4, "h_i2s0"),	/* DIN */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 3)),	/* PH_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "i2s0"),		/* MCLK */
++		  SUNXI_FUNCTION(0x4, "h_i2s0"),	/* MCLK */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* DATA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 4)),	/* PH_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
++		  SUNXI_FUNCTION(0x3, "spdif"),		/* MCLK */
++		  SUNXI_FUNCTION(0x4, "i2c1"),		/* SCK */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* RST */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 5)),	/* PH_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
++		  SUNXI_FUNCTION(0x3, "spdif"),		/* IN */
++		  SUNXI_FUNCTION(0x4, "i2c1"),		/* SDA */
++		  SUNXI_FUNCTION(0x5, "sim1"),		/* DET */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 6)),	/* PH_EINT6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "spdif"),		/* OUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 7)),	/* PH_EINT7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "hdmi"),		/* HSCL */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 8)),	/* PH_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "hdmi"),		/* HSDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 9)),	/* PH_EINT9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "hdmi"),		/* HCEC */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 3, 10)),	/* PH_EINT10 */
++};
++
++static const unsigned int h6_irq_bank_map[] = { 1, 5, 6, 7 };
++
++static const struct sunxi_pinctrl_desc h6_pinctrl_data = {
++	.pins = h6_pins,
++	.npins = ARRAY_SIZE(h6_pins),
++	.irq_banks = 3,
++	.irq_bank_map = h6_irq_bank_map,
++	.irq_read_needs_mux = true,
++};
++
++static int h6_pinctrl_probe(struct platform_device *pdev)
++{
++	return sunxi_pinctrl_init(pdev,
++				  &h6_pinctrl_data);
++}
++
++static const struct of_device_id h6_pinctrl_match[] = {
++	{ .compatible = "allwinner,sun50i-h6-pinctrl", },
++	{}
++};
++
++static struct platform_driver h6_pinctrl_driver = {
++	.probe	= h6_pinctrl_probe,
++	.driver	= {
++		.name		= "sun50i-h6-pinctrl",
++		.of_match_table	= h6_pinctrl_match,
++	},
++};
++builtin_platform_driver(h6_pinctrl_driver);
 -- 
-With Best Regards,
-Andy Shevchenko
+2.15.1
