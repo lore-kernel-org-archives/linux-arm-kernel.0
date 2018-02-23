@@ -1,34 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Feb 2018 15:22:42 +0100
-Subject: [PATCH v2 0/3] Support qcom pinctrl protected pins
-In-Reply-To: <94a7bd07-8ad5-7ab1-20ab-a02fe2476efd@codeaurora.org>
-References: <20180126011400.2191-1-sboyd@codeaurora.org>
- <94a7bd07-8ad5-7ab1-20ab-a02fe2476efd@codeaurora.org>
-Message-ID: <CACRpkdbgz9PnyLgsn_grsGHbVnak54aOKhetsqfvag5wJNm7=g@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 23 Feb 2018 22:23:57 +0800
+Subject: Build failure on arm64 defconfig for linux-next recently
+In-Reply-To: <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
+References: <06af01b0-7d95-35e2-3b21-b54f7ed65efc@rock-chips.com>
+ <0cd1b5a5-820a-3984-01b5-141770adbbea@arm.com>
+Message-ID: <9c8fef61-d2b7-3bb4-038a-0038c072036b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 5:45 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> On 01/25/2018 07:13 PM, Stephen Boyd wrote:
->>
->> This patchset proposes a solution to describing the valid
->> pins for a pin controller in a semi-generic way so that qcom
->> platforms can expose the pins that are really available.
->>
->> Typically, this has been done by having drivers and firmware
->> descriptions only use pins they know they have access to, and that
->> still works now because we no longer read the pin direction at
->> boot. But there are still some userspace drivers and debugfs facilities
->> that don't know what pins are available and attempt to read everything
->> they can. On qcom platforms, this may lead to a system hang, which isn't
->> very nice behavior, even if root is the only user that can trigger it.
->
-> Any progress on this patch set?  Stephen no longer works for Qualcomm, so I
-> don't know what the next step is, and I really want this feature in 4.17
-> (we've missed so many merge windows already).
+Hi Robin,
 
-I depend on Bjorn as maintainer of the pin control driver to ACK
-the solution he likes.
+On 2018/2/23 19:54, Robin Murphy wrote:
+> Hi Shawn,
+> 
+> On 23/02/18 08:03, Shawn Lin wrote:
+>> Hi folks,
+>>
+>> I failed to build the arm64 kernel for linux-20180222 and I confirm it
+>> works for linux-20180206. It seems there was some patches for head.S
+>> got merged. Is it a known issue? Or a fix is coming?
+> 
+> Yes, I broke it, sorry!
+> 
+> There's a fix queued in arm64/fixes/core already (04c4927359b1). Using a 
 
-Yours,
-Linus Walleij
+Good to know that! Thanks for help.
+
+> different toolchain is another option, since the one I'm currently using 
+> (gcc-linaro-7.2.1-2017.11) builds it just fine, which is how I managed 
+> to create this mess in the first place ;)
+> 
+> Thanks,
+> Robin.
+> 
+>> make ARCH=arm64 defconfig
+>>
+>> make 
+>> CROSS_COMPILE=gcc-linaro-6.3.1-aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu- 
+>> ??ARCH=arm64 -j32
+>>
+>>
+>> arch/arm64/kernel/head.S: Assembler messages:
+>> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>> arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+>> arch/arm64/kernel/head.S:677: Error: junk at end of line, first 
+>> unrecognized character is `L'
+>> arch/arm64/kernel/head.S:677: Error: unexpected characters following 
+>> instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
+>> arch/arm64/kernel/head.S:677: Error: unexpected characters following 
+>> instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
+>> make[1]: *** [arch/arm64/kernel/head.o] Error 1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
+
+
+-- 
+Best Regards
+Shawn Lin
