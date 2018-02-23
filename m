@@ -1,85 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Feb 2018 08:06:11 +0100
-Subject: [PATCH v2 19/19] ARM64: dts: r8a77965: Add EtherAVB device node
-In-Reply-To: <20180222155411.gnn42poawtlf3rze@verge.net.au>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-20-git-send-email-jacopo+renesas@jmondi.org>
- <cf157266-5ea7-6795-1e31-0d1ccf85e7e8@cogentembedded.com>
- <20180221100716.GF7203@w540>
- <cbeb1b6b-1b02-7665-0f1f-847ab8de69e3@cogentembedded.com>
- <20180221173106.vgyshbz3kkc4p3cu@verge.net.au>
- <321c6c8c-8853-ac00-7567-c0be82b510f4@cogentembedded.com>
- <35959135-cb3b-040a-1944-26845e0c07b0@cogentembedded.com>
- <20180221182340.wvdvgtv5pw7pvd3v@verge.net.au>
- <eaf3c72b-a482-86cf-88e7-4af457f74558@cogentembedded.com>
- <20180222155411.gnn42poawtlf3rze@verge.net.au>
-Message-ID: <CAMuHMdWj1v6WmfLY5JttZ+LMpSn2XvjgBS95Ag9TBohRRU1qTA@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 23 Feb 2018 08:20:22 +0100
+Subject: [PATCH] ARM: dts: imx6: Pass memory unit-adress
+In-Reply-To: <1519319795-18161-1-git-send-email-festevam@gmail.com>
+References: <1519319795-18161-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180223082022.17d7b8a2@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Thu, Feb 22, 2018 at 4:54 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Feb 21, 2018 at 09:53:58PM +0300, Sergei Shtylyov wrote:
->> On 02/21/2018 09:23 PM, Simon Horman wrote:
->>
->> > ...
->> >
->> >>>>>>>> +                    clocks = <&cpg CPG_MOD 812>;
->> >>>>>>>> +                    power-domains = <&sysc 32>;
->> >>>>>>>> +                    resets = <&cpg 812>;
->> >>>>>>>> +                    phy-mode = "rgmii-txid";
->> >>>>>>>
->> >>>>>>>    Why not just "rgmii"? TX delay is a board specific detail, no?
->> >>>>>>>
->> >>>>>> I admit I took this one straight from r8a7796 dtsi.
->> >>>>>> Would you like to me resend and change this?
->> >>>>>
->> >>>>>    Yes, unless Simon would fix it while merging...
->> >>>>
->> >>>> Can I confirm the desired change is s/rgmii-txid/rgmii/ ?
->> >>>
->> >>>    Yes.
->> >>
->> >>    Apparently that means that this prop should be overridden in the board file
->> >> (which may not be an easy task given the board is Salvator-XS again).
->> >>
->> >> [...]
->> >
->> > Can we override it in r8a77965-salvator-x.dts or r8a77965-salvator-xs.dts?
->>
->>    In salvator-common.dtsi most probably -- it has the PHY data for Ether AVB.
->>
->> > I feel that I'm missing an important point here.
->>
->>    Well, r8a779{5|6}.dtsi also have phy-mode = "rgmii-txid" (which was
->>    unjustified in my current understanding). Thus such board override
->>    wouldn't hurt them. But we lack a patch modifying salvator-common.dtsi
->>    in htis series, so I'm now thinking a respin of this series is needed
->>    anyway... sorry for being unclear. :-)
+On Thu, 22 Feb 2018 14:16:35 -0300 Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Pass the memory unit-adress to fix the following build warnings with W=1:
+> 
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> 
+> There are cases where dts passes an empty memory node, which will be filled
+> by the bootloader. Passing the memory base address still allows the 
+> bootloader to fill the memory size.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts   | 4 ++--
+>  arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts     | 4 ++--
+>  arch/arm/boot/dts/imx6dl-ts4900.dts            | 4 ++--
+>  arch/arm/boot/dts/imx6dl-ts7970.dts            | 4 ++--
+>  arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts      | 4 ++--
+>  arch/arm/boot/dts/imx6q-h100.dts               | 4 ++--
+>  arch/arm/boot/dts/imx6q-novena.dts             | 4 ++--
+>  arch/arm/boot/dts/imx6q-ts4900.dts             | 4 ++--
+>  arch/arm/boot/dts/imx6q-ts7970.dts             | 4 ++--
+>  arch/arm/boot/dts/imx6q-zii-rdu2.dts           | 4 ++--
+>  arch/arm/boot/dts/imx6qdl-apalis.dtsi          | 4 ++--
+>  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 4 ++--
+>  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 4 ++--
+>  arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi   | 4 ++--
+>  arch/arm/boot/dts/imx6qdl-tx6.dtsi             | 4 ++--
+>  arch/arm/boot/dts/imx6qp-zii-rdu2.dts          | 4 ++--
+>  arch/arm/boot/dts/imx6ul-tx6ul.dtsi            | 4 ++--
+>  arch/arm/boot/dts/imx6ull-colibri-nonwifi.dtsi | 2 +-
+>  arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi    | 2 +-
+>  19 files changed, 36 insertions(+), 36 deletions(-)
+> 
+[...]
+> diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> index 6abb66c..f015e2d 100644
+> --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> @@ -61,8 +61,8 @@
+>  		sdhc1 = &usdhc2;
+>  	};
+>  
+> -	memory {
+> -		reg = <0 0>; /* will be filled by U-Boot */
+> +	memory at 10000000 {
+> +		reg = <0x10000000 0>; /* will be filled by U-Boot */
+>  	};
+>  
+>  	clocks {
+[...]
+> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> index 65111f98..f678d18 100644
+> --- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> @@ -70,8 +70,8 @@
+>  		stdout-path = &uart1;
+>  	};
+>  
+> -	memory {
+> -		reg = <0 0>; /* will be filled by U-Boot */
+> +	memory at 80000000 {
+> +		reg = <0x80000000 0>; /* will be filled by U-Boot */
+>  	};
+>  
+>  	clocks {
 >
-> While I've applied other patches in this series I have
-> not applied this one - mainly to allow this discussion to conclude.
->
-> Is an appropriate solution to do the following?
->
-> 1) Atomically update
->    a) r8a779{5|6}.dtsi to use "rgmii" and
->    b) salvator-common.dtsi to use "rgmii-txid"
-> 2) Update this patch to use "rgmii"
+For those two:
+Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
 
-No need for atomics.
-It can all be done by patches touching single files only:
-  1) Add "rgmii-txid" to board .dts(i) files,
-  2) Change s/rgmii-txid/rgmii/ in SoC .dtsi files.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Lothar Wa?mann
