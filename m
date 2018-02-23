@@ -1,53 +1,58 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 16:16:39 +0100
-Subject: [PATCH v3 1/7] pinctrl: sunxi: refactor irq related register
- function to have desc
-In-Reply-To: <20180223122552.58049-2-icenowy@aosc.io>
-References: <20180223122552.58049-1-icenowy@aosc.io>
- <20180223122552.58049-2-icenowy@aosc.io>
-Message-ID: <20180223151639.wru7b67byksefxpk@flea.lan>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 23 Feb 2018 17:18:48 +0200
+Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
+In-Reply-To: <20180223150147.GA17857@lunn.ch>
+References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
+ <20180222214237.GH28112@lunn.ch>
+ <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
+ <20180222233457.GA6052@lunn.ch> <1519380573.10722.94.camel@linux.intel.com>
+ <20180223150147.GA17857@lunn.ch>
+Message-ID: <1519399128.10722.111.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
++Cc Alexey
 
-On Fri, Feb 23, 2018 at 08:25:46PM +0800, Icenowy Zheng wrote:
-> As the new H6 SoC has holes in the IRQ registers, refactor the IRQ
-> related register function for getting the full pinctrl desc structure.
+On Fri, 2018-02-23 at 16:01 +0100, Andrew Lunn wrote:
+> > > The patch has been corrupted by you email client. But otherwise,
+> > > yes.
+> > > 
+> > > Please take a look at:
+> > > 
+> > > https://www.kernel.org/doc/html/v4.12/process/submitting-patches.h
+> > > tml
+> > > 
+> > > It will give you hits about correctly formatting the patch. In
+> > > addition it should have:
+> > > 
+> > > Fixes: 4cd5773a2ae6 ("net: core: move mac_pton() to
+> > > lib/net_utils.c")
+> > > 
+> > > before the --- line, to indicate what it is fixing.
+> > > 
+> > > This patch should be against
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git,
+> > > since it is a fix, and sent to <netdev@vger.kernel.org>.
+> > 
+> > Guys, consider this one instead:
+> > https://patchwork.ozlabs.org/patch/851008/
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> New patch in v3.
+> Hi Andy
 > 
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 18 ++++++++----------
->  drivers/pinctrl/sunxi/pinctrl-sunxi.h | 29 +++++++++++++++++++++--------
->  2 files changed, 29 insertions(+), 18 deletions(-)
+> Thanks for pointing this patch out.
 > 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 341312d66512..31bd99f7df50 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -835,7 +835,7 @@ static void sunxi_pinctrl_irq_release_resources(struct irq_data *d)
->  static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
->  {
->  	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-> -	u32 reg = sunxi_irq_cfg_reg(d->hwirq, pctl->desc->irq_bank_base);
-> +	u32 reg = sunxi_irq_cfg_reg(d->hwirq, pctl->desc);
+> What is the advantage of doing to the strnlen()? As Stefan says, the
+> code which follows will detect a short string, in that a NULL is not
+> in [0-9a-f], nor a : .
 
-That's better, but it makes more sense to have the desc as the first
-argument.
+I'm not sure, but my understanding is that, the strchr() call in the
+original code or isxdigit() in the follow up change will trash a cache a
+bit. Besides that some of the users are (often?) supplying empty strings
+to convert from, and in this case makes sense to bail out fast.
 
-Thanks!
-Maxime
+Alexey, can you shed a light here?
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/b4a6a953/attachment.sig>
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
