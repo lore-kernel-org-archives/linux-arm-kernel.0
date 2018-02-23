@@ -1,33 +1,24 @@
-From: colin.king@canonical.com (Colin King)
-Date: Fri, 23 Feb 2018 12:41:17 +0000
-Subject: [PATCH] ASoC: sirf: remove duplicated bit-wise or of
- USP_RXFIFO_THD_INT
-Message-ID: <20180223124117.24686-1-colin.king@canonical.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 23 Feb 2018 13:50:54 +0100
+Subject: [PATCH 0/7] iio: adc: stm32-dfsdm: misc fixes and improvements
+Message-ID: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+This series brings some fixes and improvements to STM32 DFSDM driver.
 
-Bit pattern USP_RXFIFO_THD_INT is being bit-wise or'd twice;
-remove the redundant 2nd USP_RXFIFO_THD_INT
+Fabrice Gasnier (7):
+  iio: adc: stm32-dfsdm: fix compatible data use
+  iio: adc: stm32-dfsdm: fix call to stop channel
+  iio: adc: stm32-dfsdm: fix clock source selection
+  iio: adc: stm32-dfsdm: fix multiple channel initialization
+  iio: adc: stm32-dfsdm: misc style improvements and fixes
+  iio: adc: stm32-dfsdm: add check on max filter id
+  iio: adc: stm32-dfsdm: add check on spi-max-frequency
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- sound/soc/sirf/sirf-usp.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iio/adc/stm32-dfsdm-adc.c  | 52 ++++++++++++++++++++------------------
+ drivers/iio/adc/stm32-dfsdm-core.c | 17 +++++++++++--
+ 2 files changed, 42 insertions(+), 27 deletions(-)
 
-diff --git a/sound/soc/sirf/sirf-usp.h b/sound/soc/sirf/sirf-usp.h
-index bf0201cb15bc..e22e13a619e8 100644
---- a/sound/soc/sirf/sirf-usp.h
-+++ b/sound/soc/sirf/sirf-usp.h
-@@ -154,7 +154,7 @@
- 					USP_RX_IO_DMA_INT|\
- 					USP_RXFIFO_FULL_INT|\
- 					USP_RXFIFO_THD_INT|\
--					USP_RXFIFO_THD_INT|USP_RX_TIMEOUT_INT)
-+					USP_RX_TIMEOUT_INT)
- 
- #define USP_INT_ALL        0x1FFF
- 
 -- 
-2.15.1
+1.9.1
