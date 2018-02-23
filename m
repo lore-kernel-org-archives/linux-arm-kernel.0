@@ -1,53 +1,47 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 23 Feb 2018 14:37:34 +0100
-Subject: [PATCH v4 02/10] ARM: sun9i: smp: Rename clusters's power-off register
-In-Reply-To: <20180223133742.26044-1-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
-Message-ID: <20180223133742.26044-3-mylene.josserand@bootlin.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 23 Feb 2018 15:02:09 +0100
+Subject: [PATCH] arm: zynq: Use i2c-mux instead of i2cswitch for pca9548
+Message-ID: <5ea002abef0c3c2ef7fe04360c916c0db72f2619.1519394527.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare the support for sun8i-a83t, rename the variable name
-that handles the power-off of clusters because it is different from
-sun9i-a80 to sun8i-a83t.
+i2c muxes should described like this.
 
-The power off register for clusters are different from SUN9I and SUN8I
-
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/mach-sunxi/mc_smp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index 650a2ad4398f..de02e5662557 100644
---- a/arch/arm/mach-sunxi/mc_smp.c
-+++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -60,7 +60,7 @@
- #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
- #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
- #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
--#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
-+#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
- #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
- #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
- #define PRCM_CPU_SOFT_ENTRY_REG		0x164
-@@ -252,7 +252,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
+Based on Rob's comment https://patchwork.kernel.org/patch/10175211/
+
+---
+ arch/arm/boot/dts/zynq-zc702.dts | 2 +-
+ arch/arm/boot/dts/zynq-zc706.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index d96979644e49..c0384376d7e0 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -105,7 +105,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c0_default>;
  
- 	/* clear cluster power gate */
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
+-	i2cswitch at 74 {
++	i2c-mux at 74 {
+ 		compatible = "nxp,pca9548";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index d0f51d0d6c95..886d20c4fdd5 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -61,7 +61,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c0_default>;
  
-@@ -516,7 +516,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
- 	/* gate cluster power */
- 	pr_debug("%s: gate cluster power\n", __func__);
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
- 
+-	i2cswitch at 74 {
++	i2c-mux at 74 {
+ 		compatible = "nxp,pca9548";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
-2.11.0
+1.9.1
