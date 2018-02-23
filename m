@@ -1,101 +1,110 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Fri, 23 Feb 2018 10:46:52 +0000
-Subject: [PATCH v2] usb: host: ehci-platform: add support for optional
- external vbus supply
-In-Reply-To: <Pine.LNX.4.44L0.1802221325220.1295-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1802221325220.1295-100000@iolanthe.rowland.org>
-Message-ID: <55196991-f9c1-6d8d-368f-2ab5f8e81c56@st.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 23 Feb 2018 17:11:50 +0530
+Subject: [PATCH] firmware: ti_sci: Switch to SPDX Licensing
+Message-ID: <20180223114150.9980-1-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Switch to SPDX licensing and drop the GPL text which comes redundant.
 
+Acked-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ drivers/firmware/ti_sci.c              | 10 +---------
+ drivers/firmware/ti_sci.h              | 30 +-----------------------------
+ include/linux/soc/ti/ti_sci_protocol.h | 10 +---------
+ 3 files changed, 3 insertions(+), 47 deletions(-)
 
-On 02/22/2018 07:27 PM, Alan Stern wrote:
-> On Thu, 22 Feb 2018, Amelie DELAUNAY wrote:
-> 
->>>>>>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>>>>>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>>>>>> @@ -19,6 +19,7 @@ Optional properties:
->>>>>>>      - phys : phandle + phy specifier pair
->>>>>>>      - phy-names : "usb"
->>>>>>>      - resets : phandle + reset specifier pair
->>>>>>> + - vbus-supply : phandle of regulator supplying vbus
->>>>>>>     
->>>>>>
->>>>>> Can platforms have more than one regulator e.g. one regulator per port?
->>>>>>
->>>>>
->>>>> I imagine that yes, platforms could have one regulator per port.
->>>>> Regulator consumers bindings impose a <name>-supply property per
->>>>> regulator, so, what do you think about :
->>>>> vbus0-supply for port#0
->>>>> vbus1-supply for port#1
->>>>> ...
->>>>> vbusN-supply for port#N
->>>>>
->>>>> And then in probe, allocate 'struct regulator *vbus_supplies' with a
->>>>> size corresponding to 'HCS_N_PORTS(ehci->hcs_params) * sizeof(struct
->>>>> regulator *)'.
->>>>> And loop to get optional regulator vbus0, vbus1,..., vbusN.
->>>>> And then enable/disable the corresponding regulator in
->>>>> ehci_platform_port_power thanks to portnum.
->>>>
->>>> Looks fine to me but we need to get Alan's opinion if this is worth the effort.
->>>> If there isn't a single platform needing it we could probably do without it
->>>> but the DT binding must be scalable to add this feature in the future.
->>>
->>> I agree that for now there don't seem to be any platforms requiring
->>> more than one regulator, but this should be implemented in a way that
->>> could be expanded if necessary.
->>>
->>> Anyway, the basic idea is reasonable.  I don't know to what extent
->>> people want to power-off their EHCI ports, but if they do then we ought
->>> to turn off external regulators at the same time.
->>>
->>> Is there a real-life use case for this?
->>>
->>> Alan Stern
->>>
->>
->> On my setup I have the following:
->>
->>                    regulator_____vbus
->>    _________________             \
->> | EHCI controller |-port0-----[USB connector]
->> |_________________|-port1-----X
->>
->> So, I have one regulator only for port0. But I could I have one more if
->> port1 was connected. My current regulator could also supplies port1.
->>
->> To allocate a vbus_supplies array depending on N_PORTS, I have to move
->> this initialization from probe to ehci_platform_reset, after ehci_setup
->> is done.
->> Then, I have to define each regulator id depending on the port number.
->> This imposes a binding like
->> - portN_vbus-supply : phandle of regulator supplying vbus for port N
->> But I don't know if we can describe it like this in dt-bindings ?
->>
->> &ehci {
->> 	...
->> 	port0_vbus-supply = <&vbus_reg>;
->> 	port1_vbus-supply = <&vbus_reg>; //Could be another regulator, or not
->> specified if port is not connected.
->> 	...
->> };
->>
->> Is it ok to move vbus_supplies initialization in ehci_platform_reset ?
-> 
-> Yes, it's okay to move the code if you need to.
-> 
-> However, I can not speak on the DT implications.  Someone who knows
-> more about it should chime in.
-> 
-> Alan Stern
-> 
-
-Thanks Alan,
-
-I'm going to send a v3 including all these changes to ease review.
-
-Regards,
-Amelie
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index 5229036dcfbf..b74a533ef35b 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -1,17 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Texas Instruments System Control Interface Protocol Driver
+  *
+  * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+  *	Nishanth Menon
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+- * kind, whether express or implied; without even the implied warranty
+- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+diff --git a/drivers/firmware/ti_sci.h b/drivers/firmware/ti_sci.h
+index 9b611e9e6f6d..12bf316b68df 100644
+--- a/drivers/firmware/ti_sci.h
++++ b/drivers/firmware/ti_sci.h
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: BSD-3-Clause
+ /*
+  * Texas Instruments System Control Interface (TISCI) Protocol
+  *
+@@ -6,35 +7,6 @@
+  * See: http://processors.wiki.ti.com/index.php/TISCI for details
+  *
+  * Copyright (C)  2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- *   Redistributions of source code must retain the above copyright
+- *   notice, this list of conditions and the following disclaimer.
+- *
+- *   Redistributions in binary form must reproduce the above copyright
+- *   notice, this list of conditions and the following disclaimer in the
+- *   documentation and/or other materials provided with the
+- *   distribution.
+- *
+- *   Neither the name of Texas Instruments Incorporated nor the names of
+- *   its contributors may be used to endorse or promote products derived
+- *   from this software without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+  */
+ 
+ #ifndef __TI_SCI_H
+diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+index 0ccbc138c26a..18435e5c6364 100644
+--- a/include/linux/soc/ti/ti_sci_protocol.h
++++ b/include/linux/soc/ti/ti_sci_protocol.h
+@@ -1,17 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Texas Instruments System Control Interface Protocol
+  *
+  * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+  *	Nishanth Menon
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+- * kind, whether express or implied; without even the implied warranty
+- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #ifndef __TISCI_PROTOCOL_H
+-- 
+2.16.1
