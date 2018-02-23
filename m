@@ -1,95 +1,48 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 23 Feb 2018 14:37:32 +0100
-Subject: [PATCH v4 00/10] Sunxi: Add SMP support on A83T
-Message-ID: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+Date: Fri, 23 Feb 2018 14:37:36 +0100
+Subject: [PATCH v4 04/10] ARM: sun8i: smp: Add hotplug support for sun8i-a83t
+In-Reply-To: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+Message-ID: <20180223133742.26044-5-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+Add hotplug support for sun8i-a83t.
 
-This is a V4 of my series that adds SMP support for Allwinner sun8i-a83t.
-Based on sunxi's tree, sunxi/for-next branch.
+Hotplug CPU for CPU0 is currently not working.
+Remove the possibility to disable CPU0 only for sun8i-a83t.
 
-Changes since v3:
-    - Take into account Maxime's reviews:
-	- split the first patch into 4 new patches: add sun9i device tree
-	parsing, rename some variables, add a83t support and finally,
-	add hotplug support.
-	- Move the code of previous patch 07 (to disable CPU0 disabling)
-	into hotplug support patch (see patch 04)
-	- Remove the patch that added PRCM register because it is already
-	available. Because of that, update the device tree parsing to use
-	"sun8i-a83t-r-ccu".
-	- Use a variable to know which SoC we currently have
-    - Take into account Chen-Yu's reviews: create two iounmap functions
-    to release the resources of the device tree parsing.
-    - Take into account Marc's review: Update the code to initialize CNTVOFF
-    register. As there is already assembly code in the driver, I decided
-    to create an assembly file not to mix assembly and C code.
-    For that, I create 3 new patches: move the current assembly code that
-    handles the cluster cache enabling into a file, move the cpu_resume entry
-    in this file and finally, add a new assembly entry to initialize the timer
-    offset for boot CPU and secondary CPUs.
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+---
+ arch/arm/mach-sunxi/mc_smp.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Changes since v2:
-    - Rebased my modifications according to new Chen Yu's patch series
-    that adds SMP support for sun9i-a80 (without MCPM).
-    - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
-    and PRCM registers for more visibility.
-    - The hotplug of CPU0 is currently not working (even after trying what
-    Allwinner's code is doing) so remove the possibility of disabling
-    this CPU. Created a new patch for it.
-
-Changes since v1:
-    - Add Chen Yu's patch in my series (see path 01)
-    - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
-    Create two functions to separate the DT parsing of sun9i-a80 and
-    sun8i-a83t.
-    - Thanks to Maxime's review: order device tree's nodes according
-    to physical addresses, remove unused label and fix registers' sizes.
-    Update the commit log and commit title of my last patch (see
-    patch 05).
-
-Patch 01: Create a function that handles all the current code doing a
-device tree parsing.
-Patch 02: Rename a register to prepare the a83t support with different
-registers.
-Patch 03: Convert the sunxi SMP driver to add support for A83T.
-This SoC has a bit flip that needs to be handled.
-Patch 04: Add hotplug support for a83t. Remove the possibilite to
-disable the CPU0 because CPU0 hotplug is currently not working for
-this SoC.
-Patch 05-06: Add registers nodes (cpucfg and r_cpucfg) needed
-for SMP bringup.
-Patch 07: Add CCI-400 node for a83t.
-Patch 08: Move the current assembly code into an assembly file
-Patch 09: Move another assemble code (for resuming) into this file
-Patch 10: Add a new entry to initialize the timer offset for all CPUs.
-
-If you have any remarks/questions, let me know.
-Thank you in advance,
-Myl?ne
-
-Myl?ne Josserand (10):
-  ARM: sun9i: smp: Add sun9i dt parsing function
-  ARM: sun9i: smp: Rename clusters's power-off register
-  ARM: sun8i: smp: Add support for A83T
-  ARM: sun8i: smp: Add hotplug support for sun8i-a83t
-  ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
-  ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
-  ARM: dts: sun8i: a83t: Add CCI-400 node
-  ARM: sunxi: smp: Move assembly code into a file
-  ARM: sunxi: smp: Move cpu_resume assembly entry into file
-  ARM: sunxi: smp: Add initialization of CNTVOFF
-
- arch/arm/boot/dts/sun8i-a83t.dtsi |  51 ++++++
- arch/arm/mach-sunxi/Kconfig       |   2 +-
- arch/arm/mach-sunxi/Makefile      |   1 +
- arch/arm/mach-sunxi/headsmp.S     |  99 +++++++++++
- arch/arm/mach-sunxi/mc_smp.c      | 350 ++++++++++++++++++++++++--------------
- arch/arm/mach-sunxi/sunxi.c       |   4 +
- 6 files changed, 383 insertions(+), 124 deletions(-)
- create mode 100644 arch/arm/mach-sunxi/headsmp.S
-
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index 3bd9066a1422..f2c2cfca28cd 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -579,6 +579,8 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
+ 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+ 	if (is_sun9i)
+ 		reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
++	else
++		reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN8I;
+ 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+ 	udelay(20);
+ 
+@@ -660,8 +662,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
+ 	return !ret;
+ }
+ 
+-static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
++static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
+ {
++	/* CPU0 hotplug handled only for sun9i */
++	if (!is_sun9i)
++		if (cpu == 0)
++			return false;
+ 	return true;
+ }
+ #endif
 -- 
 2.11.0
