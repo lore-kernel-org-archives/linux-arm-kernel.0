@@ -1,164 +1,73 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Feb 2018 18:02:53 +0100
-Subject: [RFC PATCH 0.9/2] arm64: fpsimd: Expose CPU / FPSIMD state
- association helpers
-In-Reply-To: <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
-References: <1518805771-15346-1-git-send-email-Dave.Martin@arm.com>
- <1518806370-15697-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180223170253.GA7396@cbox>
+Date: Fri, 23 Feb 2018 18:48:44 +0100
+Subject: [PATCH v4 31/40] KVM: arm64: Move common VHE/non-VHE trap config
+ in separate functions
+In-Reply-To: <833c8ef7-dfd8-6b01-cab5-c97c86b705f3@arm.com>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-32-christoffer.dall@linaro.org>
+ <833c8ef7-dfd8-6b01-cab5-c97c86b705f3@arm.com>
+Message-ID: <20180223174844.GC7396@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 16, 2018 at 06:39:30PM +0000, Dave Martin wrote:
-> Oops, forgot to post this patch that goes before patch 1 in the series.
+On Fri, Feb 23, 2018 at 02:30:54PM +0000, Julien Grall wrote:
+> Hi Christoffer,
 > 
-> --8<--
+> On 15/02/18 21:03, Christoffer Dall wrote:
+> >@@ -85,37 +123,14 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> >  {
+> >  	u64 hcr = vcpu->arch.hcr_el2;
+> >-	/*
+> >-	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> >-	 * register accesses to EL2, however, the ARM ARM clearly states that
+> >-	 * traps are only taken to EL2 if the operation would not otherwise
+> >-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> >-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> >-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+> >-	 * it will cause an exception.
+> >-	 */
+> >-	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
+> >-		write_sysreg(1 << 30, fpexc32_el2);
+> >-		isb();
+> >-	}
+> >+	write_sysreg(hcr, hcr_el2);
+> >  	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
+> >  		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
+> >-	write_sysreg(hcr, hcr_el2);
 > 
-> Expose an interface for associating an FPSIMD context with a CPU and
-> checking the association, for use by KVM.
+> OOI, any reason to move the write to HCR_EL2 just before the if?
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/fpsimd.h |  5 +++++
->  arch/arm64/kernel/fpsimd.c      | 42 +++++++++++++++++++++++++++++------------
->  2 files changed, 35 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 8857a0f..f4ce4d6 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -23,6 +23,7 @@
->  
->  #include <linux/cache.h>
->  #include <linux/stddef.h>
-> +#include <linux/types.h>
->  
->  /*
->   * FP/SIMD storage area has:
-> @@ -62,6 +63,8 @@ struct fpsimd_state {
->  
->  struct task_struct;
->  
-> +extern bool fpsimd_foreign_fpstate(struct fpsimd_state const *state);
-> +
->  extern void fpsimd_save_state(struct fpsimd_state *state);
->  extern void fpsimd_load_state(struct fpsimd_state *state);
->  
-> @@ -76,6 +79,8 @@ extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
->  extern void fpsimd_flush_task_state(struct task_struct *target);
->  extern void sve_flush_cpu_state(void);
->  
-> +extern void fpsimd_bind_state_to_cpu(struct fpsimd_state *state);
-> +
->  /* Maximum VL that SVE VL-agnostic software can transparently support */
->  #define SVE_VL_ARCH_MAX 0x100
->  
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index e7226c4..138efaf 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -38,6 +38,7 @@
->  #include <linux/signal.h>
->  #include <linux/slab.h>
->  #include <linux/sysctl.h>
-> +#include <linux/types.h>
->  
->  #include <asm/fpsimd.h>
->  #include <asm/cputype.h>
-> @@ -121,6 +122,14 @@ struct fpsimd_last_state_struct {
->  
->  static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
->  
-> +bool fpsimd_foreign_fpstate(struct fpsimd_state const *st)
-> +{
-> +	WARN_ON(!in_softirq() && !irqs_disabled());
-> +
-> +	return st->cpu != smp_processor_id() ||
-> +		st != __this_cpu_read(fpsimd_last_state.st);
-> +}
-> +
->  /* Default VL for tasks that don't set it explicitly: */
->  static int sve_default_vl = -1;
->  
-> @@ -908,13 +917,10 @@ void fpsimd_thread_switch(struct task_struct *next)
->  		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
->  		 * upon the next return to userland.
->  		 */
-> -		struct fpsimd_state *st = &next->thread.fpsimd_state;
-> -
-> -		if (__this_cpu_read(fpsimd_last_state.st) == st
-> -		    && st->cpu == smp_processor_id())
-> -			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> -		else
-> +		if (fpsimd_foreign_fpstate(&current->thread.fpsimd_state))
->  			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> +		else
-> +			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
->  	}
->  }
->  
-> @@ -996,19 +1002,31 @@ void fpsimd_signal_preserve_current_state(void)
->  		sve_to_fpsimd(current);
->  }
->  
-> +static void __fpsimd_bind_to_cpu(struct fpsimd_last_state_struct *last,
-> +				 struct fpsimd_state *st)
-> +{
-> +	WARN_ON(!in_softirq() || !irqs_disabled());
 
-You meant && here, right?
+I suppose not, I think this is just a rebasing artifact.
 
-Currently this makes my box explode.
-
+> >-
+> >-	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+> >-	write_sysreg(1 << 15, hstr_el2);
+> >-	/*
+> >-	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
+> >-	 * PMSELR_EL0 to make sure it never contains the cycle
+> >-	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF at
+> >-	 * EL1 instead of being trapped to EL2.
+> >-	 */
+> >-	write_sysreg(0, pmselr_el0);
+> >-	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+> >-	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+> >-	__activate_traps_arch()();
+> >+	__activate_traps_fpsimd32(vcpu);
+> >+	__activate_traps_common(vcpu);
+> >+	__activate_traps_arch()(vcpu);
+> >  }
+> >  static void __hyp_text __deactivate_traps_vhe(void)
+> >@@ -160,9 +175,8 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+> >  	if (vcpu->arch.hcr_el2 & HCR_VSE)
+> >  		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+> >+	__deactivate_traps_common();
+> >  	__deactivate_traps_arch()();
+> >-	write_sysreg(0, hstr_el2);
+> >-	write_sysreg(0, pmuserenr_el0);
+> >  }
+> >  static void __hyp_text __activate_vm(struct kvm *kvm)
+> >
+> 
 Thanks,
 -Christoffer
-
-> +
-> +	last->st = st;
-> +	st->cpu = smp_processor_id();
-> +}
-> +
-> +void fpsimd_bind_state_to_cpu(struct fpsimd_state *st)
-> +{
-> +	__fpsimd_bind_to_cpu(this_cpu_ptr(&fpsimd_last_state), st);
-> +}
-> +
->  /*
->   * Associate current's FPSIMD context with this cpu
->   * Preemption must be disabled when calling this function.
->   */
-> -static void fpsimd_bind_to_cpu(void)
-> +static void fpsimd_bind_task_to_cpu(void)
->  {
->  	struct fpsimd_last_state_struct *last =
->  		this_cpu_ptr(&fpsimd_last_state);
-> -	struct fpsimd_state *st = &current->thread.fpsimd_state;
->  
-> -	last->st = st;
-> +	__fpsimd_bind_to_cpu(last, &current->thread.fpsimd_state);
->  	last->sve_in_use = test_thread_flag(TIF_SVE);
-> -	st->cpu = smp_processor_id();
->  }
->  
->  /*
-> @@ -1025,7 +1043,7 @@ void fpsimd_restore_current_state(void)
->  
->  	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->  		task_fpsimd_load();
-> -		fpsimd_bind_to_cpu();
-> +		fpsimd_bind_task_to_cpu();
->  	}
->  
->  	local_bh_enable();
-> @@ -1050,7 +1068,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
->  	task_fpsimd_load();
->  
->  	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
-> -		fpsimd_bind_to_cpu();
-> +		fpsimd_bind_task_to_cpu();
->  
->  	local_bh_enable();
->  }
-> -- 
-> 2.1.4
-> 
