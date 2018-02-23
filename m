@@ -1,42 +1,64 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 23 Feb 2018 08:54:55 -0800
-Subject: [PATCH v2 0/3] Support qcom pinctrl protected pins
-In-Reply-To: <CACRpkdbgz9PnyLgsn_grsGHbVnak54aOKhetsqfvag5wJNm7=g@mail.gmail.com>
-References: <20180126011400.2191-1-sboyd@codeaurora.org>
- <94a7bd07-8ad5-7ab1-20ab-a02fe2476efd@codeaurora.org>
- <CACRpkdbgz9PnyLgsn_grsGHbVnak54aOKhetsqfvag5wJNm7=g@mail.gmail.com>
-Message-ID: <20180223165455.GN93895@bjorns-mbp-2.lan>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 23 Feb 2018 18:57:39 +0200
+Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
+In-Reply-To: <CAANYUdAzmJdwPH+kOJufG9NDVJVQr32qs-uWiy9Q5+moFCdBzw@mail.gmail.com>
+References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
+ <20180222214237.GH28112@lunn.ch>
+ <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
+ <20180222233457.GA6052@lunn.ch> <1519380573.10722.94.camel@linux.intel.com>
+ <20180223150147.GA17857@lunn.ch>
+ <1519399128.10722.111.camel@linux.intel.com>
+ <20180223155104.GB6052@lunn.ch>
+ <CAANYUdAzmJdwPH+kOJufG9NDVJVQr32qs-uWiy9Q5+moFCdBzw@mail.gmail.com>
+Message-ID: <1519405059.10722.120.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23 Feb 06:22 PST 2018, Linus Walleij wrote:
-
-> On Tue, Feb 20, 2018 at 5:45 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> > On 01/25/2018 07:13 PM, Stephen Boyd wrote:
-> >>
-> >> This patchset proposes a solution to describing the valid
-> >> pins for a pin controller in a semi-generic way so that qcom
-> >> platforms can expose the pins that are really available.
-> >>
-> >> Typically, this has been done by having drivers and firmware
-> >> descriptions only use pins they know they have access to, and that
-> >> still works now because we no longer read the pin direction at
-> >> boot. But there are still some userspace drivers and debugfs facilities
-> >> that don't know what pins are available and attempt to read everything
-> >> they can. On qcom platforms, this may lead to a system hang, which isn't
-> >> very nice behavior, even if root is the only user that can trigger it.
-> >
-> > Any progress on this patch set?  Stephen no longer works for Qualcomm, so I
-> > don't know what the next step is, and I really want this feature in 4.17
-> > (we've missed so many merge windows already).
+On Fri, 2018-02-23 at 17:36 +0100, Stefan Hellermann wrote:
+> 2018-02-23 16:51 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+> > > > Hi Andy
+> > > > 
+> > > > Thanks for pointing this patch out.
+> > > > 
+> > > > What is the advantage of doing to the strnlen()? As Stefan says,
+> > > > the
+> > > > code which follows will detect a short string, in that a NULL is
+> > > > not
+> > > > in [0-9a-f], nor a : .
+> > > 
+> > > I'm not sure, but my understanding is that, the strchr() call in
+> > > the
+> > > original code or isxdigit() in the follow up change will trash a
+> > > cache a
+> > > bit. Besides that some of the users are (often?) supplying empty
+> > > strings
+> > > to convert from, and in this case makes sense to bail out fast.
+> > 
+> > Is this function being called on a hot path? In the case which is
+> > crashing, it is during early boot, and it gets called ~ 40 times, in
+> > quick succession. The first call to isxdigit() will need to fetch
+> > part
+> > of the _ctype array into cache, but since the caller is only walking
+> > memory, i hope it is still in cache for the next call to mac_pton().
+> > 
+> >         Andrew
 > 
-> I depend on Bjorn as maintainer of the pin control driver to ACK
-> the solution he likes.
+> In my case mac_pton is not called on a hot path, the slow sata disks
+> in the NAS dominate the boot time. For me code size matters, and on my
+> device it's rarely called on a zero string. It's probably slower with
+> the strnlen as without it. I think if there are users out there
+> calling it in a hot path on a zero string, they should check the zero
+> string themselves, this is not the common use case.
 > 
 
-I haven't found the time to review the reuse of the irq valid mask or
-the effort needed to replace this, other than that I think the series
-looks good.
+> Should I send a patch to netdev, can I get some Acked-by: ?
 
-Regards,
-Bjorn
+Not from me, sorry.
+
+Alexey would be best person to give a such.
+Please, Cc him.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
