@@ -1,33 +1,28 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 23 Feb 2018 14:49:45 +0100
-Subject: [PATCH 0/7] iio: adc: stm32-dfsdm: misc fixes and improvements
-In-Reply-To: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <31c1cd66-f2f5-201e-04e4-5a79b2191560@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 23 Feb 2018 14:51:29 +0100
+Subject: [PATCH v2 3/9] serial: imx: Fix out-of-bounds access through
+ serial port index
+In-Reply-To: <1519393117-31998-4-git-send-email-geert+renesas@glider.be>
+References: <1519393117-31998-1-git-send-email-geert+renesas@glider.be>
+ <1519393117-31998-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180223135129.lvk3rgepyuik7a2y@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-For the series:
-Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-
-Thanks,
-Arnaud
-
-On 02/23/2018 01:50 PM, Fabrice Gasnier wrote:
-> This series brings some fixes and improvements to STM32 DFSDM driver.
+On Fri, Feb 23, 2018 at 02:38:31PM +0100, Geert Uytterhoeven wrote:
+> The imx_ports[] array is indexed using a value derived from the
+> "serialN" alias in DT, or from platform data, which may lead to an
+> out-of-bounds access.
 > 
-> Fabrice Gasnier (7):
->   iio: adc: stm32-dfsdm: fix compatible data use
->   iio: adc: stm32-dfsdm: fix call to stop channel
->   iio: adc: stm32-dfsdm: fix clock source selection
->   iio: adc: stm32-dfsdm: fix multiple channel initialization
->   iio: adc: stm32-dfsdm: misc style improvements and fixes
->   iio: adc: stm32-dfsdm: add check on max filter id
->   iio: adc: stm32-dfsdm: add check on spi-max-frequency
+> Fix this by adding a range check.
 > 
->  drivers/iio/adc/stm32-dfsdm-adc.c  | 52 ++++++++++++++++++++------------------
->  drivers/iio/adc/stm32-dfsdm-core.c | 17 +++++++++++--
->  2 files changed, 42 insertions(+), 27 deletions(-)
-> 
+> Fixes: ff05967a07225ab6 ("serial/imx: add of_alias_get_id() reference back")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks for your time
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
