@@ -1,27 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Feb 2018 17:18:55 +0100
-Subject: [PATCH v2] arm64: dts: renesas: Add support for Salvator-XS with
- R-Car M3-N
-In-Reply-To: <1519064455-12505-1-git-send-email-geert+renesas@glider.be>
-References: <1519064455-12505-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180223161852.an5pmw6akj2na7tg@verge.net.au>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 23 Feb 2018 16:23:31 +0000
+Subject: [PATCH v6 01/20] dt-bindings: mailbox: add support for mailbox client
+ shared memory
+In-Reply-To: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1519403030-21189-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 07:20:55PM +0100, Geert Uytterhoeven wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> Add initial support for the Renesas Salvator-XS (Salvator-X 2nd version)
-> development board equipped with an R-Car M3-N SiP.
-> 
-> Most features are enabled through the shared salvator-xs.dtsi board
-> description.  The memory configuration is specific to the M3-N SiP.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [geert: Switch to SPDX-License-Identifier, update patch description]
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Fix patch prefix.
+Many users of the mailbox controllers depend on the shared memory
+between the two end points to exchange the main data while using simple
+doorbell mechanism to alert the end points of the presence of a message.
 
-Thanks, applied.
+This patch defines device tree bindings to represent such shared memory
+in a generic way.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ .../devicetree/bindings/mailbox/mailbox.txt        | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+index be05b9746c69..af8ecee2ac68 100644
+--- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+@@ -23,6 +23,11 @@ assign appropriate mailbox channel to client drivers.
+ 
+ Optional property:
+ - mbox-names: List of identifier strings for each mailbox channel.
++- shmem : List of phandle pointing to the shared memory(SHM) area between the
++	  users of these mailboxes for IPC, one for each mailbox. This shared
++	  memory can be part of any memory reserved for the purpose of this
++	  communication between the mailbox client and the remote.
++
+ 
+ Example:
+ 	pwr_cntrl: power {
+@@ -30,3 +35,26 @@ assign appropriate mailbox channel to client drivers.
+ 		mbox-names = "pwr-ctrl", "rpc";
+ 		mboxes = <&mailbox 0 &mailbox 1>;
+ 	};
++
++Example with shared memory(shmem):
++
++	sram: sram at 50000000 {
++		compatible = "mmio-sram";
++		reg = <0x50000000 0x10000>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x50000000 0x10000>;
++
++		cl_shmem: shmem at 0 {
++			compatible = "client-shmem";
++			reg = <0x0 0x200>;
++		};
++	};
++
++	client at 2e000000 {
++		...
++		mboxes = <&mailbox 0>;
++		shmem = <&cl_shmem>;
++		..
++	};
+-- 
+2.7.4
