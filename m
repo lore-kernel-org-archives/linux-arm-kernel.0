@@ -1,99 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Feb 2018 13:41:19 -0800
-Subject: [PATCH 0.5/12] ARM: OMAP2+: Prepare to pass auxdata for smartreflex
-In-Reply-To: <20180223210100.86732-1-tony@atomide.com>
-References: <20180223210100.86732-1-tony@atomide.com>
-Message-ID: <20180223214119.GB5593@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 23 Feb 2018 22:42:31 +0100
+Subject: [PATCH] i2c: bcm2835: Avoid clock stretching timeouts
+Message-ID: <1519422151-6218-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are still initializing smartreflex with platform data using
-omap_device_build(). We can instead pass the platform data in
-with auxdata in pdata-quirks.c and make the driver use that
-in later patches.
+From: Eric Anholt <eric@anholt.net>
 
-Note that we cannot enable the auxdata use yet, this is done
-in the last patch of the series.
+The CLKT register contains at poweron 0x40, which at our typical 100kHz
+bus rate means .64ms. But there is no specified limit to how long devices
+should be able to stretch the clocks, so just disable the timeout. We
+still have a timeout wrapping the entire transfer.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 13 +++++++++++++
- arch/arm/mach-omap2/sr_device.c    |  2 ++
- include/linux/power/smartreflex.h  |  7 +++++++
- 3 files changed, 22 insertions(+)
+Hi,
+just like "i2c: bcm2835: Set up the rising/falling edge delays" this is a
+outstanding bugfix. Unfortunately i only have I2C slaves, which doesn't
+stretch the clock. So test feedback is very welcome.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -17,6 +17,7 @@
- #include <linux/wl12xx.h>
- #include <linux/mmc/card.h>
- #include <linux/mmc/host.h>
-+#include <linux/power/smartreflex.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
+
+ drivers/i2c/busses/i2c-bcm2835.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+index 44deae7..ccd2565 100644
+--- a/drivers/i2c/busses/i2c-bcm2835.c
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -28,6 +28,11 @@
+ #define BCM2835_I2C_FIFO	0x10
+ #define BCM2835_I2C_DIV		0x14
+ #define BCM2835_I2C_DEL		0x18
++/*
++ * 16-bit field for the number of SCL cycles to wait after rising SCL
++ * before deciding the slave is not responding.  0 disables the
++ * timeout detection.
++ */
+ #define BCM2835_I2C_CLKT	0x1c
  
-@@ -542,6 +543,8 @@ static struct pdata_init auxdata_quirks[] __initdata = {
- 	{ /* sentinel */ },
- };
+ #define BCM2835_I2C_C_READ	BIT(0)
+@@ -386,6 +391,12 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+ 	adap->dev.of_node = pdev->dev.of_node;
+ 	adap->quirks = &bcm2835_i2c_quirks;
  
-+struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
-+
- static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_MACH_NOKIA_N8X0
- 	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
-@@ -551,6 +554,10 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP3
- 	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
- 		       &omap3_iommu_pdata),
-+	OF_DEV_AUXDATA("ti,omap3-smartreflex-core", 0x480cb000,
-+		       "480cb000.smartreflex", &omap_sr_pdata[OMAP_SR_CORE]),
-+	OF_DEV_AUXDATA("ti,omap3-smartreflex-mpu-iva", 0x480c9000,
-+		       "480c9000.smartreflex", &omap_sr_pdata[OMAP_SR_MPU]),
- 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
- 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
- 	OF_DEV_AUXDATA("nokia,n900-ir", 0, "n900-ir", &rx51_ir_data),
-@@ -580,6 +587,12 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 		       &omap4_iommu_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
- 		       &omap4_iommu_pdata),
-+	OF_DEV_AUXDATA("ti,omap4-smartreflex-iva", 0x4a0db000,
-+		       "4a0db000.smartreflex", &omap_sr_pdata[OMAP_SR_IVA]),
-+	OF_DEV_AUXDATA("ti,omap4-smartreflex-core", 0x4a0dd000,
-+		       "4a0dd000.smartreflex", &omap_sr_pdata[OMAP_SR_CORE]),
-+	OF_DEV_AUXDATA("ti,omap4-smartreflex-mpu", 0x4a0d9000,
-+		       "4a0d9000.smartreflex", &omap_sr_pdata[OMAP_SR_MPU]),
- #endif
- #ifdef CONFIG_SOC_DRA7XX
- 	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x4809c000, "4809c000.mmc",
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -89,6 +89,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 	sr_data->nvalue_count = j;
- }
++	/*
++	 * Disable the hardware clock stretching timeout.  SMBUS
++	 * specifies a limit for how long the device can stretch the
++	 * clock, but core I2C doesn't.
++	 */
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, 0);
+ 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
  
-+extern struct omap_sr_data omap_sr_pdata[];
-+
- static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
- {
- 	struct omap_sr_data *sr_data;
-diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
---- a/include/linux/power/smartreflex.h
-+++ b/include/linux/power/smartreflex.h
-@@ -143,6 +143,13 @@
- #define OMAP3430_SR_ERRWEIGHT		0x04
- #define OMAP3430_SR_ERRMAXLIMIT		0x02
- 
-+enum sr_instance {
-+	OMAP_SR_MPU,			/* shared with iva on omap3 */
-+	OMAP_SR_CORE,
-+	OMAP_SR_IVA,
-+	OMAP_SR_NR,
-+};
-+
- struct omap_sr {
- 	char				*name;
- 	struct list_head		node;
+ 	ret = i2c_add_adapter(adap);
 -- 
-2.16.2
+2.7.4
