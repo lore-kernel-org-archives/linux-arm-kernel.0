@@ -1,60 +1,66 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 23 Feb 2018 18:16:22 +0800
-Subject: [PATCH v1 02/19] dt-bindings: cpufreq: mediatek: use - instead of _
- in examples
+Date: Fri, 23 Feb 2018 18:16:28 +0800
+Subject: [PATCH v1 08/19] arm: dts: mt7623: enable three available UARTs on
+ bananapi-r2
 In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
 References: <cover.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <fd1fc4c6760ab8fcbf7518df1cecf3837ab18d2c.1519378871.git.sean.wang@mediatek.com>
+Message-ID: <f2e72b8c9f5755ee8943dd7be7f9b9ec50f52c9b.1519378872.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-It should be good that no use "_" is in examples. Consequently,
-those nodes in certain files which have an inappropriate name containing
-"_" are all being replaced with "-".
+On bpi-r2 board, totally there're four UARTs which we usually called
+uart[0-3] helpful to extend slow-I/O devices. Among those ones, uart2 has
+dedicated pin slot which is used to console log. uart[0-1] appear at the
+40-pins connector and uart3 has no pinout, but just has test points (TP47
+for TX and TP48 for RX, respectively) nearby uart2, but we don't enable
+uart3 in the patch. The missing pinctrl is also being supplemented for
+those newly added devices.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-pm at vger.kernel.org
-Cc: devicetree at vger.kernel.org
 ---
- Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-index d36f07e..38cfbb5 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-@@ -26,7 +26,7 @@ Optional properties:
- 
- Example 1 (MT7623 SoC):
- 
--	cpu_opp_table: opp_table {
-+	cpu_opp_table: opp-table {
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
-@@ -86,7 +86,7 @@ Example 1 (MT7623 SoC):
- 	};
- 
- Example 2 (MT8173 SoC):
--	cpu_opp_table_a: opp_table_a {
-+	cpu_opp_table_a: opp-table-a {
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
-@@ -131,7 +131,7 @@ Example 2 (MT8173 SoC):
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 8ef91d6..6b760be 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -470,6 +470,13 @@
+ 				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
  		};
  	};
++
++	uart2_pins_a: uart at 2 {
++		pins_dat {
++			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
++				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
++		};
++	};
+ };
  
--	cpu_opp_table_b: opp_table_b {
-+	cpu_opp_table_b: opp-table-b {
- 		compatible = "operating-points-v2";
- 		opp-shared;
+ &pwm {
+@@ -515,16 +522,18 @@
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_a>;
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins_a>;
+ 	status = "okay";
+ };
  
 -- 
 2.7.4
