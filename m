@@ -1,96 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 23 Feb 2018 12:41:10 -0800
-Subject: [PATCH] ARM: B15: Update to support Brahma-B53
-Message-ID: <20180223204110.6350-1-f.fainelli@gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 23 Feb 2018 22:51:07 +0200
+Subject: [PATCH] net: Allow mac_pton() to work on non-NULL terminated
+ strings
+In-Reply-To: <20180223204104.GA15686@avx2>
+References: <20180223182006.GA2116@avx2>
+ <20180223201748.14328-1-stefan@the2masters.de>
+ <20180223204104.GA15686@avx2>
+Message-ID: <1519419067.10722.139.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The B53 CPU design supports up to 8 processors, which moved the RAC_FLUSH_REG
-offset 0x4 bytes below to make room for a RAC_CONFIG2_REG to control RAC
-settings for CPU4-7.
+On Fri, 2018-02-23 at 23:41 +0300, Alexey Dobriyan wrote:
+> On Fri, Feb 23, 2018 at 09:17:48PM +0100, Stefan Hellermann wrote:
+> > @@ -8,10 +8,6 @@ bool mac_pton(const char *s, u8 *mac)
+> >  {
+> >  	int i;
+> >  
+> > -	/* XX:XX:XX:XX:XX:XX */
+> > -	if (strlen(s) < 3 * ETH_ALEN - 1)
+> > -		return false;
+> > -
+> >  	/* Don't dirty result unless string is valid MAC. */
+> >  	for (i = 0; i < ETH_ALEN; i++) {
+> >  		if (!isxdigit(s[i * 3]) || !isxdigit(s[i * 3 + 1]))
+> 
+> Short string will bail in the loop, indeed.
+> 
+> Reviewed-by: Alexey Dobriyan <adobriyan@gmail.com>
 
-Lookup the processor type (B15 or B53) and adjust the RAC_FLUSH_REG offset
-accordingly, if we do not know the processor, bail out.
+Since the author is okay with the change, I'm following:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mm/cache-b15-rac.c | 30 ++++++++++++++++++++++++++----
- 1 file changed, 26 insertions(+), 4 deletions(-)
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-diff --git a/arch/arm/mm/cache-b15-rac.c b/arch/arm/mm/cache-b15-rac.c
-index d9586ba2e63c..c6ed14840c3c 100644
---- a/arch/arm/mm/cache-b15-rac.c
-+++ b/arch/arm/mm/cache-b15-rac.c
-@@ -33,7 +33,10 @@ extern void v7_flush_kern_cache_all(void);
- #define  RAC_CPU_SHIFT			(8)
- #define  RACCFG_MASK			(0xff)
- #define RAC_CONFIG1_REG			(0x7c)
--#define RAC_FLUSH_REG			(0x80)
-+/* Brahma-B15 is a quad-core only design */
-+#define B15_RAC_FLUSH_REG		(0x80)
-+/* Brahma-B53 is an octo-core design */
-+#define B53_RAC_FLUSH_REG		(0x84)
- #define  FLUSH_RAC			(1 << 0)
- 
- /* Bitmask to enable instruction and data prefetching with a 256-bytes stride */
-@@ -52,6 +55,7 @@ static void __iomem *b15_rac_base;
- static DEFINE_SPINLOCK(rac_lock);
- 
- static u32 rac_config0_reg;
-+static u32 rac_flush_offset;
- 
- /* Initialization flag to avoid checking for b15_rac_base, and to prevent
-  * multi-platform kernels from crashing here as well.
-@@ -70,14 +74,14 @@ static inline void __b15_rac_flush(void)
- {
- 	u32 reg;
- 
--	__raw_writel(FLUSH_RAC, b15_rac_base + RAC_FLUSH_REG);
-+	__raw_writel(FLUSH_RAC, b15_rac_base + rac_flush_offset);
- 	do {
- 		/* This dmb() is required to force the Bus Interface Unit
- 		 * to clean oustanding writes, and forces an idle cycle
- 		 * to be inserted.
- 		 */
- 		dmb();
--		reg = __raw_readl(b15_rac_base + RAC_FLUSH_REG);
-+		reg = __raw_readl(b15_rac_base + rac_flush_offset);
- 	} while (reg & FLUSH_RAC);
- }
- 
-@@ -287,7 +291,7 @@ static struct syscore_ops b15_rac_syscore_ops = {
- 
- static int __init b15_rac_init(void)
- {
--	struct device_node *dn;
-+	struct device_node *dn, *cpu_dn;
- 	int ret = 0, cpu;
- 	u32 reg, en_mask = 0;
- 
-@@ -305,6 +309,24 @@ static int __init b15_rac_init(void)
- 		goto out;
- 	}
- 
-+	cpu_dn = of_get_cpu_node(0, NULL);
-+	if (!cpu_dn) {
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (of_device_is_compatible(cpu_dn, "brcm,brahma-b15"))
-+		rac_flush_offset = B15_RAC_FLUSH_REG;
-+	else if (of_device_is_compatible(cpu_dn, "brcm,brahma-b53"))
-+		rac_flush_offset = B53_RAC_FLUSH_REG;
-+	else {
-+		pr_err("Unsupported CPU\n");
-+		of_node_put(cpu_dn);
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+	of_node_put(cpu_dn);
-+
- 	ret = register_reboot_notifier(&b15_rac_reboot_nb);
- 	if (ret) {
- 		pr_err("failed to register reboot notifier\n");
 -- 
-2.14.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
