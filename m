@@ -1,101 +1,75 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 23 Feb 2018 20:25:49 +0800
-Subject: [PATCH v3 4/7] clk: sunxi-ng: Support fixed post-dividers on NKMP
- style clocks
-In-Reply-To: <20180223122552.58049-1-icenowy@aosc.io>
-References: <20180223122552.58049-1-icenowy@aosc.io>
-Message-ID: <20180223122552.58049-5-icenowy@aosc.io>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 23 Feb 2018 13:34:15 +0100
+Subject: [PATCH 1/6] arm64: dts: renesas: r8a77965: Add "reg" properties
+In-Reply-To: <20180223122250.GP7203@w540>
+References: <1519326370-15805-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519326370-15805-2-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdWGYpeOMJQKcT8=wm1YzQoB+vpK5H99Kg_pJ_HeBUw8Sw@mail.gmail.com>
+ <20180223122250.GP7203@w540>
+Message-ID: <CAMuHMdWoryzK05SvAXQiD6epy3zsYrHOq9a6=7F3ZWinxb3mdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the new Allwinner H6 SoC, multiple PLL's are NMP style clocks
-(modelled as NKMP with no K) and have fixed post-dividers.
+Hi Jacopo,
 
-Add fixed post divider support to the NKMP style clocks.
+On Fri, Feb 23, 2018 at 1:22 PM, jacopo mondi <jacopo@jmondi.org> wrote:
+> On Fri, Feb 23, 2018 at 10:19:21AM +0100, Geert Uytterhoeven wrote:
+>> On Thu, Feb 22, 2018 at 8:06 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+>> > Add "reg" properties to place-holder nodes with unit address defined for
+>> > R-Car M3-N SoC.
+>> >
+>> > This silences the following DTC compiler warning:
+>> > Warning (unit_address_vs_reg): Node /soc/... has a unit name,
+>> > but no reg property
+>> >
+>> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>>
+>> A few minor nits below...
+>>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> > --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> > +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>>
+>> > @@ -520,130 +521,163 @@
+>> >                 };
+>> >
+>> >                 avb: ethernet at e6800000 {
+>> > +                       reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+>>
+>> The first reg part would be sufficient for a placeholder.
+>> I think even setting the size to zero would work...
+>
+> Not sure I fully got your point here.
+>
+> Do you mean I have to remove the second (and third, fourth...)  addresses range block
+> in all placeholder device nodes with multiple blocks (avb, du, rcar-sound) ?
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v3:
-- Rebased on newest linux-next/master.
+No, you don't have to.
 
-No changes in v2.
+> Do you mean I have to set to 0 the address length in all placeholder nodes?
+> What's the point if they have to be added back once the device is
+> enabled?
 
- drivers/clk/sunxi-ng/ccu_nkmp.c | 20 +++++++++++++++++---
- drivers/clk/sunxi-ng/ccu_nkmp.h |  2 ++
- 2 files changed, 19 insertions(+), 3 deletions(-)
+No, you don't have to.
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index c3f6fe7be565..ebd9436d2c7c 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -95,7 +95,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 					unsigned long parent_rate)
- {
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
--	unsigned long n, m, k, p;
-+	unsigned long n, m, k, p, rate;
- 	u32 reg;
- 
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
-@@ -121,7 +121,11 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 	p = reg >> nkmp->p.shift;
- 	p &= (1 << nkmp->p.width) - 1;
- 
--	return ccu_nkmp_calc_rate(parent_rate, n, k, m, 1 << p);
-+	rate = ccu_nkmp_calc_rate(parent_rate, n, k, m, 1 << p);
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate /= nkmp->fixed_post_div;
-+
-+	return rate;
- }
- 
- static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-@@ -130,6 +134,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
- 	struct _ccu_nkmp _nkmp;
- 
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate *= nkmp->fixed_post_div;
-+
- 	_nkmp.min_n = nkmp->n.min ?: 1;
- 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
- 	_nkmp.min_k = nkmp->k.min ?: 1;
-@@ -141,8 +148,12 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
- 
--	return ccu_nkmp_calc_rate(*parent_rate, _nkmp.n, _nkmp.k,
-+	rate = ccu_nkmp_calc_rate(*parent_rate, _nkmp.n, _nkmp.k,
- 				  _nkmp.m, _nkmp.p);
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate / nkmp->fixed_post_div;
-+
-+	return rate;
- }
- 
- static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
-@@ -154,6 +165,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags;
- 	u32 reg;
- 
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate * nkmp->fixed_post_div;
-+
- 	_nkmp.min_n = nkmp->n.min ?: 1;
- 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
- 	_nkmp.min_k = nkmp->k.min ?: 1;
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
-index a82facbc6144..6940503e7fc4 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.h
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
-@@ -34,6 +34,8 @@ struct ccu_nkmp {
- 	struct ccu_div_internal		m;
- 	struct ccu_div_internal		p;
- 
-+	unsigned int		fixed_post_div;
-+
- 	struct ccu_common	common;
- };
- 
--- 
-2.15.1
+The point is to do the minimum amount of work for the placeholders.
+But since you've already done the work (and I've done the work to review it),
+it doesn't make sense to remove all of this, to be redone later.
+
+For a new future SoC+board combination, we may consider this.
+Actually we could get rid of the "reg" requirement as well, if would drop
+the unit addresses from the placeholders (e.g. "avb: ethernet { ... }", and
+"vin2: video-2 { ...}"). Even less to look up in the datasheet...
+(to be broken by Rob adding more dtc checks ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
