@@ -1,92 +1,47 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 23 Feb 2018 17:24:59 +0800
-Subject: [PATCH v8 03/13] kexec_file,x86,powerpc: factor out
- kexec_file_ops functions
-In-Reply-To: <20180222111732.23051-4-takahiro.akashi@linaro.org>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-4-takahiro.akashi@linaro.org>
-Message-ID: <20180223092459.GC4433@dhcp-128-65.nay.redhat.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Fri, 23 Feb 2018 17:43:06 +0800
+Subject: [PATCH v2 0/3] gpio-keys: Add support for specifying wakeup event
+ action
+In-Reply-To: <1541427.8RRpDbxO4f@diego>
+References: <20180210110907.5504-1-jeffy.chen@rock-chips.com>
+ <1541427.8RRpDbxO4f@diego>
+Message-ID: <5A8FE22A.1070709@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
+Hi Heiko,
 
-On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
-> As arch_kexec_kernel_*_{probe,load}(), arch_kimage_file_post_load_cleanup()
-> and arch_kexec_kernel_verify_sg can be parameterized with a kexec_file_ops
-> array and now duplicated among some architectures, let's factor them out.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
-> ---
->  arch/powerpc/include/asm/kexec.h            |  2 +-
->  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
->  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++------------------
->  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
->  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
->  arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
->  include/linux/kexec.h                       | 15 ++++----
->  kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
->  8 files changed, 70 insertions(+), 94 deletions(-)
-> 
+Thanks for your reply :)
 
-[snip]
+On 02/14/2018 09:39 PM, Heiko St?bner wrote:
+> Hi Jeffy,
+>
+> Am Samstag, 10. Februar 2018, 12:09:04 CET schrieb Jeffy Chen:
+>> On chromebook kevin, we are using gpio-keys for pen insert event. But
+>> we only want it to wakeup the system when ejecting the pen.
+>>
+>> So we may need to change the interrupt trigger type during suspending.
+>>
+>> Changes in v2:
+>> Specify wakeup event action instead of irq trigger type as Brian
+>> suggested.
+>>
+>> Jeffy Chen (3):
+>>    Input: gpio-keys - add support for wakeup event action
+>>    Input: gpio-keys - allow setting wakeup event action in DT
+>>    arm64: dts: rockchip: Avoid wakeup when inserting the pen
+>
+> The recipient-selection for the mail thread seems to be a bit off and
+> I only got the cover-letter and patch 3/3.
+> Therefore I won't really see if and when the Input-changes get
+> accepted. So please ping me once that has happened so I can pick up
+> the rockchip dts change for it.
+oops, sorry, i'll add you to the CC list in the next version :)
 
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 990adae52151..a6d14a768b3e 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -26,34 +26,83 @@
->  #include <linux/vmalloc.h>
->  #include "kexec_internal.h"
->  
-> +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
-> +
->  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
->  static int kexec_calculate_store_digests(struct kimage *image);
->  #else
->  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
->  #endif
->  
-> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> +			     unsigned long buf_len)
-> +{
-> +	const struct kexec_file_ops * const *fops;
-> +	int ret = -ENOEXEC;
-> +
-> +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
-> +		ret = (*fops)->probe(buf, buf_len);
-> +		if (!ret) {
-> +			image->fops = *fops;
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  /* Architectures can provide this probe function */
->  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
->  					 unsigned long buf_len)
->  {
-> -	return -ENOEXEC;
-> +	return _kexec_kernel_image_probe(image, buf, buf_len);
-
-
-I vaguely remember previously I suggest split the _kexec_kernel_image_probe
-because arch code can call them, and common code also use it like above.
-But in your new series I do not find where else calls this function
-except the common code arch_kexec_kernel_image_probe.  If nobody use
-them then it is not worth to split them out, it is better to just embed
-them in the __weak functions.
-
-Ditto for other similar functions.
-
-[snip]
-
-Thanks
-Dave
+>
+>
+> Thanks
+> Heiko
+>
+>
+>
