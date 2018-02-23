@@ -1,33 +1,37 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 23 Feb 2018 13:50:56 +0100
-Subject: [PATCH 2/7] iio: adc: stm32-dfsdm: fix call to stop channel
+Date: Fri, 23 Feb 2018 13:51:01 +0100
+Subject: [PATCH 7/7] iio: adc: stm32-dfsdm: add check on spi-max-frequency
 In-Reply-To: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
 References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1519390261-25453-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1519390261-25453-8-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stm32_dfsdm_stop_channel must be called with channel id, not filter id.
-
-Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
+spi-max-frequency is requested for SPI master mode (only), to tune output
+clock. It may happen requested frequency isn't reachable.
+Add explicit check, so probe fails with error in this case. Otherwise,
+output clock may simply be silently turned off (conversions fail).
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-dfsdm-adc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iio/adc/stm32-dfsdm-core.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index daa026d..0eff811 100644
---- a/drivers/iio/adc/stm32-dfsdm-adc.c
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -464,7 +464,7 @@ static int stm32_dfsdm_start_conv(struct stm32_dfsdm_adc *adc, bool dma)
+diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
+index e50efdc..1d0d823 100644
+--- a/drivers/iio/adc/stm32-dfsdm-core.c
++++ b/drivers/iio/adc/stm32-dfsdm-core.c
+@@ -227,6 +227,11 @@ static int stm32_dfsdm_parse_of(struct platform_device *pdev,
+ 	}
  
- 	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
- 			   DFSDM_CR1_RCONT_MASK, 0);
--	stm32_dfsdm_stop_channel(adc->dfsdm, adc->fl_id);
-+	stm32_dfsdm_stop_channel(adc->dfsdm, adc->ch_id);
+ 	priv->spi_clk_out_div = div_u64_rem(clk_freq, spi_freq, &rem) - 1;
++	if (!priv->spi_clk_out_div) {
++		/* spi_clk_out_div == 0 means ckout is OFF */
++		dev_err(&pdev->dev, "spi-max-frequency not achievable\n");
++		return -EINVAL;
++	}
+ 	priv->dfsdm.spi_master_freq = spi_freq;
  
- 	return ret;
- }
+ 	if (rem) {
 -- 
 1.9.1
