@@ -1,118 +1,174 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 16:18:21 +0100
-Subject: [PATCH v3 2/7] pinctrl: sunxi: support pin controllers with
- holes among IRQ banks
-In-Reply-To: <20180223122552.58049-3-icenowy@aosc.io>
-References: <20180223122552.58049-1-icenowy@aosc.io>
- <20180223122552.58049-3-icenowy@aosc.io>
-Message-ID: <20180223151821.gqn66roldejpowzu@flea.lan>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 23 Feb 2018 15:46:46 +0100
+Subject: [PATCH] arm: dts: zynq: Use SPDX-License-Identifier
+Message-ID: <21416e9b76509131db1cb7adcd42f2cae8d6b2ef.1519397204.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 08:25:47PM +0800, Icenowy Zheng wrote:
-> The Allwinner H6 SoC have its pin controllers with the first IRQ-capable
-> GPIO bank at IRQ bank 1 and the second bank at IRQ bank 5. This
-> situation cannot be processed with the current pinctrl IRQ code, as it
-> only expects a offset to all IRQ banks.
-> 
-> Update the code to use a logical IRQ bank to hardware IRQ bank map, so
-> the new situation in H6 main pin controller can be processed. The old
-> special situation which uses a constant offset (on A33 and V3s, both
-> with a offset of 1) can be also processed with the new code.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v3:
-> - change for the refactor in the new PATCH 1.
-> 
-> No changes in v2.
-> 
->  drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c |  4 +++-
->  drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c |  4 +++-
->  drivers/pinctrl/sunxi/pinctrl-sunxi.h     | 29 +++++++++++++++++------------
->  3 files changed, 23 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-> index da387211a75e..f043afa1aac5 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-> @@ -481,11 +481,13 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
->  		  SUNXI_FUNCTION(0x3, "uart3")),	/* CTS */
->  };
->  
-> +static const unsigned int sun8i_a33_pinctrl_irq_bank_map[] = { 1, 2 };
-> +
->  static const struct sunxi_pinctrl_desc sun8i_a33_pinctrl_data = {
->  	.pins = sun8i_a33_pins,
->  	.npins = ARRAY_SIZE(sun8i_a33_pins),
->  	.irq_banks = 2,
-> -	.irq_bank_base = 1,
-> +	.irq_bank_map = sun8i_a33_pinctrl_irq_bank_map,
->  	.disable_strict_mode = true,
->  };
->  
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
-> index 496ba34e1f5f..6704ce8e5e3d 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
-> @@ -293,11 +293,13 @@ static const struct sunxi_desc_pin sun8i_v3s_pins[] = {
->  		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PG_EINT5 */
->  };
->  
-> +static const unsigned int sun8i_v3s_pinctrl_irq_bank_map[] = { 1, 2 };
-> +
->  static const struct sunxi_pinctrl_desc sun8i_v3s_pinctrl_data = {
->  	.pins = sun8i_v3s_pins,
->  	.npins = ARRAY_SIZE(sun8i_v3s_pins),
->  	.irq_banks = 2,
-> -	.irq_bank_base = 1,
-> +	.irq_bank_map = sun8i_v3s_pinctrl_irq_bank_map,
->  	.irq_read_needs_mux = true
->  };
->  
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> index 909ca1504b61..36502cbef6c2 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> @@ -110,7 +110,7 @@ struct sunxi_pinctrl_desc {
->  	int				npins;
->  	unsigned			pin_base;
->  	unsigned			irq_banks;
-> -	unsigned			irq_bank_base;
-> +	const unsigned int		*irq_bank_map;
->  	bool				irq_read_needs_mux;
->  	bool				disable_strict_mode;
->  };
-> @@ -263,14 +263,23 @@ static inline u32 sunxi_pull_offset(u16 pin)
->  	return pin_num * PULL_PINS_BITS;
->  }
->  
-> +static inline u32 sunxi_irq_hw_bank_num(u8 bank,
-> +					const struct sunxi_pinctrl_desc *desc)
-> +{
-> +	if (!desc->irq_bank_map)
-> +		return bank;
-> +	else
-> +		return desc->irq_bank_map[bank];
-> +}
-> +
+Follow trend and use the SPDX License description.
 
-Same remark about the order of the argument, and I would have split
-this patch in two, one to introduce the new function (but still using
-the irq_bank_base), and then a second patch to introduce the
-irq_bank_map.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Looks good otherwise, thanks!
-Maxime
+ arch/arm/boot/dts/zynq-7000.dtsi      | 12 ++----------
+ arch/arm/boot/dts/zynq-microzed.dts   | 10 +---------
+ arch/arm/boot/dts/zynq-parallella.dts | 10 +---------
+ arch/arm/boot/dts/zynq-zc702.dts      | 10 +---------
+ arch/arm/boot/dts/zynq-zc706.dts      | 10 +---------
+ arch/arm/boot/dts/zynq-zed.dts        | 10 +---------
+ arch/arm/boot/dts/zynq-zybo.dts       | 10 +---------
+ 7 files changed, 8 insertions(+), 64 deletions(-)
 
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 0f79fe1ccd9d..e22507e23303 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -1,14 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+- *  Copyright (C) 2011 - 2014 Xilinx
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * Copyright (C) 2011 - 2014 Xilinx
+  */
+ 
+ / {
+diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
+index b9376a4904b4..e017cb67ffba 100644
+--- a/arch/arm/boot/dts/zynq-microzed.dts
++++ b/arch/arm/boot/dts/zynq-microzed.dts
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) 2011 - 2014 Xilinx
+  * Copyright (C) 2016 Jagan Teki <jteki@openedev.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ /include/ "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+index 0144acfa9793..c05f4b67d4c1 100644
+--- a/arch/arm/boot/dts/zynq-parallella.dts
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2014 SUSE LINUX Products GmbH
+  *
+@@ -6,15 +7,6 @@
+  *  Copyright (C) 2011 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+  *  Copyright (C) 2013 Xilinx
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ /include/ "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index ff3a7d22afba..f2330b0cb63d 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 1825f5722ab9..3ad1260ff2a1 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 5e44dc12fd60..53c6883ce1f6 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
+diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+index e40cafc5ee5b..a6c00e7fa767 100644
+--- a/arch/arm/boot/dts/zynq-zybo.dts
++++ b/arch/arm/boot/dts/zynq-zybo.dts
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  *  Copyright (C) 2011 - 2014 Xilinx
+  *  Copyright (C) 2012 National Instruments Corp.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ /dts-v1/;
+ #include "zynq-7000.dtsi"
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/a4870086/attachment.sig>
+1.9.1
