@@ -1,36 +1,106 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 23 Feb 2018 16:51:04 +0100
-Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
-In-Reply-To: <1519399128.10722.111.camel@linux.intel.com>
-References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
- <20180222214237.GH28112@lunn.ch>
- <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
- <20180222233457.GA6052@lunn.ch>
- <1519380573.10722.94.camel@linux.intel.com>
- <20180223150147.GA17857@lunn.ch>
- <1519399128.10722.111.camel@linux.intel.com>
-Message-ID: <20180223155104.GB6052@lunn.ch>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 23 Feb 2018 17:16:36 +0100
+Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
+In-Reply-To: <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
+References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <a6dca941-c887-3066-9290-be7590ab8f9b@st.com>
+Message-ID: <73fbc744-872a-8a69-8bf4-a46d7f5b6636@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Hi Andy
-> > 
-> > Thanks for pointing this patch out.
-> > 
-> > What is the advantage of doing to the strnlen()? As Stefan says, the
-> > code which follows will detect a short string, in that a NULL is not
-> > in [0-9a-f], nor a : .
+
+
+On 02/23/2018 04:46 PM, Ludovic BARRE wrote:
+> hi Radoslaw
 > 
-> I'm not sure, but my understanding is that, the strchr() call in the
-> original code or isxdigit() in the follow up change will trash a cache a
-> bit. Besides that some of the users are (often?) supplying empty strings
-> to convert from, and in this case makes sense to bail out fast.
+> The gpio-keys tests it's now functional on H7, great.
+> However the gpio-key test only the bank1 (like stm32f429).
+> Like the H7 introduce the multi-bank management,
+> we must perform complementary test.
+> 
+> comment below about ack in handler
+> 
+> On 02/23/2018 09:31 AM, Radoslaw Pietrzyk wrote:
+>> - discards setting handle_simple_irq handler for hierarchy interrupts
+>> - removes acking in chained irq handler as this is done by
+>> irq_chip itself inside handle_edge_irq
+>> - removes unneeded irq_domain_ops.xlate callback
+>>
+>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>> ---
+>> ? drivers/irqchip/irq-stm32-exti.c | 13 -------------
+>> ? 1 file changed, 13 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-stm32-exti.c 
+>> b/drivers/irqchip/irq-stm32-exti.c
+>> index 36f0fbe..8013a87 100644
+>> --- a/drivers/irqchip/irq-stm32-exti.c
+>> +++ b/drivers/irqchip/irq-stm32-exti.c
+>> @@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct 
+>> irq_chip_generic *gc)
+>> ????? return irq_reg_readl(gc, stm32_bank->pr_ofst);
+>> ? }
+>> -static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
+>> -{
+>> -??? const struct stm32_exti_bank *stm32_bank = gc->private;
+>> -
+>> -??? irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
+>> -}
+>> -
+>> ? static void stm32_irq_handler(struct irq_desc *desc)
+>> ? {
+>> ????? struct irq_domain *domain = irq_desc_get_handler_data(desc);
+>> @@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
+>> ????????????? for_each_set_bit(n, &pending, IRQS_PER_BANK) {
+>> ????????????????? virq = irq_find_mapping(domain, irq_base + n);
+>> ????????????????? generic_handle_irq(virq);
+>> -??????????????? stm32_exti_irq_ack(gc, BIT(n));
+> 
+> the while loop " while ((pending = " has been introduce while original
+> upstream of this driver in V2 to V3
+> https://patchwork.ozlabs.org/patch/604190/
+> https://patchwork.ozlabs.org/patch/665242/
+> 
+> the "ack" is needed to acknowledge the irq which are handled and which 
+> is not the original irq for which we enter.
+> 
+>> ????????????? }
+>> ????????? }
+>> ????? }
+>> @@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data 
+>> *data, unsigned int on)
+>> ? static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
+>> ????????????????? unsigned int nr_irqs, void *data)
+>> ? {
+>> -??? struct irq_chip_generic *gc;
+>> ????? struct irq_fwspec *fwspec = data;
+>> ????? irq_hw_number_t hwirq;
+>> ????? hwirq = fwspec->param[0];
+>> -??? gc = irq_get_domain_generic_chip(d, hwirq);
+>> ????? irq_map_generic_chip(d, virq, hwirq);
+>> -??? irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
+>> -??????????????? handle_simple_irq, NULL, NULL);
+> 
+> I see if it is not disturb the multi-bank.
 
-Is this function being called on a hot path? In the case which is
-crashing, it is during early boot, and it gets called ~ 40 times, in
-quick succession. The first call to isxdigit() will need to fetch part
-of the _ctype array into cache, but since the caller is only walking
-memory, i hope it is still in cache for the next call to mac_pton().
+you are right, normally irq_domain_set_info is already set in
+irq_map_generic_chip.
 
-	Andrew
+> 
+>> ????? return 0;
+>> ? }
+>> @@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d, 
+>> unsigned int virq,
+>> ? struct irq_domain_ops irq_exti_domain_ops = {
+>> ????? .map??? = irq_map_generic_chip,
+>> -??? .xlate??? = irq_domain_xlate_onetwocell,
+>> ????? .alloc? = stm32_exti_alloc,
+>> ????? .free??? = stm32_exti_free,
+>> ? };
+>>
+> 
+> BR
+> Ludo
