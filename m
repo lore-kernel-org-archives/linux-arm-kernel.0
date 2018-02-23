@@ -1,81 +1,77 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 23 Feb 2018 16:00:19 +0100
-Subject: [PATCH v2 1/5] arm: zynq: Add Xilinx cc108 board
+Date: Fri, 23 Feb 2018 16:00:23 +0100
+Subject: [PATCH v2 5/5] arm: zynq: Add support for Xilinx zc770 xm013 dc4 board
 In-Reply-To: <cover.1519398009.git.michal.simek@xilinx.com>
 References: <cover.1519398009.git.michal.simek@xilinx.com>
-Message-ID: <eb2fec632fcb7fbfed39dcbeae92b38a98518618.1519398009.git.michal.simek@xilinx.com>
+Message-ID: <7e29c4841930c4e4189a167934574fcf987b9f02.1519398009.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board contains 7z010 with 512MB memory, ethernet, qspi, uart, usbs
-and sd. But board is not supporting booting from sd card.
+zc770 is based board which is extended by FMC/DC cards for SoC
+validation. FMCs/DCs are supposed to cover all SoC configurations.
+FMC/DC contains can, ethernet, i2c, qspi, spi and uart.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v2:
+- use eeprom as node name instead of at25
 - Record compatible string to xilinx.txt
 
- Documentation/devicetree/bindings/arm/xilinx.txt |  5 ++
+ Documentation/devicetree/bindings/arm/xilinx.txt |  1 +
  arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/zynq-cc108.dts                 | 75 ++++++++++++++++++++++++
- 3 files changed, 81 insertions(+)
- create mode 100644 arch/arm/boot/dts/zynq-cc108.dts
+ arch/arm/boot/dts/zynq-zc770-xm013.dts           | 78 ++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/boot/dts/zynq-zc770-xm013.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-index 549e70a022cb..425c74fcc560 100644
+index 745c898f2f7f..63705a451251 100644
 --- a/Documentation/devicetree/bindings/arm/xilinx.txt
 +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-@@ -6,6 +6,11 @@ shall have the following properties.
- Required root node properties:
-     - compatible = "xlnx,zynq-7000";
+@@ -15,6 +15,7 @@ Additional compatible strings:
+   "xlnx,zynq-zc770-xm010"
+   "xlnx,zynq-zc770-xm011"
+   "xlnx,zynq-zc770-xm012"
++  "xlnx,zynq-zc770-xm013"
  
-+Additional compatible strings:
-+
-+- Xilinx internal board cc108
-+  "xlnx,zynq-cc108"
-+
  ---------------------------------------------------------------
  
- Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..c6810e84d4d7 100644
+index 2c74b935ad1c..d5de3748a80a 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -1062,6 +1062,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
- 	wm8750-apc8750.dtb \
- 	wm8850-w70v2.dtb
- dtb-$(CONFIG_ARCH_ZYNQ) += \
-+	zynq-cc108.dtb \
- 	zynq-microzed.dtb \
- 	zynq-parallella.dtb \
- 	zynq-zc702.dtb \
-diff --git a/arch/arm/boot/dts/zynq-cc108.dts b/arch/arm/boot/dts/zynq-cc108.dts
+@@ -1070,6 +1070,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+ 	zynq-zc770-xm010.dtb \
+ 	zynq-zc770-xm011.dtb \
+ 	zynq-zc770-xm012.dtb \
++	zynq-zc770-xm013.dtb \
+ 	zynq-zed.dtb \
+ 	zynq-zybo.dtb
+ dtb-$(CONFIG_MACH_ARMADA_370) += \
+diff --git a/arch/arm/boot/dts/zynq-zc770-xm013.dts b/arch/arm/boot/dts/zynq-zc770-xm013.dts
 new file mode 100644
-index 000000000000..1a0f631c1d8d
+index 000000000000..8bb66859d774
 --- /dev/null
-+++ b/arch/arm/boot/dts/zynq-cc108.dts
-@@ -0,0 +1,75 @@
++++ b/arch/arm/boot/dts/zynq-zc770-xm013.dts
+@@ -0,0 +1,78 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
-+ * Xilinx CC108 board DTS
++ * Xilinx ZC770 XM013 board DTS
 + *
-+ * (C) Copyright 2007-2018 Xilinx, Inc.
-+ * (C) Copyright 2007-2013 Michal Simek
-+ * (C) Copyright 2007-2012 PetaLogix Qld Pty Ltd
-+ *
-+ * Michal SIMEK <monstr@monstr.eu>
++ * Copyright (C) 2013 Xilinx, Inc.
 + */
 +/dts-v1/;
-+/include/ "zynq-7000.dtsi"
++#include "zynq-7000.dtsi"
 +
 +/ {
-+	compatible = "xlnx,zynq-cc108", "xlnx,zynq-7000";
++	compatible = "xlnx,zynq-zc770-xm013", "xlnx,zynq-7000";
 +	model = "Xilinx Zynq";
 +
 +	aliases {
-+		ethernet0 = &gem0;
++		ethernet0 = &gem1;
++		i2c0 = &i2c1;
 +		serial0 = &uart0;
++		spi1 = &spi0;
 +	};
 +
 +	chosen {
@@ -85,51 +81,56 @@ index 000000000000..1a0f631c1d8d
 +
 +	memory at 0 {
 +		device_type = "memory";
-+		reg = <0x0 0x20000000>;
-+	};
-+
-+	usb_phy0: phy0 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
-+
-+	usb_phy1: phy1 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
++		reg = <0x0 0x40000000>;
 +	};
 +};
 +
-+&gem0 {
++&can1 {
++	status = "okay";
++};
++
++&gem1 {
 +	status = "okay";
 +	phy-mode = "rgmii-id";
 +	phy-handle = <&ethernet_phy>;
 +
-+	ethernet_phy: ethernet-phy at 1 {
-+		reg = <1>;
++	ethernet_phy: ethernet-phy at 7 {
++		reg = <7>;
 +		device_type = "ethernet-phy";
 +	};
 +};
 +
-+&sdhci1 {
++&i2c1 {
 +	status = "okay";
-+	broken-cd ;
-+	wp-inverted ;
++	clock-frequency = <400000>;
++
++	si570: clock-generator at 55 {
++		#clock-cells = <0>;
++		compatible = "silabs,si570";
++		temperature-stability = <50>;
++		reg = <0x55>;
++		factory-fout = <156250000>;
++		clock-frequency = <148500000>;
++	};
++};
++
++&spi0 {
++	status = "okay";
++	num-cs = <4>;
++	is-decoded-cs = <0>;
++	eeprom: eeprom at 0 {
++		at25,byte-len = <8192>;
++		at25,addr-mode = <2>;
++		at25,page-size = <32>;
++
++		compatible = "atmel,at25";
++		reg = <2>;
++		spi-max-frequency = <1000000>;
++	};
 +};
 +
 +&uart0 {
 +	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
-+
-+&usb1 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy1>;
 +};
 -- 
 1.9.1
