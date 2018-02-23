@@ -1,30 +1,51 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sat, 24 Feb 2018 00:02:43 +0900
-Subject: [PATCH] [BUGFIX] arm: kprobes: Prohibit probing on optimized_callback
-Message-ID: <151939816362.3492.13470623813255297405.stgit@devbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 23 Feb 2018 23:03:53 +0800
+Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180201183126.32384-3-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-3-l.stach@pengutronix.de>
+Message-ID: <20180223150352.GU3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prohibit probing on optimized_callback() because
-it is called from kprobes itself. If we put a kprobes
-on it, that will cause a recursive call loop.
-Mark it NOKPROBE_SYMBOL.
+On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
+> +&usdhc1 {
+> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> +	pinctrl-0 = <&pinctrl_usdhc1_cd_reset>, <&pinctrl_usdhc1_clk_strobe>,
+> +	            <&pinctrl_usdhc1_data>;
+> +	pinctrl-1 = <&pinctrl_usdhc1_cd_reset>,
+> +	            <&pinctrl_usdhc1_clk_strobe_100mhz>,
+> +	            <&pinctrl_usdhc1_data_100mhz>;
+> +	pinctrl-2 = <&pinctrl_usdhc1_cd_reset>,
+> +	            <&pinctrl_usdhc1_clk_strobe_200mhz>,
+> +	            <&pinctrl_usdhc1_data_200mhz>;
+> +	vqmmc-supply = <&sw4_reg>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	no-sd;
+> +	no-sdio;
+> +	status = "okay";
+> +};
 
-Fixes: 0dc016dbd820 ("ARM: kprobes: enable OPTPROBES for ARM 32")
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
----
- arch/arm/probes/kprobes/opt-arm.c |    1 +
- 1 file changed, 1 insertion(+)
+I'm not sure it can be enabled right now.  Per my testing, eMMC is not
+working yet.
 
-diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-index ddc5a82eb10d..b2aa9b32bff2 100644
---- a/arch/arm/probes/kprobes/opt-arm.c
-+++ b/arch/arm/probes/kprobes/opt-arm.c
-@@ -192,6 +192,7 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
- 
- 	local_irq_restore(flags);
- }
-+NOKPROBE_SYMBOL(optimized_callback)
- 
- int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *orig)
- {
+[    0.879756] mmc0: Switching to 3.3V signalling voltage failed
+[    0.913587] mmc0: SDHCI controller on 30b40000.usdhc [30b40000.usdhc] using ADMA
+...
+[    1.007628] mmc0: switch to high-speed from hs200 failed, err:-110
+[    1.013873] mmc0: error -110 whilst initialising MMC card
+[    1.020639] mmc0: Switching to 3.3V signalling voltage failed
+...
+[    1.132462] mmc0: switch to high-speed from hs200 failed, err:-110
+[    1.138674] mmc0: error -110 whilst initialising MMC card
+[    1.145394] mmc0: Switching to 3.3V signalling voltage failed
+[    1.268367] mmc0: switch to high-speed from hs200 failed, err:-110
+[    1.274576] mmc0: error -110 whilst initialising MMC card
+[    1.281291] mmc0: Switching to 3.3V signalling voltage failed
+[    1.440708] mmc0: switch to high-speed from hs200 failed, err:-110
+[    1.446919] mmc0: error -110 whilst initialising MMC card
+
+Or am I missing anything?
+
+Shawn
