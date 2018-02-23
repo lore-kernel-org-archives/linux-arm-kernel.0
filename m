@@ -1,94 +1,172 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 16:12:13 +0100
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180223133742.26044-11-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
-Message-ID: <20180223151213.inrk7ghl6z3pbcol@flea.lan>
+From: john.garry@huawei.com (John Garry)
+Date: Sat, 24 Feb 2018 00:05:26 +0800
+Subject: [PATCH v2 05/11] perf vendor events arm64: Relocate ThunderX2 JSON to
+ cavium subdirectory
+In-Reply-To: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+Message-ID: <1519401932-205051-6-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 02:37:42PM +0100, Myl?ne Josserand wrote:
-> On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
-> It should be done by the bootloader but it is currently not the case,
-> even for boot CPU because this SoC is booting in secure mode.
-> It leads to an random offset value meaning that each CPU will have a
-> different time, which isn't working very well.
-> 
-> Add assembly code used for boot CPU and secondary CPU cores to make
-> sure that the CNTVOFF register is initialized.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> index d5c97e945e69..605896251927 100644
-> --- a/arch/arm/mach-sunxi/headsmp.S
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
->  	first: .word sunxi_mc_smp_first_comer - .
->  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
->  
-> +ENTRY(sunxi_init_cntvoff)
-> +	/*
-> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-> +	 * then it should be handled by the secure code
-> +	 */
-> +	cps	#MON_MODE
-> +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-> +	orr	r0, r1, #1
-> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-> +	instr_sync
-> +	mov	r0, #0
-> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-> +	instr_sync
-> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-> +	instr_sync
-> +	cps	#SVC_MODE
-> +	ret	lr
-> +ENDPROC(sunxi_init_cntvoff)
-> +
->  #ifdef CONFIG_SMP
->  ENTRY(sunxi_boot)
->  	bl	sunxi_mc_smp_cluster_cache_enable
-> +	bl	sunxi_init_cntvoff
->  	b	secondary_startup
->  ENDPROC(sunxi_boot)
->  
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 5e9602ce1573..4bb041492b54 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
->  };
->  
->  extern void __init sun6i_reset_init(void);
-> +extern void sunxi_init_cntvoff(void);
-> +
->  static void __init sun6i_timer_init(void)
->  {
-> +	sunxi_init_cntvoff();
-> +
+Since jevents now supports vendor subdirectory, relocate
+the ThunderX2 JSON to Cavium subdirectory.
 
-This would deserve a comment explaining why this is needed in the
-first place, and this is not correct. All the other SoCs listed in
-that machine have their CNTVOFF setup correctly on CPU0, and since
-Linux is booted in HYP, it's probably not even valid to do that.
+Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Signed-off-by: John Garry <john.garry@huawei.com>
+---
+ .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 ----------------------
+ .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 62 ++++++++++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +-
+ 3 files changed, 63 insertions(+), 63 deletions(-)
+ delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+ create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
 
-Maxime
-
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+deleted file mode 100644
+index 2db45c4..0000000
+--- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
++++ /dev/null
+@@ -1,62 +0,0 @@
+-[
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache access, read",
+-        "EventCode": "0x40",
+-        "EventName": "l1d_cache_rd",
+-        "BriefDescription": "L1D cache read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache access, write ",
+-        "EventCode": "0x41",
+-        "EventName": "l1d_cache_wr",
+-        "BriefDescription": "L1D cache write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache refill, read",
+-        "EventCode": "0x42",
+-        "EventName": "l1d_cache_refill_rd",
+-        "BriefDescription": "L1D cache refill read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache refill, write",
+-        "EventCode": "0x43",
+-        "EventName": "l1d_cache_refill_wr",
+-        "BriefDescription": "L1D refill write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data TLB refill, read",
+-        "EventCode": "0x4C",
+-        "EventName": "l1d_tlb_refill_rd",
+-        "BriefDescription": "L1D tlb refill read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data TLB refill, write",
+-        "EventCode": "0x4D",
+-        "EventName": "l1d_tlb_refill_wr",
+-        "BriefDescription": "L1D tlb refill write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
+-        "EventCode": "0x4E",
+-        "EventName": "l1d_tlb_rd",
+-        "BriefDescription": "L1D tlb read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
+-        "EventCode": "0x4F",
+-        "EventName": "l1d_tlb_wr",
+-        "BriefDescription": "L1D tlb write",
+-    },
+-    {
+-        "PublicDescription": "Bus access read",
+-        "EventCode": "0x60",
+-        "EventName": "bus_access_rd",
+-        "BriefDescription": "Bus access read",
+-   },
+-   {
+-        "PublicDescription": "Bus access write",
+-        "EventCode": "0x61",
+-        "EventName": "bus_access_wr",
+-        "BriefDescription": "Bus access write",
+-   }
+-]
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+new file mode 100644
+index 0000000..2db45c4
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+@@ -0,0 +1,62 @@
++[
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, read",
++        "EventCode": "0x40",
++        "EventName": "l1d_cache_rd",
++        "BriefDescription": "L1D cache read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, write ",
++        "EventCode": "0x41",
++        "EventName": "l1d_cache_wr",
++        "BriefDescription": "L1D cache write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, read",
++        "EventCode": "0x42",
++        "EventName": "l1d_cache_refill_rd",
++        "BriefDescription": "L1D cache refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, write",
++        "EventCode": "0x43",
++        "EventName": "l1d_cache_refill_wr",
++        "BriefDescription": "L1D refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, read",
++        "EventCode": "0x4C",
++        "EventName": "l1d_tlb_refill_rd",
++        "BriefDescription": "L1D tlb refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, write",
++        "EventCode": "0x4D",
++        "EventName": "l1d_tlb_refill_wr",
++        "BriefDescription": "L1D tlb refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
++        "EventCode": "0x4E",
++        "EventName": "l1d_tlb_rd",
++        "BriefDescription": "L1D tlb read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
++        "EventCode": "0x4F",
++        "EventName": "l1d_tlb_wr",
++        "BriefDescription": "L1D tlb write",
++    },
++    {
++        "PublicDescription": "Bus access read",
++        "EventCode": "0x60",
++        "EventName": "bus_access_rd",
++        "BriefDescription": "Bus access read",
++   },
++   {
++        "PublicDescription": "Bus access write",
++        "EventCode": "0x61",
++        "EventName": "bus_access_wr",
++        "BriefDescription": "Bus access write",
++   }
++]
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+index e61c9ca..952a05c 100644
+--- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -12,5 +12,5 @@
+ #
+ #
+ #Family-model,Version,Filename,EventType
+-0x00000000420f5160,v1,cavium,core
++0x00000000420f5160,v1,cavium/thunderx2,core
+ 0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/c6622d90/attachment.sig>
+1.9.1
