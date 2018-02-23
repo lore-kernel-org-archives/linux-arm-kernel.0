@@ -1,64 +1,52 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 23 Feb 2018 18:57:39 +0200
-Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
-In-Reply-To: <CAANYUdAzmJdwPH+kOJufG9NDVJVQr32qs-uWiy9Q5+moFCdBzw@mail.gmail.com>
-References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
- <20180222214237.GH28112@lunn.ch>
- <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
- <20180222233457.GA6052@lunn.ch> <1519380573.10722.94.camel@linux.intel.com>
- <20180223150147.GA17857@lunn.ch>
- <1519399128.10722.111.camel@linux.intel.com>
- <20180223155104.GB6052@lunn.ch>
- <CAANYUdAzmJdwPH+kOJufG9NDVJVQr32qs-uWiy9Q5+moFCdBzw@mail.gmail.com>
-Message-ID: <1519405059.10722.120.camel@linux.intel.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Fri, 23 Feb 2018 17:58:46 +0100
+Subject: [PATCH 0/3] ARM: Implement MODULE_PLT support in FTRACE
+Message-ID: <20180223165849.16388-1-alexander.sverdlin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-02-23 at 17:36 +0100, Stefan Hellermann wrote:
-> 2018-02-23 16:51 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
-> > > > Hi Andy
-> > > > 
-> > > > Thanks for pointing this patch out.
-> > > > 
-> > > > What is the advantage of doing to the strnlen()? As Stefan says,
-> > > > the
-> > > > code which follows will detect a short string, in that a NULL is
-> > > > not
-> > > > in [0-9a-f], nor a : .
-> > > 
-> > > I'm not sure, but my understanding is that, the strchr() call in
-> > > the
-> > > original code or isxdigit() in the follow up change will trash a
-> > > cache a
-> > > bit. Besides that some of the users are (often?) supplying empty
-> > > strings
-> > > to convert from, and in this case makes sense to bail out fast.
-> > 
-> > Is this function being called on a hot path? In the case which is
-> > crashing, it is during early boot, and it gets called ~ 40 times, in
-> > quick succession. The first call to isxdigit() will need to fetch
-> > part
-> > of the _ctype array into cache, but since the caller is only walking
-> > memory, i hope it is still in cache for the next call to mac_pton().
-> > 
-> >         Andrew
-> 
-> In my case mac_pton is not called on a hot path, the slow sata disks
-> in the NAS dominate the boot time. For me code size matters, and on my
-> device it's rarely called on a zero string. It's probably slower with
-> the strnlen as without it. I think if there are users out there
-> calling it in a hot path on a zero string, they should check the zero
-> string themselves, this is not the common use case.
-> 
+FTRACE's function tracer currently doesn't always work on ARM with
+MODULE_PLT option enabled. If the module is loaded too far, FTRACE's
+code modifier cannot cope with introduced veneers and turns the
+function tracer off globally.
 
-> Should I send a patch to netdev, can I get some Acked-by: ?
+ARM64 already has a solution for the problem, refer to the following
+patches:
 
-Not from me, sorry.
+arm64: ftrace: emit ftrace-mod.o contents through code
+arm64: module-plts: factor out PLT generation code for ftrace
+arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
+arm64: ftrace: fix building without CONFIG_MODULES
+arm64: ftrace: add support for far branches to dynamic ftrace
+arm64: ftrace: don't validate branch via PLT in ftrace_make_nop()
 
-Alexey would be best person to give a such.
-Please, Cc him.
+But the presented ARM variant has just a half of the footprint in terms of
+the changed LoCs. It also retains the code validation-before-modification
+instead of switching it off.
+
+Alexander Sverdlin (3):
+  ftrace: Add module to ftrace_make_call() parameters
+  ARM: PLT: Move struct plt_entries definition to header
+  ftrace: Add MODULE_PLTS support
+
+ arch/arm/include/asm/module.h      | 10 ++++++
+ arch/arm/kernel/ftrace.c           | 73 ++++++++++++++++++++++++++++++++------
+ arch/arm/kernel/module-plts.c      | 58 +++++++++++++++++++-----------
+ arch/arm64/kernel/ftrace.c         |  3 +-
+ arch/blackfin/kernel/ftrace.c      |  3 +-
+ arch/ia64/kernel/ftrace.c          |  3 +-
+ arch/metag/kernel/ftrace.c         |  3 +-
+ arch/microblaze/kernel/ftrace.c    |  3 +-
+ arch/mips/kernel/ftrace.c          |  3 +-
+ arch/powerpc/kernel/trace/ftrace.c |  3 +-
+ arch/s390/kernel/ftrace.c          |  3 +-
+ arch/sh/kernel/ftrace.c            |  3 +-
+ arch/sparc/kernel/ftrace.c         |  3 +-
+ arch/tile/kernel/ftrace.c          |  3 +-
+ arch/x86/kernel/ftrace.c           |  3 +-
+ include/linux/ftrace.h             |  4 ++-
+ kernel/trace/ftrace.c              |  6 ++--
+ 17 files changed, 140 insertions(+), 47 deletions(-)
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.4.6
