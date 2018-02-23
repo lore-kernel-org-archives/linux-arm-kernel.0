@@ -1,91 +1,35 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 23 Feb 2018 18:21:31 +0000
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <87sh9vzfdn.fsf@e105922-lin.cambridge.arm.com>
-References: <20180215185606.26736-1-james.morse@arm.com>	<20180215185606.26736-3-james.morse@arm.com>
- <87sh9vzfdn.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <5A905BAB.2060007@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Feb 2018 18:29:02 +0000
+Subject: [PATCH -stable] arm64: mm: don't write garbage into TTBR1_EL1 register
+Message-ID: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+Stable backport commit 173358a49173 ("arm64: kpti: Add ->enable callback
+to remap swapper using nG mappings") of upstream commit f992b4dfd58b did
+not survive the backporting process unscathed, and ends up writing garbage
+into the TTBR1_EL1 register, rather than pointing it to the zero page to
+disable translations. Fix that.
 
-On 20/02/18 18:26, Punit Agrawal wrote:
-> James Morse <james.morse@arm.com> writes:
-> 
->> To support asynchronous NMI-like notifications on arm64 we need to use
->> the estatus-queue. These patches refactor it to allow multiple APEI
->> notification types to use it.
->>
->> Refactor the estatus queue's pool grow/shrink code and notification
->> routine from NOTIFY_NMI's handlers. This will allow another notification
->> method to use the estatus queue without duplicating this code.
->>
->> This patch adds rcu_read_lock()/rcu_read_unlock() around the list
->> list_for_each_entry_rcu() walker. These aren't strictly necessary as
->> the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
->> critical section.
->>
->> Keep the oops_begin() call for x86, arm64 doesn't have one of these,
->> and APEI is the only thing outside arch code calling this..
->>
->> The existing ghes_estatus_pool_shrink() is folded into the new
->> ghes_estatus_queue_shrink_pool() as only the queue uses it.
->>
->> _in_nmi_notify_one() is separate from the rcu-list walker for a later
->> caller that doesn't need to walk a list.
+Cc: <stable@vger.kernel.org> #v4.14
+Reported-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/proc.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index e42b587c509b..d3cc5bd5b496 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -749,6 +749,54 @@ static void __process_error(struct ghes *ghes)
->>  #endif
->>  }
->>  
->> +static int _in_nmi_notify_one(struct ghes *ghes)
->> +{
->> +	int sev;
->> +	int ret = -ENOENT;
-> 
-> If ret is initialised to 0 ...
-> 
->> +
->> +	if (ghes_read_estatus(ghes, 1)) {
->> +		ghes_clear_estatus(ghes);
->> +		return ret;
-> 
-> and return -ENOENT here...
-> 
->> +	} else {
->> +		ret = 0;
->> +	}
-> 
-> ... then the else block can be dropped.
-
-
-Good point, this happened because I was trying to keep the same shape as the
-existing notify_nmi() code as far as possible.
-
-
->> +
->> +	sev = ghes_severity(ghes->estatus->error_severity);
->> +	if (sev >= GHES_SEV_PANIC) {
->> +#ifdef CONFIG_X86
->> +		oops_begin();
->> +#endif
-> 
-> Can you use IS_ENABLED() here as well?
-
-I didn't think that would build without an empty declaration for arm64, I
-assumed it would generate an implicit-declaration-of warning. But, I've tried
-it, and evidently today's toolchain does dead-code elimination before generating
-implicit-declaration-of warnings...
-I'd prefer to leave this (ugly as it is), to avoid warnings on a different
-version of the compiler.
-
-
-Thanks,
-
-James
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 08572f95bd8a..2b473ddeb7a3 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+ 
+ .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+ 	adrp	\tmp1, empty_zero_page
+-	msr	ttbr1_el1, \tmp2
++	msr	ttbr1_el1, \tmp1
+ 	isb
+ 	tlbi	vmalle1
+ 	dsb	nsh
+-- 
+2.11.0
