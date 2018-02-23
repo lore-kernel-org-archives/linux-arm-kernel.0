@@ -1,120 +1,97 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 16:20:38 +0100
-Subject: [PATCH v3 6/7] arm64: allwinner: h6: add the basical Allwinner
- H6 DTSI file
-In-Reply-To: <20180223123555.64009-7-icenowy@aosc.io>
-References: <20180223123555.64009-6-icenowy@aosc.io>
- <20180223123555.64009-7-icenowy@aosc.io>
-Message-ID: <20180223152038.2bflylwa6vj4gzfj@flea.lan>
+Date: Fri, 23 Feb 2018 16:03:05 +0100
+Subject: [PATCH v4 03/10] ARM: sun8i: smp: Add support for A83T
+In-Reply-To: <20180223133742.26044-4-mylene.josserand@bootlin.com>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-4-mylene.josserand@bootlin.com>
+Message-ID: <20180223150305.7jsuxay2idzvcy2w@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 08:35:54PM +0800, Icenowy Zheng wrote:
-> Allwinner H6 is a new SoC with Cortex-A53 cores from Allwinner, with its
-> memory map fully reworked and some high-speed peripherals (PCIe, USB
-> 3.0) introduced.
+On Fri, Feb 23, 2018 at 02:37:35PM +0100, Myl?ne Josserand wrote:
+> Add the support for A83T.
 > 
-> This commit adds the basical DTSI file of it, including the clock
-> support and UART support.
+> A83T SoC has an additional register than A80 to handle CPU configurations:
+> R_CPUS_CFG. Information about the register comes from Allwinner's BSP
+> driver.
+> An important difference is the Power Off Gating register for clusters
+> which is BIT(4) in case of SUN9I-A80 and BIT(0) in case of SUN8I-A83T.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 > ---
-> Changes in v3:
-> - SPDX license identifier fix.
+>  arch/arm/mach-sunxi/Kconfig  |   2 +-
+>  arch/arm/mach-sunxi/mc_smp.c | 168 +++++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 162 insertions(+), 8 deletions(-)
 > 
-> Changes in v2:
-> - Add APB1 clock as PIO's APB clock.
-> - Switched to SPDX license identifier.
-> 
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 177 +++++++++++++++++++++++++++
->  1 file changed, 177 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> new file mode 100644
-> index 000000000000..4a6236bd9778
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -0,0 +1,177 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
-> +/*
-> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> + */
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index ce53ceaf4cc5..a0ad35c41c02 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -51,7 +51,7 @@ config MACH_SUN9I
+>  config ARCH_SUNXI_MC_SMP
+>  	bool
+>  	depends on SMP
+> -	default MACH_SUN9I
+> +	default y if MACH_SUN9I || MACH_SUN8I
+>  	select ARM_CCI400_PORT_CTRL
+>  	select ARM_CPU_SUSPEND
+>  
+> diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+> index de02e5662557..3bd9066a1422 100644
+> --- a/arch/arm/mach-sunxi/mc_smp.c
+> +++ b/arch/arm/mach-sunxi/mc_smp.c
+> @@ -55,22 +55,32 @@
+>  #define CPUCFG_CX_RST_CTRL_L2_RST	BIT(8)
+>  #define CPUCFG_CX_RST_CTRL_CX_RST(n)	BIT(4 + (n))
+>  #define CPUCFG_CX_RST_CTRL_CORE_RST(n)	BIT(n)
+> +#define CPUCFG_CX_RST_CTRL_CORE_RST_ALL	(0xf << 0)
+>  
+>  #define PRCM_CPU_PO_RST_CTRL(c)		(0x4 + 0x4 * (c))
+>  #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
+>  #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
+>  #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
+> +/* The power off register for clusters are different from SUN9I and SUN8I */
+> +#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN8I	BIT(0)
+>  #define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
+>  #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
+>  #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
+>  #define PRCM_CPU_SOFT_ENTRY_REG		0x164
+>  
+> +/* R_CPUCFG registers, specific to SUN8I */
+> +#define R_CPUCFG_CLUSTER_PO_RST_CTRL(c)	(0x30 + (c) * 0x4)
+> +#define R_CPUCFG_CLUSTER_PO_RST_CTRL_CORE(n)	BIT(n)
+> +#define R_CPUCFG_CPU_SOFT_ENTRY_REG	0x01a4
 > +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/clock/sun50i-h6-ccu.h>
-> +#include <dt-bindings/reset/sun50i-h6-ccu.h>
-> +
-> +/ {
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	iosc: internal-osc-clk {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <16000000>;
-> +		clock-accuracy = <300000000>;
-> +		clock-output-names = "iosc";
-> +	};
+>  #define CPU0_SUPPORT_HOTPLUG_MAGIC0	0xFA50392F
+>  #define CPU0_SUPPORT_HOTPLUG_MAGIC1	0x790DCA3A
+>  
+>  static void __iomem *cpucfg_base;
+> +static void __iomem *r_cpucfg_base;
+>  static void __iomem *prcm_base;
+>  static void __iomem *sram_b_smp_base;
+> +static bool is_sun9i;
 
-You're not using it anywhere
+Since you always check for that condition to always be false, can't
+you do the opposite, ie have it called is_a83t, and verify it to be
+true?
 
-> +	osc24M: osc24M_clk {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "osc24M";
-> +	};
-> +
-> +	osc32k: osc32k_clk {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "osc32k";
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
+>  	/* Set the hardware entry point address */
+> -	writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
+> -	       prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
+> +	if (is_sun9i)
+> +		writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
+> +		       prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
+> +	else
+> +		writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
+> +		       r_cpucfg_base + R_CPUCFG_CPU_SOFT_ENTRY_REG);
 
-Is it needed? The bootloader should fill it with whatever version it
-has, shouldn't it?
+if (is_a83t)
+	reg = prcm_base + PRCM_CPU_SOFT_ENTRY_REG;
+else
+	reg = r_cpucfg_base + R_CPUCFG_CPU_SOFT_ENTRY_REG;
+writel(__pa_symbol(sunxi_mc_smp_secondary_startup), reg);
+
+?
 
 Thanks!
 Maxime
@@ -129,4 +106,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/5a314a9f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/86171836/attachment-0001.sig>
