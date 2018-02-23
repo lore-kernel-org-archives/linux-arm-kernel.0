@@ -1,394 +1,69 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 23 Feb 2018 18:16:39 +0800
-Subject: [PATCH v1 19/19] arm: dts: mediatek: converted to using SPDX
- identifiers
+Date: Fri, 23 Feb 2018 18:16:23 +0800
+Subject: [PATCH v1 03/19] dt-bindings: pinctrl: mediatek: add bindings for
+ I2C2 and SPI2 on MT7623
 In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
 References: <cover.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <8cdd049bef01b9b657e0804a7dba145520b9a1c5.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <607af13d88f733057df2ea057228e1cdbf77262a.1519378871.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Convert boilerplate license statement into proper SPDX identifier style.
+Add missing pinctrl binding about I2C2 and SPI2 which would be used in
+devicetree related files.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Philippe Ombredanne <pombredanne@nexb.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-gpio at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/mt2701-evb.dts              |  9 +--------
- arch/arm/boot/dts/mt2701.dtsi                 |  9 +--------
- arch/arm/boot/dts/mt6323.dtsi                 |  8 +-------
- arch/arm/boot/dts/mt6580-evbp1.dts            |  9 +--------
- arch/arm/boot/dts/mt6580.dtsi                 |  9 +--------
- arch/arm/boot/dts/mt6589-aquaris5.dts         | 10 +---------
- arch/arm/boot/dts/mt6589.dtsi                 | 12 ++----------
- arch/arm/boot/dts/mt6592-evb.dts              |  9 +--------
- arch/arm/boot/dts/mt6592.dtsi                 |  9 +--------
- arch/arm/boot/dts/mt7623.dtsi                 |  9 +--------
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  2 +-
- arch/arm/boot/dts/mt7623n-rfb-nand.dts        |  9 +--------
- arch/arm/boot/dts/mt7623n-rfb.dtsi            |  9 +--------
- arch/arm/boot/dts/mt8127-moose.dts            |  9 +--------
- arch/arm/boot/dts/mt8127.dtsi                 |  9 +--------
- arch/arm/boot/dts/mt8135-evbp1.dts            |  9 +--------
- arch/arm/boot/dts/mt8135.dtsi                 |  9 +--------
- 17 files changed, 18 insertions(+), 131 deletions(-)
+ include/dt-bindings/pinctrl/mt7623-pinfunc.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 63af4b1..be0edb3 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Erin Lo <erin.lo@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
+diff --git a/include/dt-bindings/pinctrl/mt7623-pinfunc.h b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+index 2d6a7b1..4878a67 100644
+--- a/include/dt-bindings/pinctrl/mt7623-pinfunc.h
++++ b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
+@@ -251,6 +251,12 @@
+ #define MT7623_PIN_76_SCL0_FUNC_GPIO76 (MTK_PIN_NO(76) | 0)
+ #define MT7623_PIN_76_SCL0_FUNC_SCL0 (MTK_PIN_NO(76) | 1)
  
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 9109a2b..0c8a17c1 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Erin.Lo <erin.lo@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
++#define MT7623_PIN_77_SDA2_FUNC_GPIO77 (MTK_PIN_NO(77) | 0)
++#define MT7623_PIN_77_SDA2_FUNC_SDA2 (MTK_PIN_NO(77) | 1)
++
++#define MT7623_PIN_78_SCL2_FUNC_GPIO78 (MTK_PIN_NO(78) | 0)
++#define MT7623_PIN_78_SCL2_FUNC_SCL2 (MTK_PIN_NO(78) | 1)
++
+ #define MT7623_PIN_79_URXD0_FUNC_GPIO79 (MTK_PIN_NO(79) | 0)
+ #define MT7623_PIN_79_URXD0_FUNC_URXD0 (MTK_PIN_NO(79) | 1)
+ #define MT7623_PIN_79_URXD0_FUNC_UTXD0 (MTK_PIN_NO(79) | 2)
+@@ -291,6 +297,24 @@
+ #define MT7623_PIN_100_MIPI_TDP0_FUNC_GPIO100 (MTK_PIN_NO(100) | 0)
+ #define MT7623_PIN_100_MIPI_TDP0_FUNC_TDP0 (MTK_PIN_NO(100) | 1)
  
- #include <dt-bindings/clock/mt2701-clk.h>
-diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
-index 44c5642..0ebc132 100644
---- a/arch/arm/boot/dts/mt6323.dtsi
-+++ b/arch/arm/boot/dts/mt6323.dtsi
-@@ -1,15 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2017-2018 MediaTek Inc.
-  * Author: John Crispin <john@phrozen.org>
-  *	   Sean Wang <sean.wang@mediatek.com>
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- &pwrap {
-diff --git a/arch/arm/boot/dts/mt6580-evbp1.dts b/arch/arm/boot/dts/mt6580-evbp1.dts
-index 17daeae..ca13789 100644
---- a/arch/arm/boot/dts/mt6580-evbp1.dts
-+++ b/arch/arm/boot/dts/mt6580-evbp1.dts
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Mars.C <mars.cheng@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt6580.dtsi b/arch/arm/boot/dts/mt6580.dtsi
-index a349dba..2bdc5ed 100644
---- a/arch/arm/boot/dts/mt6580.dtsi
-+++ b/arch/arm/boot/dts/mt6580.dtsi
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Mars.C <mars.cheng@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <dt-bindings/interrupt-controller/irq.h>
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-index 594a6f3..e31d5952 100644
---- a/arch/arm/boot/dts/mt6589-aquaris5.dts
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MundoReader S.L.
-  * Author: Matthias Brugger <matthias.bgg@gmail.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index 41df742..b47b5e5 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MundoReader S.L.
-  * Author: Matthias Brugger <matthias.bgg@gmail.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
-+*/
- 
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-diff --git a/arch/arm/boot/dts/mt6592-evb.dts b/arch/arm/boot/dts/mt6592-evb.dts
-index b57237e..02849f6 100644
---- a/arch/arm/boot/dts/mt6592-evb.dts
-+++ b/arch/arm/boot/dts/mt6592-evb.dts
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Howard Chen <ibanezchen@gmail.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
-index c69201f..8696ac8 100644
---- a/arch/arm/boot/dts/mt6592.dtsi
-+++ b/arch/arm/boot/dts/mt6592.dtsi
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Howard Chen <ibanezchen@gmail.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <dt-bindings/interrupt-controller/irq.h>
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index bf9db44..1e1c60a 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -1,16 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2017-2018 MediaTek Inc.
-  * Author: John Crispin <john@phrozen.org>
-  *	   Sean Wang <sean.wang@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <dt-bindings/interrupt-controller/irq.h>
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 3e8d02c..204c2be 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -1,7 +1,7 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Copyright 2017-2018 Sean Wang <sean.wang@mediatek.com>
-  *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-index 05f1171..61930f2 100644
---- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-+++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-@@ -1,16 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2017-2018 MediaTek Inc.
-  * Author: John Crispin <john@phrozen.org>
-  *	   Sean Wang <sean.wang@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-index 07ed15d..6609f50 100644
---- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
-+++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-@@ -1,16 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2017-2018 MediaTek Inc.
-  * Author: John Crispin <john@phrozen.org>
-  *	   Sean Wang <sean.wang@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
-index 073e295..308829b 100644
---- a/arch/arm/boot/dts/mt8127-moose.dts
-+++ b/arch/arm/boot/dts/mt8127-moose.dts
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Joe.C <yingjoe.chen@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-index 916c095..3adfc6f 100644
---- a/arch/arm/boot/dts/mt8127.dtsi
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Joe.C <yingjoe.chen@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <dt-bindings/interrupt-controller/irq.h>
-diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-index 460db6d..0ace7a4 100644
---- a/arch/arm/boot/dts/mt8135-evbp1.dts
-+++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Joe.C <yingjoe.chen@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index a97b4ee..688069d 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2014 MediaTek Inc.
-  * Author: Joe.C <yingjoe.chen@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <dt-bindings/clock/mt8135-clk.h>
++#define MT7623_PIN_101_SPI2_CSN_FUNC_GPIO101 (MTK_PIN_NO(101) | 0)
++#define MT7623_PIN_101_SPI2_CSN_FUNC_SPI2_CS (MTK_PIN_NO(101) | 1)
++#define MT7623_PIN_101_SPI2_CSN_FUNC_SCL3 (MTK_PIN_NO(101) | 3)
++
++#define MT7623_PIN_102_SPI2_MI_FUNC_GPIO102 (MTK_PIN_NO(102) | 0)
++#define MT7623_PIN_102_SPI2_MI_FUNC_SPI2_MI (MTK_PIN_NO(102) | 1)
++#define MT7623_PIN_102_SPI2_MI_FUNC_SPI2_MO (MTK_PIN_NO(102) | 2)
++#define MT7623_PIN_102_SPI2_MI_FUNC_SDA3 (MTK_PIN_NO(102) | 3)
++
++#define MT7623_PIN_103_SPI2_MO_FUNC_GPIO103 (MTK_PIN_NO(103) | 0)
++#define MT7623_PIN_103_SPI2_MO_FUNC_SPI2_MO (MTK_PIN_NO(103) | 1)
++#define MT7623_PIN_103_SPI2_MO_FUNC_SPI2_MI (MTK_PIN_NO(103) | 2)
++#define MT7623_PIN_103_SPI2_MO_FUNC_SCL3 (MTK_PIN_NO(103) | 3)
++
++#define MT7623_PIN_104_SPI2_CK_FUNC_GPIO104 (MTK_PIN_NO(104) | 0)
++#define MT7623_PIN_104_SPI2_CK_FUNC_SPI2_CK (MTK_PIN_NO(104) | 1)
++#define MT7623_PIN_104_SPI2_CK_FUNC_SDA3 (MTK_PIN_NO(104) | 3)
++
+ #define MT7623_PIN_105_MSDC1_CMD_FUNC_GPIO105 (MTK_PIN_NO(105) | 0)
+ #define MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD (MTK_PIN_NO(105) | 1)
+ #define MT7623_PIN_105_MSDC1_CMD_FUNC_SDA1 (MTK_PIN_NO(105) | 3)
 -- 
 2.7.4
