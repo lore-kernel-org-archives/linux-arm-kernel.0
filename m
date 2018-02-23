@@ -1,101 +1,110 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Feb 2018 13:00:52 -0800
-Subject: [PATCH 04/12] bus: ti-sysc: Improve handling for no-reset-on-init and
- no-idle-on-init
+Date: Fri, 23 Feb 2018 13:01:00 -0800
+Subject: [PATCH 12/12] ARM: OMAP2+: Enable ti-sysc to use device tree data for
+ smartreflex
 In-Reply-To: <20180223210100.86732-1-tony@atomide.com>
 References: <20180223210100.86732-1-tony@atomide.com>
-Message-ID: <20180223210100.86732-5-tony@atomide.com>
+Message-ID: <20180223210100.86732-13-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least earlycon needs a delayed idle before the 8250 driver probes
-to avoid glitches in the console output. Let's handle the delayed idle
-for devices tagged with ti,no-reset-on-init and ti,no-idle-on-init with
-delayed_work. Others don't need it, and there should be no need to use
-runtime PM autosuspend for the interconnect target driver as it's the
-child device drivers that should configure it.
+Let's enable ti-sysc probing of child devices. So far we have only used
+ti-sysc to probe interconnect target modules to idle them for cases where
+the SoC does not have any child devices configured for the module, such
+as smartreflex on dra7.
+
+As we have smartreflex driver configured in the device tree for some SoCs,
+we need to flip things on with a single patch to prevent both omap_device
+and ti-sysc to probe smartreflex. So let's stop probing smartreflex with
+omap_device and probe it with ti-sysc by enabling passing the auxdata.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/bus/ti-sysc.c | 28 ++++++++++++++++++++++------
- 1 file changed, 22 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/omap_device.c  |  5 +++++
+ arch/arm/mach-omap2/pdata-quirks.c |  1 +
+ arch/arm/mach-omap2/sr_device.c    | 25 ++++++++++++++-----------
+ 3 files changed, 20 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -74,6 +74,7 @@ struct sysc {
- 	u32 revision;
- 	bool enabled;
- 	bool needs_resume;
-+	struct delayed_work idle_work;
- };
- 
- static u32 sysc_read(struct sysc *ddata, int offset)
-@@ -1028,6 +1029,16 @@ static int sysc_init_match(struct sysc *ddata)
- 	return 0;
- }
- 
-+static void ti_sysc_idle(struct work_struct *work)
-+{
-+	struct sysc *ddata;
-+
-+	ddata = container_of(work, struct sysc, idle_work.work);
-+
-+	if (pm_runtime_active(ddata->dev))
-+		pm_runtime_put_sync(ddata->dev);
-+}
-+
- static int sysc_probe(struct platform_device *pdev)
- {
- 	struct sysc *ddata;
-@@ -1081,8 +1092,6 @@ static int sysc_probe(struct platform_device *pdev)
- 		goto unprepare;
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -140,6 +140,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 	struct omap_device *od;
+ 	struct omap_hwmod *oh;
+ 	struct device_node *node = pdev->dev.of_node;
++	struct resource res;
+ 	const char *oh_name;
+ 	int oh_cnt, i, ret = 0;
+ 	bool device_active = false;
+@@ -150,6 +151,10 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
  
--	pm_runtime_use_autosuspend(ddata->dev);
--
- 	sysc_show_registers(ddata);
- 
- 	ddata->dev->type = &sysc_device_type;
-@@ -1091,13 +1100,19 @@ static int sysc_probe(struct platform_device *pdev)
- 	if (error)
- 		goto err;
- 
--	pm_runtime_mark_last_busy(ddata->dev);
--	pm_runtime_put_autosuspend(ddata->dev);
-+	INIT_DELAYED_WORK(&ddata->idle_work, ti_sysc_idle);
++	/* Use ti-sysc driver instead of omap_device? */
++	if (!omap_hwmod_parse_module_range(NULL, node, &res))
++		return -ENODEV;
 +
-+	/* At least earlycon won't survive without deferred idle */
-+	if (ddata->cfg.quirks & (SYSC_QUIRK_NO_IDLE_ON_INIT |
-+				 SYSC_QUIRK_NO_RESET_ON_INIT)) {
-+		schedule_delayed_work(&ddata->idle_work, 3000);
-+	} else {
-+		pm_runtime_put(&pdev->dev);
+ 	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
+ 	if (!hwmods) {
+ 		ret = -ENOMEM;
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -487,6 +487,7 @@ static struct of_dev_auxdata omap_auxdata_lookup[];
+ 
+ static struct ti_sysc_platform_data ti_sysc_pdata = {
+ 	.auxdata = omap_auxdata_lookup,
++	.init_module = omap_hwmod_init_module,
+ 	.enable_module = ti_sysc_enable_module,
+ 	.idle_module = ti_sysc_idle_module,
+ 	.shutdown_module = ti_sysc_shutdown_module,
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -93,16 +93,23 @@ extern struct omap_sr_data omap_sr_pdata[];
+ 
+ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+ {
+-	struct omap_sr_data *sr_data;
+-	struct platform_device *pdev;
++	struct omap_sr_data *sr_data = NULL;
+ 	struct omap_volt_data *volt_data;
+ 	struct omap_smartreflex_dev_attr *sr_dev_attr;
+-	char *name = "smartreflex";
+ 	static int i;
+ 
+-	sr_data = kzalloc(sizeof(*sr_data), GFP_KERNEL);
+-	if (!sr_data)
+-		return -ENOMEM;
++	if (!strncmp(oh->name, "smartreflex_mpu_iva", 20) ||
++	    !strncmp(oh->name, "smartreflex_mpu", 16))
++		sr_data = &omap_sr_pdata[OMAP_SR_MPU];
++	else if (!strncmp(oh->name, "smartreflex_core", 17))
++		sr_data = &omap_sr_pdata[OMAP_SR_CORE];
++	else if (!strncmp(oh->name, "smartreflex_iva", 16))
++		sr_data = &omap_sr_pdata[OMAP_SR_IVA];
++
++	if (!sr_data) {
++		pr_err("%s: Unknown instance %s\n", __func__, oh->name);
++		return -EINVAL;
 +	}
  
- 	return 0;
+ 	sr_dev_attr = (struct omap_smartreflex_dev_attr *)oh->dev_attr;
+ 	if (!sr_dev_attr || !sr_dev_attr->sensor_voltdm_name) {
+@@ -147,13 +154,9 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
  
- err:
--	pm_runtime_dont_use_autosuspend(&pdev->dev);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- unprepare:
-@@ -1111,6 +1126,8 @@ static int sysc_remove(struct platform_device *pdev)
- 	struct sysc *ddata = platform_get_drvdata(pdev);
- 	int error;
+ 	sr_data->enable_on_init = sr_enable_on_init;
  
-+	cancel_delayed_work_sync(&ddata->idle_work);
+-	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data));
+-	if (IS_ERR(pdev))
+-		pr_warn("%s: Could not build omap_device for %s: %s\n",
+-			__func__, name, oh->name);
+ exit:
+ 	i++;
+-	kfree(sr_data);
 +
- 	error = pm_runtime_get_sync(ddata->dev);
- 	if (error < 0) {
- 		pm_runtime_put_noidle(ddata->dev);
-@@ -1120,7 +1137,6 @@ static int sysc_remove(struct platform_device *pdev)
- 
- 	of_platform_depopulate(&pdev->dev);
- 
--	pm_runtime_dont_use_autosuspend(&pdev->dev);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
+ 	return 0;
+ }
  
 -- 
 2.16.2
