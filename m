@@ -1,44 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 23 Feb 2018 21:27:20 +0100
-Subject: [PATCH] net: Allow mac_pton() to work on non-NULL terminated
- strings
-In-Reply-To: <20180223201748.14328-1-stefan@the2masters.de>
-References: <20180223182006.GA2116@avx2>
- <20180223201748.14328-1-stefan@the2masters.de>
-Message-ID: <20180223202720.GA27961@lunn.ch>
+From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
+Date: Fri, 23 Feb 2018 21:33:20 +0100
+Subject: [PATCH -stable] arm64: mm: don't write garbage into TTBR1_EL1
+ register
+In-Reply-To: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
+References: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAP71WjyCcYNecqc3Cz3DJ7YdgT6zi0My=R9x3=offOY5NexNdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 09:17:48PM +0100, Stefan Hellermann wrote:
-> Commit 4904dbda41c8 ("ARM: orion5x: use mac_pton() helper") crashes my
-> QNAP TS-209 NAS early on boot.
-> 
-> The boot code for the TS-209 is looping through an ext2 filesystem on a
-> 384kB mtd partition (factory configuration put there by QNAP). There it
-> looks on every 1kB boundary if there is a valid MAC address. The
-> filesystem has a 1kB block size, so this seems to work.
-> 
-> On my device the MAC address is on the 37th 1kB block. But: On the 27th
-> block is a large file (1,5kB) without 0 bytes inside. The code in
-> qnap_tsx09_find_mac_addr() maps 1kB into memory (not a whole file or the
-> whole 384kB) and then calls qnap_tsx09_check_mac_addr() -> mac_pton() ->
-> strlen() on this memory block. as there is no 0 byte in the file on the
-> 27th block, strlen() runs into bad memory and the machine panics. The old
-> code had no strlen().
-> 
-> Actually mac_pton() doesn't need to call strlen(), the following loop
-> catches short strings quite nicely. The strlen() seems to be an
-> optimization for calls to mac_pton with empty string. But this is rarely
-> the case and this is not a hot path. Remove it to reduce code size and
-> speed up calls with an not empty string.
-> 
-> Besides fixing the crash there is are other users interested in
-> this change, see https://patchwork.ozlabs.org/patch/851008/
-> 
-> Fixes: 4904dbda41c8 ("ARM: orion5x: use mac_pton() helper")
-> Signed-off-by: Stefan Hellermann <stefan@the2masters.de>
-> Cc: <stable@vger.kernel.org> [4.4+]
+hi Ard,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+many thanks for your help and the debug session ;-)
 
-    Andrew
+On Fri, Feb 23, 2018 at 7:29 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Stable backport commit 173358a49173 ("arm64: kpti: Add ->enable callback
+> to remap swapper using nG mappings") of upstream commit f992b4dfd58b did
+> not survive the backporting process unscathed, and ends up writing garbage
+> into the TTBR1_EL1 register, rather than pointing it to the zero page to
+> disable translations. Fix that.
+>
+> Cc: <stable@vger.kernel.org> #v4.14
+> Reported-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+I have tested this patch on Qualcomm Dragonboard 410c where the issue
+was found initially.
+
+Tested-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+
+This patch is also needed on 4.15-stable.
+
+> ---
+>  arch/arm64/mm/proc.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 08572f95bd8a..2b473ddeb7a3 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+>
+>  .macro __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+>         adrp    \tmp1, empty_zero_page
+> -       msr     ttbr1_el1, \tmp2
+> +       msr     ttbr1_el1, \tmp1
+>         isb
+>         tlbi    vmalle1
+>         dsb     nsh
+> --
+> 2.11.0
+>
