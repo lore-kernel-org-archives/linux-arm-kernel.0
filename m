@@ -1,64 +1,110 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 23 Feb 2018 18:16:27 +0800
-Subject: [PATCH v1 07/19] arm: dts: mt7623: fix the regulators mmc should use
- on bananapi-r2
+Date: Fri, 23 Feb 2018 18:16:25 +0800
+Subject: [PATCH v1 05/19] arm: dts: mt7623: add BTIF,
+ HSDMA and SPI-NOR device nodes
 In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
 References: <cover.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <3745e22d89f74e97d9fab7b27d0955ec15527b93.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <ca071fec200f80d894523b11c94ddde19381f936.1519378871.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Both mmc devices on bananapi-r2 board should all use the fixed regulators
-as their power source instead of PMIC MT6323 exports.
+add BTIF, HSDMA and SPI-NOR device nodes and enable it on relevant boards
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/mt7623.dtsi                 | 36 ++++++++++++++++++++++++++-
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  6 ++++-
+ 2 files changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index f660d15..8ef91d6 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -39,6 +39,15 @@
- 		};
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 91317a1..da56c54 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2017 MediaTek Inc.
++ * Copyright (c) 2017-2018 MediaTek Inc.
+  * Author: John Crispin <john@phrozen.org>
+  *	   Sean Wang <sean.wang@mediatek.com>
+  *
+@@ -483,6 +483,18 @@
+ 		nvmem-cell-names = "calibration-data";
  	};
  
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
++	btif: serial at 1100c000 {
++		compatible = "mediatek,mt7623-btif",
++			     "mediatek,mtk-btif";
++		reg = <0 0x1100c000 0 0x1000>;
++		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_BTIF>;
++		clock-names = "main";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
 +	};
 +
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "fixed-3.3V";
-@@ -213,8 +222,8 @@
- 	bus-width = <8>;
- 	max-frequency = <50000000>;
- 	cap-mmc-highspeed;
--	vmmc-supply = <&mt6323_vemc3v3_reg>;
--	vqmmc-supply = <&mt6323_vio18_reg>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_1p8v>;
- 	non-removable;
+ 	nandc: nfi at 1100d000 {
+ 		compatible = "mediatek,mt7623-nfc",
+ 			     "mediatek,mt2701-nfc";
+@@ -508,6 +520,18 @@
+ 		status = "disabled";
+ 	};
+ 
++	nor_flash: spi at 11014000 {
++		compatible = "mediatek,mt7623-nor",
++			     "mediatek,mt8173-nor";
++		reg = <0 0x11014000 0 0x1000>;
++		clocks = <&pericfg CLK_PERI_FLASH>,
++			 <&topckgen CLK_TOP_FLASH_SEL>;
++		clock-names = "spi", "sf";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	spi1: spi at 11016000 {
+ 		compatible = "mediatek,mt7623-spi",
+ 			     "mediatek,mt2701-spi";
+@@ -861,6 +885,16 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
++	hsdma: dma-controller at 1b007000 {
++		compatible = "mediatek,mt7623-hsdma";
++		reg = <0 0x1b007000 0 0x1000>;
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
++		clock-names = "hsdma";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
++		#dma-cells = <1>;
++	};
++
+ 	eth: ethernet at 1b100000 {
+ 		compatible = "mediatek,mt7623-eth",
+ 			     "mediatek,mt2701-eth",
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 3efecc5..ec11e14 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2017 Sean Wang <sean.wang@mediatek.com>
++ * Copyright 2017-2018 Sean Wang <sean.wang@mediatek.com>
+  *
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+@@ -86,6 +86,10 @@
+ 	};
  };
  
-@@ -227,8 +236,8 @@
- 	max-frequency = <50000000>;
- 	cap-sd-highspeed;
- 	cd-gpios = <&pio 261 GPIO_ACTIVE_LOW>;
--	vmmc-supply = <&mt6323_vmch_reg>;
--	vqmmc-supply = <&mt6323_vio18_reg>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_3p3v>;
- };
- 
- &pcie {
++&btif {
++	status = "okay";
++};
++
+ &cir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&cir_pins_a>;
 -- 
 2.7.4
