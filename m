@@ -1,148 +1,111 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Feb 2018 15:53:52 +0530
-Subject: [PATCH V7 13/13] boot_constraint: Add documentation
+Date: Fri, 23 Feb 2018 15:53:40 +0530
+Subject: [PATCH V7 01/13] of: platform: Add of_find_any_device_by_node()
 In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
 References: <cover.1519380923.git.viresh.kumar@linaro.org>
-Message-ID: <6b17ffecd9917ff4a1fad848839ea667e92d715f.1519380923.git.viresh.kumar@linaro.org>
+Message-ID: <483bc64db23821497d0634a86e801510e439fe3d.1519380923.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds boot constraint documentation.
+This creates a new helper that returns the struct device corresponding
+to a struct device_node. This currently works only for amba and platform
+devices, but can be easily extended to include other bus types.
+
+This also creates an internal of_find_amba_device_by_node() helper,
+which isn't exported as of now.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- .../driver-api/boot-constraint/constraints.rst     | 98 ++++++++++++++++++++++
- Documentation/driver-api/boot-constraint/index.rst |  4 +
- Documentation/driver-api/index.rst                 |  1 +
- 3 files changed, 103 insertions(+)
- create mode 100644 Documentation/driver-api/boot-constraint/constraints.rst
- create mode 100644 Documentation/driver-api/boot-constraint/index.rst
+ drivers/of/platform.c       | 55 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_platform.h |  5 +++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/Documentation/driver-api/boot-constraint/constraints.rst b/Documentation/driver-api/boot-constraint/constraints.rst
-new file mode 100644
-index 000000000000..6da2df33f2c9
---- /dev/null
-+++ b/Documentation/driver-api/boot-constraint/constraints.rst
-@@ -0,0 +1,98 @@
-+.. include:: <isonum.txt>
-+
-+=========================
-+Boot Constraint Subsystem
-+=========================
-+
-+:Copyright: |copy| 2017 Viresh Kumar <vireshk@kernel.org>, Linaro Ltd.
-+
-+Introduction
-+============
-+
-+A lot of devices are configured and powered ON by the bootloader before passing
-+on control to the operating system, Linux in our case.  It is important for some
-+of them to keep working until the time a Linux device driver probes the device
-+and reconfigure it.
-+
-+A typical example of that can be the LCD controller, which is used by the
-+bootloaders to show image(s) while the platform boots Linux.  The LCD controller
-+can be using resources like clk, regulators, etc, that are shared with other
-+devices. These shared resources should be configured in such a way that they
-+satisfy need of all the user devices.  If another device's (X) driver gets
-+probed before the LCD controller driver, then it may end up disabling or
-+reconfiguring these resources to ranges satisfying only the current user (device
-+X) and that may make the LCD screen unstable and present a bad user experience.
-+
-+Another case can be a debug serial port (earlycon) enabled from the bootloader,
-+which may be used to debug early kernel oops.
-+
-+There are also cases where the resources may not be shared, but the kernel will
-+disable them forcefully as no users may have appeared until a certain point in
-+the kernel boot.
-+
-+Of course we can have more complex cases where the same resource is getting used
-+by multiple devices while the kernel boots and the order in which the devices
-+get probed wouldn't matter as the other devices may break because of the chosen
-+configuration of the first probed device.
-+
-+Adding boot constraints
-+=======================
-+
-+A boot constraint defines a configuration requirement set for the device by the
-+boot loader. For example, if a clock is enabled for a device by the bootloader
-+and we want the device to be working as is until the time the device is probed
-+by its driver, then keeping this clock enabled is one of the boot constraint.
-+
-+Following are the different type of boot constraints supported currently by the
-+core:
-+
-+.. kernel-doc:: include/linux/boot_constraint.h
-+   :functions: dev_boot_constraint_type
-+
-+
-+A single boot constraint can be added using the following helper:
-+
-+.. kernel-doc:: drivers/bootconstraint/core.c
-+   :functions: dev_boot_constraint_add
-+
-+
-+The second parameter to this routine describes the constraint to add and is
-+represented by following structures:
-+
-+.. kernel-doc:: include/linux/boot_constraint.h
-+   :functions: dev_boot_constraint dev_boot_constraint_info
-+
-+The power domain boot constraint doesn't need any data, while the clock and
-+power supply boot constraint specific data is represented by following
-+structures:
-+
-+.. kernel-doc:: include/linux/boot_constraint.h
-+   :functions: dev_boot_constraint_supply_info dev_boot_constraint_clk_info
-+
-+
-+In order to simplify adding multiple boot constraints for a platform, the boot
-+constraints core supplies another helper which can be used to add all
-+constraints for the platform.
-+
-+.. kernel-doc:: drivers/bootconstraint/deferrable_dev.c
-+   :functions: dev_boot_constraint_add_deferrable_of
-+
-+
-+The argument of this routine is described by following structure:
-+
-+.. kernel-doc:: include/linux/boot_constraint.h
-+   :functions: dev_boot_constraint_of
-+
-+
-+Removing boot constraints
-+=========================
-+
-+Once the boot constraints are added, they will be honored by the boot constraint
-+core until the time a driver tries to probe the device. The constraints are
-+removed by the driver core if either the driver successfully probed the device
-+or failed with an error value other than -EPROBE_DEFER. The constraints are kept
-+as is for deferred probe. The driver core removes the constraints using the
-+following helper, which must not be called directly by the platforms:
-+
-+.. kernel-doc:: drivers/bootconstraint/core.c
-+   :functions: dev_boot_constraints_remove
-diff --git a/Documentation/driver-api/boot-constraint/index.rst b/Documentation/driver-api/boot-constraint/index.rst
-new file mode 100644
-index 000000000000..d6fce17626a2
---- /dev/null
-+++ b/Documentation/driver-api/boot-constraint/index.rst
-@@ -0,0 +1,4 @@
-+.. toctree::
-+   :maxdepth: 1
-+
-+   constraints
-diff --git a/Documentation/driver-api/index.rst b/Documentation/driver-api/index.rst
-index e9b41b1634f3..f982e71efb73 100644
---- a/Documentation/driver-api/index.rst
-+++ b/Documentation/driver-api/index.rst
-@@ -49,6 +49,7 @@ available subsections can be seen below.
-    dmaengine/index
-    slimbus
-    soundwire/index
-+   boot-constraint/index
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index c00d81dfac0b..72853f9043e6 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -55,6 +55,61 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
+ }
+ EXPORT_SYMBOL(of_find_device_by_node);
  
- .. only::  subproject and html
++#ifdef CONFIG_ARM_AMBA
++/**
++ * of_find_amba_device_by_node - Find the amba_device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * Returns amba_device pointer, or NULL if not found
++ */
++static struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	struct device *dev;
++
++	dev = bus_find_device(&amba_bustype, NULL, np, of_dev_node_match);
++	return dev ? to_amba_device(dev) : NULL;
++}
++#else
++static inline struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
++#endif
++
++/**
++ * of_find_any_device_by_node - Find the struct device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * This currently supports only AMBA and platform devices.
++ *
++ * Returns struct device pointer, or NULL if not found
++ */
++struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	struct device *dev = NULL;
++
++	if (of_device_is_compatible(np, "arm,primecell")) {
++		struct amba_device *adev = of_find_amba_device_by_node(np);
++
++		if (adev)
++			dev = &adev->dev;
++	} else {
++		struct platform_device *pdev = of_find_device_by_node(np);
++
++		if (pdev)
++			dev = &pdev->dev;
++	}
++
++	return dev;
++}
++EXPORT_SYMBOL(of_find_any_device_by_node);
++
+ #ifdef CONFIG_OF_ADDRESS
+ /*
+  * The following routines scan a subtree and registers a device for
+diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+index 84a966623e78..5fb20afaf895 100644
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -54,11 +54,16 @@ extern struct platform_device *of_device_alloc(struct device_node *np,
+ 					 struct device *parent);
+ #ifdef CONFIG_OF
+ extern struct platform_device *of_find_device_by_node(struct device_node *np);
++extern struct device *of_find_any_device_by_node(struct device_node *np);
+ #else
+ static inline struct platform_device *of_find_device_by_node(struct device_node *np)
+ {
+ 	return NULL;
+ }
++static inline struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
+ #endif
  
+ /* Platform devices and busses creation */
 -- 
 2.15.0.194.g9af6a3dea062
