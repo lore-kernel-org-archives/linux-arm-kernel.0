@@ -1,5 +1,5 @@
 From: MNARANI@xilinx.com (Manish Narani)
-Date: Fri, 23 Feb 2018 07:27:01 +0000
+Date: Fri, 23 Feb 2018 07:29:01 +0000
 Subject: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for
  ZynqMP Platform
 In-Reply-To: <ce9efad6-b007-4cd9-18e7-a7932835846c@intel.com>
@@ -7,11 +7,11 @@ References: <1517336073-18142-1-git-send-email-mnarani@xilinx.com>
  <608309c3-fc4d-25a2-f0a9-21c0f3e2db46@intel.com>
  <SN1PR0201MB1791863A71475E3F0D896DD0C1CE0@SN1PR0201MB1791.namprd02.prod.outlook.com>
  <ce9efad6-b007-4cd9-18e7-a7932835846c@intel.com>
-Message-ID: <SN1PR0201MB17913D8B20DD68ECD39C1164C1CC0@SN1PR0201MB1791.namprd02.prod.outlook.com>
+Message-ID: <SN1PR0201MB1791EA315C2FC9B15D7BC650C1CC0@SN1PR0201MB1791.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+
 
 > -----Original Message-----
 > From: Adrian Hunter [mailto:adrian.hunter at intel.com]
@@ -85,13 +85,10 @@ Hi Adrian,
 > 		host->mmc_host_ops.execute_tuning =
 > arasan_zynqmp_execute_tuning;
 > 
-This will need the removal of 'const' from 
-static const struct mmc_host_ops sdhci_ops = {}
-in sdhci.c file. Please confirm.
+This will need the removal of 'const' from 'static const struct mmc_host_ops sdhci_ops = {}' in sdhci.c file. Please confirm.
 
 Thanks,
 Manish
-
 > 
 > static int arasan_zynqmp_execute_tuning(struct mmc_host *mmc, u32
 > opcode) {
