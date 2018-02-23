@@ -1,136 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 23 Feb 2018 16:00:23 +0100
-Subject: [PATCH v2 5/5] arm: zynq: Add support for Xilinx zc770 xm013 dc4 board
-In-Reply-To: <cover.1519398009.git.michal.simek@xilinx.com>
-References: <cover.1519398009.git.michal.simek@xilinx.com>
-Message-ID: <7e29c4841930c4e4189a167934574fcf987b9f02.1519398009.git.michal.simek@xilinx.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 23 Feb 2018 16:01:47 +0100
+Subject: [v2,1/1] ARM: orion5x: use mac_pton() helper
+In-Reply-To: <1519380573.10722.94.camel@linux.intel.com>
+References: <1443795153-40836-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <099870d3-e2bd-aad9-d526-5438596bb575@the2masters.de>
+ <20180222214237.GH28112@lunn.ch>
+ <bce65520-7f11-49f5-c806-59e508001321@the2masters.de>
+ <20180222233457.GA6052@lunn.ch>
+ <1519380573.10722.94.camel@linux.intel.com>
+Message-ID: <20180223150147.GA17857@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-zc770 is based board which is extended by FMC/DC cards for SoC
-validation. FMCs/DCs are supposed to cover all SoC configurations.
-FMC/DC contains can, ethernet, i2c, qspi, spi and uart.
+> > The patch has been corrupted by you email client. But otherwise, yes.
+> > 
+> > Please take a look at:
+> > 
+> > https://www.kernel.org/doc/html/v4.12/process/submitting-patches.html
+> > 
+> > It will give you hits about correctly formatting the patch. In
+> > addition it should have:
+> > 
+> > Fixes: 4cd5773a2ae6 ("net: core: move mac_pton() to lib/net_utils.c")
+> > 
+> > before the --- line, to indicate what it is fixing.
+> > 
+> > This patch should be against
+> > git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git,
+> > since it is a fix, and sent to <netdev@vger.kernel.org>.
+> 
+> Guys, consider this one instead:
+> https://patchwork.ozlabs.org/patch/851008/
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Hi Andy
 
-Changes in v2:
-- use eeprom as node name instead of at25
-- Record compatible string to xilinx.txt
+Thanks for pointing this patch out.
 
- Documentation/devicetree/bindings/arm/xilinx.txt |  1 +
- arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/zynq-zc770-xm013.dts           | 78 ++++++++++++++++++++++++
- 3 files changed, 80 insertions(+)
- create mode 100644 arch/arm/boot/dts/zynq-zc770-xm013.dts
+What is the advantage of doing to the strnlen()? As Stefan says, the
+code which follows will detect a short string, in that a NULL is not
+in [0-9a-f], nor a : .
 
-diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-index 745c898f2f7f..63705a451251 100644
---- a/Documentation/devicetree/bindings/arm/xilinx.txt
-+++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-@@ -15,6 +15,7 @@ Additional compatible strings:
-   "xlnx,zynq-zc770-xm010"
-   "xlnx,zynq-zc770-xm011"
-   "xlnx,zynq-zc770-xm012"
-+  "xlnx,zynq-zc770-xm013"
- 
- ---------------------------------------------------------------
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2c74b935ad1c..d5de3748a80a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1070,6 +1070,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-zc770-xm010.dtb \
- 	zynq-zc770-xm011.dtb \
- 	zynq-zc770-xm012.dtb \
-+	zynq-zc770-xm013.dtb \
- 	zynq-zed.dtb \
- 	zynq-zybo.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
-diff --git a/arch/arm/boot/dts/zynq-zc770-xm013.dts b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-new file mode 100644
-index 000000000000..8bb66859d774
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-@@ -0,0 +1,78 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Xilinx ZC770 XM013 board DTS
-+ *
-+ * Copyright (C) 2013 Xilinx, Inc.
-+ */
-+/dts-v1/;
-+#include "zynq-7000.dtsi"
-+
-+/ {
-+	compatible = "xlnx,zynq-zc770-xm013", "xlnx,zynq-7000";
-+	model = "Xilinx Zynq";
-+
-+	aliases {
-+		ethernet0 = &gem1;
-+		i2c0 = &i2c1;
-+		serial0 = &uart0;
-+		spi1 = &spi0;
-+	};
-+
-+	chosen {
-+		bootargs = "";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&gem1 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
-+
-+	ethernet_phy: ethernet-phy at 7 {
-+		reg = <7>;
-+		device_type = "ethernet-phy";
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	si570: clock-generator at 55 {
-+		#clock-cells = <0>;
-+		compatible = "silabs,si570";
-+		temperature-stability = <50>;
-+		reg = <0x55>;
-+		factory-fout = <156250000>;
-+		clock-frequency = <148500000>;
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+	num-cs = <4>;
-+	is-decoded-cs = <0>;
-+	eeprom: eeprom at 0 {
-+		at25,byte-len = <8192>;
-+		at25,addr-mode = <2>;
-+		at25,page-size = <32>;
-+
-+		compatible = "atmel,at25";
-+		reg = <2>;
-+		spi-max-frequency = <1000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-1.9.1
+Thanks
+	Andrew
