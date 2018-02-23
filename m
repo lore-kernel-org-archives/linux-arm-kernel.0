@@ -1,41 +1,135 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Feb 2018 14:06:52 +0100
-Subject: [PATCH] drm/sun4i: link in front-end code if needed
-Message-ID: <20180223131112.715992-1-arnd@arndb.de>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 23 Feb 2018 15:12:26 +0200
+Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
+References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
+ <20180222191647.4727-3-ard.biesheuvel@linaro.org>
+ <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
+ <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
+Message-ID: <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the base sun4i DRM driver is built-in but the back-end is
-a loadable module, we run into a link error:
+On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> This is a cleaned up version of the I2C controller driver for
+>>> the Fujitsu F_I2C IP, which was never supported upstream, and
+>>> has now been incorporated into the Socionext SynQuacer SoC.
 
-drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
-sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
+>>> +       return DIV_ROUND_UP((bit_count * 9 + 10 * num) * 3, 200) + 10;
+>>
+>> When I suggested to drop parens, I also suggested to swap second pair
+>> arguments (b/c I was thinking that parens to prevent confusion + vs
+>> *), like
+>>
+>> 9 * bit_count + 10 * num, or
+>> bit_count * 9 + num * 10.
+>>
+>> Though, it is up to you, I still consider that + vs. * operator
+>> precedence is quite obvious.
 
-The dependency is a bit tricky, the best workaround I have come up
-with is to use a Makefile hack to to interpret both
-CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
-as a directive to build the front-end the same way as the main module.
+> I can change it if you like.
 
-Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/sun4i/Makefile | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I guess slightly better to change, thanks.
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 582607c0c488..db14e023256b 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- 
--obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
-+obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
-+ifdef CONFIG_DRM_SUN4I_BACKEND
-+obj-$(CONFIG_DRM_SUN4I)		+= sun4i-frontend.o
-+endif
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
- obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
+
+>>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+>>> +                                      &speed_khz);
+>>> +       if (ret) {
+>>> +               dev_err(&pdev->dev,
+>>> +                       "Missing clock-frequency property\n");
+>>> +               return -EINVAL;
+>>> +       }
+>>> +       speed_khz /= 1000;
+
+>>> +       if (dev_of_node(&pdev->dev)) {
+>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
+>>> +               if (IS_ERR(i2c->clk)) {
+>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
+>>> +                       return PTR_ERR(i2c->clk);
+>>> +               }
+>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
+>>> +
+>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
+>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
+>>> +               clk_prepare_enable(i2c->clk);
+>>> +       } else {
+>>> +               ret = device_property_read_u32(&pdev->dev,
+>>> +                                              "socionext,pclk-rate",
+>>> +                                              &i2c->clkrate);
+>>> +               if (ret)
+>>> +                       return ret;
+>>> +       }
+>>
+>> Okay, I got this case. It's more likely the one in 8250_dw.c.
+>>
+>> Can you do the similar way?
+
+> Could you elaborate?
+
+--- 8< --- 8< --- 8< ---
+        device_property_read_u32(dev, "clock-frequency", &p->uartclk);
+
+       /* If there is separate baudclk, get the rate from it. */
+       data->clk = devm_clk_get(dev, "baudclk");
+...
+       if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
+               return -EPROBE_DEFER;
+       if (!IS_ERR_OR_NULL(data->clk)) {
+               err = clk_prepare_enable(data->clk);
+               if (err)
+                       dev_warn(dev, "could not enable optional baudclk: %d\n",
+                                err);
+               else
+                       p->uartclk = clk_get_rate(data->clk);
+       }
+
+       /* If no clock rate is defined, fail. */
+       if (!p->uartclk) {
+               dev_err(dev, "clock rate not defined\n");
+               err = -EINVAL;
+               goto err_clk;
+--- 8< --- 8< --- 8< ---
+
+Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
+above and you are almost done.
+
+>>> +       i2c->irq = platform_get_irq(pdev, 0);
+>>> +       if (i2c->irq <= 0) {
+>>
+>> < 0 ?
+>>
+>> On some platforms IRQ == 0 might be valid.
+
+> Are you sure about that?
+
+Yes. I fixed some cases on one of a such.
+
+> http://yarchive.net/comp/linux/no_irq.html
+
+I agree with Linus from software IRQ (and nowadays luckily we are
+using IRQ descriptors), but I disagree with him from hardware
+prospective.
+0 is totally valid HW IRQ line. In hardware there is no descriptor
+(except, yes, MSI and alike cases), it's just a wire with an index.
+
+So, while drivers are getting better in code prospective (though I
+don't see many of them comparing this to 0), the IRQ framework is
+changing itself as well.
+
+At which circumstances we might get 0 in the first place?
+
+Second question, doesn't request_irq() fail on irq==0 if it's not
+supported as valid by platform?
+
+>>> +               dev_err(&pdev->dev, "no IRQ resource found\n");
+>>> +               return -ENODEV;
+>>> +       }
+
 -- 
-2.9.0
+With Best Regards,
+Andy Shevchenko
