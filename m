@@ -1,99 +1,108 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Feb 2018 16:03:05 +0100
-Subject: [PATCH v4 03/10] ARM: sun8i: smp: Add support for A83T
-In-Reply-To: <20180223133742.26044-4-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-4-mylene.josserand@bootlin.com>
-Message-ID: <20180223150305.7jsuxay2idzvcy2w@flea.lan>
+Date: Fri, 23 Feb 2018 16:18:21 +0100
+Subject: [PATCH v3 2/7] pinctrl: sunxi: support pin controllers with
+ holes among IRQ banks
+In-Reply-To: <20180223122552.58049-3-icenowy@aosc.io>
+References: <20180223122552.58049-1-icenowy@aosc.io>
+ <20180223122552.58049-3-icenowy@aosc.io>
+Message-ID: <20180223151821.gqn66roldejpowzu@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 02:37:35PM +0100, Myl?ne Josserand wrote:
-> Add the support for A83T.
+On Fri, Feb 23, 2018 at 08:25:47PM +0800, Icenowy Zheng wrote:
+> The Allwinner H6 SoC have its pin controllers with the first IRQ-capable
+> GPIO bank at IRQ bank 1 and the second bank at IRQ bank 5. This
+> situation cannot be processed with the current pinctrl IRQ code, as it
+> only expects a offset to all IRQ banks.
 > 
-> A83T SoC has an additional register than A80 to handle CPU configurations:
-> R_CPUS_CFG. Information about the register comes from Allwinner's BSP
-> driver.
-> An important difference is the Power Off Gating register for clusters
-> which is BIT(4) in case of SUN9I-A80 and BIT(0) in case of SUN8I-A83T.
+> Update the code to use a logical IRQ bank to hardware IRQ bank map, so
+> the new situation in H6 main pin controller can be processed. The old
+> special situation which uses a constant offset (on A33 and V3s, both
+> with a offset of 1) can be also processed with the new code.
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  arch/arm/mach-sunxi/Kconfig  |   2 +-
->  arch/arm/mach-sunxi/mc_smp.c | 168 +++++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 162 insertions(+), 8 deletions(-)
+> Changes in v3:
+> - change for the refactor in the new PATCH 1.
 > 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index ce53ceaf4cc5..a0ad35c41c02 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -51,7 +51,7 @@ config MACH_SUN9I
->  config ARCH_SUNXI_MC_SMP
->  	bool
->  	depends on SMP
-> -	default MACH_SUN9I
-> +	default y if MACH_SUN9I || MACH_SUN8I
->  	select ARM_CCI400_PORT_CTRL
->  	select ARM_CPU_SUSPEND
+> No changes in v2.
+> 
+>  drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c |  4 +++-
+>  drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c |  4 +++-
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.h     | 29 +++++++++++++++++------------
+>  3 files changed, 23 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+> index da387211a75e..f043afa1aac5 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+> @@ -481,11 +481,13 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
+>  		  SUNXI_FUNCTION(0x3, "uart3")),	/* CTS */
+>  };
 >  
-> diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> index de02e5662557..3bd9066a1422 100644
-> --- a/arch/arm/mach-sunxi/mc_smp.c
-> +++ b/arch/arm/mach-sunxi/mc_smp.c
-> @@ -55,22 +55,32 @@
->  #define CPUCFG_CX_RST_CTRL_L2_RST	BIT(8)
->  #define CPUCFG_CX_RST_CTRL_CX_RST(n)	BIT(4 + (n))
->  #define CPUCFG_CX_RST_CTRL_CORE_RST(n)	BIT(n)
-> +#define CPUCFG_CX_RST_CTRL_CORE_RST_ALL	(0xf << 0)
->  
->  #define PRCM_CPU_PO_RST_CTRL(c)		(0x4 + 0x4 * (c))
->  #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
->  #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
->  #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
-> +/* The power off register for clusters are different from SUN9I and SUN8I */
-> +#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN8I	BIT(0)
->  #define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
->  #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
->  #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
->  #define PRCM_CPU_SOFT_ENTRY_REG		0x164
->  
-> +/* R_CPUCFG registers, specific to SUN8I */
-> +#define R_CPUCFG_CLUSTER_PO_RST_CTRL(c)	(0x30 + (c) * 0x4)
-> +#define R_CPUCFG_CLUSTER_PO_RST_CTRL_CORE(n)	BIT(n)
-> +#define R_CPUCFG_CPU_SOFT_ENTRY_REG	0x01a4
+> +static const unsigned int sun8i_a33_pinctrl_irq_bank_map[] = { 1, 2 };
 > +
->  #define CPU0_SUPPORT_HOTPLUG_MAGIC0	0xFA50392F
->  #define CPU0_SUPPORT_HOTPLUG_MAGIC1	0x790DCA3A
+>  static const struct sunxi_pinctrl_desc sun8i_a33_pinctrl_data = {
+>  	.pins = sun8i_a33_pins,
+>  	.npins = ARRAY_SIZE(sun8i_a33_pins),
+>  	.irq_banks = 2,
+> -	.irq_bank_base = 1,
+> +	.irq_bank_map = sun8i_a33_pinctrl_irq_bank_map,
+>  	.disable_strict_mode = true,
+>  };
 >  
->  static void __iomem *cpucfg_base;
-> +static void __iomem *r_cpucfg_base;
->  static void __iomem *prcm_base;
->  static void __iomem *sram_b_smp_base;
-> +static bool is_sun9i;
-
-Since you always check for that condition to always be false, can't
-you do the opposite, ie have it called is_a83t, and verify it to be
-true?
-
->  	/* Set the hardware entry point address */
-> -	writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
-> -	       prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
-> +	if (is_sun9i)
-> +		writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
-> +		       prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
+> index 496ba34e1f5f..6704ce8e5e3d 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c
+> @@ -293,11 +293,13 @@ static const struct sunxi_desc_pin sun8i_v3s_pins[] = {
+>  		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PG_EINT5 */
+>  };
+>  
+> +static const unsigned int sun8i_v3s_pinctrl_irq_bank_map[] = { 1, 2 };
+> +
+>  static const struct sunxi_pinctrl_desc sun8i_v3s_pinctrl_data = {
+>  	.pins = sun8i_v3s_pins,
+>  	.npins = ARRAY_SIZE(sun8i_v3s_pins),
+>  	.irq_banks = 2,
+> -	.irq_bank_base = 1,
+> +	.irq_bank_map = sun8i_v3s_pinctrl_irq_bank_map,
+>  	.irq_read_needs_mux = true
+>  };
+>  
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> index 909ca1504b61..36502cbef6c2 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> @@ -110,7 +110,7 @@ struct sunxi_pinctrl_desc {
+>  	int				npins;
+>  	unsigned			pin_base;
+>  	unsigned			irq_banks;
+> -	unsigned			irq_bank_base;
+> +	const unsigned int		*irq_bank_map;
+>  	bool				irq_read_needs_mux;
+>  	bool				disable_strict_mode;
+>  };
+> @@ -263,14 +263,23 @@ static inline u32 sunxi_pull_offset(u16 pin)
+>  	return pin_num * PULL_PINS_BITS;
+>  }
+>  
+> +static inline u32 sunxi_irq_hw_bank_num(u8 bank,
+> +					const struct sunxi_pinctrl_desc *desc)
+> +{
+> +	if (!desc->irq_bank_map)
+> +		return bank;
 > +	else
-> +		writel(__pa_symbol(sunxi_mc_smp_secondary_startup),
-> +		       r_cpucfg_base + R_CPUCFG_CPU_SOFT_ENTRY_REG);
+> +		return desc->irq_bank_map[bank];
+> +}
+> +
 
-if (is_a83t)
-	reg = prcm_base + PRCM_CPU_SOFT_ENTRY_REG;
-else
-	reg = r_cpucfg_base + R_CPUCFG_CPU_SOFT_ENTRY_REG;
-writel(__pa_symbol(sunxi_mc_smp_secondary_startup), reg);
+Same remark about the order of the argument, and I would have split
+this patch in two, one to introduce the new function (but still using
+the irq_bank_base), and then a second patch to introduce the
+irq_bank_map.
 
-?
-
-Thanks!
+Looks good otherwise, thanks!
 Maxime
 
 -- 
@@ -106,4 +115,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/86171836/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/a4870086/attachment.sig>
