@@ -1,69 +1,35 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 23 Feb 2018 13:50:59 +0100
-Subject: [PATCH 5/7] iio: adc: stm32-dfsdm: misc style improvements and fixes
+Date: Fri, 23 Feb 2018 13:51:00 +0100
+Subject: [PATCH 6/7] iio: adc: stm32-dfsdm: add check on max filter id
 In-Reply-To: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
 References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1519390261-25453-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1519390261-25453-7-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Misc fixes & style improvements:
-- checkpatch warns about line over 80 characters.
-- remove extra spaces and a blank line (e.g. checkpatch --strict)
-- remove bad error message always printed in probe routine.
+reg property should be checked against number of available filters.
+BTW, dfsdm->num_fls wasn't used. But it can be used for this purpose.
+This prevents using data out of allocated dfsdm->fl_list array.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-dfsdm-adc.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index 01422d1..57bcb45 100644
+index 57bcb45..1b78bec 100644
 --- a/drivers/iio/adc/stm32-dfsdm-adc.c
 +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -253,7 +253,8 @@ static int stm32_dfsdm_start_filter(struct stm32_dfsdm *dfsdm,
- 				  DFSDM_CR1_RSWSTART(1));
- }
+@@ -1111,8 +1111,8 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, adc);
  
--static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
-+static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm,
-+				    unsigned int fl_id)
- {
- 	/* Disable conversion */
- 	regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-@@ -337,7 +338,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
- 					    "st,adc-channel-types", chan_idx,
- 					    &of_str);
- 	if (!ret) {
--		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
-+		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
- 		if (val < 0)
- 			return val;
- 	} else {
-@@ -349,7 +350,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
- 					    "st,adc-channel-clk-src", chan_idx,
- 					    &of_str);
- 	if (!ret) {
--		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
-+		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
- 		if (val < 0)
- 			return val;
- 	} else {
-@@ -1093,7 +1094,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
- 	char *name;
- 	int ret, irq, val;
+ 	ret = of_property_read_u32(dev->of_node, "reg", &adc->fl_id);
+-	if (ret != 0) {
+-		dev_err(dev, "Missing reg property\n");
++	if (ret != 0 || adc->fl_id >= adc->dfsdm->num_fls) {
++		dev_err(dev, "Missing or bad reg property\n");
+ 		return -EINVAL;
+ 	}
  
--
- 	dev_data = of_device_get_match_data(dev);
- 	iio = devm_iio_device_alloc(dev, sizeof(*adc));
- 	if (!iio) {
-@@ -1161,7 +1161,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_cleanup;
- 
--	dev_err(dev, "of_platform_populate\n");
- 	if (dev_data->type == DFSDM_AUDIO) {
- 		ret = of_platform_populate(np, NULL, NULL, dev);
- 		if (ret < 0) {
 -- 
 1.9.1
