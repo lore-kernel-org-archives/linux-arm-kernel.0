@@ -1,114 +1,76 @@
-From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
-Date: Fri, 23 Feb 2018 09:34:12 +0100
-Subject: [1/2] ARM: irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <CAFvLkMSa5rQUS7xboNFZO_0x0unPmd6JKyROCjv4L-KgXbXzWg@mail.gmail.com>
-References: <1519221027-4028-2-git-send-email-radoslaw.pietrzyk@gmail.com>
- <d007f880-0509-e30c-4c28-94117d2f8037@st.com>
- <CAFvLkMSa5rQUS7xboNFZO_0x0unPmd6JKyROCjv4L-KgXbXzWg@mail.gmail.com>
-Message-ID: <CAFvLkMT9YpzTRoN8f3NCpH_qGeDzyDcvZLeWpOoDL1xqje+VaQ@mail.gmail.com>
+From: liwei213@huawei.com (liwei (CM))
+Date: Fri, 23 Feb 2018 08:35:54 +0000
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjggMi81XSBkdC1iaW5kaW5nczogc2NzaTogdWZz?=
+ =?utf-8?Q?:_add_document_for_hisi-ufs?=
+In-Reply-To: <CAK8P3a2b3rLHyM+vMppCkAR3VYbhw-b0LpuWfLCqjs7z9n+hyw@mail.gmail.com>
+References: <20180213101412.5717-1-liwei213@huawei.com>
+ <20180213101412.5717-3-liwei213@huawei.com>
+ <CAK8P3a2b3rLHyM+vMppCkAR3VYbhw-b0LpuWfLCqjs7z9n+hyw@mail.gmail.com>
+Message-ID: <1699CE87DE933F49876AD744B5DC140FA56267@DGGEMM506-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
-Please check latest v2 patches series and let me know if it works on
-stm32h7 as it does on stm32f4
+Hi, Arnd
 
-2018-02-22 12:01 GMT+01:00 Rados?aw Pietrzyk <radoslaw.pietrzyk@gmail.com>:
-> Hi Ludovic,
-> I have tested on stm32f429-disco and it works without a problem.
-> handle_edge_irq is not used in current implementation because it is
-> substituted by handle_simple_irq in an alloc callback either way which
-> causes that irq_ack callback is not invoked as well (acking is done in
-> chained handler).
+Sorry late for you.
+The following two suggestions we have really discussed
+https://lkml.org/lkml/2017/11/30/1077
+
+-----????-----
+???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd Bergmann
+????: 2018?2?19? 17:58
+???: liwei (CM)
+??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; zangleigang; Gengjianfeng; Guodong Xu; Zhangfei Gao; Fengbaopeng (kevin, Kirin Solution Dept)
+??: Re: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+
+On Tue, Feb 13, 2018 at 11:14 AM, Li Wei <liwei213@huawei.com> wrote:
+> add ufs node document for Hisilicon.
 >
-> 2018-02-22 11:55 GMT+01:00 Ludovic BARRE <ludovic.barre@st.com>:
->> Hi Radek
->>
->> I've tested your change on stm32h743i-eval.dts board
->> and gpio-keys tests are not functional.
->> No interrupt occurs when we push or release button
->> (cat /proc/interrupt).
->>
->> Board: stm32h743i-eval.dts
->> Test description: gpio-keys (gpioc 13 => exti 13), with gpio or interrupt
->> property.
->>
->> comment below
->>
->>
->> On 02/21/2018 02:50 PM, radek wrote:
->>>
->>> - allocates generic chip with handle_simple_irq
->>>         which simplifies irq_domain_ops.alloc callback
->>>         - removes ack register from generic chip which is not used for
->>>         handle_simple_irq as acking is done in a chained handler
->>>         - removes unneeded irq_domain_ops.xlate callback
->>>
->>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->>> ---
->>>   drivers/irqchip/irq-stm32-exti.c | 10 +---------
->>>   1 file changed, 1 insertion(+), 9 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-stm32-exti.c
->>> b/drivers/irqchip/irq-stm32-exti.c
->>> index 36f0fbe..42e74e3 100644
->>> --- a/drivers/irqchip/irq-stm32-exti.c
->>> +++ b/drivers/irqchip/irq-stm32-exti.c
->>> @@ -176,16 +176,12 @@ static int stm32_irq_set_wake(struct irq_data *data,
->>> unsigned int on)
->>>   static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
->>>                             unsigned int nr_irqs, void *data)
->>>   {
->>> -       struct irq_chip_generic *gc;
->>>         struct irq_fwspec *fwspec = data;
->>>         irq_hw_number_t hwirq;
->>>         hwirq = fwspec->param[0];
->>> -       gc = irq_get_domain_generic_chip(d, hwirq);
->>>         irq_map_generic_chip(d, virq, hwirq);
->>> -       irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
->>> -                           handle_simple_irq, NULL, NULL);
->>>         return 0;
->>>   }
->>> @@ -200,7 +196,6 @@ static void stm32_exti_free(struct irq_domain *d,
->>> unsigned int virq,
->>>     struct irq_domain_ops irq_exti_domain_ops = {
->>>         .map    = irq_map_generic_chip,
->>> -       .xlate  = irq_domain_xlate_onetwocell,
->>>         .alloc  = stm32_exti_alloc,
->>>         .free   = stm32_exti_free,
->>>   };
->>> @@ -231,7 +226,7 @@ __init stm32_exti_init(const struct stm32_exti_bank
->>> **stm32_exti_banks,
->>>         }
->>>         ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1,
->>> "exti",
->>> -                                            handle_edge_irq, clr, 0, 0);
->>> +                                            handle_simple_irq, clr, 0,
->>> 0);
->>
->>
->> EXTI hardware block is trigged on pulse event rising or failing edge.
->> Why do you change to handle_simple_irq ?
->>
->>>         if (ret) {
->>>                 pr_err("%pOF: Could not allocate generic interrupt
->>> chip.\n",
->>>                         node);
->>> @@ -246,13 +241,10 @@ __init stm32_exti_init(const struct stm32_exti_bank
->>> **stm32_exti_banks,
->>>                 gc->reg_base = base;
->>>                 gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
->>> -               gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
->>>                 gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
->>>                 gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
->>>                 gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
->>>                 gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
->>> -               gc->chip_types->regs.ack = stm32_bank->pr_ofst;
->>> -               gc->chip_types->regs.mask = stm32_bank->imr_ofst;
->>>                 gc->private = (void *)stm32_bank;
->>>                 /* Determine number of irqs supported */
->>>
->>
->> BR
->> Ludo
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 37 
+> ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+
+
+I'm pretty sure we've discussed it before, but can you make this so that the generic properties are part of the ufshcd binding, and you refer to it from here, only describing in what ways the hisi ufs binding differs from the standard?
+
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt 
+> b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> new file mode 100644
+> index 000000000000..0d21b57496cf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,37 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +                                       "hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
+> +                                       host controller present on Hi36xx chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks               : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +                                       order as the clocks property. 
+> +"ref_clk", "phy_clk" is optional
+
+The clock names sound generic enough, should we have both in the generic binding?
+
+"ref_clk" is in the ufshcd-pltfrm binding, but "phy_clk" is not; what do you mean is that these two don't need to document here?
+
+> +- resets            : reset node register, one reset the clk and the other reset the controller
+> +- reset-names       : describe reset node register
+
+This looks incomplete. What is the name of the reset line supposed to be?
+I'd also suggest you document it in the ufshcd binding instead.
+
+As discussed in https://lkml.org/lkml/2017/11/30/1077;
+If document it in the ufshcd binding, I think it needs some codes to parse them in ufshcd.c/ufshcd-pltfrm.c, but I think these codes may not be applicable to other SOC manufacturers.
+
+      Arnd
