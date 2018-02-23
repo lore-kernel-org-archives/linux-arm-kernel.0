@@ -1,44 +1,85 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 23 Feb 2018 15:05:10 +0800
-Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20180223043242.wkrlckws73kwu6xb@tarshish>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-3-l.stach@pengutronix.de>
- <20180205072438.nxvhlqk54d7firbz@sapphire.tkos.co.il>
- <1517829046.3175.9.camel@pengutronix.de>
- <20180223034652.GM3217@dragon>
- <20180223043242.wkrlckws73kwu6xb@tarshish>
-Message-ID: <20180223070509.GP3217@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 23 Feb 2018 08:06:11 +0100
+Subject: [PATCH v2 19/19] ARM64: dts: r8a77965: Add EtherAVB device node
+In-Reply-To: <20180222155411.gnn42poawtlf3rze@verge.net.au>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-20-git-send-email-jacopo+renesas@jmondi.org>
+ <cf157266-5ea7-6795-1e31-0d1ccf85e7e8@cogentembedded.com>
+ <20180221100716.GF7203@w540>
+ <cbeb1b6b-1b02-7665-0f1f-847ab8de69e3@cogentembedded.com>
+ <20180221173106.vgyshbz3kkc4p3cu@verge.net.au>
+ <321c6c8c-8853-ac00-7567-c0be82b510f4@cogentembedded.com>
+ <35959135-cb3b-040a-1944-26845e0c07b0@cogentembedded.com>
+ <20180221182340.wvdvgtv5pw7pvd3v@verge.net.au>
+ <eaf3c72b-a482-86cf-88e7-4af457f74558@cogentembedded.com>
+ <20180222155411.gnn42poawtlf3rze@verge.net.au>
+Message-ID: <CAMuHMdWj1v6WmfLY5JttZ+LMpSn2XvjgBS95Ag9TBohRRU1qTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Simon,
 
-On Fri, Feb 23, 2018 at 06:32:42AM +0200, Baruch Siach wrote:
-> Hi Sawn,
-> 
-> On Fri, Feb 23, 2018 at 11:46:53AM +0800, Shawn Guo wrote:
-> > On Mon, Feb 05, 2018 at 12:10:46PM +0100, Lucas Stach wrote:
-> > > I've pushed a branch with all the MX8M work to:
-> > > https://git.pengutronix.de/git/lst/linux mx8-work
-> > 
-> > I have some problem to boot the kernel (and dtb) built from this branch.
-> > I'm running an U-Boot from NXP which works fine with NXP kernel for
-> > sure.  But using this U-Boot to load your kernel gives me nothing on
-> > serial, even if I put 'earlycon=ec_imx6q,0x30860000' on kernel
-> > cmdline.  Anything I'm missing here?  Thanks.
-> 
-> FWIW, I tested these patches on the i.MX8 EVK with the attached defconfig.
-> 
-> Hope this helps,
+On Thu, Feb 22, 2018 at 4:54 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Feb 21, 2018 at 09:53:58PM +0300, Sergei Shtylyov wrote:
+>> On 02/21/2018 09:23 PM, Simon Horman wrote:
+>>
+>> > ...
+>> >
+>> >>>>>>>> +                    clocks = <&cpg CPG_MOD 812>;
+>> >>>>>>>> +                    power-domains = <&sysc 32>;
+>> >>>>>>>> +                    resets = <&cpg 812>;
+>> >>>>>>>> +                    phy-mode = "rgmii-txid";
+>> >>>>>>>
+>> >>>>>>>    Why not just "rgmii"? TX delay is a board specific detail, no?
+>> >>>>>>>
+>> >>>>>> I admit I took this one straight from r8a7796 dtsi.
+>> >>>>>> Would you like to me resend and change this?
+>> >>>>>
+>> >>>>>    Yes, unless Simon would fix it while merging...
+>> >>>>
+>> >>>> Can I confirm the desired change is s/rgmii-txid/rgmii/ ?
+>> >>>
+>> >>>    Yes.
+>> >>
+>> >>    Apparently that means that this prop should be overridden in the board file
+>> >> (which may not be an easy task given the board is Salvator-XS again).
+>> >>
+>> >> [...]
+>> >
+>> > Can we override it in r8a77965-salvator-x.dts or r8a77965-salvator-xs.dts?
+>>
+>>    In salvator-common.dtsi most probably -- it has the PHY data for Ether AVB.
+>>
+>> > I feel that I'm missing an important point here.
+>>
+>>    Well, r8a779{5|6}.dtsi also have phy-mode = "rgmii-txid" (which was
+>>    unjustified in my current understanding). Thus such board override
+>>    wouldn't hurt them. But we lack a patch modifying salvator-common.dtsi
+>>    in htis series, so I'm now thinking a respin of this series is needed
+>>    anyway... sorry for being unclear. :-)
+>
+> While I've applied other patches in this series I have
+> not applied this one - mainly to allow this discussion to conclude.
+>
+> Is an appropriate solution to do the following?
+>
+> 1) Atomically update
+>    a) r8a779{5|6}.dtsi to use "rgmii" and
+>    b) salvator-common.dtsi to use "rgmii-txid"
+> 2) Update this patch to use "rgmii"
 
-Yeah, it helps a lot.  I forgot the fact that arm64 defconfig file does
-not include any i.MX platform options.  The serial driver is not even
-enabled.
+No need for atomics.
+It can all be done by patches touching single files only:
+  1) Add "rgmii-txid" to board .dts(i) files,
+  2) Change s/rgmii-txid/rgmii/ in SoC .dtsi files.
 
-I enabled a few more options on top of your defconfig, and now am able
-to boot into the Debian prompt over NFS.
+Gr{oetje,eeting}s,
 
-Thanks for help.
+                        Geert
 
-Shawn
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
