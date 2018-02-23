@@ -1,60 +1,33 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 23 Feb 2018 14:47:36 +0100
-Subject: [PATCH] dt-bindings: iio: adc: stm32-dfsdm: fix types, add
- missing pinctrl
-In-Reply-To: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
-References: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <7e40cdfc-8d9f-ccfb-f3fd-8d639a87d5b0@st.com>
+Date: Fri, 23 Feb 2018 14:49:45 +0100
+Subject: [PATCH 0/7] iio: adc: stm32-dfsdm: misc fixes and improvements
+In-Reply-To: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
+References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <31c1cd66-f2f5-201e-04e4-5a79b2191560@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
+For the series:
 Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 
-Regards,
+Thanks,
 Arnaud
 
-On 02/23/2018 12:11 PM, Fabrice Gasnier wrote:
-> - Add missing pinctrl description. Support is made optional as dfsdm
->   may use internal sources (e.g. via registers)
-> - Fix typo in IIO STM32 DFSDM filter "MANCH_F" description.
-> Basically, this should be "falling edge = logic 0", not "1" that applies
-> to "MANCH_R".
-> BTW, make the description complete by describing both rising/falling
-> edges as described in reference manuals.
+On 02/23/2018 01:50 PM, Fabrice Gasnier wrote:
+> This series brings some fixes and improvements to STM32 DFSDM driver.
 > 
-> Fixes: 6c82f947fc97 ("IIO: add DT bindings for stm32 DFSDM filter")
+> Fabrice Gasnier (7):
+>   iio: adc: stm32-dfsdm: fix compatible data use
+>   iio: adc: stm32-dfsdm: fix call to stop channel
+>   iio: adc: stm32-dfsdm: fix clock source selection
+>   iio: adc: stm32-dfsdm: fix multiple channel initialization
+>   iio: adc: stm32-dfsdm: misc style improvements and fixes
+>   iio: adc: stm32-dfsdm: add check on max filter id
+>   iio: adc: stm32-dfsdm: add check on spi-max-frequency
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> index 911492da..ed7520d 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> @@ -32,6 +32,10 @@ Optional properties:
->  		  to "clock" property. Frequency must be a multiple of the rcc
->  		  clock frequency. If not, SPI CLKOUT frequency will not be
->  		  accurate.
-> +- pinctrl-names:	Set to "default".
-> +- pinctrl-0:		List of phandles pointing to pin configuration
-> +			nodes to set pins in mode of operation for dfsdm
-> +			on external pin.
->  
->  Contents of a STM32 DFSDM child nodes:
->  --------------------------------------
-> @@ -68,8 +72,8 @@ Optional properties:
->  - st,adc-channel-types:	Single-ended channel input type.
->  			- "SPI_R": SPI with data on rising edge (default)
->  			- "SPI_F": SPI with data on falling edge
-> -			- "MANCH_R": manchester codec, rising edge = logic 0
-> -			- "MANCH_F": manchester codec, falling edge = logic 1
-> +			- "MANCH_R": manchester codec, rising edge = logic 0, falling edge = logic 1
-> +			- "MANCH_F": manchester codec, rising edge = logic 1, falling edge = logic 0
->  - st,adc-channel-clk-src: Conversion clock source.
->  			  - "CLKIN": external SPI clock (CLKIN x)
->  			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
+>  drivers/iio/adc/stm32-dfsdm-adc.c  | 52 ++++++++++++++++++++------------------
+>  drivers/iio/adc/stm32-dfsdm-core.c | 17 +++++++++++--
+>  2 files changed, 42 insertions(+), 27 deletions(-)
 > 
