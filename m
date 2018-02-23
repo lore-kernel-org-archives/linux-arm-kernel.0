@@ -1,69 +1,29 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 23 Feb 2018 18:16:23 +0800
-Subject: [PATCH v1 03/19] dt-bindings: pinctrl: mediatek: add bindings for
- I2C2 and SPI2 on MT7623
-In-Reply-To: <cover.1519378871.git.sean.wang@mediatek.com>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <607af13d88f733057df2ea057228e1cdbf77262a.1519378871.git.sean.wang@mediatek.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 23 Feb 2018 11:32:35 +0100
+Subject: [PATCH 1/4] dt-bindings: at24: sort manufacturers alphabetically
+In-Reply-To: <CAMRc=MdE_LX276mjXCHaNgAthKyzaKPW-eWBfEuCcG187X7wvQ@mail.gmail.com>
+References: <20180116160618.27859-1-peda@axentia.se>
+ <20180116160618.27859-2-peda@axentia.se>
+ <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
+ <CAMRc=Mcqj36KP7dG71dzSn_7cxw-Tru5kNtXdr5-SiH=jbCfMA@mail.gmail.com>
+ <20180221091130.4sdfnalrng4sd77i@ninjato>
+ <CAMRc=Mfcvh3PoF46DvU8RiVZ2bnQPkRm=pmv9MPEux1sHpnAOw@mail.gmail.com>
+ <20180221094009.2zql6gbzkcklbakk@ninjato>
+ <CAMRc=MdE_LX276mjXCHaNgAthKyzaKPW-eWBfEuCcG187X7wvQ@mail.gmail.com>
+Message-ID: <20180223103235.gctneumpkqdcxdme@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
 
-Add missing pinctrl binding about I2C2 and SPI2 which would be used in
-devicetree related files.
+> Ok, I'll have some time during the weekend, so I'll send a PR for rc3.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-gpio at vger.kernel.org
-Cc: devicetree at vger.kernel.org
----
- include/dt-bindings/pinctrl/mt7623-pinfunc.h | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Well, I am away this weekend, so I just sent out my pull request. But we
+can make it for rc4, no problem.
 
-diff --git a/include/dt-bindings/pinctrl/mt7623-pinfunc.h b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-index 2d6a7b1..4878a67 100644
---- a/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-+++ b/include/dt-bindings/pinctrl/mt7623-pinfunc.h
-@@ -251,6 +251,12 @@
- #define MT7623_PIN_76_SCL0_FUNC_GPIO76 (MTK_PIN_NO(76) | 0)
- #define MT7623_PIN_76_SCL0_FUNC_SCL0 (MTK_PIN_NO(76) | 1)
- 
-+#define MT7623_PIN_77_SDA2_FUNC_GPIO77 (MTK_PIN_NO(77) | 0)
-+#define MT7623_PIN_77_SDA2_FUNC_SDA2 (MTK_PIN_NO(77) | 1)
-+
-+#define MT7623_PIN_78_SCL2_FUNC_GPIO78 (MTK_PIN_NO(78) | 0)
-+#define MT7623_PIN_78_SCL2_FUNC_SCL2 (MTK_PIN_NO(78) | 1)
-+
- #define MT7623_PIN_79_URXD0_FUNC_GPIO79 (MTK_PIN_NO(79) | 0)
- #define MT7623_PIN_79_URXD0_FUNC_URXD0 (MTK_PIN_NO(79) | 1)
- #define MT7623_PIN_79_URXD0_FUNC_UTXD0 (MTK_PIN_NO(79) | 2)
-@@ -291,6 +297,24 @@
- #define MT7623_PIN_100_MIPI_TDP0_FUNC_GPIO100 (MTK_PIN_NO(100) | 0)
- #define MT7623_PIN_100_MIPI_TDP0_FUNC_TDP0 (MTK_PIN_NO(100) | 1)
- 
-+#define MT7623_PIN_101_SPI2_CSN_FUNC_GPIO101 (MTK_PIN_NO(101) | 0)
-+#define MT7623_PIN_101_SPI2_CSN_FUNC_SPI2_CS (MTK_PIN_NO(101) | 1)
-+#define MT7623_PIN_101_SPI2_CSN_FUNC_SCL3 (MTK_PIN_NO(101) | 3)
-+
-+#define MT7623_PIN_102_SPI2_MI_FUNC_GPIO102 (MTK_PIN_NO(102) | 0)
-+#define MT7623_PIN_102_SPI2_MI_FUNC_SPI2_MI (MTK_PIN_NO(102) | 1)
-+#define MT7623_PIN_102_SPI2_MI_FUNC_SPI2_MO (MTK_PIN_NO(102) | 2)
-+#define MT7623_PIN_102_SPI2_MI_FUNC_SDA3 (MTK_PIN_NO(102) | 3)
-+
-+#define MT7623_PIN_103_SPI2_MO_FUNC_GPIO103 (MTK_PIN_NO(103) | 0)
-+#define MT7623_PIN_103_SPI2_MO_FUNC_SPI2_MO (MTK_PIN_NO(103) | 1)
-+#define MT7623_PIN_103_SPI2_MO_FUNC_SPI2_MI (MTK_PIN_NO(103) | 2)
-+#define MT7623_PIN_103_SPI2_MO_FUNC_SCL3 (MTK_PIN_NO(103) | 3)
-+
-+#define MT7623_PIN_104_SPI2_CK_FUNC_GPIO104 (MTK_PIN_NO(104) | 0)
-+#define MT7623_PIN_104_SPI2_CK_FUNC_SPI2_CK (MTK_PIN_NO(104) | 1)
-+#define MT7623_PIN_104_SPI2_CK_FUNC_SDA3 (MTK_PIN_NO(104) | 3)
-+
- #define MT7623_PIN_105_MSDC1_CMD_FUNC_GPIO105 (MTK_PIN_NO(105) | 0)
- #define MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD (MTK_PIN_NO(105) | 1)
- #define MT7623_PIN_105_MSDC1_CMD_FUNC_SDA1 (MTK_PIN_NO(105) | 3)
--- 
-2.7.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180223/fe5ffb48/attachment.sig>
