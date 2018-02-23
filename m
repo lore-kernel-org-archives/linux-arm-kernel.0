@@ -1,90 +1,99 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 23 Feb 2018 13:09:23 -0800
-Subject: [PATCH 4/4] ARM: brcmstb: Add support for the V7 memory map
-In-Reply-To: <20180223210923.544-1-f.fainelli@gmail.com>
-References: <20180223210923.544-1-f.fainelli@gmail.com>
-Message-ID: <20180223210923.544-5-f.fainelli@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Feb 2018 13:41:19 -0800
+Subject: [PATCH 0.5/12] ARM: OMAP2+: Prepare to pass auxdata for smartreflex
+In-Reply-To: <20180223210100.86732-1-tony@atomide.com>
+References: <20180223210100.86732-1-tony@atomide.com>
+Message-ID: <20180223214119.GB5593@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Berger <opendmb@gmail.com>
+We are still initializing smartreflex with platform data using
+omap_device_build(). We can instead pass the platform data in
+with auxdata in pdata-quirks.c and make the driver use that
+in later patches.
 
-The 7278 device is the first device that includes support for the V7
-memory map developed for use in 64-bit architecture brcmstb devices.
-This map relocates the register physical offset from 0xF0000000 to
-0x0000000008000000.
+Note that we cannot enable the auxdata use yet, this is done
+in the last patch of the series.
 
-Since the ARM PERIPHBASE value is also relocated in the V7 memory map
-we can use its value to determine whether this device uses the new
-V7 memory map and therefore where to look for the SUN_TOP_CTRL
-register used to identify the chip family.
-
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/debug/brcmstb.S | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/pdata-quirks.c | 13 +++++++++++++
+ arch/arm/mach-omap2/sr_device.c    |  2 ++
+ include/linux/power/smartreflex.h  |  7 +++++++
+ 3 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/include/debug/brcmstb.S b/arch/arm/include/debug/brcmstb.S
-index c826f15d2f80..0f580caa81e5 100644
---- a/arch/arm/include/debug/brcmstb.S
-+++ b/arch/arm/include/debug/brcmstb.S
-@@ -11,20 +11,25 @@
-  * GNU General Public License for more details.
-  */
- #include <linux/serial_reg.h>
-+#include <asm/cputype.h>
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -17,6 +17,7 @@
+ #include <linux/wl12xx.h>
+ #include <linux/mmc/card.h>
+ #include <linux/mmc/host.h>
++#include <linux/power/smartreflex.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
  
- /* Physical register offset and virtual register offset */
- #define REG_PHYS_BASE		0xf0000000
-+#define REG_PHYS_BASE_V7	0x08000000
- #define REG_VIRT_BASE		0xfc000000
- #define REG_PHYS_ADDR(x)	((x) + REG_PHYS_BASE)
-+#define REG_PHYS_ADDR_V7(x)	((x) + REG_PHYS_BASE_V7)
+@@ -542,6 +543,8 @@ static struct pdata_init auxdata_quirks[] __initdata = {
+ 	{ /* sentinel */ },
+ };
  
- /* Product id can be read from here */
- #define SUN_TOP_CTRL_BASE	REG_PHYS_ADDR(0x404000)
-+#define SUN_TOP_CTRL_BASE_V7	REG_PHYS_ADDR_V7(0x404000)
- 
- #define UARTA_3390		REG_PHYS_ADDR(0x40a900)
- #define UARTA_7250		REG_PHYS_ADDR(0x40b400)
- #define UARTA_7260		REG_PHYS_ADDR(0x40c000)
- #define UARTA_7268		UARTA_7260
- #define UARTA_7271		UARTA_7268
-+#define UARTA_7278		REG_PHYS_ADDR_V7(0x40c000)
- #define UARTA_7364		REG_PHYS_ADDR(0x40b000)
- #define UARTA_7366		UARTA_7364
- #define UARTA_74371		REG_PHYS_ADDR(0x406b00)
-@@ -55,8 +60,21 @@
- 		mov	\rv, #0			@ yes; record init is done
- 		str	\rv, [\tmp]
- 
-+		/* Check for V7 memory map if B53 */
-+		mrc	p15, 0, \rv, c0, c0, 0	@ get Main ID register
-+		ldr	\rp, =ARM_CPU_PART_MASK
-+		and	\rv, \rv, \rp
-+		ldr	\rp, =ARM_CPU_PART_BRAHMA_B53	@ check for B53 CPU
-+		cmp	\rv, \rp
-+		bne	10f
++struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
 +
-+		/* if PERIPHBASE doesn't overlap REG_PHYS_BASE use V7 map */
-+		mrc	p15, 1, \rv, c15, c3, 0	@ get PERIPHBASE from CBAR
-+		ands	\rv, \rv, #REG_PHYS_BASE
-+		ldreq	\rp, =SUN_TOP_CTRL_BASE_V7
-+
- 		/* Check SUN_TOP_CTRL base */
--		ldr	\rp, =SUN_TOP_CTRL_BASE	@ load SUN_TOP_CTRL PA
-+10:		ldrne	\rp, =SUN_TOP_CTRL_BASE	@ load SUN_TOP_CTRL PA
- 		ldr	\rv, [\rp, #0]		@ get register contents
- ARM_BE8(	rev	\rv, \rv )
- 		and	\rv, \rv, #0xffffff00	@ strip revision bits [7:0]
-@@ -72,6 +90,7 @@ ARM_BE8(	rev	\rv, \rv )
- 27:		checkuart(\rp, \rv, 0x07437100, 74371)
- 28:		checkuart(\rp, \rv, 0x74390000, 7439)
- 29:		checkuart(\rp, \rv, 0x74450000, 7445)
-+30:		checkuart(\rp, \rv, 0x72780000, 7278)
+ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_MACH_NOKIA_N8X0
+ 	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
+@@ -551,6 +554,10 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP3
+ 	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
+ 		       &omap3_iommu_pdata),
++	OF_DEV_AUXDATA("ti,omap3-smartreflex-core", 0x480cb000,
++		       "480cb000.smartreflex", &omap_sr_pdata[OMAP_SR_CORE]),
++	OF_DEV_AUXDATA("ti,omap3-smartreflex-mpu-iva", 0x480c9000,
++		       "480c9000.smartreflex", &omap_sr_pdata[OMAP_SR_MPU]),
+ 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x4809c000, "4809c000.mmc", &mmc_pdata[0]),
+ 	OF_DEV_AUXDATA("ti,omap3-hsmmc", 0x480b4000, "480b4000.mmc", &mmc_pdata[1]),
+ 	OF_DEV_AUXDATA("nokia,n900-ir", 0, "n900-ir", &rx51_ir_data),
+@@ -580,6 +587,12 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 		       &omap4_iommu_pdata),
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
+ 		       &omap4_iommu_pdata),
++	OF_DEV_AUXDATA("ti,omap4-smartreflex-iva", 0x4a0db000,
++		       "4a0db000.smartreflex", &omap_sr_pdata[OMAP_SR_IVA]),
++	OF_DEV_AUXDATA("ti,omap4-smartreflex-core", 0x4a0dd000,
++		       "4a0dd000.smartreflex", &omap_sr_pdata[OMAP_SR_CORE]),
++	OF_DEV_AUXDATA("ti,omap4-smartreflex-mpu", 0x4a0d9000,
++		       "4a0d9000.smartreflex", &omap_sr_pdata[OMAP_SR_MPU]),
+ #endif
+ #ifdef CONFIG_SOC_DRA7XX
+ 	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x4809c000, "4809c000.mmc",
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -89,6 +89,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
+ 	sr_data->nvalue_count = j;
+ }
  
- 		/* No valid UART found */
- 90:		mov	\rp, #0
++extern struct omap_sr_data omap_sr_pdata[];
++
+ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+ {
+ 	struct omap_sr_data *sr_data;
+diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+--- a/include/linux/power/smartreflex.h
++++ b/include/linux/power/smartreflex.h
+@@ -143,6 +143,13 @@
+ #define OMAP3430_SR_ERRWEIGHT		0x04
+ #define OMAP3430_SR_ERRMAXLIMIT		0x02
+ 
++enum sr_instance {
++	OMAP_SR_MPU,			/* shared with iva on omap3 */
++	OMAP_SR_CORE,
++	OMAP_SR_IVA,
++	OMAP_SR_NR,
++};
++
+ struct omap_sr {
+ 	char				*name;
+ 	struct list_head		node;
 -- 
-2.14.1
+2.16.2
