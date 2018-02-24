@@ -1,67 +1,64 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 24 Feb 2018 22:45:30 +0100
-Subject: [PATCH 00/15] Implement H3/H5 HDMI driver
-Message-ID: <20180224214545.3740-1-jernej.skrabec@siol.net>
+Date: Sat, 24 Feb 2018 22:45:32 +0100
+Subject: [PATCH 02/15] clk: sunxi-ng: h3: h5: Add minimal rate for video PLL
+In-Reply-To: <20180224214545.3740-1-jernej.skrabec@siol.net>
+References: <20180224214545.3740-1-jernej.skrabec@siol.net>
+Message-ID: <20180224214545.3740-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements H3/H5 HDMI driver. It was tested on OrangePi 2 (H3),
-OrangePi Plus2e (H3) and OrangePi PC2 (H5) with many resolutions and it
-works well, except in some not yet determined cases, when there is a crash
-at boot if HDMI monitor is connected. If it is connected later, everything
-works as expected. Hopefully, with driver merged in drm-misc more people
-could review the code and find solution.
+Although user manuals for H3 and H5 SoCs state that minimal rate
+supported by video PLL is around 30 MHz, it seems that in reality
+minimal rate is around 192 MHz.
 
-Code is based on drm-misc-next, since some required commits are not yet
-present in linux-next.
+Experiments showed that any rate below 96 MHz doesn't produce any video
+output at all. Even at this frequency, stable output depends on right
+factors. For example, when N = 4 and M = 1, output is stable and when N
+= 8 and M = 2, it's not.
 
-Best regards,
-Jernej
+BSP clock driver suggest that minimum stable frequency is 192 MHz. That
+would also be in line with A64 SoC, which has similar periphery.
 
-Jernej Skrabec (15):
-  clk: sunxi-ng: Add check for minimal rate to NM PLLs
-  clk: sunxi-ng: h3: h5: Add minimal rate for video PLL
-  clk: sunxi-ng: h3: h5: Allow some clocks to set parent rate
-  clk: sunxi-ng: h3: h5: export CLK_PLL_VIDEO
-  dt-bindings: display: sun4i-drm: Add compatibles for H3 HDMI pipeline
-  drm/sun4i: Add support for H3 display engine
-  drm/sun4i: Add support for H3 mixer 0
-  drm/sun4i: Fix polarity configuration for DW HDMI PHY
-  drm/sun4i: Add support for variants to DW HDMI PHY
-  drm/sun4i: Move and expand DW HDMI PHY register macros
-  drm/sun4i: Add support for H3 HDMI PHY variant
-  drm/sun4i: Allow building on arm64
-  ARM: dts: sunxi: h3/h5: Add HDMI pipeline
-  ARM: dts: sun8i: h3: Enable HDMI output on H3 boards
-  ARM64: dts: sun50i: h5: Enable HDMI output on H5 boards
+Set minimal video PLL rate for H3/H5 to 192 MHz.
 
- .../bindings/display/sunxi/sun4i-drm.txt           |   6 +
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  25 ++
- arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  25 ++
- arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts |  25 ++
- arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           |  25 ++
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  25 ++
- arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  25 ++
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  24 ++
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  25 ++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 108 ++++++
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  25 ++
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     |  25 ++
- .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    |  25 ++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  32 +-
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   4 +-
- drivers/clk/sunxi-ng/ccu_nm.c                      |  11 +-
- drivers/clk/sunxi-ng/ccu_nm.h                      |  27 ++
- drivers/gpu/drm/sun4i/Kconfig                      |   2 +-
- drivers/gpu/drm/sun4i/Makefile                     |   1 +
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |   1 +
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h              | 156 ++++++++-
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c             | 369 ++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c         | 130 ++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.c                |  12 +
- include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
- 25 files changed, 1063 insertions(+), 72 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 29bc0566b776..b9f39078c0b2 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -69,17 +69,18 @@ static SUNXI_CCU_NM_WITH_SDM_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
+ 				       BIT(28),	/* lock */
+ 				       CLK_SET_RATE_UNGATE);
+ 
+-static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video_clk, "pll-video",
+-					"osc24M", 0x0010,
+-					8, 7,		/* N */
+-					0, 4,		/* M */
+-					BIT(24),	/* frac enable */
+-					BIT(25),	/* frac select */
+-					270000000,	/* frac rate 0 */
+-					297000000,	/* frac rate 1 */
+-					BIT(31),	/* gate */
+-					BIT(28),	/* lock */
+-					CLK_SET_RATE_UNGATE);
++static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video_clk, "pll-video",
++					    "osc24M", 0x0010,
++					    192000000,	/* Minimum rate */
++					    8, 7,	/* N */
++					    0, 4,	/* M */
++					    BIT(24),	/* frac enable */
++					    BIT(25),	/* frac select */
++					    270000000,	/* frac rate 0 */
++					    297000000,	/* frac rate 1 */
++					    BIT(31),	/* gate */
++					    BIT(28),	/* lock */
++					    CLK_SET_RATE_UNGATE);
+ 
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
+ 					"osc24M", 0x0018,
 -- 
 2.16.2
