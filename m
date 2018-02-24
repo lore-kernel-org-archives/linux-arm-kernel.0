@@ -1,16 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 15:51:27 +0800
-Subject: [PATCH] ARM: dts: imx6: RDU2: detail USDHC description
-In-Reply-To: <20180212130818.12665-1-l.stach@pengutronix.de>
-References: <20180212130818.12665-1-l.stach@pengutronix.de>
-Message-ID: <20180224075126.GH3217@dragon>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 24 Feb 2018 17:02:50 +0900
+Subject: [PATCH 1/2] arm: kprobes: Prohibit kprobes on do_undefinstr
+Message-ID: <151945937038.11045.14421944772744094357.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 02:08:18PM +0100, Lucas Stach wrote:
-> None of the slots support 1.8V signaling or SDIO. There is no point in
-> probing for a SD card on the eMMC controller.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Prohibit kprobes on do_undefinstr because kprobes on
+arm is implemented by undefined instruction. This means
+if we probe do_undefinstr(), it can cause infinit
+recursive exception.
 
-Applied, thanks.
+Fixes: 24ba613c9d6c ("ARM kprobes: core code")
+Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+---
+ arch/arm/kernel/traps.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 5e3633c24e63..2fe87109ae46 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -19,6 +19,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/hardirq.h>
+ #include <linux/kdebug.h>
++#include <linux/kprobes.h>
+ #include <linux/module.h>
+ #include <linux/kexec.h>
+ #include <linux/bug.h>
+@@ -417,7 +418,8 @@ void unregister_undef_hook(struct undef_hook *hook)
+ 	raw_spin_unlock_irqrestore(&undef_lock, flags);
+ }
+ 
+-static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
++static nokprobe_inline
++int call_undef_hook(struct pt_regs *regs, unsigned int instr)
+ {
+ 	struct undef_hook *hook;
+ 	unsigned long flags;
+@@ -490,6 +492,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
+ 
+ 	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
+ }
++NOKPROBE_SYMBOL(do_undefinstr)
+ 
+ /*
+  * Handle FIQ similarly to NMI on x86 systems.
