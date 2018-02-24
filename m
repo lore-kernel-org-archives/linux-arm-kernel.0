@@ -1,56 +1,137 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 24 Feb 2018 13:28:14 +0000
-Subject: [PATCH] dt-bindings: iio: adc: sd-modulator: fix io-channel-cells
-In-Reply-To: <c221e43d-c7fb-c33b-6fd1-bbf8aca6fa49@st.com>
-References: <1519384041-23782-1-git-send-email-fabrice.gasnier@st.com>
- <c221e43d-c7fb-c33b-6fd1-bbf8aca6fa49@st.com>
-Message-ID: <20180224132814.392603c3@archlinux>
+From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
+Date: Sat, 24 Feb 2018 14:28:26 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <20171019110921.GS20805@n2100.armlinux.org.uk>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+ <20171011082227.20546-2-liuwenliang@huawei.com>
+ <20171019110921.GS20805@n2100.armlinux.org.uk>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C0072EF7@dggemm510-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Feb 2018 14:46:19 +0100
-Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
+On Oct 19, 2017 at 19:09, Russell King - ARM Linux [mailto:linux at armlinux.org.uk] wrote:
+>On Wed, Oct 11, 2017 at 04:22:17PM +0800, Abbott Liu wrote:
+>> +#else
+>> +#define pud_populate(mm,pmd,pte)	do { } while (0)
+>> +#endif
+>
+>Please explain this change - we don't have a "pud" as far as the rest of
+>the Linux MM layer is concerned, so why do we need it for kasan?
+>
+>I suspect it comes from the way we wrap up the page tables - where ARM
+>does it one way (because it has to) vs the subsequently merged method
+>which is completely upside down to what ARMs doing, and therefore is
+>totally incompatible and impossible to fit in with our way.
 
-> Hello,
-> 
-> Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Applied to the fixes-togreg branch of iio.git.
+We will use pud_polulate in kasan_populate_zero_shadow function.
+....
+>>  obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
+>> +
+>> +KASAN_SANITIZE_kasan_init.o    := n
+>> +obj-$(CONFIG_KASAN)            += kasan_init.o
+>
+>Why is this placed in the middle of the cache object listing?
 
-Thanks,
+Sorry, I will place this at the end of the arch/arm/mm/Makefile.
+>> +
+>> +
+>>  obj-$(CONFIG_CACHE_UNIPHIER)	+= cache-uniphier.o
+...
 
-Jonathan
-> 
-> Regards,
-> Arnaud
-> 
-> On 02/23/2018 12:07 PM, Fabrice Gasnier wrote:
-> > io-channel-cells should be <0> since sigma delta modulator exports only
-> > one channel, as described in ../iio/iio-bindings.txt "IIO providers"
-> > section. Only the phandle is necessary for IIO consumers in this case.
-> > 
-> > Fixes: af11143757b7 ("IIO: Add DT bindings for sigma delta adc modulator")
-> > 
-> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> > ---
-> >  Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
-> > index e9ebb8a..ba24ca7 100644
-> > --- a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
-> > +++ b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
-> > @@ -3,11 +3,11 @@ Device-Tree bindings for sigma delta modulator
-> >  Required properties:
-> >  - compatible: should be "ads1201", "sd-modulator". "sd-modulator" can be use
-> >  	as a generic SD modulator if modulator not specified in compatible list.
-> > -- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-> > +- #io-channel-cells = <0>: See the IIO bindings section "IIO consumers".
-> >  
-> >  Example node:
-> >  
-> >  	ads1202: adc at 0 {
-> >  		compatible = "sd-modulator";
-> > -		#io-channel-cells = <1>;
-> > +		#io-channel-cells = <0>;
-> >  	};
-> >   
+>> +pgd_t * __meminit kasan_pgd_populate(unsigned long addr, int node)
+>> +{
+>> +	pgd_t *pgd = pgd_offset_k(addr);
+>> +	if (pgd_none(*pgd)) {
+>> +		void *p = kasan_alloc_block(PAGE_SIZE, node);
+>> +		if (!p)
+>> +			return NULL;
+>> +		pgd_populate(&init_mm, pgd, p);
+>> +	}
+>> +	return pgd;
+>> +}
+
+>This all looks wrong - you are aware that on non-LPAE platforms, there
+>is only a _two_ level page table - the top level page table is 16K in
+>size, and each _individual_ lower level page table is actually 1024
+>bytes, but we do some special handling in the kernel to combine two
+>together.  It looks to me that you allocate memory for each Linux-
+>abstracted page table level whether the hardware needs it or not.
+
+You are right. If non-LPAE platform check if(pgd_none(*pgd)) true,
+void *p = kasan_alloc_block(PAGE_SIZE, node) alloc space is not enough.
+But the the function kasan_pgd_populate only used in :
+Kasan_init-> create_mapping-> kasan_pgd_populate , so when non-LPAE platform
+the if (pgd_none(*pgd)) always false.
+But I also think change those code is much better :
+if (IS_ENABLED(CONFIG_ARM_LPAE)) {
+   p = kasan_alloc_block(PAGE_SIZE, node);
+} else {
+   /* non-LPAE need 16K for first level pagetabe*/
+   p = kasan_alloc_block(PAGE_SIZE*4, node);
+}
+
+>Is there any reason why the pre-existing "create_mapping()" function
+>can't be used, and you've had to rewrite that code here?
+
+Two reason:
+1) Here create_mapping can dynamic alloc phys memory space for mapping to virtual space 
+Which from start to end, but the create_mapping in arch/arm/mm/mmu.c can't.
+2) for LPAE, create_mapping need alloc pgd which we need use virtual space below 0xc0000000,
+ here create_mapping can alloc pgd, but create_mapping in arch/arm/mm/mmu.c can't.
+
+>> +
+>> +static int __init create_mapping(unsigned long start, unsigned long end, int node)
+>> +{
+>> +	unsigned long addr = start;
+>> +	pgd_t *pgd;
+>> +	pud_t *pud;
+>> +	pmd_t *pmd;
+>> +	pte_t *pte;
+>
+>A blank line would help between the auto variables and the code of the
+>function.
+
+Ok, I will add blank line in new version.
+>> +	pr_info("populating shadow for %lx, %lx\n", start, end);
+>
+>Blank line here too please.
+
+Ok, I will add blank line in new version.
+
+>> +	for (; addr < end; addr += PAGE_SIZE) {
+>> +		pgd = kasan_pgd_populate(addr, node);
+>> +		if (!pgd)
+>> +			return -ENOMEM;
+...
+>> +void __init kasan_init(void)
+>> +{
+>> +	struct memblock_region *reg;
+>> +	u64 orig_ttbr0;
+>> +
+>> +	orig_ttbr0 = cpu_get_ttbr(0);
+>> +
+>> +#ifdef CONFIG_ARM_LPAE
+>> +	memcpy(tmp_pmd_table, pgd_page_vaddr(*pgd_offset_k(KASAN_SHADOW_START)), sizeof(tmp_pmd_table));
+>> +	memcpy(tmp_page_table, swapper_pg_dir, sizeof(tmp_page_table));
+>> +	set_pgd(&tmp_page_table[pgd_index(KASAN_SHADOW_START)], __pgd(__pa(tmp_pmd_table) | PMD_TYPE_TABLE | L_PGD_SWAPPER));
+>> +	cpu_set_ttbr0(__pa(tmp_page_table));
+>> +#else
+>> +	memcpy(tmp_page_table, swapper_pg_dir, sizeof(tmp_page_table));
+>> +	cpu_set_ttbr0(__pa(tmp_page_table));
+>> +#endif
+>> +	flush_cache_all();
+>> +	local_flush_bp_all();
+>> +	local_flush_tlb_all();
+
+>What are you trying to achieve with all this complexity?  Some comments
+>might be useful, especially for those of us who don't know the internals
+>of kasan.
+OK, I will add some comments in kasan_init function in new version.
+...
+>> +	for_each_memblock(memory, reg) {
+>> +		void *start = __va(reg->base);
+>> +		void *end = __va(reg->base + reg->size);
+>
+>Isn't this going to complain if the translation macro debugging is enabled?
+
+Sorry, I don't what is the translation macro. Can you tell me.
