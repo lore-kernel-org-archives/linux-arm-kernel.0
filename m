@@ -1,103 +1,66 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 24 Feb 2018 13:00:42 +0800
-Subject: [PATCH v3 5/5] linux/const.h: move BIT(_ULL) to linux/const.h
- for use in assembly
-In-Reply-To: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
-References: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <201802241211.z062884N%fengguang.wu@intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 24 Feb 2018 14:00:40 +0800
+Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <AM4PR0401MB23242FA10FAFF2C23443940690C30@AM4PR0401MB2324.eurprd04.prod.outlook.com>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-3-l.stach@pengutronix.de>
+ <20180223150352.GU3217@dragon>
+ <201802231630.45460.jbe@pengutronix.de>
+ <1519400769.8609.3.camel@pengutronix.de>
+ <AM4PR0401MB23242FA10FAFF2C23443940690C30@AM4PR0401MB2324.eurprd04.prod.outlook.com>
+Message-ID: <20180224060039.GA3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+Hi Bough,
 
-I love your patch! Perhaps something to improve:
+On Sat, Feb 24, 2018 at 02:58:31AM +0000, Bough Chen wrote:
+> >Am Freitag, den 23.02.2018, 16:30 +0100 schrieb Juergen Borleis:
+> >> On Friday 23 February 2018 16:03:53 Shawn Guo wrote:
+> >> > On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
+> >> > > +&usdhc1 {
+> >> > > +???pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> >> > > +???pinctrl-0 = <&pinctrl_usdhc1_cd_reset>,
+> >> <&pinctrl_usdhc1_clk_strobe>,
+> >> > > +?????????????? <&pinctrl_usdhc1_data>;
+> >> > > +???pinctrl-1 = <&pinctrl_usdhc1_cd_reset>,
+> >> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_100mhz>,
+> >> > > +?????????????? <&pinctrl_usdhc1_data_100mhz>;
+> >> > > +???pinctrl-2 = <&pinctrl_usdhc1_cd_reset>,
+> >> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_200mhz>,
+> >> > > +?????????????? <&pinctrl_usdhc1_data_200mhz>;
+> >> > > +???vqmmc-supply = <&sw4_reg>;
+> >> > > +???bus-width = <8>;
+> >> > > +???non-removable;
+> >> > > +???no-sd;
+> >> > > +???no-sdio;
+> >> > > +???status = "okay";
+> >> > > +};
+> >> >
+> 
+> EMMC do not need cd pin, and I notice that pinctrl_usdhc1_cd_reset also contains a usdhc2 pad, this is wrong. So please remove pinctrl_usdhc1_cd_reset. 
+> EMMC I/O voltage is fixed to 1.8v so I think no need to add vqmmc-supply, can remove this property here.
+> For pinctrl_usdhc1_clk_strobe, clock pad need to be pull down, otherwise you will meet data crc error in hs400 mode.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.16-rc2 next-20180223]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks for the input.  I suspect that there are more than what you
+suggest here.  I remove vqmmc-supply and use the exactly same
+pinctrl_usdhc1 as NXP kernel, but still see errors below.
 
-url:    https://github.com/0day-ci/linux/commits/Masahiro-Yamada/linux-const-h-cleanups-of-macros-such-as-UL-_BITUL-BIT-etc/20180224-110702
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+[    0.952795] mmc0: SDHCI controller on 30b40000.usdhc [30b40000.usdhc] using ADMA
+[    1.054622] mmc0: Tuning failed, falling back to fixed sampling clock
+[    1.076458] mmc0: new HS400 MMC card at address 0001
+[    1.081980] mmcblk0: mmc0:0001 R1J56L 13.8 GiB 
+[    1.086880] mmcblk0boot0: mmc0:0001 R1J56L partition 1 4.00 MiB
+[    1.093156] mmcblk0boot1: mmc0:0001 R1J56L partition 2 4.00 MiB
+[    1.099220] mmcblk0rpmb: mmc0:0001 R1J56L partition 3 128 KiB, chardev (248:0)
+[    1.148214] mmc0: Tuning failed, falling back to fixed sampling clock
+[    1.266704] print_req_error: I/O error, dev mmcblk0, sector 0
+[    1.273487] Buffer I/O error on dev mmcblk0, logical block 0, async page read
+[    1.358863] print_req_error: I/O error, dev mmcblk0, sector 0
+[    1.365640] Buffer I/O error on dev mmcblk0, logical block 0, async page read
+[    1.372816]  mmcblk0: unable to read partition table
+[    7.231120] mmc0: switch to high-speed from hs200 failed, err:-110
+[    7.372241] mmc0: switch to high-speed from hs200 failed, err:-110
+[    7.378843] print_req_error: I/O error, dev mmcblk0, sector 0
 
-All warnings (new ones prefixed by >>):
-
-   In file included from include/linux/const.h:4:0,
-                    from include/linux/bitops.h:4,
-                    from include/linux/kernel.h:11,
-                    from include/linux/interrupt.h:6,
-                    from drivers/infiniband/hw/bnxt_re/ib_verbs.c:39:
-   drivers/infiniband/hw/bnxt_re/ib_verbs.c: In function 'bnxt_re_query_device':
->> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _BITUL(x) (_UL(1) << (x))
-                              ^
->> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
-    #define BIT(x)  (_BITUL(x))
-                     ^~~~~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
-    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
-                                     ^~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
-    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
-                                 ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/infiniband/hw/bnxt_re/ib_verbs.c:149:25: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
-     ib_attr->max_mr_size = BNXT_RE_MAX_MR_SIZE;
-                            ^~~~~~~~~~~~~~~~~~~
-   drivers/infiniband/hw/bnxt_re/ib_verbs.c: In function 'bnxt_re_reg_user_mr':
->> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _BITUL(x) (_UL(1) << (x))
-                              ^
->> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
-    #define BIT(x)  (_BITUL(x))
-                     ^~~~~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
-    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
-                                     ^~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
-    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
-                                 ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/infiniband/hw/bnxt_re/ib_verbs.c:3588:15: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
-     if (length > BNXT_RE_MAX_MR_SIZE) {
-                  ^~~~~~~~~~~~~~~~~~~
->> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _BITUL(x) (_UL(1) << (x))
-                              ^
->> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
-    #define BIT(x)  (_BITUL(x))
-                     ^~~~~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
-    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
-                                     ^~~
-   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
-    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
-                                 ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/infiniband/hw/bnxt_re/ib_verbs.c:3590:12: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
-       length, BNXT_RE_MAX_MR_SIZE);
-               ^~~~~~~~~~~~~~~~~~~
-
-vim +28 include/uapi/linux/const.h
-
-5289f87f3 Masahiro Yamada 2018-02-22  27  
-4fac4e1b2 Masahiro Yamada 2018-02-22 @28  #define _BITUL(x)	(_UL(1) << (x))
-4fac4e1b2 Masahiro Yamada 2018-02-22  29  #define _BITULL(x)	(_ULL(1) << (x))
-2fc016c5b H. Peter Anvin  2013-04-27  30  
-
-:::::: The code at line 28 was first introduced by commit
-:::::: 4fac4e1b26bc6cfec630fb48920c391d99a44940 linux/const.h: refactor _BITUL and _BITULL a bit
-
-:::::: TO: Masahiro Yamada <yamada.masahiro@socionext.com>
-:::::: CC: 0day robot <fengguang.wu@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 63097 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180224/e8afbf38/attachment-0001.gz>
+Shawn
