@@ -1,76 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 24 Feb 2018 20:16:44 +0000
-Subject: [PATCH v4 10/40] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <20180224183236.GF7396@cbox>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-11-christoffer.dall@linaro.org>
- <20180221173903.xlpwnlrnjlpatm5s@kamzik.brq.redhat.com>
- <37712e4f-7f47-2101-71f5-d024a7993f13@arm.com>
- <20180224183236.GF7396@cbox>
-Message-ID: <86zi3ynnwz.wl-marc.zyngier@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 25 Feb 2018 04:49:30 +0800
+Subject: [PATCH v3 01/10] pwm: extend PWM framework with PWM modes
+In-Reply-To: <1519300881-8136-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1519300881-8136-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <201802250410.reI8wAy2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Feb 2018 18:32:36 +0000,
-Christoffer Dall wrote:
-> 
-> On Wed, Feb 21, 2018 at 05:52:41PM +0000, Marc Zyngier wrote:
-> > On 21/02/18 17:39, Andrew Jones wrote:
-> > > On Thu, Feb 15, 2018 at 10:03:02PM +0100, Christoffer Dall wrote:
-> > >> The debug save/restore functions can be improved by using the has_vhe()
-> > >> static key instead of the instruction alternative.  Using the static key
-> > >> uses the same paradigm as we're going to use elsewhere, it makes the
-> > >> code more readable, and it generates slightly better code (no
-> > >> stack setups and function calls unless necessary).
-> > >>
-> > >> We also use a static key on the restore path, because it will be
-> > >> marginally faster than loading a value from memory.
-> > >>
-> > >> Finally, we don't have to conditionally clear the debug dirty flag if
-> > >> it's set, we can just clear it.
-> > >>
-> > >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> > >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > >> ---
-> > >>
-> > >> Notes:
-> > >>     Changes since v1:
-> > >>      - Change dot to comma in comment
-> > >>      - Rename __debug_restore_spe to __debug_restore_spe_nvhe
-> > >>
-> > >>  arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
-> > >>  1 file changed, 12 insertions(+), 14 deletions(-)
-> > >>
-> > > 
-> > > Maybe after this series is merged, if there are any hyp_alternate_select's
-> > > left, we can replace all the remaining ones with has_vhe() and then just
-> > > completely remove hyp_alternate_select.
-> > 
-> > Note that older compilers (such as GCC 4.8) will generate horrible code
-> > with static keys, as they do not support "asm goto". Not that I want to
-> > preserve the home brew hyp_alternate_select mechanism, but I just want
-> > to make it plain that some distros will definitely suffer from the
-> > transition.
-> > 
-> That's unfortunate.  I'd still like to use has_vhe() most places, but we
-> could change the implementation of has_vhe() to use the hyp alternative
-> until nobody cares about kernels compiled with GCC 4.8 ?
+Hi Claudiu,
 
-Honestly, if you're using something as outdated as GCC 4.8, you
-deserve to have crap performance. You end up with mediocre code
-generation, and the lack of "asm goto" is just icing on the cake.
+Thank you for the patch! Perhaps something to improve:
 
-Given the kernel reliance on static keys for most things, I'd be
-perfectly happy to drop the hyp alternative. It was only there because
-we couldn't use static keys at hyp at the time, and we've moved on
-since the initial VHE patches.
+[auto build test WARNING on pwm/for-next]
+[also build test WARNING on v4.16-rc2 next-20180223]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I cast my vote in favour of has_vhe() in its current form, everywhere.
+url:    https://github.com/0day-ci/linux/commits/Claudiu-Beznea/extend-PWM-framework-to-support-PWM-modes/20180225-024011
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm.git for-next
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-Thanks,
+All warnings (new ones prefixed by >>):
 
-	M.
+>> drivers//pwm/pwm-sun4i.c:36:0: warning: "PWM_MODE" redefined
+    #define PWM_MODE  BIT(7)
+    
+   In file included from drivers//pwm/pwm-sun4i.c:19:0:
+   include/linux/pwm.h:40:0: note: this is the location of the previous definition
+    #define PWM_MODE(name)  BIT(PWM_MODE_##name##_BIT)
+    
 
--- 
-Jazz is not dead, it just smell funny.
+vim +/PWM_MODE +36 drivers//pwm/pwm-sun4i.c
+
+09853ce7 Alexandre Belloni 2014-12-17  29  
+09853ce7 Alexandre Belloni 2014-12-17  30  #define PWMCH_OFFSET		15
+09853ce7 Alexandre Belloni 2014-12-17  31  #define PWM_PRESCAL_MASK	GENMASK(3, 0)
+09853ce7 Alexandre Belloni 2014-12-17  32  #define PWM_PRESCAL_OFF		0
+09853ce7 Alexandre Belloni 2014-12-17  33  #define PWM_EN			BIT(4)
+09853ce7 Alexandre Belloni 2014-12-17  34  #define PWM_ACT_STATE		BIT(5)
+09853ce7 Alexandre Belloni 2014-12-17  35  #define PWM_CLK_GATING		BIT(6)
+09853ce7 Alexandre Belloni 2014-12-17 @36  #define PWM_MODE		BIT(7)
+09853ce7 Alexandre Belloni 2014-12-17  37  #define PWM_PULSE		BIT(8)
+09853ce7 Alexandre Belloni 2014-12-17  38  #define PWM_BYPASS		BIT(9)
+09853ce7 Alexandre Belloni 2014-12-17  39  
+
+:::::: The code at line 36 was first introduced by commit
+:::::: 09853ce7bc1003a490c7ee74a5705d7a7cf16b7d pwm: Add Allwinner SoC support
+
+:::::: TO: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+:::::: CC: Thierry Reding <thierry.reding@gmail.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52627 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180225/a49faeb5/attachment-0001.gz>
