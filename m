@@ -1,55 +1,42 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 24 Feb 2018 23:11:31 +0100
-Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
-In-Reply-To: <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
-References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
-Message-ID: <2860322f-89b9-32aa-37bc-4fa4a52c1837@gmail.com>
+From: Tobias.Jordan@elektrobit.com (Tobias Jordan)
+Date: Sat, 24 Feb 2018 23:42:38 +0100
+Subject: [PATCH] i2c: cadence: Fix PM device usage count
+Message-ID: <20180224224238.nlr3mrifwngjzkrz@agrajag.zerfleddert.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2018 04:07 PM, Geert Uytterhoeven wrote:
-> Hi Marek,
+pm_runtime_get_sync() increases the device's usage count even when
+reporting an error, so add a call to pm_runtime_put_noidle() in the
+error branch.
 
-Hi,
+Fixes: 7fa32329ca03 ("i2c: cadence: Move to sensible power management")
+Signed-off-by: Tobias Jordan <Tobias.Jordan@elektrobit.com>
+---
+This is one of a number of patches for problems found using coccinelle
+scripting in the SIL2LinuxMP project. The patch has been compile-tested;
+it's based on linux-next-20180223.
 
-> CC Steve Twiss
-> 
-> On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
->> one DA9063 and one DA9210 on Porter, the only difference from
->> the other boards is that DA9063 is at I2C address 0x5a rather
->> than 0x58 .
->>
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> 
-> Thanks for your patch!
-> 
->> --- a/arch/arm/boot/dts/r8a7791-porter.dts
->> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
->> @@ -354,10 +354,47 @@
->>         clock-frequency = <400000>;
->>  };
->>
->> +&i2c6 {
->> +       status = "okay";
->> +       clock-frequency = <100000>;
->> +
->> +       pmic at 5a {
->> +               compatible = "dlg,da9063";
-> 
-> Does it matter that this is a DA9063L ("Variant 6B")?
-> Do we need a new compatible value, or can this be detected at runtime?
+For a discussion of the corresponding issue, see
+https://marc.info/?l=linux-pm&m=151904483924999&w=2
 
-The driver detects it
+ drivers/i2c/busses/i2c-cadence.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-da9063 6-005a: Device detected (chip-ID: 0x61, var-ID: 0x63)
-
-Comparing the datasheets makes it obvious that 9063L is just a cut-down
-version of 9063, with less LDOs and one less ADC. So I think we should
-have extra compatible and have the driver restrict which LDOs can be
-used with this smaller PMIC.
-
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index b13605718291..898faa7fbac5 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -574,8 +574,10 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+ 	bool hold_quirk;
+ 
+ 	ret = pm_runtime_get_sync(id->dev);
+-	if (ret < 0)
++	if (ret < 0) {
++		pm_runtime_put_noidle(id->dev);
+ 		return ret;
++	}
+ 	/* Check if the bus is free */
+ 	if (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA) {
+ 		ret = -EAGAIN;
 -- 
-Best regards,
-Marek Vasut
+2.11.0
