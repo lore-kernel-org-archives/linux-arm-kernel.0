@@ -1,40 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 17:09:18 +0800
-Subject: [PATCH 0/4][v4][RESEND] dt-bindings: mtd-physmap: Add endianness
- supports
-In-Reply-To: <20180222112814.3717af47@bbrezillon>
-References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
- <20180222112814.3717af47@bbrezillon>
-Message-ID: <20180224090917.GQ3217@dragon>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 24 Feb 2018 10:13:04 +0100
+Subject: [PATCH v4 1/1] tty: serial: imx: allow breaks to be received
+ when using dma
+In-Reply-To: <20180224022750.20942-1-troy.kisky@boundarydevices.com>
+References: <20180224022750.20942-1-troy.kisky@boundarydevices.com>
+Message-ID: <20180224091304.y4z24frpy53nrgiy@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 11:28:14AM +0100, Boris Brezillon wrote:
-> Hi Prabhakar,
+On Fri, Feb 23, 2018 at 06:27:50PM -0800, Troy Kisky wrote:
+> This allows me to login after sending a break when service
+> serial-getty at ttymxc0.service is running
 > 
-> On Thu, 22 Feb 2018 15:45:05 +0530
-> Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
+> The "tty_insert_flip_char(port, 0, TTY_BREAK)" in clear_rx_errors
+> fixes this by allowing the higher layers to see a break.
 > 
-> > Connection between flash and controller is not necessary to be always
-> > of same type. It may varies from platform to platform.
-> > 
-> > Adding endianness (optional) property to provide connection type
-> > information. This endianness property is checked in physmap_of_core.c
-> > to decide swap type. 
-> > 
-> > This patch also set "big-endian" property for ls1021a, ls1043a
-> > and ls1046a device tree. here connection between IFC controller
-> > and NOR flash is big-endian.
-> > 
-> > Prabhakar Kushwaha (4):
-> >   dt-bindings: mtd-physmap: Add endianness supports
-> >   driver: mtd: update struct map_info's swap as per map requirement
-> >   ARM: dts: Add NOR connection type with IFC
-> >   ARM64: dts: Add NOR connection type with IFC
+> Also, call uart_handle_break to handle possible
+> "secure attention key."
 > 
-> First of all, can you stop sending dts changes until we've agreed on
-> the dt-bindings/driver changes.
+> FYI: Martin said the ROM sdma firmware works with this patch,
+> but external sdma firmware still does not send breaks on a
+> i.mx6UL
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> Tested-by: Martin Hicks <mort@bork.org>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-+1
+Thanks
+Uwe
 
-Shawn
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
