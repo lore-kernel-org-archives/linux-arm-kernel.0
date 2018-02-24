@@ -1,19 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 16:45:05 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-hummingboard: fix USBOTG-ID pin
-In-Reply-To: <535f327ebffa93ee780381e6c9f9f39b7c6d1a26.1519027005.git.baruch@tkos.co.il>
-References: <535f327ebffa93ee780381e6c9f9f39b7c6d1a26.1519027005.git.baruch@tkos.co.il>
-Message-ID: <20180224084504.GL3217@dragon>
+Date: Sat, 24 Feb 2018 16:46:11 +0800
+Subject: [PATCH] ARM: dts: imx6dl: remove 'lcdif' node
+In-Reply-To: <1519037225-22872-1-git-send-email-LW@KARO-electronics.de>
+References: <1519037225-22872-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20180224084610.GM3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 09:56:44AM +0200, Baruch Siach wrote:
-> From: Jon Nettleton <jon@solid-run.com>
+On Mon, Feb 19, 2018 at 11:47:05AM +0100, Lothar Wa?mann wrote:
+> According to the "i.MX 6Solo/6DualLite Applications Processor
+> Reference Manual" Rev. 3, 09/2017 there is no LCDIF unit on the
+> i.MX6DL.
 > 
-> Fix the USBOTG-ID pin to the correct definition.  The top
-> USB port stays in device-mode without this change.
-> 
-> Signed-off-by: Jon Nettleton <jon@solid-run.com>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Applied both, thanks.
+Applied, thanks.
