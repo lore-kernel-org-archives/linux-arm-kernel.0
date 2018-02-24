@@ -1,409 +1,300 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Sat, 24 Feb 2018 11:15:03 +0800
-Subject: [PATCH v8 04/13] x86: kexec_file: factor out elf core header
- related functions
-In-Reply-To: <20180222111732.23051-5-takahiro.akashi@linaro.org>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-5-takahiro.akashi@linaro.org>
-Message-ID: <20180224031503.GA11823@dhcp-128-65.nay.redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 24 Feb 2018 11:20:42 +0800
+Subject: [PATCH v3 3/4] Document: dt: binding: imx: update clock doc for
+ imx6sll
+In-Reply-To: <1517968819-12869-3-git-send-email-ping.bai@nxp.com>
+References: <1517968819-12869-1-git-send-email-ping.bai@nxp.com>
+ <1517968819-12869-3-git-send-email-ping.bai@nxp.com>
+Message-ID: <20180224032041.GX3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
-On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
-> exclude_mem_range() and prepare_elf64_headers() can be re-used on other
-> architectures, including arm64, as well. So let them factored out so as to
-> move them to generic side in the next patch.
+On Wed, Feb 07, 2018 at 10:00:18AM +0800, Bai Ping wrote:
+> Add clock binding doc update for imx6sll.
 > 
-> fill_up_crash_elf_data() can potentially be commonalized for most
-> architectures who want to go through io resources (/proc/iomem) for a list
-> of "System RAM", but leave it private for now.
-
-Is it possible to spilt this patch to small patches?  For example it can
-be one patch to change the max ranges to a dynamically allocated buffer.
-
-The remain parts could be splitted as well, so that they can be easier
-to review.
-
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
 > ---
->  arch/x86/kernel/crash.c | 235 +++++++++++++++++++++---------------------------
->  1 file changed, 103 insertions(+), 132 deletions(-)
+> change from v2->v3:
+>  - remove the leading 0s
+>  - move the  imx6sll-clock.h to this patch.
+> ---
+>  .../devicetree/bindings/clock/imx6sll-clock.txt    |  37 ++++
+>  include/dt-bindings/clock/imx6sll-clock.h          | 204 +++++++++++++++++++++
+>  2 files changed, 241 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+>  create mode 100644 include/dt-bindings/clock/imx6sll-clock.h
 > 
-> diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
-> index 10e74d4778a1..5c19cfbf3b85 100644
-> --- a/arch/x86/kernel/crash.c
-> +++ b/arch/x86/kernel/crash.c
-> @@ -41,32 +41,14 @@
->  /* Alignment required for elf header segment */
->  #define ELF_CORE_HEADER_ALIGN   4096
->  
-> -/* This primarily represents number of split ranges due to exclusion */
-> -#define CRASH_MAX_RANGES	16
-> -
->  struct crash_mem_range {
->  	u64 start, end;
->  };
->  
->  struct crash_mem {
-> -	unsigned int nr_ranges;
-> -	struct crash_mem_range ranges[CRASH_MAX_RANGES];
-> -};
-> -
-> -/* Misc data about ram ranges needed to prepare elf headers */
-> -struct crash_elf_data {
-> -	struct kimage *image;
-> -	/*
-> -	 * Total number of ram ranges we have after various adjustments for
-> -	 * crash reserved region, etc.
-> -	 */
->  	unsigned int max_nr_ranges;
-> -
-> -	/* Pointer to elf header */
-> -	void *ehdr;
-> -	/* Pointer to next phdr */
-> -	void *bufp;
-> -	struct crash_mem mem;
-> +	unsigned int nr_ranges;
-> +	struct crash_mem_range ranges[0];
->  };
->  
->  /* Used while preparing memory map entries for second kernel */
-> @@ -217,29 +199,32 @@ static int get_nr_ram_ranges_callback(struct resource *res, void *arg)
->  	return 0;
->  }
->  
-> -
->  /* Gather all the required information to prepare elf headers for ram regions */
-> -static void fill_up_crash_elf_data(struct crash_elf_data *ced,
-> -				   struct kimage *image)
-> +static struct crash_mem *fill_up_crash_elf_data(void)
->  {
->  	unsigned int nr_ranges = 0;
-> -
-> -	ced->image = image;
-> +	struct crash_mem *cmem;
->  
->  	walk_system_ram_res(0, -1, &nr_ranges,
->  				get_nr_ram_ranges_callback);
->  
-> -	ced->max_nr_ranges = nr_ranges;
-> +	/*
-> +	 * Exclusion of crash region and/or crashk_low_res may cause
-> +	 * another range split. So add extra two slots here.
-> +	 */
-> +	nr_ranges += 2;
-> +	cmem = vmalloc(sizeof(struct crash_mem) +
-> +			sizeof(struct crash_mem_range) * nr_ranges);
-> +	if (!cmem)
-> +		return NULL;
->  
-> -	/* Exclusion of crash region could split memory ranges */
-> -	ced->max_nr_ranges++;
-> +	cmem->max_nr_ranges = nr_ranges;
-> +	cmem->nr_ranges = 0;
->  
-> -	/* If crashk_low_res is not 0, another range split possible */
-> -	if (crashk_low_res.end)
-> -		ced->max_nr_ranges++;
-> +	return cmem;
->  }
->  
-> -static int exclude_mem_range(struct crash_mem *mem,
-> +static int crash_exclude_mem_range(struct crash_mem *mem,
->  		unsigned long long mstart, unsigned long long mend)
->  {
->  	int i, j;
-> @@ -293,10 +278,8 @@ static int exclude_mem_range(struct crash_mem *mem,
->  		return 0;
->  
->  	/* Split happened */
-> -	if (i == CRASH_MAX_RANGES - 1) {
-> -		pr_err("Too many crash ranges after split\n");
-> +	if (i == mem->max_nr_ranges - 1)
->  		return -ENOMEM;
-> -	}
->  
->  	/* Location where new range should go */
->  	j = i + 1;
-> @@ -314,27 +297,20 @@ static int exclude_mem_range(struct crash_mem *mem,
->  
->  /*
->   * Look for any unwanted ranges between mstart, mend and remove them. This
-> - * might lead to split and split ranges are put in ced->mem.ranges[] array
-> + * might lead to split and split ranges are put in cmem->ranges[] array
->   */
-> -static int elf_header_exclude_ranges(struct crash_elf_data *ced,
-> -		unsigned long long mstart, unsigned long long mend)
-> +static int elf_header_exclude_ranges(struct crash_mem *cmem)
->  {
-> -	struct crash_mem *cmem = &ced->mem;
->  	int ret = 0;
->  
-> -	memset(cmem->ranges, 0, sizeof(cmem->ranges));
-> -
-> -	cmem->ranges[0].start = mstart;
-> -	cmem->ranges[0].end = mend;
-> -	cmem->nr_ranges = 1;
-> -
->  	/* Exclude crashkernel region */
-> -	ret = exclude_mem_range(cmem, crashk_res.start, crashk_res.end);
-> +	ret = crash_exclude_mem_range(cmem, crashk_res.start, crashk_res.end);
->  	if (ret)
->  		return ret;
->  
->  	if (crashk_low_res.end) {
-> -		ret = exclude_mem_range(cmem, crashk_low_res.start, crashk_low_res.end);
-> +		ret = crash_exclude_mem_range(cmem, crashk_low_res.start,
-> +							crashk_low_res.end);
->  		if (ret)
->  			return ret;
->  	}
-> @@ -344,70 +320,29 @@ static int elf_header_exclude_ranges(struct crash_elf_data *ced,
->  
->  static int prepare_elf64_ram_headers_callback(struct resource *res, void *arg)
->  {
-> -	struct crash_elf_data *ced = arg;
-> -	Elf64_Ehdr *ehdr;
-> -	Elf64_Phdr *phdr;
-> -	unsigned long mstart, mend;
-> -	struct kimage *image = ced->image;
-> -	struct crash_mem *cmem;
-> -	int ret, i;
-> +	struct crash_mem *cmem = arg;
->  
-> -	ehdr = ced->ehdr;
-> -
-> -	/* Exclude unwanted mem ranges */
-> -	ret = elf_header_exclude_ranges(ced, res->start, res->end);
-> -	if (ret)
-> -		return ret;
-> -
-> -	/* Go through all the ranges in ced->mem.ranges[] and prepare phdr */
-> -	cmem = &ced->mem;
-> -
-> -	for (i = 0; i < cmem->nr_ranges; i++) {
-> -		mstart = cmem->ranges[i].start;
-> -		mend = cmem->ranges[i].end;
-> -
-> -		phdr = ced->bufp;
-> -		ced->bufp += sizeof(Elf64_Phdr);
-> -
-> -		phdr->p_type = PT_LOAD;
-> -		phdr->p_flags = PF_R|PF_W|PF_X;
-> -		phdr->p_offset  = mstart;
-> -
-> -		/*
-> -		 * If a range matches backup region, adjust offset to backup
-> -		 * segment.
-> -		 */
-> -		if (mstart == image->arch.backup_src_start &&
-> -		    (mend - mstart + 1) == image->arch.backup_src_sz)
-> -			phdr->p_offset = image->arch.backup_load_addr;
-> -
-> -		phdr->p_paddr = mstart;
-> -		phdr->p_vaddr = (unsigned long long) __va(mstart);
-> -		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
-> -		phdr->p_align = 0;
-> -		ehdr->e_phnum++;
-> -		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
-> -			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
-> -			ehdr->e_phnum, phdr->p_offset);
-> -	}
-> +	cmem->ranges[cmem->nr_ranges].start = res->start;
-> +	cmem->ranges[cmem->nr_ranges].end = res->end;
-> +	cmem->nr_ranges++;
->  
-> -	return ret;
-> +	return 0;
->  }
->  
-> -static int prepare_elf64_headers(struct crash_elf_data *ced,
-> -		void **addr, unsigned long *sz)
-> +static int crash_prepare_elf64_headers(struct crash_mem *cmem, int kernel_map,
-> +					void **addr, unsigned long *sz)
->  {
->  	Elf64_Ehdr *ehdr;
->  	Elf64_Phdr *phdr;
->  	unsigned long nr_cpus = num_possible_cpus(), nr_phdr, elf_sz;
-> -	unsigned char *buf, *bufp;
-> -	unsigned int cpu;
-> +	unsigned char *buf;
-> +	unsigned int cpu, i;
->  	unsigned long long notes_addr;
-> -	int ret;
-> +	unsigned long mstart, mend;
->  
->  	/* extra phdr for vmcoreinfo elf note */
->  	nr_phdr = nr_cpus + 1;
-> -	nr_phdr += ced->max_nr_ranges;
-> +	nr_phdr += cmem->nr_ranges;
->  
->  	/*
->  	 * kexec-tools creates an extra PT_LOAD phdr for kernel text mapping
-> @@ -425,9 +360,8 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
->  	if (!buf)
->  		return -ENOMEM;
->  
-> -	bufp = buf;
-> -	ehdr = (Elf64_Ehdr *)bufp;
-> -	bufp += sizeof(Elf64_Ehdr);
-> +	ehdr = (Elf64_Ehdr *)buf;
-> +	phdr = (Elf64_Phdr *)(ehdr + 1);
->  	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
->  	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
->  	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-> @@ -443,42 +377,51 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
->  
->  	/* Prepare one phdr of type PT_NOTE for each present cpu */
->  	for_each_present_cpu(cpu) {
-> -		phdr = (Elf64_Phdr *)bufp;
-> -		bufp += sizeof(Elf64_Phdr);
->  		phdr->p_type = PT_NOTE;
->  		notes_addr = per_cpu_ptr_to_phys(per_cpu_ptr(crash_notes, cpu));
->  		phdr->p_offset = phdr->p_paddr = notes_addr;
->  		phdr->p_filesz = phdr->p_memsz = sizeof(note_buf_t);
->  		(ehdr->e_phnum)++;
-> +		phdr++;
->  	}
->  
->  	/* Prepare one PT_NOTE header for vmcoreinfo */
-> -	phdr = (Elf64_Phdr *)bufp;
-> -	bufp += sizeof(Elf64_Phdr);
->  	phdr->p_type = PT_NOTE;
->  	phdr->p_offset = phdr->p_paddr = paddr_vmcoreinfo_note();
->  	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
->  	(ehdr->e_phnum)++;
-> +	phdr++;
->  
-> -#ifdef CONFIG_X86_64
->  	/* Prepare PT_LOAD type program header for kernel text region */
-> -	phdr = (Elf64_Phdr *)bufp;
-> -	bufp += sizeof(Elf64_Phdr);
-> -	phdr->p_type = PT_LOAD;
-> -	phdr->p_flags = PF_R|PF_W|PF_X;
-> -	phdr->p_vaddr = (Elf64_Addr)_text;
-> -	phdr->p_filesz = phdr->p_memsz = _end - _text;
-> -	phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
-> -	(ehdr->e_phnum)++;
-> -#endif
-> +	if (kernel_map) {
-> +		phdr->p_type = PT_LOAD;
-> +		phdr->p_flags = PF_R|PF_W|PF_X;
-> +		phdr->p_vaddr = (Elf64_Addr)_text;
-> +		phdr->p_filesz = phdr->p_memsz = _end - _text;
-> +		phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
-> +		ehdr->e_phnum++;
-> +		phdr++;
-> +	}
->  
-> -	/* Prepare PT_LOAD headers for system ram chunks. */
-> -	ced->ehdr = ehdr;
-> -	ced->bufp = bufp;
-> -	ret = walk_system_ram_res(0, -1, ced,
-> -			prepare_elf64_ram_headers_callback);
-> -	if (ret < 0)
-> -		return ret;
-> +	/* Go through all the ranges in cmem->ranges[] and prepare phdr */
-> +	for (i = 0; i < cmem->nr_ranges; i++) {
-> +		mstart = cmem->ranges[i].start;
-> +		mend = cmem->ranges[i].end;
+> diff --git a/Documentation/devicetree/bindings/clock/imx6sll-clock.txt b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> new file mode 100644
+> index 0000000..b5d272f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> @@ -0,0 +1,37 @@
+> +* Clock bindings for Freescale i.MX6 SLL
 > +
-> +		phdr->p_type = PT_LOAD;
-> +		phdr->p_flags = PF_R|PF_W|PF_X;
-> +		phdr->p_offset  = mstart;
+> +Required properties:
+> +- compatible: Should be "fsl,imx6sll-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +  entry in clock-names
+> +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
 > +
-> +		phdr->p_paddr = mstart;
-> +		phdr->p_vaddr = (unsigned long long) __va(mstart);
-> +		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
-> +		phdr->p_align = 0;
-> +		ehdr->e_phnum++;
-> +		phdr++;
-> +		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
-> +			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
-> +			ehdr->e_phnum, phdr->p_offset);
-> +	}
->  
->  	*addr = buf;
->  	*sz = elf_sz;
-> @@ -489,18 +432,46 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
->  static int prepare_elf_headers(struct kimage *image, void **addr,
->  					unsigned long *sz)
->  {
-> -	struct crash_elf_data *ced;
-> -	int ret;
-> +	struct crash_mem *cmem;
-> +	Elf64_Ehdr *ehdr;
-> +	Elf64_Phdr *phdr;
-> +	int ret, i;
->  
-> -	ced = kzalloc(sizeof(*ced), GFP_KERNEL);
-> -	if (!ced)
-> +	cmem = fill_up_crash_elf_data();
-> +	if (!cmem)
->  		return -ENOMEM;
->  
-> -	fill_up_crash_elf_data(ced, image);
-> +	ret = walk_system_ram_res(0, -1, cmem,
-> +				prepare_elf64_ram_headers_callback);
-> +	if (ret)
-> +		goto out;
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6sll-clock.h
+> +for the full list of i.MX6 SLL clock IDs.
 > +
-> +	/* Exclude unwanted mem ranges */
-> +	ret = elf_header_exclude_ranges(cmem);
-> +	if (ret)
-> +		goto out;
->  
->  	/* By default prepare 64bit headers */
-> -	ret =  prepare_elf64_headers(ced, addr, sz);
-> -	kfree(ced);
-> +	ret =  crash_prepare_elf64_headers(cmem,
-> +				(int)IS_ENABLED(CONFIG_X86_64), addr, sz);
-> +	if (ret)
-> +		goto out;
+> +Examples:
 > +
-> +	/*
-> +	 * If a range matches backup region, adjust offset to backup
-> +	 * segment.
-> +	 */
-> +	ehdr = (Elf64_Ehdr *)*addr;
-> +	phdr = (Elf64_Phdr *)(ehdr + 1);
-> +	for (i = 0; i < ehdr->e_phnum; phdr++, i++)
-> +		if (phdr->p_type == PT_LOAD &&
-> +				phdr->p_paddr == image->arch.backup_src_start &&
-> +				phdr->p_memsz == image->arch.backup_src_sz) {
-> +			phdr->p_offset = image->arch.backup_load_addr;
-> +			break;
-> +		}
-> +out:
-> +	vfree(cmem);
->  	return ret;
->  }
->  
-> @@ -546,14 +517,14 @@ static int memmap_exclude_ranges(struct kimage *image, struct crash_mem *cmem,
->  	/* Exclude Backup region */
->  	start = image->arch.backup_load_addr;
->  	end = start + image->arch.backup_src_sz - 1;
-> -	ret = exclude_mem_range(cmem, start, end);
-> +	ret = crash_exclude_mem_range(cmem, start, end);
->  	if (ret)
->  		return ret;
->  
->  	/* Exclude elf header region */
->  	start = image->arch.elf_load_addr;
->  	end = start + image->arch.elf_headers_sz - 1;
-> -	return exclude_mem_range(cmem, start, end);
-> +	return crash_exclude_mem_range(cmem, start, end);
->  }
->  
->  /* Prepare memory map for crash dump kernel */
-> -- 
-> 2.16.2
-> 
+> +#include <dt-bindings/clock/imx6sll-clock.h>
+> +
+> +clks: ccm at 20c4000 {
 
-Thanks
-Dave
+s/ccm/clock-controller
+
+> +		compatible = "fsl,imx6sll-ccm";
+> +		reg = <0x020c4000 0x4000>;
+> +		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+> +		#clock-cells = <1>;
+> +		clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
+> +		clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
+> +};
+> +
+> +uart1: serial at 2020000 {
+> +		compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +		reg = <0x02020000 0x4000>;
+> +		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks IMX6SLL_CLK_UART1_IPG>,
+> +			 <&clks IMX6SLL_CLK_UART1_SERIAL>;
+> +		clock-names = "ipg", "per";
+> +		status = "disabled";
+
+The status line can be dropped in example.
+
+> +};
+> diff --git a/include/dt-bindings/clock/imx6sll-clock.h b/include/dt-bindings/clock/imx6sll-clock.h
+> new file mode 100644
+> index 0000000..39c2567
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/imx6sll-clock.h
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+
+Can we use SPDX tag instead?  You can look at Lucas' i.MX8MQ clock patch
+for example, or document Documentation/process/license-rules.rst for
+details.
+
+Shawn
+
+> + *
+> + */
+> +
+> +#ifndef __DT_BINDINGS_CLOCK_IMX6SLL_H
+> +#define __DT_BINDINGS_CLOCK_IMX6SLL_H
+> +
+> +#define IMX6SLL_CLK_DUMMY		0
+> +#define IMX6SLL_CLK_CKIL		1
+> +#define IMX6SLL_CLK_OSC			2
+> +#define IMX6SLL_PLL1_BYPASS_SRC		3
+> +#define IMX6SLL_PLL2_BYPASS_SRC		4
+> +#define IMX6SLL_PLL3_BYPASS_SRC		5
+> +#define IMX6SLL_PLL4_BYPASS_SRC		6
+> +#define IMX6SLL_PLL5_BYPASS_SRC		7
+> +#define IMX6SLL_PLL6_BYPASS_SRC		8
+> +#define IMX6SLL_PLL7_BYPASS_SRC		9
+> +#define IMX6SLL_CLK_PLL1		10
+> +#define IMX6SLL_CLK_PLL2		11
+> +#define IMX6SLL_CLK_PLL3		12
+> +#define IMX6SLL_CLK_PLL4		13
+> +#define IMX6SLL_CLK_PLL5		14
+> +#define IMX6SLL_CLK_PLL6		15
+> +#define IMX6SLL_CLK_PLL7		16
+> +#define IMX6SLL_PLL1_BYPASS		17
+> +#define IMX6SLL_PLL2_BYPASS		18
+> +#define IMX6SLL_PLL3_BYPASS		19
+> +#define IMX6SLL_PLL4_BYPASS		20
+> +#define IMX6SLL_PLL5_BYPASS		21
+> +#define IMX6SLL_PLL6_BYPASS		22
+> +#define IMX6SLL_PLL7_BYPASS		23
+> +#define IMX6SLL_CLK_PLL1_SYS		24
+> +#define IMX6SLL_CLK_PLL2_BUS		25
+> +#define IMX6SLL_CLK_PLL3_USB_OTG	26
+> +#define IMX6SLL_CLK_PLL4_AUDIO		27
+> +#define IMX6SLL_CLK_PLL5_VIDEO		28
+> +#define IMX6SLL_CLK_PLL6_ENET		29
+> +#define IMX6SLL_CLK_PLL7_USB_HOST	30
+> +#define IMX6SLL_CLK_USBPHY1		31
+> +#define IMX6SLL_CLK_USBPHY2		32
+> +#define IMX6SLL_CLK_USBPHY1_GATE	33
+> +#define IMX6SLL_CLK_USBPHY2_GATE	34
+> +#define IMX6SLL_CLK_PLL2_PFD0		35
+> +#define IMX6SLL_CLK_PLL2_PFD1		36
+> +#define IMX6SLL_CLK_PLL2_PFD2		37
+> +#define IMX6SLL_CLK_PLL2_PFD3		38
+> +#define IMX6SLL_CLK_PLL3_PFD0		39
+> +#define IMX6SLL_CLK_PLL3_PFD1		40
+> +#define IMX6SLL_CLK_PLL3_PFD2		41
+> +#define IMX6SLL_CLK_PLL3_PFD3		42
+> +#define IMX6SLL_CLK_PLL4_POST_DIV	43
+> +#define IMX6SLL_CLK_PLL4_AUDIO_DIV	44
+> +#define IMX6SLL_CLK_PLL5_POST_DIV	45
+> +#define IMX6SLL_CLK_PLL5_VIDEO_DIV	46
+> +#define IMX6SLL_CLK_PLL2_198M		47
+> +#define IMX6SLL_CLK_PLL3_120M		48
+> +#define IMX6SLL_CLK_PLL3_80M		49
+> +#define IMX6SLL_CLK_PLL3_60M		50
+> +#define IMX6SLL_CLK_STEP		51
+> +#define IMX6SLL_CLK_PLL1_SW		52
+> +#define IMX6SLL_CLK_AXI_ALT_SEL		53
+> +#define IMX6SLL_CLK_AXI_SEL		54
+> +#define IMX6SLL_CLK_PERIPH_PRE		55
+> +#define IMX6SLL_CLK_PERIPH2_PRE		56
+> +#define IMX6SLL_CLK_PERIPH_CLK2_SEL	57
+> +#define IMX6SLL_CLK_PERIPH2_CLK2_SEL	58
+> +#define IMX6SLL_CLK_PERCLK_SEL		59
+> +#define IMX6SLL_CLK_USDHC1_SEL		60
+> +#define IMX6SLL_CLK_USDHC2_SEL		61
+> +#define IMX6SLL_CLK_USDHC3_SEL		62
+> +#define IMX6SLL_CLK_SSI1_SEL		63
+> +#define IMX6SLL_CLK_SSI2_SEL		64
+> +#define IMX6SLL_CLK_SSI3_SEL		65
+> +#define IMX6SLL_CLK_PXP_SEL		66
+> +#define IMX6SLL_CLK_LCDIF_PRE_SEL	67
+> +#define IMX6SLL_CLK_LCDIF_SEL		68
+> +#define IMX6SLL_CLK_EPDC_PRE_SEL	69
+> +#define IMX6SLL_CLK_SPDIF_SEL		70
+> +#define IMX6SLL_CLK_ECSPI_SEL		71
+> +#define IMX6SLL_CLK_UART_SEL		72
+> +#define IMX6SLL_CLK_ARM			73
+> +#define IMX6SLL_CLK_PERIPH		74
+> +#define IMX6SLL_CLK_PERIPH2		75
+> +#define IMX6SLL_CLK_PERIPH2_CLK2	76
+> +#define IMX6SLL_CLK_PERIPH_CLK2		77
+> +#define IMX6SLL_CLK_MMDC_PODF		78
+> +#define IMX6SLL_CLK_AXI_PODF		79
+> +#define IMX6SLL_CLK_AHB			80
+> +#define IMX6SLL_CLK_IPG			81
+> +#define IMX6SLL_CLK_PERCLK		82
+> +#define IMX6SLL_CLK_USDHC1_PODF		83
+> +#define IMX6SLL_CLK_USDHC2_PODF		84
+> +#define IMX6SLL_CLK_USDHC3_PODF		85
+> +#define IMX6SLL_CLK_SSI1_PRED		86
+> +#define IMX6SLL_CLK_SSI2_PRED		87
+> +#define IMX6SLL_CLK_SSI3_PRED		88
+> +#define IMX6SLL_CLK_SSI1_PODF		89
+> +#define IMX6SLL_CLK_SSI2_PODF		90
+> +#define IMX6SLL_CLK_SSI3_PODF		91
+> +#define IMX6SLL_CLK_PXP_PODF		92
+> +#define IMX6SLL_CLK_LCDIF_PRED		93
+> +#define IMX6SLL_CLK_LCDIF_PODF		94
+> +#define IMX6SLL_CLK_EPDC_SEL		95
+> +#define IMX6SLL_CLK_EPDC_PODF		96
+> +#define IMX6SLL_CLK_SPDIF_PRED		97
+> +#define IMX6SLL_CLK_SPDIF_PODF		98
+> +#define IMX6SLL_CLK_ECSPI_PODF		99
+> +#define IMX6SLL_CLK_UART_PODF		100
+> +
+> +/* CCGR 0 */
+> +#define IMX6SLL_CLK_AIPSTZ1		101
+> +#define IMX6SLL_CLK_AIPSTZ2		102
+> +#define IMX6SLL_CLK_DCP			103
+> +#define IMX6SLL_CLK_UART2_IPG		104
+> +#define IMX6SLL_CLK_UART2_SERIAL	105
+> +
+> +/* CCGR 1 */
+> +#define IMX6SLL_CLK_ECSPI1		106
+> +#define IMX6SLL_CLK_ECSPI2		107
+> +#define IMX6SLL_CLK_ECSPI3		108
+> +#define IMX6SLL_CLK_ECSPI4		109
+> +#define IMX6SLL_CLK_UART3_IPG		110
+> +#define IMX6SLL_CLK_UART3_SERIAL	111
+> +#define IMX6SLL_CLK_UART4_IPG		112
+> +#define IMX6SLL_CLK_UART4_SERIAL	113
+> +#define IMX6SLL_CLK_EPIT1		114
+> +#define IMX6SLL_CLK_EPIT2		115
+> +#define IMX6SLL_CLK_GPT_BUS		116
+> +#define IMX6SLL_CLK_GPT_SERIAL		117
+> +
+> +/* CCGR2 */
+> +#define IMX6SLL_CLK_CSI			118
+> +#define IMX6SLL_CLK_I2C1		119
+> +#define IMX6SLL_CLK_I2C2		120
+> +#define IMX6SLL_CLK_I2C3		121
+> +#define IMX6SLL_CLK_OCOTP		122
+> +#define IMX6SLL_CLK_LCDIF_APB		123
+> +#define IMX6SLL_CLK_PXP			124
+> +
+> +/* CCGR3 */
+> +#define IMX6SLL_CLK_UART5_IPG		125
+> +#define IMX6SLL_CLK_UART5_SERIAL	126
+> +#define IMX6SLL_CLK_EPDC_AXI		127
+> +#define IMX6SLL_CLK_EPDC_PIX		128
+> +#define IMX6SLL_CLK_LCDIF_PIX		129
+> +#define IMX6SLL_CLK_WDOG1		130
+> +#define IMX6SLL_CLK_MMDC_P0_FAST	131
+> +#define IMX6SLL_CLK_MMDC_P0_IPG		132
+> +#define IMX6SLL_CLK_OCRAM		133
+> +
+> +/* CCGR4 */
+> +#define IMX6SLL_CLK_PWM1		134
+> +#define IMX6SLL_CLK_PWM2		135
+> +#define IMX6SLL_CLK_PWM3		136
+> +#define IMX6SLL_CLK_PWM4		137
+> +
+> +/* CCGR 5 */
+> +#define IMX6SLL_CLK_ROM			138
+> +#define IMX6SLL_CLK_SDMA		139
+> +#define IMX6SLL_CLK_KPP			140
+> +#define IMX6SLL_CLK_WDOG2		141
+> +#define IMX6SLL_CLK_SPBA		142
+> +#define IMX6SLL_CLK_SPDIF		143
+> +#define IMX6SLL_CLK_SPDIF_GCLK		144
+> +#define IMX6SLL_CLK_SSI1		145
+> +#define IMX6SLL_CLK_SSI1_IPG		146
+> +#define IMX6SLL_CLK_SSI2		147
+> +#define IMX6SLL_CLK_SSI2_IPG		148
+> +#define IMX6SLL_CLK_SSI3		149
+> +#define IMX6SLL_CLK_SSI3_IPG		150
+> +#define IMX6SLL_CLK_UART1_IPG		151
+> +#define IMX6SLL_CLK_UART1_SERIAL	152
+> +
+> +/* CCGR 6 */
+> +#define IMX6SLL_CLK_USBOH3		153
+> +#define IMX6SLL_CLK_USDHC1		154
+> +#define IMX6SLL_CLK_USDHC2		155
+> +#define IMX6SLL_CLK_USDHC3		156
+> +
+> +#define IMX6SLL_CLK_IPP_DI0		157
+> +#define IMX6SLL_CLK_IPP_DI1		158
+> +#define IMX6SLL_CLK_LDB_DI0_SEL		159
+> +#define IMX6SLL_CLK_LDB_DI0_DIV_3_5	160
+> +#define IMX6SLL_CLK_LDB_DI0_DIV_7	161
+> +#define IMX6SLL_CLK_LDB_DI0_DIV_SEL	162
+> +#define IMX6SLL_CLK_LDB_DI0		163
+> +#define IMX6SLL_CLK_LDB_DI1_SEL		164
+> +#define IMX6SLL_CLK_LDB_DI1_DIV_3_5	165
+> +#define IMX6SLL_CLK_LDB_DI1_DIV_7	166
+> +#define IMX6SLL_CLK_LDB_DI1_DIV_SEL	167
+> +#define IMX6SLL_CLK_LDB_DI1		168
+> +#define IMX6SLL_CLK_EXTERN_AUDIO_SEL    169
+> +#define IMX6SLL_CLK_EXTERN_AUDIO_PRED   170
+> +#define IMX6SLL_CLK_EXTERN_AUDIO_PODF   171
+> +#define IMX6SLL_CLK_EXTERN_AUDIO        172
+> +
+> +#define IMX6SLL_CLK_END			173
+> +
+> +#endif /* __DT_BINDINGS_CLOCK_IMX6SLL_H */
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
