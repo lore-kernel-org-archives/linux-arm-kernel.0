@@ -1,70 +1,56 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 24 Feb 2018 13:11:37 +0000
-Subject: [PATCH] dt-bindings: iio: adc: stm32-dfsdm: fix types, add
- missing pinctrl
-In-Reply-To: <7e40cdfc-8d9f-ccfb-f3fd-8d639a87d5b0@st.com>
-References: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
- <7e40cdfc-8d9f-ccfb-f3fd-8d639a87d5b0@st.com>
-Message-ID: <20180224131137.1b2a79f3@archlinux>
+Date: Sat, 24 Feb 2018 13:28:14 +0000
+Subject: [PATCH] dt-bindings: iio: adc: sd-modulator: fix io-channel-cells
+In-Reply-To: <c221e43d-c7fb-c33b-6fd1-bbf8aca6fa49@st.com>
+References: <1519384041-23782-1-git-send-email-fabrice.gasnier@st.com>
+ <c221e43d-c7fb-c33b-6fd1-bbf8aca6fa49@st.com>
+Message-ID: <20180224132814.392603c3@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Feb 2018 14:47:36 +0100
+On Fri, 23 Feb 2018 14:46:19 +0100
 Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
 > Hello,
 > 
 > Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Applied to the fixes-togreg branch of iio.git.
 
-I'm feeling conservative today so will be wanting a devicetree
-maintainer ack for this one..
+Thanks,
 
 Jonathan
-
 > 
 > Regards,
 > Arnaud
 > 
-> On 02/23/2018 12:11 PM, Fabrice Gasnier wrote:
-> > - Add missing pinctrl description. Support is made optional as dfsdm
-> >   may use internal sources (e.g. via registers)
-> > - Fix typo in IIO STM32 DFSDM filter "MANCH_F" description.
-> > Basically, this should be "falling edge = logic 0", not "1" that applies
-> > to "MANCH_R".
-> > BTW, make the description complete by describing both rising/falling
-> > edges as described in reference manuals.
+> On 02/23/2018 12:07 PM, Fabrice Gasnier wrote:
+> > io-channel-cells should be <0> since sigma delta modulator exports only
+> > one channel, as described in ../iio/iio-bindings.txt "IIO providers"
+> > section. Only the phandle is necessary for IIO consumers in this case.
 > > 
-> > Fixes: 6c82f947fc97 ("IIO: add DT bindings for stm32 DFSDM filter")
+> > Fixes: af11143757b7 ("IIO: Add DT bindings for sigma delta adc modulator")
 > > 
 > > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > > ---
-> >  Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt | 8 ++++++--
-> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> >  Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> > index 911492da..ed7520d 100644
-> > --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> > +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> > @@ -32,6 +32,10 @@ Optional properties:
-> >  		  to "clock" property. Frequency must be a multiple of the rcc
-> >  		  clock frequency. If not, SPI CLKOUT frequency will not be
-> >  		  accurate.
-> > +- pinctrl-names:	Set to "default".
-> > +- pinctrl-0:		List of phandles pointing to pin configuration
-> > +			nodes to set pins in mode of operation for dfsdm
-> > +			on external pin.
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> > index e9ebb8a..ba24ca7 100644
+> > --- a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> > +++ b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> > @@ -3,11 +3,11 @@ Device-Tree bindings for sigma delta modulator
+> >  Required properties:
+> >  - compatible: should be "ads1201", "sd-modulator". "sd-modulator" can be use
+> >  	as a generic SD modulator if modulator not specified in compatible list.
+> > -- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+> > +- #io-channel-cells = <0>: See the IIO bindings section "IIO consumers".
 > >  
-> >  Contents of a STM32 DFSDM child nodes:
-> >  --------------------------------------
-> > @@ -68,8 +72,8 @@ Optional properties:
-> >  - st,adc-channel-types:	Single-ended channel input type.
-> >  			- "SPI_R": SPI with data on rising edge (default)
-> >  			- "SPI_F": SPI with data on falling edge
-> > -			- "MANCH_R": manchester codec, rising edge = logic 0
-> > -			- "MANCH_F": manchester codec, falling edge = logic 1
-> > +			- "MANCH_R": manchester codec, rising edge = logic 0, falling edge = logic 1
-> > +			- "MANCH_F": manchester codec, rising edge = logic 1, falling edge = logic 0
-> >  - st,adc-channel-clk-src: Conversion clock source.
-> >  			  - "CLKIN": external SPI clock (CLKIN x)
-> >  			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
+> >  Example node:
+> >  
+> >  	ads1202: adc at 0 {
+> >  		compatible = "sd-modulator";
+> > -		#io-channel-cells = <1>;
+> > +		#io-channel-cells = <0>;
+> >  	};
 > >   
