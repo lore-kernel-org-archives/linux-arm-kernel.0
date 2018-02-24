@@ -1,230 +1,103 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 23 Feb 2018 22:37:33 -0600
-Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-12-jeremy.linton@arm.com>
- <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
- <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
- <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
-Message-ID: <52a4e58b-b5dd-cf68-1207-b43e60efee4b@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 24 Feb 2018 13:00:42 +0800
+Subject: [PATCH v3 5/5] linux/const.h: move BIT(_ULL) to linux/const.h
+ for use in assembly
+In-Reply-To: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
+References: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <201802241211.z062884N%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2018 05:02 AM, Lorenzo Pieralisi wrote:
-> On Thu, Jan 25, 2018 at 09:56:30AM -0600, Jeremy Linton wrote:
->> Hi,
->>
->> On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
->>> Hi Jeremy,
->>>
->>> I have tested the patch with the newest UEFI. It prints the below error:
->>>
->>> [    4.017371] BUG: arch topology borken
->>> [    4.021069] BUG: arch topology borken
->>> [    4.024764] BUG: arch topology borken
->>> [    4.028460] BUG: arch topology borken
->>> [    4.032153] BUG: arch topology borken
->>> [    4.035849] BUG: arch topology borken
->>> [    4.039543] BUG: arch topology borken
->>> [    4.043239] BUG: arch topology borken
->>> [    4.046932] BUG: arch topology borken
->>> [    4.050629] BUG: arch topology borken
->>> [    4.054322] BUG: arch topology borken
->>>
->>> I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
->>> the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
->>
->> I commented about that on the EDK2 mailing list. While the current spec
->> doesn't explicitly ban having the flag set multiple times between the leaf
->> and the root I consider it a "bug" and there is an effort to clarify the
->> spec and the use of that flag.
->>>
->>> When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
->>> and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
->>> sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
->>
->> Right. I've mentioned this problem a couple of times.
->>
->> At at the moment, the spec isn't clear about how the proximity domain is
->> detected/located within the PPTT topology (a node with a 1:1 correspondence
->> isn't even required). As you can see from this patch set, we are making the
->> general assumption that the proximity domains are at the same level as the
->> physical socket. This isn't ideal for NUMA topologies, like the D05, that
->> don't align with the physical socket.
->>
->> There are efforts underway to clarify and expand upon the specification to
->> deal with this general problem. The simple solution is another flag (say
->> PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to
->> find nodes with 1:1 correspondence. At that point we could add a fairly
->> trivial patch to correct just the scheduler topology without affecting the
->> rest of the system topology code.
-> 
-> I think Morten asked already but isn't this the same end result we end
-> up having if we remove the DIE level if NUMA-within-package is detected
-> (instead of using the default_topology[]) and we create our own ARM64
-> domain hierarchy (with DIE level removed) through set_sched_topology()
-> accordingly ?
+Hi Masahiro,
 
-I'm not sure what removing the die level does for you, but its not 
-really the problem AFAIK, the problem is because MC layer is larger than 
-the NUMA domains.
+I love your patch! Perhaps something to improve:
 
-> 
-> Put it differently: do we really need to rely on another PPTT flag to
-> collect this information ?
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.16-rc2 next-20180223]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Strictly no, and I have a partial patch around here i've been meaning to 
-flush out which uses the early node information to detect if there are 
-nodes smaller than the package. Initially I've been claiming i was going 
-to stay away from making scheduler topology changes in this patch set, 
-but it seems that at least providing a patch which does the minimal bits 
-is in the cards. The PXN flag was is more of a shortcut to finding the 
-cache levels at or below the numa domains, rather than any hard 
-requirement. Similarly, to the request someone else was making for a 
-leaf node flag (or node ordering) to avoid multiple passes in the table. 
-That request would simplify the posted code a bit but it works without it.
+url:    https://github.com/0day-ci/linux/commits/Masahiro-Yamada/linux-const-h-cleanups-of-macros-such-as-UL-_BITUL-BIT-etc/20180224-110702
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All warnings (new ones prefixed by >>):
 
-> I can't merge code that breaks a platform with legitimate firmware
-> bindings.
+   In file included from include/linux/const.h:4:0,
+                    from include/linux/bitops.h:4,
+                    from include/linux/kernel.h:11,
+                    from include/linux/interrupt.h:6,
+                    from drivers/infiniband/hw/bnxt_re/ib_verbs.c:39:
+   drivers/infiniband/hw/bnxt_re/ib_verbs.c: In function 'bnxt_re_query_device':
+>> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define _BITUL(x) (_UL(1) << (x))
+                              ^
+>> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
+    #define BIT(x)  (_BITUL(x))
+                     ^~~~~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
+    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
+                                     ^~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
+    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
+                                 ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/infiniband/hw/bnxt_re/ib_verbs.c:149:25: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
+     ib_attr->max_mr_size = BNXT_RE_MAX_MR_SIZE;
+                            ^~~~~~~~~~~~~~~~~~~
+   drivers/infiniband/hw/bnxt_re/ib_verbs.c: In function 'bnxt_re_reg_user_mr':
+>> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define _BITUL(x) (_UL(1) << (x))
+                              ^
+>> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
+    #define BIT(x)  (_BITUL(x))
+                     ^~~~~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
+    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
+                                     ^~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
+    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
+                                 ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/infiniband/hw/bnxt_re/ib_verbs.c:3588:15: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
+     if (length > BNXT_RE_MAX_MR_SIZE) {
+                  ^~~~~~~~~~~~~~~~~~~
+>> include/uapi/linux/const.h:28:27: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define _BITUL(x) (_UL(1) << (x))
+                              ^
+>> include/linux/const.h:9:18: note: in expansion of macro '_BITUL'
+    #define BIT(x)  (_BITUL(x))
+                     ^~~~~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:61:34: note: in expansion of macro 'BIT'
+    #define BNXT_RE_MAX_MR_SIZE_HIGH BIT(39)
+                                     ^~~
+   drivers/infiniband/hw/bnxt_re/bnxt_re.h:62:30: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE_HIGH'
+    #define BNXT_RE_MAX_MR_SIZE  BNXT_RE_MAX_MR_SIZE_HIGH
+                                 ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/infiniband/hw/bnxt_re/ib_verbs.c:3590:12: note: in expansion of macro 'BNXT_RE_MAX_MR_SIZE'
+       length, BNXT_RE_MAX_MR_SIZE);
+               ^~~~~~~~~~~~~~~~~~~
 
-Breaks in this case is a BUG warning that shows up right before it 
-"corrects" a scheduler domain.
+vim +28 include/uapi/linux/const.h
 
-Basically, as i've mentioned a few times, this patch set corrects the 
-existing topology problems, in doing so it uncovers issues with the way 
-we are mapping that topology for the scheduler. That is actually not 
-difficult thing to fix, my assumption originally is that we would 
-already be at the point of discussion the finer points of the scheduler 
-changes but we are still here.
+5289f87f3 Masahiro Yamada 2018-02-22  27  
+4fac4e1b2 Masahiro Yamada 2018-02-22 @28  #define _BITUL(x)	(_UL(1) << (x))
+4fac4e1b2 Masahiro Yamada 2018-02-22  29  #define _BITULL(x)	(_ULL(1) << (x))
+2fc016c5b H. Peter Anvin  2013-04-27  30  
 
-Anyway, I was planning on posting a v7 this week, but time flys... I 
-will include a further scheduler tweak to work around the inverted numa 
-domain problem in that set early next week.
+:::::: The code at line 28 was first introduced by commit
+:::::: 4fac4e1b26bc6cfec630fb48920c391d99a44940 linux/const.h: refactor _BITUL and _BITULL a bit
 
-Thanks,
+:::::: TO: Masahiro Yamada <yamada.masahiro@socionext.com>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
 
-> 
-> Thanks,
-> Lorenzo
-> 
->>
->>>
->>> If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
->>> within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
->>> the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
->>> If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
->>> to record which cores are in each cluster.
->>
->> The problem is that there isn't a generic way to identify which level of
->> cache sharing is the "correct" top layer MC domain. For one system cluster
->> might be appropriate, for another it might be the highest caching level
->> within a socket, for another is might be a something in between or a group
->> of clusters or LLCs..
->>
->> Hence the effort to standardize/guarantee a PPTT node that exactly matches a
->> SRAT domain. With that, each SOC/system provider has clearly defined method
->> for communicating where they want the proximity domain information to begin.
->>
->> Thanks,
->>
->>>
->>>
->>> Thanks,
->>> Xiongfeng
->>>
->>> On 2018/1/13 8:59, Jeremy Linton wrote:
->>>> Propagate the topology information from the PPTT tree to the
->>>> cpu_topology array. We can get the thread id, core_id and
->>>> cluster_id by assuming certain levels of the PPTT tree correspond
->>>> to those concepts. The package_id is flagged in the tree and can be
->>>> found by calling find_acpi_cpu_topology_package() which terminates
->>>> its search when it finds an ACPI node flagged as the physical
->>>> package. If the tree doesn't contain enough levels to represent
->>>> all of the requested levels then the root node will be returned
->>>> for all subsequent levels.
->>>>
->>>> Cc: Juri Lelli <juri.lelli@arm.com>
->>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>> ---
->>>>   arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
->>>>   1 file changed, 45 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->>>> index 7b06e263fdd1..ce8ec7fd6b32 100644
->>>> --- a/arch/arm64/kernel/topology.c
->>>> +++ b/arch/arm64/kernel/topology.c
->>>> @@ -11,6 +11,7 @@
->>>>    * for more details.
->>>>    */
->>>> +#include <linux/acpi.h>
->>>>   #include <linux/arch_topology.h>
->>>>   #include <linux/cpu.h>
->>>>   #include <linux/cpumask.h>
->>>> @@ -22,6 +23,7 @@
->>>>   #include <linux/sched.h>
->>>>   #include <linux/sched/topology.h>
->>>>   #include <linux/slab.h>
->>>> +#include <linux/smp.h>
->>>>   #include <linux/string.h>
->>>>   #include <asm/cpu.h>
->>>> @@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
->>>>   	}
->>>>   }
->>>> +#ifdef CONFIG_ACPI
->>>> +/*
->>>> + * Propagate the topology information of the processor_topology_node tree to the
->>>> + * cpu_topology array.
->>>> + */
->>>> +static int __init parse_acpi_topology(void)
->>>> +{
->>>> +	bool is_threaded;
->>>> +	int cpu, topology_id;
->>>> +
->>>> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
->>>> +
->>>> +	for_each_possible_cpu(cpu) {
->>>> +		topology_id = find_acpi_cpu_topology(cpu, 0);
->>>> +		if (topology_id < 0)
->>>> +			return topology_id;
->>>> +
->>>> +		if (is_threaded) {
->>>> +			cpu_topology[cpu].thread_id = topology_id;
->>>> +			topology_id = find_acpi_cpu_topology(cpu, 1);
->>>> +			cpu_topology[cpu].core_id   = topology_id;
->>>> +			topology_id = find_acpi_cpu_topology_package(cpu);
->>>> +			cpu_topology[cpu].package_id = topology_id;
->>>> +		} else {
->>>> +			cpu_topology[cpu].thread_id  = -1;
->>>> +			cpu_topology[cpu].core_id    = topology_id;
->>>> +			topology_id = find_acpi_cpu_topology_package(cpu);
->>>> +			cpu_topology[cpu].package_id = topology_id;
->>>> +		}
->>>> +	}
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +
->>>> +#else
->>>> +static inline int __init parse_acpi_topology(void)
->>>> +{
->>>> +	return -EINVAL;
->>>> +}
->>>> +#endif
->>>>   void __init init_cpu_topology(void)
->>>>   {
->>>> @@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
->>>>   	 * Discard anything that was parsed if we hit an error so we
->>>>   	 * don't use partial information.
->>>>   	 */
->>>> -	if (of_have_populated_dt() && parse_dt_topology())
->>>> +	if ((!acpi_disabled) && parse_acpi_topology())
->>>> +		reset_cpu_topology();
->>>> +	else if (of_have_populated_dt() && parse_dt_topology())
->>>>   		reset_cpu_topology();
->>>>   }
->>>>
->>>
->>
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63097 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180224/e8afbf38/attachment-0001.gz>
