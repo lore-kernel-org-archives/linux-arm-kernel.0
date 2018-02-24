@@ -1,36 +1,44 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 23 Feb 2018 16:56:37 -0800
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
-Message-ID: <5A90B845.3030504@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 23 Feb 2018 22:42:04 -0300
+Subject: [PATCH] ARM: imx: pm-imx6: Return the error directly
+Message-ID: <1519436524-24583-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2018 04:19 PM, Saravana Kannan wrote:
-> Some PMUs events can be read from any CPU. So allow the PMU to mark
-> events as such. For these events, we don't need to reject reads or
-> make smp calls to the event's CPU and cause unnecessary wake ups.
->
-> Good examples of such events would be events from caches shared across
-> all CPUs.
->
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->   include/linux/perf_event.h |  3 +++
->   kernel/events/core.c       | 10 ++++++++--
->   2 files changed, 11 insertions(+), 2 deletions(-)
->
->
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Ugh! Didn't mean to chain these two emails. This one is independent of 
-the other email.
+Simplify the error path by returning the error code directly rather
+than jumping to a label.
 
--Saravana
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/mach-imx/pm-imx6.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index ecdf071..017539d 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -428,10 +428,8 @@ static int __init imx6_pm_get_base(struct imx6_pm_base *base,
+ 	int ret = 0;
+ 
+ 	node = of_find_compatible_node(NULL, NULL, compat);
+-	if (!node) {
+-		ret = -ENODEV;
+-		goto out;
+-	}
++	if (!node)
++		return -ENODEV;
+ 
+ 	ret = of_address_to_resource(node, 0, &res);
+ 	if (ret)
+@@ -444,7 +442,6 @@ static int __init imx6_pm_get_base(struct imx6_pm_base *base,
+ 
+ put_node:
+ 	of_node_put(node);
+-out:
+ 	return ret;
+ }
+ 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
