@@ -1,88 +1,212 @@
-From: haibo.chen@nxp.com (Bough Chen)
-Date: Sat, 24 Feb 2018 02:58:31 +0000
-Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <1519400769.8609.3.camel@pengutronix.de>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-3-l.stach@pengutronix.de>
- <20180223150352.GU3217@dragon> <201802231630.45460.jbe@pengutronix.de>
- <1519400769.8609.3.camel@pengutronix.de>
-Message-ID: <AM4PR0401MB23242FA10FAFF2C23443940690C30@AM4PR0401MB2324.eurprd04.prod.outlook.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Sat, 24 Feb 2018 11:05:53 +0800
+Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-12-jeremy.linton@arm.com>
+ <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
+ <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+ <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
+Message-ID: <2d248f08-79b6-d5e2-7e34-31a21efcdc07@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Lucas Stach [mailto:l.stach at pengutronix.de]
->Sent: 2018?2?23? 23:46
->To: Juergen Borleis <jbe@pengutronix.de>; kernel at pengutronix.de
->Cc: Shawn Guo <shawnguo@kernel.org>; Mark Rutland
-><mark.rutland@arm.com>; devicetree at vger.kernel.org; Baruch Siach
-><baruch@tkos.co.il>; Catalin Marinas <catalin.marinas@arm.com>; Will
->Deacon <will.deacon@arm.com>; patchwork-lst at pengutronix.de; Rob Herring
-><robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>; Fabio Estevam
-><fabio.estevam@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
->linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
->
->Am Freitag, den 23.02.2018, 16:30 +0100 schrieb Juergen Borleis:
->> On Friday 23 February 2018 16:03:53 Shawn Guo wrote:
->> > On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
->> > > +&usdhc1 {
->> > > +???pinctrl-names = "default", "state_100mhz", "state_200mhz";
->> > > +???pinctrl-0 = <&pinctrl_usdhc1_cd_reset>,
->> <&pinctrl_usdhc1_clk_strobe>,
->> > > +?????????????? <&pinctrl_usdhc1_data>;
->> > > +???pinctrl-1 = <&pinctrl_usdhc1_cd_reset>,
->> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_100mhz>,
->> > > +?????????????? <&pinctrl_usdhc1_data_100mhz>;
->> > > +???pinctrl-2 = <&pinctrl_usdhc1_cd_reset>,
->> > > +?????????????? <&pinctrl_usdhc1_clk_strobe_200mhz>,
->> > > +?????????????? <&pinctrl_usdhc1_data_200mhz>;
->> > > +???vqmmc-supply = <&sw4_reg>;
->> > > +???bus-width = <8>;
->> > > +???non-removable;
->> > > +???no-sd;
->> > > +???no-sdio;
->> > > +???status = "okay";
->> > > +};
->> >
 
-EMMC do not need cd pin, and I notice that pinctrl_usdhc1_cd_reset also contains a usdhc2 pad, this is wrong. So please remove pinctrl_usdhc1_cd_reset. 
-EMMC I/O voltage is fixed to 1.8v so I think no need to add vqmmc-supply, can remove this property here.
-For pinctrl_usdhc1_clk_strobe, clock pad need to be pull down, otherwise you will meet data crc error in hs400 mode.
-
-Best Regards,
-Bough Chen
-
->> > I'm not sure it can be enabled right now.? Per my testing, eMMC is
->> not
->> > working yet.
->> >
->> > [??? 0.879756] mmc0: Switching to 3.3V signalling voltage failed [
->> > 0.913587] mmc0: SDHCI controller on 30b40000.usdhc
->> [30b40000.usdhc]
->> > using ADMA ...
->> > [??? 1.007628] mmc0: switch to high-speed from hs200 failed, err:-
->> 110
->> > [??? 1.013873] mmc0: error -110 whilst initialising MMC card [
->> > 1.020639] mmc0: Switching to 3.3V signalling voltage failed ...
->> > [??? 1.132462] mmc0: switch to high-speed from hs200 failed, err:-
->> 110
->> > [??? 1.138674] mmc0: error -110 whilst initialising MMC card [
->> > 1.145394] mmc0: Switching to 3.3V signalling voltage failed [
->> > 1.268367] mmc0: switch to high-speed from hs200 failed, err:-
->> 110
->> > [??? 1.274576] mmc0: error -110 whilst initialising MMC card [
->> > 1.281291] mmc0: Switching to 3.3V signalling voltage failed [
->> > 1.440708] mmc0: switch to high-speed from hs200 failed, err:-
->> 110
->> > [??? 1.446919] mmc0: error -110 whilst initialising MMC card
->> >
->> > Or am I missing anything?
+Hi,
+On 2018/2/23 19:02, Lorenzo Pieralisi wrote:
+> On Thu, Jan 25, 2018 at 09:56:30AM -0600, Jeremy Linton wrote:
+>> Hi,
 >>
->> Property "no-1-8-v;" if no 1.8 V is available?
->
->The issue is the other way around: the eMMC is hardwired to 1.8V IO voltage
->(which is fine per eMMC spec), so it can't switch to 3.3V mode.
->
->Regards,
->Lucas
+>> On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
+>>> Hi Jeremy,
+>>>
+>>> I have tested the patch with the newest UEFI. It prints the below error:
+>>>
+>>> [    4.017371] BUG: arch topology borken
+>>> [    4.021069] BUG: arch topology borken
+>>> [    4.024764] BUG: arch topology borken
+>>> [    4.028460] BUG: arch topology borken
+>>> [    4.032153] BUG: arch topology borken
+>>> [    4.035849] BUG: arch topology borken
+>>> [    4.039543] BUG: arch topology borken
+>>> [    4.043239] BUG: arch topology borken
+>>> [    4.046932] BUG: arch topology borken
+>>> [    4.050629] BUG: arch topology borken
+>>> [    4.054322] BUG: arch topology borken
+>>>
+>>> I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
+>>> the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
+>>
+>> I commented about that on the EDK2 mailing list. While the current spec
+>> doesn't explicitly ban having the flag set multiple times between the leaf
+>> and the root I consider it a "bug" and there is an effort to clarify the
+>> spec and the use of that flag.
+>>>
+>>> When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
+>>> and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
+>>> sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
+>>
+>> Right. I've mentioned this problem a couple of times.
+>>
+>> At at the moment, the spec isn't clear about how the proximity domain is
+>> detected/located within the PPTT topology (a node with a 1:1 correspondence
+>> isn't even required). As you can see from this patch set, we are making the
+>> general assumption that the proximity domains are at the same level as the
+>> physical socket. This isn't ideal for NUMA topologies, like the D05, that
+>> don't align with the physical socket.
+>>
+>> There are efforts underway to clarify and expand upon the specification to
+>> deal with this general problem. The simple solution is another flag (say
+>> PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to
+>> find nodes with 1:1 correspondence. At that point we could add a fairly
+>> trivial patch to correct just the scheduler topology without affecting the
+>> rest of the system topology code.
+> 
+> I think Morten asked already but isn't this the same end result we end
+> up having if we remove the DIE level if NUMA-within-package is detected
+> (instead of using the default_topology[]) and we create our own ARM64
+> domain hierarchy (with DIE level removed) through set_sched_topology()
+> accordingly ?
+> 
+> Put it differently: do we really need to rely on another PPTT flag to
+> collect this information ?
+> 
+> I can't merge code that breaks a platform with legitimate firmware
+> bindings.
+
+I think we really need another PPTT flag, from which we can get information
+about how to build a multi-core sched_domain. I think only cache-sharing information
+is not enough to get information about how to build a multi-core shced_domain.
+
+How about this? We assume the upper layer of the lowest layer to be multi-core layer.
+After that flag is added into ACPI specs, we add another patch to adapt to the change.
+
+Thanks,
+Xiongfeng
+
+> 
+> Thanks,
+> Lorenzo
+> 
+>>
+>>>
+>>> If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
+>>> within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
+>>> the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
+>>> If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
+>>> to record which cores are in each cluster.
+>>
+>> The problem is that there isn't a generic way to identify which level of
+>> cache sharing is the "correct" top layer MC domain. For one system cluster
+>> might be appropriate, for another it might be the highest caching level
+>> within a socket, for another is might be a something in between or a group
+>> of clusters or LLCs..
+>>
+>> Hence the effort to standardize/guarantee a PPTT node that exactly matches a
+>> SRAT domain. With that, each SOC/system provider has clearly defined method
+>> for communicating where they want the proximity domain information to begin.
+>>
+>> Thanks,
+>>
+>>>
+>>>
+>>> Thanks,
+>>> Xiongfeng
+>>>
+>>> On 2018/1/13 8:59, Jeremy Linton wrote:
+>>>> Propagate the topology information from the PPTT tree to the
+>>>> cpu_topology array. We can get the thread id, core_id and
+>>>> cluster_id by assuming certain levels of the PPTT tree correspond
+>>>> to those concepts. The package_id is flagged in the tree and can be
+>>>> found by calling find_acpi_cpu_topology_package() which terminates
+>>>> its search when it finds an ACPI node flagged as the physical
+>>>> package. If the tree doesn't contain enough levels to represent
+>>>> all of the requested levels then the root node will be returned
+>>>> for all subsequent levels.
+>>>>
+>>>> Cc: Juri Lelli <juri.lelli@arm.com>
+>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>> ---
+>>>>  arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
+>>>>  1 file changed, 45 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>>>> index 7b06e263fdd1..ce8ec7fd6b32 100644
+>>>> --- a/arch/arm64/kernel/topology.c
+>>>> +++ b/arch/arm64/kernel/topology.c
+>>>> @@ -11,6 +11,7 @@
+>>>>   * for more details.
+>>>>   */
+>>>> +#include <linux/acpi.h>
+>>>>  #include <linux/arch_topology.h>
+>>>>  #include <linux/cpu.h>
+>>>>  #include <linux/cpumask.h>
+>>>> @@ -22,6 +23,7 @@
+>>>>  #include <linux/sched.h>
+>>>>  #include <linux/sched/topology.h>
+>>>>  #include <linux/slab.h>
+>>>> +#include <linux/smp.h>
+>>>>  #include <linux/string.h>
+>>>>  #include <asm/cpu.h>
+>>>> @@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
+>>>>  	}
+>>>>  }
+>>>> +#ifdef CONFIG_ACPI
+>>>> +/*
+>>>> + * Propagate the topology information of the processor_topology_node tree to the
+>>>> + * cpu_topology array.
+>>>> + */
+>>>> +static int __init parse_acpi_topology(void)
+>>>> +{
+>>>> +	bool is_threaded;
+>>>> +	int cpu, topology_id;
+>>>> +
+>>>> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+>>>> +
+>>>> +	for_each_possible_cpu(cpu) {
+>>>> +		topology_id = find_acpi_cpu_topology(cpu, 0);
+>>>> +		if (topology_id < 0)
+>>>> +			return topology_id;
+>>>> +
+>>>> +		if (is_threaded) {
+>>>> +			cpu_topology[cpu].thread_id = topology_id;
+>>>> +			topology_id = find_acpi_cpu_topology(cpu, 1);
+>>>> +			cpu_topology[cpu].core_id   = topology_id;
+>>>> +			topology_id = find_acpi_cpu_topology_package(cpu);
+>>>> +			cpu_topology[cpu].package_id = topology_id;
+>>>> +		} else {
+>>>> +			cpu_topology[cpu].thread_id  = -1;
+>>>> +			cpu_topology[cpu].core_id    = topology_id;
+>>>> +			topology_id = find_acpi_cpu_topology_package(cpu);
+>>>> +			cpu_topology[cpu].package_id = topology_id;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +#else
+>>>> +static inline int __init parse_acpi_topology(void)
+>>>> +{
+>>>> +	return -EINVAL;
+>>>> +}
+>>>> +#endif
+>>>>  void __init init_cpu_topology(void)
+>>>>  {
+>>>> @@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
+>>>>  	 * Discard anything that was parsed if we hit an error so we
+>>>>  	 * don't use partial information.
+>>>>  	 */
+>>>> -	if (of_have_populated_dt() && parse_dt_topology())
+>>>> +	if ((!acpi_disabled) && parse_acpi_topology())
+>>>> +		reset_cpu_topology();
+>>>> +	else if (of_have_populated_dt() && parse_dt_topology())
+>>>>  		reset_cpu_topology();
+>>>>  }
+>>>>
+>>>
+>>
+> 
+> .
+> 
