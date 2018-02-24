@@ -1,50 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 24 Feb 2018 17:54:01 +0000
-Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
- Cortex-A53 erratum #843419
-In-Reply-To: <20180223172518.264ara42xj52ehao@lakrids.cambridge.arm.com>
-References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-3-ard.biesheuvel@linaro.org>
- <20180223171551.qnpuf2rydyibztgt@lakrids.cambridge.arm.com>
- <CAKv+Gu_Jm9PDGj0uq2BwWLja7_FNekT=GyQ7OG50KZxuOj9xiA@mail.gmail.com>
- <20180223172518.264ara42xj52ehao@lakrids.cambridge.arm.com>
-Message-ID: <CAKv+Gu_sYmCbxGEmJ3Wyjq3uUH9-YP8PvUbUYZpOuAGVLEaBXQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 24 Feb 2018 19:32:36 +0100
+Subject: [PATCH v4 10/40] KVM: arm64: Slightly improve debug save/restore
+ functions
+In-Reply-To: <37712e4f-7f47-2101-71f5-d024a7993f13@arm.com>
+References: <20180215210332.8648-1-christoffer.dall@linaro.org>
+ <20180215210332.8648-11-christoffer.dall@linaro.org>
+ <20180221173903.xlpwnlrnjlpatm5s@kamzik.brq.redhat.com>
+ <37712e4f-7f47-2101-71f5-d024a7993f13@arm.com>
+Message-ID: <20180224183236.GF7396@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2018 at 17:25, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Feb 23, 2018 at 05:17:31PM +0000, Ard Biesheuvel wrote:
->> On 23 February 2018 at 17:15, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
->> >> +static bool reloc_adrp_erratum_843419(struct module *mod, __le32 *place,
->> >> +                                   u64 val)
->> >> +{
->> >> +     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
->> >> +             return false;
->> >> +
->> >> +     /* only ADRP instructions at the end of a 4k page are affected */
->> >> +     if (((u64)place & 0xfff) < 0xff8)
->> >> +             return false;
->> >> +
->> >> +     /* patch ADRP to ADR if it is in range */
->> >> +     if (!reloc_insn_imm(RELOC_OP_PREL, place, val & ~0xfff, 0, 21,
->> >> +                         AARCH64_INSN_IMM_ADR)) {
->> >> +             ((u8 *)place)[3] &= 0x7f; /* clear opcode bit 31 */
->> >
->> > That's a bit hideous, and broken for BE, I think.
->>
->> Instructions are always LE
->
-> Ugh; I forgot that single didn't have endianness. :(
->
->> > Can we not construct the equivalent ADR using the usual insn code, and
->> > insert it?
->>
->> Sure.
->
-> Cheers!
->
+On Wed, Feb 21, 2018 at 05:52:41PM +0000, Marc Zyngier wrote:
+> On 21/02/18 17:39, Andrew Jones wrote:
+> > On Thu, Feb 15, 2018 at 10:03:02PM +0100, Christoffer Dall wrote:
+> >> The debug save/restore functions can be improved by using the has_vhe()
+> >> static key instead of the instruction alternative.  Using the static key
+> >> uses the same paradigm as we're going to use elsewhere, it makes the
+> >> code more readable, and it generates slightly better code (no
+> >> stack setups and function calls unless necessary).
+> >>
+> >> We also use a static key on the restore path, because it will be
+> >> marginally faster than loading a value from memory.
+> >>
+> >> Finally, we don't have to conditionally clear the debug dirty flag if
+> >> it's set, we can just clear it.
+> >>
+> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> ---
+> >>
+> >> Notes:
+> >>     Changes since v1:
+> >>      - Change dot to comma in comment
+> >>      - Rename __debug_restore_spe to __debug_restore_spe_nvhe
+> >>
+> >>  arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
+> >>  1 file changed, 12 insertions(+), 14 deletions(-)
+> >>
+> > 
+> > Maybe after this series is merged, if there are any hyp_alternate_select's
+> > left, we can replace all the remaining ones with has_vhe() and then just
+> > completely remove hyp_alternate_select.
+> 
+> Note that older compilers (such as GCC 4.8) will generate horrible code
+> with static keys, as they do not support "asm goto". Not that I want to
+> preserve the home brew hyp_alternate_select mechanism, but I just want
+> to make it plain that some distros will definitely suffer from the
+> transition.
+> 
+That's unfortunate.  I'd still like to use has_vhe() most places, but we
+could change the implementation of has_vhe() to use the hyp alternative
+until nobody cares about kernels compiled with GCC 4.8 ?
 
-Umm, it appears we don't have any code to emit ADR or ADRP
-instructions, and I am reluctant to add a bunch of routines that are
-only ever used to flick a single opcode bit.
+Thanks,
+-Christoffer
