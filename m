@@ -1,45 +1,40 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 17:08:21 +0800
-Subject: [PATCH] ARM: mx35_3ds: remove unnecessary USB OTG init flag
-In-Reply-To: <1519251463-12318-1-git-send-email-martin@kaiser.cx>
-References: <1519251463-12318-1-git-send-email-martin@kaiser.cx>
-Message-ID: <20180224090818.GP3217@dragon>
+Date: Sat, 24 Feb 2018 17:09:18 +0800
+Subject: [PATCH 0/4][v4][RESEND] dt-bindings: mtd-physmap: Add endianness
+ supports
+In-Reply-To: <20180222112814.3717af47@bbrezillon>
+References: <20180222101511.29631-1-prabhakar.kushwaha@nxp.com>
+ <20180222112814.3717af47@bbrezillon>
+Message-ID: <20180224090917.GQ3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 11:17:43PM +0100, Martin Kaiser wrote:
-> The platform-specific init function for the USB OTG port,
-> mx35_3ds_otg_init(), sets the MXC_EHCI_INTERNAL_PHY flag.
+On Thu, Feb 22, 2018 at 11:28:14AM +0100, Boris Brezillon wrote:
+> Hi Prabhakar,
 > 
-> This flag is applicable only to the host port, not to the OTG port. It's
-> ignored by mx35_initialize_usb_hw() when the OTG port is initialized.
+> On Thu, 22 Feb 2018 15:45:05 +0530
+> Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
 > 
-> Remove the flag to make it clear what is actually configured.
+> > Connection between flash and controller is not necessary to be always
+> > of same type. It may varies from platform to platform.
+> > 
+> > Adding endianness (optional) property to provide connection type
+> > information. This endianness property is checked in physmap_of_core.c
+> > to decide swap type. 
+> > 
+> > This patch also set "big-endian" property for ls1021a, ls1043a
+> > and ls1046a device tree. here connection between IFC controller
+> > and NOR flash is big-endian.
+> > 
+> > Prabhakar Kushwaha (4):
+> >   dt-bindings: mtd-physmap: Add endianness supports
+> >   driver: mtd: update struct map_info's swap as per map requirement
+> >   ARM: dts: Add NOR connection type with IFC
+> >   ARM64: dts: Add NOR connection type with IFC
 > 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> First of all, can you stop sending dts changes until we've agreed on
+> the dt-bindings/driver changes.
 
-We do not take any patch on legacy board files, unless it fixes some
-real problem.
++1
 
 Shawn
-
-> ---
->  arch/arm/mach-imx/mach-mx35_3ds.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-> index 1c33a6c..f1963f2 100644
-> --- a/arch/arm/mach-imx/mach-mx35_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-> @@ -407,7 +407,7 @@ static void __init imx35_3ds_init_mc13892(void)
->  
->  static int mx35_3ds_otg_init(struct platform_device *pdev)
->  {
-> -	return mx35_initialize_usb_hw(pdev->id, MXC_EHCI_INTERNAL_PHY);
-> +	return mx35_initialize_usb_hw(pdev->id, 0);
->  }
->  
->  /* OTG config */
-> -- 
-> 2.1.4
-> 
