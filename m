@@ -1,62 +1,42 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 24 Feb 2018 12:20:29 +0000
-Subject: [PATCH v4 13/13] iio: adc: axp20x_adc: remove !! in favor of
- ternary condition
-In-Reply-To: <9ec180ff4358ac6e163115aa7832a0674b6a640e.1519044068.git-series.quentin.schulz@bootlin.com>
-References: <cover.6545459c99a33874413abf619136986f53d2c2a2.1519044068.git-series.quentin.schulz@bootlin.com>
- <9ec180ff4358ac6e163115aa7832a0674b6a640e.1519044068.git-series.quentin.schulz@bootlin.com>
-Message-ID: <20180224122029.1520fe89@archlinux>
+Date: Sat, 24 Feb 2018 12:56:34 +0000
+Subject: [PATCH 1/7] iio: adc: stm32-dfsdm: fix compatible data use
+In-Reply-To: <1519390261-25453-2-git-send-email-fabrice.gasnier@st.com>
+References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
+ <1519390261-25453-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180224125634.0035d81f@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Feb 2018 13:47:36 +0100
-Quentin Schulz <quentin.schulz@bootlin.com> wrote:
+On Fri, 23 Feb 2018 13:50:55 +0100
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> !!'s behaviour isn't that obvious and sparse complained about it, so
-> let's replace it with a ternary condition.
+> Fix use of compatible data: stm32h7 regmap configuration is statically
+> used. Rather use regmap_cfg from compatible data.
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.
+> Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the fixes-togreg branch of iio.git
 
 Thanks,
 
 Jonathan
 
 > ---
->  drivers/iio/adc/axp20x_adc.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
+>  drivers/iio/adc/stm32-dfsdm-core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-> index a30a972..7a745cf 100644
-> --- a/drivers/iio/adc/axp20x_adc.c
-> +++ b/drivers/iio/adc/axp20x_adc.c
-> @@ -365,7 +365,7 @@ static int axp20x_adc_offset_voltage(struct iio_dev *indio_dev, int channel,
->  		return -EINVAL;
->  	}
+> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
+> index 6290332..0635f93 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-core.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
+> @@ -274,7 +274,7 @@ static int stm32_dfsdm_probe(struct platform_device *pdev)
 >  
-> -	*val = !!(*val) * 700000;
-> +	*val = *val ? 700000 : 0;
->  
->  	return IIO_VAL_INT;
->  }
-> @@ -442,15 +442,17 @@ static int axp20x_write_raw(struct iio_dev *indio_dev,
->  	if (val != 0 && val != 700000)
->  		return -EINVAL;
->  
-> +	val = val ? 1 : 0;
-> +
->  	switch (chan->channel) {
->  	case AXP20X_GPIO0_V:
->  		reg = AXP20X_GPIO10_IN_RANGE_GPIO0;
-> -		regval = AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(!!val);
-> +		regval = AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(val);
->  		break;
->  
->  	case AXP20X_GPIO1_V:
->  		reg = AXP20X_GPIO10_IN_RANGE_GPIO1;
-> -		regval = AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(!!val);
-> +		regval = AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(val);
->  		break;
->  
->  	default:
+>  	dfsdm->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "dfsdm",
+>  						  dfsdm->base,
+> -						  &stm32h7_dfsdm_regmap_cfg);
+> +						  dev_data->regmap_cfg);
+>  	if (IS_ERR(dfsdm->regmap)) {
+>  		ret = PTR_ERR(dfsdm->regmap);
+>  		dev_err(&pdev->dev, "%s: Failed to allocate regmap: %d\n",
