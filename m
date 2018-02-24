@@ -1,58 +1,28 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sat, 24 Feb 2018 09:08:09 +0100
-Subject: [PATCH v1 1/2] perf/core: Add API to look up PMU type by name
-In-Reply-To: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20180224080809.GA25201@hirez.programming.kicks-ass.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 24 Feb 2018 16:24:23 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Re-sync defconfig
+In-Reply-To: <1518628339-6337-1-git-send-email-festevam@gmail.com>
+References: <1518628339-6337-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180224082422.GI3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 04:19:37PM -0800, Saravana Kannan wrote:
-> When the event numbers registered by multiple PMUs overlap, the
-> attr->type value passed to perf_event_create_kernel_counter() is used
-> to determine which PMU to use to create a perf_event.
+On Wed, Feb 14, 2018 at 03:12:19PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> However, when the PMU in question is not a standard PMU (defined in
-> perf_type_id), there is no way for a kernel client to look up the PMU
-> type for the PMU of interest and set the attr->type appropriately.
+> Re-sync the defconfig by doing:
 > 
-> So, add an API to look up the PMU type by name. That way, the kernel
-> APIs can function in a fashion similar to the user space interface.
+> make savedefconfig
+> cp defconfig arch/arm/configs/imx_v6_v7_defconfig
 > 
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->  kernel/events/core.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+> Checked that all the removed options are still enabled by Kconfig logic.
 > 
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 96db9ae..5d3df58 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -10310,6 +10310,29 @@ static int perf_event_set_clock(struct perf_event *event, clockid_t clk_id)
->  	return err;
->  }
->  
-> +int perf_find_pmu_type_by_name(const char *name)
-> +{
-> +	struct pmu *pmu;
-> +	int ret = -1;
-> +
-> +	mutex_lock(&pmus_lock);
-> +
-> +	list_for_each_entry(pmu, &pmus, entry) {
-> +		if (!pmu->name || pmu->type < 0)
-> +			continue;
-> +
-> +		if (!strcmp(name, pmu->name)) {
-> +			ret = pmu->type;
-> +			goto out;
-> +		}
-> +	}
-> +
-> +out:
-> +	mutex_unlock(&pmus_lock);
-> +
-> +	return ret;
-> +}
+> The exception is CONFIG_SOC_CAMERA_OV2640, which is only used by some
+> mx31 machines. As the mx3_camera driver has been removed from the kernel
+> tree, removing CONFIG_SOC_CAMERA_OV2640 is not an issue.
+> 
+> So keep it in sync to help further changes in defconfig.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Not without an in-tree user.
+Applied, thanks.
