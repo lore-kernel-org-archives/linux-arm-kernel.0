@@ -1,90 +1,52 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sat, 24 Feb 2018 10:47:26 +0100
-Subject: [PATCH] PCIe bridge deferred probe breaks suspend resume
-In-Reply-To: <CAJZ5v0hDM=DtBZA1awz7ao62cpe4CAhUz1L7KkLTv=G3YQhuEw@mail.gmail.com>
-References: <1519433209-14581-1-git-send-email-fkan@apm.com>
- <CAJZ5v0hDM=DtBZA1awz7ao62cpe4CAhUz1L7KkLTv=G3YQhuEw@mail.gmail.com>
-Message-ID: <CAJZ5v0jJMODOsZV41Jn18LCtttMemFQyXonJxZnUgXday8_4iw@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 24 Feb 2018 11:05:49 +0100
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <20180223164517.aboazzeuujgtkh7q@verge.net.au>
+References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
+ <20180223164517.aboazzeuujgtkh7q@verge.net.au>
+Message-ID: <1d93db7c-e65a-e2b3-5a65-a1eb4fa1d60e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 10:35 AM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Sat, Feb 24, 2018 at 1:46 AM, Feng Kan <fkan@apm.com> wrote:
->> This is not a patch, but rather a question regarding the deferred
->> probe's effect on PCIe PM ordering. This happens on our system
->> which defer the probing of root bridge due to  the IOMMU not being
->> ready. Because of the deferred action, the bridge is moved to the
->> end of the dpm_list which results in incorrect suspend and resume
->> sequence.
+On 02/23/2018 05:45 PM, Simon Horman wrote:
+> On Sun, Feb 18, 2018 at 04:07:51PM +0100, Geert Uytterhoeven wrote:
+>> Hi Marek,
 >>
->> In the cases I have seen, the bridge is always reordered because of
->> startup sequence. They are always place after the endpoint. If that
->> is the case the following code should be able to prevent such cases.
->> However, is there some cases here that would violate such situation?
->
-> The code in dd.c assumes that the device being probed has no children
-> (or consumers, for that matter) and so it is safe to move it to the
-> end of the list.
->
-> If the device has children (or consumers), moving it to the end of the
-> list by itself doesn't work, which is the case for you.
->
->> ---
->>  drivers/base/dd.c | 20 +++++++++++---------
->>  1 file changed, 11 insertions(+), 9 deletions(-)
+>> CC Steve Twiss
 >>
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index de6fd09..5b96d5c 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -116,15 +116,17 @@ static void deferred_probe_work_func(struct work_struct *work)
->>                  */
->>                 mutex_unlock(&deferred_probe_mutex);
+>> On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>>> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+>>> one DA9063 and one DA9210 on Porter, the only difference from
+>>> the other boards is that DA9063 is at I2C address 0x5a rather
+>>> than 0x58 .
+>>>
+>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 >>
->> -               /*
->> -                * Force the device to the end of the dpm_list since
->> -                * the PM code assumes that the order we add things to
->> -                * the list is a good order for suspend but deferred
->> -                * probe makes that very unsafe.
->> -                */
->> -               device_pm_lock();
->> -               device_pm_move_last(dev);
->> -               device_pm_unlock();
->> +                if (!dev_is_pci(dev)) {
->
-> You can't do this here.
->
-> It is not clear why all PCI devices should be an exception in the
-> first place.  There may be PCI devices without children that need to
-> be moved to the end of the list and you'd break that case.
->
->> +                        /*
->> +                         * Force the device to the end of the dpm_list since
->> +                         * the PM code assumes that the order we add things to
->> +                         * the list is a good order for suspend but deferred
->> +                         * probe makes that very unsafe.
->> +                         */
->> +                        device_pm_lock();
->> +                        device_pm_move_last(dev);
->> +                        device_pm_unlock();
->> +                }
+>> Thanks for your patch!
 >>
->>                 dev_dbg(dev, "Retrying from deferred list\n");
->>                 if (initcall_debug && !initcalls_done)
->> --
->
-> You can try to replace the device_pm_move_last(dev) in
-> deferred_probe_work_func(struct() with device_reorder_to_tail(), but
-> that has to be called under device_links_read_lock/unloc () and
-> device_pm_lock/unloc() (in the right order).
+>>> --- a/arch/arm/boot/dts/r8a7791-porter.dts
+>>> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+>>> @@ -354,10 +354,47 @@
+>>>         clock-frequency = <400000>;
+>>>  };
+>>>
+>>> +&i2c6 {
+>>> +       status = "okay";
+>>> +       clock-frequency = <100000>;
+>>> +
+>>> +       pmic at 5a {
+>>> +               compatible = "dlg,da9063";
+>>
+>> Does it matter that this is a DA9063L ("Variant 6B")?
+>> Do we need a new compatible value, or can this be detected at runtime?
+> 
+> Hi Marek,
+> 
+> could you follow up on this?
 
-Alternatively, you can replace your !dev_is_pci(dev) check with a
-check for the presence of children or consumers and only move the
-device to the end of the PM list if there are not any.  That would
-kind of make sense, but it may break other assumptions in the deferred
-probing mechanism which I don't recall ATM.
+Yes, ASAP, once I'm back in the office, currently I'm stuck at the airport.
 
-Or avoid deferred probing of the host bridge driver entirely.  I guess
-you can use it with limited functionality until the IOMMU driver is
-ready and switch over to the fully functional operation mode when that
-happens, but that would need to hook into the IOMMU code somehow.
+-- 
+Best regards,
+Marek Vasut
