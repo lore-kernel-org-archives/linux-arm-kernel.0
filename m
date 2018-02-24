@@ -1,58 +1,158 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 24 Feb 2018 22:45:35 +0100
-Subject: [PATCH 05/15] dt-bindings: display: sun4i-drm: Add compatibles for H3
- HDMI pipeline
+Date: Sat, 24 Feb 2018 22:45:43 +0100
+Subject: [PATCH 13/15] ARM: dts: sunxi: h3/h5: Add HDMI pipeline
 In-Reply-To: <20180224214545.3740-1-jernej.skrabec@siol.net>
 References: <20180224214545.3740-1-jernej.skrabec@siol.net>
-Message-ID: <20180224214545.3740-6-jernej.skrabec@siol.net>
+Message-ID: <20180224214545.3740-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing compatibles for H3 HDMI pipeline. These compatibles can also
-be used with H5 SoC.
+This commit adds all entries needed for HDMI to function properly.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 108 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index b995bfee734a..8bdef4920edc 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -102,6 +102,7 @@ DWC HDMI PHY
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-a83t-hdmi-phy
-+    * allwinner,sun8i-h3-hdmi-phy
-   - reg: base address and size of memory-mapped region
-   - clocks: phandles to the clocks feeding the HDMI PHY
-     * bus: the HDMI PHY interface clock
-@@ -110,6 +111,9 @@ Required properties:
-   - resets: phandle to the reset controller driving the PHY
-   - reset-names: must be "phy"
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 7a83b15225c7..e70348ed9bc0 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -105,6 +105,12 @@
+ 		};
+ 	};
  
-+H3 HDMI PHY requires additional clock:
-+  - pll-0: parent of phy clock
++	de: display-engine {
++		compatible = "allwinner,sun8i-h3-display-engine";
++		allwinner,pipelines = <&mixer0>;
++		status = "disabled";
++	};
 +
- TV Encoder
- ----------
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -123,6 +129,29 @@
+ 			#reset-cells = <1>;
+ 		};
  
-@@ -275,6 +279,7 @@ Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-a83t-de2-mixer-0
-     * allwinner,sun8i-a83t-de2-mixer-1
-+    * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-@@ -305,6 +310,7 @@ Required properties:
-     * allwinner,sun7i-a20-display-engine
-     * allwinner,sun8i-a33-display-engine
-     * allwinner,sun8i-a83t-display-engine
-+    * allwinner,sun8i-h3-display-engine
-     * allwinner,sun8i-v3s-display-engine
++		mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun8i-h3-de2-mixer-0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint {
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++				};
++			};
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun8i-h3-system-controller",
+ 				"syscon";
+@@ -138,6 +167,41 @@
+ 			#dma-cells = <1>;
+ 		};
  
-   - allwinner,pipelines: list of phandle to the display engine
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun8i-h3-tcon-tv",
++				     "allwinner,sun8i-a83t-tcon-tv";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
++			clock-names = "ahb", "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON0>;
++			reset-names = "lcd";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint {
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					tcon0_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon0>;
++					};
++				};
++			};
++		};
++
+ 		mmc0: mmc at 1c0f000 {
+ 			/* compatible and clocks are in per SoC .dtsi file */
+ 			reg = <0x01c0f000 0x1000>;
+@@ -684,6 +748,50 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		hdmi: hdmi at 1ee0000 {
++			compatible = "allwinner,sun8i-h3-dw-hdmi",
++				     "allwinner,sun8i-a83t-dw-hdmi";
++			reg = <0x01ee0000 0x10000>;
++			reg-io-width = <1>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_HDMI>;
++			clock-names = "iahb", "isfr", "tmds";
++			resets = <&ccu RST_BUS_HDMI1>;
++			reset-names = "ctrl";
++			phys = <&hdmi_phy>;
++			phy-names = "hdmi-phy";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					reg = <0>;
++
++					hdmi_in_tcon0: endpoint {
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
++				};
++
++				hdmi_out: port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		hdmi_phy: hdmi-phy at 1ef0000 {
++			compatible = "allwinner,sun8i-h3-hdmi-phy";
++			reg = <0x01ef0000 0x10000>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu 6>;
++			clock-names = "bus", "mod", "pll-0";
++			resets = <&ccu RST_BUS_HDMI0>;
++			reset-names = "phy";
++			#phy-cells = <0>;
++		};
++
+ 		rtc: rtc at 1f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
 -- 
 2.16.2
