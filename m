@@ -1,50 +1,55 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Sat, 24 Feb 2018 00:31:36 +0100
-Subject: [v2,03/10] drm/sun4i: Protect the TCON pixel clocks
-In-Reply-To: <d5224d2e81ecf73dc09f234e580ada52c00eaee3.1519204731.git-series.maxime.ripard@bootlin.com>
-References: <d5224d2e81ecf73dc09f234e580ada52c00eaee3.1519204731.git-series.maxime.ripard@bootlin.com>
-Message-ID: <7ed0fad9-6b3d-aafc-08a6-fb18761897aa@micronovasrl.com>
+From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
+Date: Sat, 24 Feb 2018 01:00:47 +0100
+Subject: [PATCH v2 7/8] [PATCH 7/8] drivers/hwmon: Add a generic PECI
+ hwmon client driver
+In-Reply-To: <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-8-jae.hyun.yoo@linux.intel.com>
+ <20180221182608.GA11635@roeck-us.net>
+ <618f34cd-ee43-d8e4-4fb0-3c23bf03835f@linux.intel.com>
+ <20180221214859.GA30263@roeck-us.net>
+ <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
+ <20180222003720.GA25250@lunn.ch>
+ <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
+Message-ID: <CANiq72mjsfJRzfFmhbL7dnih_0=2pFoJDTrmi35x0yLmKrSBFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 21/02/2018 10:20, Maxime Ripard ha scritto:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Both TCON clocks are very sensitive to clock changes, since any change
-> might lead to improper timings.
-> 
-> Make sure our rate is never changed.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Tested-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+On Thu, Feb 22, 2018 at 2:29 AM, Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+> On 2/21/2018 4:37 PM, Andrew Lunn wrote:
+>>>
+>>> But even with this change, it still needs to use delayed creation
+>>> because BMC side kernel doesn't know how many DIMMs are populated on
+>>> a remote server before the remote server completes its memory
+>>> training and testing in BIOS, but it needs to check the remote
+>>> server's CPU temperature as immediate as possible to make
+>>> appropriate thermal control based on the remote CPU's temperature to
+>>> avoid any critical thermal issue. What would be a better solution in
+>>> this case?
+>>
+>>
+>> You could change this driver so that it supports one DIMM.  Move the
+>> 'hotplug' part into another driver which creates and destroys
+>> instances of the hwmon DIMM device as the DIMMS come and go.
+>>
+>> Also, do you need to handle CPU hotplug? You could split the CPU
+>> temperature part into a separate hwmon driver? And again create and
+>> destroy devices as CPUs come and go?
+>>
+>>         Andrew
+>>
+>
+> That seems like a possible option. I'll rewrite the hwmon driver again like
+> that.
+>
+> Thanks for the good idea. :)
 
-Tested on A20-LiNova1-4_3i-ctp with Mali r6p2 installed.
-Before Mali changed dotclock, now it doesn't anymore.
+By the way, in the rewrite, please try to avoid the create*workqueue()
+functions (they are deprecated :).
 
-> ---
->   drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index b73acab74867..cbe87cee13d1 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -261,7 +261,7 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
->   					const struct drm_display_mode *mode)
->   {
->   	/* Configure the dot clock */
-> -	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
-> +	clk_set_rate_exclusive(tcon->dclk, mode->crtc_clock * 1000);
->   
->   	/* Set the resolution */
->   	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
-> @@ -419,7 +419,7 @@ static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
->   	WARN_ON(!tcon->quirks->has_channel_1);
->   
->   	/* Configure the dot clock */
-> -	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
-> +	clk_set_rate_exclusive(tcon->sclk1, mode->crtc_clock * 1000);
->   
->   	/* Adjust clock delay */
->   	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
-> 
+Cheers,
+Miguel
+
+>
+> Jae
