@@ -1,66 +1,77 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Sat, 24 Feb 2018 01:32:53 -0800
-Subject: [PATCH v2 7/8] [PATCH 7/8] drivers/hwmon: Add a generic PECI
- hwmon client driver
-In-Reply-To: <CANiq72mjsfJRzfFmhbL7dnih_0=2pFoJDTrmi35x0yLmKrSBFA@mail.gmail.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-8-jae.hyun.yoo@linux.intel.com>
- <20180221182608.GA11635@roeck-us.net>
- <618f34cd-ee43-d8e4-4fb0-3c23bf03835f@linux.intel.com>
- <20180221214859.GA30263@roeck-us.net>
- <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
- <20180222003720.GA25250@lunn.ch>
- <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
- <CANiq72mjsfJRzfFmhbL7dnih_0=2pFoJDTrmi35x0yLmKrSBFA@mail.gmail.com>
-Message-ID: <85f66284-2e18-2a74-1e7b-9378353ab43e@linux.intel.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sat, 24 Feb 2018 10:35:25 +0100
+Subject: [PATCH] PCIe bridge deferred probe breaks suspend resume
+In-Reply-To: <1519433209-14581-1-git-send-email-fkan@apm.com>
+References: <1519433209-14581-1-git-send-email-fkan@apm.com>
+Message-ID: <CAJZ5v0hDM=DtBZA1awz7ao62cpe4CAhUz1L7KkLTv=G3YQhuEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2018 4:00 PM, Miguel Ojeda wrote:
-> On Thu, Feb 22, 2018 at 2:29 AM, Jae Hyun Yoo
-> <jae.hyun.yoo@linux.intel.com> wrote:
->> On 2/21/2018 4:37 PM, Andrew Lunn wrote:
->>>>
->>>> But even with this change, it still needs to use delayed creation
->>>> because BMC side kernel doesn't know how many DIMMs are populated on
->>>> a remote server before the remote server completes its memory
->>>> training and testing in BIOS, but it needs to check the remote
->>>> server's CPU temperature as immediate as possible to make
->>>> appropriate thermal control based on the remote CPU's temperature to
->>>> avoid any critical thermal issue. What would be a better solution in
->>>> this case?
->>>
->>>
->>> You could change this driver so that it supports one DIMM.  Move the
->>> 'hotplug' part into another driver which creates and destroys
->>> instances of the hwmon DIMM device as the DIMMS come and go.
->>>
->>> Also, do you need to handle CPU hotplug? You could split the CPU
->>> temperature part into a separate hwmon driver? And again create and
->>> destroy devices as CPUs come and go?
->>>
->>>          Andrew
->>>
->>
->> That seems like a possible option. I'll rewrite the hwmon driver again like
->> that.
->>
->> Thanks for the good idea. :)
-> 
-> By the way, in the rewrite, please try to avoid the create*workqueue()
-> functions (they are deprecated :).
-> 
-> Cheers,
-> Miguel
-> 
+On Sat, Feb 24, 2018 at 1:46 AM, Feng Kan <fkan@apm.com> wrote:
+> This is not a patch, but rather a question regarding the deferred
+> probe's effect on PCIe PM ordering. This happens on our system
+> which defer the probing of root bridge due to  the IOMMU not being
+> ready. Because of the deferred action, the bridge is moved to the
+> end of the dpm_list which results in incorrect suspend and resume
+> sequence.
+>
+> In the cases I have seen, the bridge is always reordered because of
+> startup sequence. They are always place after the endpoint. If that
+> is the case the following code should be able to prevent such cases.
+> However, is there some cases here that would violate such situation?
 
-Hi Miguel,
+The code in dd.c assumes that the device being probed has no children
+(or consumers, for that matter) and so it is safe to move it to the
+end of the list.
 
-Thanks for letting me know that. I'll replace that with 
-alloc_workqueue(). :)
+If the device has children (or consumers), moving it to the end of the
+list by itself doesn't work, which is the case for you.
 
-Regards,
-Jae
+> ---
+>  drivers/base/dd.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index de6fd09..5b96d5c 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -116,15 +116,17 @@ static void deferred_probe_work_func(struct work_struct *work)
+>                  */
+>                 mutex_unlock(&deferred_probe_mutex);
+>
+> -               /*
+> -                * Force the device to the end of the dpm_list since
+> -                * the PM code assumes that the order we add things to
+> -                * the list is a good order for suspend but deferred
+> -                * probe makes that very unsafe.
+> -                */
+> -               device_pm_lock();
+> -               device_pm_move_last(dev);
+> -               device_pm_unlock();
+> +                if (!dev_is_pci(dev)) {
 
->>
->> Jae
+You can't do this here.
+
+It is not clear why all PCI devices should be an exception in the
+first place.  There may be PCI devices without children that need to
+be moved to the end of the list and you'd break that case.
+
+> +                        /*
+> +                         * Force the device to the end of the dpm_list since
+> +                         * the PM code assumes that the order we add things to
+> +                         * the list is a good order for suspend but deferred
+> +                         * probe makes that very unsafe.
+> +                         */
+> +                        device_pm_lock();
+> +                        device_pm_move_last(dev);
+> +                        device_pm_unlock();
+> +                }
+>
+>                 dev_dbg(dev, "Retrying from deferred list\n");
+>                 if (initcall_debug && !initcalls_done)
+> --
+
+You can try to replace the device_pm_move_last(dev) in
+deferred_probe_work_func(struct() with device_reorder_to_tail(), but
+that has to be called under device_links_read_lock/unloc () and
+device_pm_lock/unloc() (in the right order).
