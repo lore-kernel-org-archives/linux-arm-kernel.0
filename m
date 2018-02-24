@@ -1,67 +1,128 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 15:17:04 +0800
-Subject: [PATCH 3/3] ARM: dts: phycore-imx6: set buck regulator modes
- explicitly
-In-Reply-To: <1518170721-28198-4-git-send-email-chf.fritz@googlemail.com>
-References: <1518170721-28198-1-git-send-email-chf.fritz@googlemail.com>
- <1518170721-28198-4-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <20180224071702.GD3217@dragon>
+Date: Sat, 24 Feb 2018 15:34:13 +0800
+Subject: [PATCH RFC] ARM: imx: avic: set low-power interrupt mask for imx25
+In-Reply-To: <1518180203-9698-1-git-send-email-martin@kaiser.cx>
+References: <1518180203-9698-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20180224073408.GE3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 11:05:21AM +0100, Christoph Fritz wrote:
-> This patch sets initial buck regulator modes explicitly to a state
-> this hardware needs.  So a wrong initial mode set by bootloader or
-> pmic itself does not interfere anymore.
+On Fri, Feb 09, 2018 at 01:43:23PM +0100, Martin Kaiser wrote:
+> imx25 contains two registers (LPIMR0 and 1) to define which interrupts
+> are enabled in low-power mode. As of today, those two registers are
+> configured to enable all interrupts. Before going to low-power mode, the
+> AVIC's INTENABLEH and INTENABLEL registers are configured to enable only
+> those interrupts which are used as wakeup sources.
 > 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> It turned out that this approach is not sufficient if we want the imx25
+> to go into stop mode during suspend-to-ram. (Stop mode is the low-power
+> mode that consumes the least power. The peripheral master clock is
+> switched off in this mode). For stop mode to work, the LPIMR0 and 1
+> registers have to be configured with the set of interrupts that are
+> allowed in low-power mode. Fortunately, the bits in the LPIMR registers
+> are assigned to the same interrups as the bits in INTENABLEH and
+> INTENABLEL. However, LPIMR uses 1 to mask an interrupt whereas the
+> INTENABLE registers use 1 to enable an interrupt.
+> 
+> This patch sets the LPIMR registers to the inverted bitmask of the
+> INTENABLE registers during suspend and goes back to "all interrupts
+> masked" when we wake up again. We also make this the default at startup.
+> 
+> As far as I know, the other supported imx architectures have no similar
+> mechanism. Since the LPIMR registers are part of the CCM module, we
+> query the device tree for an imx25 ccm node in order to detect if we're
+> running on imx25.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+> 
+> Dear all,
+> 
+> could you have a look at this first draft? The approach to detect imx25
+> looks a bit hackish, I'd appreciate your suggestions how to do this
+> properly.
+> 
+> Thanks & best regards,
+> 
+>    Martin
+> 
+>  arch/arm/mach-imx/avic.c | 24 +++++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
+> index 1afccae..bd6d3f2 100644
+> --- a/arch/arm/mach-imx/avic.c
+> +++ b/arch/arm/mach-imx/avic.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <asm/mach/irq.h>
+>  #include <asm/exception.h>
+>  
+> @@ -51,7 +52,10 @@
+>  
+>  #define AVIC_NUM_IRQS 64
+>  
+> -static void __iomem *avic_base;
+> +#define MX25_CCM_LPIMR0	0x68
+> +#define MX25_CCM_LPIMR1	0x6C
+> +
+> +static void __iomem *avic_base, *mx25_ccm_base;
 
-Looks good to me.  Ping me to pick it up when first two patches are
-accepted.
+Keep avic_base line untouched, and add a new one for mx25_ccm_base.
+
+>  static struct irq_domain *domain;
+>  
+>  #ifdef CONFIG_FIQ
+> @@ -93,6 +97,11 @@ static void avic_irq_suspend(struct irq_data *d)
+>  
+>  	avic_saved_mask_reg[idx] = imx_readl(avic_base + ct->regs.mask);
+>  	imx_writel(gc->wake_active, avic_base + ct->regs.mask);
+
+Have a newline here.
+
+> +	if (mx25_ccm_base) {
+> +		u8 offs = d->hwirq < AVIC_NUM_IRQS / 2 ?
+> +			MX25_CCM_LPIMR0 : MX25_CCM_LPIMR1;
+> +		imx_writel(~gc->wake_active, mx25_ccm_base + offs);
+> +	}
+>  }
+>  
+>  static void avic_irq_resume(struct irq_data *d)
+> @@ -102,6 +111,11 @@ static void avic_irq_resume(struct irq_data *d)
+>  	int idx = d->hwirq >> 5;
+>  
+>  	imx_writel(avic_saved_mask_reg[idx], avic_base + ct->regs.mask);
+
+Ditto
 
 Shawn
 
-> ---
->  arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
-> index 53e4337..2ad1336 100644
-> --- a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
-> @@ -109,6 +109,7 @@
->  				regulator-name = "vdd_arm";
->  				regulator-min-microvolt = <730000>;
->  				regulator-max-microvolt = <1380000>;
-> +				regulator-initial-mode = <2>; /* SYNC */
->  				regulator-always-on;
->  			};
+> +	if (mx25_ccm_base) {
+> +		u8 offs = d->hwirq < AVIC_NUM_IRQS / 2 ?
+> +			MX25_CCM_LPIMR0 : MX25_CCM_LPIMR1;
+> +		imx_writel(0xffffffff, mx25_ccm_base + offs);
+> +	}
+>  }
 >  
-> @@ -116,6 +117,7 @@
->  				regulator-name = "vdd_soc";
->  				regulator-min-microvolt = <730000>;
->  				regulator-max-microvolt = <1380000>;
-> +				regulator-initial-mode = <2>; /* SYNC */
->  				regulator-always-on;
->  			};
+>  #else
+> @@ -158,6 +172,14 @@ void __init mxc_init_irq(void __iomem *irqbase)
 >  
-> @@ -123,6 +125,7 @@
->  				regulator-name = "vdd_ddr3";
->  				regulator-min-microvolt = <1500000>;
->  				regulator-max-microvolt = <1500000>;
-> +				regulator-initial-mode = <2>; /* SYNC */
->  				regulator-always-on;
->  			};
+>  	avic_base = irqbase;
 >  
-> @@ -130,6 +133,7 @@
->  				regulator-name = "vdd_eth";
->  				regulator-min-microvolt = <1200000>;
->  				regulator-max-microvolt = <1200000>;
-> +				regulator-initial-mode = <2>; /* SYNC */
->  				regulator-always-on;
->  			};
->  
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-ccm");
+> +	mx25_ccm_base = of_iomap(np, 0);
+> +
+> +	if (mx25_ccm_base) {
+> +		imx_writel(0xffffffff, mx25_ccm_base + MX25_CCM_LPIMR0);
+> +		imx_writel(0xffffffff, mx25_ccm_base + MX25_CCM_LPIMR1);
+> +	}
+> +
+>  	/* put the AVIC into the reset value with
+>  	 * all interrupts disabled
+>  	 */
 > -- 
 > 2.1.4
 > 
