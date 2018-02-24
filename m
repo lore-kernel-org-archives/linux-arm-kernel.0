@@ -1,55 +1,61 @@
-From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
-Date: Sat, 24 Feb 2018 01:00:47 +0100
-Subject: [PATCH v2 7/8] [PATCH 7/8] drivers/hwmon: Add a generic PECI
- hwmon client driver
-In-Reply-To: <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-8-jae.hyun.yoo@linux.intel.com>
- <20180221182608.GA11635@roeck-us.net>
- <618f34cd-ee43-d8e4-4fb0-3c23bf03835f@linux.intel.com>
- <20180221214859.GA30263@roeck-us.net>
- <576a50c6-c302-654c-ceb3-aaf820b7738a@linux.intel.com>
- <20180222003720.GA25250@lunn.ch>
- <b506b4b1-7e7d-abd6-bac2-c45e7c1e0aae@linux.intel.com>
-Message-ID: <CANiq72mjsfJRzfFmhbL7dnih_0=2pFoJDTrmi35x0yLmKrSBFA@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 23 Feb 2018 16:19:37 -0800
+Subject: [PATCH v1 1/2] perf/core: Add API to look up PMU type by name
+Message-ID: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 2:29 AM, Jae Hyun Yoo
-<jae.hyun.yoo@linux.intel.com> wrote:
-> On 2/21/2018 4:37 PM, Andrew Lunn wrote:
->>>
->>> But even with this change, it still needs to use delayed creation
->>> because BMC side kernel doesn't know how many DIMMs are populated on
->>> a remote server before the remote server completes its memory
->>> training and testing in BIOS, but it needs to check the remote
->>> server's CPU temperature as immediate as possible to make
->>> appropriate thermal control based on the remote CPU's temperature to
->>> avoid any critical thermal issue. What would be a better solution in
->>> this case?
->>
->>
->> You could change this driver so that it supports one DIMM.  Move the
->> 'hotplug' part into another driver which creates and destroys
->> instances of the hwmon DIMM device as the DIMMS come and go.
->>
->> Also, do you need to handle CPU hotplug? You could split the CPU
->> temperature part into a separate hwmon driver? And again create and
->> destroy devices as CPUs come and go?
->>
->>         Andrew
->>
->
-> That seems like a possible option. I'll rewrite the hwmon driver again like
-> that.
->
-> Thanks for the good idea. :)
+When the event numbers registered by multiple PMUs overlap, the
+attr->type value passed to perf_event_create_kernel_counter() is used
+to determine which PMU to use to create a perf_event.
 
-By the way, in the rewrite, please try to avoid the create*workqueue()
-functions (they are deprecated :).
+However, when the PMU in question is not a standard PMU (defined in
+perf_type_id), there is no way for a kernel client to look up the PMU
+type for the PMU of interest and set the attr->type appropriately.
 
-Cheers,
-Miguel
+So, add an API to look up the PMU type by name. That way, the kernel
+APIs can function in a fashion similar to the user space interface.
 
->
-> Jae
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+---
+ kernel/events/core.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 96db9ae..5d3df58 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -10310,6 +10310,29 @@ static int perf_event_set_clock(struct perf_event *event, clockid_t clk_id)
+ 	return err;
+ }
+ 
++int perf_find_pmu_type_by_name(const char *name)
++{
++	struct pmu *pmu;
++	int ret = -1;
++
++	mutex_lock(&pmus_lock);
++
++	list_for_each_entry(pmu, &pmus, entry) {
++		if (!pmu->name || pmu->type < 0)
++			continue;
++
++		if (!strcmp(name, pmu->name)) {
++			ret = pmu->type;
++			goto out;
++		}
++	}
++
++out:
++	mutex_unlock(&pmus_lock);
++
++	return ret;
++}
++
+ /**
+  * perf_event_create_kernel_counter
+  *
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
