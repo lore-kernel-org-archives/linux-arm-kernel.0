@@ -1,41 +1,57 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 24 Feb 2018 12:57:59 +0000
-Subject: [PATCH 2/7] iio: adc: stm32-dfsdm: fix call to stop channel
-In-Reply-To: <1519390261-25453-3-git-send-email-fabrice.gasnier@st.com>
+Date: Sat, 24 Feb 2018 12:59:47 +0000
+Subject: [PATCH 3/7] iio: adc: stm32-dfsdm: fix clock source selection
+In-Reply-To: <1519390261-25453-4-git-send-email-fabrice.gasnier@st.com>
 References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
- <1519390261-25453-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180224125759.18678f8b@archlinux>
+ <1519390261-25453-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180224125947.5c5734a9@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Feb 2018 13:50:56 +0100
+On Fri, 23 Feb 2018 13:50:57 +0100
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> stm32_dfsdm_stop_channel must be called with channel id, not filter id.
+> Add missing clock source selection. In case "audio" clock is provided,
+> it's unused currently: "dfsdm" clock is wrongly used by default.
 > 
-> Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
+> Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to the fixes-togreg branch of iio.git
+Applied to the fixes-togreg branch of iio.git.
 
 Thanks,
 
 Jonathan
 
 > ---
->  drivers/iio/adc/stm32-dfsdm-adc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/iio/adc/stm32-dfsdm-core.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-> index daa026d..0eff811 100644
-> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
-> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-> @@ -464,7 +464,7 @@ static int stm32_dfsdm_start_conv(struct stm32_dfsdm_adc *adc, bool dma)
+> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
+> index 0635f93..e50efdc 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-core.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
+> @@ -83,7 +83,7 @@ int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm)
+>  {
+>  	struct dfsdm_priv *priv = container_of(dfsdm, struct dfsdm_priv, dfsdm);
+>  	struct device *dev = &priv->pdev->dev;
+> -	unsigned int clk_div = priv->spi_clk_out_div;
+> +	unsigned int clk_div = priv->spi_clk_out_div, clk_src;
+>  	int ret;
 >  
->  	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
->  			   DFSDM_CR1_RCONT_MASK, 0);
-> -	stm32_dfsdm_stop_channel(adc->dfsdm, adc->fl_id);
-> +	stm32_dfsdm_stop_channel(adc->dfsdm, adc->ch_id);
+>  	if (atomic_inc_return(&priv->n_active_ch) == 1) {
+> @@ -100,6 +100,14 @@ int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm)
+>  			}
+>  		}
 >  
->  	return ret;
->  }
+> +		/* select clock source, e.g. 0 for "dfsdm" or 1 for "audio" */
+> +		clk_src = priv->aclk ? 1 : 0;
+> +		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
+> +					 DFSDM_CHCFGR1_CKOUTSRC_MASK,
+> +					 DFSDM_CHCFGR1_CKOUTSRC(clk_src));
+> +		if (ret < 0)
+> +			goto disable_aclk;
+> +
+>  		/* Output the SPI CLKOUT (if clk_div == 0 clock if OFF) */
+>  		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
+>  					 DFSDM_CHCFGR1_CKOUTDIV_MASK,
