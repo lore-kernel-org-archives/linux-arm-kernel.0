@@ -1,163 +1,236 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 24 Feb 2018 22:45:45 +0100
-Subject: [PATCH 15/15] ARM64: dts: sun50i: h5: Enable HDMI output on H5 boards
+Date: Sat, 24 Feb 2018 22:45:39 +0100
+Subject: [PATCH 09/15] drm/sun4i: Add support for variants to DW HDMI PHY
 In-Reply-To: <20180224214545.3740-1-jernej.skrabec@siol.net>
 References: <20180224214545.3740-1-jernej.skrabec@siol.net>
-Message-ID: <20180224214545.3740-16-jernej.skrabec@siol.net>
+Message-ID: <20180224214545.3740-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HDMI output on all boards with HDMI connector.
+There are multiple variants of DW HDMI PHYs in Allwinner SoCs. While
+some things like clock and reset setup are the same, PHY configuration
+differs a lot.
+
+Split out code which is PHY specific to separate functions and create
+a structure which holds pointers to those functions.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 25 ++++++++++++++++++++++
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 25 ++++++++++++++++++++++
- .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 25 ++++++++++++++++++++++
- 3 files changed, 75 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  | 20 ++++++--
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 91 +++++++++++++++++++++++-----------
+ 2 files changed, 77 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-index 9e51d3a5f4e6..7236cd81875f 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -67,6 +67,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index d8d0684fc8aa..1e9eb6072615 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -12,11 +12,23 @@
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
  
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
++struct sun8i_hdmi_phy;
 +
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
++struct sun8i_hdmi_phy_variant {
++	void (*phy_init)(struct sun8i_hdmi_phy *phy);
++	void (*phy_disable)(struct dw_hdmi *hdmi,
++			    struct sun8i_hdmi_phy *phy);
++	int  (*phy_config)(struct dw_hdmi *hdmi,
++			   struct sun8i_hdmi_phy *phy,
++			   unsigned int clk_rate);
++};
 +
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -121,6 +132,10 @@
- 	status = "okay";
+ struct sun8i_hdmi_phy {
+-	struct clk		*clk_bus;
+-	struct clk		*clk_mod;
+-	struct regmap		*regs;
+-	struct reset_control	*rst_phy;
++	struct clk			*clk_bus;
++	struct clk			*clk_mod;
++	struct regmap			*regs;
++	struct reset_control		*rst_phy;
++	struct sun8i_hdmi_phy_variant	*variant;
  };
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -153,6 +168,16 @@
- 	};
- };
+ struct sun8i_dw_hdmi {
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index f48e8b70fabe..ab758f040acd 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -29,22 +29,10 @@
+  */
+ #define I2C_ADDR	0x69
  
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-index 0f25c4a6f15d..0cc9f4a9e733 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -62,6 +62,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -128,6 +139,10 @@
- 	status = "okay";
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -160,6 +175,16 @@
- 	};
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-index af43533c7134..1bc3d9351941 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-@@ -58,6 +58,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	reg_vcc3v3: vcc3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc3v3";
-@@ -73,6 +84,20 @@
- 	};
+-static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+-				 struct drm_display_mode *mode)
++static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
++				      struct sun8i_hdmi_phy *phy,
++				      unsigned int clk_rate)
+ {
+-	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
+-	u32 val = 0;
+-
+-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+-		val |= 0x01;
+-
+-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+-		val |= 0x02;
+-
+-	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
+-			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK,
+-			   SUN8I_HDMI_PHY_DBG_CTRL_POL(val));
+-
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
+@@ -64,21 +52,21 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+ 	 * release any documentation, explanation of this values can
+ 	 * be found in i.MX 6Dual/6Quad Reference Manual.
+ 	 */
+-	if (mode->crtc_clock <= 27000) {
++	if (clk_rate <= 27000000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x01e0, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x08da, 0x10);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0007, 0x19);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0318, 0x0e);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x8009, 0x09);
+-	} else if (mode->crtc_clock <= 74250) {
++	} else if (clk_rate <= 74250000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0540, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x10);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0007, 0x19);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x02b5, 0x0e);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x8009, 0x09);
+-	} else if (mode->crtc_clock <= 148500) {
++	} else if (clk_rate <= 148500000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x04a0, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x10);
+@@ -103,10 +91,28 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+ 	return 0;
  };
  
-+&de {
-+	status = "okay";
+-static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
++static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
++				 struct drm_display_mode *mode)
+ {
+ 	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
++	u32 val = 0;
++
++	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
++		val |= 0x01;
++
++	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
++		val |= 0x02;
++
++	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
++			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK,
++			   SUN8I_HDMI_PHY_DBG_CTRL_POL(val));
++
++	return phy->variant->phy_config(hdmi, phy, mode->crtc_clock * 1000);
++};
+ 
++static void sun8i_hdmi_phy_disable_a83t(struct dw_hdmi *hdmi,
++					struct sun8i_hdmi_phy *phy)
++{
+ 	dw_hdmi_phy_gen2_txpwron(hdmi, 0);
+ 	dw_hdmi_phy_gen2_pddq(hdmi, 1);
+ 
+@@ -114,6 +120,13 @@ static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN, 0);
+ }
+ 
++static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
++{
++	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
++
++	phy->variant->phy_disable(hdmi, phy);
++}
++
+ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
+ 	.init = &sun8i_hdmi_phy_config,
+ 	.disable = &sun8i_hdmi_phy_disable,
+@@ -122,16 +135,8 @@ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
+ 	.setup_hpd = &dw_hdmi_phy_setup_hpd,
+ };
+ 
+-void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
++static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
+ {
+-	/* enable read access to HDMI controller */
+-	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
+-		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
+-
+-	/* unscramble register offsets */
+-	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
+-		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
+-
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK,
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK);
+@@ -145,6 +150,19 @@ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_ADDR(I2C_ADDR));
+ }
+ 
++void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
++{
++	/* enable read access to HDMI controller */
++	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
++		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
++
++	/* unscramble register offsets */
++	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
++		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
++
++	phy->variant->phy_init(phy);
++}
++
+ const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void)
+ {
+ 	return &sun8i_hdmi_phy_ops;
+@@ -158,20 +176,31 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ 	.name		= "phy"
+ };
+ 
++static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
++	.phy_init = &sun8i_hdmi_phy_init_a83t,
++	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
++	.phy_config = &sun8i_hdmi_phy_config_a83t,
 +};
 +
-+&hdmi {
-+	status = "okay";
-+};
+ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
+-	{ .compatible = "allwinner,sun8i-a83t-hdmi-phy" },
++	{
++		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
++		.data = &sun8i_a83t_hdmi_phy,
++	},
+ 	{ /* sentinel */ }
+ };
+ 
+ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ {
++	const struct of_device_id *match;
+ 	struct device *dev = hdmi->dev;
+ 	struct sun8i_hdmi_phy *phy;
+ 	struct resource res;
+ 	void __iomem *regs;
+ 	int ret;
+ 
+-	if (!of_match_node(sun8i_hdmi_phy_of_table, node)) {
++	match = of_match_node(sun8i_hdmi_phy_of_table, node);
++	if (!match) {
+ 		dev_err(dev, "Incompatible HDMI PHY\n");
+ 		return -EINVAL;
+ 	}
+@@ -180,6 +209,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	if (!phy)
+ 		return -ENOMEM;
+ 
++	phy->variant = (struct sun8i_hdmi_phy_variant *)match->data;
 +
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>;
+ 	ret = of_address_to_resource(node, 0, &res);
+ 	if (ret) {
+ 		dev_err(dev, "phy: Couldn't get our resources\n");
 -- 
 2.16.2
