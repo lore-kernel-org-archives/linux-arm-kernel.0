@@ -1,41 +1,31 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 24 Feb 2018 15:04:56 +0800
-Subject: [PATCH] arm64: dts: ls1046a: drop incomplete memory node
-Message-ID: <1519455896-8924-1-git-send-email-shawnguo@kernel.org>
+Date: Sat, 24 Feb 2018 15:12:40 +0800
+Subject: [PATCH 1/3] arm64: dts: ls1012a: add cpu idle support
+In-Reply-To: <20180224062514.GB3217@dragon>
+References: <20180208075436.38443-1-ran.wang_1@nxp.com>
+ <20180224062514.GB3217@dragon>
+Message-ID: <20180224071239.GC3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory node in fsl-ls1046a.dtsi has no 'reg' property, and causes
-the dtc warning below.
+On Sat, Feb 24, 2018 at 02:25:16PM +0800, Shawn Guo wrote:
+> On Thu, Feb 08, 2018 at 03:54:34PM +0800, Ran Wang wrote:
+> > From: Yuantian Tang <andy.tang@nxp.com>
+> > 
+> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |   18 ++++++++++++++++++
+> >  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> Applied all, thanks.
 
-Warning (unit_address_vs_reg): Node /memory at 80000000 has a unit name, but no reg property
+Ran,
 
-This is clearly an incomplete memory node.  Let's drop it.  Either
-a complete memory should be added, or bootloader needs to fill the node
-as a whole.
+Just noticed that these patches are authored by Yuantian.  When you send
+patches authored by someone else, you should have your SoB added to it.
 
-Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-Cc: Shaohui Xie <Shaohui.Xie@nxp.com>
-Cc: Li Yang <leoyang.li@nxp.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+I just append your SoB below to all 3 patches.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 606ea496f24e..cbf4b3e15c17 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -129,10 +129,6 @@
- 		};
- 	};
- 
--	memory at 80000000 {
--		device_type = "memory";
--	};
--
- 	sysclk: sysclk {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--- 
-1.9.1
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+
+Shawn
