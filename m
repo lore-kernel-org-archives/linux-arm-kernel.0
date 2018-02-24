@@ -1,52 +1,117 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 24 Feb 2018 22:45:33 +0100
-Subject: [PATCH 03/15] clk: sunxi-ng: h3: h5: Allow some clocks to set parent
- rate
+Date: Sat, 24 Feb 2018 22:45:31 +0100
+Subject: [PATCH 01/15] clk: sunxi-ng: Add check for minimal rate to NM PLLs
 In-Reply-To: <20180224214545.3740-1-jernej.skrabec@siol.net>
 References: <20180224214545.3740-1-jernej.skrabec@siol.net>
-Message-ID: <20180224214545.3740-4-jernej.skrabec@siol.net>
+Message-ID: <20180224214545.3740-2-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some units have to be able to set it's own clock precisely to work
-correctly. Allow them to do so by adding CLK_SET_RATE_PARENT flag.
+Some NM PLLs doesn't work well when their output clock rate is set below
+certain rate.
 
-Add this flag to DE, TCON and HDMI clocks.
+Add support for that constrain.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nm.c | 11 +++++++----
+ drivers/clk/sunxi-ng/ccu_nm.h | 27 +++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index b9f39078c0b2..77ed0b0ba681 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -452,11 +452,13 @@ static SUNXI_CCU_GATE(dram_ts_clk,	"dram-ts",	"dram",
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index a16de092bf94..c5ca62a9c2b9 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -20,7 +20,7 @@ struct _ccu_nm {
+ };
  
- static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
- static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
--				 0x104, 0, 4, 24, 3, BIT(31), 0);
-+				 0x104, 0, 4, 24, 3, BIT(31),
-+				 CLK_SET_RATE_PARENT);
+ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+-			     struct _ccu_nm *nm)
++			     unsigned long min_rate, struct _ccu_nm *nm)
+ {
+ 	unsigned long best_rate = 0;
+ 	unsigned long best_n = 0, best_m = 0;
+@@ -30,7 +30,7 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+ 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
+ 			unsigned long tmp_rate = parent * _n  / _m;
  
- static const char * const tcon_parents[] = { "pll-video" };
- static SUNXI_CCU_M_WITH_MUX_GATE(tcon_clk, "tcon", tcon_parents,
--				 0x118, 0, 4, 24, 3, BIT(31), 0);
-+				 0x118, 0, 4, 24, 3, BIT(31),
-+				 CLK_SET_RATE_PARENT);
+-			if (tmp_rate > rate)
++			if (tmp_rate > rate || tmp_rate < min_rate)
+ 				continue;
  
- static const char * const tve_parents[] = { "pll-de", "pll-periph1" };
- static SUNXI_CCU_M_WITH_MUX_GATE(tve_clk, "tve", tve_parents,
-@@ -487,7 +489,8 @@ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
+ 			if ((rate - tmp_rate) < (rate - best_rate)) {
+@@ -134,7 +134,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	_nm.min_m = 1;
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
  
- static const char * const hdmi_parents[] = { "pll-video" };
- static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
--				 0x150, 0, 4, 24, 2, BIT(31), 0);
-+				 0x150, 0, 4, 24, 2, BIT(31),
-+				 CLK_SET_RATE_PARENT);
+-	ccu_nm_find_best(*parent_rate, rate, &_nm);
++	ccu_nm_find_best(*parent_rate, rate, nm->min_rate, &_nm);
+ 	rate = *parent_rate * _nm.n / _nm.m;
  
- static SUNXI_CCU_GATE(hdmi_ddc_clk,	"hdmi-ddc",	"osc24M",
- 		      0x154, BIT(31), 0);
+ 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+@@ -155,6 +155,9 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate = rate * nm->fixed_post_div;
+ 
++	if (rate < nm->min_rate)
++		return -EINVAL;
++
+ 	if (ccu_frac_helper_has_rate(&nm->common, &nm->frac, rate)) {
+ 		spin_lock_irqsave(nm->common.lock, flags);
+ 
+@@ -186,7 +189,7 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 					   &_nm.m, &_nm.n);
+ 	} else {
+ 		ccu_sdm_helper_disable(&nm->common, &nm->sdm);
+-		ccu_nm_find_best(parent_rate, rate, &_nm);
++		ccu_nm_find_best(parent_rate, rate, nm->min_rate, &_nm);
+ 	}
+ 
+ 	spin_lock_irqsave(nm->common.lock, flags);
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.h b/drivers/clk/sunxi-ng/ccu_nm.h
+index eba586b4c7d0..1d8b459c50b7 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.h
++++ b/drivers/clk/sunxi-ng/ccu_nm.h
+@@ -37,6 +37,7 @@ struct ccu_nm {
+ 	struct ccu_sdm_internal		sdm;
+ 
+ 	unsigned int		fixed_post_div;
++	unsigned int		min_rate;
+ 
+ 	struct ccu_common	common;
+ };
+@@ -88,6 +89,32 @@ struct ccu_nm {
+ 		},							\
+ 	}
+ 
++#define SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(_struct, _name, _parent,	\
++					     _reg, _min_rate,		\
++					     _nshift, _nwidth,		\
++					     _mshift, _mwidth,		\
++					     _frac_en, _frac_sel,	\
++					     _frac_rate_0, _frac_rate_1,\
++					     _gate, _lock, _flags)	\
++	struct ccu_nm _struct = {					\
++		.enable		= _gate,				\
++		.lock		= _lock,				\
++		.n		= _SUNXI_CCU_MULT(_nshift, _nwidth),	\
++		.m		= _SUNXI_CCU_DIV(_mshift, _mwidth),	\
++		.frac		= _SUNXI_CCU_FRAC(_frac_en, _frac_sel,	\
++						  _frac_rate_0,		\
++						  _frac_rate_1),	\
++		.min_rate	= _min_rate,				\
++		.common		= {					\
++			.reg		= _reg,				\
++			.features	= CCU_FEATURE_FRACTIONAL,	\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &ccu_nm_ops,	\
++						      _flags),		\
++		},							\
++	}
++
+ #define SUNXI_CCU_NM_WITH_GATE_LOCK(_struct, _name, _parent, _reg,	\
+ 				    _nshift, _nwidth,			\
+ 				    _mshift, _mwidth,			\
 -- 
 2.16.2
