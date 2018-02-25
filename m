@@ -1,60 +1,47 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Sun, 25 Feb 2018 22:38:59 +0100
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <648118289.71086.1519593373795@email.1und1.de>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
-Message-ID: <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 25 Feb 2018 17:25:09 -0500
+Subject: [PATCH V3 0/6] PCI: handle CRS response following Hot Reset and
+ D3hot->D0
+In-Reply-To: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
+References: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <9826c7b4-8ebc-e70b-ab21-bc2ec7af8a14@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Bjorn,
 
->>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
->>> This allows to automatically insert the bcm43438 to the bluetooth
->>> subsystem instead of relying on patched userspace helpers (hciattach).
->>> 
->>> In order to keep a debug UART we need to switch to uart1.
->>> 
->>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>> ---
->>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
->>> 1 file changed, 13 insertions(+), 1 deletion(-)
->>> 
->>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>> index cf53436..b7f79f1 100644
->>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>> @@ -131,6 +131,18 @@
->>> 
->>> &uart0 {
->>> 	pinctrl-names = "default";
->>> -	pinctrl-0 = <&uart0_gpio14>;
->>> +	pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
->>> +	status = "okay";
->>> +
->>> +	bluetooth {
->>> +		compatible = "brcm,bcm43438-bt";
->>> +		max-speed = <2000000>;
->>> +		shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
->>> +	};
->>> +};
->> 
->> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
+On 1/2/2018 12:00 PM, Sinan Kaya wrote:
+> Rev 3.1 Sec 2.3.1 Request Handling Rules:
+> Valid reset conditions after which a device is permitted to return CRS
+> are:
+> * Cold, Warm, and Hot Resets,
+> * FLR
+> * A reset initiated in response to a D3hot to D0 uninitialized
 > 
-> Yes, unload and reload works fine. 
+> Try to reuse FLR implementation towards other reset types.
 > 
->> Meaning we are getting back to the 115200 default baud rate on the UART?
+> Changes from v2:
+> * Correct Conventional PCI spec reference for AF_FLR
+> * Commit message update to capitilize the first word following colon
 > 
-> I assume that, because reload works as expected. 
+> Sinan Kaya (6):
+>   PCI: Protect restore with device lock to be consistent
+>   PCI: Handle FLR failure and allow other reset types
+>   PCI: Make pci_flr_wait() generic and rename to pci_dev_wait()
+>   PCI: Wait device ready after pci_pm_reset()
+>   PCI: Add a return type for pci_reset_bridge_secondary_bus()
+>   PCI: Add device wait after slot and bus reset
+> 
+>  drivers/pci/pci.c   | 70 ++++++++++++++++++++++++++++++++++-------------------
+>  include/linux/pci.h |  4 +--
+>  2 files changed, 47 insertions(+), 27 deletions(-)
+> 
 
-awesome. That is good news.
+Do you think this is ready for merge or do you have more feedback?
 
-Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
+Sinan
 
-Regards
-
-Marcel
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
