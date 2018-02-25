@@ -1,47 +1,61 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 25 Feb 2018 17:25:09 -0500
-Subject: [PATCH V3 0/6] PCI: handle CRS response following Hot Reset and
- D3hot->D0
-In-Reply-To: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-References: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <9826c7b4-8ebc-e70b-ab21-bc2ec7af8a14@codeaurora.org>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Sun, 25 Feb 2018 15:35:21 -0800
+Subject: [PATCH v5 0/4] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume
+ support
+In-Reply-To: <20180223154357.23504-1-d-gerlach@ti.com>
+References: <20180223154357.23504-1-d-gerlach@ti.com>
+Message-ID: <a56830af-cf81-3603-ba58-2a2c65c49f34@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Tony,
 
-On 1/2/2018 12:00 PM, Sinan Kaya wrote:
-> Rev 3.1 Sec 2.3.1 Request Handling Rules:
-> Valid reset conditions after which a device is permitted to return CRS
-> are:
-> * Cold, Warm, and Hot Resets,
-> * FLR
-> * A reset initiated in response to a D3hot to D0 uninitialized
+On 2/23/2018 7:43 AM, Dave Gerlach wrote:
+> Hi,
 > 
-> Try to reuse FLR implementation towards other reset types.
+> This is a minor update to previous series sent here [1] to switch to
+> SPDX license headers. Because update is so minor I have included original
+> cover letter below unmodified with the exception of updated links.
 > 
-> Changes from v2:
-> * Correct Conventional PCI spec reference for AF_FLR
-> * Commit message update to capitilize the first word following colon
+> This series contains the remaining code to enable suspend to mem and standby
+> on am335x and am437x platforms. All dependencies have been merged and this
+> is just a rebase on v4.16-rc1. For this to work on am437x-gp-evm this
+> bug fix patch [2] is required but suspend works fine on am335x platforms
+> without it. V3 of this series can be found here [3].
 > 
-> Sinan Kaya (6):
->   PCI: Protect restore with device lock to be consistent
->   PCI: Handle FLR failure and allow other reset types
->   PCI: Make pci_flr_wait() generic and rename to pci_dev_wait()
->   PCI: Wait device ready after pci_pm_reset()
->   PCI: Add a return type for pci_reset_bridge_secondary_bus()
->   PCI: Add device wait after slot and bus reset
+> This code also depends on firmware for the wkup_m3 that is available here [4]
+> that can either be placed in /lib/firmware or built in to the kernel.
 > 
->  drivers/pci/pci.c   | 70 ++++++++++++++++++++++++++++++++++-------------------
->  include/linux/pci.h |  4 +--
->  2 files changed, 47 insertions(+), 27 deletions(-)
+> For testing the drivers required are:
 > 
+> CONFIG_MAILBOX
+> CONFIG_OMAP2PLUS_MBOX
+> CONFIG_WKUP_M3_RPROC
+> CONFIG_SOC_TI
+> CONFIG_WKUP_M3_IPC
+> CONFIG_TI_EMIF_SRAM
+> CONFIG_AMX3_PM
+> 
+> There is a device tree patch series to follow immediately after this that will
+> completely enable suspend, all patches pushed here [5] for convenience
+> including the aforementioned [2] regulator bug fix if anyone is testing.
+> 
+> Regards,
+> Dave
+> 
+> [1] https://www.spinics.net/lists/linux-omap/msg141652.html
+> [2] https://www.spinics.net/lists/linux-omap/msg141626.html
+> [3] https://www.spinics.net/lists/arm-kernel/msg595931.html
+> [4] https://git.ti.com/processor-firmware/ti-amx3-cm3-pm-firmware/blobs/7eb9c0856a9e8b3b42bf64f761da135852b8eea7/bin/am335x-pm-firmware.elf
+> [5] https://github.com/dgerlach/linux-pm/tree/upstream/v4.16/amx3-suspend-v5
+> 
+> Dave Gerlach (4):
+>    ARM: OMAP2+: Introduce low-level suspend code for AM33XX
+>    ARM: OMAP2+: Introduce low-level suspend code for AM43XX
+>    ARM: OMAP2+: pm33xx-core: Add platform code needed for PM
+>    soc: ti: Add pm33xx driver for basic suspend support
+> 
+Are you going to pickup this series ?
 
-Do you think this is ready for merge or do you have more feedback?
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+Santosh
