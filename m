@@ -1,23 +1,48 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 25 Feb 2018 14:13:20 +0200
-Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
- 'select MFD_SYSCON'
-In-Reply-To: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAHp75VdKDFnrk6i9vBZL2YnqeUH3AaxdZJ_f6ZNOUtnq1pjM3Q@mail.gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sun, 25 Feb 2018 21:21:18 +0900
+Subject: [PATCH 2/2] arm: kprobes: Prohibit kprobes on get_user functions
+In-Reply-To: <151945939903.11045.1486072728379559979.stgit@devbox>
+References: <151945937038.11045.14421944772744094357.stgit@devbox>
+ <151945939903.11045.1486072728379559979.stgit@devbox>
+Message-ID: <20180225212118.ee09db43772a338151762730@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 4:50 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Sat, 24 Feb 2018 17:03:19 +0900
+Masami Hiramatsu <mhiramat@kernel.org> wrote:
 
-> Also, make MFD_SYSCON 'default y' because some defconfig files may
-> rely on someone select's MFD_SYSCON.
+> Since do_undefinstr() uses get_user to get the undefined
+> instruction, it can be called before kprobes processes
+> recursive check. This can cause an infinit recursive
+> exception.
+> Prohibit probing on get_user functions.
+> 
+> Fixes: 24ba613c9d6c ("ARM kprobes: core code")
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> ---
+>  arch/arm/include/asm/assembler.h |    8 ++++++++
+>  arch/arm/lib/getuser.S           |   10 ++++++++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index bc8d4bbd82e2..dd5e7f30eaed 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -536,4 +536,12 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+>  #endif
+>  	.endm
+>  
+> +#ifdef CONFIG_KPROBES
+> +# define _ASM_NOKPROBE(entry)				\
+> +	.pushsection "_kprobe_blacklist", "aw" ;	\
+> +	.balign 4 ;					\
+> +	.long entry;					\
+> +	.popsection
 
-I'm not sure this is right thing to do. You basically imply that there
-always a user of it.
+Oops, I missed #else block... which cause build error if !CONFIG_KPROBES.
+I'll update it soon.
 
+Thanks,
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Masami Hiramatsu <mhiramat@kernel.org>
