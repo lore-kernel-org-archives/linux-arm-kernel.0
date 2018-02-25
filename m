@@ -1,74 +1,61 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 25 Feb 2018 17:08:50 +0800
-Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <CAGRGNgXosix84T3i4y0_ct4eiDSq9ef-dfo3soU54Or42bjxbQ@mail.gmail.com>
-References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <20180224214545.3740-15-jernej.skrabec@siol.net>
- <CAGRGNgWgkfax2TUSjK4397i678gXTTLh80r2HWwTB6u0GM0Cuw@mail.gmail.com>
- <E26547A5-F219-4310-B0E6-49AC3A700566@aosc.io>
- <CAGRGNgXosix84T3i4y0_ct4eiDSq9ef-dfo3soU54Or42bjxbQ@mail.gmail.com>
-Message-ID: <51519389-EAEF-47B5-A49C-AA04692FB8FA@aosc.io>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sun, 25 Feb 2018 10:29:47 +0100
+Subject: [PATCH] PCIe bridge deferred probe breaks suspend resume
+In-Reply-To: <20180224135946.GA1735@wunner.de>
+References: <1519433209-14581-1-git-send-email-fkan@apm.com>
+ <CAJZ5v0hDM=DtBZA1awz7ao62cpe4CAhUz1L7KkLTv=G3YQhuEw@mail.gmail.com>
+ <CAJZ5v0jJMODOsZV41Jn18LCtttMemFQyXonJxZnUgXday8_4iw@mail.gmail.com>
+ <20180224135946.GA1735@wunner.de>
+Message-ID: <CAJZ5v0gDDUKy_vzjBiBiBLThsaeZxwpi7t9se0VKPsB1eo778Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2018?2?25? GMT+08:00 ??5:06:32, Julian Calaby <julian.calaby@gmail.com> ??:
->Hi Icenowy,
->
->On Sun, Feb 25, 2018 at 7:43 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Sat, Feb 24, 2018 at 2:59 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> On Sat, Feb 24, 2018 at 10:47:26AM +0100, Rafael J. Wysocki wrote:
+>> On Sat, Feb 24, 2018 at 10:35 AM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > On Sat, Feb 24, 2018 at 1:46 AM, Feng Kan <fkan@apm.com> wrote:
+>> >> This is not a patch, but rather a question regarding the deferred
+>> >> probe's effect on PCIe PM ordering. This happens on our system
+>> >> which defer the probing of root bridge due to  the IOMMU not being
+>> >> ready. Because of the deferred action, the bridge is moved to the
+>> >> end of the dpm_list which results in incorrect suspend and resume
+>> >> sequence.
+>> >>
+>> >> In the cases I have seen, the bridge is always reordered because of
+>> >> startup sequence. They are always place after the endpoint. If that
+>> >> is the case the following code should be able to prevent such cases.
+>> >> However, is there some cases here that would violate such situation?
+>> >
+>> > The code in dd.c assumes that the device being probed has no children
+>> > (or consumers, for that matter) and so it is safe to move it to the
+>> > end of the list.
+>> >
+>> > If the device has children (or consumers), moving it to the end of the
+>> > list by itself doesn't work, which is the case for you.
+>> >
+>> > You can try to replace the device_pm_move_last(dev) in
+>> > deferred_probe_work_func(struct() with device_reorder_to_tail(), but
+>> > that has to be called under device_links_read_lock/unloc () and
+>> > device_pm_lock/unloc() (in the right order).
 >>
+>> Alternatively, you can replace your !dev_is_pci(dev) check with a
+>> check for the presence of children or consumers and only move the
+>> device to the end of the PM list if there are not any.  That would
+>> kind of make sense, but it may break other assumptions in the deferred
+>> probing mechanism which I don't recall ATM.
 >>
->> ? 2018?2?25? GMT+08:00 ??4:11:34, Julian Calaby
-><julian.calaby@gmail.com> ??:
->>>Hi Jernej,
->>>
->>>On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
->>><jernej.skrabec@siol.net> wrote:
->>>> Enable HDMI output on all boards which have HDMI connector.
->>>>
->>>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->>>> ---
->>>>  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
->>>++++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 24
->>>+++++++++++++++++++++
->>>>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         | 25
->>>++++++++++++++++++++++
->>>>  8 files changed, 199 insertions(+)
->>>
->>>As I understand it, the H2+ is just a slightly trimmed down H3. In
->>>terms of HDMI support, the difference is that the H2+ can't output
->4k.
->>
->> H2+ can OUTPUT 4K. The BSP restricts it to DECODE 4K. (And mainline
->won't have such restriction)
+>> Or avoid deferred probing of the host bridge driver entirely.  I guess
+>> you can use it with limited functionality until the IOMMU driver is
+>> ready and switch over to the fully functional operation mode when that
+>> happens, but that would need to hook into the IOMMU code somehow.
 >
->Interesting!
->
->I'm getting my data from here: http://linux-sunxi.org/H3#Variants
->
->So essentially what you're saying is that the H2+ is just a H3 with
->less pins? (I'm assuming the "lack of gigabit mac" is effectively it
->not having the required pins, i.e. GPIO bank D)
+> Or model the root bridge's dependency on the iommu using a device link:
+> https://www.kernel.org/doc/html/latest/driver-api/device_link.html
 
-No it's just downspec and BSP decode code restricts 4K
-decode (by reserving less memory).
+Apparently, there are children registered under the bridge device
+before the driver for it is probed.
 
-Just similar to STM32F103C8T6, which has a spec of 64KiB Flash, but with in fact 128KiB usable.
-
-For GbE with H2+, it's verified by Banana Pi.
-
->
->Thanks,
+That is kind of unusual and I'm not really sure why it happens at all,
+because (in theory) the bridge driver should be responsible for
+assigning resources to the devices on the bus, among other things.
+Depending on what the reason is, your suggestion may or may not work.
