@@ -1,42 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 25 Feb 2018 14:08:14 +0100
-Subject: [PATCH] ARM: dts: Set D-Link DNS-313 SATA to muxmode 0
-Message-ID: <20180225130814.26515-1-linus.walleij@linaro.org>
+From: hao5781286@gmail.com (hao_zhang)
+Date: Sun, 25 Feb 2018 21:49:46 +0800
+Subject: [PATCH v2 0/4] pwm support for allwinner sun8i SOCs.
+Message-ID: <20180225134946.GA14015@arx-s1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This stops the driver from trying to probe the ATA slave
-interface. The vendor code enables the slave interface
-but the driver in the vendor tree does not make use of
-it.
+PWM support for allwinner sun8i SOCs.
 
-Setting it to muxmode 0 disables the slave interface:
-the hardware only has the master interface connected
-to the one harddrive slot anyways.
+This patchset adds pwm support for allwinner sun8i SOCs.
 
-Without this change booting takes excessive time, so it
-is very annoying to end users.
 
-Fixes: dd5c0561db75 ("ARM: dts: Add basic devicetree for D-Link DNS-313")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this for fixes for v4.16.
----
- arch/arm/boot/dts/gemini-dlink-dns-313.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v2 Changes:
+1. change sun8i-r40 symbol to sun8i.
+2. change pwm0_pin, pwm0-pin to pwm_ch0_pin, pwm-ch0-pin.
+3. remove clk_disable_unprepare(), check !match and IS_ERR(pwm->regmap).
 
-diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-index 08568ce24d06..da8bb9d60f99 100644
---- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-@@ -269,7 +269,7 @@
- 
- 		sata: sata at 46000000 {
- 			/* The ROM uses this muxmode */
--			cortina,gemini-ata-muxmode = <3>;
-+			cortina,gemini-ata-muxmode = <0>;
- 			cortina,gemini-enable-sata-bridge;
- 			status = "okay";
- 		};
+
+
+
+hao_zhang (4):
+  dt-bindings: pwm: binding allwinner sun8i.
+  ARM: dtsi: add pwm node for sun8i.
+  ARM: dts: add pwm status for r40.
+  ARM: PWM: add allwinner sun8i pwm support.
+
+ .../devicetree/bindings/pwm/pwm-sun8i.txt          |  18 +
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |   6 +
+ arch/arm/boot/dts/sun8i-r40.dtsi                   |  13 +
+ drivers/pwm/Kconfig                                |  10 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sun8i.c                            | 401 +++++++++++++++++++++
+ 6 files changed, 449 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+ create mode 100644 drivers/pwm/pwm-sun8i.c
+
 -- 
-2.14.3
+2.7.4
