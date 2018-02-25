@@ -1,41 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 25 Feb 2018 15:10:55 +0100
-Subject: [PATCH 4/4] ARM: bcm2385_defconfig: Enable BT support for BCM43438
-In-Reply-To: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1519567855-26105-5-git-send-email-stefan.wahren@i2se.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 25 Feb 2018 14:36:53 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5A90B77E.8040105@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org>
+Message-ID: <20180225143653.peb4quk3ha5h3t5x@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi Zero W has an onboard BT chip (BCM43438). So enable the
-necessary HCI UART driver (requires serial device bus).
+On Fri, Feb 23, 2018 at 04:53:18PM -0800, Saravana Kannan wrote:
+> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
+> > +static void dsu_pmu_event_update(struct perf_event *event)
+> > +{
+> > +	struct hw_perf_event *hwc = &event->hw;
+> > +	u64 delta, prev_count, new_count;
+> > +
+> > +	do {
+> > +		/* We may also be called from the irq handler */
+> > +		prev_count = local64_read(&hwc->prev_count);
+> > +		new_count = dsu_pmu_read_counter(event);
+> > +	} while (local64_cmpxchg(&hwc->prev_count, prev_count, new_count) !=
+> > +			prev_count);
+> > +	delta = (new_count - prev_count) & DSU_PMU_COUNTER_MASK(hwc->idx);
+> > +	local64_add(delta, &event->count);
+> > +}
+> > +
+> > +static void dsu_pmu_read(struct perf_event *event)
+> > +{
+> > +	dsu_pmu_event_update(event);
+> > +}
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/configs/bcm2835_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+> I sent out a patch that'll allow PMUs to set an event flag to avoid
+> unnecessary smp calls when the event can be read from any CPU. You could
+> just always set that if you can't have multiple DSU's running the kernel (I
+> don't know if the current ARM designs support having multiple DSUs in a
+> SoC/system) or set it if associated_cpus == cpu_present_mask.
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 43dab48..8682b15 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -49,6 +49,9 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_NETWORK_SECMARK=y
- CONFIG_NETFILTER=y
-+CONFIG_BT=y
-+CONFIG_BT_HCIUART=m
-+CONFIG_BT_HCIUART_BCM=y
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
- CONFIG_DEVTMPFS=y
-@@ -74,6 +77,7 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
- CONFIG_SERIAL_8250_BCM2835AUX=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_DEV_BUS=y
- CONFIG_TTY_PRINTK=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_BCM2835=y
--- 
-2.7.4
+As-is, that won't be safe, given the read function calls the event_update()
+function, which has side-effects on hwc->prec_count and event->count. Those
+need to be serialized somehow.
+
+Thanks,
+Mark.
