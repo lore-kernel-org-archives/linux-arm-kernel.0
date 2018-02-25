@@ -1,46 +1,41 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 25 Feb 2018 15:10:53 +0100
-Subject: [PATCH 2/4] ARM: dts: bcm283x: Apply pull settings to Zero W relevant
- groups
+Date: Sun, 25 Feb 2018 15:10:55 +0100
+Subject: [PATCH 4/4] ARM: bcm2385_defconfig: Enable BT support for BCM43438
 In-Reply-To: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
 References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1519567855-26105-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1519567855-26105-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of keeping the firmware's pull settings, we better apply
-them via the devicetree pin control. Start with the RPi Zero W relevant
-first to keep the effort low.
+The Raspberry Pi Zero W has an onboard BT chip (BCM43438). So enable the
+necessary HCI UART driver (requires serial device bus).
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm283x.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/bcm2835_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 8d9a0df..1a50b67 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -223,6 +223,7 @@
- 			gpclk2_gpio43: gpclk2_gpio43 {
- 				brcm,pins = <43>;
- 				brcm,function = <BCM2835_FSEL_ALT0>;
-+				brcm,pull = <BCM2835_PUD_OFF>;
- 			};
- 
- 			i2c0_gpio0: i2c0_gpio0 {
-@@ -335,10 +336,12 @@
- 			uart0_ctsrts_gpio30: uart0_ctsrts_gpio30 {
- 				brcm,pins = <30 31>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
-+				brcm,pull = <BCM2835_PUD_UP BCM2835_PUD_OFF>;
- 			};
- 			uart0_gpio32: uart0_gpio32 {
- 				brcm,pins = <32 33>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
-+				brcm,pull = <BCM2835_PUD_OFF BCM2835_PUD_UP>;
- 			};
- 			uart0_gpio36: uart0_gpio36 {
- 				brcm,pins = <36 37>;
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 43dab48..8682b15 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -49,6 +49,9 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_NETWORK_SECMARK=y
+ CONFIG_NETFILTER=y
++CONFIG_BT=y
++CONFIG_BT_HCIUART=m
++CONFIG_BT_HCIUART_BCM=y
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_DEVTMPFS=y
+@@ -74,6 +77,7 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_8250_BCM2835AUX=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_DEV_BUS=y
+ CONFIG_TTY_PRINTK=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_BCM2835=y
 -- 
 2.7.4
