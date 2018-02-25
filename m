@@ -1,42 +1,45 @@
-From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
-Date: Sun, 25 Feb 2018 02:24:46 +0100
-Subject: [PATCH v2] ARM: dts: imx6ul: add wdog3 node
-Message-ID: <20180225012446.24499-1-joerg.krause@embedded.rocks>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Sun, 25 Feb 2018 02:55:58 +0100
+Subject: [PATCH] pwm: sun4i: properly check current state
+Message-ID: <20180225015558.4843-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6UL(L) has a WDOG3 located at start address 0x021E0000 in the
-AIPS-2 memory region [1].
+Correctly extract the prescaler value from CTRL_REG before comparing it to
+PWM_PRESCAL_MASK.
 
-[1] i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1,
-    04/2016, Table-2-3 AIPS-2 memory map, p. 166
+Also, check that both PWM_CLK_GATING and PWM_EN to ensure the PWM is
+enabled instead of relying on only one of those.
 
-Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+Fixes: 93e0dfb2c52f ("pwm: sun4i: Improve hardware read out")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
-v2:
- * Fix IRQ number
----
- arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/pwm/pwm-sun4i.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 81c426e1b664..1241972b16ba 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -931,6 +931,14 @@
- 				status = "disabled";
- 			};
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 334199c58f1d..42e6f0873d1c 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -117,7 +117,8 @@ static void sun4i_pwm_get_state(struct pwm_chip *chip,
  
-+			wdog3: wdog at 21e4000 {
-+				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
-+				reg = <0x021e4000 0x4000>;
-+				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_WDOG3>;
-+				status = "disabled";
-+			};
-+
- 			uart2: serial at 21e8000 {
- 				compatible = "fsl,imx6ul-uart",
- 					     "fsl,imx6q-uart";
+ 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+ 
+-	if ((val == PWM_PRESCAL_MASK) && sun4i_pwm->data->has_prescaler_bypass)
++	if ((PWM_REG_PRESCAL(val, pwm->hwpwm) == PWM_PRESCAL_MASK) &&
++	    sun4i_pwm->data->has_prescaler_bypass)
+ 		prescaler = 1;
+ 	else
+ 		prescaler = prescaler_table[PWM_REG_PRESCAL(val, pwm->hwpwm)];
+@@ -130,7 +131,8 @@ static void sun4i_pwm_get_state(struct pwm_chip *chip,
+ 	else
+ 		state->polarity = PWM_POLARITY_INVERSED;
+ 
+-	if (val & BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm))
++	if ((val & BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm)) ==
++	    BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm))
+ 		state->enabled = true;
+ 	else
+ 		state->enabled = false;
 -- 
-2.16.2
+2.16.1
