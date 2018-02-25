@@ -1,45 +1,34 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sun, 25 Feb 2018 02:55:58 +0100
-Subject: [PATCH] pwm: sun4i: properly check current state
-Message-ID: <20180225015558.4843-1-alexandre.belloni@bootlin.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sun, 25 Feb 2018 11:50:37 +0900
+Subject: [BUG] arm64: Build error with gcc 6
+Message-ID: <20180225115037.5613c91f061163dcf1d36023@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correctly extract the prescaler value from CTRL_REG before comparing it to
-PWM_PRESCAL_MASK.
+Hello,
 
-Also, check that both PWM_CLK_GATING and PWM_EN to ensure the PWM is
-enabled instead of relying on only one of those.
+commit e1a50de37860 ("arm64: cputype: Silence Sparse warnings")
+introduces "UL" suffix to a hex number, but it causes a build error with gcc-6 series.
+I've hit below error with 6.2.1 and 6.4.1. Of course this is resolved by the latest
+stable gcc-7.2.1. But from the compatibility point of view, should we revert it?
 
-Fixes: 93e0dfb2c52f ("pwm: sun4i: Improve hardware read out")
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- drivers/pwm/pwm-sun4i.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+  AS      arch/arm64/kernel/head.o
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S: Assembler messages:
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: found 'L', expected: ')'
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: junk at end of line, first unrecognized character is `L'
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: unexpected characters following instruction at operand 2 -- `movz x1,:abs_g1_s:0xff00ffffffUL'
+/home/mhiramat/ksrc/linux/arch/arm64/kernel/head.S:677: Error: unexpected characters following instruction at operand 2 -- `movk x1,:abs_g0_nc:0xff00ffffffUL'
+make[2]: *** [/home/mhiramat/ksrc/linux/scripts/Makefile.build:425: arch/arm64/kernel/head.o] error 1
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index 334199c58f1d..42e6f0873d1c 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -117,7 +117,8 @@ static void sun4i_pwm_get_state(struct pwm_chip *chip,
- 
- 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 
--	if ((val == PWM_PRESCAL_MASK) && sun4i_pwm->data->has_prescaler_bypass)
-+	if ((PWM_REG_PRESCAL(val, pwm->hwpwm) == PWM_PRESCAL_MASK) &&
-+	    sun4i_pwm->data->has_prescaler_bypass)
- 		prescaler = 1;
- 	else
- 		prescaler = prescaler_table[PWM_REG_PRESCAL(val, pwm->hwpwm)];
-@@ -130,7 +131,8 @@ static void sun4i_pwm_get_state(struct pwm_chip *chip,
- 	else
- 		state->polarity = PWM_POLARITY_INVERSED;
- 
--	if (val & BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm))
-+	if ((val & BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm)) ==
-+	    BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm))
- 		state->enabled = true;
- 	else
- 		state->enabled = false;
+I've checked with below 2 latest gccs.
+
+http://releases.linaro.org/components/toolchain/binaries/latest-6/aarch64-linux-gnu/gcc-linaro-6.4.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
+
+http://releases.linaro.org/components/toolchain/binaries/latest-7/aarch64-linux-gnu/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
+
+Thank you,
+
 -- 
-2.16.1
+Masami Hiramatsu <mhiramat@kernel.org>
