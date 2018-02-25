@@ -1,46 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 Feb 2018 22:29:43 +0100
-Subject: [PATCH v4 31/40] KVM: arm64: Move common VHE/non-VHE trap config
- in separate functions
-In-Reply-To: <833c8ef7-dfd8-6b01-cab5-c97c86b705f3@arm.com>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
- <20180215210332.8648-32-christoffer.dall@linaro.org>
- <833c8ef7-dfd8-6b01-cab5-c97c86b705f3@arm.com>
-Message-ID: <20180225212943.GH7396@cbox>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Sun, 25 Feb 2018 22:38:59 +0100
+Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
+ slave
+In-Reply-To: <648118289.71086.1519593373795@email.1und1.de>
+References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
+ <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
+ <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
+ <648118289.71086.1519593373795@email.1und1.de>
+Message-ID: <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 02:30:54PM +0000, Julien Grall wrote:
-> Hi Christoffer,
-> 
-> On 15/02/18 21:03, Christoffer Dall wrote:
-> >@@ -85,37 +123,14 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> >  {
-> >  	u64 hcr = vcpu->arch.hcr_el2;
-> >-	/*
-> >-	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> >-	 * register accesses to EL2, however, the ARM ARM clearly states that
-> >-	 * traps are only taken to EL2 if the operation would not otherwise
-> >-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> >-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> >-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
-> >-	 * it will cause an exception.
-> >-	 */
-> >-	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
-> >-		write_sysreg(1 << 30, fpexc32_el2);
-> >-		isb();
-> >-	}
-> >+	write_sysreg(hcr, hcr_el2);
-> >  	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
-> >  		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
-> >-	write_sysreg(hcr, hcr_el2);
-> 
-> OOI, any reason to move the write to HCR_EL2 just before the if?
-> 
+Hi Stefan,
 
-Just to keep the two lines together where we read the value from the
-vcpu structure and write it to hardware.  It's hard to tell from this
-patch, but I think it looks nicer in the end.
+>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
+>>> This allows to automatically insert the bcm43438 to the bluetooth
+>>> subsystem instead of relying on patched userspace helpers (hciattach).
+>>> 
+>>> In order to keep a debug UART we need to switch to uart1.
+>>> 
+>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>> ---
+>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
+>>> 1 file changed, 13 insertions(+), 1 deletion(-)
+>>> 
+>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>>> index cf53436..b7f79f1 100644
+>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>>> @@ -131,6 +131,18 @@
+>>> 
+>>> &uart0 {
+>>> 	pinctrl-names = "default";
+>>> -	pinctrl-0 = <&uart0_gpio14>;
+>>> +	pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
+>>> +	status = "okay";
+>>> +
+>>> +	bluetooth {
+>>> +		compatible = "brcm,bcm43438-bt";
+>>> +		max-speed = <2000000>;
+>>> +		shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
+>>> +	};
+>>> +};
+>> 
+>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
+> 
+> Yes, unload and reload works fine. 
+> 
+>> Meaning we are getting back to the 115200 default baud rate on the UART?
+> 
+> I assume that, because reload works as expected. 
 
-Thanks,
--Christoffer
+awesome. That is good news.
+
+Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
+
+Regards
+
+Marcel
