@@ -1,123 +1,42 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sun, 25 Feb 2018 21:43:59 +0900
-Subject: [BUGFIX PATCH v2 2/2] arm: kprobes: Prohibit kprobes on get_user
- functions
-In-Reply-To: <151956261434.20858.3784217115908190486.stgit@devbox>
-References: <151956261434.20858.3784217115908190486.stgit@devbox>
-Message-ID: <151956263910.20858.1139867369448367478.stgit@devbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 25 Feb 2018 14:08:14 +0100
+Subject: [PATCH] ARM: dts: Set D-Link DNS-313 SATA to muxmode 0
+Message-ID: <20180225130814.26515-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since do_undefinstr() uses get_user to get the undefined
-instruction, it can be called before kprobes processes
-recursive check. This can cause an infinit recursive
-exception.
-Prohibit probing on get_user functions.
+This stops the driver from trying to probe the ATA slave
+interface. The vendor code enables the slave interface
+but the driver in the vendor tree does not make use of
+it.
 
-Fixes: 24ba613c9d6c ("ARM kprobes: core code")
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
----
- Changes in v2:
-  - Fix to add _ASM_NOKPROBE() definition for
-    !CONFIG_KPROBES.
----
- arch/arm/include/asm/assembler.h |   10 ++++++++++
- arch/arm/lib/getuser.S           |   10 ++++++++++
- 2 files changed, 20 insertions(+)
+Setting it to muxmode 0 disables the slave interface:
+the hardware only has the master interface connected
+to the one harddrive slot anyways.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index bc8d4bbd82e2..9342904cccca 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -536,4 +536,14 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
+Without this change booting takes excessive time, so it
+is very annoying to end users.
+
+Fixes: dd5c0561db75 ("ARM: dts: Add basic devicetree for D-Link DNS-313")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this for fixes for v4.16.
+---
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+index 08568ce24d06..da8bb9d60f99 100644
+--- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
++++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+@@ -269,7 +269,7 @@
  
-+#ifdef CONFIG_KPROBES
-+#define _ASM_NOKPROBE(entry)				\
-+	.pushsection "_kprobe_blacklist", "aw" ;	\
-+	.balign 4 ;					\
-+	.long entry;					\
-+	.popsection
-+#else
-+#define _ASM_NOKPROBE(entry)
-+#endif
-+
- #endif /* __ASM_ASSEMBLER_H__ */
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index df73914e81c8..746e7801dcdf 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -38,6 +38,7 @@ ENTRY(__get_user_1)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_1)
-+_ASM_NOKPROBE(__get_user_1)
- 
- ENTRY(__get_user_2)
- 	check_uaccess r0, 2, r1, r2, __get_user_bad
-@@ -58,6 +59,7 @@ rb	.req	r0
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_2)
-+_ASM_NOKPROBE(__get_user_2)
- 
- ENTRY(__get_user_4)
- 	check_uaccess r0, 4, r1, r2, __get_user_bad
-@@ -65,6 +67,7 @@ ENTRY(__get_user_4)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_4)
-+_ASM_NOKPROBE(__get_user_4)
- 
- ENTRY(__get_user_8)
- 	check_uaccess r0, 8, r1, r2, __get_user_bad8
-@@ -78,6 +81,7 @@ ENTRY(__get_user_8)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_8)
-+_ASM_NOKPROBE(__get_user_8)
- 
- #ifdef __ARMEB__
- ENTRY(__get_user_32t_8)
-@@ -91,6 +95,7 @@ ENTRY(__get_user_32t_8)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_32t_8)
-+_ASM_NOKPROBE(__get_user_32t_8)
- 
- ENTRY(__get_user_64t_1)
- 	check_uaccess r0, 1, r1, r2, __get_user_bad8
-@@ -98,6 +103,7 @@ ENTRY(__get_user_64t_1)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_1)
-+_ASM_NOKPROBE(__get_user_64t_1)
- 
- ENTRY(__get_user_64t_2)
- 	check_uaccess r0, 2, r1, r2, __get_user_bad8
-@@ -114,6 +120,7 @@ rb	.req	r0
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_2)
-+_ASM_NOKPROBE(__get_user_64t_2)
- 
- ENTRY(__get_user_64t_4)
- 	check_uaccess r0, 4, r1, r2, __get_user_bad8
-@@ -121,6 +128,7 @@ ENTRY(__get_user_64t_4)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_4)
-+_ASM_NOKPROBE(__get_user_64t_4)
- #endif
- 
- __get_user_bad8:
-@@ -131,6 +139,8 @@ __get_user_bad:
- 	ret	lr
- ENDPROC(__get_user_bad)
- ENDPROC(__get_user_bad8)
-+_ASM_NOKPROBE(__get_user_bad)
-+_ASM_NOKPROBE(__get_user_bad8)
- 
- .pushsection __ex_table, "a"
- 	.long	1b, __get_user_bad
+ 		sata: sata at 46000000 {
+ 			/* The ROM uses this muxmode */
+-			cortina,gemini-ata-muxmode = <3>;
++			cortina,gemini-ata-muxmode = <0>;
+ 			cortina,gemini-enable-sata-bridge;
+ 			status = "okay";
+ 		};
+-- 
+2.14.3
