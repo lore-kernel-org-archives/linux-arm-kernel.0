@@ -1,63 +1,48 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 26 Feb 2018 13:11:03 +0000
-Subject: [PATCH v2] cpufreq: scpi: invoke frequency-invariance setter function
-Message-ID: <20180226131103.5951-1-dietmar.eggemann@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 Feb 2018 13:12:07 +0000
+Subject: [PATCH v2 01/10] regmap: mmio: Add function to attach a clock
+In-Reply-To: <1155920db000d014fd1cd604ed48d1b9a8f64ac1.1519204731.git-series.maxime.ripard@bootlin.com>
+References: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
+ <1155920db000d014fd1cd604ed48d1b9a8f64ac1.1519204731.git-series.maxime.ripard@bootlin.com>
+Message-ID: <20180226131207.GB6681@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
-changed the cpufreq driver on juno from arm_big_little to scpi.
+On Wed, Feb 21, 2018 at 10:20:25AM +0100, Maxime Ripard wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> regmap_init_mmio_clk allows to specify a clock that needs to be enabled
+> while accessing the registers.
 
-The scpi set_target function does not call the frequency-invariance
-setter function arch_set_freq_scale() like the arm_big_little set_target
-function does. As a result the task scheduler load and utilization
-signals are not frequency-invariant on this platform anymore.
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Fix this by adding a call to arch_set_freq_scale() into
-scpi_cpufreq_set_target().
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/scpi-cpufreq.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+are available in the Git repository at:
 
-diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-index c32a833e1b00..d300a163945f 100644
---- a/drivers/cpufreq/scpi-cpufreq.c
-+++ b/drivers/cpufreq/scpi-cpufreq.c
-@@ -51,15 +51,23 @@ static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
- static int
- scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
- {
-+	unsigned long freq = policy->freq_table[index].frequency;
- 	struct scpi_data *priv = policy->driver_data;
--	u64 rate = policy->freq_table[index].frequency * 1000;
-+	u64 rate = freq * 1000;
- 	int ret;
- 
- 	ret = clk_set_rate(priv->clk, rate);
--	if (!ret && (clk_get_rate(priv->clk) != rate))
--		ret = -EIO;
- 
--	return ret;
-+	if (ret)
-+		return ret;
-+
-+	if (clk_get_rate(priv->clk) != rate)
-+		return -EIO;
-+
-+	arch_set_freq_scale(policy->related_cpus, freq,
-+			    policy->cpuinfo.max_freq);
-+
-+	return 0;
- }
- 
- static int
--- 
-2.11.0
+  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/mmio-clk-config
+
+for you to fetch changes up to 31895662f9ba81e8ea9ef05abf8edcb29d4b9c18:
+
+  regmap: mmio: Add function to attach a clock (2018-02-26 11:05:44 +0000)
+
+----------------------------------------------------------------
+regmap: MMIO regmap clock configuration
+
+This patch provides a mechanism for specifying a different clock to be
+used with the regmap clock integration.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      regmap: mmio: Add function to attach a clock
+
+ drivers/base/regmap/regmap-mmio.c | 24 ++++++++++++++++++++++++
+ include/linux/regmap.h            |  3 +++
+ 2 files changed, 27 insertions(+)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/1cab3bf5/attachment.sig>
