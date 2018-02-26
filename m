@@ -1,34 +1,36 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Mon, 26 Feb 2018 18:57:12 +0100
-Subject: [PATCH 4/8] arm64: dts: renesas: r8a77995: Set EtherAVB phy mode to
- "rgmii"
-In-Reply-To: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519667836-31330-5-git-send-email-jacopo+renesas@jmondi.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 19:03:45 +0100
+Subject: [PATCH 4/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
+ Salvator-XS board
+In-Reply-To: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1519668225-12548-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the "phy-mode" property of EtherAVB device to "rgmii" and let board
-files override it if the installed PHY layer provides delays for the
-RX/TX channels.
+The Renesas Salvator-XS development board can be equipped with an R-Car
+H3, M3-W, or M3-N SiP, which are pin-compatible.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Document board part number and compatible values for the version with
+R-Car M3-N.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index cd3c6a3..fc48677 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -512,7 +512,7 @@
- 			clocks = <&cpg CPG_MOD 812>;
- 			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
--			phy-mode = "rgmii-txid";
-+			phy-mode = "rgmii";
- 			iommus = <&ipmmu_ds0 16>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 51e4428856be4557..303f04e639431837 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -114,6 +114,8 @@ Boards:
+     compatible = "renesas,salvator-xs", "renesas,r8a7795"
+   - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+     compatible = "renesas,salvator-xs", "renesas,r8a7796"
++  - Salvator-XS (Salvator-X 2nd version, RTP0RC77965SIPB012S)
++    compatible = "renesas,salvator-xs", "renesas,r8a77965"
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
+   - SK-RZG1E (YR8A77450S000BE)
 -- 
 2.7.4
