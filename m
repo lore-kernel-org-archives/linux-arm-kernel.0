@@ -1,66 +1,60 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 26 Feb 2018 09:43:27 -0600
-Subject: regression v4.16 on Nokia N900:/dev/input/event6 aka AV Jack
- support disappeared
-In-Reply-To: <20180224214617.GA22619@amd>
-References: <20180224214617.GA22619@amd>
-Message-ID: <052b4de7-5734-925b-7e0d-edf7abeefcfc@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Feb 2018 15:48:49 +0000
+Subject: [RFC PATCH v2 08/12] arm64: cmpxchg: Include build_bug.h instead
+ of bug.h for BUILD_BUG
+In-Reply-To: <1519657500-15094-9-git-send-email-will.deacon@arm.com>
+References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+ <1519657500-15094-9-git-send-email-will.deacon@arm.com>
+Message-ID: <20180226154848.ejqxw5lkbiqqxlsf@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2018 03:46 PM, Pavel Machek wrote:
-> Hi!
+On Mon, Feb 26, 2018 at 03:04:56PM +0000, Will Deacon wrote:
+> Having asm/cmpxchg.h pull in linux/bug.h is problematic because this
+> ends up pulling in the atomic bitops which themselves may be built on
+> top of atomic.h and cmpxchg.h.
 > 
-> In v4.16, AV jack support disappeared.
-> 
-> This one is suspect:
-> 
-> commit 7be4b5dc7ffa9499ac6ef33a5ffa9ff43f9b7057
-> Author: Andrew F. Davis <afd@ti.com>
-> Date:   Wed Nov 29 11:13:59 2017 -0600
-> 
->     ARM: dts: omap3-n900: Fix the audio CODEC's reset pin
-> 
->     The correct DT property for specifying a GPIO used for reset
->         is "reset-gpios", fix this here.
-> 
->     Fixes: 14e3e295b2b9 ("ARM: dts: omap3-n900: Add TLV320AIC3X
->     support")
-> 
-> Signed-off-by: Andrew F. Davis <afd@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> How was it tested? It reverts polarity of reset pin, but
-> sound/soc/codecs/tlv320aic3x.c treats those as aliases:
-> 
+> Instead, just include build_bug.h for the definition of BUILD_BUG.
 
+We also use VM_BUG_ON(), defined in <linux/mmdebug.h>, which includes
+<linux/bug.h>.
 
-The polarity was wrong before, the AIC3x devices are active low reset
-and there is no logic inverters between the SoC and the reset line.
-GPIO_ACTIVE_LOW is therefor the correct polarity.
+... so I think we still have some fragility here, albeit no worse than before.
 
-This does not change the driver behavior as currently it uses the old
-gpio_set_value() which does not respect the polarity as set in DT.
+We also miss includes for:
 
-When this driver is converted to use gpiod_ style calls having the
-polarity correct will be important, and right now the old style gpio
-calls will cause this driver to fail to work if a board comes along that
-does have some logic inversion on the reset line as GPIO_ACTIVE is ignored.
+* <linux/percpu-defs.h> (raw_cpu_ptr)
+* <linux/preempt.h> (preempt_disable, preempt_enable)
+* <linux/compiler.h> (unreachable)
 
-As Pavel points out I think your trouble is elsewhere.
+I'm not sure if those are made worse by this change.
 
-Andrew
+Mark.
 
-
->  ret = of_get_named_gpio(np, "reset-gpios", 0);
->  if (ret >= 0) {
->     aic3x->gpio_reset = ret;
->  } else {
->  ret = of_get_named_gpio(np, "gpio-reset", 0);
->  if (ret > 0) {
->     dev_warn(&i2c->dev, "Using deprecated property \"gpio-r\eset\", please update your DT");
->     aic3x->gpio_reset = ret;
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cmpxchg.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+> index ae852add053d..bc9e07bc6428 100644
+> --- a/arch/arm64/include/asm/cmpxchg.h
+> +++ b/arch/arm64/include/asm/cmpxchg.h
+> @@ -18,7 +18,7 @@
+>  #ifndef __ASM_CMPXCHG_H
+>  #define __ASM_CMPXCHG_H
+>  
+> -#include <linux/bug.h>
+> +#include <linux/build_bug.h>
+>  
+>  #include <asm/atomic.h>
+>  #include <asm/barrier.h>
+> -- 
+> 2.1.4
 > 
 > 
-> 									Pavel
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
