@@ -1,40 +1,54 @@
 From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Mon, 26 Feb 2018 16:33:58 +0800
-Subject: [PATCH v2 0/4] PINCTRL: Mediatek pinctrl driver for mt2712 
-Message-ID: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+Date: Mon, 26 Feb 2018 16:34:00 +0800
+Subject: [PATCH v2 2/4] arm64: dts: mt2712: add pintcrl device node.
+In-Reply-To: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1519634042-12063-3-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes four patches:
-1.Add mt2712 pintcrl head file
-2.Add mt2712 pinctrl device node.
-3.Add mt2712 pinctrl driver.
-4.Support bias-disable of generic and special pins simultaneously
+This patch adds pintcrl device node for mt2712.
 
-Changes in patch v2:
-1)Separate patch4 for supporting bias-disable of generic and special pins.
-2)GPIO16~17 direction setting is changed as generic pins in mt2712 E2,
-  So remove GPIO16~17 special direction setting and remove apmixedsys node in pinctrl device node.
-3)Add pinmux define in "mt2712-pinfunc.h" and "pinctrl-mtk-mt2712.h" for mt2712 E2 design.
+Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Zhiyong Tao (4):
-  arm64: dts: mt2712: add pintcrl file
-  arm64: dts: mt2712: add pintcrl device node.
-  pinctrl: add mt2712 pinctrl driver
-  pintcrl: support bias-disable of generic and special pins
-    simultaneously
-
- arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1129 ++++++++++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi     |   18 +
- drivers/pinctrl/mediatek/Kconfig              |    7 +
- drivers/pinctrl/mediatek/Makefile             |    1 +
- drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  639 ++++++++
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   13 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1973 +++++++++++++++++++++++++
- 7 files changed, 3778 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
-
---
-1.8.1.1.dirty
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index d7688bc..fb3b051 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -9,6 +9,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/mt2712-power.h>
++#include "mt2712-pinfunc.h"
+ 
+ / {
+ 	compatible = "mediatek,mt2712";
+@@ -258,6 +259,23 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	syscfg_pctl_a: syscfg_pctl_a at 10005000 {
++		compatible = "mediatek,mt2712-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
++	};
++
++	pio: pinctrl at 10005000 {
++		compatible = "mediatek,mt2712-pinctrl";
++		reg = <0 0x1000b000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	scpsys: scpsys at 10006000 {
+ 		compatible = "mediatek,mt2712-scpsys", "syscon";
+ 		#power-domain-cells = <1>;
+-- 
+1.9.1
