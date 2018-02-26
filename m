@@ -1,121 +1,127 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 26 Feb 2018 19:24:19 +0900
-Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
-In-Reply-To: <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-3-takahiro.akashi@linaro.org>
- <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180226102418.GD6019@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Feb 2018 18:25:10 +0800
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180226101252.ozdsxjvawgkemz2c@flea.lan>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <CAGb2v67SuK9Xr7_dVb7RVGXUJwYRKnTiJwDrOJ-Su5CXmm7HXA@mail.gmail.com>
+ <20180226101252.ozdsxjvawgkemz2c@flea.lan>
+Message-ID: <CAGb2v64SaBR-_nL9S20eXe57r_kJTiqSg-di=_mZrv3Yx2-2JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 04:49:34PM +0800, Dave Young wrote:
-> Hi AKASHI,
-> 
-> On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
-> > On arm64, no trampline code between old kernel and new kernel will be
-> > required in kexec_file implementation. This patch introduces a new
-> > configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
-> > compiled in only if necessary.
-> 
-> Here also need the explanation about why no purgatory is needed, it would be
-> required for kexec if no strong reason.
+On Mon, Feb 26, 2018 at 6:12 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Sat, Feb 24, 2018 at 12:17:13AM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Feb 23, 2018 at 9:37 PM, Myl?ne Josserand
+>> <mylene.josserand@bootlin.com> wrote:
+>> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
+>> > It should be done by the bootloader but it is currently not the case,
+>> > even for boot CPU because this SoC is booting in secure mode.
+>> > It leads to an random offset value meaning that each CPU will have a
+>> > different time, which isn't working very well.
+>> >
+>> > Add assembly code used for boot CPU and secondary CPU cores to make
+>> > sure that the CNTVOFF register is initialized.
+>> >
+>> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>> > ---
+>> >  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
+>> >  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
+>> >  2 files changed, 25 insertions(+)
+>> >
+>> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+>> > index d5c97e945e69..605896251927 100644
+>> > --- a/arch/arm/mach-sunxi/headsmp.S
+>> > +++ b/arch/arm/mach-sunxi/headsmp.S
+>> > @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
+>> >         first: .word sunxi_mc_smp_first_comer - .
+>> >  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+>> >
+>> > +ENTRY(sunxi_init_cntvoff)
+>> > +       /*
+>> > +        * CNTVOFF has to be initialized either from non-secure Hypervisor
+>> > +        * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+>> > +        * then it should be handled by the secure code
+>> > +        */
+>> > +       cps     #MON_MODE
+>> > +       mrc     p15, 0, r1, c1, c1, 0           /* Get Secure Config */
+>> > +       orr     r0, r1, #1
+>> > +       mcr     p15, 0, r0, c1, c1, 0           /* Set Non Secure bit */
+>> > +       instr_sync
+>> > +       mov     r0, #0
+>> > +       mcrr    p15, 4, r0, r0, c14             /* CNTVOFF = 0 */
+>> > +       instr_sync
+>> > +       mcr     p15, 0, r1, c1, c1, 0           /* Set Secure bit */
+>> > +       instr_sync
+>> > +       cps     #SVC_MODE
+>> > +       ret     lr
+>> > +ENDPROC(sunxi_init_cntvoff)
+>>
+>> There is no need to move all the assembly into a separate file, just
+>> to add this function. Everything can be inlined as a naked function.
+>> The "instr_sync" macro can be replaced with "isb", which is what it
+>> expands to anyway.
+>>
+>> I really want to keep everything self-contained without global symbols,
+>> and in C files if possible.
+>
+> What is the rationale for keeping it in C files (beside the global
+> symbols)? Because the syntax is quite ugly, and it's much easier to
+> read, review and amend using a separate file.
 
-OK, I will add the reason:
-On arm64, crash dump kernel's usable memory is protected by
-*unmapping* it from kernel virtual space unlike other architectures
-where the region is just made read-only.
-So our key developers think that it is highly unlikely that the region
-is accidentally corrupted and this rationalizes that digest check code
-be also dropped from purgatory.
-This greatly simplifies our purgatory without any need for a bit ugly
-relocation stuff, i.e. arch_kexec_apply_relocations_add().
+Global symbols and keeping everything in one place I guess.
+This symbol would be used in a few places, so I suppose having it
+in a separate assembly file would be OK.
 
-Please see:
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
-to find out how simple our purgatory was. All that it does is
-to shuffle arguments and jump into a new kernel.
+>> >  #ifdef CONFIG_SMP
+>> >  ENTRY(sunxi_boot)
+>> >         bl      sunxi_mc_smp_cluster_cache_enable
+>> > +       bl      sunxi_init_cntvoff
+>> >         b       secondary_startup
+>> >  ENDPROC(sunxi_boot)
+>> >
+>> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+>> > index 5e9602ce1573..4bb041492b54 100644
+>> > --- a/arch/arm/mach-sunxi/sunxi.c
+>> > +++ b/arch/arm/mach-sunxi/sunxi.c
+>> > @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
+>> >  };
+>> >
+>> >  extern void __init sun6i_reset_init(void);
+>> > +extern void sunxi_init_cntvoff(void);
+>> > +
+>> >  static void __init sun6i_timer_init(void)
+>> >  {
+>> > +       sunxi_init_cntvoff();
+>>
+>> You should check the enable-method to see if PSCI is set or not,
+>> as an indicator whether the kernel is booted secure or non-secure.
+>
+> It's an indicator, but it's not really a perfect one. You could very
+> well have your kernel booted in non-secure, without PSCI. Or even with
+> PSCI, but without the SMP ops.
+>
+> We have a quite big number of these cases already, where, depending on
+> the configuration, we might not have access to the device we write to,
+> the number of hacks to just enable that device for non-secure is a
+> good example of that.
 
-Without this patch, we would have to have purgatory with a space for
-a hash value (purgatory_sha256_digest) which is never checked against.
+I wouldn't consider them hacks though. The hardware gives the option
+to have control of many devices delegated solely to secure-only, or
+secure/non-secure. Our present model is to support everything we can
+in Linux directly, instead of through some firmware interface to a
+non-existent firmware.
 
-Do you think it makes sense?
+ChenYu
 
-Thanks,
--Takahiro AKASHI
-
-
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Dave Young <dyoung@redhat.com>
-> > Cc: Vivek Goyal <vgoyal@redhat.com>
-> > Cc: Baoquan He <bhe@redhat.com>
-> > ---
-> >  arch/powerpc/Kconfig | 3 +++
-> >  arch/x86/Kconfig     | 3 +++
-> >  kernel/kexec_file.c  | 6 ++++++
-> >  3 files changed, 12 insertions(+)
-> > 
-> > diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> > index 73ce5dd07642..c32a181a7cbb 100644
-> > --- a/arch/powerpc/Kconfig
-> > +++ b/arch/powerpc/Kconfig
-> > @@ -552,6 +552,9 @@ config KEXEC_FILE
-> >  	  for kernel and initramfs as opposed to a list of segments as is the
-> >  	  case for the older kexec call.
-> >  
-> > +config ARCH_HAS_KEXEC_PURGATORY
-> > +	def_bool KEXEC_FILE
-> > +
-> >  config RELOCATABLE
-> >  	bool "Build a relocatable kernel"
-> >  	depends on PPC64 || (FLATMEM && (44x || FSL_BOOKE))
-> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> > index c1236b187824..f031c3efe47e 100644
-> > --- a/arch/x86/Kconfig
-> > +++ b/arch/x86/Kconfig
-> > @@ -2019,6 +2019,9 @@ config KEXEC_FILE
-> >  	  for kernel and initramfs as opposed to list of segments as
-> >  	  accepted by previous system call.
-> >  
-> > +config ARCH_HAS_KEXEC_PURGATORY
-> > +	def_bool KEXEC_FILE
-> > +
-> >  config KEXEC_VERIFY_SIG
-> >  	bool "Verify kernel signature during kexec_file_load() syscall"
-> >  	depends on KEXEC_FILE
-> > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > index e5bcd94c1efb..990adae52151 100644
-> > --- a/kernel/kexec_file.c
-> > +++ b/kernel/kexec_file.c
-> > @@ -26,7 +26,11 @@
-> >  #include <linux/vmalloc.h>
-> >  #include "kexec_internal.h"
-> >  
-> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
-> >  static int kexec_calculate_store_digests(struct kimage *image);
-> > +#else
-> > +static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
-> > +#endif
-> >  
-> >  /* Architectures can provide this probe function */
-> >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> > @@ -520,6 +524,7 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
-> >  	return 0;
-> >  }
-> >  
-> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
-> >  /* Calculate and store the digest of segments */
-> >  static int kexec_calculate_store_digests(struct kimage *image)
-> >  {
-> > @@ -1022,3 +1027,4 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
-> >  
-> >  	return 0;
-> >  }
-> > +#endif /* CONFIG_ARCH_HAS_KEXEC_PURGATORY */
-> > -- 
-> > 2.16.2
-> > 
-> 
-> Thanks
-> Dave
+>> AFAIK trying to set CNTVOFF under non-secure would be very bad.
+>
+> Just like any other access we do :/
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
