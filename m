@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Feb 2018 11:17:34 +0000
-Subject: Applied "ASoC: uniphier: fix broken sound if use SRC in replay" to
- the asoc tree
-In-Reply-To: <20180223121701.13372-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1eqGmk-0005WS-EY@debutante>
+Date: Mon, 26 Feb 2018 11:17:31 +0000
+Subject: Applied "ASoC: sirf: remove duplicated bit-wise or of
+ USP_RXFIFO_THD_INT" to the asoc tree
+In-Reply-To: <20180223124117.24686-1-colin.king@canonical.com>
+Message-ID: <E1eqGmh-0005VX-8k@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: uniphier: fix broken sound if use SRC in replay
+   ASoC: sirf: remove duplicated bit-wise or of USP_RXFIFO_THD_INT
 
 has been applied to the asoc tree at
 
@@ -34,66 +34,33 @@ to this mail.
 Thanks,
 Mark
 
->From 398fa30bf138fd4b928dc11422abfe5486aaa8fe Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Fri, 23 Feb 2018 21:17:01 +0900
-Subject: [PATCH] ASoC: uniphier: fix broken sound if use SRC in replay
+>From f49f49aa1541615f1f77bf2c62f184459825ed92 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Fri, 23 Feb 2018 12:41:17 +0000
+Subject: [PATCH] ASoC: sirf: remove duplicated bit-wise or of
+ USP_RXFIFO_THD_INT
 
-This patch fixes settings for ports with SRC. These ports need to
-set the fixed audio rate and clock. If not, the SRC outputs broken
-sound.
+Bit pattern USP_RXFIFO_THD_INT is being bit-wise or'd twice;
+remove the redundant 2nd USP_RXFIFO_THD_INT
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/uniphier/aio-core.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ sound/soc/sirf/sirf-usp.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
-index 1e5f053d9f6b..1711361fc0c2 100644
---- a/sound/soc/uniphier/aio-core.c
-+++ b/sound/soc/uniphier/aio-core.c
-@@ -501,7 +501,7 @@ int aio_port_set_clk(struct uniphier_aio_sub *sub)
- 				OPORTMXCTR2_MSSEL_MASTER |
- 				OPORTMXCTR2_EXTLSIFSSEL_36 |
- 				OPORTMXCTR2_DACCKSEL_1_2;
--		} else {
-+		} else if (sub->swm->type == PORT_TYPE_SPDIF) {
- 			if (sub->aio->pll_out >= ARRAY_SIZE(v_pll)) {
- 				dev_err(dev, "PLL(%d) is invalid\n",
- 					sub->aio->pll_out);
-@@ -521,6 +521,11 @@ int aio_port_set_clk(struct uniphier_aio_sub *sub)
- 				v |= OPORTMXCTR2_EXTLSIFSSEL_24;
- 				break;
- 			}
-+		} else {
-+			v = OPORTMXCTR2_ACLKSEL_A1 |
-+				OPORTMXCTR2_MSSEL_MASTER |
-+				OPORTMXCTR2_EXTLSIFSSEL_36 |
-+				OPORTMXCTR2_DACCKSEL_1_2;
- 		}
- 		regmap_write(r, OPORTMXCTR2(sub->swm->oport.map), v);
- 	} else {
-@@ -550,11 +555,19 @@ int aio_port_set_param(struct uniphier_aio_sub *sub, int pass_through,
- 		       const struct snd_pcm_hw_params *params)
- {
- 	struct regmap *r = sub->aio->chip->regmap;
-+	unsigned int rate;
- 	u32 v;
- 	int ret;
+diff --git a/sound/soc/sirf/sirf-usp.h b/sound/soc/sirf/sirf-usp.h
+index bf0201cb15bc..e22e13a619e8 100644
+--- a/sound/soc/sirf/sirf-usp.h
++++ b/sound/soc/sirf/sirf-usp.h
+@@ -154,7 +154,7 @@
+ 					USP_RX_IO_DMA_INT|\
+ 					USP_RXFIFO_FULL_INT|\
+ 					USP_RXFIFO_THD_INT|\
+-					USP_RXFIFO_THD_INT|USP_RX_TIMEOUT_INT)
++					USP_RX_TIMEOUT_INT)
  
- 	if (!pass_through) {
--		ret = aio_port_set_rate(sub, params_rate(params));
-+		if (sub->swm->type == PORT_TYPE_EVE ||
-+		    sub->swm->type == PORT_TYPE_CONV) {
-+			rate = 48000;
-+		} else {
-+			rate = params_rate(params);
-+		}
-+
-+		ret = aio_port_set_rate(sub, rate);
- 		if (ret)
- 			return ret;
+ #define USP_INT_ALL        0x1FFF
  
 -- 
 2.16.1
