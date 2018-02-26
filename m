@@ -1,52 +1,96 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Mon, 26 Feb 2018 09:54:01 -0600
-Subject: [PATCH v3 6/7] arm64: allwinner: h6: add the basical Allwinner H6
- DTSI file
-In-Reply-To: <20180226092645.xghkmfowenzlbm42@flea.lan>
-References: <20180223123555.64009-6-icenowy@aosc.io>
- <20180223123555.64009-7-icenowy@aosc.io>
- <20180223152038.2bflylwa6vj4gzfj@flea.lan>
- <81D53DC5-7622-430E-A530-ED0DE5397DC3@aosc.io>
- <20180226092645.xghkmfowenzlbm42@flea.lan>
-Message-ID: <b9bc5944-b9e3-91d7-8012-c87a2b2d17fa@sholland.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 16:56:46 +0100
+Subject: [PATCHv2 6/8] arm_pmu: explicitly enable/disable SPIs at hotplug
+In-Reply-To: <20180226152253.GA19446@arm.com>
+References: <20180205164202.26502-1-mark.rutland@arm.com>
+ <20180205164202.26502-7-mark.rutland@arm.com>
+ <CAMuHMdU9UPhKdNGknZDkrzWDE75sKDdbMNu4RFfU25eVEswLkg@mail.gmail.com>
+ <20180226152253.GA19446@arm.com>
+Message-ID: <CAMuHMdU46fdQgmhKqNyqK9BBHJiwoqHwYvpnM5eTM9sJ3UnUAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/18 03:26, Maxime Ripard wrote:
-> On Fri, Feb 23, 2018 at 11:22:06PM +0800, Icenowy Zheng wrote:
->>>> +	psci {
->>>> +		compatible = "arm,psci-0.2";
->>>> +		method = "smc";
->>>> +	};
->>>
->>> Is it needed? The bootloader should fill it with whatever version it
->>> has, shouldn't it?
+Hi Will,
+
+On Mon, Feb 26, 2018 at 4:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Feb 26, 2018 at 04:16:19PM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Feb 5, 2018 at 5:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > To support ACPI systems, we need to request IRQs before CPUs are
+>> > hotplugged, and thus we need to request IRQs before we know their
+>> > associated PMU.
+>> >
+>> > This is problematic if a PMU IRQ is pending out of reset, as it may be
+>> > taken before we know the PMU, and thus the IRQ handler won't be able to
+>> > handle it, leaving it screaming.
+>> >
+>> > To avoid such problems, lets request all IRQs in a disabled state, and
+>> > explicitly enable/disable them at hotplug time, when we're sure the PMU
+>> > has been probed.
+>> >
+>> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 >>
->> But we now use ATF rather than U-Boot PSCI. U-Boot will not fill ATF
->> info.
+>> This is now commit 6de3f79112cc26bf in v4.16-rc3, and causes a BUG during
+>> CPU offlining (e.g. during system suspend, or during boot with
+>> CONFIG_ARM_PSCI_CHECKER=y).
 >>
->> See A64/H5 device trees.
-> 
-> So if the PSCI version implemented in ATF ever changes, we would have
-> to update all the DT everywhere, but only if you're running the new
-> version?
+>> With CONFIG_ARM_PSCI_CHECKER=y:
+>>
+>> psci_checker: PSCI checker started using 6 CPUs
+>> psci_checker: Starting hotplug tests
+>> psci_checker: Trying to turn off and on again all CPUs
+>> BUG: sleeping function called from invalid context at kernel/irq/manage.c:112
+>> in_atomic(): 1, irqs_disabled(): 128, pid: 15, name: migration/1
+>> no locks held by migration/1/15.
+>> irq event stamp: 192
+>> hardirqs last  enabled at (191): [<00000000803c2507>]
+>> _raw_spin_unlock_irq+0x2c/0x4c
+>> hardirqs last disabled at (192): [<000000007f57ad28>] multi_cpu_stop+0x9c/0x140
+>> softirqs last  enabled at (0): [<0000000004ee1b58>]
+>> copy_process.isra.77.part.78+0x43c/0x1504
+>> softirqs last disabled at (0): [<          (null)>]           (null)
+>> CPU: 1 PID: 15 Comm: migration/1 Not tainted 4.16.0-rc3-salvator-x #1651
+>> Hardware name: Renesas Salvator-X board based on r8a7796 (DT)
+>> Call trace:
+>>  dump_backtrace+0x0/0x140
+>>  show_stack+0x14/0x1c
+>>  dump_stack+0xb4/0xf0
+>>  ___might_sleep+0x1fc/0x218
+>>  __might_sleep+0x70/0x80
+>>  synchronize_irq+0x40/0xa8
+>>  disable_irq+0x20/0x2c
+>
+> Given that these things are CPU-affine, I reckon this should be
+> disable_irq_nosync. Mark?
+>
+> Will
+>
+> --->8
+>
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 0c2ed11c0603..f63db346c219 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -638,7 +638,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
+>                 if (irq_is_percpu_devid(irq))
+>                         disable_percpu_irq(irq);
+>                 else
+> -                       disable_irq(irq);
+> +                       disable_irq_nosync(irq);
+>         }
+>
+>         per_cpu(cpu_armpmu, cpu) = NULL;
 
-Yes but no. PSCI 1.0 is generally backward compatible with PSCI 0.2. In fact,
-the Linux driver treats them exactly the same:
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-        { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
-        { .compatible = "arm,psci-1.0", .data = psci_0_2_init},
+Thanks!
 
-For the H6, however, the oldest ATF source available (which I believe was the
-one in use during bringup) is based on mainline 1.4, and is already at PSCI
-version 1.1:
+Gr{oetje,eeting}s,
 
-[    0.000000] psci: probing for conduit method from DT.
-[    0.000000] psci: PSCIv1.1 detected in firmware.
-[    0.000000] psci: Using standard PSCI v0.2 function IDs
-[    0.000000] psci: MIGRATE_INFO_TYPE not supported.
+                        Geert
 
-So we could go ahead and bump the compatible to "arm,psci-1.0".
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-Samuel
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
