@@ -1,26 +1,35 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 26 Feb 2018 15:31:48 -0800
-Subject: [PATCH 4/4] ARM: bcm2385_defconfig: Enable BT support for BCM43438
-In-Reply-To: <1519567855-26105-5-git-send-email-stefan.wahren@i2se.com>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-5-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87o9kbjpjv.fsf@anholt.net>
+Date: Mon, 26 Feb 2018 15:33:50 -0800
+Subject: [PATCH] i2c: bcm2835: Avoid clock stretching timeouts
+In-Reply-To: <1519422151-6218-1-git-send-email-stefan.wahren@i2se.com>
+References: <1519422151-6218-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87fu5njpgh.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-> The Raspberry Pi Zero W has an onboard BT chip (BCM43438). So enable the
-> necessary HCI UART driver (requires serial device bus).
+> From: Eric Anholt <eric@anholt.net>
 >
+> The CLKT register contains at poweron 0x40, which at our typical 100kHz
+> bus rate means .64ms. But there is no specified limit to how long devices
+> should be able to stretch the clocks, so just disable the timeout. We
+> still have a timeout wrapping the entire transfer.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+> Hi,
+> just like "i2c: bcm2835: Set up the rising/falling edge delays" this is a
+> outstanding bugfix. Unfortunately i only have I2C slaves, which doesn't
+> stretch the clock. So test feedback is very welcome.
 
-Applied patches 2-4 to bcm2835-dt-next and bcm2835-defconfig-next.
-Thanks!
+I also didn't have any particular devices that this fixed.  It was just
+an issue that came up in a previous discussion of clock stretching.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/d561a6d1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/0b6ffd48/attachment.sig>
