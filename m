@@ -1,68 +1,52 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Mon, 26 Feb 2018 10:11:45 +0200
-Subject: [PATCH v3 01/10] pwm: extend PWM framework with PWM modes
-In-Reply-To: <201802250410.reI8wAy2%fengguang.wu@intel.com>
-References: <1519300881-8136-2-git-send-email-claudiu.beznea@microchip.com>
- <201802250410.reI8wAy2%fengguang.wu@intel.com>
-Message-ID: <a26cdf7b-024e-957b-8691-c3c898d0d9d6@microchip.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 26 Feb 2018 09:13:34 +0100
+Subject: [PATCH v2] ARM: dts: imx6ul: add wdog3 node
+In-Reply-To: <20180225012446.24499-1-joerg.krause@embedded.rocks>
+References: <20180225012446.24499-1-joerg.krause@embedded.rocks>
+Message-ID: <9e8be8f6d33f53033b9929a9be37c889@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'll rebase it on latest for-next in next version.
+On 25.02.2018 02:24, J?rg Krause wrote:
+> The i.MX6UL(L) has a WDOG3 located at start address 0x021E0000 in the
+> AIPS-2 memory region [1].
+> 
+> [1] i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1,
+>     04/2016, Table-2-3 AIPS-2 memory map, p. 166
 
-Thank you,
-Claudiu Beznea
+And it seems that WDOG3 is also available on 6ULL, so imx6ull.dtsi
+should be fine.
 
-On 24.02.2018 22:49, kbuild test robot wrote:
-> Hi Claudiu,
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+
+--
+Stefan
+
 > 
-> Thank you for the patch! Perhaps something to improve:
-> 
-> [auto build test WARNING on pwm/for-next]
-> [also build test WARNING on v4.16-rc2 next-20180223]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Claudiu-Beznea/extend-PWM-framework-to-support-PWM-modes/20180225-024011
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm.git for-next
-> config: xtensa-allmodconfig (attached as .config)
-> compiler: xtensa-linux-gcc (GCC) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=xtensa 
-> 
-> All warnings (new ones prefixed by >>):
-> 
->>> drivers//pwm/pwm-sun4i.c:36:0: warning: "PWM_MODE" redefined
->     #define PWM_MODE  BIT(7)
->     
->    In file included from drivers//pwm/pwm-sun4i.c:19:0:
->    include/linux/pwm.h:40:0: note: this is the location of the previous definition
->     #define PWM_MODE(name)  BIT(PWM_MODE_##name##_BIT)
->     
-> 
-> vim +/PWM_MODE +36 drivers//pwm/pwm-sun4i.c
-> 
-> 09853ce7 Alexandre Belloni 2014-12-17  29  
-> 09853ce7 Alexandre Belloni 2014-12-17  30  #define PWMCH_OFFSET		15
-> 09853ce7 Alexandre Belloni 2014-12-17  31  #define PWM_PRESCAL_MASK	GENMASK(3, 0)
-> 09853ce7 Alexandre Belloni 2014-12-17  32  #define PWM_PRESCAL_OFF		0
-> 09853ce7 Alexandre Belloni 2014-12-17  33  #define PWM_EN			BIT(4)
-> 09853ce7 Alexandre Belloni 2014-12-17  34  #define PWM_ACT_STATE		BIT(5)
-> 09853ce7 Alexandre Belloni 2014-12-17  35  #define PWM_CLK_GATING		BIT(6)
-> 09853ce7 Alexandre Belloni 2014-12-17 @36  #define PWM_MODE		BIT(7)
-> 09853ce7 Alexandre Belloni 2014-12-17  37  #define PWM_PULSE		BIT(8)
-> 09853ce7 Alexandre Belloni 2014-12-17  38  #define PWM_BYPASS		BIT(9)
-> 09853ce7 Alexandre Belloni 2014-12-17  39  
-> 
-> :::::: The code at line 36 was first introduced by commit
-> :::::: 09853ce7bc1003a490c7ee74a5705d7a7cf16b7d pwm: Add Allwinner SoC support
-> 
-> :::::: TO: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> :::::: CC: Thierry Reding <thierry.reding@gmail.com>
-> 
+> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> v2:
+>  * Fix IRQ number
+> ---
+>  arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+> index 81c426e1b664..1241972b16ba 100644
+> --- a/arch/arm/boot/dts/imx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+> @@ -931,6 +931,14 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			wdog3: wdog at 21e4000 {
+> +				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
+> +				reg = <0x021e4000 0x4000>;
+> +				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6UL_CLK_WDOG3>;
+> +				status = "disabled";
+> +			};
+> +
+>  			uart2: serial at 21e8000 {
+>  				compatible = "fsl,imx6ul-uart",
+>  					     "fsl,imx6q-uart";
