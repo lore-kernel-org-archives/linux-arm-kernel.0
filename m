@@ -1,62 +1,53 @@
-From: regressions@leemhuis.info (Thorsten Leemhuis)
-Date: Mon, 26 Feb 2018 10:47:45 +0100
-Subject: regression v4.16 on Nokia N900:/dev/input/event6 aka AV Jack
- support disappeared
-In-Reply-To: <20180224214617.GA22619@amd>
-References: <20180224214617.GA22619@amd>
-Message-ID: <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Feb 2018 09:51:55 +0000
+Subject: [PATCH] arm64: mm: fix thinko in non-global page table attribute
+ check
+In-Reply-To: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
+References: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180226095154.GA7920@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JFYI: This issues is tracked in the regression reports for Linux 4.16
-(http://bit.ly/lnxregrep416 ) with this id:
+On Fri, Feb 23, 2018 at 06:04:48PM +0000, Ard Biesheuvel wrote:
+> The routine pgattr_change_is_safe() was extended in commit 4e6020565596
+> ("arm64: mm: Permit transitioning from Global to Non-Global without BBM")
+> to permit changing the nG attribute from not set to set, but did so in a
+> way that inadvertently disallows such changes if other permitted attribute
+> changes take place at the same time. So update the code to take this into
+> account.
+> 
+> Fixes: 4e6020565596 ("arm64: mm: Permit transitioning from Global to ...")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/mmu.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 451f96f3377c..5bdc2c4db9ad 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+>  	 * The following mapping attributes may be updated in live
+>  	 * kernel mappings without the need for break-before-make.
+>  	 */
+> -	static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
+> +	static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE | PTE_NG;
+>  
+>  	/* creating or taking down mappings is always safe */
+>  	if (old == 0 || new == 0)
+> @@ -117,9 +117,9 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+>  	if ((old | new) & PTE_CONT)
+>  		return false;
+>  
+> -	/* Transitioning from Global to Non-Global is safe */
+> -	if (((old ^ new) == PTE_NG) && (new & PTE_NG))
+> -		return true;
+> +	/* Transitioning from Non-Global to Global is unsafe */
+> +	if (old & ~new & PTE_NG)
+> +		return false;
 
-Linux-Regression-ID: lr#4b650f
+Oops, sorry about this:
 
-Please include this line in the comment section of patches that are
-supposed to fix the issue. Please also mention the string once in other
-mailinglist threads or different bug tracking entries if you or someone
-else start to discuss the issue there. By including that string you make
-it a whole lot easier to track where an issue gets discussed and how far
-patches to fix it have made it. For more details on this please see
-here: http://bit.ly/lnxregtrackid
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thx for your help. Ciao, Thorsten
-
-On 24.02.2018 22:46, Pavel Machek wrote:
-> Hi!
-> 
-> In v4.16, AV jack support disappeared.
-> 
-> This one is suspect:
-> 
-> commit 7be4b5dc7ffa9499ac6ef33a5ffa9ff43f9b7057
-> Author: Andrew F. Davis <afd@ti.com>
-> Date:   Wed Nov 29 11:13:59 2017 -0600
-> 
->     ARM: dts: omap3-n900: Fix the audio CODEC's reset pin
-> 
->     The correct DT property for specifying a GPIO used for reset
->         is "reset-gpios", fix this here.
-> 
->     Fixes: 14e3e295b2b9 ("ARM: dts: omap3-n900: Add TLV320AIC3X
->     support")
-> 
-> Signed-off-by: Andrew F. Davis <afd@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> How was it tested? It reverts polarity of reset pin, but
-> sound/soc/codecs/tlv320aic3x.c treats those as aliases:
-> 
->  ret = of_get_named_gpio(np, "reset-gpios", 0);
->  if (ret >= 0) {
->     aic3x->gpio_reset = ret;
->  } else {
->  ret = of_get_named_gpio(np, "gpio-reset", 0);
->  if (ret > 0) {
->     dev_warn(&i2c->dev, "Using deprecated property \"gpio-r\eset\", please update your DT");
->     aic3x->gpio_reset = ret;
-> 
-> 
-> 									Pavel
-> 
+Will
