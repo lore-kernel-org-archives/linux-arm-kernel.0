@@ -1,58 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Feb 2018 10:31:51 +0100
-Subject: [PATCH] drm/sun4i: link in front-end code if needed
-In-Reply-To: <20180226092129.t4uogg2q7jkeolbu@flea.lan>
-References: <20180223131112.715992-1-arnd@arndb.de>
- <20180226092129.t4uogg2q7jkeolbu@flea.lan>
-Message-ID: <CAK8P3a1w=hLzZLPe1TURPyyu5oxpG8yD0eb_8GrVviUODy0zqQ@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 26 Feb 2018 10:32:14 +0100
+Subject: [PATCH] cpufreq: scpi: invoke frequency-invariance setter function
+In-Reply-To: <23dba70b-aa83-4a21-a33d-733bec215264@arm.com>
+References: <20180220111057.14756-1-dietmar.eggemann@arm.com>
+ <CAJZ5v0hB+Uk8SNVqUH3fr1y0SXbY1Rd26b84P-8PPV8FiPbnWw@mail.gmail.com>
+ <23dba70b-aa83-4a21-a33d-733bec215264@arm.com>
+Message-ID: <CAJZ5v0iYdR84O-z99yNBeK3kd7fE7AZYDKWH+oDFN77Ai_a6xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 10:21 AM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> Hi,
+On Mon, Feb 26, 2018 at 8:49 AM, Dietmar Eggemann
+<dietmar.eggemann@arm.com> wrote:
+> On 02/22/2018 11:27 PM, Rafael J. Wysocki wrote:
+>> On Tue, Feb 20, 2018 at 12:10 PM, Dietmar Eggemann
+>> <dietmar.eggemann@arm.com> wrote:
 >
-> On Fri, Feb 23, 2018 at 02:06:52PM +0100, Arnd Bergmann wrote:
->> When the base sun4i DRM driver is built-in but the back-end is
->> a loadable module, we run into a link error:
->>
->> drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
->> sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
->>
->> The dependency is a bit tricky, the best workaround I have come up
->> with is to use a Makefile hack to to interpret both
->> CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
->> as a directive to build the front-end the same way as the main module.
->>
->> Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  drivers/gpu/drm/sun4i/Makefile | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
->> index 582607c0c488..db14e023256b 100644
->> --- a/drivers/gpu/drm/sun4i/Makefile
->> +++ b/drivers/gpu/drm/sun4i/Makefile
->> @@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)             += sun4i-tcon.o
->>  obj-$(CONFIG_DRM_SUN4I)              += sun4i_tv.o
->>  obj-$(CONFIG_DRM_SUN4I)              += sun6i_drc.o
->>
->> -obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o sun4i-frontend.o
->> +obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o
->> +ifdef CONFIG_DRM_SUN4I_BACKEND
->> +obj-$(CONFIG_DRM_SUN4I)              += sun4i-frontend.o
->> +endif
+> [...]
 >
-> Can we just create a Kconfig symbol, selected by DRM_SUN4I_BACKEND,
-> and we would export the symbol?
+>>> Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
+>>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>>> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+>>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>> This is really minor, but I would reorder this slightly.
+>
+> Tried to figure out what would be the better order. Not sure since I saw
+> different examples. Can you tell what would be the best tag order?
 
-Yes, I think that would work just as well. Something like
+I was talking about the patch, not about tags, sorry for the confusion.
 
-config DRM_SUN4I_FRONTEND
-      tristate
-      default DRM_SUN4I if CONFIG_DRM_SUN4I_BACKEND != n
-
-should do the trick.
-
-      Arnd
+Frankly, I don't care about the ordering of the tags. :-)
