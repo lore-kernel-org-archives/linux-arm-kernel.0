@@ -1,36 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Feb 2018 18:05:21 +0000
-Subject: [PATCH v2 2/2] arm64: Expose Arm v8.4 features
-In-Reply-To: <20180207142106.10716-2-suzuki.poulose@arm.com>
-References: <20180207142106.10716-1-suzuki.poulose@arm.com>
- <20180207142106.10716-2-suzuki.poulose@arm.com>
-Message-ID: <20180226180521.GH26147@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 19:20:37 +0100
+Subject: [PATCH 6/8] iommu/ipmmu-vmsa: Hook up R8A77965 DT matching code
+In-Reply-To: <1519667836-31330-7-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519667836-31330-7-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVRCWeCYcxL-iiaQ0oKCh9cAaQSieBU2KMR-F5NHrq1TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 02:21:06PM +0000, Suzuki K Poulose wrote:
-> Expose the new features introduced by Arm v8.4 extensions to
-> Arm v8-A profile.
-> 
-> These include :
-> 
->  1) Data indpendent timing of instructions. (DIT, exposed as HWCAP_DIT)
->  2) Unaligned atomic instructions and Single-copy atomicity of loads
->     and stores. (AT, expose as HWCAP_USCAT)
->  3) LDAPR and STLR instructions with immediate offsets (extension to
->     LRCPC, exposed as HWCAP_ILRCPC)
->  4) Flag manipulation instructions (TS, exposed as HWCAP_FLAGM).
+On Mon, Feb 26, 2018 at 6:57 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Add support for R-Car M3-N (R8A77965) SoC IPMMUs.
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Please resend this but continuing with the default of FTR_STRICT, as we
-currently have. That way this can be merged while we work out what we want
-to do there.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> While at it get rid of the RES0 entries in the cpu-feature-registers.txt
-> documentation, as:
->  1) We care only about the user visible fields.
->  2) The field may not be up-to-date
->  3) We already explain the rules of the fields if it is not visible.
+Gr{oetje,eeting}s,
 
-Please spin this part as a separate patch.
+                        Geert
 
-Will
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
