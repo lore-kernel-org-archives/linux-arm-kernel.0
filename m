@@ -1,58 +1,55 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:10 +0800
-Subject: [PATCH 36/52] arm64: KVM: Make PSCI_VERSION a fast path
+Date: Mon, 26 Feb 2018 16:19:55 +0800
+Subject: [PATCH 21/52] arm64: cpufeature: Pass capability structure to
+ ->enable callback
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-37-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-22-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 90348689d500 upstream.
+commit 0a0d111d40fd upstream.
 
-For those CPUs that require PSCI to perform a BP invalidation,
-going all the way to the PSCI code for not much is a waste of
-precious cycles. Let's terminate that call as early as possible.
+In order to invoke the CPU capability ->matches callback from the ->enable
+callback for applying local-CPU workarounds, we need a handle on the
+capability structure.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch passes a pointer to the capability structure to the ->enable
+callback.
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kvm/hyp/switch.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index cf6d962..3eab6ac 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,7 @@
+Conflicts:
+	arch/arm64/kernel/cpufeature.c
+---
+ arch/arm64/kernel/cpufeature.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index fcb67e0..5c41ef6 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -949,7 +949,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ 			 * uses an IPI, giving us a PSTATE that disappears when
+ 			 * we return.
+ 			 */
+-			stop_machine(caps->enable, NULL, cpu_online_mask);
++			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
+ }
  
- #include <linux/types.h>
- #include <linux/jump_label.h>
-+#include <uapi/linux/psci.h>
+ /*
+@@ -1005,7 +1005,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+ 			cpu_die_early();
+ 		}
+ 		if (caps->enable)
+-			caps->enable(NULL);
++			caps->enable((void *)caps);
+ 	}
+ }
  
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-@@ -308,6 +309,18 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
- 
-+	if (exit_code == ARM_EXCEPTION_TRAP &&
-+	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
-+	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
-+	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
-+		u64 val = PSCI_RET_NOT_SUPPORTED;
-+		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+			val = 2;
-+
-+		vcpu_set_reg(vcpu, 0, val);
-+		goto again;
-+	}
-+
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
 -- 
 2.7.4
