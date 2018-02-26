@@ -1,56 +1,55 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 26 Feb 2018 08:41:13 +0000
-Subject: [PATCH v2 14/15] clk: stm32: Add clk entry for SDMMC2 on stm32F769
-In-Reply-To: <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
-References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
- <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
-Message-ID: <fb3b26e8-0102-122b-1386-68a661139706@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Feb 2018 09:43:26 +0100
+Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
+ 'select MFD_SYSCON'
+In-Reply-To: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Michael
-
-It's a gentle reminder as this patch is present on mailing list and 
-acked-by since 01/12/2018
-
-Thanks
-
-Patrice
-
-On 01/16/2018 01:30 PM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> STM32F769 has 2 SDMMC port, add clock entry for the second one.
-> 
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
+> used with care - it forces a lower limit of another symbol, ignoring
+> the dependency.
+>
+> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
+> select it.
+>
+> This causes unmet dependencies for architecture without HAS_IOMEM.
+>
+>   $ make ARCH=score randconfig
+>   scripts/kconfig/conf  --randconfig Kconfig
+>   KCONFIG_SEED=0x27C47F43
+>   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
+>   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+>
+> Use 'depends on' to observe the dependency.
+>
+> This commit was created by the following command:
+>
+>   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
+>     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
+>
+> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
+>
+> Also, make MFD_SYSCON 'default y' because some defconfig files may
+> rely on someone select's MFD_SYSCON.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> 
-> v2 _ Add Acked-by
-> 
->   drivers/clk/clk-stm32f4.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-> index 96c6b6b..8f8a178 100644
-> --- a/drivers/clk/clk-stm32f4.c
-> +++ b/drivers/clk/clk-stm32f4.c
-> @@ -282,6 +282,7 @@ struct stm32f4_gate_data {
->   
->   	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
->   	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
-> +	{ STM32F4_RCC_APB2ENR,  7,	"sdmmc2",	"sdmux"    },
->   	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
->   	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
->   	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
-> @@ -315,7 +316,7 @@ struct stm32f4_gate_data {
->   
->   static const u64 stm32f746_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
->   						      0x0000000000000003ull,
-> -						      0x04f77f033e01c9ffull };
-> +						      0x04f77f833e01c9ffull };
->   
->   static const u64 *stm32f4_gate_map;
->   
-> 
+>
+> If you have a better idea to fix 'unmet dependencies',
+> please suggest.
+
+Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
+of defconfig configurations, I'd rather not do that.
+
+Only score, tile and um have some configurations that select 'NO_IOMEM'.
+Score is getting removed now, tile might get removed later (we could make
+PCI mandatory in the meantime to avoid that configuration), and I think for
+um, we already have a workaround for the NO_IOMEM dependencies
+(I forget the details).
+
+        Arnd
