@@ -1,25 +1,24 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 19:16:38 +0100
-Subject: [PATCH 1/8] arm64: dts: renesas: salvator-common: Override
- EtherAVB phy-mode
-In-Reply-To: <1519667836-31330-2-git-send-email-jacopo+renesas@jmondi.org>
+Date: Mon, 26 Feb 2018 19:17:27 +0100
+Subject: [PATCH 2/8] arm64: dts: renesas: r8a7796: Set EtherAVB phy mode
+ to "rgmii"
+In-Reply-To: <1519667836-31330-3-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519667836-31330-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWM4-pisr+Yg4FABf0RnY_=2hnCvsmKYdUVe+FwM0T+rQ@mail.gmail.com>
+ <1519667836-31330-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdVnS3_f6ZsaJ3=SqZwAdKv+mWqJ1_q2VpKD+VMvsqZEnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Feb 26, 2018 at 6:57 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> As the PHY interface installed on the Salvator-X[S] board, provides TX
-> channel delay, make the "phy-mode" property a board-specific one, meant
-> to override the one specified in the SoC DTSI.
->
-> Follow up patches will reset the SoC DTSI to use "rgmii" mode and let
-> the board file override that.
+> Set the "phy-mode" property of EtherAVB device to "rgmii" and let board
+> files override it if the installed PHY layer provides delays for the
+> RX/TX channels.
 >
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+But you need a patch to update ulcb.dtsi first.
 
 Gr{oetje,eeting}s,
 
