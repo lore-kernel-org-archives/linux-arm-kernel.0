@@ -1,68 +1,51 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:52 +0800
-Subject: [PATCH 18/52] arm64: cpufeature: __this_cpu_has_cap() shouldn't stop
- early
+Date: Mon, 26 Feb 2018 16:19:53 +0800
+Subject: [PATCH 19/52] arm64: cpu_errata: Allow an erratum to be match for all
+ revisions of a core
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-19-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-20-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit edf298cfce47 upstream.
-Alex Shi rewrite this commit on func this_cpu_has_cap(). The following commit
-log is still meaningful.
+commit 06f1494f837 upstream.
 
-    this_cpu_has_cap() tests caps->desc not caps->matches, so it stops
-    walking the list when it finds a 'silent' feature, instead of
-    walking to the end of the list.
+Some minor erratum may not be fixed in further revisions of a core,
+leading to a situation where the workaround needs to be updated each
+time an updated core is released.
 
-    Prior to v4.6's 644c2ae198412 ("arm64: cpufeature: Test 'matches' pointer
-    to find the end of the list") we always tested desc to find the end of
-    a capability list. This was changed for dubious things like PAN_NOT_UAO.
-    v4.7's e3661b128e53e ("arm64: Allow a capability to be checked on
-    single CPU") added this_cpu_has_cap() using the old desc style test.
+Introduce a MIDR_ALL_VERSIONS match helper that will work for all
+versions of that MIDR, once and for all.
 
-    CC: Suzuki K Poulose <suzuki.poulose@arm.com>
-    Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-    Signed-off-by: James Morse <james.morse@arm.com>
-    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/futex.h | 1 +
- arch/arm64/kernel/cpufeature.c | 4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/cpu_errata.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 1943cf6..718140a 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index b75e917..c66a673c 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ 	.midr_range_min = min, \
+ 	.midr_range_max = max
  
- #include <linux/futex.h>
- #include <linux/uaccess.h>
-+#include <linux/compiler.h>
- 
- #include <asm/errno.h>
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 3a129d4..fcb67e0 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1063,8 +1063,8 @@ bool this_cpu_has_cap(unsigned int cap)
- 	if (WARN_ON(preemptible()))
- 		return false;
- 
--	for (caps = arm64_features; caps->desc; caps++)
--		if (caps->capability == cap && caps->matches)
-+	for (caps = arm64_features; caps->matches; caps++)
-+		if (caps->capability == cap)
- 			return caps->matches(caps, SCOPE_LOCAL_CPU);
- 
- 	return false;
++#define MIDR_ALL_VERSIONS(model) \
++	.def_scope = SCOPE_LOCAL_CPU, \
++	.matches = is_affected_midr_range, \
++	.midr_model = model, \
++	.midr_range_min = 0, \
++	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
 -- 
 2.7.4
