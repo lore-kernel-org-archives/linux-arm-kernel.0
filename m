@@ -1,30 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Feb 2018 21:42:02 +0100
-Subject: [PATCH] ARM: dts: Set D-Link DNS-313 SATA to muxmode 0
-In-Reply-To: <20180225130814.26515-1-linus.walleij@linaro.org>
-References: <20180225130814.26515-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a3-jvmRF1HoRqBcik0HcQ1xd4bXFXzhoREnVyV9eevGAQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 26 Feb 2018 23:48:47 +0300
+Subject: [PATCH v2 0/2] Add R8A77970/Eagle I2C support
+Message-ID: <3aaa4464-fc85-3fb4-2026-5d9df357bdff@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 25, 2018 at 2:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This stops the driver from trying to probe the ATA slave
-> interface. The vendor code enables the slave interface
-> but the driver in the vendor tree does not make use of
-> it.
->
-> Setting it to muxmode 0 disables the slave interface:
-> the hardware only has the master interface connected
-> to the one harddrive slot anyways.
->
-> Without this change booting takes excessive time, so it
-> is very annoying to end users.
->
-> Fixes: dd5c0561db75 ("ARM: dts: Add basic devicetree for D-Link DNS-313")
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this for fixes for v4.16.
+Hello!
 
-Applied, thanks!
+Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20180226-v4.16-rc3' tag. We're adding the R8A77970 I2C nodes
+and then describing the PCA9654 I/O expander connected to the I2C0 bus.
 
-      Arnd
+[1/2] arm64: dts: renesas: r8a77970: add I2C support
+[2/2] arm64: dts: renesas: eagle: add I2C0 support
+
+WBR, Sergei
