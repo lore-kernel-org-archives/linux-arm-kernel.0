@@ -1,88 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 26 Feb 2018 10:23:00 -0800
-Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
- kevin panel
-In-Reply-To: <20180208174855.55620-7-seanpaul@chromium.org>
-References: <20180208174855.55620-1-seanpaul@chromium.org>
- <20180208174855.55620-7-seanpaul@chromium.org>
-Message-ID: <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 19:19:35 +0100
+Subject: [PATCH 5/8] dt-bindings: iommu/ipmmu-vmsa: Add R-Car M3-N
+ (R8A77965)
+In-Reply-To: <1519667836-31330-6-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519667836-31330-6-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdWyKOT_aGfgkfZMFVTj3-__OmbiOrYqxXP5fL-ApLTifA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
-> This patch adds an override mode for kevin devices. The mode increases
-> both back porches to allow a pixel clock of 26666kHz as opposed to the
-> 'typical' value of 252750kHz. This is needed to avoid interference with
-> the touch digitizer on these laptops.
+On Mon, Feb 26, 2018 at 6:57 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Add Renesas R-Car M3-N (R8A77965) compat string to IPMMU DT bindings
+> documentation.
 >
-> Changes in v2:
->  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
-> Changes in v3:
->  - Unwrap the timing from display-timings and rename panel-timing (Rob)
->
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: St?phane Marchesin <marcheu@chromium.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-rockchip at lists.infradead.org
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index 191a6bcb1704..658411ce37ea 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -98,6 +98,20 @@
->                 backlight = <&backlight>;
->                 power-supply = <&pp3300_disp>;
->
-> +               panel-timing {
-> +                       clock-frequency = <266604720>;
-> +                       hactive = <2400>;
-> +                       hfront-porch = <48>;
-> +                       hback-porch = <84>;
-> +                       hsync-len = <32>;
-> +                       hsync-active = <0>;
-> +                       vactive = <1600>;
-> +                       vfront-porch = <3>;
-> +                       vback-porch = <120>;
-> +                       vsync-len = <10>;
-> +                       vsync-active = <0>;
-> +               };
-> +
->                 ports {
->                         panel_in_edp: endpoint {
->                                 remote-endpoint = <&edp_out_panel>;
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Kristian brought an old bug to my attention
-<https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
-made me think.  Should we somehow adjust the bindings here to account
-for the fact that a board may source several different panels?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-AKA: on some boards an ODM may want to second source (or third source,
-or ...) the panel.  They'll randomly connect several different panels
-to the board and ship the boards out.  The panels are all compatible
-electrically (same power sequencing) but might need slightly different
-timings.  In this particular case there's no board-level strappings
-for the different panels--it's assumed that the EDID on the panels can
-be used to distinguish them.
+Gr{oetje,eeting}s,
 
-In that case it seems like it would be nice to allow specifying more
-than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
-present in the EDID?
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Is that something we'd want to account for before we land this series?
- It seems like it would just be adding an extra level of nodes?
-
-
--Doug
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
