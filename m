@@ -1,52 +1,47 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 26 Feb 2018 09:44:33 +0100
-Subject: [PATCH v2 1/4] dt-bindings: pwm: binding allwinner sun8i.
-In-Reply-To: <20180225135045.GA14508@arx-s1>
-References: <20180225135045.GA14508@arx-s1>
-Message-ID: <20180226084433.jcahdixnz63jo34m@flea.lan>
+Date: Mon, 26 Feb 2018 09:49:19 +0100
+Subject: [PATCH v2 2/4] ARM: dtsi: add pwm node for sun8i.
+In-Reply-To: <20180225135134.GA14529@arx-s1>
+References: <20180225135134.GA14529@arx-s1>
+Message-ID: <20180226084919.wt2yljq3nxr5g2vu@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Feb 25, 2018 at 09:50:45PM +0800, hao_zhang wrote:
-> This patch adds allwinner sun8i pwm binding documents.
+On Sun, Feb 25, 2018 at 09:51:34PM +0800, hao_zhang wrote:
+> This patch adds pwm node for sun8i.
 > 
 > Signed-off-by: hao_zhang <hao5781286@gmail.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+>  arch/arm/boot/dts/sun8i-r40.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> new file mode 100644
-> index 0000000..e8c48be
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> @@ -0,0 +1,18 @@
-> +Allwinner sun8i R40/V40/T3 SoC PWM controller
+> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> index 173dcc1..99a0261 100644
+> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> @@ -295,6 +295,11 @@
+>  				bias-pull-up;
+>  			};
+>  
+> +			pwm_ch0_pin: pwm-ch0-pin {
+> +				pins = "PB2";
+> +				function = "pwm";
+> +			};
 > +
-> +Required properties:
-> +  - compatible: should be one of:
-> +    - "allwinner,sun8i-r40-pwm"
-> +  - reg: physical base address and length of the controller's registers
-> +  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-> +    the cells format.
-> +  - clocks: From common clock binding, handle to the parent clock.
-> +
-> +Example:
-> +
-> +pwm: pwm at 1c23400 {
-> +	     compatible = "allwinner,sun8i-pwm";
+>  			uart0_pb_pins: uart0-pb-pins {
+>  				pins = "PB22", "PB23";
+>  				function = "uart0";
+> @@ -306,6 +311,14 @@
+>  			reg = <0x01c20c90 0x10>;
+>  		};
+>  
+> +		pwm: pwm at 1c23400 {
+> +			     compatible = "allwinner,sun8i-r40-pwm";
+> +			     reg = <0x01c23400 0x154>;
 
-The compatible you have here isn't the one documented.
+The size must be the size of the whole memory block allocated to the
+controller, so that would be 0x400 in this case.
 
-> +	     reg = <0x01c23400 0x154>;
-
-And the size isn't correct, even though that doesn't really make any
-difference here.
-
-Thanks!
 Maxime
 
 -- 
@@ -59,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/67e22370/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/01b8f6e2/attachment-0001.sig>
