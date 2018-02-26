@@ -1,131 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 26 Feb 2018 11:51:58 +0000
-Subject: [RFC PATCH] irqchip/gic-v3-its: apply ACPI device based quirks
-In-Reply-To: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-References: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180226115158.GC19841@e107981-ln.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 26 Feb 2018 20:53:29 +0900
+Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
+ 'select MFD_SYSCON'
+In-Reply-To: <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+Message-ID: <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 02:11:18PM +0000, Ard Biesheuvel wrote:
-> Reapply the SynQuacer quirk for ITS frames that are matched by 'SCX0005'
-> based ACPI devices, replacing the dummy fwnode with the one populated by
-> the ACPI device core.
-> 
-> This allows the SynQuacer ACPI tables to publish a device node such
-> as
-> 
->     Device (ITS0) {
->       Name (_HID, "SCX0005")
->       Name (_ADR, 0x30020000)
+2018-02-26 17:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
+>> used with care - it forces a lower limit of another symbol, ignoring
+>> the dependency.
+>>
+>> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
+>> select it.
+>>
+>> This causes unmet dependencies for architecture without HAS_IOMEM.
+>>
+>>   $ make ARCH=score randconfig
+>>   scripts/kconfig/conf  --randconfig Kconfig
+>>   KCONFIG_SEED=0x27C47F43
+>>   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
+>>   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+>>
+>> Use 'depends on' to observe the dependency.
+>>
+>> This commit was created by the following command:
+>>
+>>   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
+>>     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
+>>
+>> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
+>>
+>> Also, make MFD_SYSCON 'default y' because some defconfig files may
+>> rely on someone select's MFD_SYSCON.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>> If you have a better idea to fix 'unmet dependencies',
+>> please suggest.
+>
+> Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
+> of defconfig configurations, I'd rather not do that.
 
-You can't have both _HID and _ADR (ACPI 6.2 - 6.1 - page 321) and
-I do not think _ADR is the correct binding to solve this problem either
-(_ADR can only be used for enumerable busses).
 
->       Name (_DSD, Package ()  // _DSD: Device-Specific Data
->       {
->         ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->         Package () {
->           Package (2) {
->             "socionext,synquacer-pre-its",
->             Package () { 0x58000000, 0x200000 }
->           },
->         }
->       })
->     }
-> 
-> which will trigger the existing quirk that replaces the doorbell
-> address with the appropriate address in the pre-ITS frame.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Marc, Lorenzo,
-> 
-> I am aware that this patch may be seen as controversial, but I would like to
-> propose it nonetheless. The reason is that this is the only thing standing in
-> the way of full ACPI support in Socionext SynQuacer based platforms.
+Could you explain why?
 
-I question whether these platforms should have upstream and long-term
-ACPI support(dependency) - that's where the controversy is (aka if you
-allow one quirk you allow them all), I do not want to add a dependency
-to the ITS ACPI support for a platform that may well/is likely to be
-short-lived.
+I set 'default y' for MFD_SYSCON.
 
-> The pre-ITS is a monstrosity, but as it turns out, Socionext had help from
-> ARM designing it, and the reason we need DT/ACPI based quirks in the first
-> place is that the IIDR of this GICv3 implementation is simply the ARM Ltd.
-> one (as they designed the IP)
-> 
-> Please take this into consideration when reviewing this patch,
-> 
-> Thanks,
-> Ard.
-> 
->  drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 06f025fd5726..a63973baf08a 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -3517,3 +3517,42 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
->  
->  	return 0;
->  }
-> +
-> +#if defined(CONFIG_SOCIONEXT_SYNQUACER_PREITS) && defined(CONFIG_ACPI)
-> +static acpi_status __init acpi_its_device_probe (acpi_handle handle,
-> +						 u32 depth, void *context,
-> +						 void **ret)
-> +{
-> +	struct acpi_device *adev;
-> +	unsigned long long phys_base;
-> +	struct its_node *its;
-> +	acpi_status status;
-> +	int err;
-> +
-> +	err = acpi_bus_get_device(handle, &adev);
-> +	if (err)
-> +		return AE_CTRL_TERMINATE;
-> +
-> +	status = acpi_evaluate_integer(handle, "_ADR", NULL, &phys_base);
-> +	if (ACPI_FAILURE(status))
-> +		return status;
+Would it still break defconfig configurations?
 
-I do not think using _ADR is correct here, the phys_base should be
-described as a _CRS (or you avoided using _CRS for resources
-conflicts ? Still, I do not think that using _ADR is right).
 
-> +	list_for_each_entry(its, &its_nodes, entry)
-> +		if (its->phys_base == phys_base) {
-> +			irq_domain_free_fwnode(its->fwnode_handle);
-> +			its->fwnode_handle = &adev->fwnode;
-> +			its_enable_quirk_socionext_synquacer(its);
-> +			break;
-> +		}
 
-I think this is wrong. Why do you need to replace the fwnode at all
-(and how does this work with IORT ?) ?
 
-I understand you want to have a uniform DT/ACPI quirk handling (and stash
-the fwnode so that you can read a _DSD out of it with the fwnode_ API)
-but still, that does not justify swapping the IRQ domain fwnode handle.
+> Only score, tile and um have some configurations that select 'NO_IOMEM'.
+> Score is getting removed now, tile might get removed later (we could make
+> PCI mandatory in the meantime to avoid that configuration), and I think for
+> um, we already have a workaround for the NO_IOMEM dependencies
+> (I forget the details).
 
-> +
-> +	return AE_CTRL_TERMINATE;
-> +}
-> +
-> +static int __init acpi_its_device_probe_init(void)
-> +{
-> +	if (!acpi_disabled)
-> +		acpi_get_devices("SCX0005", acpi_its_device_probe, NULL, NULL);
-> +	return 0;
-> +}
-> +subsys_initcall_sync(acpi_its_device_probe_init);
+I do not think this is a stable solution.
 
-That's a subsys_initcall_sync just because you need the interpreter up and
-running right ?
+Or, do you mean to remove NO_IOMEM and HAS_IOMEM completely?
 
-Thanks,
-Lorenzo
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
