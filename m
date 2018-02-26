@@ -1,28 +1,72 @@
-From: daniel.baluta@gmail.com (Daniel Baluta)
-Date: Mon, 26 Feb 2018 16:02:22 +0200
-Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
-In-Reply-To: <20180226131318.GA14045@amd>
-References: <20180224214617.GA22619@amd>
- <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
- <20180226131318.GA14045@amd>
-Message-ID: <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 26 Feb 2018 16:05:53 +0200
+Subject: v4.16-rc0: missing includes in framebuffers break N900 compilation
+In-Reply-To: <20180226130007.GA5634@amd>
+References: <20180226130007.GA5634@amd>
+Message-ID: <46d9fddf-7e6d-b157-0745-6366ccd57a41@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 3:13 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
->
->> JFYI: This issues is tracked in the regression reports for Linux 4.16
->> (http://bit.ly/lnxregrep416 ) with this id:
->>
->> Linux-Regression-ID: lr#4b650f
->
-> Ok, so it seems that issue is bigger: whole sound subsystem does not
-> work. /proc/asound/cards is empty.
->
-> 7e6127c1240ed569cdda2a67c8f03836f9f28c05 seems to be bad already.
->
-> I tried to revert sound/soc changes, and sound is broken, too. Nasty
+v4.16-rc1 has a fix (b9058afcd6c7).
 
+ Tomi
 
-dmesg log?
+On 26/02/18 15:00, Pavel Machek wrote:
+> I needed this to get -rc0 to compile.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> 
+> diff --git a/drivers/video/fbdev/omap2/omapfb/dss/dss.c b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> index 48c6500..990f1c9 100644
+> --- a/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> +++ b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> @@ -38,6 +38,7 @@
+>  #include <linux/regmap.h>
+>  #include <linux/of.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/pinctrl/consumer.h>
+>  #include <linux/suspend.h>
+>  #include <linux/component.h>
+>  
+> diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> index 9a13c35..4862b12 100644
+> --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/seq_file.h>
+>  #include <linux/slab.h>
+>  #include <video/omapfb_dss.h>
+>  
+> diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> index eac3665..39014e2 100644
+> --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/seq_file.h>
+>  #include <linux/clk.h>
+>  
+>  #include <video/omapfb_dss.h>
+> diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> index 705373e..e93e7a7 100644
+> --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+>  #include <video/omapfb_dss.h>
+> +#include <linux/seq_file.h>
+>  
+>  #include "dss.h"
+>  #include "hdmi.h"
+> 
+
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
