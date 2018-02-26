@@ -1,50 +1,78 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 26 Feb 2018 16:37:27 +0800
-Subject: [PATCH 0.5/12] ARM: OMAP2+: Prepare to pass auxdata for
- smartreflex
-In-Reply-To: <20180223214119.GB5593@atomide.com>
-References: <20180223214119.GB5593@atomide.com>
-Message-ID: <201802261623.teHicLDZ%fengguang.wu@intel.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 26 Feb 2018 16:20:00 +0800
+Subject: [PATCH 26/52] arm64: entry: Apply BP hardening for high-priority
+ synchronous exceptions
+In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-27-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: Will Deacon <will.deacon@arm.com>
 
-I love your patch! Yet something to improve:
+commit 5dfc6ed27710 upstream.
 
-[auto build test ERROR on omap/for-next]
-[also build test ERROR on v4.16-rc3 next-20180226]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Software-step and PC alignment fault exceptions have higher priority than
+instruction abort exceptions, so apply the BP hardening hooks there too
+if the user PC appears to reside in kernel space.
 
-url:    https://github.com/0day-ci/linux/commits/Tony-Lindgren/ARM-OMAP2-Prepare-to-pass-auxdata-for-smartreflex/20180226-132741
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git for-next
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Reported-by: Dan Hettena <dhettena@nvidia.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
-All errors (new ones prefixed by >>):
-
->> arch/arm/mach-omap2/pdata-quirks.c:517:36: error: array type has incomplete element type 'struct omap_sr_data'
-    struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
-                                       ^~~~~~~~~~~~~
-
-vim +517 arch/arm/mach-omap2/pdata-quirks.c
-
-   516	
- > 517	struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
-   518	
-
+Conflicts:
+	expand enable_da_f to 'msr daifclr, #(8 | 4 | 1)'
+	in arch/arm64/kernel/entry.S
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 43115 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/bc2b37ff/attachment-0001.gz>
+ arch/arm64/kernel/entry.S | 6 ++++--
+ arch/arm64/mm/fault.c     | 9 +++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index bdb0139..d50c2fe 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -584,8 +584,10 @@ el0_sp_pc:
+ 	 * Stack or PC alignment exception handling
+ 	 */
+ 	mrs	x26, far_el1
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	msr	daifclr, #(8 | 4 | 1)
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl	trace_hardirqs_off
++#endif
+ 	ct_user_exit
+ 	mov	x0, x26
+ 	mov	x1, x25
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c95b194..6120a14 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -617,6 +617,12 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+ 	struct siginfo info;
+ 	struct task_struct *tsk = current;
+ 
++	if (user_mode(regs)) {
++		if (instruction_pointer(regs) > TASK_SIZE)
++			arm64_apply_bp_hardening();
++		local_irq_enable();
++	}
++
+ 	if (show_unhandled_signals && unhandled_signal(tsk, SIGBUS))
+ 		pr_info_ratelimited("%s[%d]: %s exception: pc=%p sp=%p\n",
+ 				    tsk->comm, task_pid_nr(tsk),
+@@ -676,6 +682,9 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	if (interrupts_enabled(regs))
+ 		trace_hardirqs_off();
+ 
++	if (user_mode(regs) && instruction_pointer(regs) > TASK_SIZE)
++		arm64_apply_bp_hardening();
++
+ 	if (!inf->fn(addr, esr, regs)) {
+ 		rv = 1;
+ 	} else {
+-- 
+2.7.4
