@@ -1,55 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Feb 2018 09:43:26 +0100
-Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
- 'select MFD_SYSCON'
-In-Reply-To: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 26 Feb 2018 09:44:33 +0100
+Subject: [PATCH v2 1/4] dt-bindings: pwm: binding allwinner sun8i.
+In-Reply-To: <20180225135045.GA14508@arx-s1>
+References: <20180225135045.GA14508@arx-s1>
+Message-ID: <20180226084433.jcahdixnz63jo34m@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
-> used with care - it forces a lower limit of another symbol, ignoring
-> the dependency.
->
-> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
-> select it.
->
-> This causes unmet dependencies for architecture without HAS_IOMEM.
->
->   $ make ARCH=score randconfig
->   scripts/kconfig/conf  --randconfig Kconfig
->   KCONFIG_SEED=0x27C47F43
->   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
->   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
->
-> Use 'depends on' to observe the dependency.
->
-> This commit was created by the following command:
->
->   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
->     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
->
-> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
->
-> Also, make MFD_SYSCON 'default y' because some defconfig files may
-> rely on someone select's MFD_SYSCON.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Hi,
+
+On Sun, Feb 25, 2018 at 09:50:45PM +0800, hao_zhang wrote:
+> This patch adds allwinner sun8i pwm binding documents.
+> 
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
 > ---
->
-> If you have a better idea to fix 'unmet dependencies',
-> please suggest.
+>  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> new file mode 100644
+> index 0000000..e8c48be
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> @@ -0,0 +1,18 @@
+> +Allwinner sun8i R40/V40/T3 SoC PWM controller
+> +
+> +Required properties:
+> +  - compatible: should be one of:
+> +    - "allwinner,sun8i-r40-pwm"
+> +  - reg: physical base address and length of the controller's registers
+> +  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+> +    the cells format.
+> +  - clocks: From common clock binding, handle to the parent clock.
+> +
+> +Example:
+> +
+> +pwm: pwm at 1c23400 {
+> +	     compatible = "allwinner,sun8i-pwm";
 
-Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
-of defconfig configurations, I'd rather not do that.
+The compatible you have here isn't the one documented.
 
-Only score, tile and um have some configurations that select 'NO_IOMEM'.
-Score is getting removed now, tile might get removed later (we could make
-PCI mandatory in the meantime to avoid that configuration), and I think for
-um, we already have a workaround for the NO_IOMEM dependencies
-(I forget the details).
+> +	     reg = <0x01c23400 0x154>;
 
-        Arnd
+And the size isn't correct, even though that doesn't really make any
+difference here.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/67e22370/attachment-0001.sig>
