@@ -1,59 +1,154 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 09:14:36 +0100
-Subject: [PATCH v2 01/19] clk: renesas: cpg-mssr: Add support for R-Car
- M3-N
-In-Reply-To: <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWcLd6BnwW2fwOPhpsRZ=qfuYE6YoehFj8WXkUmGZMW_A@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 26 Feb 2018 16:19:36 +0800
+Subject: [PATCH 02/52] arm64: alternatives: apply boot time fixups via the
+ linear mapping
+In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-3-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Initial support for R-Car M3-N (r8a77965), including core and module
-> clocks.
->
-> Based on Table 8.2d of "R-Car Series, 3rd Generation User's Manual:
-> Hardware (Rev. 0.80, Oct 31, 2017)".
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+commit 5ea5306c323 upstream.
 
-> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-> @@ -22,6 +22,7 @@ Required Properties:
->        - "renesas,r8a7794-cpg-mssr" for the r8a7794 SoC (R-Car E2)
->        - "renesas,r8a7795-cpg-mssr" for the r8a7795 SoC (R-Car H3)
->        - "renesas,r8a7796-cpg-mssr" for the r8a7796 SoC (R-Car M3-W)
-> +      - "renesas,r8a77965-cpg-mssr" for the r8a77965 SoC (R-Car M3-N)
->        - "renesas,r8a77970-cpg-mssr" for the r8a77970 SoC (R-Car V3M)
->        - "renesas,r8a77995-cpg-mssr" for the r8a77995 SoC (R-Car D3)
+One important rule of thumb when desiging a secure software system is
+that memory should never be writable and executable at the same time.
+We mostly adhere to this rule in the kernel, except at boot time, when
+regions may be mapped RWX until after we are done applying alternatives
+or making other one-off changes.
 
-You forgot to update the list of external parent clock names.
-No need to fix and resend, I've squashed in the following:
+For the alternative patching, we can improve the situation by applying
+the fixups via the linear mapping, which is never mapped with executable
+permissions. So map the linear alias of .text with RW- permissions
+initially, and remove the write permissions as soon as alternative
+patching has completed.
 
---- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-@@ -34,8 +34,8 @@ Required Properties:
-     clock-names
-   - clock-names: List of external parent clock names. Valid names are:
-       - "extal" (r8a7743, r8a7745, r8a7790, r8a7791, r8a7792, r8a7793, r8a7794,
--                r8a7795, r8a7796, r8a77970, r8a77980, r8a77995)
--      - "extalr" (r8a7795, r8a7796, r8a77970, r8a77980)
-+                r8a7795, r8a7796, r8a77965, r8a77970, r8a77980, r8a77995)
-+      - "extalr" (r8a7795, r8a7796, r8a77965, r8a77970, r8a77980)
-       - "usb_extal" (r8a7743, r8a7745, r8a7790, r8a7791, r8a7793, r8a7794)
+Reviewed-by: Laura Abbott <labbott@redhat.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
-   - #clock-cells: Must be 2
+Conflicts:
+	replace update_mapping_prot with old create_mapping_late
+	arch/arm64/mm/mmu.c
+---
+ arch/arm64/include/asm/mmu.h    |  1 +
+ arch/arm64/kernel/alternative.c | 11 ++++++-----
+ arch/arm64/kernel/smp.c         |  1 +
+ arch/arm64/mm/mmu.c             | 22 +++++++++++++++++-----
+ 4 files changed, 25 insertions(+), 10 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 8d9fce0..b075140 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -36,5 +36,6 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+ 			       pgprot_t prot, bool allow_block_mappings);
+ extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
++extern void mark_linear_text_alias_ro(void);
+ 
+ #endif
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 06d650f..8840c10 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -105,11 +105,11 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
+ 	return insn;
+ }
+ 
+-static void __apply_alternatives(void *alt_region)
++static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+-	u32 *origptr, *replptr;
++	u32 *origptr, *replptr, *updptr;
+ 
+ 	for (alt = region->begin; alt < region->end; alt++) {
+ 		u32 insn;
+@@ -124,11 +124,12 @@ static void __apply_alternatives(void *alt_region)
+ 
+ 		origptr = ALT_ORIG_PTR(alt);
+ 		replptr = ALT_REPL_PTR(alt);
++		updptr = use_linear_alias ? (u32 *)lm_alias(origptr) : origptr;
+ 		nr_inst = alt->alt_len / sizeof(insn);
+ 
+ 		for (i = 0; i < nr_inst; i++) {
+ 			insn = get_alt_insn(alt, origptr + i, replptr + i);
+-			*(origptr + i) = cpu_to_le32(insn);
++			updptr[i] = cpu_to_le32(insn);
+ 		}
+ 
+ 		flush_icache_range((uintptr_t)origptr,
+@@ -155,7 +156,7 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(patched);
+-		__apply_alternatives(&region);
++		__apply_alternatives(&region, true);
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(patched, 1);
+ 	}
+@@ -176,5 +177,5 @@ void apply_alternatives(void *start, size_t length)
+ 		.end	= start + length,
+ 	};
+ 
+-	__apply_alternatives(&region);
++	__apply_alternatives(&region, false);
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index a70f7d3..66db515 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -426,6 +426,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 	setup_cpu_features();
+ 	hyp_mode_check();
+ 	apply_alternatives_all();
++	mark_linear_text_alias_ro();
+ }
+ 
+ void __init smp_prepare_boot_cpu(void)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d5cc6d7..5dc72c0 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -354,16 +354,28 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 				     !debug_pagealloc_enabled());
+ 
+ 	/*
+-	 * Map the linear alias of the [_text, __init_begin) interval as
+-	 * read-only/non-executable. This makes the contents of the
+-	 * region accessible to subsystems such as hibernate, but
+-	 * protects it from inadvertent modification or execution.
++	 * Map the linear alias of the [_text, __init_begin) interval
++	 * as non-executable now, and remove the write permission in
++	 * mark_linear_text_alias_ro() below (which will be called after
++	 * alternative patching has completed). This makes the contents
++	 * of the region accessible to subsystems such as hibernate,
++	 * but protects it from inadvertent modification or execution.
+ 	 */
+ 	__create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
+-			     kernel_end - kernel_start, PAGE_KERNEL_RO,
++			     kernel_end - kernel_start, PAGE_KERNEL,
+ 			     early_pgtable_alloc, !debug_pagealloc_enabled());
+ }
+ 
++void __init mark_linear_text_alias_ro(void)
++{
++	/*
++	 * Remove the write permissions from the linear alias of .text/.rodata
++	 */
++	create_mapping_late(__pa_symbol(_text), (unsigned long)lm_alias(_text),
++			    (unsigned long)__init_begin - (unsigned long)_text,
++			    PAGE_KERNEL_RO);
++}
++
+ static void __init map_mem(pgd_t *pgd)
+ {
+ 	struct memblock_region *reg;
+-- 
+2.7.4
