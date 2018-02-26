@@ -1,62 +1,114 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Feb 2018 11:30:50 +0000
-Subject: [PATCH -stable] arm64: mm: don't write garbage into TTBR1_EL1
- register
-In-Reply-To: <CAKv+Gu9rZEAk1RMUEk=7XCVVkLQ-chDu7GTGArCG0YeYcmx52w@mail.gmail.com>
-References: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
- <20180224083424.GC9681@kroah.com>
- <CAKv+Gu9rZEAk1RMUEk=7XCVVkLQ-chDu7GTGArCG0YeYcmx52w@mail.gmail.com>
-Message-ID: <20180226113050.GE8736@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 26 Feb 2018 13:35:16 +0200
+Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
+References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
+ <20180222191647.4727-3-ard.biesheuvel@linaro.org>
+ <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
+ <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
+ <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
+ <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
+Message-ID: <CAHp75VcjUey4K1xOkjKjn_ppPKC0bktcBK2p9NjcPYG1ed7X0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 08:50:42AM +0000, Ard Biesheuvel wrote:
-> On 24 February 2018 at 08:34, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Fri, Feb 23, 2018 at 06:29:02PM +0000, Ard Biesheuvel wrote:
-> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> >> index 08572f95bd8a..2b473ddeb7a3 100644
-> >> --- a/arch/arm64/mm/proc.S
-> >> +++ b/arch/arm64/mm/proc.S
-> >> @@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
-> >>
-> >>  .macro       __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
-> >>       adrp    \tmp1, empty_zero_page
-> >> -     msr     ttbr1_el1, \tmp2
-> >> +     msr     ttbr1_el1, \tmp1
-> >
-> > I don't understand why this isn't also needed in Linus's tree.  What
-> > commit there prevents this from being required?
-> >
-> 
-> Linus's tree has
-> 
->  +.macro __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
-> +     adrp \tmp1, empty_zero_page
-> +     phys_to_ttbr \tmp1, \tmp2
-> +     msr ttbr1_el1, \tmp2
-> +     isb
-> +     tlbi vmalle1
-> +     dsb nsh
-> +     isb
-> +.endm
-> 
-> but phys_to_ttbr does not exist in the v4.15 and earlier trees (it is
-> related to 52-bit physical address support which landed in v4.16), so
-> it was removed for the backport. However, that means tmp2 is never
-> assigned, and whatever was there is poked into the translation table
-> base register.
+On Mon, Feb 26, 2018 at 11:59 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>>>> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
+>>>> <ard.biesheuvel@linaro.org> wrote:
+> ...
+>>>>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+>>>>> +                                      &speed_khz);
+>>>>> +       if (ret) {
+>>>>> +               dev_err(&pdev->dev,
+>>>>> +                       "Missing clock-frequency property\n");
+>>>>> +               return -EINVAL;
+>>>>> +       }
+>>>>> +       speed_khz /= 1000;
+>>
+>>>>> +       if (dev_of_node(&pdev->dev)) {
+>>>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
+>>>>> +               if (IS_ERR(i2c->clk)) {
+>>>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
+>>>>> +                       return PTR_ERR(i2c->clk);
+>>>>> +               }
+>>>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
+>>>>> +
+>>>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
+>>>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
+>>>>> +               clk_prepare_enable(i2c->clk);
+>>>>> +       } else {
+>>>>> +               ret = device_property_read_u32(&pdev->dev,
+>>>>> +                                              "socionext,pclk-rate",
+>>>>> +                                              &i2c->clkrate);
+>>>>> +               if (ret)
+>>>>> +                       return ret;
+>>>>> +       }
+>>>>
+>>>> Okay, I got this case. It's more likely the one in 8250_dw.c.
+>>>>
+>>>> Can you do the similar way?
+>>
+>>> Could you elaborate?
+>>
+>> --- 8< --- 8< --- 8< ---
+>>         device_property_read_u32(dev, "clock-frequency", &p->uartclk);
+>>
+>>        /* If there is separate baudclk, get the rate from it. */
+>>        data->clk = devm_clk_get(dev, "baudclk");
+>> ...
+>>        if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
+>>                return -EPROBE_DEFER;
+>>        if (!IS_ERR_OR_NULL(data->clk)) {
+>>                err = clk_prepare_enable(data->clk);
+>>                if (err)
+>>                        dev_warn(dev, "could not enable optional baudclk: %d\n",
+>>                                 err);
+>>                else
+>>                        p->uartclk = clk_get_rate(data->clk);
+>>        }
+>>
+>>        /* If no clock rate is defined, fail. */
+>>        if (!p->uartclk) {
+>>                dev_err(dev, "clock rate not defined\n");
+>>                err = -EINVAL;
+>>                goto err_clk;
+>> --- 8< --- 8< --- 8< ---
+>>
+>> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
+>> above and you are almost done.
+>>
+>
+> I don't think this is better.
 
-Damnit, sorry again. I changed the argument order of phys_to_ttbr along
-the way, so must've confused myself during the backporting exercise. It's
-also one of those things that will lead to potential TLB corruption in rare
-circumstances where the junk in TTBR1 ends up giving a valid translation,
-so it didn't crop up in my testing. How did Nicolas see this? The bug
-report I saw didn't look related.
+It's a pattern over ACPI vs. clk cases at least for now.
+But hold on. We have already an example of dealing with ACPI /
+non-ACPI cases for I2C controllers ? i2c-designware-platdrv.c.
+Check how it's done there.
 
-> But let's wait for team-ARM to ack this in any case.
+I actually totally forgot about ACPI slaves described in the table. We
+need to take into account the ones with lowest bus speed.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+>  The generic DT I2C 'clock-frequency'
+> property denotes the bus clock rate not the rate of the clock that
+> feeds the IP block. This is rather different from the UART bindings.
 
-Greg -- please can you apply this to the 4.14 and 4.15 stable trees?
+> Also, I don't want to support 'socionext,pclk-rate' for DT platforms,
+> only for ACPI platforms.
 
-Will
+Unfortunately, we are strong against deviations between DT and ACPI in
+case of device properties.
+You may provide a clock and use devm_clk_get() without any concerns
+from where this comes from.
+
+You won't find any deviation in DW I2C driver since there is none,
+while driver works for non-ACPI platforms as well.
+
+-- 
+With Best Regards,
+Andy Shevchenko
