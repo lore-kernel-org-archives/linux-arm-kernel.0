@@ -1,145 +1,148 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Mon, 26 Feb 2018 11:37:51 +0100
-Subject: [PATCH 11/12] PM / AVS: SmartReflex: Prepare to use device tree
- based probing
-In-Reply-To: <20180223210100.86732-12-tony@atomide.com>
-References: <20180223210100.86732-1-tony@atomide.com>
- <20180223210100.86732-12-tony@atomide.com>
-Message-ID: <5d37e6ff-9b89-b677-859e-6eeae5527276@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 11:39:58 +0100
+Subject: [RFC][PATCH] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <20180226101718.5353-1-marek.vasut+renesas@gmail.com>
+References: <20180226101718.5353-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdXep2sdVK71i1FBkJTd+3aYj0LzCKsqp8vBKrewkaX1FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2018 10:00 PM, Tony Lindgren wrote:
-> We are currently probing smartreflex with omap_device while we are
-> already probing smartreflex related interconnect target module with
-> ti-sysc driver and dts data.
->
-> Before we can flip things on for ti-sysc, we need to prepare the
-> smartreflex driver a bit:
->
-> 1. The smartreflex clock is really for the whole interconnect target
->     module. So it may be configured at the parent device level with
->     ti-sysc
->
-> 2. With ti-sysc, we have the child device manage interconnect target
->     module directly if pm_runtime_irq_safe() is set and there is only
->     one child. In that case nobody else is going to call pm_runtime_get
->     and put, so we need to add these calls to idle smartreflex properly
->     after probe if not fully configured
->
-> 3. With ti-sysc, the parent driver may rebind. So we want to use
->     platform_driver_register() and don't want probe to be __init
->
-> Note that this patch depends on the related changes to ti-sysc driver
-> and omap_device probing to prevent both ti-sysc and omap_device to
-> try to probe smartreflex.
->
-> Cc: linux-pm at vger.kernel.org
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Hi Marek,
 
-You need an ACK from Kevin Hilman on this anyway and if you receive one, 
-please feel free to route it whatever way is convenient for you.
-
-> ---
->   drivers/power/avs/smartreflex.c | 41 ++++++++++++++++++++++++++++++++++-------
->   1 file changed, 34 insertions(+), 7 deletions(-)
+On Mon, Feb 26, 2018 at 11:17 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Rather than hard-coding the quirk topology, which stopped scaling,
+> parse the information from DT. The code looks for all compatible
+> PMICs -- da9036 and da9210 -- and checks if their IRQ line is tied
+> to the same pin. If so, the code sends a matching sequence to the
+> PMIC to deassert the IRQ.
 >
-> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-> --- a/drivers/power/avs/smartreflex.c
-> +++ b/drivers/power/avs/smartreflex.c
-> @@ -132,12 +132,16 @@ static void sr_set_clk_length(struct omap_sr *sr)
->   	struct clk *fck;
->   	u32 fclk_speed;
->   
-> -	fck = clk_get(&sr->pdev->dev, "fck");
-> -
-> +	/* Try interconnect target module fck first if it already exists */
-> +	fck = clk_get(sr->pdev->dev.parent, "fck");
->   	if (IS_ERR(fck)) {
-> -		dev_err(&sr->pdev->dev, "%s: unable to get fck for device %s\n",
-> -			__func__, dev_name(&sr->pdev->dev));
-> -		return;
-> +		fck = clk_get(&sr->pdev->dev, "fck");
-> +		if (IS_ERR(fck)) {
-> +			dev_err(&sr->pdev->dev,
-> +				"%s: unable to get fck for device %s\n",
-> +				__func__, dev_name(&sr->pdev->dev));
-> +			return;
-> +		}
->   	}
->   
->   	fclk_speed = clk_get_rate(fck);
-> @@ -838,7 +842,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
->   DEFINE_SIMPLE_ATTRIBUTE(pm_sr_fops, omap_sr_autocomp_show,
->   			omap_sr_autocomp_store, "%llu\n");
->   
-> -static int __init omap_sr_probe(struct platform_device *pdev)
-> +static int omap_sr_probe(struct platform_device *pdev)
->   {
->   	struct omap_sr *sr_info;
->   	struct omap_sr_data *pdata = pdev->dev.platform_data;
-> @@ -898,6 +902,12 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->   
->   	list_add(&sr_info->node, &sr_list);
->   
-> +	ret = pm_runtime_get_sync(&pdev->dev);
-> +	if (ret < 0) {
-> +		pm_runtime_put_noidle(&pdev->dev);
-> +		goto err_list_del;
-> +	}
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+
+Thanks for your patch!
+
+At first sight, the probing part looks good to me. I'll have a closer look,
+and will give it a try later.
+
+A few early comment below.
+
+> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+
+> @@ -88,17 +103,21 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+>         client = to_i2c_client(dev);
+>         dev_dbg(dev, "Detected %s\n", client->name);
+>
+> -       if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
+> -           (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
+> -           (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
+> -               int ret, len;
+> +       list_for_each_entry(pos, &quirk_list, list) {
+> +               if (pos->i2c_msg.addr != client->addr)
+> +                       continue;
+>
+> -               /* There are two DA9210 on Stout, one on the other boards. */
+> -               len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
+> +               if (!of_device_is_compatible(dev->of_node, pos->id->compatible))
+> +                       continue;
+>
+> -               dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
+> -               ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
+> -               if (ret != ARRAY_SIZE(da9xxx_msgs))
+> +               if (!pos->shared)
+> +                       continue;
 > +
->   	/*
->   	 * Call into late init to do initializations that require
->   	 * both sr driver and sr class driver to be initiallized.
-> @@ -966,12 +976,17 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->   
->   	}
->   
-> +	pm_runtime_put_sync(&pdev->dev);
+> +               dev_info(&client->dev, "clearing %s at 0x%02x interrupts\n",
+> +                        pos->id->compatible, pos->i2c_msg.addr);
 > +
->   	return ret;
->   
->   err_debugfs:
->   	debugfs_remove_recursive(sr_info->dbg_dir);
->   err_list_del:
->   	list_del(&sr_info->node);
+> +               ret = i2c_transfer(client->adapter, &pos->i2c_msg, 1);
+> +               if (ret != 1)
+>                         dev_err(&client->dev, "i2c error %d\n", ret);
+>         }
+
+The loop above sents a clear message to a single device only, right?
+That won't work, as that will clear the interrupt for that single device only.
+All other devices may still have their interrupts asserted.
+Next step in probing will be binding the da9210 or da9063 driver, which will
+enable the shared irq, and boom!
+
+Upon detecting the first affected device, you really have to send clear
+messages to all devices in the list for which shared == true.
+
+> @@ -122,7 +146,14 @@ static struct notifier_block regulator_quirk_nb = {
+>
+>  static int __init rcar_gen2_regulator_quirk(void)
+>  {
+> -       u32 mon;
+> +       struct device_node *np;
+> +       const struct of_device_id *id;
+> +       struct regulator_quirk *quirk;
+> +       struct regulator_quirk *pos;
+> +       struct of_phandle_args *argsa, *argsb;
+> +       u32 mon, addr, i;
+> +       bool match;
+> +       int ret;
+>
+>         if (!of_machine_is_compatible("renesas,koelsch") &&
+>             !of_machine_is_compatible("renesas,lager") &&
+
+> @@ -130,6 +161,51 @@ static int __init rcar_gen2_regulator_quirk(void)
+>             !of_machine_is_compatible("renesas,gose"))
+>                 return -ENODEV;
+
+We might drop the checks above, to handle other platforms based on the
+Renesas reference designs.
+
+>
+> +       for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
+> +               if(!np || !of_device_is_available(np))
+> +                       break;
 > +
-> +	pm_runtime_put_sync(&pdev->dev);
+> +               quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
 > +
->   	return ret;
->   }
->   
-> @@ -1025,11 +1040,23 @@ static void omap_sr_shutdown(struct platform_device *pdev)
->   	return;
->   }
->   
-> +static const struct of_device_id omap_sr_match[] = {
-> +	{ .compatible = "ti,omap3-smartreflex-core", },
-> +	{ .compatible = "ti,omap3-smartreflex-mpu-iva", },
-> +	{ .compatible = "ti,omap4-smartreflex-core", },
-> +	{ .compatible = "ti,omap4-smartreflex-mpu", },
-> +	{ .compatible = "ti,omap4-smartreflex-iva", },
-> +	{  },
-> +};
-> +MODULE_DEVICE_TABLE(of, omap_sr_match);
+> +               argsa = &quirk->irq_args;
+> +               memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
 > +
->   static struct platform_driver smartreflex_driver = {
-> +	.probe		= omap_sr_probe,
->   	.remove         = omap_sr_remove,
->   	.shutdown	= omap_sr_shutdown,
->   	.driver		= {
->   		.name	= DRIVER_NAME,
-> +		.of_match_table	= omap_sr_match,
->   	},
->   };
->   
-> @@ -1048,7 +1075,7 @@ static int __init sr_init(void)
->   	else
->   		pr_warn("%s: No PMIC hook to init smartreflex\n", __func__);
->   
-> -	ret = platform_driver_probe(&smartreflex_driver, omap_sr_probe);
-> +	ret = platform_driver_register(&smartreflex_driver);
->   	if (ret) {
->   		pr_err("%s: platform driver register failed for SR\n",
->   		       __func__);
+> +               ret = of_property_read_u32(np, "reg", &addr);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               quirk->id = id;
+> +               quirk->i2c_msg.addr = addr;
+> +               quirk->shared = false;
+> +
+> +               ret = of_irq_parse_one(np, 0, &quirk->irq_args);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               list_for_each_entry(pos, &quirk_list, list) {
+> +                       argsa = &quirk->irq_args;
+> +                       argsb = &pos->irq_args;
+> +
+> +                       if (argsa->args_count != argsb->args_count)
+> +                               continue;
+> +
+> +                       match = true;
+> +                       for (i = 0; i < argsa->args_count; i++) {
+> +                               if (argsa->args[i] != argsb->args[i]) {
+> +                                       match = false;
+> +                                       break;
+> +                               }
+> +                       }
+> +
+> +                       if (match) {
+
+The loop and check above can be replaced by
+
+    if (!memcmp(argsa->args, argsb->args, argsa->args_count *
+sizeof(argsa->args[0]))
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
