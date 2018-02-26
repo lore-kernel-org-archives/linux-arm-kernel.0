@@ -1,105 +1,58 @@
-From: nobuhiro.iwamatsu@cybertrust.co.jp (Nobuhiro Iwamatsu)
-Date: Mon, 26 Feb 2018 09:59:48 +0900
-Subject: [PATCH 1/2] arm: dts: zynq: Add Digilent Zybo Z7 board
-Message-ID: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Mon, 26 Feb 2018 01:33:34 +0000
+Subject: [PATCH] arm64: dts: ls1046a: drop incomplete memory node
+In-Reply-To: <1519455896-8924-1-git-send-email-shawnguo@kernel.org>
+References: <1519455896-8924-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <AM4PR0401MB1699AD47DE96B4299F680E498FC10@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add a DTS for the Digilent Zybo Z7 board.
-This board is the successor board of Zybo, these are almost the same except
-for ps-clk-frequency specifications.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu@cybertrust.co.jp>
----
- arch/arm/boot/dts/Makefile         |  3 +-
- arch/arm/boot/dts/zynq-zybo-z7.dts | 65 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/zynq-zybo-z7.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..62605d600681 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1067,7 +1067,8 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-zc702.dtb \
- 	zynq-zc706.dtb \
- 	zynq-zed.dtb \
--	zynq-zybo.dtb
-+	zynq-zybo.dtb \
-+	zynq-zybo-z7.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
- 	armada-370-db.dtb \
- 	armada-370-dlink-dns327l.dtb \
-diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts b/arch/arm/boot/dts/zynq-zybo-z7.dts
-new file mode 100644
-index 000000000000..97e487913f8f
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zybo-z7.dts
-@@ -0,0 +1,65 @@
-+/*
-+ * Digilent Zybo Z7 board DTS
-+ *
-+ *  Copyright (C) 2017 Cybertrust Japan Co., Ltd.
-+ *  Copyright (C) 2017 Nobuhiro Iwamatsu <nobuhiro.iwamatsu@cybertrust.co.jp>
-+ *
-+ *  SPDX-License-Identifier:	GPL-2.0+
-+ */
-+/dts-v1/;
-+#include "zynq-7000.dtsi"
-+
-+/ {
-+	model = "Zynq ZYBO Z7 Development Board";
-+	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
-+
-+	aliases {
-+		ethernet0 = &gem0;
-+		serial0 = &uart1;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	usb_phy0: phy0 {
-+		#phy-cells = <0>;
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio0 46 1>;
-+	};
-+};
-+
-+&clkc {
-+	ps-clk-frequency = <33333333>;
-+};
-+
-+&gem0 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
-+
-+	ethernet_phy: ethernet-phy at 0 {
-+		reg = <0>;
-+		device_type = "ethernet-phy";
-+	};
-+};
-+
-+&sdhci0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
-+};
--- 
-2.16.1
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Saturday, February 24, 2018 3:05 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org; Shawn Guo <shawnguo@kernel.org>;
+> Mingkai Hu <mingkai.hu@nxp.com>; Shaohui Xie <Shaohui.Xie@nxp.com>;
+> Leo Li <leoyang.li@nxp.com>
+> Subject: [PATCH] arm64: dts: ls1046a: drop incomplete memory node
+> 
+> The memory node in fsl-ls1046a.dtsi has no 'reg' property, and causes the
+> dtc warning below.
+> 
+> Warning (unit_address_vs_reg): Node /memory at 80000000 has a unit name,
+> but no reg property
+> 
+> This is clearly an incomplete memory node.  Let's drop it.  Either a complete
+> memory should be added, or bootloader needs to fill the node as a whole.
+
+Or we can put in a dummy reg property to be updated by bootloader like the mac-address property?
+
+> 
+> Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> Cc: Shaohui Xie <Shaohui.Xie@nxp.com>
+> Cc: Li Yang <leoyang.li@nxp.com>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> index 606ea496f24e..cbf4b3e15c17 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> @@ -129,10 +129,6 @@
+>  		};
+>  	};
+> 
+> -	memory at 80000000 {
+> -		device_type = "memory";
+> -	};
+> -
+>  	sysclk: sysclk {
+>  		compatible = "fixed-clock";
+>  		#clock-cells = <0>;
+> --
+> 1.9.1
