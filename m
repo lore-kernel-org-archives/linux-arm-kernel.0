@@ -1,192 +1,403 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 26 Feb 2018 11:26:59 +0800
-Subject: [PATCH usb-next v10 2/8] usb: add a flag to skip PHY
- initialization to struct usb_hcd
-In-Reply-To: <20180218184504.3331-3-martin.blumenstingl@googlemail.com>
-References: <20180218184504.3331-1-martin.blumenstingl@googlemail.com>
- <20180218184504.3331-3-martin.blumenstingl@googlemail.com>
-Message-ID: <20180226032659.GC22100@b29397-desktop>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 26 Feb 2018 15:23:27 +0530
+Subject: [PATCH v7 11/15] clk: qcom: Add Krait clock controller driver
+In-Reply-To: <1519638811-17269-1-git-send-email-sricharan@codeaurora.org>
+References: <1519638811-17269-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1519638811-17269-12-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 18, 2018 at 07:44:58PM +0100, Martin Blumenstingl wrote:
-> The USB HCD core driver parses the device-tree node for "phys" and
-> "usb-phys" properties. It also manages the power state of these PHYs
-> automatically.
-> However, drivers may opt-out of this behavior by setting "phy" or
-> "usb_phy" in struct usb_hcd to a non-null value. An example where this
-> is required is the "Qualcomm USB2 controller", implemented by the
-> chipidea driver. The hardware requires that the PHY is only powered on
-> after the "reset completed" event from the controller is received.
-> 
-> A follow-up patch will allow the USB HCD core driver to manage more than
-> one PHY. Add a new "skip_phy_initialization" bitflag to struct usb_hcd
-> so drivers can opt-out of any PHY management provided by the USB HCD
-> core driver.
-> 
-> This also updates the existing drivers so they use the new flag if they
-> want to opt out of the PHY management provided by the USB HCD core
-> driver. This means that for these drivers the new "multiple PHY"
-> handling (which will be added in a follow-up patch) will be disabled as
-> well.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  drivers/usb/chipidea/host.c      | 6 ++----
->  drivers/usb/core/hcd.c           | 4 ++--
->  drivers/usb/host/ehci-fsl.c      | 2 ++
->  drivers/usb/host/ehci-platform.c | 4 ++--
->  drivers/usb/host/ehci-tegra.c    | 1 +
->  drivers/usb/host/ohci-omap.c     | 1 +
->  drivers/usb/host/ohci-platform.c | 4 ++--
->  drivers/usb/host/xhci-plat.c     | 1 +
->  include/linux/usb/hcd.h          | 6 ++++++
->  9 files changed, 19 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index 19d60ed7e41f..af45aa3222b5 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -124,10 +124,8 @@ static int host_start(struct ci_hdrc *ci)
->  
->  	hcd->power_budget = ci->platdata->power_budget;
->  	hcd->tpl_support = ci->platdata->tpl_support;
-> -	if (ci->phy)
-> -		hcd->phy = ci->phy;
-> -	else
-> -		hcd->usb_phy = ci->usb_phy;
-> +	if (ci->phy || ci->usb_phy)
-> +		hcd->skip_phy_initialization = 1;
->  
->  	ehci = hcd_to_ehci(hcd);
->  	ehci->caps = ci->hw_bank.cap;
-> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> index fc32391a34d5..f2307470a31e 100644
-> --- a/drivers/usb/core/hcd.c
-> +++ b/drivers/usb/core/hcd.c
-> @@ -2727,7 +2727,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
->  	int retval;
->  	struct usb_device *rhdev;
->  
-> -	if (IS_ENABLED(CONFIG_USB_PHY) && !hcd->usb_phy) {
-> +	if (IS_ENABLED(CONFIG_USB_PHY) && !hcd->skip_phy_initialization) {
->  		struct usb_phy *phy = usb_get_phy_dev(hcd->self.sysdev, 0);
->  
->  		if (IS_ERR(phy)) {
-> @@ -2745,7 +2745,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
->  		}
->  	}
->  
-> -	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->phy) {
-> +	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->skip_phy_initialization) {
->  		struct phy *phy = phy_get(hcd->self.sysdev, "usb");
->  
->  		if (IS_ERR(phy)) {
-> diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
-> index c5094cb88cd5..0a9fd2022acf 100644
-> --- a/drivers/usb/host/ehci-fsl.c
-> +++ b/drivers/usb/host/ehci-fsl.c
-> @@ -155,6 +155,8 @@ static int fsl_ehci_drv_probe(struct platform_device *pdev)
->  			retval = -ENODEV;
->  			goto err2;
->  		}
-> +
-> +		hcd->skip_phy_initialization = 1;
->  	}
->  #endif
->  	return retval;
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index b065a960adc2..b91eea8c73ae 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -219,9 +219,9 @@ static int ehci_platform_probe(struct platform_device *dev)
->  			if (IS_ERR(priv->phys[phy_num])) {
->  				err = PTR_ERR(priv->phys[phy_num]);
->  					goto err_put_hcd;
-> -			} else if (!hcd->phy) {
-> +			} else {
->  				/* Avoiding phy_get() in usb_add_hcd() */
-> -				hcd->phy = priv->phys[phy_num];
-> +				hcd->skip_phy_initialization = 1;
->  			}
->  		}
->  
-> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
-> index c809f7d2f08f..a6f4389f7e88 100644
-> --- a/drivers/usb/host/ehci-tegra.c
-> +++ b/drivers/usb/host/ehci-tegra.c
-> @@ -461,6 +461,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
->  		goto cleanup_clk_en;
->  	}
->  	hcd->usb_phy = u_phy;
-> +	hcd->skip_phy_initialization = 1;
->  
->  	tegra->needs_double_reset = of_property_read_bool(pdev->dev.of_node,
->  		"nvidia,needs-double-reset");
-> diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-> index 0201c49bc4fc..d8d35d456456 100644
-> --- a/drivers/usb/host/ohci-omap.c
-> +++ b/drivers/usb/host/ohci-omap.c
-> @@ -230,6 +230,7 @@ static int ohci_omap_reset(struct usb_hcd *hcd)
->  		} else {
->  			return -EPROBE_DEFER;
->  		}
-> +		hcd->skip_phy_initialization = 1;
->  		ohci->start_hnp = start_hnp;
->  	}
->  #endif
-> diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-> index 1e6c954f4b3f..62ef36a9333f 100644
-> --- a/drivers/usb/host/ohci-platform.c
-> +++ b/drivers/usb/host/ohci-platform.c
-> @@ -186,9 +186,9 @@ static int ohci_platform_probe(struct platform_device *dev)
->  			if (IS_ERR(priv->phys[phy_num])) {
->  				err = PTR_ERR(priv->phys[phy_num]);
->  				goto err_put_hcd;
-> -			} else if (!hcd->phy) {
-> +			} else {
->  				/* Avoiding phy_get() in usb_add_hcd() */
-> -				hcd->phy = priv->phys[phy_num];
-> +				hcd->skip_phy_initialization = 1;
->  			}
->  		}
->  
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 6f038306c14d..6700e5ee82ad 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -284,6 +284,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  		ret = usb_phy_init(hcd->usb_phy);
->  		if (ret)
->  			goto put_usb3_hcd;
-> +		hcd->skip_phy_initialization = 1;
->  	}
->  
->  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-> diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
-> index 176900528822..693502c84c04 100644
-> --- a/include/linux/usb/hcd.h
-> +++ b/include/linux/usb/hcd.h
-> @@ -151,6 +151,12 @@ struct usb_hcd {
->  	unsigned		msix_enabled:1;	/* driver has MSI-X enabled? */
->  	unsigned		msi_enabled:1;	/* driver has MSI enabled? */
->  	unsigned		remove_phy:1;	/* auto-remove USB phy */
-> +	/*
-> +	 * do not manage the PHY state in the HCD core, instead let the driver
-> +	 * handle this (for example if the PHY can only be turned on after a
-> +	 * specific event)
-> +	 */
-> +	unsigned		skip_phy_initialization:1;
->  
->  	/* The next flag is a stopgap, to be removed when all the HCDs
->  	 * support the new root-hub polling mechanism. */
-> -- 
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-For chipidea part:
+The Krait CPU clocks are made up of a primary mux and secondary
+mux for each CPU and the L2, controlled via cp15 accessors. For
+Kraits within KPSSv1 each secondary mux accepts a different aux
+source, but on KPSSv2 each secondary mux accepts the same aux
+source.
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/Kconfig    |   8 ++
+ drivers/clk/qcom/Makefile   |   1 +
+ drivers/clk/qcom/krait-cc.c | 341 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 350 insertions(+)
+ create mode 100644 drivers/clk/qcom/krait-cc.c
 
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 8fca65d..73cb840 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -243,6 +243,14 @@ config KPSS_XCC
+ 	  if you want to support CPU frequency scaling on devices such
+ 	  as MSM8960, APQ8064, etc.
+ 
++config KRAITCC
++	tristate "Krait Clock Controller"
++	depends on COMMON_CLK_QCOM && ARM
++	select KRAIT_CLOCKS
++	help
++	  Support for the Krait CPU clocks on Qualcomm devices.
++	  Say Y if you want to support CPU frequency scaling.
++
+ config KRAIT_CLOCKS
+ 	bool
+ 	select KRAIT_L2_ACCESSORS
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index 24e598a..cd99c7b 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -42,3 +42,4 @@ obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
+ obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
+ obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
+ obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
++obj-$(CONFIG_KRAITCC) += krait-cc.o
+diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
+new file mode 100644
+index 0000000..7c9dfb0
+--- /dev/null
++++ b/drivers/clk/qcom/krait-cc.c
+@@ -0,0 +1,341 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++
++#include "clk-krait.h"
++
++static unsigned int sec_mux_map[] = {
++	2,
++	0,
++};
++
++static unsigned int pri_mux_map[] = {
++	1,
++	2,
++	0,
++};
++
++static int
++krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
++{
++	struct krait_div2_clk *div;
++	struct clk_init_data init = {
++		.num_parents = 1,
++		.ops = &krait_div2_clk_ops,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	const char *p_names[1];
++	struct clk *clk;
++
++	div = devm_kzalloc(dev, sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return -ENOMEM;
++
++	div->width = 2;
++	div->shift = 6;
++	div->lpl = id >= 0;
++	div->offset = offset;
++	div->hw.init = &init;
++
++	init.name = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
++	if (!init.name)
++		return -ENOMEM;
++
++	init.parent_names = p_names;
++	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
++	if (!p_names[0]) {
++		kfree(init.name);
++		return -ENOMEM;
++	}
++
++	clk = devm_clk_register(dev, &div->hw);
++	kfree(p_names[0]);
++	kfree(init.name);
++
++	return PTR_ERR_OR_ZERO(clk);
++}
++
++static int
++krait_add_sec_mux(struct device *dev, int id, const char *s,
++		  unsigned int offset, bool unique_aux)
++{
++	struct krait_mux_clk *mux;
++	static const char *sec_mux_list[] = {
++		"acpu_aux",
++		"qsb",
++	};
++	struct clk_init_data init = {
++		.parent_names = sec_mux_list,
++		.num_parents = ARRAY_SIZE(sec_mux_list),
++		.ops = &krait_mux_clk_ops,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	struct clk *clk;
++
++	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return -ENOMEM;
++
++	mux->offset = offset;
++	mux->lpl = id >= 0;
++	mux->mask = 0x3;
++	mux->shift = 2;
++	mux->parent_map = sec_mux_map;
++	mux->hw.init = &init;
++
++	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
++	if (!init.name)
++		return -ENOMEM;
++
++	if (unique_aux) {
++		sec_mux_list[0] = kasprintf(GFP_KERNEL, "acpu%s_aux", s);
++		if (!sec_mux_list[0]) {
++			clk = ERR_PTR(-ENOMEM);
++			goto err_aux;
++		}
++	}
++
++	clk = devm_clk_register(dev, &mux->hw);
++
++	if (unique_aux)
++		kfree(sec_mux_list[0]);
++err_aux:
++	kfree(init.name);
++	return PTR_ERR_OR_ZERO(clk);
++}
++
++static struct clk *
++krait_add_pri_mux(struct device *dev, int id, const char *s,
++		  unsigned int offset)
++{
++	struct krait_mux_clk *mux;
++	const char *p_names[3];
++	struct clk_init_data init = {
++		.parent_names = p_names,
++		.num_parents = ARRAY_SIZE(p_names),
++		.ops = &krait_mux_clk_ops,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	struct clk *clk;
++
++	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return ERR_PTR(-ENOMEM);
++
++	mux->mask = 0x3;
++	mux->shift = 0;
++	mux->offset = offset;
++	mux->lpl = id >= 0;
++	mux->parent_map = pri_mux_map;
++	mux->hw.init = &init;
++
++	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
++	if (!init.name)
++		return ERR_PTR(-ENOMEM);
++
++	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
++	if (!p_names[0]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p0;
++	}
++
++	p_names[1] = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
++	if (!p_names[1]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p1;
++	}
++
++	p_names[2] = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
++	if (!p_names[2]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p2;
++	}
++
++	clk = devm_clk_register(dev, &mux->hw);
++
++	kfree(p_names[2]);
++err_p2:
++	kfree(p_names[1]);
++err_p1:
++	kfree(p_names[0]);
++err_p0:
++	kfree(init.name);
++	return clk;
++}
++
++/* id < 0 for L2, otherwise id == physical CPU number */
++static struct clk *krait_add_clks(struct device *dev, int id, bool unique_aux)
++{
++	int ret;
++	unsigned int offset;
++	void *p = NULL;
++	const char *s;
++	struct clk *clk;
++
++	if (id >= 0) {
++		offset = 0x4501 + (0x1000 * id);
++		s = p = kasprintf(GFP_KERNEL, "%d", id);
++		if (!s)
++			return ERR_PTR(-ENOMEM);
++	} else {
++		offset = 0x500;
++		s = "_l2";
++	}
++
++	ret = krait_add_div(dev, id, s, offset);
++	if (ret) {
++		clk = ERR_PTR(ret);
++		goto err;
++	}
++
++	ret = krait_add_sec_mux(dev, id, s, offset, unique_aux);
++	if (ret) {
++		clk = ERR_PTR(ret);
++		goto err;
++	}
++
++	clk = krait_add_pri_mux(dev, id, s, offset);
++err:
++	kfree(p);
++	return clk;
++}
++
++static struct clk *krait_of_get(struct of_phandle_args *clkspec, void *data)
++{
++	unsigned int idx = clkspec->args[0];
++	struct clk **clks = data;
++
++	if (idx >= 5) {
++		pr_err("%s: invalid clock index %d\n", __func__, idx);
++		return ERR_PTR(-EINVAL);
++	}
++
++	return clks[idx] ? : ERR_PTR(-ENODEV);
++}
++
++static const struct of_device_id krait_cc_match_table[] = {
++	{ .compatible = "qcom,krait-cc-v1", (void *)1UL },
++	{ .compatible = "qcom,krait-cc-v2" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, krait_cc_match_table);
++
++static int krait_cc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	const struct of_device_id *id;
++	unsigned long cur_rate, aux_rate;
++	int cpu;
++	struct clk *clk;
++	struct clk **clks;
++	struct clk *l2_pri_mux_clk;
++
++	id = of_match_device(krait_cc_match_table, dev);
++	if (!id)
++		return -ENODEV;
++
++	/* Rate is 1 because 0 causes problems for __clk_mux_determine_rate */
++	clk = clk_register_fixed_rate(dev, "qsb", NULL, 0, 1);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	if (!id->data) {
++		clk = clk_register_fixed_factor(dev, "acpu_aux",
++						"gpll0_vote", 0, 1, 2);
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++	}
++
++	/* Krait configurations have at most 4 CPUs and one L2 */
++	clks = devm_kcalloc(dev, 5, sizeof(*clks), GFP_KERNEL);
++	if (!clks)
++		return -ENOMEM;
++
++	for_each_possible_cpu(cpu) {
++		clk = krait_add_clks(dev, cpu, id->data);
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++		clks[cpu] = clk;
++	}
++
++	l2_pri_mux_clk = krait_add_clks(dev, -1, id->data);
++	if (IS_ERR(l2_pri_mux_clk))
++		return PTR_ERR(l2_pri_mux_clk);
++	clks[4] = l2_pri_mux_clk;
++
++	/*
++	 * We don't want the CPU or L2 clocks to be turned off at late init
++	 * if CPUFREQ or HOTPLUG configs are disabled. So, bump up the
++	 * refcount of these clocks. Any cpufreq/hotplug manager can assume
++	 * that the clocks have already been prepared and enabled by the time
++	 * they take over.
++	 */
++	for_each_online_cpu(cpu) {
++		clk_prepare_enable(l2_pri_mux_clk);
++		WARN(clk_prepare_enable(clks[cpu]),
++		     "Unable to turn on CPU%d clock", cpu);
++	}
++
++	/*
++	 * Force reinit of HFPLLs and muxes to overwrite any potential
++	 * incorrect configuration of HFPLLs and muxes by the bootloader.
++	 * While at it, also make sure the cores are running at known rates
++	 * and print the current rate.
++	 *
++	 * The clocks are set to aux clock rate first to make sure the
++	 * secondary mux is not sourcing off of QSB. The rate is then set to
++	 * two different rates to force a HFPLL reinit under all
++	 * circumstances.
++	 */
++	cur_rate = clk_get_rate(l2_pri_mux_clk);
++	aux_rate = 384000000;
++	if (cur_rate == 1) {
++		pr_info("L2 @ QSB rate. Forcing new rate.\n");
++		cur_rate = aux_rate;
++	}
++	clk_set_rate(l2_pri_mux_clk, aux_rate);
++	clk_set_rate(l2_pri_mux_clk, 2);
++	clk_set_rate(l2_pri_mux_clk, cur_rate);
++	pr_info("L2 @ %lu KHz\n", clk_get_rate(l2_pri_mux_clk) / 1000);
++	for_each_possible_cpu(cpu) {
++		clk = clks[cpu];
++		cur_rate = clk_get_rate(clk);
++		if (cur_rate == 1) {
++			pr_info("CPU%d @ QSB rate. Forcing new rate.\n", cpu);
++			cur_rate = aux_rate;
++		}
++
++		clk_set_rate(clk, aux_rate);
++		clk_set_rate(clk, 2);
++		clk_set_rate(clk, cur_rate);
++		pr_info("CPU%d @ %lu KHz\n", cpu, clk_get_rate(clk) / 1000);
++	}
++
++	of_clk_add_provider(dev->of_node, krait_of_get, clks);
++
++	return 0;
++}
++
++static struct platform_driver krait_cc_driver = {
++	.probe = krait_cc_probe,
++	.driver = {
++		.name = "krait-cc",
++		.of_match_table = krait_cc_match_table,
++	},
++};
++module_platform_driver(krait_cc_driver);
++
++MODULE_DESCRIPTION("Krait CPU Clock Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:krait-cc");
 -- 
-
-Best Regards,
-Peter Chen
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
