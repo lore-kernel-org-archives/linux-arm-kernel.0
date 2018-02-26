@@ -1,52 +1,59 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 26 Feb 2018 09:13:34 +0100
-Subject: [PATCH v2] ARM: dts: imx6ul: add wdog3 node
-In-Reply-To: <20180225012446.24499-1-joerg.krause@embedded.rocks>
-References: <20180225012446.24499-1-joerg.krause@embedded.rocks>
-Message-ID: <9e8be8f6d33f53033b9929a9be37c889@agner.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 09:14:36 +0100
+Subject: [PATCH v2 01/19] clk: renesas: cpg-mssr: Add support for R-Car
+ M3-N
+In-Reply-To: <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdWcLd6BnwW2fwOPhpsRZ=qfuYE6YoehFj8WXkUmGZMW_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.02.2018 02:24, J?rg Krause wrote:
-> The i.MX6UL(L) has a WDOG3 located at start address 0x021E0000 in the
-> AIPS-2 memory region [1].
-> 
-> [1] i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1,
->     04/2016, Table-2-3 AIPS-2 memory map, p. 166
+Hi Jacopo,
 
-And it seems that WDOG3 is also available on 6ULL, so imx6ull.dtsi
-should be fine.
+On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> Initial support for R-Car M3-N (r8a77965), including core and module
+> clocks.
+>
+> Based on Table 8.2d of "R-Car Series, 3rd Generation User's Manual:
+> Hardware (Rev. 0.80, Oct 31, 2017)".
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
+> @@ -22,6 +22,7 @@ Required Properties:
+>        - "renesas,r8a7794-cpg-mssr" for the r8a7794 SoC (R-Car E2)
+>        - "renesas,r8a7795-cpg-mssr" for the r8a7795 SoC (R-Car H3)
+>        - "renesas,r8a7796-cpg-mssr" for the r8a7796 SoC (R-Car M3-W)
+> +      - "renesas,r8a77965-cpg-mssr" for the r8a77965 SoC (R-Car M3-N)
+>        - "renesas,r8a77970-cpg-mssr" for the r8a77970 SoC (R-Car V3M)
+>        - "renesas,r8a77995-cpg-mssr" for the r8a77995 SoC (R-Car D3)
+
+You forgot to update the list of external parent clock names.
+No need to fix and resend, I've squashed in the following:
+
+--- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
+@@ -34,8 +34,8 @@ Required Properties:
+     clock-names
+   - clock-names: List of external parent clock names. Valid names are:
+       - "extal" (r8a7743, r8a7745, r8a7790, r8a7791, r8a7792, r8a7793, r8a7794,
+-                r8a7795, r8a7796, r8a77970, r8a77980, r8a77995)
+-      - "extalr" (r8a7795, r8a7796, r8a77970, r8a77980)
++                r8a7795, r8a7796, r8a77965, r8a77970, r8a77980, r8a77995)
++      - "extalr" (r8a7795, r8a7796, r8a77965, r8a77970, r8a77980)
+       - "usb_extal" (r8a7743, r8a7745, r8a7790, r8a7791, r8a7793, r8a7794)
+
+   - #clock-cells: Must be 2
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 --
-Stefan
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
-> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> ---
-> v2:
->  * Fix IRQ number
-> ---
->  arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index 81c426e1b664..1241972b16ba 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -931,6 +931,14 @@
->  				status = "disabled";
->  			};
->  
-> +			wdog3: wdog at 21e4000 {
-> +				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
-> +				reg = <0x021e4000 0x4000>;
-> +				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX6UL_CLK_WDOG3>;
-> +				status = "disabled";
-> +			};
-> +
->  			uart2: serial at 21e8000 {
->  				compatible = "fsl,imx6ul-uart",
->  					     "fsl,imx6q-uart";
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
