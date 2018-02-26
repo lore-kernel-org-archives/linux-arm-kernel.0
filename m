@@ -1,64 +1,50 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 26 Feb 2018 10:39:30 +0100
-Subject: [PATCH 08/15] drm/sun4i: Fix polarity configuration for DW HDMI
- PHY
-In-Reply-To: <20180224214545.3740-9-jernej.skrabec@siol.net>
-References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <20180224214545.3740-9-jernej.skrabec@siol.net>
-Message-ID: <20180226093930.mipjyr6sr35ldkw6@flea.lan>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 26 Feb 2018 16:37:27 +0800
+Subject: [PATCH 0.5/12] ARM: OMAP2+: Prepare to pass auxdata for
+ smartreflex
+In-Reply-To: <20180223214119.GB5593@atomide.com>
+References: <20180223214119.GB5593@atomide.com>
+Message-ID: <201802261623.teHicLDZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-On Sat, Feb 24, 2018 at 10:45:38PM +0100, Jernej Skrabec wrote:
-> Current polarity configuration code is cleary wrong since it compares
-> same flag two times. However, even if flag name is fixed, it won't work
-> well for resolutions which have one polarity positive and another
-> negative.
-> 
-> Fix that by properly set each bit according to each polarity. Since
-> those two bits are not described in any documentation, relationships
-> were obtained by experimentation.
-> 
-> Fixes: b7c7436a5ff0 ("drm/sun4i: Implement A83T HDMI driver")
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> index e5bfcdd43ec9..f48e8b70fabe 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> @@ -35,10 +35,11 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
->  	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
->  	u32 val = 0;
->  
-> -	if ((mode->flags & DRM_MODE_FLAG_NHSYNC) &&
-> -	    (mode->flags & DRM_MODE_FLAG_NHSYNC)) {
-> -		val = 0x03;
-> -	}
-> +	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-> +		val |= 0x01;
-> +
-> +	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-> +		val |= 0x02;
+I love your patch! Yet something to improve:
 
-Can you introduce defines for those?
+[auto build test ERROR on omap/for-next]
+[also build test ERROR on v4.16-rc3 next-20180226]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks!
-Maxime
+url:    https://github.com/0day-ci/linux/commits/Tony-Lindgren/ARM-OMAP2-Prepare-to-pass-auxdata-for-smartreflex/20180226-132741
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git for-next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+All errors (new ones prefixed by >>):
+
+>> arch/arm/mach-omap2/pdata-quirks.c:517:36: error: array type has incomplete element type 'struct omap_sr_data'
+    struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
+                                       ^~~~~~~~~~~~~
+
+vim +517 arch/arm/mach-omap2/pdata-quirks.c
+
+   516	
+ > 517	struct omap_sr_data __maybe_unused omap_sr_pdata[OMAP_SR_NR];
+   518	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 43115 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/5dd2c855/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/bc2b37ff/attachment-0001.gz>
