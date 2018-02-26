@@ -1,51 +1,67 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:53 +0800
-Subject: [PATCH 19/52] arm64: cpu_errata: Allow an erratum to be match for all
- revisions of a core
+Date: Mon, 26 Feb 2018 16:19:56 +0800
+Subject: [PATCH 22/52] arm64: Move post_ttbr_update_workaround to C code
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-20-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-23-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 06f1494f837 upstream.
+commit 95e3de3590e3 upstream.
 
-Some minor erratum may not be fixed in further revisions of a core,
-leading to a situation where the workaround needs to be updated each
-time an updated core is released.
+We will soon need to invoke a CPU-specific function pointer after changing
+page tables, so move post_ttbr_update_workaround out into C code to make
+this possible.
 
-Introduce a MIDR_ALL_VERSIONS match helper that will work for all
-versions of that MIDR, once and for all.
-
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kernel/cpu_errata.c | 7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index b75e917..c66a673c 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 	.midr_range_min = min, \
- 	.midr_range_max = max
+Conflicts:
+	don't include PAN related changes
+	arch/arm64/include/asm/assembler.h
+	arch/arm64/kernel/entry.S
+	arch/arm64/mm/proc.S
+---
+ arch/arm64/mm/context.c | 9 +++++++++
+ arch/arm64/mm/proc.S    | 3 +--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index efcf1f7..32eeabe91 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -224,6 +224,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ 	cpu_switch_mm(mm->pgd, mm);
+ }
  
-+#define MIDR_ALL_VERSIONS(model) \
-+	.def_scope = SCOPE_LOCAL_CPU, \
-+	.matches = is_affected_midr_range, \
-+	.midr_model = model, \
-+	.midr_range_min = 0, \
-+	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
++/* Errata workaround post TTBRx_EL1 update. */
++asmlinkage void post_ttbr_update_workaround(void)
++{
++	asm(ALTERNATIVE("nop; nop; nop",
++			"ic iallu; dsb nsh; isb",
++			ARM64_WORKAROUND_CAVIUM_27456,
++			CONFIG_CAVIUM_ERRATUM_27456));
++}
 +
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+ static int asids_init(void)
+ {
+ 	asid_bits = get_cpu_asid_bits();
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c2adb0c..cca061a 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -136,8 +136,7 @@ ENTRY(cpu_do_switch_mm)
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+ 	isb
+-	post_ttbr0_update_workaround
+-	ret
++	b	post_ttbr_update_workaround	// Back to C code...
+ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
 -- 
 2.7.4
