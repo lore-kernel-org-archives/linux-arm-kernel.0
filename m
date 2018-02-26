@@ -1,37 +1,54 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Feb 2018 14:33:50 +0800
-Subject: [PATCH] arm64: dts: ls1046a: add a dummy memory 'reg' property
-Message-ID: <1519626830-14370-1-git-send-email-shawnguo@kernel.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 26 Feb 2018 06:52:15 +0000
+Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180226031700.GS3217@dragon>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-2-l.stach@pengutronix.de>
+ <AM3PR04MB306E1344C6242887F4797AC80C20@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20180226031700.GS3217@dragon>
+Message-ID: <AM3PR04MB3063F807F42E76CD515A17480C10@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory node in fsl-ls1046a.dtsi has no 'reg' property, and causes
-the dtc warning below.
+Hi Shawn,
 
-Warning (unit_address_vs_reg): Node /memory at 80000000 has a unit name, but no reg property
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, February 26, 2018 11:17 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>; Mark Rutland
+> <mark.rutland@arm.com>; devicetree at vger.kernel.org; Baruch Siach
+> <baruch@tkos.co.il>; Catalin Marinas <catalin.marinas@arm.com>; Will
+> Deacon <will.deacon@arm.com>; patchwork-lst at pengutronix.de; Rob
+> Herring <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+> 
+> On Sun, Feb 25, 2018 at 10:47:11AM +0000, A.s. Dong wrote:
+> > >  Documentation/devicetree/bindings/arm/fsl.txt  |   4 +
+> > >  arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623
+> > > +++++++++++++++++++++++++
+> >
+> > Should this belongs to pinctrl part?
+> 
+> No.  Those pinfunc defines are used by device tree rather than pinctrl driver.
+> 
 
-Let's add a 'reg' property with dummy memory size, since bootloader will
-need to fill the correct one per board memory configuration anyway.
+I had this question because we have below info in the patch
+"dt-bindings: add binding for i.MX8MQ IOMUXC":
 
-Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-Cc: Li Yang <leoyang.li@nxp.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
+new file mode 100644
+index 0000000..5c5d2d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
+@@ -0,0 +1,39 @@
+...
++       Refer to imx8mq-pinfunc.h in device tree source folder for all available
++       imx8mq PIN_FUNC_ID.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 606ea496f24e..136ebfa9b333 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -131,6 +131,8 @@
- 
- 	memory at 80000000 {
- 		device_type = "memory";
-+		/* Real size will be filled by bootloader */
-+		reg = <0x0 0x80000000 0x0 0x0>;
- 	};
- 
- 	sysclk: sysclk {
--- 
-1.9.1
+Regards
+Dong Aisheng
+
+> Shawn
