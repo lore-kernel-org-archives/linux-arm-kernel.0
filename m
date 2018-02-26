@@ -1,13 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Feb 2018 11:51:19 +0100
-Subject: [RFC][PATCH] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <CAMuHMdXep2sdVK71i1FBkJTd+3aYj0LzCKsqp8vBKrewkaX1FA@mail.gmail.com>
-References: <20180226101718.5353-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXep2sdVK71i1FBkJTd+3aYj0LzCKsqp8vBKrewkaX1FA@mail.gmail.com>
-Message-ID: <20180226105118.7uh7enjfnofoelkh@verge.net.au>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Feb 2018 10:53:22 +0000
+Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
+ Cortex-A53 erratum #843419
+In-Reply-To: <CAKv+Gu_sYmCbxGEmJ3Wyjq3uUH9-YP8PvUbUYZpOuAGVLEaBXQ@mail.gmail.com>
+References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
+ <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+ <20180223171551.qnpuf2rydyibztgt@lakrids.cambridge.arm.com>
+ <CAKv+Gu_Jm9PDGj0uq2BwWLja7_FNekT=GyQ7OG50KZxuOj9xiA@mail.gmail.com>
+ <20180223172518.264ara42xj52ehao@lakrids.cambridge.arm.com>
+ <CAKv+Gu_sYmCbxGEmJ3Wyjq3uUH9-YP8PvUbUYZpOuAGVLEaBXQ@mail.gmail.com>
+Message-ID: <20180226105322.lmvtkngxi3iveal6@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Sat, Feb 24, 2018 at 05:54:01PM +0000, Ard Biesheuvel wrote:
+> On 23 February 2018 at 17:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Feb 23, 2018 at 05:17:31PM +0000, Ard Biesheuvel wrote:
+> >> On 23 February 2018 at 17:15, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
 
-please include linux-renesas-soc at vger.kernel.org on the CC list.
+> >> >> +     /* patch ADRP to ADR if it is in range */
+> >> >> +     if (!reloc_insn_imm(RELOC_OP_PREL, place, val & ~0xfff, 0, 21,
+> >> >> +                         AARCH64_INSN_IMM_ADR)) {
+> >> >> +             ((u8 *)place)[3] &= 0x7f; /* clear opcode bit 31 */
+
+> >> > Can we not construct the equivalent ADR using the usual insn code, and
+> >> > insert it?
+> >>
+> >> Sure.
+> >
+> > Cheers!
+> 
+> Umm, it appears we don't have any code to emit ADR or ADRP
+> instructions, and I am reluctant to add a bunch of routines that are
+> only ever used to flick a single opcode bit.
+
+Fair enough.
+
+Mark.
