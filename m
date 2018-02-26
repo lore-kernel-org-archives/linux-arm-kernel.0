@@ -1,55 +1,71 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:55 +0800
-Subject: [PATCH 21/52] arm64: cpufeature: Pass capability structure to
- ->enable callback
+Date: Mon, 26 Feb 2018 16:19:50 +0800
+Subject: [PATCH 16/52] arm64: futex: Mask __user pointers prior to dereference
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-22-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-17-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 0a0d111d40fd upstream.
+commit 91b2d3442f6a upstream.
 
-In order to invoke the CPU capability ->matches callback from the ->enable
-callback for applying local-CPU workarounds, we need a handle on the
-capability structure.
+The arm64 futex code has some explicit dereferencing of user pointers
+where performing atomic operations in response to a futex command. This
+patch uses masking to limit any speculative futex operations to within
+the user address space.
 
-This patch passes a pointer to the capability structure to the ->enable
-callback.
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	arch/arm64/kernel/cpufeature.c
+	change on old futex_atomic_op_inuser function instead of
+	arch_futex_atomic_op_inuser in arch/arm64/include/asm/futex.h
 ---
- arch/arm64/kernel/cpufeature.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/futex.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index fcb67e0..5c41ef6 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -949,7 +949,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 			 * uses an IPI, giving us a PSTATE that disappears when
- 			 * we return.
- 			 */
--			stop_machine(caps->enable, NULL, cpu_online_mask);
-+			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index 85c4a89..1943cf6 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -48,13 +48,14 @@ do {									\
+ } while (0)
+ 
+ static inline int
+-futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
++futex_atomic_op_inuser (int encoded_op, u32 __user *_uaddr)
+ {
+ 	int op = (encoded_op >> 28) & 7;
+ 	int cmp = (encoded_op >> 24) & 15;
+ 	int oparg = (encoded_op << 8) >> 20;
+ 	int cmparg = (encoded_op << 20) >> 20;
+ 	int oldval = 0, ret, tmp;
++	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
+ 
+ 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
+ 		oparg = 1 << oparg;
+@@ -106,15 +107,17 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
  }
  
- /*
-@@ -1005,7 +1005,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
- 			cpu_die_early();
- 		}
- 		if (caps->enable)
--			caps->enable(NULL);
-+			caps->enable((void *)caps);
- 	}
- }
+ static inline int
+-futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
+ 			      u32 oldval, u32 newval)
+ {
+ 	int ret = 0;
+ 	u32 val, tmp;
++	u32 __user *uaddr;
  
+-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
+ 		return -EFAULT;
+ 
++	uaddr = __uaccess_mask_ptr(_uaddr);
+ 	uaccess_enable();
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+ "	prfm	pstl1strm, %2\n"
 -- 
 2.7.4
