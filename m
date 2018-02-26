@@ -1,66 +1,69 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 26 Feb 2018 12:15:39 +0100
-Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
-In-Reply-To: <20180226105510.azlj56eohhu5wu3n@verge.net.au>
-References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
- <2860322f-89b9-32aa-37bc-4fa4a52c1837@gmail.com>
- <20180226105510.azlj56eohhu5wu3n@verge.net.au>
-Message-ID: <0a1597df-a9ba-c178-3af2-042cb3e31de4@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 26 Feb 2018 11:37:02 +0000
+Subject: [PATCH -stable] arm64: mm: don't write garbage into TTBR1_EL1
+ register
+In-Reply-To: <20180226113050.GE8736@arm.com>
+References: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
+ <20180224083424.GC9681@kroah.com>
+ <CAKv+Gu9rZEAk1RMUEk=7XCVVkLQ-chDu7GTGArCG0YeYcmx52w@mail.gmail.com>
+ <20180226113050.GE8736@arm.com>
+Message-ID: <CAKv+Gu-CghL6V7mVqh59mjqWZqj2w8UpYwotEMJmOeT0KGWuxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2018 11:55 AM, Simon Horman wrote:
-> On Sat, Feb 24, 2018 at 11:11:31PM +0100, Marek Vasut wrote:
->> On 02/18/2018 04:07 PM, Geert Uytterhoeven wrote:
->>> Hi Marek,
+On 26 February 2018 at 11:30, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Feb 24, 2018 at 08:50:42AM +0000, Ard Biesheuvel wrote:
+>> On 24 February 2018 at 08:34, Greg KH <gregkh@linuxfoundation.org> wrote:
+>> > On Fri, Feb 23, 2018 at 06:29:02PM +0000, Ard Biesheuvel wrote:
+>> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+>> >> index 08572f95bd8a..2b473ddeb7a3 100644
+>> >> --- a/arch/arm64/mm/proc.S
+>> >> +++ b/arch/arm64/mm/proc.S
+>> >> @@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+>> >>
+>> >>  .macro       __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+>> >>       adrp    \tmp1, empty_zero_page
+>> >> -     msr     ttbr1_el1, \tmp2
+>> >> +     msr     ttbr1_el1, \tmp1
+>> >
+>> > I don't understand why this isn't also needed in Linus's tree.  What
+>> > commit there prevents this from being required?
+>> >
 >>
->> Hi,
+>> Linus's tree has
 >>
->>> CC Steve Twiss
->>>
->>> On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->>>> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
->>>> one DA9063 and one DA9210 on Porter, the only difference from
->>>> the other boards is that DA9063 is at I2C address 0x5a rather
->>>> than 0x58 .
->>>>
->>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>>
->>> Thanks for your patch!
->>>
->>>> --- a/arch/arm/boot/dts/r8a7791-porter.dts
->>>> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
->>>> @@ -354,10 +354,47 @@
->>>>         clock-frequency = <400000>;
->>>>  };
->>>>
->>>> +&i2c6 {
->>>> +       status = "okay";
->>>> +       clock-frequency = <100000>;
->>>> +
->>>> +       pmic at 5a {
->>>> +               compatible = "dlg,da9063";
->>>
->>> Does it matter that this is a DA9063L ("Variant 6B")?
->>> Do we need a new compatible value, or can this be detected at runtime?
+>>  +.macro __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+>> +     adrp \tmp1, empty_zero_page
+>> +     phys_to_ttbr \tmp1, \tmp2
+>> +     msr ttbr1_el1, \tmp2
+>> +     isb
+>> +     tlbi vmalle1
+>> +     dsb nsh
+>> +     isb
+>> +.endm
 >>
->> The driver detects it
->>
->> da9063 6-005a: Device detected (chip-ID: 0x61, var-ID: 0x63)
->>
->> Comparing the datasheets makes it obvious that 9063L is just a cut-down
->> version of 9063, with less LDOs and one less ADC. So I think we should
->> have extra compatible and have the driver restrict which LDOs can be
->> used with this smaller PMIC.
-> 
-> Thanks, and sorry to ping yo about this while you were in transit.
-> 
-> It sounds like this patch should be updated.
-> Accordingly I'm marking it as "Changes Requested".
+>> but phys_to_ttbr does not exist in the v4.15 and earlier trees (it is
+>> related to 52-bit physical address support which landed in v4.16), so
+>> it was removed for the backport. However, that means tmp2 is never
+>> assigned, and whatever was there is poked into the translation table
+>> base register.
+>
+> Damnit, sorry again. I changed the argument order of phys_to_ttbr along
+> the way, so must've confused myself during the backporting exercise. It's
+> also one of those things that will lead to potential TLB corruption in rare
+> circumstances where the junk in TTBR1 ends up giving a valid translation,
+> so it didn't crop up in my testing. How did Nicolas see this? The bug
+> report I saw didn't look related.
+>
 
-Correct
+This broke the boot on the Dragonboard 410c, but the bisect identified
+another unrelated commit initially.
 
--- 
-Best regards,
-Marek Vasut
+
+>> But let's wait for team-ARM to ack this in any case.
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Greg -- please can you apply this to the 4.14 and 4.15 stable trees?
+>
+> Will
