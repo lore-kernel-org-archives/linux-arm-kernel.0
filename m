@@ -1,71 +1,56 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:50 +0800
-Subject: [PATCH 16/52] arm64: futex: Mask __user pointers prior to dereference
-In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-17-git-send-email-alex.shi@linaro.org>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 26 Feb 2018 08:41:13 +0000
+Subject: [PATCH v2 14/15] clk: stm32: Add clk entry for SDMMC2 on stm32F769
+In-Reply-To: <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
+References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
+ <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
+Message-ID: <fb3b26e8-0102-122b-1386-68a661139706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi Stephen, Michael
 
-commit 91b2d3442f6a upstream.
+It's a gentle reminder as this patch is present on mailing list and 
+acked-by since 01/12/2018
 
-The arm64 futex code has some explicit dereferencing of user pointers
-where performing atomic operations in response to a futex command. This
-patch uses masking to limit any speculative futex operations to within
-the user address space.
+Thanks
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
+Patrice
 
-Conflicts:
-	change on old futex_atomic_op_inuser function instead of
-	arch_futex_atomic_op_inuser in arch/arm64/include/asm/futex.h
----
- arch/arm64/include/asm/futex.h | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 85c4a89..1943cf6 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -48,13 +48,14 @@ do {									\
- } while (0)
- 
- static inline int
--futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
-+futex_atomic_op_inuser (int encoded_op, u32 __user *_uaddr)
- {
- 	int op = (encoded_op >> 28) & 7;
- 	int cmp = (encoded_op >> 24) & 15;
- 	int oparg = (encoded_op << 8) >> 20;
- 	int cmparg = (encoded_op << 20) >> 20;
- 	int oldval = 0, ret, tmp;
-+	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
- 
- 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
- 		oparg = 1 << oparg;
-@@ -106,15 +107,17 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
- }
- 
- static inline int
--futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-+futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
- 			      u32 oldval, u32 newval)
- {
- 	int ret = 0;
- 	u32 val, tmp;
-+	u32 __user *uaddr;
- 
--	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-+	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
- 		return -EFAULT;
- 
-+	uaddr = __uaccess_mask_ptr(_uaddr);
- 	uaccess_enable();
- 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
- "	prfm	pstl1strm, %2\n"
--- 
-2.7.4
+On 01/16/2018 01:30 PM, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+> 
+> STM32F769 has 2 SDMMC port, add clock entry for the second one.
+> 
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> v2 _ Add Acked-by
+> 
+>   drivers/clk/clk-stm32f4.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+> index 96c6b6b..8f8a178 100644
+> --- a/drivers/clk/clk-stm32f4.c
+> +++ b/drivers/clk/clk-stm32f4.c
+> @@ -282,6 +282,7 @@ struct stm32f4_gate_data {
+>   
+>   	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
+>   	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
+> +	{ STM32F4_RCC_APB2ENR,  7,	"sdmmc2",	"sdmux"    },
+>   	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
+>   	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
+>   	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
+> @@ -315,7 +316,7 @@ struct stm32f4_gate_data {
+>   
+>   static const u64 stm32f746_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
+>   						      0x0000000000000003ull,
+> -						      0x04f77f033e01c9ffull };
+> +						      0x04f77f833e01c9ffull };
+>   
+>   static const u64 *stm32f4_gate_map;
+>   
+> 
