@@ -1,268 +1,122 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 26 Feb 2018 15:23:30 +0530
-Subject: [PATCH v7 14/15] cpufreq: Add module to register cpufreq on Krait CPUs
-In-Reply-To: <1519638811-17269-1-git-send-email-sricharan@codeaurora.org>
-References: <1519638811-17269-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1519638811-17269-15-git-send-email-sricharan@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 26 Feb 2018 09:59:33 +0000
+Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
+References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
+ <20180222191647.4727-3-ard.biesheuvel@linaro.org>
+ <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
+ <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
+ <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
+Message-ID: <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>>> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+...
+>>>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+>>>> +                                      &speed_khz);
+>>>> +       if (ret) {
+>>>> +               dev_err(&pdev->dev,
+>>>> +                       "Missing clock-frequency property\n");
+>>>> +               return -EINVAL;
+>>>> +       }
+>>>> +       speed_khz /= 1000;
+>
+>>>> +       if (dev_of_node(&pdev->dev)) {
+>>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
+>>>> +               if (IS_ERR(i2c->clk)) {
+>>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
+>>>> +                       return PTR_ERR(i2c->clk);
+>>>> +               }
+>>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
+>>>> +
+>>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
+>>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
+>>>> +               clk_prepare_enable(i2c->clk);
+>>>> +       } else {
+>>>> +               ret = device_property_read_u32(&pdev->dev,
+>>>> +                                              "socionext,pclk-rate",
+>>>> +                                              &i2c->clkrate);
+>>>> +               if (ret)
+>>>> +                       return ret;
+>>>> +       }
+>>>
+>>> Okay, I got this case. It's more likely the one in 8250_dw.c.
+>>>
+>>> Can you do the similar way?
+>
+>> Could you elaborate?
+>
+> --- 8< --- 8< --- 8< ---
+>         device_property_read_u32(dev, "clock-frequency", &p->uartclk);
+>
+>        /* If there is separate baudclk, get the rate from it. */
+>        data->clk = devm_clk_get(dev, "baudclk");
+> ...
+>        if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
+>                return -EPROBE_DEFER;
+>        if (!IS_ERR_OR_NULL(data->clk)) {
+>                err = clk_prepare_enable(data->clk);
+>                if (err)
+>                        dev_warn(dev, "could not enable optional baudclk: %d\n",
+>                                 err);
+>                else
+>                        p->uartclk = clk_get_rate(data->clk);
+>        }
+>
+>        /* If no clock rate is defined, fail. */
+>        if (!p->uartclk) {
+>                dev_err(dev, "clock rate not defined\n");
+>                err = -EINVAL;
+>                goto err_clk;
+> --- 8< --- 8< --- 8< ---
+>
+> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
+> above and you are almost done.
+>
 
-Register a cpufreq-generic device whenever we detect that a
-"qcom,krait" compatible CPU is present in DT.
+I don't think this is better. The generic DT I2C 'clock-frequency'
+property denotes the bus clock rate not the rate of the clock that
+feeds the IP block. This is rather different from the UART bindings.
 
-Cc: <devicetree@vger.kernel.org>
-[Sricharan: updated to use dev_pm_opp_set_prop_name and
-	    nvmem apis]
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/cpufreq/Kconfig.arm          |  10 ++
- drivers/cpufreq/Makefile             |   3 +
- drivers/cpufreq/cpufreq-dt-platdev.c |   5 +
- drivers/cpufreq/qcom-cpufreq.c       | 182 +++++++++++++++++++++++++++++++++++
- 4 files changed, 200 insertions(+)
- create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+Also, I don't want to support 'socionext,pclk-rate' for DT platforms,
+only for ACPI platforms.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 3a88e33..826f9e7 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -133,6 +133,16 @@ config ARM_OMAP2PLUS_CPUFREQ
- 	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
- 
-+config ARM_QCOM_CPUFREQ
-+	bool "CPUfreq driver for the QCOM SoCs with KRAIT processors"
-+	depends on ARCH_QCOM
-+	select PM_OPP
-+	help
-+	  This enables the CPUFreq driver for Qualcomm SoCs with
-+	  KRAIT processors.
-+
-+	  If in doubt, say N.
-+
- config ARM_S3C_CPUFREQ
- 	bool
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index c60c1e1..21894f6 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -65,6 +65,9 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-+obj-$(CONFIG_ARM_QCOM_CPUFREQ)		+= qcom-cpufreq.o
-+obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
-+obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
- obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
- obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
- obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 3b585e4..e2e9a99 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -127,6 +127,11 @@
- 	{ .compatible = "ti,am43", },
- 	{ .compatible = "ti,dra7", },
- 
-+	{ .compatible = "qcom,ipq8064", },
-+	{ .compatible = "qcom,apq8064", },
-+	{ .compatible = "qcom,msm8974", },
-+	{ .compatible = "qcom,msm8960", },
-+
- 	{ }
- };
- 
-diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
-new file mode 100644
-index 0000000..20d9fa8
---- /dev/null
-+++ b/drivers/cpufreq/qcom-cpufreq.c
-@@ -0,0 +1,182 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include <linux/cpu.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-consumer.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
-+
-+static void __init get_krait_bin_format_a(int *speed, int *pvs, int *pvs_ver,
-+					  struct nvmem_cell *pvs_nvmem, u8 *buf)
-+{
-+	u32 pte_efuse;
-+
-+	pte_efuse = *((u32 *)buf);
-+
-+	*speed = pte_efuse & 0xf;
-+	if (*speed == 0xf)
-+		*speed = (pte_efuse >> 4) & 0xf;
-+
-+	if (*speed == 0xf) {
-+		*speed = 0;
-+		pr_warn("Speed bin: Defaulting to %d\n", *speed);
-+	} else {
-+		pr_info("Speed bin: %d\n", *speed);
-+	}
-+
-+	*pvs = (pte_efuse >> 10) & 0x7;
-+	if (*pvs == 0x7)
-+		*pvs = (pte_efuse >> 13) & 0x7;
-+
-+	if (*pvs == 0x7) {
-+		*pvs = 0;
-+		pr_warn("PVS bin: Defaulting to %d\n", *pvs);
-+	} else {
-+		pr_info("PVS bin: %d\n", *pvs);
-+	}
-+
-+	kfree(buf);
-+}
-+
-+static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver,
-+					  struct nvmem_cell *pvs_nvmem, u8 *buf)
-+{
-+	u32 pte_efuse, redundant_sel;
-+
-+	pte_efuse = *((u32 *)buf);
-+	redundant_sel = (pte_efuse >> 24) & 0x7;
-+	*speed = pte_efuse & 0x7;
-+
-+	/* 4 bits of PVS are in efuse register bits 31, 8-6. */
-+	*pvs = ((pte_efuse >> 28) & 0x8) | ((pte_efuse >> 6) & 0x7);
-+	*pvs_ver = (pte_efuse >> 4) & 0x3;
-+
-+	switch (redundant_sel) {
-+	case 1:
-+		*speed = (pte_efuse >> 27) & 0xf;
-+		break;
-+	case 2:
-+		*pvs = (pte_efuse >> 27) & 0xf;
-+		break;
-+	}
-+
-+	/* Check SPEED_BIN_BLOW_STATUS */
-+	if (pte_efuse & BIT(3)) {
-+		pr_info("Speed bin: %d\n", *speed);
-+	} else {
-+		pr_warn("Speed bin not set. Defaulting to 0!\n");
-+		*speed = 0;
-+	}
-+
-+	/* Check PVS_BLOW_STATUS */
-+	pte_efuse = *(((u32 *)buf) + 4);
-+	if (pte_efuse) {
-+		pr_info("PVS bin: %d\n", *pvs);
-+	} else {
-+		pr_warn("PVS bin not set. Defaulting to 0!\n");
-+		*pvs = 0;
-+	}
-+
-+	pr_info("PVS version: %d\n", *pvs_ver);
-+	kfree(buf);
-+}
-+
-+static int __init qcom_cpufreq_populate_opps(struct nvmem_cell *pvs_nvmem,
-+					     struct opp_table **tbl)
-+{
-+	int speed = 0, pvs = 0, pvs_ver = 0, cpu;
-+	struct device *cpu_dev;
-+	u8 *buf;
-+	size_t len;
-+	char pvs_name[] = "speedXX-pvsXX-vXX";
-+
-+	buf = nvmem_cell_read(pvs_nvmem, &len);
-+	if (len == 4)
-+		get_krait_bin_format_a(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
-+	else if (len == 8)
-+		get_krait_bin_format_b(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
-+	else
-+		pr_warn("Unable to read nvmem data. Defaulting to 0!\n");
-+
-+	snprintf(pvs_name, sizeof(pvs_name), "speed%d-pvs%d-v%d",
-+		 speed, pvs, pvs_ver);
-+
-+	for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
-+		cpu_dev = get_cpu_device(cpu);
-+		if (!cpu_dev)
-+			return -ENODEV;
-+
-+		tbl[cpu] = dev_pm_opp_set_prop_name(cpu_dev, pvs_name);
-+
-+		if (IS_ERR(tbl[cpu])) {
-+			tbl[cpu] = 0;
-+			pr_warn("failed to add OPP name %s\n", pvs_name);
-+			return PTR_ERR(tbl[cpu]);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init qcom_cpufreq_driver_init(void)
-+{
-+	struct platform_device *pdev;
-+	struct device *cpu_dev;
-+	struct device_node *np;
-+	struct nvmem_cell *pvs_nvmem;
-+	struct opp_table *tbl[NR_CPUS] = { NULL };
-+	int ret, cpu = 0;
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev)
-+		return -ENODEV;
-+
-+	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev);
-+	if (!np)
-+		return -ENOENT;
-+
-+	if (!of_device_is_compatible(np, "operating-points-v2-krait-cpu")) {
-+		ret = -ENOENT;
-+		goto free_np;
-+	}
-+
-+	pvs_nvmem = of_nvmem_cell_get(np, NULL);
-+	if (IS_ERR(pvs_nvmem)) {
-+		dev_err(cpu_dev, "Could not get nvmem cell\n");
-+		ret = PTR_ERR(pvs_nvmem);
-+		goto free_np;
-+	}
-+
-+	ret = qcom_cpufreq_populate_opps(pvs_nvmem, tbl);
-+	if (ret)
-+		goto free_opp_name;
-+
-+	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+	if (IS_ERR(pdev)) {
-+		ret = PTR_ERR(pdev);
-+		goto free_opp_name;
-+	}
-+
-+	of_node_put(np);
-+
-+	return 0;
-+
-+free_opp_name:
-+	while (tbl[cpu]) {
-+		dev_pm_opp_put_prop_name(tbl[cpu]);
-+		cpu++;
-+	}
-+
-+free_np:
-+	of_node_put(np);
-+
-+	return ret;
-+}
-+late_initcall(qcom_cpufreq_driver_init);
-+
-+MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
-+MODULE_AUTHOR("Stephen Boyd <sboyd@codeaurora.org>");
-+MODULE_LICENSE("GPL v2");
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>>>> +       i2c->irq = platform_get_irq(pdev, 0);
+>>>> +       if (i2c->irq <= 0) {
+>>>
+>>> < 0 ?
+>>>
+>>> On some platforms IRQ == 0 might be valid.
+>
+>> Are you sure about that?
+>
+> Yes. I fixed some cases on one of a such.
+>
+>> http://yarchive.net/comp/linux/no_irq.html
+>
+> I agree with Linus from software IRQ (and nowadays luckily we are
+> using IRQ descriptors), but I disagree with him from hardware
+> prospective.
+> 0 is totally valid HW IRQ line. In hardware there is no descriptor
+> (except, yes, MSI and alike cases), it's just a wire with an index.
+>
+> So, while drivers are getting better in code prospective (though I
+> don't see many of them comparing this to 0), the IRQ framework is
+> changing itself as well.
+>
+> At which circumstances we might get 0 in the first place?
+>
+> Second question, doesn't request_irq() fail on irq==0 if it's not
+> supported as valid by platform?
+>
+
+Yes, I suppose it does.
+
+I'll change it to '< 0'
