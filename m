@@ -1,82 +1,25 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Mon, 26 Feb 2018 16:24:15 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <87po4s2hve.fsf@intel.com>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180222123308.mypx2r7n6o63mj5z@oak.lan> <87po4s2hve.fsf@intel.com>
-Message-ID: <3a70b89c-b470-3723-760c-5294d0a75230@microchip.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 26 Feb 2018 14:27:44 +0000
+Subject: [PATCH] arm64: mm: fix thinko in non-global page table attribute
+ check
+In-Reply-To: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
+References: <20180223180448.6006-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180226142743.evt7hkr7wsh452qc@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 26.02.2018 11:57, Jani Nikula wrote:
-> On Thu, 22 Feb 2018, Daniel Thompson <daniel.thompson@linaro.org> wrote:
->> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
->>> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
->>> were adapted to this change.
->>>
->>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>> ---
->>>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->>>  drivers/bus/ts-nbus.c                |  2 +-
->>>  drivers/clk/clk-pwm.c                |  3 ++-
->>>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->>>  drivers/hwmon/pwm-fan.c              |  2 +-
->>>  drivers/input/misc/max77693-haptic.c |  2 +-
->>>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->>>  drivers/leds/leds-pwm.c              |  5 ++++-
->>>  drivers/media/rc/ir-rx51.c           |  5 ++++-
->>>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->>>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->>>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->>>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->>>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->>>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->>>  include/linux/pwm.h                  |  6 ++++--
->>>  16 files changed, 70 insertions(+), 21 deletions(-)
->>>
->>> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
->>> index 2030a6b77a09..696fa25dafd2 100644
->>> --- a/drivers/video/backlight/lm3630a_bl.c
->>> +++ b/drivers/video/backlight/lm3630a_bl.c
->>> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
->>>  {
->>>  	unsigned int period = pchip->pdata->pwm_period;
->>>  	unsigned int duty = br * period / br_max;
->>> +	struct pwm_caps caps = { };
->>>  
->>> -	pwm_config(pchip->pwmd, duty, period);
->>> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
->>> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
->>
->> Well... I admit I've only really looked at the patches that impact 
->> backlight but dispersing this really odd looking bit twiddling 
->> throughout the kernel doesn't strike me a great API design.
->>
->> IMHO callers should not be required to find the first set bit in
->> some specially crafted set of capability bits simply to get sane 
->> default behaviour.
+On Fri, Feb 23, 2018 at 06:04:48PM +0000, Ard Biesheuvel wrote:
+> The routine pgattr_change_is_safe() was extended in commit 4e6020565596
+> ("arm64: mm: Permit transitioning from Global to Non-Global without BBM")
+> to permit changing the nG attribute from not set to set, but did so in a
+> way that inadvertently disallows such changes if other permitted attribute
+> changes take place at the same time. So update the code to take this into
+> account.
 > 
-> Agreed. IMHO the regular use case becomes rather tedious, ugly, and
-> error prone.
+> Fixes: 4e6020565596 ("arm64: mm: Permit transitioning from Global to ...")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Using simply PWM_MODE(NORMAL) instead of BIT(ffs(caps.modes) - 1) would be OK
-from your side?
+Queued for 4.16. Thanks.
 
-Or, what about using a function like pwm_mode_first() to get the first supported
-mode by PWM channel?
-
-Or, would you prefer to solve this inside pwm_config() function, let's say, in
-case an invalid mode is passed as argument, to let pwm_config() to choose the
-first available PWM mode for PWM channel passed as argument?
-
-Thank you,
-Claudiu Beznea
-
-> 
-> BR,
-> Jani.
-> 
-> 
+-- 
+Catalin
