@@ -1,50 +1,108 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 26 Feb 2018 09:22:06 +0200
-Subject: [PATCH] ARM: ds: keystone-k2g: add watchdog support
-In-Reply-To: <1e1b645d-2829-8809-61b5-3906fd24c02a@oracle.com>
-References: <1518623703-24529-1-git-send-email-t-kristo@ti.com>
- <1e1b645d-2829-8809-61b5-3906fd24c02a@oracle.com>
-Message-ID: <643467a8-5158-e178-0b45-2fe6ba866499@ti.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Mon, 26 Feb 2018 08:49:10 +0100
+Subject: [PATCH] cpufreq: scpi: invoke frequency-invariance setter function
+In-Reply-To: <CAJZ5v0hB+Uk8SNVqUH3fr1y0SXbY1Rd26b84P-8PPV8FiPbnWw@mail.gmail.com>
+References: <20180220111057.14756-1-dietmar.eggemann@arm.com>
+ <CAJZ5v0hB+Uk8SNVqUH3fr1y0SXbY1Rd26b84P-8PPV8FiPbnWw@mail.gmail.com>
+Message-ID: <23dba70b-aa83-4a21-a33d-733bec215264@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/18 01:40, Santosh Shilimkar wrote:
-> s/ds/dts
+On 02/22/2018 11:27 PM, Rafael J. Wysocki wrote:
+> On Tue, Feb 20, 2018 at 12:10 PM, Dietmar Eggemann
+> <dietmar.eggemann@arm.com> wrote:
 
-Oops, sorry about the typo. Do you want new patch posted or do you fix 
-it locally?
+[...]
 
--Tero
+>> Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> 
+> This is really minor, but I would reorder this slightly.
+
+Tried to figure out what would be the better order. Not sure since I saw
+different examples. Can you tell what would be the best tag order?
+
+[...]
+
+>> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+>> index c32a833e1b00..3101d4e9c2de 100644
+>> --- a/drivers/cpufreq/scpi-cpufreq.c
+>> +++ b/drivers/cpufreq/scpi-cpufreq.c
+>> @@ -51,13 +51,19 @@ static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
+>>   static int
+>>   scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+>>   {
+>> +       unsigned long freq = policy->freq_table[index].frequency;
+>>          struct scpi_data *priv = policy->driver_data;
+>> -       u64 rate = policy->freq_table[index].frequency * 1000;
+>> +       u64 rate = freq * 1000;
+>>          int ret;
+>>
+>>          ret = clk_set_rate(priv->clk, rate);
+>> -       if (!ret && (clk_get_rate(priv->clk) != rate))
+>> -               ret = -EIO;
+>> +       if (!ret) {
+> 
+> I would do:
+> 
+> if (ret)
+>          return ret;
+> 
+> arch_set_freq_scale(policy->related_cpus, freq, policy->cpuinfo.max_freq);
+> 
+> if (clk_get_rate(priv->clk) != rate)
+>          return -EIO;
+> 
+> return 0;
+> 
+> That's somewhat easier to follow for me.
+
+Yes I can change this.
 
 > 
-> On 2/14/2018 7:55 AM, Tero Kristo wrote:
->> Add a watchdog node for keystone-k2g, with the corresponding clock and
->> power domain handles.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->> ? arch/arm/boot/dts/keystone-k2g.dtsi | 7 +++++++
->> ? 1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi 
->> b/arch/arm/boot/dts/keystone-k2g.dtsi
->> index fd06171..ca94221 100644
->> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
->> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
->> @@ -583,5 +583,12 @@
->> ????????????? power-domains = <&k2g_pds 0x0013>;
->> ????????????? clocks = <&k2g_clks 0x0013 0>;
->> ????????? };
+>> +               if (clk_get_rate(priv->clk) != rate)
+>> +                       ret = -EIO;
 >> +
->> +??????? wdt: wdt at 02250000 {
->> +??????????? compatible = "ti,keystone-wdt", "ti,davinci-wdt";
->> +??????????? reg = <0x02250000 0x80>;
->> +??????????? power-domains = <&k2g_pds 0x22>;
->> +??????????? clocks = <&k2g_clks 0x22 0>;
->> +??????? };
->> ????? };
->> ? };
+>> +               arch_set_freq_scale(policy->related_cpus, freq,
+>> +                                   policy->cpuinfo.max_freq);
+>> +       }
 >>
+>>          return ret;
+>>   }
+>> --
+> 
+> I also am not sure why you want to call arch_set_freq_scale() even if
+> the new clock rate didn't stick.
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Right, this is much better.
+
+ static int
+ scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+ {
++       unsigned long freq = policy->freq_table[index].frequency;
+        struct scpi_data *priv = policy->driver_data;
+-       u64 rate = policy->freq_table[index].frequency * 1000;
++       u64 rate = freq * 1000;
+        int ret;
+ 
+        ret = clk_set_rate(priv->clk, rate);
+-       if (!ret && (clk_get_rate(priv->clk) != rate))
+-               ret = -EIO;
+ 
+-       return ret;
++       if (ret)
++               return ret;
++
++       if (clk_get_rate(priv->clk) != rate)
++               return -EIO;
++
++       arch_set_freq_scale(policy->related_cpus, freq,
++                           policy->cpuinfo.max_freq);
++
++       return 0;
+
+Will send out a v2 as soon as I know the preferred tag order.
