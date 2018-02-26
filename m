@@ -1,64 +1,79 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:54 +0800
-Subject: [PATCH 20/52] arm64: Run enable method for errata work arounds on
- late CPUs
+Date: Mon, 26 Feb 2018 16:19:49 +0800
+Subject: [PATCH 15/52] arm64: uaccess: Mask __user pointers for __arch_{clear,
+ copy_*}_user
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-21-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-16-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 55b35d070c25 upstream.
+Rewritting from commit f71c2ffcb20d upstream. On LTS 4.9, there has no
+raw_copy_from/to_user, neither __copy_user_flushcache, and it isn't good
+idead to pick up them. The following is origin commit log, that's also
+applicable for the new patch.
 
-When a CPU is brought up after we have finalised the system
-wide capabilities (i.e, features and errata), we make sure the
-new CPU doesn't need a new errata work around which has not been
-detected already. However we don't run enable() method on the new
-CPU for the errata work arounds already detected. This could
-cause the new CPU running without potential work arounds.
-It is upto the "enable()" method to decide if this CPU should
-do something about the errata.
+    Like we've done for get_user and put_user, ensure that user pointers
+    are masked before invoking the underlying __arch_{clear,copy_*}_user
+    operations.
 
-Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/cpu_errata.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/uaccess.h | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index c66a673c..8de43799 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -150,15 +150,18 @@ void verify_local_cpu_errata_workarounds(void)
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index ffa4e39..fbf4ce4 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -357,14 +357,14 @@ static inline unsigned long __must_check __copy_from_user(void *to, const void _
  {
- 	const struct arm64_cpu_capabilities *caps = arm64_errata;
- 
--	for (; caps->matches; caps++)
--		if (!cpus_have_cap(caps->capability) &&
--			caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+	for (; caps->matches; caps++) {
-+		if (cpus_have_cap(caps->capability)) {
-+			if (caps->enable)
-+				caps->enable((void *)caps);
-+		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
- 			pr_crit("CPU%d: Requires work around for %s, not detected"
- 					" at boot time\n",
- 				smp_processor_id(),
- 				caps->desc ? : "an erratum");
- 			cpu_die_early();
- 		}
-+	}
+ 	kasan_check_write(to, n);
+ 	check_object_size(to, n, false);
+-	return __arch_copy_from_user(to, from, n);
++	return __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
  }
  
- void update_cpu_errata_workarounds(void)
+ static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+ 	kasan_check_read(from, n);
+ 	check_object_size(from, n, true);
+-	return __arch_copy_to_user(to, from, n);
++	return __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
+ }
+ 
+ static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+@@ -374,7 +374,7 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
+ 	check_object_size(to, n, false);
+ 
+ 	if (access_ok(VERIFY_READ, from, n)) {
+-		res = __arch_copy_from_user(to, from, n);
++		res = __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
+ 	}
+ 	if (unlikely(res))
+ 		memset(to + (n - res), 0, res);
+@@ -387,7 +387,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
+ 	check_object_size(from, n, true);
+ 
+ 	if (access_ok(VERIFY_WRITE, to, n)) {
+-		n = __arch_copy_to_user(to, from, n);
++		n = __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
+ 	}
+ 	return n;
+ }
+@@ -395,7 +395,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
+ static inline unsigned long __must_check copy_in_user(void __user *to, const void __user *from, unsigned long n)
+ {
+ 	if (access_ok(VERIFY_READ, from, n) && access_ok(VERIFY_WRITE, to, n))
+-		n = __copy_in_user(to, from, n);
++		n = __copy_in_user(__uaccess_mask_ptr(to), __uaccess_mask_ptr(from), n);
+ 	return n;
+ }
+ 
 -- 
 2.7.4
