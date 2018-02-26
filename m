@@ -1,87 +1,45 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:25 +0800
-Subject: [PATCH 51/52] arm: KVM: Invalidate icache on guest exit for Cortex-A15
-In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-52-git-send-email-alex.shi@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 09:23:33 +0100
+Subject: [PATCH] arm64: defconfig: enable R8A77965 SoC
+In-Reply-To: <20180223150023.f2pf3afpcckbskme@verge.net.au>
+References: <20180223085115.13782-1-horms+renesas@verge.net.au>
+ <CAMuHMdVsOzXz+pU_7bDaQgs371zozy6Za8eDDiauV8qu03ckmw@mail.gmail.com>
+ <20180223150023.f2pf3afpcckbskme@verge.net.au>
+Message-ID: <CAMuHMdXg1qYsS8H1EQ+rs9r2uibtraYv9jhgrzO=mBpSx5D0vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi Simon,
 
-** Not yet queued for inclusion in mainline **
+On Fri, Feb 23, 2018 at 4:00 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Feb 23, 2018 at 10:19:45AM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Feb 23, 2018 at 9:51 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 defconfig.
+>> >
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> I have applied this to the topic/renesas-defconfig branch which is included
+> in the devel branch and tags of the Renesas tree as a convenience to
+> developers.  The branch is not, however, included in the next branch or
+> tags nor is it targeted at upstream.
 
-In order to avoid aliasing attacks against the branch predictor
-on Cortex-A15, let's invalidate the BTB on guest exit, which can
-only be done by invalidating the icache (with ACTLR[0] being set).
+Looks like it accidentally ended up in your next branch.
 
-We use the same hack as for A12/A17 to perform the vector decoding.
+Merge report from sfr:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm/include/asm/kvm_mmu.h |  5 +++++
- arch/arm/kvm/hyp/hyp-entry.S   | 24 ++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+Merging renesas/next (60d04a4b6d41 Merge branch
+'topic/renesas-defconfig' into next)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 2887129..a602467 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -235,6 +235,11 @@ static inline void *kvm_get_hyp_vector(void)
- 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
- 	}
- 
-+	case ARM_CPU_PART_CORTEX_A15:
-+	{
-+		extern char __kvm_hyp_vector_ic_inv[];
-+		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
-+	}
- #endif
- 	default:
- 	{
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index b6b8cb1..4492768 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -73,6 +73,28 @@ __kvm_hyp_vector:
- 
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- 	.align 5
-+__kvm_hyp_vector_ic_inv:
-+	.global __kvm_hyp_vector_ic_inv
-+
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(nop)			/* FIQ		  0 */
-+
-+	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
-+	isb
-+
-+	b	decode_vectors
-+
-+	.align 5
- __kvm_hyp_vector_bp_inv:
- 	.global __kvm_hyp_vector_bp_inv
- 
-@@ -92,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
- 	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
- 	isb
- 
-+decode_vectors:
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 	/*
- 	 * Yet another silly hack: Use VPIDR as a temp register.
--- 
-2.7.4
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
