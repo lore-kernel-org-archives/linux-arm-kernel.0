@@ -1,92 +1,90 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 26 Feb 2018 17:27:52 +0100
-Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
-References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <2676311.2IEVhXnSIE@jernej-laptop>
- <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
-Message-ID: <2342395.9m6rrqTry7@jernej-laptop>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 26 Feb 2018 18:00:42 +0100
+Subject: [PATCH v5 0/7] ARM: stm32: add initial STM32MPU support
+In-Reply-To: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
+References: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <45339923-de01-16b5-1d24-17e95c643e06@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ludovic
 
-Dne ponedeljek, 26. februar 2018 ob 17:21:05 CET je Icenowy Zheng napisal(a):
-> ? 2018?2?27? GMT+08:00 ??12:16:44, "Jernej ?krabec" 
-<jernej.skrabec@siol.net> ??:
-> >Hi Julian,
-> >
-> >Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby
-> >
-> >napisal(a):
-> >> Hi Jernej,
-> >> 
-> >> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
-> >
-> ><jernej.skrabec@siol.net>
-> >
-> >wrote:
-> >> > Enable HDMI output on all boards which have HDMI connector.
-> >> > 
-> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> > ---
-> >> > 
-> >> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
-> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-> >> >  
-> >> >   | 25 ++++++++++++++++++++++
-> >> >  
-> >> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
-> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-> >> >  
-> >> >   | 25 ++++++++++++++++++++++
-> >
-> >arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> >
-> >> >         | 25 ++++++++++++++++++++++
-> >> >  
-> >> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
-> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> >> >  
-> >> >   | 24 +++++++++++++++++++++
-> >
-> >arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> >
-> >> >        | 25 ++++++++++++++++++++++ 8 files changed, 199
-> >
-> >insertions(+)
-> >
-> >> As I understand it, the H2+ is just a slightly trimmed down H3. In
-> >> terms of HDMI support, the difference is that the H2+ can't output
-> >
-> >4k.
-> >
-> >> If this code is compatible with the H2+, could you please add the
-> >> necessary bits and pieces to the h2-plus DTSs too?
-> >
-> >There are only 3 H2+ boards in kernel and none of them has HDMI
-> >connector, so
+On 01/16/2018 03:56 PM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 > 
-> BPi M2 Zero has miniHDMI connector.
+> This patch series extends the existing STM32 microcontrollers (MCUs)
+> family to microprocessors (MPUs). The MPU platform (based on
+> Arm Cortex-A) is a continuation of the MCU one (based on Arm
+> Cortex-M) in that it shares a wide number of hardware blocks.
 
-Ah, sorry, I missed that one. Since I don't have it (or any other board with 
-H2+) I'm not really comfortable including such patch. If anyone will test it, 
-I can include it in next revision.
+Series applied on stm32-next (except patch3 which is already in 4.16-rc1).
 
-Best regards,
-Jernej
+Thanks
+alex
 
 > 
-> >there's nothing to do actually. But if such board is added to kernel,
-> >it would
-> >be trivially add proper nodes, since all H2+ boards include H3 DTSI.
-> >
-> >Best regards,
-> >Jernej
+> change v5:
+> -fix serial3 aliases by serial0
+>   
+> change v4:
+> -Add all available uarts in stm32mp157c
+> -Move uart aliases to board files
 > 
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group. To unsubscribe from this group and stop receiving
-> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> change v3:
+> -Remove bootargs
+> -Remove armv7m_restart and Share stm32_compat for mcu/mpu
+> -Modify stm32 kconfig with Arnd template
+> -Remove patch below (Linus W: Patch applied)
+>   devicetree: bindings: Document supported STM32 SoC family
+>   pinctrl: stm32: Add STM32MP157 MPU support
+> 
+> change V2:
+> -Add stm32 documentation in this serie to avoid merge conflict
+> thread: "https://patchwork.kernel.org/patch/10102573/";
+> -Split bindings (stm32.txt) to separate patches.
+> -Remove ARCH_STM32_MCU/MPU flags
+> -Adopt rst format for Documentation/arm/stm32 files
+> -s/STMicrolectronics/STMicroelectronics/g
+> 
+> Ludovic Barre (7):
+>    Documentation: arm: stm32: move to rst format
+>    ARM: stm32: prepare stm32 family to welcome armv7 architecture
+>    dt-bindings: stm32: add support of STM32MP157
+>    ARM: stm32: add initial support for STM32MP157
+>    ARM: configs: multi_v7: add stm32 support
+>    ARM: dts: stm32: add stm32mp157c initial support
+>    ARM: dts: stm32: add initial support of stm32mp157c eval board
+> 
+>   Documentation/arm/stm32/overview.rst            |  34 +++++
+>   Documentation/arm/stm32/overview.txt            |  33 ----
+>   Documentation/arm/stm32/stm32f429-overview.rst  |  26 ++++
+>   Documentation/arm/stm32/stm32f429-overview.txt  |  22 ---
+>   Documentation/arm/stm32/stm32f746-overview.rst  |  33 ++++
+>   Documentation/arm/stm32/stm32f746-overview.txt  |  34 -----
+>   Documentation/arm/stm32/stm32h743-overview.rst  |  34 +++++
+>   Documentation/arm/stm32/stm32h743-overview.txt  |  30 ----
+>   Documentation/arm/stm32/stm32mp157-overview.rst |  19 +++
+>   Documentation/devicetree/bindings/arm/stm32.txt |   1 +
+>   arch/arm/boot/dts/Makefile                      |   6 +-
+>   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi       | 185 ++++++++++++++++++++++
+>   arch/arm/boot/dts/stm32mp157c-ed1.dts           |  32 ++++
+>   arch/arm/boot/dts/stm32mp157c-ev1.dts           |  21 +++
+>   arch/arm/boot/dts/stm32mp157c.dtsi              | 194 ++++++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig             |   3 +
+>   arch/arm/mach-stm32/Kconfig                     |  38 +++--
+>   arch/arm/mach-stm32/board-dt.c                  |   5 +-
+>   18 files changed, 614 insertions(+), 136 deletions(-)
+>   create mode 100644 Documentation/arm/stm32/overview.rst
+>   delete mode 100644 Documentation/arm/stm32/overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32f429-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32f746-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32h743-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32mp157-overview.rst
+>   create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
+> 
