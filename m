@@ -1,67 +1,39 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Mon, 26 Feb 2018 11:57:25 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <20180222123308.mypx2r7n6o63mj5z@oak.lan>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180222123308.mypx2r7n6o63mj5z@oak.lan>
-Message-ID: <87po4s2hve.fsf@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Feb 2018 10:45:05 +0000
+Subject: [PATCH 46/52] arm: Add BTB invalidation on switch_mm for
+ Cortex-A9, A12 and A17
+In-Reply-To: <3fa9ebcb-fe94-bbd6-49a7-e90c91c3905e@linaro.org>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+ <1519633227-29832-47-git-send-email-alex.shi@linaro.org>
+ <20180226100518.GA11378@kroah.com>
+ <3fa9ebcb-fe94-bbd6-49a7-e90c91c3905e@linaro.org>
+Message-ID: <20180226104505.GB8736@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Feb 2018, Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
->> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
->> were adapted to this change.
->> 
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
->>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->>  drivers/bus/ts-nbus.c                |  2 +-
->>  drivers/clk/clk-pwm.c                |  3 ++-
->>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->>  drivers/hwmon/pwm-fan.c              |  2 +-
->>  drivers/input/misc/max77693-haptic.c |  2 +-
->>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->>  drivers/leds/leds-pwm.c              |  5 ++++-
->>  drivers/media/rc/ir-rx51.c           |  5 ++++-
->>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->>  include/linux/pwm.h                  |  6 ++++--
->>  16 files changed, 70 insertions(+), 21 deletions(-)
->> 
->> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
->> index 2030a6b77a09..696fa25dafd2 100644
->> --- a/drivers/video/backlight/lm3630a_bl.c
->> +++ b/drivers/video/backlight/lm3630a_bl.c
->> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
->>  {
->>  	unsigned int period = pchip->pdata->pwm_period;
->>  	unsigned int duty = br * period / br_max;
->> +	struct pwm_caps caps = { };
->>  
->> -	pwm_config(pchip->pwmd, duty, period);
->> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
->> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
->
-> Well... I admit I've only really looked at the patches that impact 
-> backlight but dispersing this really odd looking bit twiddling 
-> throughout the kernel doesn't strike me a great API design.
->
-> IMHO callers should not be required to find the first set bit in
-> some specially crafted set of capability bits simply to get sane 
-> default behaviour.
+On Mon, Feb 26, 2018 at 06:40:42PM +0800, Alex Shi wrote:
+> 
+> 
+> On 02/26/2018 06:05 PM, Greg KH wrote:
+> > On Mon, Feb 26, 2018 at 04:20:20PM +0800, Alex Shi wrote:
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >>
+> >> ** Not yet queued for inclusion in mainline **
+> > 
+> > As Marc said, this should have been a HUGE clue that we can't take this
+> > patch.  Please go re-read
+> > 	https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
+> > 
+> 
+> Thanks for comments, Greg!
+> 
+> I read the rules for several times, and thought it maybe a exception for
+> this bug fix. But since MarcZ said so. We can wait. :)
 
-Agreed. IMHO the regular use case becomes rather tedious, ugly, and
-error prone.
+The reason I added the disclaimer to the commit message was precisely to
+avoid these things accidentally going into stable. If stable diverges
+significantly from mainline, it's just going to make backports of other
+patches more difficult. So no, we shouldn't be considering an exception
+for this.
 
-BR,
-Jani.
-
-
--- 
-Jani Nikula, Intel Open Source Technology Center
+Will
