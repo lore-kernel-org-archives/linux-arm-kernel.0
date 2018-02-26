@@ -1,21 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 26 Feb 2018 12:03:16 +0530
-Subject: [PATCH V2] ARM: dts: da850-evm: add chosen and SPI alias
-In-Reply-To: <1504563124-25568-1-git-send-email-aford173@gmail.com>
-References: <1504563124-25568-1-git-send-email-aford173@gmail.com>
-Message-ID: <27fcbdce-8038-f288-1aa5-0744d2abdba5@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 26 Feb 2018 14:33:50 +0800
+Subject: [PATCH] arm64: dts: ls1046a: add a dummy memory 'reg' property
+Message-ID: <1519626830-14370-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 September 2017 03:42 AM, Adam Ford wrote:
-> This patch will add the chosen container to point stdout-path to serial2
-> and set the alias for spi0 to spi1 since the SPI NOR flash exists on SPI1.
-> 
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+The memory node in fsl-ls1046a.dtsi has no 'reg' property, and causes
+the dtc warning below.
 
-Looks like this patch just never got applied. Sorry about that. Applied
-to v4.17/dt now.
+Warning (unit_address_vs_reg): Node /memory at 80000000 has a unit name, but no reg property
 
-Thanks,
-Sekhar
+Let's add a 'reg' property with dummy memory size, since bootloader will
+need to fill the correct one per board memory configuration anyway.
+
+Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+Cc: Li Yang <leoyang.li@nxp.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 606ea496f24e..136ebfa9b333 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -131,6 +131,8 @@
+ 
+ 	memory at 80000000 {
+ 		device_type = "memory";
++		/* Real size will be filled by bootloader */
++		reg = <0x0 0x80000000 0x0 0x0>;
+ 	};
+ 
+ 	sysclk: sysclk {
+-- 
+1.9.1
