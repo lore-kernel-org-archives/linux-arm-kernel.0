@@ -1,29 +1,55 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 26 Feb 2018 14:03:48 +0100
-Subject: [PATCH] MAINTAINERS: update entries for ARM/STM32
-Message-ID: <1519650228-6271-1-git-send-email-alexandre.torgue@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Feb 2018 13:05:36 +0000
+Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid
+ context
+In-Reply-To: <1518112700.2911.0.camel@redhat.com>
+References: <20180208174504.30665-1-msalter@redhat.com>
+ <20180208175433.p2a3g2q7tctfpk7c@lakrids.cambridge.arm.com>
+ <1518112700.2911.0.camel@redhat.com>
+Message-ID: <20180226130535.7wvvyst5bwj76ss3@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes old git repository to the maintained one and adds more patterns.
+On Thu, Feb 08, 2018 at 12:58:20PM -0500, Mark Salter wrote:
+> On Thu, 2018-02-08 at 17:54 +0000, Mark Rutland wrote:
+> > Hi Mark,
+> > 
+> > On Thu, Feb 08, 2018 at 12:45:04PM -0500, Mark Salter wrote:
+> > > When booting an arm64 debug kernel with ACPI, I see:
+> > > 
+> > >    BUG: sleeping function called from invalid context at mm/slab.h:420
+> > >    in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
+> > >    1 lock held by cpuhp/0/12:
+> > >     #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
+> > >    irq event stamp: 28
+> > >    hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
+> > >    hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
+> > >    softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
+> > >    softirqs last disabled at (0): [<          (null)>]           (null)
+> > >    CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
+> > >    Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
+> > >    Call trace:
+> > >     dump_backtrace+0x0/0x188
+> > >     show_stack+0x24/0x2c
+> > >     dump_stack+0xa4/0xe0
+> > >     ___might_sleep+0x208/0x234
+> > >     __might_sleep+0x58/0x8c
+> > >     kmem_cache_alloc_trace+0x248/0x3e0
+> > >     armpmu_alloc+0x38/0x1a8
+> > >     arm_pmu_acpi_cpu_starting+0x11c/0x15c
+> > >     cpuhp_invoke_callback+0x120/0x100c
+> > >     cpuhp_thread_fun+0xe8/0x258
+> > >     smpboot_thread_fn+0x170/0x268
+> > >     kthread+0x110/0x13c
+> > >     ret_from_fork+0x10/0x18
+> > 
+> > I have patches to address this:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/557838.html
+> > https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
+> 
+> Awesome, I completely missed that. Thanks.
 
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+As a heads-up, these were merged in v4.16-rc3.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3bdc260..802b984 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1999,8 +1999,10 @@ M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
- M:	Alexandre Torgue <alexandre.torgue@st.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git stm32-next
- N:	stm32
-+F:	arch/arm/boot/dts/stm32*
-+F:	arch/arm/mach-stm32/
- F:	drivers/clocksource/armv7m_systick.c
- 
- ARM/TANGO ARCHITECTURE
--- 
-2.7.4
+Mark.
