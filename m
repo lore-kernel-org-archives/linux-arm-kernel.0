@@ -1,107 +1,176 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:15 +0800
-Subject: [PATCH 41/52] firmware/psci: Expose SMCCC version through psci_ops
+Date: Mon, 26 Feb 2018 16:20:18 +0800
+Subject: [PATCH 44/52] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-42-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-45-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit e78eef554a91 upstream.
+commit b092201e0020 upstream.
 
-Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
-let's do that at boot time, and expose the version of the calling
-convention as part of the psci_ops structure.
+Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+It is lovely. Really.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- drivers/firmware/psci.c | 27 +++++++++++++++++++++++++++
- include/linux/psci.h    |  6 ++++++
- 2 files changed, 33 insertions(+)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index a49196a..79a48c3 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
+Conflicts:
+	no qcom hyp functions in
+	arch/arm64/kernel/bpi.S
+	arch/arm64/kernel/cpu_errata.c
+---
+ arch/arm64/kernel/bpi.S        | 20 ++++++++++++
+ arch/arm64/kernel/cpu_errata.c | 72 ++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 89 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index dec95bd..c72f261 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -17,6 +17,7 @@
+  */
  
- struct psci_operations psci_ops = {
- 	.conduit = PSCI_CONDUIT_NONE,
-+	.smccc_version = SMCCC_VERSION_1_0,
- };
+ #include <linux/linkage.h>
++#include <linux/arm-smccc.h>
  
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-@@ -511,6 +512,31 @@ static void __init psci_init_migrate(void)
- 	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+ .macro ventry target
+ 	.rept 31
+@@ -77,3 +78,22 @@ ENTRY(__psci_hyp_bp_inval_start)
+ 	ldp	x0, x1, [sp, #(16 * 8)]
+ 	add	sp, sp, #(8 * 18)
+ ENTRY(__psci_hyp_bp_inval_end)
++
++.macro smccc_workaround_1 inst
++	sub	sp, sp, #(8 * 4)
++	stp	x2, x3, [sp, #(8 * 0)]
++	stp	x0, x1, [sp, #(8 * 2)]
++	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_1
++	\inst	#0
++	ldp	x2, x3, [sp, #(8 * 0)]
++	ldp	x0, x1, [sp, #(8 * 2)]
++	add	sp, sp, #(8 * 4)
++.endm
++
++ENTRY(__smccc_workaround_1_smc_start)
++	smccc_workaround_1	smc
++ENTRY(__smccc_workaround_1_smc_end)
++
++ENTRY(__smccc_workaround_1_hvc_start)
++	smccc_workaround_1	hvc
++ENTRY(__smccc_workaround_1_hvc_end)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index f8810bf..9632319 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -54,6 +54,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+ 
+ #ifdef CONFIG_KVM
+ extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
++extern char __smccc_workaround_1_smc_start[];
++extern char __smccc_workaround_1_smc_end[];
++extern char __smccc_workaround_1_hvc_start[];
++extern char __smccc_workaround_1_hvc_end[];
+ 
+ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+ 				const char *hyp_vecs_end)
+@@ -96,8 +100,12 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	spin_unlock(&bp_lock);
+ }
+ #else
+-#define __psci_hyp_bp_inval_start	NULL
+-#define __psci_hyp_bp_inval_end		NULL
++#define __psci_hyp_bp_inval_start		NULL
++#define __psci_hyp_bp_inval_end			NULL
++#define __smccc_workaround_1_smc_start		NULL
++#define __smccc_workaround_1_smc_end		NULL
++#define __smccc_workaround_1_hvc_start		NULL
++#define __smccc_workaround_1_hvc_end		NULL
+ 
+ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 				      const char *hyp_vecs_start,
+@@ -124,17 +132,75 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
  }
  
-+static void __init psci_init_smccc(void)
++#include <uapi/linux/psci.h>
++#include <linux/arm-smccc.h>
+ #include <linux/psci.h>
+ 
++static void call_smc_arch_workaround_1(void)
 +{
-+	u32 ver = ARM_SMCCC_VERSION_1_0;
-+	int feature;
-+
-+	feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
-+
-+	if (feature != PSCI_RET_NOT_SUPPORTED) {
-+		u32 ret;
-+		ret = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
-+		if (ret == ARM_SMCCC_VERSION_1_1) {
-+			psci_ops.smccc_version = SMCCC_VERSION_1_1;
-+			ver = ret;
-+		}
-+	}
-+
-+	/*
-+	 * Conveniently, the SMCCC and PSCI versions are encoded the
-+	 * same way. No, this isn't accidental.
-+	 */
-+	pr_info("SMC Calling Convention v%d.%d\n",
-+		PSCI_VERSION_MAJOR(ver), PSCI_VERSION_MINOR(ver));
-+
++	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
 +}
 +
- static void __init psci_0_2_set_functions(void)
- {
- 	pr_info("Using standard PSCI v0.2 function IDs\n");
-@@ -559,6 +585,7 @@ static int __init psci_probe(void)
- 	psci_init_migrate();
- 
- 	if (PSCI_VERSION_MAJOR(ver) >= 1) {
-+		psci_init_smccc();
- 		psci_init_cpu_suspend();
- 		psci_init_system_suspend();
- 	}
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 66ff547..347077c 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -31,6 +31,11 @@ enum psci_conduit {
- 	PSCI_CONDUIT_HVC,
- };
- 
-+enum smccc_version {
-+	SMCCC_VERSION_1_0,
-+	SMCCC_VERSION_1_1,
-+};
++static void call_hvc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
 +
- struct psci_operations {
- 	u32 (*get_version)(void);
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-@@ -41,6 +46,7 @@ struct psci_operations {
- 			unsigned long lowest_affinity_level);
- 	int (*migrate_info_type)(void);
- 	enum psci_conduit conduit;
-+	enum smccc_version smccc_version;
- };
++static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
++{
++	bp_hardening_cb_t cb;
++	void *smccc_start, *smccc_end;
++	struct arm_smccc_res res;
++
++	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
++		return false;
++
++	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
++		return false;
++
++	switch (psci_ops.conduit) {
++	case PSCI_CONDUIT_HVC:
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++		if (res.a0)
++			return false;
++		cb = call_hvc_arch_workaround_1;
++		smccc_start = __smccc_workaround_1_hvc_start;
++		smccc_end = __smccc_workaround_1_hvc_end;
++		break;
++
++	case PSCI_CONDUIT_SMC:
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++		if (res.a0)
++			return false;
++		cb = call_smc_arch_workaround_1;
++		smccc_start = __smccc_workaround_1_smc_start;
++		smccc_end = __smccc_workaround_1_smc_end;
++		break;
++
++	default:
++		return false;
++	}
++
++	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
++
++	return true;
++}
++
+ static int enable_psci_bp_hardening(void *data)
+ {
+ 	const struct arm64_cpu_capabilities *entry = data;
  
- extern struct psci_operations psci_ops;
+-	if (psci_ops.get_version)
++	if (psci_ops.get_version) {
++		if (check_smccc_arch_workaround_1(entry))
++			return 0;
++
+ 		install_bp_hardening_cb(entry,
+ 				       (bp_hardening_cb_t)psci_ops.get_version,
+ 				       __psci_hyp_bp_inval_start,
+ 				       __psci_hyp_bp_inval_end);
++	}
+ 
+ 	return 0;
+ }
 -- 
 2.7.4
