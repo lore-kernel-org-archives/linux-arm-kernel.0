@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Feb 2018 11:17:31 +0000
-Subject: Applied "ASoC: sirf: remove duplicated bit-wise or of
- USP_RXFIFO_THD_INT" to the asoc tree
-In-Reply-To: <20180223124117.24686-1-colin.king@canonical.com>
-Message-ID: <E1eqGmh-0005VX-8k@debutante>
+Date: Mon, 26 Feb 2018 11:17:49 +0000
+Subject: Applied "regmap: mmio: Add function to attach a clock" to the regmap
+ tree
+In-Reply-To: <1155920db000d014fd1cd604ed48d1b9a8f64ac1.1519204731.git-series.maxime.ripard@bootlin.com>
+Message-ID: <E1eqGmz-0005ZC-LJ@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sirf: remove duplicated bit-wise or of USP_RXFIFO_THD_INT
+   regmap: mmio: Add function to attach a clock
 
-has been applied to the asoc tree at
+has been applied to the regmap tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,33 +34,89 @@ to this mail.
 Thanks,
 Mark
 
->From f49f49aa1541615f1f77bf2c62f184459825ed92 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Fri, 23 Feb 2018 12:41:17 +0000
-Subject: [PATCH] ASoC: sirf: remove duplicated bit-wise or of
- USP_RXFIFO_THD_INT
+>From 31895662f9ba81e8ea9ef05abf8edcb29d4b9c18 Mon Sep 17 00:00:00 2001
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Wed, 21 Feb 2018 10:20:25 +0100
+Subject: [PATCH] regmap: mmio: Add function to attach a clock
 
-Bit pattern USP_RXFIFO_THD_INT is being bit-wise or'd twice;
-remove the redundant 2nd USP_RXFIFO_THD_INT
+regmap_init_mmio_clk allows to specify a clock that needs to be enabled
+while accessing the registers.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+However, that clock is retrieved through its clock ID, which means it will
+lookup that clock based on the current device that registers the regmap,
+and, in the DT case, will only look in that device OF node.
+
+This might be problematic if the clock to enable is stored in another node.
+Let's add a function that allows to attach a clock that has already been
+retrieved to a regmap in order to fix this.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sirf/sirf-usp.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/base/regmap/regmap-mmio.c | 24 ++++++++++++++++++++++++
+ include/linux/regmap.h            |  3 +++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/sound/soc/sirf/sirf-usp.h b/sound/soc/sirf/sirf-usp.h
-index bf0201cb15bc..e22e13a619e8 100644
---- a/sound/soc/sirf/sirf-usp.h
-+++ b/sound/soc/sirf/sirf-usp.h
-@@ -154,7 +154,7 @@
- 					USP_RX_IO_DMA_INT|\
- 					USP_RXFIFO_FULL_INT|\
- 					USP_RXFIFO_THD_INT|\
--					USP_RXFIFO_THD_INT|USP_RX_TIMEOUT_INT)
-+					USP_RX_TIMEOUT_INT)
+diff --git a/drivers/base/regmap/regmap-mmio.c b/drivers/base/regmap/regmap-mmio.c
+index 5189fd6182f6..5cadfd3394d8 100644
+--- a/drivers/base/regmap/regmap-mmio.c
++++ b/drivers/base/regmap/regmap-mmio.c
+@@ -28,6 +28,8 @@
+ struct regmap_mmio_context {
+ 	void __iomem *regs;
+ 	unsigned val_bytes;
++
++	bool attached_clk;
+ 	struct clk *clk;
  
- #define USP_INT_ALL        0x1FFF
+ 	void (*reg_write)(struct regmap_mmio_context *ctx,
+@@ -363,4 +365,26 @@ struct regmap *__devm_regmap_init_mmio_clk(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(__devm_regmap_init_mmio_clk);
  
++int regmap_mmio_attach_clk(struct regmap *map, struct clk *clk)
++{
++	struct regmap_mmio_context *ctx = map->bus_context;
++
++	ctx->clk = clk;
++	ctx->attached_clk = true;
++
++	return clk_prepare(ctx->clk);
++}
++EXPORT_SYMBOL_GPL(regmap_mmio_attach_clk);
++
++void regmap_mmio_detach_clk(struct regmap *map)
++{
++	struct regmap_mmio_context *ctx = map->bus_context;
++
++	clk_unprepare(ctx->clk);
++
++	ctx->attached_clk = false;
++	ctx->clk = NULL;
++}
++EXPORT_SYMBOL_GPL(regmap_mmio_detach_clk);
++
+ MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 6a3aeba40e9e..5f7ad0552c03 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -21,6 +21,7 @@
+ #include <linux/lockdep.h>
+ 
+ struct module;
++struct clk;
+ struct device;
+ struct i2c_client;
+ struct irq_domain;
+@@ -905,6 +906,8 @@ bool regmap_ac97_default_volatile(struct device *dev, unsigned int reg);
+ 	__regmap_lockdep_wrapper(__devm_regmap_init_sdw, #config,	\
+ 				sdw, config)
+ 
++int regmap_mmio_attach_clk(struct regmap *map, struct clk *clk);
++void regmap_mmio_detach_clk(struct regmap *map);
+ void regmap_exit(struct regmap *map);
+ int regmap_reinit_cache(struct regmap *map,
+ 			const struct regmap_config *config);
 -- 
 2.16.1
