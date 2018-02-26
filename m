@@ -1,39 +1,35 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 19:03:44 +0100
-Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
- Salvator-X board
+Date: Mon, 26 Feb 2018 19:03:42 +0100
+Subject: [PATCH 1/4] dt-bindings: arm: Document SoC compatible value for
+ Armadillo-800 EVA
 In-Reply-To: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
 References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1519668225-12548-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Renesas Salvator-X development board can be equipped with an R-Car
-H3, M3-W, or M3-N SiP, which are pin-compatible.
+The compatible property of the root node in a DTS for Atmark Techno
+Armadillo-800 EVA should include the compatible value for the R-Mobile
+A1 SoC, too.
 
-Document board part number and compatible values for the version with
-R-Car M3-N.
-
-The board part number was extracted from a big patch by Takeshi Kihara
-in the BSP.
-
+Fixes: d2c2a0776899ba2d ("ARM: shmobile: Add platform device tree bindings documentation")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 82908a9447e4b051..51e4428856be4557 100644
+index 63edc11e83ef287f..ded2cd3b5f4df0c8 100644
 --- a/Documentation/devicetree/bindings/arm/shmobile.txt
 +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -108,6 +108,8 @@ Boards:
-     compatible = "renesas,salvator-x", "renesas,r8a7795"
-   - Salvator-X (RTP0RC7796SIPB0011S)
-     compatible = "renesas,salvator-x", "renesas,r8a7796"
-+  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
-+    compatible = "renesas,salvator-x", "renesas,r8a77965"
-   - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
-     compatible = "renesas,salvator-xs", "renesas,r8a7795"
-   - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+@@ -56,7 +56,7 @@ Boards:
+   - APE6-EVM
+     compatible = "renesas,ape6evm", "renesas,r8a73a4"
+   - Atmark Techno Armadillo-800 EVA
+-    compatible = "renesas,armadillo800eva"
++    compatible = "renesas,armadillo800eva", "renesas,r8a7740"
+   - Blanche (RTP0RC7792SEB00010S)
+     compatible = "renesas,blanche", "renesas,r8a7792"
+   - BOCK-W
 -- 
 2.7.4
