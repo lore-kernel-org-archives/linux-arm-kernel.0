@@ -1,122 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 26 Feb 2018 09:59:33 +0000
-Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
-References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
- <20180222191647.4727-3-ard.biesheuvel@linaro.org>
- <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
- <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
- <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
-Message-ID: <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 Feb 2018 15:34:25 +0530
+Subject: [PATCH v7 14/15] cpufreq: Add module to register cpufreq on
+ Krait CPUs
+In-Reply-To: <1519638811-17269-15-git-send-email-sricharan@codeaurora.org>
+References: <1519638811-17269-1-git-send-email-sricharan@codeaurora.org>
+ <1519638811-17269-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180226100425.GO26947@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->>> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
-...
->>>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
->>>> +                                      &speed_khz);
->>>> +       if (ret) {
->>>> +               dev_err(&pdev->dev,
->>>> +                       "Missing clock-frequency property\n");
->>>> +               return -EINVAL;
->>>> +       }
->>>> +       speed_khz /= 1000;
->
->>>> +       if (dev_of_node(&pdev->dev)) {
->>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
->>>> +               if (IS_ERR(i2c->clk)) {
->>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
->>>> +                       return PTR_ERR(i2c->clk);
->>>> +               }
->>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
->>>> +
->>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
->>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
->>>> +               clk_prepare_enable(i2c->clk);
->>>> +       } else {
->>>> +               ret = device_property_read_u32(&pdev->dev,
->>>> +                                              "socionext,pclk-rate",
->>>> +                                              &i2c->clkrate);
->>>> +               if (ret)
->>>> +                       return ret;
->>>> +       }
->>>
->>> Okay, I got this case. It's more likely the one in 8250_dw.c.
->>>
->>> Can you do the similar way?
->
->> Could you elaborate?
->
-> --- 8< --- 8< --- 8< ---
->         device_property_read_u32(dev, "clock-frequency", &p->uartclk);
->
->        /* If there is separate baudclk, get the rate from it. */
->        data->clk = devm_clk_get(dev, "baudclk");
-> ...
->        if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
->                return -EPROBE_DEFER;
->        if (!IS_ERR_OR_NULL(data->clk)) {
->                err = clk_prepare_enable(data->clk);
->                if (err)
->                        dev_warn(dev, "could not enable optional baudclk: %d\n",
->                                 err);
->                else
->                        p->uartclk = clk_get_rate(data->clk);
->        }
->
->        /* If no clock rate is defined, fail. */
->        if (!p->uartclk) {
->                dev_err(dev, "clock rate not defined\n");
->                err = -EINVAL;
->                goto err_clk;
-> --- 8< --- 8< --- 8< ---
->
-> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
-> above and you are almost done.
->
+On 26-02-18, 15:23, Sricharan R wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 
-I don't think this is better. The generic DT I2C 'clock-frequency'
-property denotes the bus clock rate not the rate of the clock that
-feeds the IP block. This is rather different from the UART bindings.
+Is this email id still valid ?
 
-Also, I don't want to support 'socionext,pclk-rate' for DT platforms,
-only for ACPI platforms.
+> +static int __init qcom_cpufreq_populate_opps(struct nvmem_cell *pvs_nvmem,
+> +					     struct opp_table **tbl)
+> +{
+> +	int speed = 0, pvs = 0, pvs_ver = 0, cpu;
+> +	struct device *cpu_dev;
+> +	u8 *buf;
+> +	size_t len;
+> +	char pvs_name[] = "speedXX-pvsXX-vXX";
+> +
+> +	buf = nvmem_cell_read(pvs_nvmem, &len);
+> +	if (len == 4)
+> +		get_krait_bin_format_a(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
+> +	else if (len == 8)
+> +		get_krait_bin_format_b(&speed, &pvs, &pvs_ver, pvs_nvmem, buf);
+> +	else
+> +		pr_warn("Unable to read nvmem data. Defaulting to 0!\n");
+> +
+> +	snprintf(pvs_name, sizeof(pvs_name), "speed%d-pvs%d-v%d",
+> +		 speed, pvs, pvs_ver);
+> +
+> +	for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
+> +		cpu_dev = get_cpu_device(cpu);
+> +		if (!cpu_dev)
+> +			return -ENODEV;
+> +
+> +		tbl[cpu] = dev_pm_opp_set_prop_name(cpu_dev, pvs_name);
+> +
+> +		if (IS_ERR(tbl[cpu])) {
+> +			tbl[cpu] = 0;
+> +			pr_warn("failed to add OPP name %s\n", pvs_name);
+> +			return PTR_ERR(tbl[cpu]);
 
->>>> +       i2c->irq = platform_get_irq(pdev, 0);
->>>> +       if (i2c->irq <= 0) {
->>>
->>> < 0 ?
->>>
->>> On some platforms IRQ == 0 might be valid.
->
->> Are you sure about that?
->
-> Yes. I fixed some cases on one of a such.
->
->> http://yarchive.net/comp/linux/no_irq.html
->
-> I agree with Linus from software IRQ (and nowadays luckily we are
-> using IRQ descriptors), but I disagree with him from hardware
-> prospective.
-> 0 is totally valid HW IRQ line. In hardware there is no descriptor
-> (except, yes, MSI and alike cases), it's just a wire with an index.
->
-> So, while drivers are getting better in code prospective (though I
-> don't see many of them comparing this to 0), the IRQ framework is
-> changing itself as well.
->
-> At which circumstances we might get 0 in the first place?
->
-> Second question, doesn't request_irq() fail on irq==0 if it's not
-> supported as valid by platform?
->
+You just set tbl[cpu] to 0 :)
 
-Yes, I suppose it does.
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init qcom_cpufreq_driver_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	struct device *cpu_dev;
+> +	struct device_node *np;
+> +	struct nvmem_cell *pvs_nvmem;
+> +	struct opp_table *tbl[NR_CPUS] = { NULL };
+> +	int ret, cpu = 0;
+> +
+> +	cpu_dev = get_cpu_device(0);
+> +	if (!cpu_dev)
+> +		return -ENODEV;
+> +
+> +	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev);
+> +	if (!np)
+> +		return -ENOENT;
+> +
+> +	if (!of_device_is_compatible(np, "operating-points-v2-krait-cpu")) {
+> +		ret = -ENOENT;
+> +		goto free_np;
+> +	}
+> +
+> +	pvs_nvmem = of_nvmem_cell_get(np, NULL);
+> +	if (IS_ERR(pvs_nvmem)) {
+> +		dev_err(cpu_dev, "Could not get nvmem cell\n");
+> +		ret = PTR_ERR(pvs_nvmem);
+> +		goto free_np;
+> +	}
+> +
+> +	ret = qcom_cpufreq_populate_opps(pvs_nvmem, tbl);
+> +	if (ret)
+> +		goto free_opp_name;
+> +
+> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +	if (IS_ERR(pdev)) {
+> +		ret = PTR_ERR(pdev);
+> +		goto free_opp_name;
+> +	}
+> +
+> +	of_node_put(np);
+> +
+> +	return 0;
+> +
+> +free_opp_name:
+> +	while (tbl[cpu]) {
+> +		dev_pm_opp_put_prop_name(tbl[cpu]);
+> +		cpu++;
+> +	}
+> +
+> +free_np:
+> +	of_node_put(np);
+> +
+> +	return ret;
+> +}
+> +late_initcall(qcom_cpufreq_driver_init);
+> +
+> +MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
+> +MODULE_AUTHOR("Stephen Boyd <sboyd@codeaurora.org>");
+> +MODULE_LICENSE("GPL v2");
 
-I'll change it to '< 0'
+Everything else is fine. Fix above issue and you can add
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
