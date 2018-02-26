@@ -1,185 +1,92 @@
 From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 26 Feb 2018 17:24:13 +0100
-Subject: [PATCH 11/15] drm/sun4i: Add support for H3 HDMI PHY variant
-In-Reply-To: <20180224214545.3740-12-jernej.skrabec@siol.net>
+Date: Mon, 26 Feb 2018 17:27:52 +0100
+Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
+ output on H3 boards
+In-Reply-To: <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
 References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <20180224214545.3740-12-jernej.skrabec@siol.net>
-Message-ID: <5983773.Yp6r9qpA8a@jernej-laptop>
+ <2676311.2IEVhXnSIE@jernej-laptop>
+ <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
+Message-ID: <2342395.9m6rrqTry7@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-Dne sobota, 24. februar 2018 ob 22:45:41 CET je Jernej Skrabec napisal(a):
-> While A83T HDMI PHY seems to be just customized Synopsys HDMI PHY, H3
-> HDMI PHY is completely custom PHY.
+Dne ponedeljek, 26. februar 2018 ob 17:21:05 CET je Icenowy Zheng napisal(a):
+> ? 2018?2?27? GMT+08:00 ??12:16:44, "Jernej ?krabec" 
+<jernej.skrabec@siol.net> ??:
+> >Hi Julian,
+> >
+> >Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby
+> >
+> >napisal(a):
+> >> Hi Jernej,
+> >> 
+> >> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
+> >
+> ><jernej.skrabec@siol.net>
+> >
+> >wrote:
+> >> > Enable HDMI output on all boards which have HDMI connector.
+> >> > 
+> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> >> > ---
+> >> > 
+> >> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
+> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+> >> >  
+> >> >   | 25 ++++++++++++++++++++++
+> >> >  
+> >> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
+> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+> >> >  
+> >> >   | 25 ++++++++++++++++++++++
+> >
+> >arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> >
+> >> >         | 25 ++++++++++++++++++++++
+> >> >  
+> >> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
+> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+> >> >  
+> >> >   | 24 +++++++++++++++++++++
+> >
+> >arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> >
+> >> >        | 25 ++++++++++++++++++++++ 8 files changed, 199
+> >
+> >insertions(+)
+> >
+> >> As I understand it, the H2+ is just a slightly trimmed down H3. In
+> >> terms of HDMI support, the difference is that the H2+ can't output
+> >
+> >4k.
+> >
+> >> If this code is compatible with the H2+, could you please add the
+> >> necessary bits and pieces to the h2-plus DTSs too?
+> >
+> >There are only 3 H2+ boards in kernel and none of them has HDMI
+> >connector, so
 > 
-> However, they still have many things in common like clock and reset
-> setup, setting sync polarity and more.
-> 
-> Add support for H3 HDMI PHY variant.
-> 
-> While documentation exists for this PHY variant, it doesn't go in great
-> details. Because of that, almost all settings are copied from BSP linux
-> 4.4. Interestingly, those settings are slightly different to those found
-> in a older BSP with Linux 3.4. For now, no user visible difference was
-> found between them.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/Makefile             |   1 +
->  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h      |   6 +
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c     | 263
-> ++++++++++++++++++++++++++++- drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c |
-> 130 ++++++++++++++
->  4 files changed, 397 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> 
-[...]
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c new file mode 100644
-> index 000000000000..3c34ec5ff4af
-> --- /dev/null
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> @@ -0,0 +1,130 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018 Jernej Skrabec <jernej.skrabec@siol.net>
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +
-> +#include "sun8i_dw_hdmi.h"
-> +
-> +struct sun8i_phy_clk {
-> +	struct clk_hw		hw;
-> +	struct sun8i_hdmi_phy	*phy;
-> +};
-> +
-> +static inline struct sun8i_phy_clk *hw_to_phy_clk(struct clk_hw *hw)
-> +{
-> +	return container_of(hw, struct sun8i_phy_clk, hw);
-> +}
-> +
-> +static int sun8i_phy_clk_determine_rate(struct clk_hw *hw,
-> +					struct clk_rate_request *req)
-> +{
-> +	unsigned long rate = req->rate;
-> +	unsigned long best_rate = 0;
-> +	struct clk_hw *parent;
-> +	int best_div = 1;
-> +	int i;
-> +
-> +	parent = clk_hw_get_parent(hw);
-> +
-> +	for (i = 1; i <= 16; i++) {
-> +		unsigned long ideal = rate * i;
-> +		unsigned long rounded;
-> +
-> +		rounded = clk_hw_round_rate(parent, ideal);
-> +
-> +		if (rounded == ideal) {
-> +			best_rate = rounded;
-> +			best_div = i;
-> +			break;
-> +		}
-> +
-> +		if (abs(rate - rounded) < abs(rate - best_rate / best_div)) {
+> BPi M2 Zero has miniHDMI connector.
 
-Here is a bug. Above line should be:
-if (abs(rate - rounded / i) < abs(rate - best_rate / best_div)) {
-
-I guess this could solve the issue described in cover letter.
+Ah, sorry, I missed that one. Since I don't have it (or any other board with 
+H2+) I'm not really comfortable including such patch. If anyone will test it, 
+I can include it in next revision.
 
 Best regards,
 Jernej
 
-> +			best_rate = rounded;
-> +			best_div = i;
-> +		}
-> +	}
-> +
-> +	req->rate = best_rate / best_div;
-> +	req->best_parent_rate = best_rate;
-> +	req->best_parent_hw = parent;
-> +
-> +	return 0;
-> +}
-> +
-> +static unsigned long sun8i_phy_clk_recalc_rate(struct clk_hw *hw,
-> +					       unsigned long parent_rate)
-> +{
-> +	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-> +	u32 reg;
-> +
-> +	regmap_read(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG, &reg);
-> +	reg = ((reg >> SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_SHIFT) &
-> +		SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_MSK) + 1;
-> +
-> +	return parent_rate / reg;
-> +}
-> +
-> +static int sun8i_phy_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-> +				  unsigned long parent_rate)
-> +{
-> +	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-> +	unsigned long best_rate = 0;
-> +	u8 best_m = 0, m;
-> +
-> +	for (m = 1; m <= 16; m++) {
-> +		unsigned long tmp_rate = parent_rate / m;
-> +
-> +		if (tmp_rate > rate)
-> +			continue;
-> +
-> +		if (!best_rate ||
-> +		    (rate - tmp_rate) < (rate - best_rate)) {
-> +			best_rate = tmp_rate;
-> +			best_m = m;
-> +		}
-> +	}
-> +
-> +	regmap_update_bits(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG,
-> +			   SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_MSK,
-> +			   SUN8I_HDMI_PHY_PLL_CFG2_PREDIV(best_m));
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct clk_ops sun8i_phy_clk_ops = {
-> +	.determine_rate	= sun8i_phy_clk_determine_rate,
-> +	.recalc_rate	= sun8i_phy_clk_recalc_rate,
-> +	.set_rate	= sun8i_phy_clk_set_rate,
-> +};
-> +
-> +int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
-> +{
-> +	struct clk_init_data init;
-> +	struct sun8i_phy_clk *priv;
-> +	const char *parents[1];
-> +
-> +	parents[0] = __clk_get_name(phy->clk_pll0);
-> +	if (!parents[0])
-> +		return -ENODEV;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	init.name = "hdmi-phy-clk";
-> +	init.ops = &sun8i_phy_clk_ops;
-> +	init.parent_names = parents;
-> +	init.num_parents = 1;
-> +	init.flags = CLK_SET_RATE_PARENT;
-> +
-> +	priv->phy = phy;
-> +	priv->hw.init = &init;
-> +
-> +	phy->clk_phy = devm_clk_register(dev, &priv->hw);
-> +	if (IS_ERR(phy->clk_phy))
-> +		return PTR_ERR(phy->clk_phy);
-> +
-> +	return 0;
-> +}
+> 
+> >there's nothing to do actually. But if such board is added to kernel,
+> >it would
+> >be trivially add proper nodes, since all H2+ boards include H3 DTSI.
+> >
+> >Best regards,
+> >Jernej
+> 
 > --
-> 2.16.2
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group. To unsubscribe from this group and stop receiving
+> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
