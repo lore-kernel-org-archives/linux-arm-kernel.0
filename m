@@ -1,135 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 26 Feb 2018 14:58:19 +0000
-Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <CAHp75VcjUey4K1xOkjKjn_ppPKC0bktcBK2p9NjcPYG1ed7X0g@mail.gmail.com>
-References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
- <20180222191647.4727-3-ard.biesheuvel@linaro.org>
- <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
- <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
- <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
- <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
- <CAHp75VcjUey4K1xOkjKjn_ppPKC0bktcBK2p9NjcPYG1ed7X0g@mail.gmail.com>
-Message-ID: <CAKv+Gu-y3GG+McAK2b8SCmMf60fo_XSHFBAWsKGw3OBvD04ggg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Feb 2018 15:04:49 +0000
+Subject: [RFC PATCH v2 01/12] h8300: Don't include linux/kernel.h in
+ asm/atomic.h
+In-Reply-To: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1519657500-15094-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2018 at 11:35, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> On Mon, Feb 26, 2018 at 11:59 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->>> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>> On 23 February 2018 at 12:27, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->>>>> On Thu, Feb 22, 2018 at 9:16 PM, Ard Biesheuvel
->>>>> <ard.biesheuvel@linaro.org> wrote:
->> ...
->>>>>> +       ret = device_property_read_u32(&pdev->dev, "clock-frequency",
->>>>>> +                                      &speed_khz);
->>>>>> +       if (ret) {
->>>>>> +               dev_err(&pdev->dev,
->>>>>> +                       "Missing clock-frequency property\n");
->>>>>> +               return -EINVAL;
->>>>>> +       }
->>>>>> +       speed_khz /= 1000;
->>>
->>>>>> +       if (dev_of_node(&pdev->dev)) {
->>>>>> +               i2c->clk = devm_clk_get(&pdev->dev, "pclk");
->>>>>> +               if (IS_ERR(i2c->clk)) {
->>>>>> +                       dev_err(&pdev->dev, "cannot get clock\n");
->>>>>> +                       return PTR_ERR(i2c->clk);
->>>>>> +               }
->>>>>> +               dev_dbg(&pdev->dev, "clock source %p\n", i2c->clk);
->>>>>> +
->>>>>> +               i2c->clkrate = clk_get_rate(i2c->clk);
->>>>>> +               dev_dbg(&pdev->dev, "clock rate %d\n", i2c->clkrate);
->>>>>> +               clk_prepare_enable(i2c->clk);
->>>>>> +       } else {
->>>>>> +               ret = device_property_read_u32(&pdev->dev,
->>>>>> +                                              "socionext,pclk-rate",
->>>>>> +                                              &i2c->clkrate);
->>>>>> +               if (ret)
->>>>>> +                       return ret;
->>>>>> +       }
->>>>>
->>>>> Okay, I got this case. It's more likely the one in 8250_dw.c.
->>>>>
->>>>> Can you do the similar way?
->>>
->>>> Could you elaborate?
->>>
->>> --- 8< --- 8< --- 8< ---
->>>         device_property_read_u32(dev, "clock-frequency", &p->uartclk);
->>>
->>>        /* If there is separate baudclk, get the rate from it. */
->>>        data->clk = devm_clk_get(dev, "baudclk");
->>> ...
->>>        if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
->>>                return -EPROBE_DEFER;
->>>        if (!IS_ERR_OR_NULL(data->clk)) {
->>>                err = clk_prepare_enable(data->clk);
->>>                if (err)
->>>                        dev_warn(dev, "could not enable optional baudclk: %d\n",
->>>                                 err);
->>>                else
->>>                        p->uartclk = clk_get_rate(data->clk);
->>>        }
->>>
->>>        /* If no clock rate is defined, fail. */
->>>        if (!p->uartclk) {
->>>                dev_err(dev, "clock rate not defined\n");
->>>                err = -EINVAL;
->>>                goto err_clk;
->>> --- 8< --- 8< --- 8< ---
->>>
->>> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
->>> above and you are almost done.
->>>
->>
->> I don't think this is better.
->
-> It's a pattern over ACPI vs. clk cases at least for now.
-> But hold on. We have already an example of dealing with ACPI /
-> non-ACPI cases for I2C controllers ? i2c-designware-platdrv.c.
-> Check how it's done there.
->
-> I actually totally forgot about ACPI slaves described in the table. We
-> need to take into account the ones with lowest bus speed.
->
+linux/kernel.h isn't needed by asm/atomic.h and will result in circular
+dependencies when the asm-generic atomic bitops are built around the
+tomic_long_t interface.
 
-Wow, that code is absolutely terrible.
+Remove the broad include and replace it with linux/compiler.h for
+READ_ONCE etc and asm/irqflags.h for arch_local_irq_save etc.
 
-So even while _DSD device properties require vendor prefixes, which
-are lacking in this case, and the fact that the ACPI flavor of the
-Designware I2C controller now provides two different ways to get the
-timing parameters (using device properties or using SSCN/FMCN/etc ACPI
-methods), you think this is a shining example of how this should be
-implemented?
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/h8300/include/asm/atomic.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Also, I still think implementing a clock device using rate X just to
-interrogate it for its rate (returning X) is absolutely pointless.
-
-So what I can do is invent an ACPI method that returns the PCLK rate.
-Would that work for you?
-
-As for the max I2C speed: I think that looks sane, so I can
-incorporate that as well.
-
->>  The generic DT I2C 'clock-frequency'
->> property denotes the bus clock rate not the rate of the clock that
->> feeds the IP block. This is rather different from the UART bindings.
->
->> Also, I don't want to support 'socionext,pclk-rate' for DT platforms,
->> only for ACPI platforms.
->
-> Unfortunately, we are strong against deviations between DT and ACPI in
-> case of device properties.
-> You may provide a clock and use devm_clk_get() without any concerns
-> from where this comes from.
->
-> You won't find any deviation in DW I2C driver since there is none,
-> while driver works for non-ACPI platforms as well.
->
-> --
-> With Best Regards,
-> Andy Shevchenko
+diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
+index 941e7554e886..b174dec099bf 100644
+--- a/arch/h8300/include/asm/atomic.h
++++ b/arch/h8300/include/asm/atomic.h
+@@ -2,8 +2,10 @@
+ #ifndef __ARCH_H8300_ATOMIC__
+ #define __ARCH_H8300_ATOMIC__
+ 
++#include <linux/compiler.h>
+ #include <linux/types.h>
+ #include <asm/cmpxchg.h>
++#include <asm/irqflags.h>
+ 
+ /*
+  * Atomic operations that C can't guarantee us.  Useful for
+@@ -15,8 +17,6 @@
+ #define atomic_read(v)		READ_ONCE((v)->counter)
+ #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
+ 
+-#include <linux/kernel.h>
+-
+ #define ATOMIC_OP_RETURN(op, c_op)				\
+ static inline int atomic_##op##_return(int i, atomic_t *v)	\
+ {								\
+-- 
+2.1.4
