@@ -1,70 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 26 Feb 2018 18:55:49 +0800
-Subject: [PATCH] drm/sun4i: link in front-end code if needed
-In-Reply-To: <20180226105359.k5a3rz2wow4gweba@flea.lan>
-References: <20180223131112.715992-1-arnd@arndb.de>
- <20180226092129.t4uogg2q7jkeolbu@flea.lan>
- <CAK8P3a1w=hLzZLPe1TURPyyu5oxpG8yD0eb_8GrVviUODy0zqQ@mail.gmail.com>
- <20180226105359.k5a3rz2wow4gweba@flea.lan>
-Message-ID: <CAGb2v64RKGMMMF+KZdfVq6BgheAYSJYmb=kg_a0hSp153hNT2Q@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 26 Feb 2018 18:57:20 +0800
+Subject: =?UTF-8?Q?Re:_=e7=ad=94=e5=a4=8d:_[RFC_patch]_ioremap:_don't_set_up?=
+ =?UTF-8?Q?_huge_I/O_mappings_when_p4d/pud/pmd_is_zero?=
+In-Reply-To: <20180221115758.GA7614@arm.com>
+References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+ <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
+ <1519175992.16384.121.camel@hpe.com> <etPan.5a8d2180.1dbfd272.49b8@localhost>
+ <20180221115758.GA7614@arm.com>
+Message-ID: <32c9b1c3-086b-ba54-f9e9-aefa50066730@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 6:53 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, Feb 26, 2018 at 10:31:51AM +0100, Arnd Bergmann wrote:
->> On Mon, Feb 26, 2018 at 10:21 AM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > Hi,
->> >
->> > On Fri, Feb 23, 2018 at 02:06:52PM +0100, Arnd Bergmann wrote:
->> >> When the base sun4i DRM driver is built-in but the back-end is
->> >> a loadable module, we run into a link error:
->> >>
->> >> drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
->> >> sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
->> >>
->> >> The dependency is a bit tricky, the best workaround I have come up
->> >> with is to use a Makefile hack to to interpret both
->> >> CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
->> >> as a directive to build the front-end the same way as the main module.
->> >>
->> >> Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
->> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> >> ---
->> >>  drivers/gpu/drm/sun4i/Makefile | 5 ++++-
->> >>  1 file changed, 4 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
->> >> index 582607c0c488..db14e023256b 100644
->> >> --- a/drivers/gpu/drm/sun4i/Makefile
->> >> +++ b/drivers/gpu/drm/sun4i/Makefile
->> >> @@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)             += sun4i-tcon.o
->> >>  obj-$(CONFIG_DRM_SUN4I)              += sun4i_tv.o
->> >>  obj-$(CONFIG_DRM_SUN4I)              += sun6i_drc.o
->> >>
->> >> -obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o sun4i-frontend.o
->> >> +obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o
->> >> +ifdef CONFIG_DRM_SUN4I_BACKEND
->> >> +obj-$(CONFIG_DRM_SUN4I)              += sun4i-frontend.o
->> >> +endif
->> >
->> > Can we just create a Kconfig symbol, selected by DRM_SUN4I_BACKEND,
->> > and we would export the symbol?
->>
->> Yes, I think that would work just as well. Something like
->>
->> config DRM_SUN4I_FRONTEND
->>       tristate
->>       default DRM_SUN4I if CONFIG_DRM_SUN4I_BACKEND != n
->>
->> should do the trick.
->
-> I had more something like this in mind:
-> https://pastebin.com/raw/XydvzAtz
+On 2018/2/21 19:57, Will Deacon wrote:
+> [sorry, trying to deal with top-posting here]
+> 
+> On Wed, Feb 21, 2018 at 07:36:34AM +0000, Wangxuefeng (E) wrote:
+>>      The old flow of reuse the 4k page as 2M page does not follow the BBM flow
+>> for page table reconstruction?not only the memory leak problems.  If BBM flow
+>> is not followed?the speculative prefetch of tlb will made false tlb entries
+>> cached in MMU, the false address will be got? panic will happen.
+> 
+> If I understand Toshi's suggestion correctly, he's saying that the PMD can
+> be cleared when unmapping the last PTE (like try_to_free_pte_page). In this
+> case, there's no issue with the TLB because this is exactly BBM -- the PMD
+> is cleared and TLB invalidation is issued before the PTE table is freed. A
+> subsequent 2M map request will see an empty PMD and put down a block
+> mapping.
+> 
+> The downside is that freeing becomes more expensive as the last level table
+> becomes more sparsely populated and you need to ensure you don't have any
+> concurrent maps going on for the same table when you're unmapping. I also
+> can't see a neat way to fit this into the current vunmap code. Perhaps we
+> need an iounmap_page_range.
+> 
+> In the meantime, the code in lib/ioremap.c looks totally broken so I think
+> we should deselect CONFIG_HAVE_ARCH_HUGE_VMAP on arm64 until it's fixed.
 
-This doesn't solve the issue at hand, which is sun4i-drv (CONFIG_DRM_SUN4I)
-requires something in sun4i-backend (CONFIG_DRM_SUN4I_BACKEND), and if
-sun4i-drv is built-in, then anything it uses must also be built-in.
+Simply do something below at now (before the broken code is fixed)?
 
-ChenYu
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b2b95f7..a86148c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -84,7 +84,6 @@ config ARM64
+        select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+        select HAVE_ARCH_AUDITSYSCALL
+        select HAVE_ARCH_BITREVERSE
+-   select HAVE_ARCH_HUGE_VMAP
+        select HAVE_ARCH_JUMP_LABEL
+        select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+        select HAVE_ARCH_KGDB
+
+Thanks
+Hanjun
