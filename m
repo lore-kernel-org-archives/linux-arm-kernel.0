@@ -1,75 +1,58 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 26 Feb 2018 11:53:59 +0100
-Subject: [PATCH] drm/sun4i: link in front-end code if needed
-In-Reply-To: <CAK8P3a1w=hLzZLPe1TURPyyu5oxpG8yD0eb_8GrVviUODy0zqQ@mail.gmail.com>
-References: <20180223131112.715992-1-arnd@arndb.de>
- <20180226092129.t4uogg2q7jkeolbu@flea.lan>
- <CAK8P3a1w=hLzZLPe1TURPyyu5oxpG8yD0eb_8GrVviUODy0zqQ@mail.gmail.com>
-Message-ID: <20180226105359.k5a3rz2wow4gweba@flea.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Feb 2018 11:55:10 +0100
+Subject: [PATCH] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <2860322f-89b9-32aa-37bc-4fa4a52c1837@gmail.com>
+References: <20180217020756.21474-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdUiGAV7r55mqRH549BufDsh8_j8_S-BD_49sCM=aO9hZQ@mail.gmail.com>
+ <2860322f-89b9-32aa-37bc-4fa4a52c1837@gmail.com>
+Message-ID: <20180226105510.azlj56eohhu5wu3n@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 10:31:51AM +0100, Arnd Bergmann wrote:
-> On Mon, Feb 26, 2018 at 10:21 AM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > Hi,
-> >
-> > On Fri, Feb 23, 2018 at 02:06:52PM +0100, Arnd Bergmann wrote:
-> >> When the base sun4i DRM driver is built-in but the back-end is
-> >> a loadable module, we run into a link error:
-> >>
-> >> drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
-> >> sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
-> >>
-> >> The dependency is a bit tricky, the best workaround I have come up
-> >> with is to use a Makefile hack to to interpret both
-> >> CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
-> >> as a directive to build the front-end the same way as the main module.
-> >>
-> >> Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> ---
-> >>  drivers/gpu/drm/sun4i/Makefile | 5 ++++-
-> >>  1 file changed, 4 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-> >> index 582607c0c488..db14e023256b 100644
-> >> --- a/drivers/gpu/drm/sun4i/Makefile
-> >> +++ b/drivers/gpu/drm/sun4i/Makefile
-> >> @@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)             += sun4i-tcon.o
-> >>  obj-$(CONFIG_DRM_SUN4I)              += sun4i_tv.o
-> >>  obj-$(CONFIG_DRM_SUN4I)              += sun6i_drc.o
-> >>
-> >> -obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o sun4i-frontend.o
-> >> +obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o
-> >> +ifdef CONFIG_DRM_SUN4I_BACKEND
-> >> +obj-$(CONFIG_DRM_SUN4I)              += sun4i-frontend.o
-> >> +endif
-> >
-> > Can we just create a Kconfig symbol, selected by DRM_SUN4I_BACKEND,
-> > and we would export the symbol?
+On Sat, Feb 24, 2018 at 11:11:31PM +0100, Marek Vasut wrote:
+> On 02/18/2018 04:07 PM, Geert Uytterhoeven wrote:
+> > Hi Marek,
 > 
-> Yes, I think that would work just as well. Something like
+> Hi,
 > 
-> config DRM_SUN4I_FRONTEND
->       tristate
->       default DRM_SUN4I if CONFIG_DRM_SUN4I_BACKEND != n
+> > CC Steve Twiss
+> > 
+> > On Sat, Feb 17, 2018 at 3:07 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+> >> one DA9063 and one DA9210 on Porter, the only difference from
+> >> the other boards is that DA9063 is at I2C address 0x5a rather
+> >> than 0x58 .
+> >>
+> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > 
+> > Thanks for your patch!
+> > 
+> >> --- a/arch/arm/boot/dts/r8a7791-porter.dts
+> >> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+> >> @@ -354,10 +354,47 @@
+> >>         clock-frequency = <400000>;
+> >>  };
+> >>
+> >> +&i2c6 {
+> >> +       status = "okay";
+> >> +       clock-frequency = <100000>;
+> >> +
+> >> +       pmic at 5a {
+> >> +               compatible = "dlg,da9063";
+> > 
+> > Does it matter that this is a DA9063L ("Variant 6B")?
+> > Do we need a new compatible value, or can this be detected at runtime?
 > 
-> should do the trick.
+> The driver detects it
+> 
+> da9063 6-005a: Device detected (chip-ID: 0x61, var-ID: 0x63)
+> 
+> Comparing the datasheets makes it obvious that 9063L is just a cut-down
+> version of 9063, with less LDOs and one less ADC. So I think we should
+> have extra compatible and have the driver restrict which LDOs can be
+> used with this smaller PMIC.
 
-I had more something like this in mind:
-https://pastebin.com/raw/XydvzAtz
+Thanks, and sorry to ping yo about this while you were in transit.
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/b12de33e/attachment.sig>
+It sounds like this patch should be updated.
+Accordingly I'm marking it as "Changes Requested".
