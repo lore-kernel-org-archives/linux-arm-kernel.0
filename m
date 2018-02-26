@@ -1,181 +1,40 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:22 +0800
-Subject: [PATCH 48/52] arm: KVM: Invalidate BTB on guest exit for
- Cortex-A12/A17
-In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-49-git-send-email-alex.shi@linaro.org>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Mon, 26 Feb 2018 16:33:58 +0800
+Subject: [PATCH v2 0/4] PINCTRL: Mediatek pinctrl driver for mt2712 
+Message-ID: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+This series includes four patches:
+1.Add mt2712 pintcrl head file
+2.Add mt2712 pinctrl device node.
+3.Add mt2712 pinctrl driver.
+4.Support bias-disable of generic and special pins simultaneously
 
-** Not yet queued for inclusion in mainline **
+Changes in patch v2:
+1)Separate patch4 for supporting bias-disable of generic and special pins.
+2)GPIO16~17 direction setting is changed as generic pins in mt2712 E2,
+  So remove GPIO16~17 special direction setting and remove apmixedsys node in pinctrl device node.
+3)Add pinmux define in "mt2712-pinfunc.h" and "pinctrl-mtk-mt2712.h" for mt2712 E2 design.
 
-In order to avoid aliasing attacks against the branch predictor,
-let's invalidate the BTB on guest exit. This is made complicated
-by the fact that we cannot take a branch before invalidating the
-BTB.
+Zhiyong Tao (4):
+  arm64: dts: mt2712: add pintcrl file
+  arm64: dts: mt2712: add pintcrl device node.
+  pinctrl: add mt2712 pinctrl driver
+  pintcrl: support bias-disable of generic and special pins
+    simultaneously
 
-We only apply this to A12 and A17, which are the only two ARM
-cores on which this useful.
+ arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1129 ++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi     |   18 +
+ drivers/pinctrl/mediatek/Kconfig              |    7 +
+ drivers/pinctrl/mediatek/Makefile             |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  639 ++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   13 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1973 +++++++++++++++++++++++++
+ 7 files changed, 3778 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
-
-Conflicts:
-	no hvc stub in hyp_hvc in arch/arm/kvm/hyp/hyp-entry.S
----
- arch/arm/include/asm/kvm_asm.h |  2 --
- arch/arm/include/asm/kvm_mmu.h | 18 ++++++++++-
- arch/arm/kvm/hyp/hyp-entry.S   | 71 ++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 86 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef0538..24f3ec7 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -61,8 +61,6 @@ struct kvm_vcpu;
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
- 
--extern char __kvm_hyp_vector[];
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index d10e362..2887129 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,7 @@
- 
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
- 
-@@ -225,7 +226,22 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 
- static inline void *kvm_get_hyp_vector(void)
- {
--	return kvm_ksym_ref(__kvm_hyp_vector);
-+	switch(read_cpuid_part()) {
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	case ARM_CPU_PART_CORTEX_A12:
-+	case ARM_CPU_PART_CORTEX_A17:
-+	{
-+		extern char __kvm_hyp_vector_bp_inv[];
-+		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
-+	}
-+
-+#endif
-+	default:
-+	{
-+		extern char __kvm_hyp_vector[];
-+		return kvm_ksym_ref(__kvm_hyp_vector);
-+	}
-+	}
- }
- 
- static inline int kvm_map_vectors(void)
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 96beb53..b6b8cb1 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -71,6 +71,66 @@ __kvm_hyp_vector:
- 	W(b)	hyp_irq
- 	W(b)	hyp_fiq
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	.align 5
-+__kvm_hyp_vector_bp_inv:
-+	.global __kvm_hyp_vector_bp_inv
-+
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(nop)			/* FIQ		  0 */
-+
-+	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
-+	isb
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+	/*
-+	 * Yet another silly hack: Use VPIDR as a temp register.
-+	 * Thumb2 is really a pain, as SP cannot be used with most
-+	 * of the bitwise instructions. The vect_br macro ensures
-+	 * things gets cleaned-up.
-+	 */
-+	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mov	r0, sp
-+	and	r0, r0, #7
-+	sub	sp, sp, r0
-+	push	{r1, r2}
-+	mov	r1, r0
-+	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
-+	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
-+#endif
-+
-+.macro vect_br val, targ
-+ARM(	eor	sp, sp, #\val	)
-+ARM(	tst	sp, #7		)
-+ARM(	eorne	sp, sp, #\val	)
-+
-+THUMB(	cmp	r1, #\val	)
-+THUMB(	popeq	{r1, r2}	)
-+
-+	beq	\targ
-+.endm
-+
-+	vect_br	0, hyp_fiq
-+	vect_br	1, hyp_irq
-+	vect_br	2, hyp_hvc
-+	vect_br	3, hyp_dabt
-+	vect_br	4, hyp_pabt
-+	vect_br	5, hyp_svc
-+	vect_br	6, hyp_undef
-+	vect_br	7, hyp_reset
-+#endif
-+
- .macro invalid_vector label, cause
- 	.align
- \label:	mov	r0, #\cause
-@@ -131,7 +191,14 @@ hyp_hvc:
- 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	beq	1f
- 
--	push	{lr}
-+	/*
-+	 * Pushing r2 here is just a way of keeping the stack aligned to
-+	 * 8 bytes on any path that can trigger a HYP exception. Here,
-+	 * we may well be about to jump into the guest, and the guest
-+	 * exit would otherwise be badly decoded by our fancy
-+	 * "decode-exception-without-a-branch" code...
-+	 */
-+	push    {r2, lr}
- 
- 	mov	lr, r0
- 	mov	r0, r1
-@@ -141,7 +208,7 @@ hyp_hvc:
- THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
- 
--	pop	{lr}
-+	pop	{r2, lr}
- 1:	eret
- 
- guest_trap:
--- 
-2.7.4
+--
+1.8.1.1.dirty
