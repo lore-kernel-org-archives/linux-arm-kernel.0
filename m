@@ -1,69 +1,77 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 26 Feb 2018 08:32:25 +0000
-Subject: [GIT PULL] STi DT update for v4.17 round 1
-Message-ID: <e30ac9b4-253c-106d-4ea5-604ec3eeb953@st.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 26 Feb 2018 16:20:13 +0800
+Subject: [PATCH 39/52] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-40-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-PLease consider this first round of STi dts update for v4.17 :
+commit f72af90c3783 upstream.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+So let's intercept it as early as we can by testing for the
+function call number as soon as we've identified a HVC call
+coming from the guest.
 
-   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kvm/hyp/hyp-entry.S | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-
-for you to fetch changes up to 0e04ce02e6a2ac30d21294d8bb2aeceb8489e52b:
-
-   ARM: dts: STi: Remove unused clk_ext2f_a9 clock (2018-02-13 13:31:38 
-+0100)
-
-----------------------------------------------------------------
-warn: You locally have sti-dt-for-v4.17-round1 but it does not (yet)
-warn: appear to be at 
-git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-warn: Do you want to push it there, perhaps?
-warning: refname 'sti-dt-for-v4.17-round1' is ambiguous.
-STi dts update:
-
-Fix all DT dtc warnings when building with W=1
-For most of implicated node, the addition of a fake reg property
-fixes these warnings.
-For others nodes, their location in device tree
-have been updated.
-
-----------------------------------------------------------------
-Patrice Chotard (11):
-       ARM: dts: STi: Fix bindings notation
-       ARM: dts: STi: Move leds node outside soc node
-       ARM: dts: STi: Add fake reg property for sti-display-subsystem
-       ARM: dts: STi: Add fake reg property for miphy28lp_phy
-       ARM: dts: STi: Add fake reg property for irq-syscfg
-       ARM: dts: STi: Add fake reg property for remote processors
-       ARM: dts: STi: Add fake reg for restart, powerdown and 
-picophy/softreset
-       ARM: dts: STi: Add fake reg property for usb2_picophyX nodes
-       ARM: dts: STi: Update sound related nodes location
-       ARM: dts: STi: Update clocks node location
-       ARM: dts: STi: Remove unused clk_ext2f_a9 clock
-
-  arch/arm/boot/dts/stih407-b2120.dts    |   2 +-
-  arch/arm/boot/dts/stih407-clock.dtsi   |  92 +++++++++++-------------
-  arch/arm/boot/dts/stih407-family.dtsi  |  42 ++++++-----
-  arch/arm/boot/dts/stih407-pinctrl.dtsi |  10 +--
-  arch/arm/boot/dts/stih407.dtsi         |   4 +-
-  arch/arm/boot/dts/stih410-b2120.dts    |   8 +--
-  arch/arm/boot/dts/stih410-b2260.dts    |  89 ++++++++++++-----------
-  arch/arm/boot/dts/stih410-clock.dtsi   |  96 +++++++++++--------------
-  arch/arm/boot/dts/stih410-pinctrl.dtsi |   2 +-
-  arch/arm/boot/dts/stih410.dtsi         |  13 ++--
-  arch/arm/boot/dts/stih418-b2199.dts    |  30 ++++----
-  arch/arm/boot/dts/stih418-clock.dtsi   |  95 +++++++++++--------------
-  arch/arm/boot/dts/stih418.dtsi         |   6 +-
-  arch/arm/boot/dts/stihxxx-b2120.dtsi   | 126 
-+++++++++++++++++----------------
-  14 files changed, 300 insertions(+), 315 deletions(-)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 4e92399..4e9d50c 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -15,6 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/arm-smccc.h>
+ #include <linux/linkage.h>
+ 
+ #include <asm/alternative.h>
+@@ -79,10 +80,11 @@ alternative_endif
+ 	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+ 
+ 	cmp	x0, #ESR_ELx_EC_HVC64
++	ccmp	x0, #ESR_ELx_EC_HVC32, #4, ne
+ 	b.ne	el1_trap
+ 
+-	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+-	cbnz	x1, el1_trap		// called HVC
++	mrs	x1, vttbr_el2		// If vttbr is valid, the guest
++	cbnz	x1, el1_hvc_guest	// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
+ 	ldp	x0, x1, [sp], #16
+@@ -101,6 +103,20 @@ alternative_endif
+ 
+ 2:	eret
+ 
++el1_hvc_guest:
++	/*
++	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
++	 * The workaround has already been applied on the host,
++	 * so let's quickly get back to the guest. We don't bother
++	 * restoring x1, as it can be clobbered anyway.
++	 */
++	ldr	x1, [sp]				// Guest's x0
++	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
++	cbnz	w1, el1_trap
++	mov	x0, x1
++	add	sp, sp, #16
++	eret
++
+ el1_trap:
+ 	/*
+ 	 * x0: ESR_EC
+-- 
+2.7.4
