@@ -1,49 +1,46 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Mon, 26 Feb 2018 16:25:37 +0100
-Subject: [PATCH v2 2/2] pinctrl: stm32: Optimizes and enhances stm32gpio
- irqchip
-In-Reply-To: <c648235f538b030e7f349e286661fd00894d5316.1519374248.git.radoslaw.pietrzyk@gmail.com>
-References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <c648235f538b030e7f349e286661fd00894d5316.1519374248.git.radoslaw.pietrzyk@gmail.com>
-Message-ID: <83f7cbec-05f6-a937-a848-bd533bb1001a@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Feb 2018 15:37:21 +0000
+Subject: [RFC PATCH v2 06/12] arm64: fpsimd: include <linux/init.h> in
+ fpsimd.h
+In-Reply-To: <1519657500-15094-7-git-send-email-will.deacon@arm.com>
+References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+ <1519657500-15094-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20180226153720.knpw7a4fncixdb4a@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Radoslaw
-
-Reviewed-by: Ludovic Barre <ludovic.barre@st.com>
-Tested-by: Ludovic Barre <ludovic.barre@st.com>
-
-BR
-Ludo
-
-On 02/23/2018 09:31 AM, Radoslaw Pietrzyk wrote:
-> - removes unneeded irq_chip.irq_eoi callback
-> - adds irq_chip.irq_set_wake callback for possible
-> in the future GPIO wakeup
-> - adds irq_chip.irq_ack callback
+On Mon, Feb 26, 2018 at 03:04:54PM +0000, Will Deacon wrote:
+> fpsimd.h uses the __init annotation, so pull in linux/init.h
 > 
-> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Having skimmed through, this looks like all we need.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->   drivers/pinctrl/stm32/pinctrl-stm32.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm64/include/asm/fpsimd.h | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> index 617df16..6cbcff4 100644
-> --- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-> +++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> @@ -268,10 +268,11 @@ static void stm32_gpio_irq_release_resources(struct irq_data *irq_data)
->   
->   static struct irq_chip stm32_gpio_irq_chip = {
->   	.name           = "stm32gpio",
-> -	.irq_eoi	= irq_chip_eoi_parent,
-> +	.irq_ack       = irq_chip_ack_parent,
->   	.irq_mask       = irq_chip_mask_parent,
->   	.irq_unmask     = irq_chip_unmask_parent,
->   	.irq_set_type   = irq_chip_set_type_parent,
-> +	.irq_set_wake   = irq_chip_set_wake_parent,
->   	.irq_request_resources = stm32_gpio_irq_request_resources,
->   	.irq_release_resources = stm32_gpio_irq_release_resources,
->   };
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index 8857a0f0d0f7..fc3527b985ca 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -22,6 +22,7 @@
+>  #ifndef __ASSEMBLY__
+>  
+>  #include <linux/cache.h>
+> +#include <linux/init.h>
+>  #include <linux/stddef.h>
+>  
+>  /*
+> -- 
+> 2.1.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
