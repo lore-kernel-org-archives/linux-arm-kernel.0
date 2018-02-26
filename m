@@ -1,79 +1,54 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:49 +0800
-Subject: [PATCH 15/52] arm64: uaccess: Mask __user pointers for __arch_{clear,
- copy_*}_user
+Date: Mon, 26 Feb 2018 16:20:02 +0800
+Subject: [PATCH 28/52] arm64: cputype: Add missing MIDR values for Cortex-A72
+ and Cortex-A75
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-16-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-29-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-Rewritting from commit f71c2ffcb20d upstream. On LTS 4.9, there has no
-raw_copy_from/to_user, neither __copy_user_flushcache, and it isn't good
-idead to pick up them. The following is origin commit log, that's also
-applicable for the new patch.
+commit a65d219fe5dc upstream.
 
-    Like we've done for get_user and put_user, ensure that user pointers
-    are masked before invoking the underlying __arch_{clear,copy_*}_user
-    operations.
+Hook up MIDR values for the Cortex-A72 and Cortex-A75 CPUs, since they
+will soon need MIDR matches for hardening the branch predictor.
 
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/include/asm/uaccess.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index ffa4e39..fbf4ce4 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -357,14 +357,14 @@ static inline unsigned long __must_check __copy_from_user(void *to, const void _
- {
- 	kasan_check_write(to, n);
- 	check_object_size(to, n, false);
--	return __arch_copy_from_user(to, from, n);
-+	return __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
- }
+Conflicts:
+	pick A73 too in arch/arm64/include/asm/cputype.h
+---
+ arch/arm64/include/asm/cputype.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 26a68dd..0843b3f 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -75,7 +75,10 @@
+ #define ARM_CPU_PART_AEM_V8		0xD0F
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
++#define ARM_CPU_PART_CORTEX_A72		0xD08
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A73		0xD09
++#define ARM_CPU_PART_CORTEX_A75		0xD0A
  
- static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
- {
- 	kasan_check_read(from, n);
- 	check_object_size(from, n, true);
--	return __arch_copy_to_user(to, from, n);
-+	return __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
- }
+ #define APM_CPU_PART_POTENZA		0x000
  
- static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
-@@ -374,7 +374,7 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
- 	check_object_size(to, n, false);
+@@ -86,6 +89,9 @@
  
- 	if (access_ok(VERIFY_READ, from, n)) {
--		res = __arch_copy_from_user(to, from, n);
-+		res = __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
- 	}
- 	if (unlikely(res))
- 		memset(to + (n - res), 0, res);
-@@ -387,7 +387,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
- 	check_object_size(from, n, true);
- 
- 	if (access_ok(VERIFY_WRITE, to, n)) {
--		n = __arch_copy_to_user(to, from, n);
-+		n = __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
- 	}
- 	return n;
- }
-@@ -395,7 +395,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
- static inline unsigned long __must_check copy_in_user(void __user *to, const void __user *from, unsigned long n)
- {
- 	if (access_ok(VERIFY_READ, from, n) && access_ok(VERIFY_WRITE, to, n))
--		n = __copy_in_user(to, from, n);
-+		n = __copy_in_user(__uaccess_mask_ptr(to), __uaccess_mask_ptr(from), n);
- 	return n;
- }
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
++#define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
++#define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
  
 -- 
 2.7.4
