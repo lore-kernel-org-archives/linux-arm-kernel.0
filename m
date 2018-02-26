@@ -1,118 +1,135 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:14 +0800
-Subject: [PATCH 40/52] firmware/psci: Expose PSCI conduit
+Date: Mon, 26 Feb 2018 16:20:23 +0800
+Subject: [PATCH 49/52] arm: Add icache invalidation on switch_mm for Cortex-A15
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-41-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-50-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 09a8d6d48499 upstream.
+** Not yet queued for inclusion in mainline **
 
-In order to call into the firmware to apply workarounds, it is
-useful to find out whether we're using HVC or SMC. Let's expose
-this through the psci_ops.
+In order to avoid aliasing attacks against the branch predictor,
+Cortex-A15 require to invalidate the BTB when switching
+from one user context to another. The only way to do so on this
+CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+mode.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
- include/linux/psci.h    |  7 +++++++
- 2 files changed, 30 insertions(+), 5 deletions(-)
+ arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+ arch/arm/mm/proc-v7-3level.S | 10 ++++++++++
+ arch/arm/mm/proc-v7.S        | 23 ++++++++++++++++++++++-
+ 3 files changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 9a3ce76..a49196a 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
- 	return cpu == resident_cpu;
- }
- 
--struct psci_operations psci_ops;
-+struct psci_operations psci_ops = {
-+	.conduit = PSCI_CONDUIT_NONE,
-+};
- 
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
- 				unsigned long, unsigned long);
-@@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
- 			      0, 0, 0);
- }
- 
-+static void set_conduit(enum psci_conduit conduit)
-+{
-+	switch (conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		break;
-+	case PSCI_CONDUIT_SMC:
-+		invoke_psci_fn = __invoke_psci_fn_smc;
-+		break;
-+	default:
-+		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
-+	}
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 0422e58b..6d81ed7 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -40,7 +40,16 @@
+  *	Note that we always need to flush BTAC/BTB if IBE is set
+  *	even on Cortex-A8 revisions not affected by 430973.
+  *	If IBE is not set, the flush BTAC/BTB won't do anything.
++ *
++ *	Cortex-A15 requires ACTLR[0] to be set from secure in order
++ *	for the icache invalidation to also invalidate the BTB.
+  */
++ENTRY(cpu_v7_icinv_switch_mm)
++#ifdef CONFIG_MMU
++	mcr	p15, 0, r0, c7, c5, 0		@ ICIALLU
++	/* Fall through to switch_mm... */
++#endif
 +
-+	psci_ops.conduit = conduit;
-+}
+ ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+@@ -67,6 +76,7 @@ ENTRY(cpu_v7_switch_mm)
+ 	bx	lr
+ ENDPROC(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_btbinv_switch_mm)
++ENDPROC(cpu_v7_icinv_switch_mm)
+ 
+ /*
+  *	cpu_v7_set_pte_ext(ptep, pte)
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index a25450b..af6d7b1 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -54,6 +54,15 @@
+  * Set the translation table base pointer to be pgd_phys (physical address of
+  * the new TTB).
+  */
++ENTRY(cpu_v7_icinv_switch_mm)
++#ifdef CONFIG_MMU
++	/*
++	 * Cortex-A15 requires ACTLR[0] to be set from secure in order
++	 * for the icache invalidation to also invalidate the BTB.
++	 */
++	mcr	p15, 0, r0, c7, c5, 0		@ ICIALLU
++	/* Fall through to switch_mm... */
++#endif
+ ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r0, c7, c5, 6			@ flush BTAC/BTB
+@@ -69,6 +78,7 @@ ENTRY(cpu_v7_switch_mm)
+ 	ret	lr
+ ENDPROC(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_btbinv_switch_mm)
++ENDPROC(cpu_v7_icinv_switch_mm)
+ 
+ #ifdef __ARMEB__
+ #define rl r3
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index ff7018a..f385933 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -227,6 +227,26 @@ ENDPROC(cpu_ca9mp_do_resume)
+ 	globl_equ	cpu_ca17_do_resume,	cpu_v7_do_resume
+ #endif
+ 
++/*
++ * Cortex-A15
++ */
++	globl_equ	cpu_ca15_proc_init,	cpu_v7_proc_init
++	globl_equ	cpu_ca15_proc_fin,	cpu_v7_proc_fin
++	globl_equ	cpu_ca15_reset,		cpu_v7_reset
++	globl_equ	cpu_ca15_do_idle,	cpu_v7_do_idle
++	globl_equ	cpu_ca15_dcache_clean_area, cpu_v7_dcache_clean_area
++	globl_equ	cpu_ca15_set_pte_ext,	cpu_v7_set_pte_ext
++	globl_equ	cpu_ca15_suspend_size,	cpu_v7_suspend_size
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	globl_equ	cpu_ca15_switch_mm,	cpu_v7_icinv_switch_mm
++#else
++	globl_equ	cpu_ca15_switch_mm,	cpu_v7_switch_mm
++#endif
++#ifdef CONFIG_ARM_CPU_SUSPEND
++	globl_equ	cpu_ca15_do_suspend,	cpu_v7_do_suspend
++	globl_equ	cpu_ca15_do_resume,	cpu_v7_do_resume
++#endif
 +
- static int get_set_conduit_method(struct device_node *np)
- {
- 	const char *method;
-@@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
- 	}
+ #ifdef CONFIG_CPU_PJ4B
+ 	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
+ 	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
+@@ -568,6 +588,7 @@ __v7_setup_stack:
  
- 	if (!strcmp("hvc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		set_conduit(PSCI_CONDUIT_HVC);
- 	} else if (!strcmp("smc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_smc;
-+		set_conduit(PSCI_CONDUIT_SMC);
- 	} else {
- 		pr_warn("invalid \"method\" property: %s\n", method);
- 		return -EINVAL;
-@@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
- 	pr_info("probing for conduit method from ACPI.\n");
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+ 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ 	define_processor_functions ca17, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #ifndef CONFIG_ARM_LPAE
+ 	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+@@ -689,7 +710,7 @@ __v7_ca12mp_proc_info:
+ __v7_ca15mp_proc_info:
+ 	.long	0x410fc0f0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup
++	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup, proc_fns = ca15_processor_functions
+ 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
  
- 	if (acpi_psci_use_hvc())
--		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		set_conduit(PSCI_CONDUIT_HVC);
- 	else
--		invoke_psci_fn = __invoke_psci_fn_smc;
-+		set_conduit(PSCI_CONDUIT_SMC);
- 
- 	return psci_probe();
- }
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 6306ab1..66ff547 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
- int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
- 
-+enum psci_conduit {
-+	PSCI_CONDUIT_NONE,
-+	PSCI_CONDUIT_SMC,
-+	PSCI_CONDUIT_HVC,
-+};
-+
- struct psci_operations {
- 	u32 (*get_version)(void);
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-@@ -34,6 +40,7 @@ struct psci_operations {
- 	int (*affinity_info)(unsigned long target_affinity,
- 			unsigned long lowest_affinity_level);
- 	int (*migrate_info_type)(void);
-+	enum psci_conduit conduit;
- };
- 
- extern struct psci_operations psci_ops;
+ 	/*
 -- 
 2.7.4
