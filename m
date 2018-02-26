@@ -1,62 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Feb 2018 11:04:22 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUkZDIHBhdGNoXSBp?= =?utf-8?Q?oremap?=
- =?utf-8?Q?=3A?= don't set up huge I/O mappings when p4d/pud/pmd is zero
-In-Reply-To: <32c9b1c3-086b-ba54-f9e9-aefa50066730@huawei.com>
-References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
- <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
- <1519175992.16384.121.camel@hpe.com>
- <etPan.5a8d2180.1dbfd272.49b8@localhost>
- <20180221115758.GA7614@arm.com>
- <32c9b1c3-086b-ba54-f9e9-aefa50066730@huawei.com>
-Message-ID: <20180226110422.GD8736@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 26 Feb 2018 12:06:37 +0100
+Subject: [PATCH v7 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180130104833.a06e44c558c7ddc6b38e20b3@magewell.com>
+References: <1517217696-17816-1-git-send-email-yong.deng@magewell.com>
+ <c86097d7-dade-01e5-3826-3f22f9ca4b4f@infradead.org>
+ <20180130104833.a06e44c558c7ddc6b38e20b3@magewell.com>
+Message-ID: <ce3a30b9-f017-61b6-1fe6-f5dcc8bd3ec3@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 06:57:20PM +0800, Hanjun Guo wrote:
-> On 2018/2/21 19:57, Will Deacon wrote:
-> > [sorry, trying to deal with top-posting here]
-> > 
-> > On Wed, Feb 21, 2018 at 07:36:34AM +0000, Wangxuefeng (E) wrote:
-> >>      The old flow of reuse the 4k page as 2M page does not follow the BBM flow
-> >> for page table reconstruction?not only the memory leak problems.  If BBM flow
-> >> is not followed?the speculative prefetch of tlb will made false tlb entries
-> >> cached in MMU, the false address will be got? panic will happen.
-> > 
-> > If I understand Toshi's suggestion correctly, he's saying that the PMD can
-> > be cleared when unmapping the last PTE (like try_to_free_pte_page). In this
-> > case, there's no issue with the TLB because this is exactly BBM -- the PMD
-> > is cleared and TLB invalidation is issued before the PTE table is freed. A
-> > subsequent 2M map request will see an empty PMD and put down a block
-> > mapping.
-> > 
-> > The downside is that freeing becomes more expensive as the last level table
-> > becomes more sparsely populated and you need to ensure you don't have any
-> > concurrent maps going on for the same table when you're unmapping. I also
-> > can't see a neat way to fit this into the current vunmap code. Perhaps we
-> > need an iounmap_page_range.
-> > 
-> > In the meantime, the code in lib/ioremap.c looks totally broken so I think
-> > we should deselect CONFIG_HAVE_ARCH_HUGE_VMAP on arm64 until it's fixed.
+Hi all,
+
+On 01/30/2018 03:48 AM, Yong wrote:
+> Hi,
 > 
-> Simply do something below at now (before the broken code is fixed)?
+> On Mon, 29 Jan 2018 13:49:14 -0800
+> Randy Dunlap <rdunlap@infradead.org> wrote:
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b2b95f7..a86148c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -84,7 +84,6 @@ config ARM64
->         select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->         select HAVE_ARCH_AUDITSYSCALL
->         select HAVE_ARCH_BITREVERSE
-> -   select HAVE_ARCH_HUGE_VMAP
->         select HAVE_ARCH_JUMP_LABEL
->         select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->         select HAVE_ARCH_KGDB
+>> On 01/29/2018 01:21 AM, Yong Deng wrote:
+>>> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+>>> interface and CSI1 is used for parallel interface. This is not
+>>> documented in datasheet but by test and guess.
+>>>
+>>> This patch implement a v4l2 framework driver for it.
+>>>
+>>> Currently, the driver only support the parallel interface. MIPI-CSI2,
+>>> ISP's support are not included in this patch.
+>>>
+>>> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+>>> ---
+>>
+>>
+>> A previous version (I think v6) had a build error with the use of
+>> PHYS_OFFSET, so Kconfig was modified to depend on ARM and ARCH_SUNXI
+>> (one of which seems to be overkill).  As is here, the COMPILE_TEST piece is
+>> meaningless for all arches except ARM.  If you care enough for COMPILE_TEST
+>> (and I would), then you could make COMPILE_TEST useful on any arch by
+>> removing the "depends on ARM" (the ARCH_SUNXI takes care of that) and by
+>> having an alternate value for PHYS_OFFSET, like so:
+>>
+>> +#if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
+>> +#define PHYS_OFFSET	0
+>> +#endif
+>>
+>> With those 2 changes, the driver builds for me on x86_64.
+> 
+> I have considered this method.
+> But it's so sick to put these code in dirver (for my own). I mean 
+> this is meaningless for the driver itself and make people confused.
+> 
+> I grepped the driver/ code and I found many drivers writing Kconfig
+> like this. For example:
+> ARM && COMPILE_TEST
+> MIPS && COMPILE_TEST
+> PPC64 && COMPILE_TEST
+> 
+> BTW, for my own, I do not care about COMPILE_TEST.
 
-No, that actually breaks with the use of block mappings for the kernel
-text. Anyway, see:
+There was a discussion about this in the v6 patch, but it petered out.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=15122ee2c515a253b0c66a3e618bc7ebe35105eb
+I want to merge this driver, but I would very much prefer that this
+compiles with COMPILE_TEST. So unless someone has a better solution, then
+adding 'hack' that defines PHYS_OFFSET to 0 for COMPILE_TEST would be required.
 
-Will
+Otherwise this driver looks good, so it is just this issue blocking it.
+
+Regards,
+
+	Hans
+
+> 
+>>
+>>> diff --git a/drivers/media/platform/sunxi/sun6i-csi/Kconfig b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
+>>> new file mode 100644
+>>> index 0000000..f80c965
+>>> --- /dev/null
+>>> +++ b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
+>>> @@ -0,0 +1,10 @@
+>>> +config VIDEO_SUN6I_CSI
+>>> +	tristate "Allwinner V3s Camera Sensor Interface driver"
+>>> +	depends on ARM
+>>> +	depends on VIDEO_V4L2 && COMMON_CLK && VIDEO_V4L2_SUBDEV_API && HAS_DMA
+>>> +	depends on ARCH_SUNXI || COMPILE_TEST
+>>> +	select VIDEOBUF2_DMA_CONTIG
+>>> +	select REGMAP_MMIO
+>>> +	select V4L2_FWNODE
+>>> +	---help---
+>>> +	   Support for the Allwinner Camera Sensor Interface Controller on V3s.
+>>
+>> thanks,
+>> -- 
+>> ~Randy
+> 
+> 
+> Thanks,
+> Yong
+> 
