@@ -1,43 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Feb 2018 15:42:29 +0000
-Subject: [RFC PATCH v2 07/12] arm64: lse: Include compiler_types.h and
- export.h for out-of-line LL/SC
-In-Reply-To: <1519657500-15094-8-git-send-email-will.deacon@arm.com>
-References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
- <1519657500-15094-8-git-send-email-will.deacon@arm.com>
-Message-ID: <20180226154229.ms6povjtyv4xt5ru@salmiak>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 26 Feb 2018 16:42:21 +0100
+Subject: [PATCH 0/2] arm64: dts: r8a77965: salvator-x(s): Enable s2ram and PMIC
+Message-ID: <1519659743-27027-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 03:04:55PM +0000, Will Deacon wrote:
-> When the LL/SC atomics are moved out-of-line, they are annotated as
-> notrace and exported to modules. Ensure we pull in the relevant include
-> files so that these macros are defined when we need them.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/lse.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
-> index eec95768eaad..e612a6be113f 100644
-> --- a/arch/arm64/include/asm/lse.h
-> +++ b/arch/arm64/include/asm/lse.h
-> @@ -4,6 +4,8 @@
->  
->  #if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
->  
-> +#include <linux/compiler_types.h>
-> +#include <linux/export.h>
->  #include <linux/stringify.h>
->  #include <asm/alternative.h>
+	Hi Simon, Magnus,
 
-I think we should include <asm/cpucaps.h> since we explicitly use
-ARM64_HAS_LSE_ATOMICS here.
+This patch populates the placeholders in the R-Car M3-N DTS file for the
+IIC Bus Interface for DVFS (IIC for DVFS) and Interrupt Controller for
+External Devices (INTC-EX) device nodes.
 
-Otherwise, I don't see that we need anything else here. With that, or if we
-decide that <asm/alternative.h> will always include the definition of cpucaps:
+After applying the first patch, you can start using s2ram (PSCI
+suspend), like on other Salvator-X(S) boards
+(https://elinux.org/R-Car/Boards/Salvator-XS#PSCI_System_Suspend).
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+The second patch enables dependencies for the BD9571MWV PMIC device,
+which is described in salvator-common.dtsi. Note that operation still
+depends on "[PATCH] pinctrl: sh-pfc: r8a77965: Add support for INTC-EX
+IRQ pins".
 
-Mark.
+Thanks!
+
+Geert Uytterhoeven (2):
+  arm64: dts: r8a77965: Add IIC-DVFS device node
+  arm64: dts: r8a77965: Add INTC-EX device node
+
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
+
+-- 
+2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
