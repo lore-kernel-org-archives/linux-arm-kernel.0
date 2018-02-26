@@ -1,56 +1,58 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 26 Feb 2018 09:30:12 +0000
-Subject: [PATCH v3 00/22] Verbatim device names and
- devm_nvmem_(un)register()
-In-Reply-To: <CAHQ1cqGp3jPvb1FNd9SoP_t-hzAHZazAOobrgM2yustrZ5ja6w@mail.gmail.com>
-References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
- <CAMRc=Mct60LMcr-CGJue1dTK+XNwz=dmkm2arTGeN1czeN9JoA@mail.gmail.com>
- <61e56a69-5722-138e-481e-44473a79b388@linaro.org>
- <CAHQ1cqGp3jPvb1FNd9SoP_t-hzAHZazAOobrgM2yustrZ5ja6w@mail.gmail.com>
-Message-ID: <858e2843-1aa9-05e5-7f36-926da1c92db1@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Feb 2018 10:31:51 +0100
+Subject: [PATCH] drm/sun4i: link in front-end code if needed
+In-Reply-To: <20180226092129.t4uogg2q7jkeolbu@flea.lan>
+References: <20180223131112.715992-1-arnd@arndb.de>
+ <20180226092129.t4uogg2q7jkeolbu@flea.lan>
+Message-ID: <CAK8P3a1w=hLzZLPe1TURPyyu5oxpG8yD0eb_8GrVviUODy0zqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
-Thankyou for your patience.
+On Mon, Feb 26, 2018 at 10:21 AM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Fri, Feb 23, 2018 at 02:06:52PM +0100, Arnd Bergmann wrote:
+>> When the base sun4i DRM driver is built-in but the back-end is
+>> a loadable module, we run into a link error:
+>>
+>> drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
+>> sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
+>>
+>> The dependency is a bit tricky, the best workaround I have come up
+>> with is to use a Makefile hack to to interpret both
+>> CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
+>> as a directive to build the front-end the same way as the main module.
+>>
+>> Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  drivers/gpu/drm/sun4i/Makefile | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+>> index 582607c0c488..db14e023256b 100644
+>> --- a/drivers/gpu/drm/sun4i/Makefile
+>> +++ b/drivers/gpu/drm/sun4i/Makefile
+>> @@ -25,6 +25,9 @@ obj-$(CONFIG_DRM_SUN4I)             += sun4i-tcon.o
+>>  obj-$(CONFIG_DRM_SUN4I)              += sun4i_tv.o
+>>  obj-$(CONFIG_DRM_SUN4I)              += sun6i_drc.o
+>>
+>> -obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o sun4i-frontend.o
+>> +obj-$(CONFIG_DRM_SUN4I_BACKEND)      += sun4i-backend.o
+>> +ifdef CONFIG_DRM_SUN4I_BACKEND
+>> +obj-$(CONFIG_DRM_SUN4I)              += sun4i-frontend.o
+>> +endif
+>
+> Can we just create a Kconfig symbol, selected by DRM_SUN4I_BACKEND,
+> and we would export the symbol?
 
-On 26/02/18 03:45, Andrey Smirnov wrote:
-> On Thu, Jan 25, 2018 at 1:17 AM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->>
->>
->> On 24/01/18 11:13, Bartosz Golaszewski wrote:
->>>>
->>>>
->>> Hi Srinivas,
->>>
->>> I don't see this series in next - is it going to miss this merge window?
->>>
->>
->> Thanks for your patience.
->>
->> In general, I pick stuff which are sent before rc5-rc6 and send it to Greg
->> KH for inclusion in char-misc tree.
->>
->> These patches will be queued for next release cycle..
->>
-> 
-> Srinivas:
-> 
-> Correct me if I am wrong, but doesn't seem like these patches made it
-> to char-misc tree yet. I was recently rebasing them on top of Linus'
+Yes, I think that would work just as well. Something like
 
-As this is 4.17 material, these will not go into char-misc tree until or 
-after rc5.
-> master and ended up having to resolve a couple of merge conflicts, so
-> would you like me to re-spin v4 on top of 4.16-rc1 (or any other
-> version) and re-submit the series?
-Sure thanks, If you can respin the patches than that would reduce my 
-time while sending it to Greg. I will send them to Greg next week.
+config DRM_SUN4I_FRONTEND
+      tristate
+      default DRM_SUN4I if CONFIG_DRM_SUN4I_BACKEND != n
 
-thanks,
-Srini
-> 
-> Thanks,
-> Andrey Smirnov
-> 
+should do the trick.
+
+      Arnd
