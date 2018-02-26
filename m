@@ -1,122 +1,29 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:08 +0800
-Subject: [PATCH 34/52] arm/arm64: KVM: Implement PSCI 1.0 support
-In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-35-git-send-email-alex.shi@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Feb 2018 17:43:01 +0800
+Subject: [PATCH 01/15] clk: sunxi-ng: Add check for minimal rate to NM PLLs
+In-Reply-To: <20180226093800.uwbo54wrdcwmsyzh@flea.lan>
+References: <20180224214545.3740-1-jernej.skrabec@siol.net>
+ <20180224214545.3740-2-jernej.skrabec@siol.net>
+ <20180226093800.uwbo54wrdcwmsyzh@flea.lan>
+Message-ID: <CAGb2v64fxs5Ne5=orQxNcg70Z_N0NJyyC7MPuNH6pxcqrsUq4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Feb 26, 2018 at 5:38 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Sat, Feb 24, 2018 at 10:45:31PM +0100, Jernej Skrabec wrote:
+>> Some NM PLLs doesn't work well when their output clock rate is set below
+>> certain rate.
+>>
+>> Add support for that constrain.
+>
+> In such a case, you should round the rate to the minimum the clock can
+> operate at, and not return an error.
 
-commit 58e0b2239a4d upstream.
+That's true for round_rate. But what's the expected behavior of set_rate?
+AFAIK we presume all users call round_rate before set_rate, but that doesn't
+seem to be true all the time.
 
-PSCI 1.0 can be trivially implemented by providing the FEATURES
-call on top of PSCI 0.2 and returning 1.0 as the PSCI version.
-
-We happily ignore everything else, as they are either optional or
-are clarifications that do not require any additional change.
-
-PSCI 1.0 is now the default until we decide to add a userspace
-selection API.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
-
-Conflicts:
-	mv chagnes from virt/kvm/arm/psci.c to arch/arm/kvm/psci.c
----
- arch/arm/kvm/psci.c    | 45 ++++++++++++++++++++++++++++++++++++++++++++-
- include/kvm/arm_psci.h |  3 +++
- 2 files changed, 47 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index bc334d6..097632c 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -233,7 +233,7 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
- int kvm_psci_version(struct kvm_vcpu *vcpu)
- {
- 	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
--		return KVM_ARM_PSCI_0_2;
-+		return KVM_ARM_PSCI_LATEST;
- 
- 	return KVM_ARM_PSCI_0_1;
- }
-@@ -312,6 +312,47 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	return ret;
- }
- 
-+static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
-+{
-+	u32 psci_fn = smccc_get_function(vcpu);
-+	u32 feature;
-+	unsigned long val;
-+	int ret = 1;
-+
-+	switch(psci_fn) {
-+	case PSCI_0_2_FN_PSCI_VERSION:
-+		val = KVM_ARM_PSCI_1_0;
-+		break;
-+	case PSCI_1_0_FN_PSCI_FEATURES:
-+		feature = smccc_get_arg1(vcpu);
-+		switch(feature) {
-+		case PSCI_0_2_FN_PSCI_VERSION:
-+		case PSCI_0_2_FN_CPU_SUSPEND:
-+		case PSCI_0_2_FN64_CPU_SUSPEND:
-+		case PSCI_0_2_FN_CPU_OFF:
-+		case PSCI_0_2_FN_CPU_ON:
-+		case PSCI_0_2_FN64_CPU_ON:
-+		case PSCI_0_2_FN_AFFINITY_INFO:
-+		case PSCI_0_2_FN64_AFFINITY_INFO:
-+		case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
-+		case PSCI_0_2_FN_SYSTEM_OFF:
-+		case PSCI_0_2_FN_SYSTEM_RESET:
-+		case PSCI_1_0_FN_PSCI_FEATURES:
-+			val = 0;
-+			break;
-+		default:
-+			val = PSCI_RET_NOT_SUPPORTED;
-+			break;
-+		}
-+		break;
-+	default:
-+		return kvm_psci_0_2_call(vcpu);
-+	}
-+
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
-+	return ret;
-+}
-+
- static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
-@@ -354,6 +395,8 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- int kvm_psci_call(struct kvm_vcpu *vcpu)
- {
- 	switch (kvm_psci_version(vcpu)) {
-+	case KVM_ARM_PSCI_1_0:
-+		return kvm_psci_1_0_call(vcpu);
- 	case KVM_ARM_PSCI_0_2:
- 		return kvm_psci_0_2_call(vcpu);
- 	case KVM_ARM_PSCI_0_1:
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index 5659343..3236043 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -22,6 +22,9 @@
- 
- #define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
- #define KVM_ARM_PSCI_0_2	PSCI_VERSION(0, 2)
-+#define KVM_ARM_PSCI_1_0	PSCI_VERSION(1, 0)
-+
-+#define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
--- 
-2.7.4
+ChenYu
