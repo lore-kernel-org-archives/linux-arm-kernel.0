@@ -1,42 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 26 Feb 2018 21:21:39 +0100
-Subject: [PATCH 4.15 02/64] arm64: mm: dont write garbage into TTBR1_EL1
- register
-In-Reply-To: <20180226202153.453363333@linuxfoundation.org>
-References: <20180226202153.453363333@linuxfoundation.org>
-Message-ID: <20180226202153.550888076@linuxfoundation.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Feb 2018 21:40:52 +0100
+Subject: [PATCH] ARM: omap2: set CONFIG_LIRC=y in defconfig
+Message-ID: <20180226204105.2858838-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.15-stable review patch.  If anyone has any objections, please let me know.
+The CONFIG_LIRC symbol has changed from 'tristate' to 'bool, so we now
+get a warning for omap2plus_defconfig:
 
-------------------
+arch/arm/configs/omap2plus_defconfig:322:warning: symbol value 'm' invalid for LIRC
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+This changes the file to mark the symbol as built-in to get rid of the
+warning.
 
-Stable backport commit 173358a49173 ("arm64: kpti: Add ->enable callback
-to remap swapper using nG mappings") of upstream commit f992b4dfd58b did
-not survive the backporting process unscathed, and ends up writing garbage
-into the TTBR1_EL1 register, rather than pointing it to the zero page to
-disable translations. Fix that.
-
-Cc: <stable@vger.kernel.org> #v4.14
-Reported-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Fixes: a60d64b15c20 ("media: lirc: lirc interface should not be a raw decoder")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/mm/proc.S |    2 +-
+ arch/arm/configs/omap2plus_defconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
- 
- .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
- 	adrp	\tmp1, empty_zero_page
--	msr	ttbr1_el1, \tmp2
-+	msr	ttbr1_el1, \tmp1
- 	isb
- 	tlbi	vmalle1
- 	dsb	nsh
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 2f145c4af93a..92674f247a12 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -319,7 +319,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_RC_CORE=m
+ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+-CONFIG_LIRC=m
++CONFIG_LIRC=y
+ CONFIG_RC_DEVICES=y
+ CONFIG_IR_RX51=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+-- 
+2.9.0
