@@ -1,130 +1,121 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Feb 2018 10:18:20 +0000
-Subject: [RFC PATCH] irqchip/gic-v3-its: apply ACPI device based quirks
-In-Reply-To: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-References: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-Message-ID: <f0a6a635-0b0f-01d1-bc64-3d3d95b5de0b@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 26 Feb 2018 19:24:19 +0900
+Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
+In-Reply-To: <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-3-takahiro.akashi@linaro.org>
+ <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180226102418.GD6019@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, Feb 23, 2018 at 04:49:34PM +0800, Dave Young wrote:
+> Hi AKASHI,
+> 
+> On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
+> > On arm64, no trampline code between old kernel and new kernel will be
+> > required in kexec_file implementation. This patch introduces a new
+> > configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
+> > compiled in only if necessary.
+> 
+> Here also need the explanation about why no purgatory is needed, it would be
+> required for kexec if no strong reason.
 
-On 13/02/18 14:11, Ard Biesheuvel wrote:
-> Reapply the SynQuacer quirk for ITS frames that are matched by 'SCX0005'
-> based ACPI devices, replacing the dummy fwnode with the one populated by
-> the ACPI device core.
-> 
-> This allows the SynQuacer ACPI tables to publish a device node such
-> as
-> 
->     Device (ITS0) {
->       Name (_HID, "SCX0005")
->       Name (_ADR, 0x30020000)
->       Name (_DSD, Package ()  // _DSD: Device-Specific Data
->       {
->         ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->         Package () {
->           Package (2) {
->             "socionext,synquacer-pre-its",
->             Package () { 0x58000000, 0x200000 }
->           },
->         }
->       })
->     }
-> 
-> which will trigger the existing quirk that replaces the doorbell
-> address with the appropriate address in the pre-ITS frame.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Marc, Lorenzo,
-> 
-> I am aware that this patch may be seen as controversial, but I would like to
-> propose it nonetheless. The reason is that this is the only thing standing in
-> the way of full ACPI support in Socionext SynQuacer based platforms.
-> 
-> The pre-ITS is a monstrosity, but as it turns out, Socionext had help from
-> ARM designing it, and the reason we need DT/ACPI based quirks in the first
-> place is that the IIDR of this GICv3 implementation is simply the ARM Ltd.
-> one (as they designed the IP)
+OK, I will add the reason:
+On arm64, crash dump kernel's usable memory is protected by
+*unmapping* it from kernel virtual space unlike other architectures
+where the region is just made read-only.
+So our key developers think that it is highly unlikely that the region
+is accidentally corrupted and this rationalizes that digest check code
+be also dropped from purgatory.
+This greatly simplifies our purgatory without any need for a bit ugly
+relocation stuff, i.e. arch_kexec_apply_relocations_add().
 
-That's odd. A bit of archaeology shows that ARM indeed designed a
-pre-ITS, but that one doesn't break isolation at all (it still has a
-single doorbell). So whatever creative changes Socionext applied to that
-piece of IP (assuming this is the same IP), they didn't really
-understand the far reaching impact it has.
+Please see:
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
+to find out how simple our purgatory was. All that it does is
+to shuffle arguments and jump into a new kernel.
 
-> 
-> Please take this into consideration when reviewing this patch,
-> 
-> Thanks,
-> Ard.
-> 
->  drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 06f025fd5726..a63973baf08a 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -3517,3 +3517,42 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
->  
->  	return 0;
->  }
-> +
-> +#if defined(CONFIG_SOCIONEXT_SYNQUACER_PREITS) && defined(CONFIG_ACPI)
-> +static acpi_status __init acpi_its_device_probe (acpi_handle handle,
-> +						 u32 depth, void *context,
-> +						 void **ret)
-> +{
-> +	struct acpi_device *adev;
-> +	unsigned long long phys_base;
-> +	struct its_node *its;
-> +	acpi_status status;
-> +	int err;
-> +
-> +	err = acpi_bus_get_device(handle, &adev);
-> +	if (err)
-> +		return AE_CTRL_TERMINATE;
-> +
-> +	status = acpi_evaluate_integer(handle, "_ADR", NULL, &phys_base);
-> +	if (ACPI_FAILURE(status))
-> +		return status;
-> +
-> +	list_for_each_entry(its, &its_nodes, entry)
-> +		if (its->phys_base == phys_base) {
-> +			irq_domain_free_fwnode(its->fwnode_handle);
+Without this patch, we would have to have purgatory with a space for
+a hash value (purgatory_sha256_digest) which is never checked against.
 
-That line scares me. What about irq domains that are hold a pointer to
-this handle? its_init_domain() uses it to construct the LPI domain, and
-it is now pointing to some free memory.
-
-You'd need to reassign all the domains that match this fwnode before
-freeing it.
-
-> +			its->fwnode_handle = &adev->fwnode;
-> +			its_enable_quirk_socionext_synquacer(its);
-> +			break;
-> +		}
-> +
-> +	return AE_CTRL_TERMINATE;
-> +}
-> +
-> +static int __init acpi_its_device_probe_init(void)
-> +{
-> +	if (!acpi_disabled)
-> +		acpi_get_devices("SCX0005", acpi_its_device_probe, NULL, NULL);
-> +	return 0;
-> +}
-> +subsys_initcall_sync(acpi_its_device_probe_init);
-> +#endif
-> 
-
-Is there any chance that MSIs could be allocated before this kicks in?
-If that happens, we're in trouble...
+Do you think it makes sense?
 
 Thanks,
+-Takahiro AKASHI
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Cc: Dave Young <dyoung@redhat.com>
+> > Cc: Vivek Goyal <vgoyal@redhat.com>
+> > Cc: Baoquan He <bhe@redhat.com>
+> > ---
+> >  arch/powerpc/Kconfig | 3 +++
+> >  arch/x86/Kconfig     | 3 +++
+> >  kernel/kexec_file.c  | 6 ++++++
+> >  3 files changed, 12 insertions(+)
+> > 
+> > diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+> > index 73ce5dd07642..c32a181a7cbb 100644
+> > --- a/arch/powerpc/Kconfig
+> > +++ b/arch/powerpc/Kconfig
+> > @@ -552,6 +552,9 @@ config KEXEC_FILE
+> >  	  for kernel and initramfs as opposed to a list of segments as is the
+> >  	  case for the older kexec call.
+> >  
+> > +config ARCH_HAS_KEXEC_PURGATORY
+> > +	def_bool KEXEC_FILE
+> > +
+> >  config RELOCATABLE
+> >  	bool "Build a relocatable kernel"
+> >  	depends on PPC64 || (FLATMEM && (44x || FSL_BOOKE))
+> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> > index c1236b187824..f031c3efe47e 100644
+> > --- a/arch/x86/Kconfig
+> > +++ b/arch/x86/Kconfig
+> > @@ -2019,6 +2019,9 @@ config KEXEC_FILE
+> >  	  for kernel and initramfs as opposed to list of segments as
+> >  	  accepted by previous system call.
+> >  
+> > +config ARCH_HAS_KEXEC_PURGATORY
+> > +	def_bool KEXEC_FILE
+> > +
+> >  config KEXEC_VERIFY_SIG
+> >  	bool "Verify kernel signature during kexec_file_load() syscall"
+> >  	depends on KEXEC_FILE
+> > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > index e5bcd94c1efb..990adae52151 100644
+> > --- a/kernel/kexec_file.c
+> > +++ b/kernel/kexec_file.c
+> > @@ -26,7 +26,11 @@
+> >  #include <linux/vmalloc.h>
+> >  #include "kexec_internal.h"
+> >  
+> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+> >  static int kexec_calculate_store_digests(struct kimage *image);
+> > +#else
+> > +static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
+> > +#endif
+> >  
+> >  /* Architectures can provide this probe function */
+> >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > @@ -520,6 +524,7 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
+> >  	return 0;
+> >  }
+> >  
+> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+> >  /* Calculate and store the digest of segments */
+> >  static int kexec_calculate_store_digests(struct kimage *image)
+> >  {
+> > @@ -1022,3 +1027,4 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
+> >  
+> >  	return 0;
+> >  }
+> > +#endif /* CONFIG_ARCH_HAS_KEXEC_PURGATORY */
+> > -- 
+> > 2.16.2
+> > 
+> 
+> Thanks
+> Dave
