@@ -1,117 +1,62 @@
-From: prudo@linux.vnet.ibm.com (Philipp Rudo)
-Date: Mon, 26 Feb 2018 12:25:05 +0100
-Subject: [PATCH v8 03/13] kexec_file,x86,powerpc: factor out
- kexec_file_ops functions
-In-Reply-To: <20180226100138.GC6019@linaro.org>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-4-takahiro.akashi@linaro.org>
- <20180223092459.GC4433@dhcp-128-65.nay.redhat.com>
- <20180226100138.GC6019@linaro.org>
-Message-ID: <20180226122505.3d999efc@ThinkPad>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Feb 2018 11:30:50 +0000
+Subject: [PATCH -stable] arm64: mm: don't write garbage into TTBR1_EL1
+ register
+In-Reply-To: <CAKv+Gu9rZEAk1RMUEk=7XCVVkLQ-chDu7GTGArCG0YeYcmx52w@mail.gmail.com>
+References: <20180223182902.24873-1-ard.biesheuvel@linaro.org>
+ <20180224083424.GC9681@kroah.com>
+ <CAKv+Gu9rZEAk1RMUEk=7XCVVkLQ-chDu7GTGArCG0YeYcmx52w@mail.gmail.com>
+Message-ID: <20180226113050.GE8736@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Feb 2018 19:01:39 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+On Sat, Feb 24, 2018 at 08:50:42AM +0000, Ard Biesheuvel wrote:
+> On 24 February 2018 at 08:34, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > On Fri, Feb 23, 2018 at 06:29:02PM +0000, Ard Biesheuvel wrote:
+> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> >> index 08572f95bd8a..2b473ddeb7a3 100644
+> >> --- a/arch/arm64/mm/proc.S
+> >> +++ b/arch/arm64/mm/proc.S
+> >> @@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+> >>
+> >>  .macro       __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+> >>       adrp    \tmp1, empty_zero_page
+> >> -     msr     ttbr1_el1, \tmp2
+> >> +     msr     ttbr1_el1, \tmp1
+> >
+> > I don't understand why this isn't also needed in Linus's tree.  What
+> > commit there prevents this from being required?
+> >
+> 
+> Linus's tree has
+> 
+>  +.macro __idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+> +     adrp \tmp1, empty_zero_page
+> +     phys_to_ttbr \tmp1, \tmp2
+> +     msr ttbr1_el1, \tmp2
+> +     isb
+> +     tlbi vmalle1
+> +     dsb nsh
+> +     isb
+> +.endm
+> 
+> but phys_to_ttbr does not exist in the v4.15 and earlier trees (it is
+> related to 52-bit physical address support which landed in v4.16), so
+> it was removed for the backport. However, that means tmp2 is never
+> assigned, and whatever was there is poked into the translation table
+> base register.
 
-> On Fri, Feb 23, 2018 at 05:24:59PM +0800, Dave Young wrote:
-> > Hi AKASHI,
-> > 
-> > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:  
-> > > As arch_kexec_kernel_*_{probe,load}(), arch_kimage_file_post_load_cleanup()
-> > > and arch_kexec_kernel_verify_sg can be parameterized with a kexec_file_ops
-> > > array and now duplicated among some architectures, let's factor them out.
-> > > 
-> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > Cc: Dave Young <dyoung@redhat.com>
-> > > Cc: Vivek Goyal <vgoyal@redhat.com>
-> > > Cc: Baoquan He <bhe@redhat.com>
-> > > Cc: Michael Ellerman <mpe@ellerman.id.au>
-> > > Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
-> > > ---
-> > >  arch/powerpc/include/asm/kexec.h            |  2 +-
-> > >  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
-> > >  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++------------------
-> > >  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
-> > >  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
-> > >  arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
-> > >  include/linux/kexec.h                       | 15 ++++----
-> > >  kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
-> > >  8 files changed, 70 insertions(+), 94 deletions(-)
-> > >   
-> > 
-> > [snip]
-> >   
-> > > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > > index 990adae52151..a6d14a768b3e 100644
-> > > --- a/kernel/kexec_file.c
-> > > +++ b/kernel/kexec_file.c
-> > > @@ -26,34 +26,83 @@
-> > >  #include <linux/vmalloc.h>
-> > >  #include "kexec_internal.h"
-> > >  
-> > > +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
-> > > +
-> > >  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
-> > >  static int kexec_calculate_store_digests(struct kimage *image);
-> > >  #else
-> > >  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
-> > >  #endif
-> > >  
-> > > +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> > > +			     unsigned long buf_len)
-> > > +{
-> > > +	const struct kexec_file_ops * const *fops;
-> > > +	int ret = -ENOEXEC;
-> > > +
-> > > +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
-> > > +		ret = (*fops)->probe(buf, buf_len);
-> > > +		if (!ret) {
-> > > +			image->fops = *fops;
-> > > +			return ret;
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return ret;
-> > > +}
-> > > +
-> > >  /* Architectures can provide this probe function */
-> > >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> > >  					 unsigned long buf_len)
-> > >  {
-> > > -	return -ENOEXEC;
-> > > +	return _kexec_kernel_image_probe(image, buf, buf_len);  
-> > 
-> > 
-> > I vaguely remember previously I suggest split the _kexec_kernel_image_probe
-> > because arch code can call them, and common code also use it like above.
-> > But in your new series I do not find where else calls this function
-> > except the common code arch_kexec_kernel_image_probe.  If nobody use
-> > them then it is not worth to split them out, it is better to just embed
-> > them in the __weak functions.  
-> 
-> Powerpc's arch_kexec_kernel_image_probe() uses
-> _kexec_kekrnel_image_probe() as it needs an extra check to rule out
-> crash dump for now.
+Damnit, sorry again. I changed the argument order of phys_to_ttbr along
+the way, so must've confused myself during the backporting exercise. It's
+also one of those things that will lead to potential TLB corruption in rare
+circumstances where the junk in TTBR1 ends up giving a valid translation,
+so it didn't crop up in my testing. How did Nicolas see this? The bug
+report I saw didn't look related.
 
-s390 has to use it too. We have to write to a fixed address in the buffer. So
-we need to check if the buffer is large enough to write to that address.
+> But let's wait for team-ARM to ack this in any case.
 
-Philipp
- 
-> Thanks,
-> -Takahiro AKASHI
-> 
-> 
-> > Ditto for other similar functions.
-> > 
-> > [snip]
-> > 
-> > Thanks
-> > Dave  
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
-> 
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Greg -- please can you apply this to the 4.14 and 4.15 stable trees?
+
+Will
