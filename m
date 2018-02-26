@@ -1,81 +1,68 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 26 Feb 2018 08:07:06 +0000
-Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <20180226070957.GU3217@dragon>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-2-l.stach@pengutronix.de>
- <AM3PR04MB306E1344C6242887F4797AC80C20@AM3PR04MB306.eurprd04.prod.outlook.com>
- <20180226031700.GS3217@dragon>
- <AM3PR04MB3063F807F42E76CD515A17480C10@AM3PR04MB306.eurprd04.prod.outlook.com>
- <20180226070957.GU3217@dragon>
-Message-ID: <AM3PR04MB306C310C7B438099E0D35CA80C10@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Mon, 26 Feb 2018 10:11:45 +0200
+Subject: [PATCH v3 01/10] pwm: extend PWM framework with PWM modes
+In-Reply-To: <201802250410.reI8wAy2%fengguang.wu@intel.com>
+References: <1519300881-8136-2-git-send-email-claudiu.beznea@microchip.com>
+ <201802250410.reI8wAy2%fengguang.wu@intel.com>
+Message-ID: <a26cdf7b-024e-957b-8691-c3c898d0d9d6@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, February 26, 2018 3:10 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org;
-> Baruch Siach <baruch@tkos.co.il>; Catalin Marinas
-> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
-> patchwork-lst at pengutronix.de; Rob Herring <robh+dt@kernel.org>; dl-
-> linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; linux-arm-kernel at lists.infradead.org; Lucas
-> Stach <l.stach@pengutronix.de>
-> Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
-> 
-> On Mon, Feb 26, 2018 at 06:52:15AM +0000, A.s. Dong wrote:
-> > Hi Shawn,
-> >
-> > > -----Original Message-----
-> > > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > > Sent: Monday, February 26, 2018 11:17 AM
-> > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > Cc: Lucas Stach <l.stach@pengutronix.de>; Mark Rutland
-> > > <mark.rutland@arm.com>; devicetree at vger.kernel.org; Baruch Siach
-> > > <baruch@tkos.co.il>; Catalin Marinas <catalin.marinas@arm.com>; Will
-> > > Deacon <will.deacon@arm.com>; patchwork-lst at pengutronix.de; Rob
-> > > Herring <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>;
-> > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux-
-> > > arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
-> > >
-> > > On Sun, Feb 25, 2018 at 10:47:11AM +0000, A.s. Dong wrote:
-> > > > >  Documentation/devicetree/bindings/arm/fsl.txt  |   4 +
-> > > > >  arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623
-> > > > > +++++++++++++++++++++++++
-> > > >
-> > > > Should this belongs to pinctrl part?
-> > >
-> > > No.  Those pinfunc defines are used by device tree rather than pinctrl
-> driver.
-> > >
-> >
-> > I had this question because we have below info in the patch
-> > "dt-bindings: add binding for i.MX8MQ IOMUXC":
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
-> > b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
-> > new file mode 100644
-> > index 0000000..5c5d2d8
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
-> > @@ -0,0 +1,39 @@
-> > ...
-> > +       Refer to imx8mq-pinfunc.h in device tree source folder for all available
-> > +       imx8mq PIN_FUNC_ID.
-> 
-> This is just a cross reference in document, and should be okay on different
-> tree during development cycle.  If we have the pinfunc header go via pinctrl
-> tree, we will have a more serious dependency between DT and pinctrl tree.
-> 
+I'll rebase it on latest for-next in next version.
 
-Okay, understand now.
+Thank you,
+Claudiu Beznea
 
-Regards
-Dong Aisheng
-
-> Shawn
+On 24.02.2018 22:49, kbuild test robot wrote:
+> Hi Claudiu,
+> 
+> Thank you for the patch! Perhaps something to improve:
+> 
+> [auto build test WARNING on pwm/for-next]
+> [also build test WARNING on v4.16-rc2 next-20180223]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Claudiu-Beznea/extend-PWM-framework-to-support-PWM-modes/20180225-024011
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm.git for-next
+> config: xtensa-allmodconfig (attached as .config)
+> compiler: xtensa-linux-gcc (GCC) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=xtensa 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>>> drivers//pwm/pwm-sun4i.c:36:0: warning: "PWM_MODE" redefined
+>     #define PWM_MODE  BIT(7)
+>     
+>    In file included from drivers//pwm/pwm-sun4i.c:19:0:
+>    include/linux/pwm.h:40:0: note: this is the location of the previous definition
+>     #define PWM_MODE(name)  BIT(PWM_MODE_##name##_BIT)
+>     
+> 
+> vim +/PWM_MODE +36 drivers//pwm/pwm-sun4i.c
+> 
+> 09853ce7 Alexandre Belloni 2014-12-17  29  
+> 09853ce7 Alexandre Belloni 2014-12-17  30  #define PWMCH_OFFSET		15
+> 09853ce7 Alexandre Belloni 2014-12-17  31  #define PWM_PRESCAL_MASK	GENMASK(3, 0)
+> 09853ce7 Alexandre Belloni 2014-12-17  32  #define PWM_PRESCAL_OFF		0
+> 09853ce7 Alexandre Belloni 2014-12-17  33  #define PWM_EN			BIT(4)
+> 09853ce7 Alexandre Belloni 2014-12-17  34  #define PWM_ACT_STATE		BIT(5)
+> 09853ce7 Alexandre Belloni 2014-12-17  35  #define PWM_CLK_GATING		BIT(6)
+> 09853ce7 Alexandre Belloni 2014-12-17 @36  #define PWM_MODE		BIT(7)
+> 09853ce7 Alexandre Belloni 2014-12-17  37  #define PWM_PULSE		BIT(8)
+> 09853ce7 Alexandre Belloni 2014-12-17  38  #define PWM_BYPASS		BIT(9)
+> 09853ce7 Alexandre Belloni 2014-12-17  39  
+> 
+> :::::: The code at line 36 was first introduced by commit
+> :::::: 09853ce7bc1003a490c7ee74a5705d7a7cf16b7d pwm: Add Allwinner SoC support
+> 
+> :::::: TO: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> :::::: CC: Thierry Reding <thierry.reding@gmail.com>
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
