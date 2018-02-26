@@ -1,33 +1,42 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 26 Feb 2018 22:22:09 +0200
-Subject: [resend, PATCH v1] ARM: pxa/raumfeld: use PROPERTY_ENTRY_U32()
- directly
-In-Reply-To: <87po5s8rtw.fsf@belgarion.home>
-References: <20180129173708.59097-1-andriy.shevchenko@linux.intel.com>
- <87po5s8rtw.fsf@belgarion.home>
-Message-ID: <1519676529.10722.200.camel@linux.intel.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 26 Feb 2018 21:21:39 +0100
+Subject: [PATCH 4.14 02/54] arm64: mm: dont write garbage into TTBR1_EL1
+ register
+In-Reply-To: <20180226202144.375869933@linuxfoundation.org>
+References: <20180226202144.375869933@linuxfoundation.org>
+Message-ID: <20180226202144.483348512@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-29 at 19:04 +0100, Robert Jarzmik wrote:
-> Andy Shevchenko <andriy.shevchenko@linux.intel.com> writes:
-> 
-> > Instead of using PROPERTY_ENTRY_INTEGER() with explicitly supplied
-> > type,
-> > use PROPERTY_ENTRY_U32() dedicated macro.
-> > 
-> > It will help modify internals of built-in device properties API.
-> > 
-> > No functional change intended.
-> > 
-> > Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> > Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> 
-> Applied to pxa/for-next branch, thanks.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
-Can't find either in linux-next, or in your tree on Github.
-Am I looking at wrong locations?
+------------------
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Stable backport commit 173358a49173 ("arm64: kpti: Add ->enable callback
+to remap swapper using nG mappings") of upstream commit f992b4dfd58b did
+not survive the backporting process unscathed, and ends up writing garbage
+into the TTBR1_EL1 register, rather than pointing it to the zero page to
+disable translations. Fix that.
+
+Cc: <stable@vger.kernel.org> #v4.14
+Reported-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ arch/arm64/mm/proc.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -155,7 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+ 
+ .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+ 	adrp	\tmp1, empty_zero_page
+-	msr	ttbr1_el1, \tmp2
++	msr	ttbr1_el1, \tmp1
+ 	isb
+ 	tlbi	vmalle1
+ 	dsb	nsh
