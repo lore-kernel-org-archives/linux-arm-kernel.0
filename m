@@ -1,47 +1,62 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 26 Feb 2018 09:49:19 +0100
-Subject: [PATCH v2 2/4] ARM: dtsi: add pwm node for sun8i.
-In-Reply-To: <20180225135134.GA14529@arx-s1>
-References: <20180225135134.GA14529@arx-s1>
-Message-ID: <20180226084919.wt2yljq3nxr5g2vu@flea.lan>
+Date: Mon, 26 Feb 2018 10:00:38 +0100
+Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
+In-Reply-To: <20180225135308.GA14561@arx-s1>
+References: <20180225135308.GA14561@arx-s1>
+Message-ID: <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 25, 2018 at 09:51:34PM +0800, hao_zhang wrote:
-> This patch adds pwm node for sun8i.
-> 
-> Signed-off-by: hao_zhang <hao5781286@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-r40.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> index 173dcc1..99a0261 100644
-> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> @@ -295,6 +295,11 @@
->  				bias-pull-up;
->  			};
->  
-> +			pwm_ch0_pin: pwm-ch0-pin {
-> +				pins = "PB2";
-> +				function = "pwm";
-> +			};
+Hi,
+
+Thanks for respinning this serie. It looks mostly good, but you still
+have a quite significant number of checkpatch (--strict) warnings that
+you should address.
+
+On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
+> +#define CAPTURE_IRQ_ENABLE_REG	0x0010
+> +#define CFIE(ch)	BIT(ch << 1 + 1)
+> +#define CRIE(ch)	BIT(ch << 1)
+
+You should also put your argument between parentheses here (and in all
+your other macros).
+
+> +static const u16 div_m_table[] = {
+> +	1,
+> +	2,
+> +	4,
+> +	8,
+> +	16,
+> +	32,
+> +	64,
+> +	128,
+> +	256
+> +};
+
+If this is just a power of two, you can use either the power of two /
+ilog2 to switch back and forth, instead of using that table.
+
+> +static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		struct pwm_state *state)
+> +{
+> +	int ret;
+> +	struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
+> +	struct pwm_state cstate;
 > +
->  			uart0_pb_pins: uart0-pb-pins {
->  				pins = "PB22", "PB23";
->  				function = "uart0";
-> @@ -306,6 +311,14 @@
->  			reg = <0x01c20c90 0x10>;
->  		};
->  
-> +		pwm: pwm at 1c23400 {
-> +			     compatible = "allwinner,sun8i-r40-pwm";
-> +			     reg = <0x01c23400 0x154>;
+> +	pwm_get_state(pwm, &cstate);
+> +	if (!cstate.enabled) {
+> +		ret = clk_prepare_enable(sun8i_pwm->clk);
+> +		if (ret) {
+> +			dev_err(chip->dev, "Failed to enable PWM clock\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	spin_lock(&sun8i_pwm->ctrl_lock);
 
-The size must be the size of the whole memory block allocated to the
-controller, so that would be 0x400 in this case.
+What do you need that spinlock for? Can you use a mutex instead?
 
+Thanks!
 Maxime
 
 -- 
@@ -54,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/01b8f6e2/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/b8890ab2/attachment.sig>
