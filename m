@@ -1,27 +1,25 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 26 Feb 2018 11:25:54 +0530
-Subject: [PATCH] ARM: dts: da850-lego-ev3: use a correct fallback for at24
- compatible
-In-Reply-To: <c4c07714-4937-48bd-466d-c2c9848c4725@lechnology.com>
-References: <20180122125505.16806-1-brgl@bgdev.pl>
- <c4c07714-4937-48bd-466d-c2c9848c4725@lechnology.com>
-Message-ID: <134fc583-785c-0112-94f2-f94b9ff93065@ti.com>
+Date: Mon, 26 Feb 2018 11:38:05 +0530
+Subject: [PATCH] ARM: davinci: board-da830-evm: fix unused const variable
+ warning
+In-Reply-To: <20180119145129.16818-1-nsekhar@ti.com>
+References: <20180119145129.16818-1-nsekhar@ti.com>
+Message-ID: <00cc2c53-f2f1-4631-243b-e2370b9679e4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 January 2018 10:20 PM, David Lechner wrote:
-> On 01/22/2018 06:55 AM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> We now require all at24 users to use the "atmel,<model>" fallback in
->> device tree for different manufacturers.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
+On Friday 19 January 2018 08:21 PM, Sekhar Nori wrote:
+> da830_evm_emif25_pins[] is used only when CONFIG_DA830_UI_NAND
+> is enabled. It gives the following warning when the config is
+> switched off. Fix it.
 > 
-> Reviewed-by: David Lechner <david@lechnology.com>
+> arch/arm/mach-davinci/board-da830-evm.c:245:20: warning: ?da830_evm_emif25_pins? defined but not used [-Wunused-const-variable=]
+>  static const short da830_evm_emif25_pins[] = {
+>                     ^~~~~~~~~~~~~~~~~~~~~
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-Applied to v4.17/dt
+Added to v4.17/soc of my tree.
 
 Thanks,
 Sekhar
