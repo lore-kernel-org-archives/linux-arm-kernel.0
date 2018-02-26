@@ -1,25 +1,28 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 26 Feb 2018 11:38:05 +0530
-Subject: [PATCH] ARM: davinci: board-da830-evm: fix unused const variable
- warning
-In-Reply-To: <20180119145129.16818-1-nsekhar@ti.com>
-References: <20180119145129.16818-1-nsekhar@ti.com>
-Message-ID: <00cc2c53-f2f1-4631-243b-e2370b9679e4@ti.com>
+Date: Mon, 26 Feb 2018 11:43:06 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y
+In-Reply-To: <1516037371-3932-1-git-send-email-david@lechnology.com>
+References: <1516037371-3932-1-git-send-email-david@lechnology.com>
+Message-ID: <7849e3ae-cebe-b067-213c-3fe0d6e7a18e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 January 2018 08:21 PM, Sekhar Nori wrote:
-> da830_evm_emif25_pins[] is used only when CONFIG_DA830_UI_NAND
-> is enabled. It gives the following warning when the config is
-> switched off. Fix it.
-> 
-> arch/arm/mach-davinci/board-da830-evm.c:245:20: warning: ?da830_evm_emif25_pins? defined but not used [-Wunused-const-variable=]
->  static const short da830_evm_emif25_pins[] = {
->                     ^~~~~~~~~~~~~~~~~~~~~
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+On Monday 15 January 2018 10:59 PM, David Lechner wrote:
+> This changes CONFIG_DAVINCI_WATCHDOG from a module to a compiled-in
+> option. Since the reset function has been moved out of the mach code in
+> commit 0808d3260456 ("ARM: davinci: remove watchdog reset") and into the
 
-Added to v4.17/soc of my tree.
+commit id adjusted since the said patch did not make it to v4.16
+
+> watchdog driver, devices cannot reboot unless the watchdog driver is
+> loaded, so make it a compiled-in option so that we can always reboot, even
+> when modules are not loaded.
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Suggested-by: Adam Ford <aford173@gmail.com>
+> Signed-off-by: David Lechner <david@lechnology.com>
+
+Applied to v4.17/defconfig
 
 Thanks,
 Sekhar
