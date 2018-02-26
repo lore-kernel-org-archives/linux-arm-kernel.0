@@ -1,141 +1,203 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:03 +0800
-Subject: [PATCH 29/52] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
+Date: Mon, 26 Feb 2018 16:20:05 +0800
+Subject: [PATCH 31/52] arm/arm64: KVM: Consolidate the PSCI include files
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-30-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-32-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit aa6acde65e03 upstream.
+commit 1a2fb94e6a77 upstream.
 
-Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
-and can theoretically be attacked by malicious code.
+As we're about to update the PSCI support, and because I'm lazy,
+let's move the PSCI include file to include/kvm so that both
+ARM architectures can find it.
 
-This patch implements a PSCI-based mitigation for these CPUs when available.
-The call into firmware will invalidate the branch predictor state, preventing
-any malicious entries from affecting other victim contexts.
-
-Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	no falkor in arch/arm64/kernel/cpu_errata.c
+	need kvm/arm_psci.h in files:
+	arch/arm64/kvm/handle_exit.c
+	arch/arm/kvm/psci.c and arch/arm/kvm/arm.c
+	no virt/kvm/arm/arm.c and virt/kvm/arm/psci.c
 ---
- arch/arm64/kernel/bpi.S        | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c | 42 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ arch/arm/include/asm/kvm_psci.h   | 27 ---------------------------
+ arch/arm/kvm/arm.c                |  2 +-
+ arch/arm/kvm/handle_exit.c        |  2 +-
+ arch/arm/kvm/psci.c               |  2 +-
+ arch/arm64/include/asm/kvm_psci.h | 27 ---------------------------
+ arch/arm64/kvm/handle_exit.c      |  3 ++-
+ include/kvm/arm_psci.h            | 27 +++++++++++++++++++++++++++
+ 7 files changed, 32 insertions(+), 58 deletions(-)
+ delete mode 100644 arch/arm/include/asm/kvm_psci.h
+ delete mode 100644 arch/arm64/include/asm/kvm_psci.h
+ create mode 100644 include/kvm/arm_psci.h
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 06a931e..dec95bd 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	vectors __kvm_hyp_vector
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
-+ENTRY(__psci_hyp_bp_inval_start)
-+	sub	sp, sp, #(8 * 18)
-+	stp	x16, x17, [sp, #(16 * 0)]
-+	stp	x14, x15, [sp, #(16 * 1)]
-+	stp	x12, x13, [sp, #(16 * 2)]
-+	stp	x10, x11, [sp, #(16 * 3)]
-+	stp	x8, x9, [sp, #(16 * 4)]
-+	stp	x6, x7, [sp, #(16 * 5)]
-+	stp	x4, x5, [sp, #(16 * 6)]
-+	stp	x2, x3, [sp, #(16 * 7)]
-+	stp	x0, x1, [sp, #(16 * 8)]
-+	mov	x0, #0x84000000
-+	smc	#0
-+	ldp	x16, x17, [sp, #(16 * 0)]
-+	ldp	x14, x15, [sp, #(16 * 1)]
-+	ldp	x12, x13, [sp, #(16 * 2)]
-+	ldp	x10, x11, [sp, #(16 * 3)]
-+	ldp	x8, x9, [sp, #(16 * 4)]
-+	ldp	x6, x7, [sp, #(16 * 5)]
-+	ldp	x4, x5, [sp, #(16 * 6)]
-+	ldp	x2, x3, [sp, #(16 * 7)]
-+	ldp	x0, x1, [sp, #(16 * 8)]
-+	add	sp, sp, #(8 * 18)
-+ENTRY(__psci_hyp_bp_inval_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0e07893..f8810bf 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,8 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+deleted file mode 100644
+index 6bda945..0000000
+--- a/arch/arm/include/asm/kvm_psci.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * Copyright (C) 2012 - ARM Ltd
+- * Author: Marc Zyngier <marc.zyngier@arm.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#ifndef __ARM_KVM_PSCI_H__
+-#define __ARM_KVM_PSCI_H__
+-
+-#define KVM_ARM_PSCI_0_1	1
+-#define KVM_ARM_PSCI_0_2	2
+-
+-int kvm_psci_version(struct kvm_vcpu *vcpu);
+-int kvm_psci_call(struct kvm_vcpu *vcpu);
+-
+-#endif /* __ARM_KVM_PSCI_H__ */
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 4e4ae07..8588e67 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -44,8 +44,8 @@
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+-#include <asm/kvm_psci.h>
+ #include <asm/sections.h>
++#include <kvm/arm_psci.h>
  
- #ifdef CONFIG_KVM
-+extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-+
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
- {
-@@ -94,6 +96,9 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
- }
- #else
-+#define __psci_hyp_bp_inval_start	NULL
-+#define __psci_hyp_bp_inval_end		NULL
-+
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
- 				      const char *hyp_vecs_end)
-@@ -118,6 +123,21 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ #ifdef REQUIRES_VIRT
+ __asm__(".arch_extension	virt");
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index 4e57ebc..0a2b758 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -21,7 +21,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_mmu.h>
+-#include <asm/kvm_psci.h>
++#include <kvm/arm_psci.h>
+ #include <trace/events/kvm.h>
  
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
-+
-+#include <linux/psci.h>
-+
-+static int enable_psci_bp_hardening(void *data)
-+{
-+	const struct arm64_cpu_capabilities *entry = data;
-+
-+	if (psci_ops.get_version)
-+		install_bp_hardening_cb(entry,
-+				       (bp_hardening_cb_t)psci_ops.get_version,
-+				       __psci_hyp_bp_inval_start,
-+				       __psci_hyp_bp_inval_end);
-+
-+	return 0;
-+}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ #include "trace.h"
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index a08d7a9..18f9e9d 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -21,8 +21,8 @@
  
- #define MIDR_RANGE(model, min, max) \
-@@ -211,6 +231,28 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.def_scope = SCOPE_LOCAL_CPU,
- 		.enable = cpu_enable_trap_ctr_access,
- 	},
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+#endif
- 	{
- 	}
- };
+ #include <asm/cputype.h>
+ #include <asm/kvm_emulate.h>
+-#include <asm/kvm_psci.h>
+ #include <asm/kvm_host.h>
++#include <kvm/arm_psci.h>
+ 
+ #include <uapi/linux/psci.h>
+ 
+diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+deleted file mode 100644
+index bc39e55..0000000
+--- a/arch/arm64/include/asm/kvm_psci.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * Copyright (C) 2012,2013 - ARM Ltd
+- * Author: Marc Zyngier <marc.zyngier@arm.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#ifndef __ARM64_KVM_PSCI_H__
+-#define __ARM64_KVM_PSCI_H__
+-
+-#define KVM_ARM_PSCI_0_1	1
+-#define KVM_ARM_PSCI_0_2	2
+-
+-int kvm_psci_version(struct kvm_vcpu *vcpu);
+-int kvm_psci_call(struct kvm_vcpu *vcpu);
+-
+-#endif /* __ARM64_KVM_PSCI_H__ */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 5b56b09..0231ebc 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -22,12 +22,13 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ 
++#include <kvm/arm_psci.h>
++
+ #include <asm/esr.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+-#include <asm/kvm_psci.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+new file mode 100644
+index 0000000..2042bb9
+--- /dev/null
++++ b/include/kvm/arm_psci.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __KVM_ARM_PSCI_H__
++#define __KVM_ARM_PSCI_H__
++
++#define KVM_ARM_PSCI_0_1	1
++#define KVM_ARM_PSCI_0_2	2
++
++int kvm_psci_version(struct kvm_vcpu *vcpu);
++int kvm_psci_call(struct kvm_vcpu *vcpu);
++
++#endif /* __KVM_ARM_PSCI_H__ */
 -- 
 2.7.4
