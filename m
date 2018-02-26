@@ -1,55 +1,148 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Feb 2018 13:05:36 +0000
-Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid
- context
-In-Reply-To: <1518112700.2911.0.camel@redhat.com>
-References: <20180208174504.30665-1-msalter@redhat.com>
- <20180208175433.p2a3g2q7tctfpk7c@lakrids.cambridge.arm.com>
- <1518112700.2911.0.camel@redhat.com>
-Message-ID: <20180226130535.7wvvyst5bwj76ss3@salmiak>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 26 Feb 2018 13:08:26 +0000
+Subject: [RFC PATCH] irqchip/gic-v3-its: apply ACPI device based quirks
+In-Reply-To: <20180226115158.GC19841@e107981-ln.cambridge.arm.com>
+References: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
+ <20180226115158.GC19841@e107981-ln.cambridge.arm.com>
+Message-ID: <CAKv+Gu81u-3rzoKbzchRkxPtS_-KNM+hDfOnajgkM_CPUX4UWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 12:58:20PM -0500, Mark Salter wrote:
-> On Thu, 2018-02-08 at 17:54 +0000, Mark Rutland wrote:
-> > Hi Mark,
-> > 
-> > On Thu, Feb 08, 2018 at 12:45:04PM -0500, Mark Salter wrote:
-> > > When booting an arm64 debug kernel with ACPI, I see:
-> > > 
-> > >    BUG: sleeping function called from invalid context at mm/slab.h:420
-> > >    in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
-> > >    1 lock held by cpuhp/0/12:
-> > >     #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
-> > >    irq event stamp: 28
-> > >    hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
-> > >    hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
-> > >    softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
-> > >    softirqs last disabled at (0): [<          (null)>]           (null)
-> > >    CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
-> > >    Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
-> > >    Call trace:
-> > >     dump_backtrace+0x0/0x188
-> > >     show_stack+0x24/0x2c
-> > >     dump_stack+0xa4/0xe0
-> > >     ___might_sleep+0x208/0x234
-> > >     __might_sleep+0x58/0x8c
-> > >     kmem_cache_alloc_trace+0x248/0x3e0
-> > >     armpmu_alloc+0x38/0x1a8
-> > >     arm_pmu_acpi_cpu_starting+0x11c/0x15c
-> > >     cpuhp_invoke_callback+0x120/0x100c
-> > >     cpuhp_thread_fun+0xe8/0x258
-> > >     smpboot_thread_fn+0x170/0x268
-> > >     kthread+0x110/0x13c
-> > >     ret_from_fork+0x10/0x18
-> > 
-> > I have patches to address this:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/557838.html
-> > https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
-> 
-> Awesome, I completely missed that. Thanks.
+On 26 February 2018 at 11:51, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Feb 13, 2018 at 02:11:18PM +0000, Ard Biesheuvel wrote:
+>> Reapply the SynQuacer quirk for ITS frames that are matched by 'SCX0005'
+>> based ACPI devices, replacing the dummy fwnode with the one populated by
+>> the ACPI device core.
+>>
+>> This allows the SynQuacer ACPI tables to publish a device node such
+>> as
+>>
+>>     Device (ITS0) {
+>>       Name (_HID, "SCX0005")
+>>       Name (_ADR, 0x30020000)
+>
+> You can't have both _HID and _ADR (ACPI 6.2 - 6.1 - page 321) and
+> I do not think _ADR is the correct binding to solve this problem either
+> (_ADR can only be used for enumerable busses).
+>
 
-As a heads-up, these were merged in v4.16-rc3.
+OK.
 
-Mark.
+>>       Name (_DSD, Package ()  // _DSD: Device-Specific Data
+>>       {
+>>         ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>         Package () {
+>>           Package (2) {
+>>             "socionext,synquacer-pre-its",
+>>             Package () { 0x58000000, 0x200000 }
+>>           },
+>>         }
+>>       })
+>>     }
+>>
+>> which will trigger the existing quirk that replaces the doorbell
+>> address with the appropriate address in the pre-ITS frame.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> Marc, Lorenzo,
+>>
+>> I am aware that this patch may be seen as controversial, but I would like to
+>> propose it nonetheless. The reason is that this is the only thing standing in
+>> the way of full ACPI support in Socionext SynQuacer based platforms.
+>
+> I question whether these platforms should have upstream and long-term
+> ACPI support(dependency) - that's where the controversy is (aka if you
+> allow one quirk you allow them all), I do not want to add a dependency
+> to the ITS ACPI support for a platform that may well/is likely to be
+> short-lived.
+>
+
+I understand.
+>> The pre-ITS is a monstrosity, but as it turns out, Socionext had help from
+>> ARM designing it, and the reason we need DT/ACPI based quirks in the first
+>> place is that the IIDR of this GICv3 implementation is simply the ARM Ltd.
+>> one (as they designed the IP)
+>>
+>> Please take this into consideration when reviewing this patch,
+>>
+>> Thanks,
+>> Ard.
+>>
+>>  drivers/irqchip/irq-gic-v3-its.c | 39 ++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 06f025fd5726..a63973baf08a 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -3517,3 +3517,42 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>>
+>>       return 0;
+>>  }
+>> +
+>> +#if defined(CONFIG_SOCIONEXT_SYNQUACER_PREITS) && defined(CONFIG_ACPI)
+>> +static acpi_status __init acpi_its_device_probe (acpi_handle handle,
+>> +                                              u32 depth, void *context,
+>> +                                              void **ret)
+>> +{
+>> +     struct acpi_device *adev;
+>> +     unsigned long long phys_base;
+>> +     struct its_node *its;
+>> +     acpi_status status;
+>> +     int err;
+>> +
+>> +     err = acpi_bus_get_device(handle, &adev);
+>> +     if (err)
+>> +             return AE_CTRL_TERMINATE;
+>> +
+>> +     status = acpi_evaluate_integer(handle, "_ADR", NULL, &phys_base);
+>> +     if (ACPI_FAILURE(status))
+>> +             return status;
+>
+> I do not think using _ADR is correct here, the phys_base should be
+> described as a _CRS (or you avoided using _CRS for resources
+> conflicts ? Still, I do not think that using _ADR is right).
+>
+
+No, there is no resource conflict afaik. I just wasn't aware that _ADR
+is inappropriate here.
+
+>> +     list_for_each_entry(its, &its_nodes, entry)
+>> +             if (its->phys_base == phys_base) {
+>> +                     irq_domain_free_fwnode(its->fwnode_handle);
+>> +                     its->fwnode_handle = &adev->fwnode;
+>> +                     its_enable_quirk_socionext_synquacer(its);
+>> +                     break;
+>> +             }
+>
+> I think this is wrong. Why do you need to replace the fwnode at all
+> (and how does this work with IORT ?) ?
+>
+> I understand you want to have a uniform DT/ACPI quirk handling (and stash
+> the fwnode so that you can read a _DSD out of it with the fwnode_ API)
+> but still, that does not justify swapping the IRQ domain fwnode handle.
+>
+
+Fair enough. I am looking into whether it is feasible to instantiate
+the ITS node later (and not describe it at all in the MADT)
+
+>> +
+>> +     return AE_CTRL_TERMINATE;
+>> +}
+>> +
+>> +static int __init acpi_its_device_probe_init(void)
+>> +{
+>> +     if (!acpi_disabled)
+>> +             acpi_get_devices("SCX0005", acpi_its_device_probe, NULL, NULL);
+>> +     return 0;
+>> +}
+>> +subsys_initcall_sync(acpi_its_device_probe_init);
+>
+> That's a subsys_initcall_sync just because you need the interpreter up and
+> running right ?
+>
+
+Because it is the earliest initcall level where ACPI devices have been
+instantiated.
