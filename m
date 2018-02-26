@@ -1,96 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 16:56:46 +0100
-Subject: [PATCHv2 6/8] arm_pmu: explicitly enable/disable SPIs at hotplug
-In-Reply-To: <20180226152253.GA19446@arm.com>
-References: <20180205164202.26502-1-mark.rutland@arm.com>
- <20180205164202.26502-7-mark.rutland@arm.com>
- <CAMuHMdU9UPhKdNGknZDkrzWDE75sKDdbMNu4RFfU25eVEswLkg@mail.gmail.com>
- <20180226152253.GA19446@arm.com>
-Message-ID: <CAMuHMdU46fdQgmhKqNyqK9BBHJiwoqHwYvpnM5eTM9sJ3UnUAA@mail.gmail.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 26 Feb 2018 07:57:04 -0800
+Subject: [PATCH v6 03/20] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1519403030-21189-4-git-send-email-sudeep.holla@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAOFm3uE8q63h-zk3FGnZkDqvxjJj=d0mfuUtK+nyioKosmt=dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Sudeep,
 
-On Mon, Feb 26, 2018 at 4:22 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Feb 26, 2018 at 04:16:19PM +0100, Geert Uytterhoeven wrote:
->> On Mon, Feb 5, 2018 at 5:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > To support ACPI systems, we need to request IRQs before CPUs are
->> > hotplugged, and thus we need to request IRQs before we know their
->> > associated PMU.
->> >
->> > This is problematic if a PMU IRQ is pending out of reset, as it may be
->> > taken before we know the PMU, and thus the IRQ handler won't be able to
->> > handle it, leaving it screaming.
->> >
->> > To avoid such problems, lets request all IRQs in a disabled state, and
->> > explicitly enable/disable them at hotplug time, when we're sure the PMU
->> > has been probed.
->> >
->> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>
->> This is now commit 6de3f79112cc26bf in v4.16-rc3, and causes a BUG during
->> CPU offlining (e.g. during system suspend, or during boot with
->> CONFIG_ARM_PSCI_CHECKER=y).
->>
->> With CONFIG_ARM_PSCI_CHECKER=y:
->>
->> psci_checker: PSCI checker started using 6 CPUs
->> psci_checker: Starting hotplug tests
->> psci_checker: Trying to turn off and on again all CPUs
->> BUG: sleeping function called from invalid context at kernel/irq/manage.c:112
->> in_atomic(): 1, irqs_disabled(): 128, pid: 15, name: migration/1
->> no locks held by migration/1/15.
->> irq event stamp: 192
->> hardirqs last  enabled at (191): [<00000000803c2507>]
->> _raw_spin_unlock_irq+0x2c/0x4c
->> hardirqs last disabled at (192): [<000000007f57ad28>] multi_cpu_stop+0x9c/0x140
->> softirqs last  enabled at (0): [<0000000004ee1b58>]
->> copy_process.isra.77.part.78+0x43c/0x1504
->> softirqs last disabled at (0): [<          (null)>]           (null)
->> CPU: 1 PID: 15 Comm: migration/1 Not tainted 4.16.0-rc3-salvator-x #1651
->> Hardware name: Renesas Salvator-X board based on r8a7796 (DT)
->> Call trace:
->>  dump_backtrace+0x0/0x140
->>  show_stack+0x14/0x1c
->>  dump_stack+0xb4/0xf0
->>  ___might_sleep+0x1fc/0x218
->>  __might_sleep+0x70/0x80
->>  synchronize_irq+0x40/0xa8
->>  disable_irq+0x20/0x2c
+On Fri, Feb 23, 2018 at 8:23 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> The SCMI is intended to allow OSPM to manage various functions that are
+> provided by the hardware platform it is running on, including power and
+> performance functions. SCMI provides two levels of abstraction, protocols
+> and transports. Protocols define individual groups of system control and
+> management messages. A protocol specification describes the messages
+> that it supports. Transports describe the method by which protocol
+> messages are communicated between agents and the platform.
 >
-> Given that these things are CPU-affine, I reckon this should be
-> disable_irq_nosync. Mark?
+> This patch adds basic infrastructure to manage the message allocation,
+> initialisation, packing/unpacking and shared memory management.
 >
-> Will
->
-> --->8
->
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 0c2ed11c0603..f63db346c219 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -638,7 +638,7 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
->                 if (irq_is_percpu_devid(irq))
->                         disable_percpu_irq(irq);
->                 else
-> -                       disable_irq(irq);
-> +                       disable_irq_nosync(irq);
->         }
->
->         per_cpu(cpu_armpmu, cpu) = NULL;
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+<snip>
 
+
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/common.h
+> @@ -0,0 +1,77 @@
+> +/*
+> + * System Control and Management Interface (SCMI) Message Protocol
+> + * driver common header file containing some definitions, structures
+> + * and function prototypes used in all the different SCMI protocols.
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+
+Would you consider using the SPDX tags [1] instead of this legalese?
 Thanks!
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+-- 
+Cordially
+Philippe Ombredanne
