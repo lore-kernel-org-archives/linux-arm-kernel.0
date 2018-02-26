@@ -1,47 +1,29 @@
 From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 26 Feb 2018 17:16:44 +0100
-Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <CAGRGNgWgkfax2TUSjK4397i678gXTTLh80r2HWwTB6u0GM0Cuw@mail.gmail.com>
+Date: Mon, 26 Feb 2018 17:17:41 +0100
+Subject: [PATCH 01/15] clk: sunxi-ng: Add check for minimal rate to NM PLLs
+In-Reply-To: <20180226093800.uwbo54wrdcwmsyzh@flea.lan>
 References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <20180224214545.3740-15-jernej.skrabec@siol.net>
- <CAGRGNgWgkfax2TUSjK4397i678gXTTLh80r2HWwTB6u0GM0Cuw@mail.gmail.com>
-Message-ID: <2676311.2IEVhXnSIE@jernej-laptop>
+ <20180224214545.3740-2-jernej.skrabec@siol.net>
+ <20180226093800.uwbo54wrdcwmsyzh@flea.lan>
+Message-ID: <2662255.10CUWtpM2s@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+Hi,
 
-Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby napisal(a):
-> Hi Jernej,
+Dne ponedeljek, 26. februar 2018 ob 10:38:00 CET je Maxime Ripard napisal(a):
+> Hi,
 > 
-> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
-wrote:
-> > Enable HDMI output on all boards which have HDMI connector.
+> On Sat, Feb 24, 2018 at 10:45:31PM +0100, Jernej Skrabec wrote:
+> > Some NM PLLs doesn't work well when their output clock rate is set below
+> > certain rate.
 > > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
-> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts        
-> >   | 25 ++++++++++++++++++++++
-> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
-> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts         
-> >   | 25 ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  
-> >         | 25 ++++++++++++++++++++++
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
-> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts      
-> >   | 24 +++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts  
-> >        | 25 ++++++++++++++++++++++ 8 files changed, 199 insertions(+)
+> > Add support for that constrain.
 > 
-> As I understand it, the H2+ is just a slightly trimmed down H3. In
-> terms of HDMI support, the difference is that the H2+ can't output 4k.
-> If this code is compatible with the H2+, could you please add the
-> necessary bits and pieces to the h2-plus DTSs too?
+> In such a case, you should round the rate to the minimum the clock can
+> operate at, and not return an error.
 
-There are only 3 H2+ boards in kernel and none of them has HDMI connector, so 
-there's nothing to do actually. But if such board is added to kernel, it would 
-be trivially add proper nodes, since all H2+ boards include H3 DTSI.
+OK.
 
 Best regards,
 Jernej
