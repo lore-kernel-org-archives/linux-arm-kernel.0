@@ -1,36 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Feb 2018 21:40:52 +0100
-Subject: [PATCH] ARM: omap2: set CONFIG_LIRC=y in defconfig
-Message-ID: <20180226204105.2858838-1-arnd@arndb.de>
+Date: Mon, 26 Feb 2018 21:42:02 +0100
+Subject: [PATCH] ARM: dts: Set D-Link DNS-313 SATA to muxmode 0
+In-Reply-To: <20180225130814.26515-1-linus.walleij@linaro.org>
+References: <20180225130814.26515-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a3-jvmRF1HoRqBcik0HcQ1xd4bXFXzhoREnVyV9eevGAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CONFIG_LIRC symbol has changed from 'tristate' to 'bool, so we now
-get a warning for omap2plus_defconfig:
+On Sun, Feb 25, 2018 at 2:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This stops the driver from trying to probe the ATA slave
+> interface. The vendor code enables the slave interface
+> but the driver in the vendor tree does not make use of
+> it.
+>
+> Setting it to muxmode 0 disables the slave interface:
+> the hardware only has the master interface connected
+> to the one harddrive slot anyways.
+>
+> Without this change booting takes excessive time, so it
+> is very annoying to end users.
+>
+> Fixes: dd5c0561db75 ("ARM: dts: Add basic devicetree for D-Link DNS-313")
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this for fixes for v4.16.
 
-arch/arm/configs/omap2plus_defconfig:322:warning: symbol value 'm' invalid for LIRC
+Applied, thanks!
 
-This changes the file to mark the symbol as built-in to get rid of the
-warning.
-
-Fixes: a60d64b15c20 ("media: lirc: lirc interface should not be a raw decoder")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/configs/omap2plus_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 2f145c4af93a..92674f247a12 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -319,7 +319,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_RC_CORE=m
- CONFIG_MEDIA_CONTROLLER=y
- CONFIG_VIDEO_V4L2_SUBDEV_API=y
--CONFIG_LIRC=m
-+CONFIG_LIRC=y
- CONFIG_RC_DEVICES=y
- CONFIG_IR_RX51=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
--- 
-2.9.0
+      Arnd
