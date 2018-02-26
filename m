@@ -1,73 +1,88 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 26 Feb 2018 13:37:23 -0500 (EST)
-Subject: [PATCH] net: Allow mac_pton() to work on non-NULL terminated
- strings
-In-Reply-To: <20180223201748.14328-1-stefan@the2masters.de>
-References: <20180223182006.GA2116@avx2>
- <20180223201748.14328-1-stefan@the2masters.de>
-Message-ID: <20180226.133723.1747355754308807711.davem@davemloft.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 26 Feb 2018 10:23:00 -0800
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <20180208174855.55620-7-seanpaul@chromium.org>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+Message-ID: <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Hellermann <stefan@the2masters.de>
-Date: Fri, 23 Feb 2018 21:17:48 +0100
+Hi,
 
-> Commit 4904dbda41c8 ("ARM: orion5x: use mac_pton() helper") crashes my
-> QNAP TS-209 NAS early on boot.
-> 
-> The boot code for the TS-209 is looping through an ext2 filesystem on a
-> 384kB mtd partition (factory configuration put there by QNAP). There it
-> looks on every 1kB boundary if there is a valid MAC address. The
-> filesystem has a 1kB block size, so this seems to work.
-> 
-> On my device the MAC address is on the 37th 1kB block. But: On the 27th
-> block is a large file (1,5kB) without 0 bytes inside. The code in
-> qnap_tsx09_find_mac_addr() maps 1kB into memory (not a whole file or the
-> whole 384kB) and then calls qnap_tsx09_check_mac_addr() -> mac_pton() ->
-> strlen() on this memory block. as there is no 0 byte in the file on the
-> 27th block, strlen() runs into bad memory and the machine panics. The old
-> code had no strlen().
-> 
-> Actually mac_pton() doesn't need to call strlen(), the following loop
-> catches short strings quite nicely. The strlen() seems to be an
-> optimization for calls to mac_pton with empty string. But this is rarely
-> the case and this is not a hot path. Remove it to reduce code size and
-> speed up calls with an not empty string.
-> 
-> Besides fixing the crash there is are other users interested in
-> this change, see https://patchwork.ozlabs.org/patch/851008/
-> 
-> Fixes: 4904dbda41c8 ("ARM: orion5x: use mac_pton() helper")
-> Signed-off-by: Stefan Hellermann <stefan@the2masters.de>
-> Cc: <stable@vger.kernel.org> [4.4+]
+On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+> This patch adds an override mode for kevin devices. The mode increases
+> both back porches to allow a pixel clock of 26666kHz as opposed to the
+> 'typical' value of 252750kHz. This is needed to avoid interference with
+> the touch digitizer on these laptops.
+>
+> Changes in v2:
+>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+> Changes in v3:
+>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: St?phane Marchesin <marcheu@chromium.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-rockchip at lists.infradead.org
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> index 191a6bcb1704..658411ce37ea 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> @@ -98,6 +98,20 @@
+>                 backlight = <&backlight>;
+>                 power-supply = <&pp3300_disp>;
+>
+> +               panel-timing {
+> +                       clock-frequency = <266604720>;
+> +                       hactive = <2400>;
+> +                       hfront-porch = <48>;
+> +                       hback-porch = <84>;
+> +                       hsync-len = <32>;
+> +                       hsync-active = <0>;
+> +                       vactive = <1600>;
+> +                       vfront-porch = <3>;
+> +                       vback-porch = <120>;
+> +                       vsync-len = <10>;
+> +                       vsync-active = <0>;
+> +               };
+> +
+>                 ports {
+>                         panel_in_edp: endpoint {
+>                                 remote-endpoint = <&edp_out_panel>;
 
-Nope, instead the Fixes: tag commit should be completely reverted.
+Kristian brought an old bug to my attention
+<https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+made me think.  Should we somehow adjust the bindings here to account
+for the fact that a board may source several different panels?
 
-It is wrong on several levels.
+AKA: on some boards an ODM may want to second source (or third source,
+or ...) the panel.  They'll randomly connect several different panels
+to the board and ship the boards out.  The panels are all compatible
+electrically (same power sequencing) but might need slightly different
+timings.  In this particular case there's no board-level strappings
+for the different panels--it's assumed that the EDID on the panels can
+be used to distinguish them.
 
-If we don't check for NULL termination, only the caller knows if it
-is safe to blindly parse the buffer and whether it's length is
-legitimate, and in what manner it is ok to do so.
+In that case it seems like it would be nice to allow specifying more
+than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+present in the EDID?
 
-But that's not my main beef.
 
-The major problem is that the orion5x code passes an __iomem pointer
-to mac_pton().
+Is that something we'd want to account for before we land this series?
+ It seems like it would just be adding an extra level of nodes?
 
-It is never correct to use real C pointer dereferencing on an __iomem
-pointer.  __iomem pointer accesses must go through the appropriate
-iomem accessor functions and interfaces, because __iomem pointers are
-opaque and not real C pointers.
 
-sparse should have emitted a ton of warnings for the orion5x code, and
-furthermore it should have done so when the __iomem pointer is passed
-straight into mac_pton().
-
-It is therefore the orion5x's code business to do such non-portable
-operations, and to be able to assume that the mac buffer is safe to be
-non-NULL terminated.
-
-Therefore I am reverted the above mentioned commit to fix this
-problem.
-
-Thank you.
+-Doug
