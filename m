@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 19:17:27 +0100
-Subject: [PATCH 2/8] arm64: dts: renesas: r8a7796: Set EtherAVB phy mode
+Date: Mon, 26 Feb 2018 19:17:41 +0100
+Subject: [PATCH 3/8] arm64: dts: renesas: r8a7795: Set EtherAVB phy mode
  to "rgmii"
-In-Reply-To: <1519667836-31330-3-git-send-email-jacopo+renesas@jmondi.org>
+In-Reply-To: <1519667836-31330-4-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519667836-31330-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdVnS3_f6ZsaJ3=SqZwAdKv+mWqJ1_q2VpKD+VMvsqZEnw@mail.gmail.com>
+ <1519667836-31330-4-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdXFa=t4F6gtwq4PnSjyXchbCoETjkphgy-A_RYMWyOnBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
