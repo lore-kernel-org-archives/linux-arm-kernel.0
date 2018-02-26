@@ -1,73 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Feb 2018 15:04:48 +0000
-Subject: [RFC PATCH v2 00/12] Rewrite asm-generic/bitops/{atomic,
- lock}.h and use on arm64
-Message-ID: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 26 Feb 2018 15:04:53 +0000
+Subject: [RFC PATCH v2 05/12] sh: Don't pull in all of linux/bitops.h in
+ asm/cmpxchg-xchg.h
+In-Reply-To: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1519657500-15094-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The sh implementation of asm/cmpxchg-xchg.h pulls in linux/bitops.h
+so that it can refer to BITS_PER_BYTE. It also transitively relies on
+this pulling in linux/compiler.h for READ_ONCE.
 
-This is version two of the RFC I previously posted here:
+Replace the #include with asm-generic/bits.h and linux/compiler.h
 
-  https://www.spinics.net/lists/arm-kernel/msg634719.html
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/sh/include/asm/cmpxchg-xchg.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Changes since v1 include:
-
-  * Fixed __clear_bit_unlock to work on archs with lock-based atomics
-  * Moved lock ops into bitops/lock.h
-  * Fixed build breakage on lesser-spotted architectures
-
-Trying to fix the circular #includes introduced by pulling atomic.h
-into btops/lock.h has been driving me insane. I've ended up moving some
-basic BIT definitions into bits.h, but this might all be better in
-const.h which is being proposed by Masahiro. Feedback is especially
-welcome on this part.
-
-I've not bothered optimising for the case of a 64-bit, big-endian
-architecture that uses the generic implementation of atomic64_t because
-it's both messy and hypothetical. The code here should still work
-correctly for that case, it just sucks (as does the implementation
-currently in mainline).
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (12):
-  h8300: Don't include linux/kernel.h in asm/atomic.h
-  m68k: Don't use asm-generic/bitops/lock.h
-  asm-generic: Move some macros from linux/bitops.h to a new bits.h file
-  openrisc: Don't pull in all of linux/bitops.h in asm/cmpxchg.h
-  sh: Don't pull in all of linux/bitops.h in asm/cmpxchg-xchg.h
-  arm64: fpsimd: include <linux/init.h> in fpsimd.h
-  arm64: lse: Include compiler_types.h and export.h for out-of-line
-    LL/SC
-  arm64: cmpxchg: Include build_bug.h instead of bug.h for BUILD_BUG
-  asm-generic/bitops/atomic.h: Rewrite using atomic_fetch_*
-  asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*
-  arm64: Replace our atomic/lock bitop implementations with asm-generic
-  arm64: bitops: Include <asm-generic/bitops/ext2-atomic-setbit.h>
-
- arch/arm64/include/asm/bitops.h     |  21 +---
- arch/arm64/include/asm/cmpxchg.h    |   2 +-
- arch/arm64/include/asm/fpsimd.h     |   1 +
- arch/arm64/include/asm/lse.h        |   2 +
- arch/arm64/lib/Makefile             |   2 +-
- arch/arm64/lib/bitops.S             |  76 ---------------
- arch/h8300/include/asm/atomic.h     |   4 +-
- arch/m68k/include/asm/bitops.h      |   6 +-
- arch/openrisc/include/asm/cmpxchg.h |   3 +-
- arch/sh/include/asm/cmpxchg-xchg.h  |   3 +-
- include/asm-generic/bitops/atomic.h | 188 +++++++-----------------------------
- include/asm-generic/bitops/lock.h   |  68 ++++++++++---
- include/asm-generic/bits.h          |  26 +++++
- include/linux/bitops.h              |  22 +----
- 14 files changed, 135 insertions(+), 289 deletions(-)
- delete mode 100644 arch/arm64/lib/bitops.S
- create mode 100644 include/asm-generic/bits.h
-
+diff --git a/arch/sh/include/asm/cmpxchg-xchg.h b/arch/sh/include/asm/cmpxchg-xchg.h
+index 1e881f5db659..41c290efa3c4 100644
+--- a/arch/sh/include/asm/cmpxchg-xchg.h
++++ b/arch/sh/include/asm/cmpxchg-xchg.h
+@@ -8,7 +8,8 @@
+  * This work is licensed under the terms of the GNU GPL, version 2.  See the
+  * file "COPYING" in the main directory of this archive for more details.
+  */
+-#include <linux/bitops.h>
++#include <linux/compiler.h>
++#include <asm-generic/bits.h>
+ #include <asm/byteorder.h>
+ 
+ /*
 -- 
 2.1.4
