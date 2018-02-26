@@ -1,73 +1,80 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 26 Feb 2018 18:04:42 +0100
-Subject: [PATCH 1/2] ARM: dts: exynos: Fix address of PPMU ACP on
- Exynos4210
-In-Reply-To: <5A8F608E.4030509@samsung.com>
-References: <CGME20180222191146epcas2p1e0fc10e3f8b278f0c3671d32e2d76350@epcas2p1.samsung.com>
- <20180222191111.23747-1-krzk@kernel.org>
- <5A8F608E.4030509@samsung.com>
-Message-ID: <20180226170442.opmhse4wm3iqoshz@kozik-lap>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 26 Feb 2018 19:05:59 +0200
+Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
+ controller
+In-Reply-To: <CAKv+Gu-y3GG+McAK2b8SCmMf60fo_XSHFBAWsKGw3OBvD04ggg@mail.gmail.com>
+References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
+ <20180222191647.4727-3-ard.biesheuvel@linaro.org>
+ <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
+ <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
+ <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
+ <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
+ <CAHp75VcjUey4K1xOkjKjn_ppPKC0bktcBK2p9NjcPYG1ed7X0g@mail.gmail.com>
+ <CAKv+Gu-y3GG+McAK2b8SCmMf60fo_XSHFBAWsKGw3OBvD04ggg@mail.gmail.com>
+Message-ID: <CAHp75Vco1wUR7cUu-zuaP-TVMnm+m7X+CctnRC0cgvpuo5S2vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 09:30:06AM +0900, Chanwoo Choi wrote:
-> On 2018? 02? 23? 04:11, Krzysztof Kozlowski wrote:
-> > Typo in unit address of PPMU ACP caused DTC warnings:
-> > 
-> >     arch/arm/boot/dts/exynos4412-odroidu3.dtb:
-> >         Warning (simple_bus_reg): Node /soc/ppmu_acp at 10ae0000 simple-bus unit address format error, expected "106e0000"
-> > 
-> > PPMU ACP (under 0x10ae0000 address) is present only in Exynos4210 so
-> > move this node to exynos4210.dtsi with fixing the reg address to proper
-> > one.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > ---
-> >  arch/arm/boot/dts/exynos4.dtsi    | 6 ------
-> >  arch/arm/boot/dts/exynos4210.dtsi | 6 ++++++
-> >  2 files changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> > index 967cd02401c5..909a9f2bf5be 100644
-> > --- a/arch/arm/boot/dts/exynos4.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4.dtsi
-> > @@ -821,12 +821,6 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > -		ppmu_acp: ppmu_acp at 10ae0000 {
-> > -			compatible = "samsung,exynos-ppmu";
-> > -			reg = <0x106e0000 0x2000>;
-> > -			status = "disabled";
-> > -		};
-> > -
-> >  		ppmu_rightbus: ppmu_rightbus at 112a0000 {
-> >  			compatible = "samsung,exynos-ppmu";
-> >  			reg = <0x112a0000 0x2000>;
-> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> > index 853604d91158..88fb47cef9a8 100644
-> > --- a/arch/arm/boot/dts/exynos4210.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> > @@ -162,6 +162,12 @@
-> >  			iommus = <&sysmmu_g2d>;
-> >  		};
-> >  
-> > +		ppmu_acp: ppmu_acp at 10ae0000 {
-> > +			compatible = "samsung,exynos-ppmu";
-> > +			reg = <0x10ae0000 0x2000>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		ppmu_lcd1: ppmu_lcd1 at 12240000 {
-> >  			compatible = "samsung,exynos-ppmu";
-> >  			reg = <0x12240000 0x2000>;
-> > 
-> 
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+On Mon, Feb 26, 2018 at 4:58 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 26 February 2018 at 11:35, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>> On Mon, Feb 26, 2018 at 11:59 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>>>> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
+>>>> <ard.biesheuvel@linaro.org> wrote:
 
-Thanks for reviews!
+>>>> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
+>>>> above and you are almost done.
 
-Applied both.
+>>> I don't think this is better.
+>>
+>> It's a pattern over ACPI vs. clk cases at least for now.
+>> But hold on. We have already an example of dealing with ACPI /
+>> non-ACPI cases for I2C controllers ? i2c-designware-platdrv.c.
+>> Check how it's done there.
+>>
+>> I actually totally forgot about ACPI slaves described in the table. We
+>> need to take into account the ones with lowest bus speed.
+>>
+>
+> Wow, that code is absolutely terrible.
 
-Best regards,
-Krzysztof
+To some degree I may say yes it is.
+
+> So even while _DSD device properties require vendor prefixes, which
+> are lacking in this case,
+
+What kind? clock-frequency? Does it require prefix?
+
+> and the fact that the ACPI flavor of the
+> Designware I2C controller now provides two different ways to get the
+> timing parameters (using device properties or using SSCN/FMCN/etc ACPI
+> methods), you think this is a shining example of how this should be
+> implemented?
+
+No, those methods because of windows driver and existed ACPI tables at
+that time.
+You are not supposed to uglify your case.
+
+> Also, I still think implementing a clock device using rate X just to
+> interrogate it for its rate (returning X) is absolutely pointless.
+
+OTOH the deviation in the driver is what I absolutely against of.
+Driver must not know the resource provider (ideally at all).
+
+> So what I can do is invent an ACPI method that returns the PCLK rate.
+> Would that work for you?
+
+Again, looking into existing examples (UART, I2C, etc) we better to
+create a generic helper in clock framework that would provide us a
+clock based on property value.
+But doing different paths for different resource providers is not what
+we are looking for.
+
+P.S. To move this somehow forward I may propose to submit an OF
+driver, and discuss ACPI part after.
+
+-- 
+With Best Regards,
+Andy Shevchenko
