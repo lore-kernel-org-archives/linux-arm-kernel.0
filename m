@@ -1,80 +1,54 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 26 Feb 2018 19:05:59 +0200
-Subject: [PATCH v2 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <CAKv+Gu-y3GG+McAK2b8SCmMf60fo_XSHFBAWsKGw3OBvD04ggg@mail.gmail.com>
-References: <20180222191647.4727-1-ard.biesheuvel@linaro.org>
- <20180222191647.4727-3-ard.biesheuvel@linaro.org>
- <CAHp75Vc1AGzdgTB281XVo=FmZerkU1vijLih3JUO=_wNPjxgfA@mail.gmail.com>
- <CAKv+Gu9XkmSPHZf+jVKOm-SX1GCWJUc7y3zTCuaHBwk8O3OC3Q@mail.gmail.com>
- <CAHp75VfFKDkQQ9-vdjzDfE2Cdk2Cb93+kdceYQgEqt3hti=Wkg@mail.gmail.com>
- <CAKv+Gu__HiajW5fWvRnDft3+ef+gOowijxEd8wrF4U5Vu=3o0Q@mail.gmail.com>
- <CAHp75VcjUey4K1xOkjKjn_ppPKC0bktcBK2p9NjcPYG1ed7X0g@mail.gmail.com>
- <CAKv+Gu-y3GG+McAK2b8SCmMf60fo_XSHFBAWsKGw3OBvD04ggg@mail.gmail.com>
-Message-ID: <CAHp75Vco1wUR7cUu-zuaP-TVMnm+m7X+CctnRC0cgvpuo5S2vg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 26 Feb 2018 17:10:59 +0000
+Subject: [PATCH v6 03/20] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <CAOFm3uE8q63h-zk3FGnZkDqvxjJj=d0mfuUtK+nyioKosmt=dw@mail.gmail.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-4-git-send-email-sudeep.holla@arm.com>
+ <CAOFm3uE8q63h-zk3FGnZkDqvxjJj=d0mfuUtK+nyioKosmt=dw@mail.gmail.com>
+Message-ID: <9c173e91-cb4e-fcc4-7671-b16c0a672401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 4:58 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 26 February 2018 at 11:35, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->> On Mon, Feb 26, 2018 at 11:59 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 23 February 2018 at 13:12, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->>>> On Fri, Feb 23, 2018 at 2:40 PM, Ard Biesheuvel
->>>> <ard.biesheuvel@linaro.org> wrote:
+Hi Philippe,
 
->>>> Replace 'baudclk' with 'pclk' and p->uartclk with i2c->clkrate in
->>>> above and you are almost done.
+On 26/02/18 15:57, Philippe Ombredanne wrote:
+> Sudeep,
 
->>> I don't think this is better.
->>
->> It's a pattern over ACPI vs. clk cases at least for now.
->> But hold on. We have already an example of dealing with ACPI /
->> non-ACPI cases for I2C controllers ? i2c-designware-platdrv.c.
->> Check how it's done there.
->>
->> I actually totally forgot about ACPI slaves described in the table. We
->> need to take into account the ones with lowest bus speed.
->>
->
-> Wow, that code is absolutely terrible.
+[...]
 
-To some degree I may say yes it is.
+>> --- /dev/null
+>> +++ b/drivers/firmware/arm_scmi/common.h
+>> @@ -0,0 +1,77 @@
+>> +/*
+>> + * System Control and Management Interface (SCMI) Message Protocol
+>> + * driver common header file containing some definitions, structures
+>> + * and function prototypes used in all the different SCMI protocols.
+>> + *
+>> + * Copyright (C) 2017 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along
+>> + * with this program. If not, see <http://www.gnu.org/licenses/>.
+>> + */
+> 
+> Would you consider using the SPDX tags [1] instead of this legalese?
+> Thanks!
+> 
 
-> So even while _DSD device properties require vendor prefixes, which
-> are lacking in this case,
-
-What kind? clock-frequency? Does it require prefix?
-
-> and the fact that the ACPI flavor of the
-> Designware I2C controller now provides two different ways to get the
-> timing parameters (using device properties or using SSCN/FMCN/etc ACPI
-> methods), you think this is a shining example of how this should be
-> implemented?
-
-No, those methods because of windows driver and existed ACPI tables at
-that time.
-You are not supposed to uglify your case.
-
-> Also, I still think implementing a clock device using rate X just to
-> interrogate it for its rate (returning X) is absolutely pointless.
-
-OTOH the deviation in the driver is what I absolutely against of.
-Driver must not know the resource provider (ideally at all).
-
-> So what I can do is invent an ACPI method that returns the PCLK rate.
-> Would that work for you?
-
-Again, looking into existing examples (UART, I2C, etc) we better to
-create a generic helper in clock framework that would provide us a
-clock based on property value.
-But doing different paths for different resource providers is not what
-we are looking for.
-
-P.S. To move this somehow forward I may propose to submit an OF
-driver, and discuss ACPI part after.
+Sure, I have fixed locally [1] for now, will post if there are any other
+changes before PR.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Regards,
+Sudeep
+
+[1] https://git.kernel.org/sudeep.holla/linux/h/for-list/new_arm_scmi
