@@ -1,108 +1,81 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 26 Feb 2018 08:49:10 +0100
-Subject: [PATCH] cpufreq: scpi: invoke frequency-invariance setter function
-In-Reply-To: <CAJZ5v0hB+Uk8SNVqUH3fr1y0SXbY1Rd26b84P-8PPV8FiPbnWw@mail.gmail.com>
-References: <20180220111057.14756-1-dietmar.eggemann@arm.com>
- <CAJZ5v0hB+Uk8SNVqUH3fr1y0SXbY1Rd26b84P-8PPV8FiPbnWw@mail.gmail.com>
-Message-ID: <23dba70b-aa83-4a21-a33d-733bec215264@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 26 Feb 2018 08:07:06 +0000
+Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180226070957.GU3217@dragon>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-2-l.stach@pengutronix.de>
+ <AM3PR04MB306E1344C6242887F4797AC80C20@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20180226031700.GS3217@dragon>
+ <AM3PR04MB3063F807F42E76CD515A17480C10@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20180226070957.GU3217@dragon>
+Message-ID: <AM3PR04MB306C310C7B438099E0D35CA80C10@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2018 11:27 PM, Rafael J. Wysocki wrote:
-> On Tue, Feb 20, 2018 at 12:10 PM, Dietmar Eggemann
-> <dietmar.eggemann@arm.com> wrote:
-
-[...]
-
->> Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
->> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
->> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, February 26, 2018 3:10 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org;
+> Baruch Siach <baruch@tkos.co.il>; Catalin Marinas
+> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
+> patchwork-lst at pengutronix.de; Rob Herring <robh+dt@kernel.org>; dl-
+> linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; linux-arm-kernel at lists.infradead.org; Lucas
+> Stach <l.stach@pengutronix.de>
+> Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
 > 
-> This is really minor, but I would reorder this slightly.
-
-Tried to figure out what would be the better order. Not sure since I saw
-different examples. Can you tell what would be the best tag order?
-
-[...]
-
->> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
->> index c32a833e1b00..3101d4e9c2de 100644
->> --- a/drivers/cpufreq/scpi-cpufreq.c
->> +++ b/drivers/cpufreq/scpi-cpufreq.c
->> @@ -51,13 +51,19 @@ static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
->>   static int
->>   scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->>   {
->> +       unsigned long freq = policy->freq_table[index].frequency;
->>          struct scpi_data *priv = policy->driver_data;
->> -       u64 rate = policy->freq_table[index].frequency * 1000;
->> +       u64 rate = freq * 1000;
->>          int ret;
->>
->>          ret = clk_set_rate(priv->clk, rate);
->> -       if (!ret && (clk_get_rate(priv->clk) != rate))
->> -               ret = -EIO;
->> +       if (!ret) {
+> On Mon, Feb 26, 2018 at 06:52:15AM +0000, A.s. Dong wrote:
+> > Hi Shawn,
+> >
+> > > -----Original Message-----
+> > > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > > Sent: Monday, February 26, 2018 11:17 AM
+> > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > > Cc: Lucas Stach <l.stach@pengutronix.de>; Mark Rutland
+> > > <mark.rutland@arm.com>; devicetree at vger.kernel.org; Baruch Siach
+> > > <baruch@tkos.co.il>; Catalin Marinas <catalin.marinas@arm.com>; Will
+> > > Deacon <will.deacon@arm.com>; patchwork-lst at pengutronix.de; Rob
+> > > Herring <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>;
+> > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> linux-
+> > > arm-kernel at lists.infradead.org
+> > > Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+> > >
+> > > On Sun, Feb 25, 2018 at 10:47:11AM +0000, A.s. Dong wrote:
+> > > > >  Documentation/devicetree/bindings/arm/fsl.txt  |   4 +
+> > > > >  arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623
+> > > > > +++++++++++++++++++++++++
+> > > >
+> > > > Should this belongs to pinctrl part?
+> > >
+> > > No.  Those pinfunc defines are used by device tree rather than pinctrl
+> driver.
+> > >
+> >
+> > I had this question because we have below info in the patch
+> > "dt-bindings: add binding for i.MX8MQ IOMUXC":
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
+> > b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
+> > new file mode 100644
+> > index 0000000..5c5d2d8
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx8mq-pinctrl.txt
+> > @@ -0,0 +1,39 @@
+> > ...
+> > +       Refer to imx8mq-pinfunc.h in device tree source folder for all available
+> > +       imx8mq PIN_FUNC_ID.
 > 
-> I would do:
+> This is just a cross reference in document, and should be okay on different
+> tree during development cycle.  If we have the pinfunc header go via pinctrl
+> tree, we will have a more serious dependency between DT and pinctrl tree.
 > 
-> if (ret)
->          return ret;
-> 
-> arch_set_freq_scale(policy->related_cpus, freq, policy->cpuinfo.max_freq);
-> 
-> if (clk_get_rate(priv->clk) != rate)
->          return -EIO;
-> 
-> return 0;
-> 
-> That's somewhat easier to follow for me.
 
-Yes I can change this.
+Okay, understand now.
 
-> 
->> +               if (clk_get_rate(priv->clk) != rate)
->> +                       ret = -EIO;
->> +
->> +               arch_set_freq_scale(policy->related_cpus, freq,
->> +                                   policy->cpuinfo.max_freq);
->> +       }
->>
->>          return ret;
->>   }
->> --
-> 
-> I also am not sure why you want to call arch_set_freq_scale() even if
-> the new clock rate didn't stick.
+Regards
+Dong Aisheng
 
-Right, this is much better.
-
- static int
- scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
- {
-+       unsigned long freq = policy->freq_table[index].frequency;
-        struct scpi_data *priv = policy->driver_data;
--       u64 rate = policy->freq_table[index].frequency * 1000;
-+       u64 rate = freq * 1000;
-        int ret;
- 
-        ret = clk_set_rate(priv->clk, rate);
--       if (!ret && (clk_get_rate(priv->clk) != rate))
--               ret = -EIO;
- 
--       return ret;
-+       if (ret)
-+               return ret;
-+
-+       if (clk_get_rate(priv->clk) != rate)
-+               return -EIO;
-+
-+       arch_set_freq_scale(policy->related_cpus, freq,
-+                           policy->cpuinfo.max_freq);
-+
-+       return 0;
-
-Will send out a v2 as soon as I know the preferred tag order.
+> Shawn
