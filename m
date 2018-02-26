@@ -1,156 +1,65 @@
-From: prudo@linux.vnet.ibm.com (Philipp Rudo)
-Date: Mon, 26 Feb 2018 12:17:18 +0100
-Subject: [PATCH v8 03/13] kexec_file, x86, powerpc: factor out
- kexec_file_ops functions
-In-Reply-To: <20180222111732.23051-4-takahiro.akashi@linaro.org>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-4-takahiro.akashi@linaro.org>
-Message-ID: <20180226121718.3432bbd6@ThinkPad>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 Feb 2018 11:17:28 +0000
+Subject: Applied "ASoC: pxa: remove duplicated bit-wise or of
+ SNDRV_PCM_FMTBIT_S24_LE" to the asoc tree
+In-Reply-To: <20180223143738.29600-1-colin.king@canonical.com>
+Message-ID: <E1eqGme-0005UW-4n@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI
+The patch
 
-On Thu, 22 Feb 2018 20:17:22 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+   ASoC: pxa: remove duplicated bit-wise or of SNDRV_PCM_FMTBIT_S24_LE
 
-[...]
+has been applied to the asoc tree at
 
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 990adae52151..a6d14a768b3e 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -26,34 +26,83 @@
->  #include <linux/vmalloc.h>
->  #include "kexec_internal.h"
-> 
-> +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
-> +
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Having a weak definition of kexec_file_loaders causes trouble on s390 with 
-gcc 4.8 (newer versions seem to work fine). For me it looks like that in this
-version gcc doesn't recognize __weak but use the default value for
-optimization. This leads to _kexec_kernel_image_probe to always return ENOEXEC
-because the for-loop gets optimized out.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-The problem can easily be worked around by declaring kexec_file_loaders in
-include/linux/kexec.h and defining it in arch code. In particular doing this
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index 37e9dce518aa..fc0788540d90 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -139,6 +139,8 @@ struct kexec_file_ops {
- #endif
- };
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 8b597ff47053c9f53384a3a26dcc4c4316a375e5 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Fri, 23 Feb 2018 14:37:38 +0000
+Subject: [PATCH] ASoC: pxa: remove duplicated bit-wise or of
+ SNDRV_PCM_FMTBIT_S24_LE
+
+Bit pattern SNDRV_PCM_FMTBIT_S24_LE is being bit-wise or'd twice; remove
+the redundant 2nd SNDRV_PCM_FMTBIT_S24_LE
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/pxa/mmp-sspa.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
+index 64b85e30c1f8..7c998ea4ebee 100644
+--- a/sound/soc/pxa/mmp-sspa.c
++++ b/sound/soc/pxa/mmp-sspa.c
+@@ -377,7 +377,6 @@ static int mmp_sspa_probe(struct snd_soc_dai *dai)
+ #define MMP_SSPA_FORMATS (SNDRV_PCM_FMTBIT_S8 | \
+ 		SNDRV_PCM_FMTBIT_S16_LE | \
+ 		SNDRV_PCM_FMTBIT_S24_LE | \
+-		SNDRV_PCM_FMTBIT_S24_LE | \
+ 		SNDRV_PCM_FMTBIT_S32_LE)
  
-+extern const struct kexec_file_ops * const kexec_file_loaders[];
-+
- /**
-  * struct kexec_buf - parameters for finding a place for a buffer in memory
-  * @image:	kexec image in which memory to search.
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 17ba407d0e79..4e3d1e4bc7f6 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -31,8 +31,6 @@
- #include <linux/vmalloc.h>
- #include "kexec_internal.h"
- 
--const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
--
- #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
- static int kexec_calculate_store_digests(struct kimage *image);
- #else
-
-A nice side effect of this solution is, that a developer who forgets to define
-kexec_file_loaders gets a linker error. So he directly knows what's missing
-instead of first having to find out where/why an error gets returned.
-
-Otherwise the series is fine for me.
-
-Thanks
-Philipp
-
->  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
->  static int kexec_calculate_store_digests(struct kimage *image);
->  #else
->  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
->  #endif
-> 
-> +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
-> +			     unsigned long buf_len)
-> +{
-> +	const struct kexec_file_ops * const *fops;
-> +	int ret = -ENOEXEC;
-> +
-> +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
-> +		ret = (*fops)->probe(buf, buf_len);
-> +		if (!ret) {
-> +			image->fops = *fops;
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  /* Architectures can provide this probe function */
->  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
->  					 unsigned long buf_len)
->  {
-> -	return -ENOEXEC;
-> +	return _kexec_kernel_image_probe(image, buf, buf_len);
-> +}
-> +
-> +void *_kexec_kernel_image_load(struct kimage *image)
-> +{
-> +	if (!image->fops || !image->fops->load)
-> +		return ERR_PTR(-ENOEXEC);
-> +
-> +	return image->fops->load(image, image->kernel_buf,
-> +				 image->kernel_buf_len, image->initrd_buf,
-> +				 image->initrd_buf_len, image->cmdline_buf,
-> +				 image->cmdline_buf_len);
->  }
-> 
->  void * __weak arch_kexec_kernel_image_load(struct kimage *image)
->  {
-> -	return ERR_PTR(-ENOEXEC);
-> +	return _kexec_kernel_image_load(image);
-> +}
-> +
-> +int _kimage_file_post_load_cleanup(struct kimage *image)
-> +{
-> +	if (!image->fops || !image->fops->cleanup)
-> +		return 0;
-> +
-> +	return image->fops->cleanup(image->image_loader_data);
->  }
-> 
->  int __weak arch_kimage_file_post_load_cleanup(struct kimage *image)
->  {
-> -	return -EINVAL;
-> +	return _kimage_file_post_load_cleanup(image);
->  }
-> 
->  #ifdef CONFIG_KEXEC_VERIFY_SIG
-> +int _kexec_kernel_verify_sig(struct kimage *image, void *buf,
-> +			    unsigned long buf_len)
-> +{
-> +	if (!image->fops || !image->fops->verify_sig) {
-> +		pr_debug("kernel loader does not support signature verification.\n");
-> +		return -EKEYREJECTED;
-> +	}
-> +
-> +	return image->fops->verify_sig(buf, buf_len);
-> +}
-> +
->  int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
->  					unsigned long buf_len)
->  {
-> -	return -EKEYREJECTED;
-> +	return _kexec_kernel_verify_sig(image, buf, buf_len);
->  }
->  #endif
-> 
+ static const struct snd_soc_dai_ops mmp_sspa_dai_ops = {
+-- 
+2.16.1
