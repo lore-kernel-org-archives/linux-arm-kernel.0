@@ -1,36 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Feb 2018 15:04:56 +0000
-Subject: [RFC PATCH v2 08/12] arm64: cmpxchg: Include build_bug.h instead of
- bug.h for BUILD_BUG
+Date: Mon, 26 Feb 2018 15:05:00 +0000
+Subject: [RFC PATCH v2 12/12] arm64: bitops: Include
+ <asm-generic/bitops/ext2-atomic-setbit.h>
 In-Reply-To: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
 References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1519657500-15094-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1519657500-15094-13-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having asm/cmpxchg.h pull in linux/bug.h is problematic because this
-ends up pulling in the atomic bitops which themselves may be built on
-top of atomic.h and cmpxchg.h.
-
-Instead, just include build_bug.h for the definition of BUILD_BUG.
+asm-generic/bitops/ext2-atomic-setbit.h provides the ext2 atomic bitop
+definitions, so we don't need to define our own.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cmpxchg.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/bitops.h | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index ae852add053d..bc9e07bc6428 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -18,7 +18,7 @@
- #ifndef __ASM_CMPXCHG_H
- #define __ASM_CMPXCHG_H
+diff --git a/arch/arm64/include/asm/bitops.h b/arch/arm64/include/asm/bitops.h
+index 13501460be6b..10d536b1af74 100644
+--- a/arch/arm64/include/asm/bitops.h
++++ b/arch/arm64/include/asm/bitops.h
+@@ -38,11 +38,6 @@
+ #include <asm-generic/bitops/lock.h>
+ #include <asm-generic/bitops/non-atomic.h>
+ #include <asm-generic/bitops/le.h>
+-
+-/*
+- * Ext2 is defined to use little-endian byte ordering.
+- */
+-#define ext2_set_bit_atomic(lock, nr, p)	test_and_set_bit_le(nr, p)
+-#define ext2_clear_bit_atomic(lock, nr, p)	test_and_clear_bit_le(nr, p)
++#include <asm-generic/bitops/ext2-atomic-setbit.h>
  
--#include <linux/bug.h>
-+#include <linux/build_bug.h>
- 
- #include <asm/atomic.h>
- #include <asm/barrier.h>
+ #endif /* __ASM_BITOPS_H */
 -- 
 2.1.4
