@@ -1,55 +1,23 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Mon, 26 Feb 2018 18:57:20 +0800
-Subject: =?UTF-8?Q?Re:_=e7=ad=94=e5=a4=8d:_[RFC_patch]_ioremap:_don't_set_up?=
- =?UTF-8?Q?_huge_I/O_mappings_when_p4d/pud/pmd_is_zero?=
-In-Reply-To: <20180221115758.GA7614@arm.com>
-References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
- <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
- <1519175992.16384.121.camel@hpe.com> <etPan.5a8d2180.1dbfd272.49b8@localhost>
- <20180221115758.GA7614@arm.com>
-Message-ID: <32c9b1c3-086b-ba54-f9e9-aefa50066730@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Feb 2018 12:02:07 +0100
+Subject: [PATCH] arm64: defconfig: enable R8A77965 SoC
+In-Reply-To: <SN4PR0601MB3709B0D878715B944580EFCCC4CC0@SN4PR0601MB3709.namprd06.prod.outlook.com>
+ <e10b7083-5148-0463-9ca9-1eb08483265e@mentor.com>
+Message-ID: <20180226110207.k67jq2y7hxsmyfh4@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/2/21 19:57, Will Deacon wrote:
-> [sorry, trying to deal with top-posting here]
+On Fri, Feb 23, 2018 at 05:27:30PM +0200, Vladimir Zapolskiy wrote:
+> Hi Simon,
 > 
-> On Wed, Feb 21, 2018 at 07:36:34AM +0000, Wangxuefeng (E) wrote:
->>      The old flow of reuse the 4k page as 2M page does not follow the BBM flow
->> for page table reconstruction?not only the memory leak problems.  If BBM flow
->> is not followed?the speculative prefetch of tlb will made false tlb entries
->> cached in MMU, the false address will be got? panic will happen.
+> On 02/23/2018 10:51 AM, Simon Horman wrote:
+> > Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 defconfig.
 > 
-> If I understand Toshi's suggestion correctly, he's saying that the PMD can
-> be cleared when unmapping the last PTE (like try_to_free_pte_page). In this
-> case, there's no issue with the TLB because this is exactly BBM -- the PMD
-> is cleared and TLB invalidation is issued before the PTE table is freed. A
-> subsequent 2M map request will see an empty PMD and put down a block
-> mapping.
-> 
-> The downside is that freeing becomes more expensive as the last level table
-> becomes more sparsely populated and you need to ensure you don't have any
-> concurrent maps going on for the same table when you're unmapping. I also
-> can't see a neat way to fit this into the current vunmap code. Perhaps we
-> need an iounmap_page_range.
-> 
-> In the meantime, the code in lib/ioremap.c looks totally broken so I think
-> we should deselect CONFIG_HAVE_ARCH_HUGE_VMAP on arm64 until it's fixed.
+> If I'm not mistaken in my tardy note, then M3-W is R8A7796 and R8A77965 is M3-N, no?
 
-Simply do something below at now (before the broken code is fixed)?
+On Fri, Feb 23, 2018 at 03:29:08PM +0000, Yao Lihua wrote:
+> On Friday, February 23, 2018 04:51 PM, Simon Horman wrote:
+> > Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 defconfig.
+> R8A77965 should be M3-N?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b2b95f7..a86148c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -84,7 +84,6 @@ config ARM64
-        select HAVE_ALIGNED_STRUCT_PAGE if SLUB
-        select HAVE_ARCH_AUDITSYSCALL
-        select HAVE_ARCH_BITREVERSE
--   select HAVE_ARCH_HUGE_VMAP
-        select HAVE_ARCH_JUMP_LABEL
-        select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-        select HAVE_ARCH_KGDB
-
-Thanks
-Hanjun
+Thanks, I have fixed this up to read M3-N.
