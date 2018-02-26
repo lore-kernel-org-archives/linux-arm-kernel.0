@@ -1,52 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 26 Feb 2018 09:22:13 +0000
-Subject: [RFC PATCH] irqchip/gic-v3-its: apply ACPI device based quirks
-In-Reply-To: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-References: <20180213141118.3092-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8pGzrgQk2nGMeOXL_d2bPx_BOZVBZ6PvHkR8EcbVDNRA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 26 Feb 2018 10:26:45 +0100
+Subject: [PATCH v3 6/7] arm64: allwinner: h6: add the basical Allwinner
+ H6 DTSI file
+In-Reply-To: <81D53DC5-7622-430E-A530-ED0DE5397DC3@aosc.io>
+References: <20180223123555.64009-6-icenowy@aosc.io>
+ <20180223123555.64009-7-icenowy@aosc.io>
+ <20180223152038.2bflylwa6vj4gzfj@flea.lan>
+ <81D53DC5-7622-430E-A530-ED0DE5397DC3@aosc.io>
+Message-ID: <20180226092645.xghkmfowenzlbm42@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 February 2018 at 14:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Reapply the SynQuacer quirk for ITS frames that are matched by 'SCX0005'
-> based ACPI devices, replacing the dummy fwnode with the one populated by
-> the ACPI device core.
->
-> This allows the SynQuacer ACPI tables to publish a device node such
-> as
->
->     Device (ITS0) {
->       Name (_HID, "SCX0005")
->       Name (_ADR, 0x30020000)
->       Name (_DSD, Package ()  // _DSD: Device-Specific Data
->       {
->         ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->         Package () {
->           Package (2) {
->             "socionext,synquacer-pre-its",
->             Package () { 0x58000000, 0x200000 }
->           },
->         }
->       })
->     }
->
-> which will trigger the existing quirk that replaces the doorbell
-> address with the appropriate address in the pre-ITS frame.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Marc, Lorenzo,
->
-> I am aware that this patch may be seen as controversial, but I would like to
-> propose it nonetheless. The reason is that this is the only thing standing in
-> the way of full ACPI support in Socionext SynQuacer based platforms.
->
-> The pre-ITS is a monstrosity, but as it turns out, Socionext had help from
-> ARM designing it, and the reason we need DT/ACPI based quirks in the first
-> place is that the IIDR of this GICv3 implementation is simply the ARM Ltd.
-> one (as they designed the IP)
->
-> Please take this into consideration when reviewing this patch,
->
+On Fri, Feb 23, 2018 at 11:22:06PM +0800, Icenowy Zheng wrote:
+> >> +	psci {
+> >> +		compatible = "arm,psci-0.2";
+> >> +		method = "smc";
+> >> +	};
+> >
+> >Is it needed? The bootloader should fill it with whatever version it
+> >has, shouldn't it?
+> 
+> But we now use ATF rather than U-Boot PSCI. U-Boot will not fill ATF
+> info.
+> 
+> See A64/H5 device trees.
 
-Ping?
+So if the PSCI version implemented in ATF ever changes, we would have
+to update all the DT everywhere, but only if you're running the new
+version?
+
+Sigh.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180226/433a414e/attachment.sig>
