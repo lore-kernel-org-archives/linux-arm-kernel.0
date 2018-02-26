@@ -1,55 +1,62 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:04 +0800
-Subject: [PATCH 30/52] arm64: KVM: Increment PC after handling an SMC trap
-In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-31-git-send-email-alex.shi@linaro.org>
+From: regressions@leemhuis.info (Thorsten Leemhuis)
+Date: Mon, 26 Feb 2018 10:47:45 +0100
+Subject: regression v4.16 on Nokia N900:/dev/input/event6 aka AV Jack
+ support disappeared
+In-Reply-To: <20180224214617.GA22619@amd>
+References: <20180224214617.GA22619@amd>
+Message-ID: <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+JFYI: This issues is tracked in the regression reports for Linux 4.16
+(http://bit.ly/lnxregrep416 ) with this id:
 
-commit f5115e8869e1 upstream.
+Linux-Regression-ID: lr#4b650f
 
-When handling an SMC trap, the "preferred return address" is set
-to that of the SMC, and not the next PC (which is a departure from
-the behaviour of an SMC that isn't trapped).
+Please include this line in the comment section of patches that are
+supposed to fix the issue. Please also mention the string once in other
+mailinglist threads or different bug tracking entries if you or someone
+else start to discuss the issue there. By including that string you make
+it a whole lot easier to track where an issue gets discussed and how far
+patches to fix it have made it. For more details on this please see
+here: http://bit.ly/lnxregtrackid
 
-Increment PC in the handler, as the guest is otherwise forever
-stuck...
+Thx for your help. Ciao, Thorsten
 
-Cc: stable at vger.kernel.org
-Fixes: acfb3b883f6d ("arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls")
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kvm/handle_exit.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 2e6e9e9..5b56b09 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -53,7 +53,16 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
-+	/*
-+	 * "If an SMC instruction executed at Non-secure EL1 is
-+	 * trapped to EL2 because HCR_EL2.TSC is 1, the exception is a
-+	 * Trap exception, not a Secure Monitor Call exception [...]"
-+	 *
-+	 * We need to advance the PC after the trap, as it would
-+	 * otherwise return to the same address...
-+	 */
- 	vcpu_set_reg(vcpu, 0, ~0UL);
-+	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
- 	return 1;
- }
- 
--- 
-2.7.4
+On 24.02.2018 22:46, Pavel Machek wrote:
+> Hi!
+> 
+> In v4.16, AV jack support disappeared.
+> 
+> This one is suspect:
+> 
+> commit 7be4b5dc7ffa9499ac6ef33a5ffa9ff43f9b7057
+> Author: Andrew F. Davis <afd@ti.com>
+> Date:   Wed Nov 29 11:13:59 2017 -0600
+> 
+>     ARM: dts: omap3-n900: Fix the audio CODEC's reset pin
+> 
+>     The correct DT property for specifying a GPIO used for reset
+>         is "reset-gpios", fix this here.
+> 
+>     Fixes: 14e3e295b2b9 ("ARM: dts: omap3-n900: Add TLV320AIC3X
+>     support")
+> 
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> How was it tested? It reverts polarity of reset pin, but
+> sound/soc/codecs/tlv320aic3x.c treats those as aliases:
+> 
+>  ret = of_get_named_gpio(np, "reset-gpios", 0);
+>  if (ret >= 0) {
+>     aic3x->gpio_reset = ret;
+>  } else {
+>  ret = of_get_named_gpio(np, "gpio-reset", 0);
+>  if (ret > 0) {
+>     dev_warn(&i2c->dev, "Using deprecated property \"gpio-r\eset\", please update your DT");
+>     aic3x->gpio_reset = ret;
+> 
+> 
+> 									Pavel
+> 
