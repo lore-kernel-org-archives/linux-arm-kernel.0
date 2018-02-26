@@ -1,65 +1,78 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Mon, 26 Feb 2018 12:18:20 +0000
-Subject: [PATCH 2/2] arm: rzn1: Add basic support for RZN1D-DB Board
-In-Reply-To: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1519647518-15579-3-git-send-email-michel.pollet@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 Feb 2018 13:43:14 +0100
+Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
+ 'select MFD_SYSCON'
+In-Reply-To: <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
+References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+ <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
+Message-ID: <CAK8P3a3zMG4wV9SWg78NGmk=BU9yq5paxZvJ=coHCWxVgNhO2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only enables the uart0 for now, and also relies on the bootloader
-for setting up the clocks and pinctrl.
+On Mon, Feb 26, 2018 at 12:53 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2018-02-26 17:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
+>>> used with care - it forces a lower limit of another symbol, ignoring
+>>> the dependency.
+>>>
+>>> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
+>>> select it.
+>>>
+>>> This causes unmet dependencies for architecture without HAS_IOMEM.
+>>>
+>>>   $ make ARCH=score randconfig
+>>>   scripts/kconfig/conf  --randconfig Kconfig
+>>>   KCONFIG_SEED=0x27C47F43
+>>>   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
+>>>   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+>>>
+>>> Use 'depends on' to observe the dependency.
+>>>
+>>> This commit was created by the following command:
+>>>
+>>>   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
+>>>     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
+>>>
+>>> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
+>>>
+>>> Also, make MFD_SYSCON 'default y' because some defconfig files may
+>>> rely on someone select's MFD_SYSCON.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> ---
+>>>
+>>> If you have a better idea to fix 'unmet dependencies',
+>>> please suggest.
+>>
+>> Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
+>> of defconfig configurations, I'd rather not do that.
+>
+>
+> Could you explain why?
+>
+> I set 'default y' for MFD_SYSCON.
+>
+> Would it still break defconfig configurations?
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
----
- Documentation/devicetree/bindings/arm/shmobile.txt |  2 ++
- arch/arm/boot/dts/rzn1d400-db.dts                  | 25 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
- create mode 100644 arch/arm/boot/dts/rzn1d400-db.dts
+No, you are right, that would not break defconfigs, it would just mean one
+useless driver being enabled for many configurations that don't need it.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 153f69bb..498871b 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -105,6 +105,8 @@ Boards:
-     compatible = "renesas,porter", "renesas,r8a7791"
-   - RSKRZA1 (YR0K77210C000BE)
-     compatible = "renesas,rskrza1", "renesas,r7s72100"
-+  - RZN1D-DB (RZ/N1D Demo Board)
-+    compatible = "renesas,rzn1d-db", "renesas,r9a06g032"
-   - Salvator-X (RTP0RC7795SIPB0010S)
-     compatible = "renesas,salvator-x", "renesas,r8a7795"
-   - Salvator-X (RTP0RC7796SIPB0011S)
-diff --git a/arch/arm/boot/dts/rzn1d400-db.dts b/arch/arm/boot/dts/rzn1d400-db.dts
-new file mode 100644
-index 0000000..1b686f0
---- /dev/null
-+++ b/arch/arm/boot/dts/rzn1d400-db.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Device Tree Source for the RZN1D-DB Board
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Europe Limited
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+/dts-v1/;
-+
-+#include "rzn1.dtsi"
-+
-+/ {
-+	model = "RZN1D-DB Board";
-+	compatible = "renesas,rzn1d-db", "renesas,r9a06g032";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+		stdout-path = &uart0;
-+		linux,stdout-path = &uart0;
-+	};
-+};
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.7.4
+>> Only score, tile and um have some configurations that select 'NO_IOMEM'.
+>> Score is getting removed now, tile might get removed later (we could make
+>> PCI mandatory in the meantime to avoid that configuration), and I think for
+>> um, we already have a workaround for the NO_IOMEM dependencies
+>> (I forget the details).
+>
+> I do not think this is a stable solution.
+>
+> Or, do you mean to remove NO_IOMEM and HAS_IOMEM completely?
+
+We could either leave it for arch/um only and have that deal with the
+issues (which I think we already have), or we could remove the options
+entirely.
+
+      Arnd
