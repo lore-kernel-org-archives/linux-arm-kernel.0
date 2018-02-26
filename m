@@ -1,153 +1,118 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:09 +0800
-Subject: [PATCH 35/52] arm/arm64: KVM: Advertise SMCCC v1.1
+Date: Mon, 26 Feb 2018 16:20:14 +0800
+Subject: [PATCH 40/52] firmware/psci: Expose PSCI conduit
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-36-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-41-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 09e6be12effd upstream.
+commit 09a8d6d48499 upstream.
 
-The new SMC Calling Convention (v1.1) allows for a reduced overhead
-when calling into the firmware, and provides a new feature discovery
-mechanism.
+In order to call into the firmware to apply workarounds, it is
+useful to find out whether we're using HVC or SMC. Let's expose
+this through the psci_ops.
 
-Make it visible to KVM guests.
-
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
-
-Conflicts:
-	mv change from virt/kvm/arm/psci.c to arch/arm/kvm/psci.c
 ---
- arch/arm/kvm/handle_exit.c   |  2 +-
- arch/arm/kvm/psci.c          | 24 +++++++++++++++++++++++-
- arch/arm64/kvm/handle_exit.c |  2 +-
- include/kvm/arm_psci.h       |  2 +-
- include/linux/arm-smccc.h    | 13 +++++++++++++
- 5 files changed, 39 insertions(+), 4 deletions(-)
+ drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+ include/linux/psci.h    |  7 +++++++
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 0a2b758..de1aedc 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -36,7 +36,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		      kvm_vcpu_hvc_get_imm(vcpu));
- 	vcpu->stat.hvc_exit_stat++;
- 
--	ret = kvm_psci_call(vcpu);
-+	ret = kvm_hvc_call_handler(vcpu);
- 	if (ret < 0) {
- 		vcpu_set_reg(vcpu, 0, ~0UL);
- 		return 1;
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 097632c..7b44253 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/arm-smccc.h>
- #include <linux/preempt.h>
- #include <linux/kvm_host.h>
- #include <linux/wait.h>
-@@ -338,6 +339,7 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
- 		case PSCI_0_2_FN_SYSTEM_OFF:
- 		case PSCI_0_2_FN_SYSTEM_RESET:
- 		case PSCI_1_0_FN_PSCI_FEATURES:
-+		case ARM_SMCCC_VERSION_FUNC_ID:
- 			val = 0;
- 			break;
- 		default:
-@@ -392,7 +394,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-  * Errors:
-  * -EINVAL: Unrecognized PSCI function
-  */
--int kvm_psci_call(struct kvm_vcpu *vcpu)
-+static int kvm_psci_call(struct kvm_vcpu *vcpu)
- {
- 	switch (kvm_psci_version(vcpu)) {
- 	case KVM_ARM_PSCI_1_0:
-@@ -405,3 +407,23 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	};
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 9a3ce76..a49196a 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+ 	return cpu == resident_cpu;
  }
-+
-+int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ 
+-struct psci_operations psci_ops;
++struct psci_operations psci_ops = {
++	.conduit = PSCI_CONDUIT_NONE,
++};
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+@@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+ 			      0, 0, 0);
+ }
+ 
++static void set_conduit(enum psci_conduit conduit)
 +{
-+	u32 func_id = smccc_get_function(vcpu);
-+	u32 val = PSCI_RET_NOT_SUPPORTED;
-+
-+	switch (func_id) {
-+	case ARM_SMCCC_VERSION_FUNC_ID:
-+		val = ARM_SMCCC_VERSION_1_1;
++	switch (conduit) {
++	case PSCI_CONDUIT_HVC:
++		invoke_psci_fn = __invoke_psci_fn_hvc;
 +		break;
-+	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
-+		/* Nothing supported yet */
++	case PSCI_CONDUIT_SMC:
++		invoke_psci_fn = __invoke_psci_fn_smc;
 +		break;
 +	default:
-+		return kvm_psci_call(vcpu);
++		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
 +	}
 +
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
-+	return 1;
++	psci_ops.conduit = conduit;
 +}
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 0231ebc..d4047fc 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -43,7 +43,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			    kvm_vcpu_hvc_get_imm(vcpu));
- 	vcpu->stat.hvc_exit_stat++;
- 
--	ret = kvm_psci_call(vcpu);
-+	ret = kvm_hvc_call_handler(vcpu);
- 	if (ret < 0) {
- 		vcpu_set_reg(vcpu, 0, ~0UL);
- 		return 1;
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index 3236043..ed1dd80 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -27,6 +27,6 @@
- #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
-+int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
- 
- #endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index 4c5bca38..dc68aa5 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -60,6 +60,19 @@
- #define ARM_SMCCC_QUIRK_NONE		0
- #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
- 
-+#define ARM_SMCCC_VERSION_1_0		0x10000
-+#define ARM_SMCCC_VERSION_1_1		0x10001
 +
-+#define ARM_SMCCC_VERSION_FUNC_ID					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 0)
-+
-+#define ARM_SMCCC_ARCH_FEATURES_FUNC_ID					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 1)
-+
- #ifndef __ASSEMBLY__
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+ 	}
  
- #include <linux/linkage.h>
+ 	if (!strcmp("hvc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	} else if (!strcmp("smc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 	} else {
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 		return -EINVAL;
+@@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+ 	pr_info("probing for conduit method from ACPI.\n");
+ 
+ 	if (acpi_psci_use_hvc())
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	else
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 
+ 	return psci_probe();
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 6306ab1..66ff547 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+ int psci_cpu_init_idle(unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
+ 
++enum psci_conduit {
++	PSCI_CONDUIT_NONE,
++	PSCI_CONDUIT_SMC,
++	PSCI_CONDUIT_HVC,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -34,6 +40,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	enum psci_conduit conduit;
+ };
+ 
+ extern struct psci_operations psci_ops;
 -- 
 2.7.4
