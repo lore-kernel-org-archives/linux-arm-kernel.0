@@ -1,131 +1,59 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 26 Feb 2018 23:54:47 +0300
-Subject: [PATCH v2 1/2] arm64: dts: renesas: r8a77970: add I2C support
+Date: Mon, 26 Feb 2018 23:55:43 +0300
+Subject: [PATCH v2 2/2] arm64: dts: renesas: eagle: add I2C0 support
 In-Reply-To: <3aaa4464-fc85-3fb4-2026-5d9df357bdff@cogentembedded.com>
 References: <3aaa4464-fc85-3fb4-2026-5d9df357bdff@cogentembedded.com>
-Message-ID: <e309d9cd-69c6-7db2-96a4-73bc788b7cfc@cogentembedded.com>
+Message-ID: <f830570f-f7e7-b277-172a-360a20de1aaf@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A77970 parts of the I2C[0-4] device node.
+Define the Eagle board dependent part of the I2C0 device node.
 
-Based on the original (and large) patch by Daisuke Matsushita
-<daisuke.matsushita.ns@hitachi.com>.
+The I2C0 bus is populated by ON Semiconductor PCA9653 I/O expander and
+Analog Devices ADV7511W HDMI transmitter (but we're only describing the
+former chip now).
+
+Based on the original (and large) patch by Vladimir Barinov.
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
 Changes in version 2:
-- made  use of  the SYSC power domain #define's;
-- moved the I2C nodes before HSCIF nodes.
+- resolved rejects (with the patch adding EtherAVB pins removed for now).
 
- arch/arm64/boot/dts/renesas/r8a77970.dtsi |   88 ++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
 ===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -19,6 +19,14 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+@@ -54,7 +54,27 @@
+ 	clock-frequency = <32768>;
+ };
  
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+		i2c4 = &i2c4;
++&i2c0 {
++	pinctrl-0 = <&i2c0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	io_expander: gpio at 20 {
++		compatible = "onnn,pca9654";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++};
++
+ &pfc {
++	i2c0_pins: i2c0 {
++		groups = "i2c0";
++		function = "i2c0";
 +	};
 +
- 	psci {
- 		compatible = "arm,psci-1.0", "arm,psci-0.2";
- 		method = "smc";
-@@ -338,6 +346,86 @@
- 			       <&ipmmu_ds1 22>, <&ipmmu_ds1 23>;
- 		};
- 
-+		i2c0: i2c at e6500000 {
-+			compatible = "renesas,i2c-r8a77970",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6500000 0 0x40>;
-+			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 931>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 931>;
-+			dmas = <&dmac1 0x91>, <&dmac1 0x90>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at e6508000 {
-+			compatible = "renesas,i2c-r8a77970",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6508000 0 0x40>;
-+			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 930>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 930>;
-+			dmas = <&dmac1 0x93>, <&dmac1 0x92>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at e6510000 {
-+			compatible = "renesas,i2c-r8a77970",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6510000 0 0x40>;
-+			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 929>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 929>;
-+			dmas = <&dmac1 0x95>, <&dmac1 0x94>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at e66d0000 {
-+			compatible = "renesas,i2c-r8a77970",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66d0000 0 0x40>;
-+			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 928>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 928>;
-+			dmas = <&dmac1 0x97>, <&dmac1 0x96>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at e66d8000 {
-+			compatible = "renesas,i2c-r8a77970",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66d8000 0 0x40>;
-+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 927>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 927>;
-+			dmas = <&dmac1 0x99>, <&dmac1 0x98>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a77970",
- 				     "renesas,rcar-gen3-hscif",
+ 	scif0_pins: scif0 {
+ 		groups = "scif0_data";
+ 		function = "scif0";
