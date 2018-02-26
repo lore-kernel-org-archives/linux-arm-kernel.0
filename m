@@ -1,45 +1,107 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Feb 2018 09:23:33 +0100
-Subject: [PATCH] arm64: defconfig: enable R8A77965 SoC
-In-Reply-To: <20180223150023.f2pf3afpcckbskme@verge.net.au>
-References: <20180223085115.13782-1-horms+renesas@verge.net.au>
- <CAMuHMdVsOzXz+pU_7bDaQgs371zozy6Za8eDDiauV8qu03ckmw@mail.gmail.com>
- <20180223150023.f2pf3afpcckbskme@verge.net.au>
-Message-ID: <CAMuHMdXg1qYsS8H1EQ+rs9r2uibtraYv9jhgrzO=mBpSx5D0vA@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 26 Feb 2018 16:20:15 +0800
+Subject: [PATCH 41/52] firmware/psci: Expose SMCCC version through psci_ops
+In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-42-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-On Fri, Feb 23, 2018 at 4:00 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Feb 23, 2018 at 10:19:45AM +0100, Geert Uytterhoeven wrote:
->> On Fri, Feb 23, 2018 at 9:51 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Enable the Renesas R-Car M3-W (R8A77965) SoC in the ARM64 defconfig.
->> >
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> I have applied this to the topic/renesas-defconfig branch which is included
-> in the devel branch and tags of the Renesas tree as a convenience to
-> developers.  The branch is not, however, included in the next branch or
-> tags nor is it targeted at upstream.
+commit e78eef554a91 upstream.
 
-Looks like it accidentally ended up in your next branch.
+Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
+let's do that at boot time, and expose the version of the calling
+convention as part of the psci_ops structure.
 
-Merge report from sfr:
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ drivers/firmware/psci.c | 27 +++++++++++++++++++++++++++
+ include/linux/psci.h    |  6 ++++++
+ 2 files changed, 33 insertions(+)
 
-Merging renesas/next (60d04a4b6d41 Merge branch
-'topic/renesas-defconfig' into next)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index a49196a..79a48c3 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
+ 
+ struct psci_operations psci_ops = {
+ 	.conduit = PSCI_CONDUIT_NONE,
++	.smccc_version = SMCCC_VERSION_1_0,
+ };
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+@@ -511,6 +512,31 @@ static void __init psci_init_migrate(void)
+ 	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+ }
+ 
++static void __init psci_init_smccc(void)
++{
++	u32 ver = ARM_SMCCC_VERSION_1_0;
++	int feature;
++
++	feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
++
++	if (feature != PSCI_RET_NOT_SUPPORTED) {
++		u32 ret;
++		ret = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
++		if (ret == ARM_SMCCC_VERSION_1_1) {
++			psci_ops.smccc_version = SMCCC_VERSION_1_1;
++			ver = ret;
++		}
++	}
++
++	/*
++	 * Conveniently, the SMCCC and PSCI versions are encoded the
++	 * same way. No, this isn't accidental.
++	 */
++	pr_info("SMC Calling Convention v%d.%d\n",
++		PSCI_VERSION_MAJOR(ver), PSCI_VERSION_MINOR(ver));
++
++}
++
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+@@ -559,6 +585,7 @@ static int __init psci_probe(void)
+ 	psci_init_migrate();
+ 
+ 	if (PSCI_VERSION_MAJOR(ver) >= 1) {
++		psci_init_smccc();
+ 		psci_init_cpu_suspend();
+ 		psci_init_system_suspend();
+ 	}
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 66ff547..347077c 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -31,6 +31,11 @@ enum psci_conduit {
+ 	PSCI_CONDUIT_HVC,
+ };
+ 
++enum smccc_version {
++	SMCCC_VERSION_1_0,
++	SMCCC_VERSION_1_1,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -41,6 +46,7 @@ struct psci_operations {
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
+ 	enum psci_conduit conduit;
++	enum smccc_version smccc_version;
+ };
+ 
+ extern struct psci_operations psci_ops;
+-- 
+2.7.4
