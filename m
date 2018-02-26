@@ -1,22 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Feb 2018 13:25:15 -0800
-Subject: [PATCH] ARM: omap2: set CONFIG_LIRC=y in defconfig
-In-Reply-To: <20180226204105.2858838-1-arnd@arndb.de>
-References: <20180226204105.2858838-1-arnd@arndb.de>
-Message-ID: <20180226212344.GA16043@atomide.com>
+Date: Mon, 26 Feb 2018 13:26:50 -0800
+Subject: [PATCH v5 0/4] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume
+ support
+In-Reply-To: <a56830af-cf81-3603-ba58-2a2c65c49f34@oracle.com>
+References: <20180223154357.23504-1-d-gerlach@ti.com>
+ <a56830af-cf81-3603-ba58-2a2c65c49f34@oracle.com>
+Message-ID: <20180226212650.GB16043@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [180226 20:42]:
-> The CONFIG_LIRC symbol has changed from 'tristate' to 'bool, so we now
-> get a warning for omap2plus_defconfig:
-> 
-> arch/arm/configs/omap2plus_defconfig:322:warning: symbol value 'm' invalid for LIRC
-> 
-> This changes the file to mark the symbol as built-in to get rid of the
-> warning.
-> 
-> Fixes: a60d64b15c20 ("media: lirc: lirc interface should not be a raw decoder")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+* Santosh Shilimkar <santosh.shilimkar@oracle.com> [180225 23:36]:
+> > Dave Gerlach (4):
+> >    ARM: OMAP2+: Introduce low-level suspend code for AM33XX
+> >    ARM: OMAP2+: Introduce low-level suspend code for AM43XX
+> >    ARM: OMAP2+: pm33xx-core: Add platform code needed for PM
+> >    soc: ti: Add pm33xx driver for basic suspend support
+> > 
+> Are you going to pickup this series ?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Yes planning to apply it today or tomorrow.
+
+Regards,
+
+Tony
