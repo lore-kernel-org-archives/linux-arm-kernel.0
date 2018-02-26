@@ -1,10 +1,10 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:20:21 +0800
-Subject: [PATCH 47/52] arm: Invalidate BTB on prefetch abort outside of user
- mapping on Cortex A8, A9, A12 and A17
+Date: Mon, 26 Feb 2018 16:20:22 +0800
+Subject: [PATCH 48/52] arm: KVM: Invalidate BTB on guest exit for
+ Cortex-A12/A17
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-48-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-49-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,181 +12,170 @@ From: Marc Zyngier <marc.zyngier@arm.com>
 
 ** Not yet queued for inclusion in mainline **
 
-In order to prevent aliasing attacks on the branch predictor,
-invalidate the BTB on CPUs that are known to be affected when taking
-a prefetch abort on a address that is outside of a user task limit.
+In order to avoid aliasing attacks against the branch predictor,
+let's invalidate the BTB on guest exit. This is made complicated
+by the fact that we cannot take a branch before invalidating the
+BTB.
+
+We only apply this to A12 and A17, which are the only two ARM
+cores on which this useful.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm/include/asm/cp15.h |  2 ++
- arch/arm/mm/fault.c         | 25 ++++++++++++++++
- arch/arm/mm/fsr-2level.c    |  4 +--
- arch/arm/mm/fsr-3level.c    | 69 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 98 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index dbdbce1..0672ddc 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -64,6 +64,8 @@
- #define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
- #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+Conflicts:
+	no hvc stub in hyp_hvc in arch/arm/kvm/hyp/hyp-entry.S
+---
+ arch/arm/include/asm/kvm_asm.h |  2 --
+ arch/arm/include/asm/kvm_mmu.h | 18 ++++++++++-
+ arch/arm/kvm/hyp/hyp-entry.S   | 71 ++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 86 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 8ef0538..24f3ec7 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -61,8 +61,6 @@ struct kvm_vcpu;
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
  
-+#define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
-+
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+-extern char __kvm_hyp_vector[];
+-
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index d10e362..2887129 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -37,6 +37,7 @@
  
- static inline unsigned long get_cr(void)
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index f7861dc..17fd0c7 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -20,6 +20,7 @@
  #include <linux/highmem.h>
- #include <linux/perf_event.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/stage2_pgtable.h>
  
-+#include <asm/cp15.h>
- #include <asm/exception.h>
- #include <asm/pgtable.h>
- #include <asm/system_misc.h>
-@@ -395,12 +396,36 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	__do_kernel_fault(mm, addr, fsr, regs);
- 	return 0;
- }
-+
-+static int __maybe_unused
-+do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-+{
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	if (addr > TASK_SIZE) {
-+		switch (read_cpuid_part()) {
-+		case ARM_CPU_PART_CORTEX_A8:
-+		case ARM_CPU_PART_CORTEX_A9:
-+		case ARM_CPU_PART_CORTEX_A12:
-+		case ARM_CPU_PART_CORTEX_A17:
-+			write_sysreg(0, BPIALL);
-+			break;
-+		}
-+	}
-+#endif
-+	return do_page_fault(addr, fsr, regs);
-+}
- #else					/* CONFIG_MMU */
- static int
- do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+@@ -225,7 +226,22 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 
+ static inline void *kvm_get_hyp_vector(void)
  {
- 	return 0;
- }
+-	return kvm_ksym_ref(__kvm_hyp_vector);
++	switch(read_cpuid_part()) {
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A17:
++	{
++		extern char __kvm_hyp_vector_bp_inv[];
++		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
++	}
 +
-+static int
-+do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-+{
-+	return 0;
-+}
- #endif					/* CONFIG_MMU */
++#endif
++	default:
++	{
++		extern char __kvm_hyp_vector[];
++		return kvm_ksym_ref(__kvm_hyp_vector);
++	}
++	}
+ }
  
- /*
-diff --git a/arch/arm/mm/fsr-2level.c b/arch/arm/mm/fsr-2level.c
-index 18ca74c..4cede9b 100644
---- a/arch/arm/mm/fsr-2level.c
-+++ b/arch/arm/mm/fsr-2level.c
-@@ -50,7 +50,7 @@ static struct fsr_info ifsr_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"unknown 4"			   },
- 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
- 	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page access flag fault"	   },
--	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
- 	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
- 	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 10"			   },
-@@ -58,7 +58,7 @@ static struct fsr_info ifsr_info[] = {
- 	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
- 	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
- 	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
--	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
-diff --git a/arch/arm/mm/fsr-3level.c b/arch/arm/mm/fsr-3level.c
-index ab4409a..2745f7f 100644
---- a/arch/arm/mm/fsr-3level.c
-+++ b/arch/arm/mm/fsr-3level.c
-@@ -65,4 +65,73 @@ static struct fsr_info fsr_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
- };
+ static inline int kvm_map_vectors(void)
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 96beb53..b6b8cb1 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -71,6 +71,66 @@ __kvm_hyp_vector:
+ 	W(b)	hyp_irq
+ 	W(b)	hyp_fiq
  
 +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+static struct fsr_info ifsr_info[] = {
-+	{ do_bad,		SIGBUS,  0,		"unknown 0"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 1"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 2"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 3"			},
-+	{ do_bad,		SIGBUS,  0,		"reserved translation fault"	},
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
-+	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
-+	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
-+	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
-+	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
-+	{ do_pabt_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-+	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
-+	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-+	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
-+	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-+	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-+	{ do_bad,		SIGBUS,  0,		"debug event"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
-+	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
-+	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
-+};
-+#else
- #define ifsr_info	fsr_info
++	.align 5
++__kvm_hyp_vector_bp_inv:
++	.global __kvm_hyp_vector_bp_inv
++
++	/*
++	 * We encode the exception entry in the bottom 3 bits of
++	 * SP, and we have to guarantee to be 8 bytes aligned.
++	 */
++	W(add)	sp, sp, #1	/* Reset 	  7 */
++	W(add)	sp, sp, #1	/* Undef	  6 */
++	W(add)	sp, sp, #1	/* Syscall	  5 */
++	W(add)	sp, sp, #1	/* Prefetch abort 4 */
++	W(add)	sp, sp, #1	/* Data abort	  3 */
++	W(add)	sp, sp, #1	/* HVC		  2 */
++	W(add)	sp, sp, #1	/* IRQ		  1 */
++	W(nop)			/* FIQ		  0 */
++
++	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
++	isb
++
++#ifdef CONFIG_THUMB2_KERNEL
++	/*
++	 * Yet another silly hack: Use VPIDR as a temp register.
++	 * Thumb2 is really a pain, as SP cannot be used with most
++	 * of the bitwise instructions. The vect_br macro ensures
++	 * things gets cleaned-up.
++	 */
++	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
++	mov	r0, sp
++	and	r0, r0, #7
++	sub	sp, sp, r0
++	push	{r1, r2}
++	mov	r1, r0
++	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
++	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
++	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
 +#endif
++
++.macro vect_br val, targ
++ARM(	eor	sp, sp, #\val	)
++ARM(	tst	sp, #7		)
++ARM(	eorne	sp, sp, #\val	)
++
++THUMB(	cmp	r1, #\val	)
++THUMB(	popeq	{r1, r2}	)
++
++	beq	\targ
++.endm
++
++	vect_br	0, hyp_fiq
++	vect_br	1, hyp_irq
++	vect_br	2, hyp_hvc
++	vect_br	3, hyp_dabt
++	vect_br	4, hyp_pabt
++	vect_br	5, hyp_svc
++	vect_br	6, hyp_undef
++	vect_br	7, hyp_reset
++#endif
++
+ .macro invalid_vector label, cause
+ 	.align
+ \label:	mov	r0, #\cause
+@@ -131,7 +191,14 @@ hyp_hvc:
+ 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+ 	beq	1f
+ 
+-	push	{lr}
++	/*
++	 * Pushing r2 here is just a way of keeping the stack aligned to
++	 * 8 bytes on any path that can trigger a HYP exception. Here,
++	 * we may well be about to jump into the guest, and the guest
++	 * exit would otherwise be badly decoded by our fancy
++	 * "decode-exception-without-a-branch" code...
++	 */
++	push    {r2, lr}
+ 
+ 	mov	lr, r0
+ 	mov	r0, r1
+@@ -141,7 +208,7 @@ hyp_hvc:
+ THUMB(	orr	lr, #1)
+ 	blx	lr			@ Call the HYP function
+ 
+-	pop	{lr}
++	pop	{r2, lr}
+ 1:	eret
+ 
+ guest_trap:
 -- 
 2.7.4
