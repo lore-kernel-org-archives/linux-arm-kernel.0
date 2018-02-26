@@ -1,56 +1,68 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 26 Feb 2018 16:19:51 +0800
-Subject: [PATCH 17/52] drivers/firmware: Expose psci_get_version through
- psci_ops structure
+Date: Mon, 26 Feb 2018 16:19:52 +0800
+Subject: [PATCH 18/52] arm64: cpufeature: __this_cpu_has_cap() shouldn't stop
+ early
 In-Reply-To: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
 References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519633227-29832-18-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519633227-29832-19-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: James Morse <james.morse@arm.com>
 
-commit d68e3ba5303f upstream.
+commit edf298cfce47 upstream.
+Alex Shi rewrite this commit on func this_cpu_has_cap(). The following commit
+log is still meaningful.
 
-Entry into recent versions of ARM Trusted Firmware will invalidate the CPU
-branch predictor state in order to protect against aliasing attacks.
+    this_cpu_has_cap() tests caps->desc not caps->matches, so it stops
+    walking the list when it finds a 'silent' feature, instead of
+    walking to the end of the list.
 
-This patch exposes the PSCI "VERSION" function via psci_ops, so that it
-can be invoked outside of the PSCI driver where necessary.
+    Prior to v4.6's 644c2ae198412 ("arm64: cpufeature: Test 'matches' pointer
+    to find the end of the list") we always tested desc to find the end of
+    a capability list. This was changed for dubious things like PAN_NOT_UAO.
+    v4.7's e3661b128e53e ("arm64: Allow a capability to be checked on
+    single CPU") added this_cpu_has_cap() using the old desc style test.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+    CC: Suzuki K Poulose <suzuki.poulose@arm.com>
+    Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+    Signed-off-by: James Morse <james.morse@arm.com>
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- drivers/firmware/psci.c | 2 ++
- include/linux/psci.h    | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm64/include/asm/futex.h | 1 +
+ arch/arm64/kernel/cpufeature.c | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 8263429..9a3ce76 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -496,6 +496,8 @@ static void __init psci_init_migrate(void)
- static void __init psci_0_2_set_functions(void)
- {
- 	pr_info("Using standard PSCI v0.2 function IDs\n");
-+	psci_ops.get_version = psci_get_version;
-+
- 	psci_function_id[PSCI_FN_CPU_SUSPEND] =
- 					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
- 	psci_ops.cpu_suspend = psci_cpu_suspend;
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index bdea1cb..6306ab1 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -26,6 +26,7 @@ int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index 1943cf6..718140a 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -20,6 +20,7 @@
  
- struct psci_operations {
-+	u32 (*get_version)(void);
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
- 	int (*cpu_off)(u32 state);
- 	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+ #include <linux/futex.h>
+ #include <linux/uaccess.h>
++#include <linux/compiler.h>
+ 
+ #include <asm/errno.h>
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 3a129d4..fcb67e0 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1063,8 +1063,8 @@ bool this_cpu_has_cap(unsigned int cap)
+ 	if (WARN_ON(preemptible()))
+ 		return false;
+ 
+-	for (caps = arm64_features; caps->desc; caps++)
+-		if (caps->capability == cap && caps->matches)
++	for (caps = arm64_features; caps->matches; caps++)
++		if (caps->capability == cap)
+ 			return caps->matches(caps, SCOPE_LOCAL_CPU);
+ 
+ 	return false;
 -- 
 2.7.4
