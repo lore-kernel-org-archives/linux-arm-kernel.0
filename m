@@ -1,41 +1,73 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 26 Feb 2018 18:01:37 +0100
-Subject: [PATCH v4] arch: arm: mach-stm32: Fix copyright
-In-Reply-To: <20171130084950.23873-1-benjamin.gaignard@st.com>
-References: <20171130084950.23873-1-benjamin.gaignard@st.com>
-Message-ID: <29bf34f5-9b63-9184-b219-879155f7f78f@st.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 26 Feb 2018 18:04:42 +0100
+Subject: [PATCH 1/2] ARM: dts: exynos: Fix address of PPMU ACP on
+ Exynos4210
+In-Reply-To: <5A8F608E.4030509@samsung.com>
+References: <CGME20180222191146epcas2p1e0fc10e3f8b278f0c3671d32e2d76350@epcas2p1.samsung.com>
+ <20180222191111.23747-1-krzk@kernel.org>
+ <5A8F608E.4030509@samsung.com>
+Message-ID: <20180226170442.opmhse4wm3iqoshz@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
-
-On 11/30/2017 09:49 AM, Benjamin Gaignard wrote:
-> Uniformize STMicroelectronics copyrights header
-> Add SPDX identifier
+On Fri, Feb 23, 2018 at 09:30:06AM +0900, Chanwoo Choi wrote:
+> On 2018? 02? 23? 04:11, Krzysztof Kozlowski wrote:
+> > Typo in unit address of PPMU ACP caused DTC warnings:
+> > 
+> >     arch/arm/boot/dts/exynos4412-odroidu3.dtb:
+> >         Warning (simple_bus_reg): Node /soc/ppmu_acp at 10ae0000 simple-bus unit address format error, expected "106e0000"
+> > 
+> > PPMU ACP (under 0x10ae0000 address) is present only in Exynos4210 so
+> > move this node to exynos4210.dtsi with fixing the reg address to proper
+> > one.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > ---
+> >  arch/arm/boot/dts/exynos4.dtsi    | 6 ------
+> >  arch/arm/boot/dts/exynos4210.dtsi | 6 ++++++
+> >  2 files changed, 6 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> > index 967cd02401c5..909a9f2bf5be 100644
+> > --- a/arch/arm/boot/dts/exynos4.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4.dtsi
+> > @@ -821,12 +821,6 @@
+> >  			status = "disabled";
+> >  		};
+> >  
+> > -		ppmu_acp: ppmu_acp at 10ae0000 {
+> > -			compatible = "samsung,exynos-ppmu";
+> > -			reg = <0x106e0000 0x2000>;
+> > -			status = "disabled";
+> > -		};
+> > -
+> >  		ppmu_rightbus: ppmu_rightbus at 112a0000 {
+> >  			compatible = "samsung,exynos-ppmu";
+> >  			reg = <0x112a0000 0x2000>;
+> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> > index 853604d91158..88fb47cef9a8 100644
+> > --- a/arch/arm/boot/dts/exynos4210.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> > @@ -162,6 +162,12 @@
+> >  			iommus = <&sysmmu_g2d>;
+> >  		};
+> >  
+> > +		ppmu_acp: ppmu_acp at 10ae0000 {
+> > +			compatible = "samsung,exynos-ppmu";
+> > +			reg = <0x10ae0000 0x2000>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >  		ppmu_lcd1: ppmu_lcd1 at 12240000 {
+> >  			compatible = "samsung,exynos-ppmu";
+> >  			reg = <0x12240000 0x2000>;
+> > 
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> CC: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->   arch/arm/mach-stm32/board-dt.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-> index e918686e4191..548a19f97129 100644
-> --- a/arch/arm/mach-stm32/board-dt.c
-> +++ b/arch/arm/mach-stm32/board-dt.c
-> @@ -1,7 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
->   /*
->    * Copyright (C) Maxime Coquelin 2015
-> + * Copyright (C) STMicroelectronics 2017
->    * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> - * License terms:  GNU General Public License (GPL), version 2
->    */
->   
->   #include <linux/kernel.h>
-> 
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Applied on stm32-next.
+Thanks for reviews!
 
-Regards
-Alex
+Applied both.
+
+Best regards,
+Krzysztof
