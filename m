@@ -1,23 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 27 Feb 2018 14:55:18 +0000
-Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
-In-Reply-To: <1454e833-e3b9-780b-c5db-a6f73e799352@redhat.com>
-References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
- <CAKv+Gu9FVD18v6WA8MMG5LFX9GPObq_79hFuYv6j+S98a5Ej6w@mail.gmail.com>
- <1454e833-e3b9-780b-c5db-a6f73e799352@redhat.com>
-Message-ID: <b0f9d2d3-9029-1581-9330-807fab3b2d44@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 27 Feb 2018 15:58:47 +0100
+Subject: [PATCH v8 14/15] cpufreq: Add module to register cpufreq on Krait
+ CPUs
+In-Reply-To: <1519740422-3835-15-git-send-email-sricharan@codeaurora.org>
+ (Sricharan R.'s message of "Tue, 27 Feb 2018 19:37:01 +0530")
+References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+ <1519740422-3835-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <87zi3ujx7c.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/18 14:28, Jonathan Toppins wrote:
->> 'only intended to be booted via ACPI' is a property of the system, not
->> of the OS. If you need this functionality for development, you can
->> append 'acpi=on' to the kernel command line via kconfig.
-> 
-> This is not for development this is for production rate shipping firmware.
+Hi Sricharan,
+ 
+ On mar., f?vr. 27 2018, Sricharan R <sricharan@codeaurora.org> wrote:
 
-Obvious question: if this is "production" firmware on systems which "do 
-not support DT", what the hell is a non-trivial DT doing in there in the 
-first place?
+> From: Stephen Boyd <sboyd@codeaurora.org>
+>
+> Register a cpufreq-generic device whenever we detect that a
+> "qcom,krait" compatible CPU is present in DT.
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> [Sricharan: updated to use dev_pm_opp_set_prop_name and
+> 	    nvmem apis]
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |  10 ++
+>  drivers/cpufreq/Makefile             |   3 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c |   5 +
+>  drivers/cpufreq/qcom-cpufreq.c       | 183 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 201 insertions(+)
+>  create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+>
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 3a88e33..826f9e7 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -133,6 +133,16 @@ config ARM_OMAP2PLUS_CPUFREQ
+>  	depends on ARCH_OMAP2PLUS
+>  	default ARCH_OMAP2PLUS
+>  
+> +config ARM_QCOM_CPUFREQ
+> +	bool "CPUfreq driver for the QCOM SoCs with KRAIT processors"
+> +	depends on ARCH_QCOM
+> +	select PM_OPP
+> +	help
+> +	  This enables the CPUFreq driver for Qualcomm SoCs with
+> +	  KRAIT processors.
+> +
+> +	  If in doubt, say N.
+> +
+>  config ARM_S3C_CPUFREQ
+>  	bool
+>  	help
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index c60c1e1..21894f6 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -65,6 +65,9 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
+>  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+>  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+>  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+> +obj-$(CONFIG_ARM_QCOM_CPUFREQ)		+= qcom-cpufreq.o
 
-Robin.
+These 2 following lines don't seem related to the commit log:
+> +obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
+> +obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
+
+Gregory
+
+>  obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+>  obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
+>  obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
