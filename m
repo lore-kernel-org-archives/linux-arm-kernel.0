@@ -1,72 +1,130 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 27 Feb 2018 13:57:34 +0000
-Subject: [PATCH v2 4/4] iommu/arm-smmu-v3: Support 52-bit virtual address
-In-Reply-To: <20180226180508.GE26147@arm.com>
-References: <cover.1512038236.git.robin.murphy@arm.com>
- <15d196d9a8e160c5df0e0340e23a432482389f9f.1512038236.git.robin.murphy@arm.com>
- <20180226180508.GE26147@arm.com>
-Message-ID: <7275370d-747d-5be9-3cfd-70809b07c2ce@arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 27 Feb 2018 19:36:48 +0530
+Subject: [PATCH v8 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1519740422-3835-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/18 18:05, Will Deacon wrote:
-> On Thu, Dec 14, 2017 at 04:58:53PM +0000, Robin Murphy wrote:
->> Stage 1 input addresses are effectively 64-bit in SMMUv3 anyway, so
->> really all that's involved is letting io-pgtable know the appropriate
->> upper bound for T0SZ.
->>
->> Tested-by: Nate Watterson <nwatters@codeaurora.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: No change
->>
->>   drivers/iommu/arm-smmu-v3.c | 8 ++++++++
->>   1 file changed, 8 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index c9c4e6132e27..7059a0805bd1 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -102,6 +102,7 @@
->>   #define IDR5_OAS_44_BIT			(4 << IDR5_OAS_SHIFT)
->>   #define IDR5_OAS_48_BIT			(5 << IDR5_OAS_SHIFT)
->>   #define IDR5_OAS_52_BIT			(6 << IDR5_OAS_SHIFT)
->> +#define IDR5_VAX			(1 << 10)
-> 
-> I think this is actually a two-bit field, so we should check the whole
-> thing.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Yes, I either overlooked that or took a cheeky shortcut; will fix.
+Krait CPUs have a handful of L2 cache controller registers that
+live behind a cp15 based indirection register. First you program
+the indirection register (l2cpselr) to point the L2 'window'
+register (l2cpdr) at what you want to read/write.  Then you
+read/write the 'window' register to do what you want. The
+l2cpselr register is not banked per-cpu so we must lock around
+accesses to it to prevent other CPUs from re-pointing l2cpdr
+underneath us.
 
->>   
->>   #define ARM_SMMU_CR0			0x20
->>   #define CR0_CMDQEN			(1 << 3)
->> @@ -604,6 +605,7 @@ struct arm_smmu_device {
->>   #define ARM_SMMU_FEAT_STALLS		(1 << 11)
->>   #define ARM_SMMU_FEAT_HYP		(1 << 12)
->>   #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
->> +#define ARM_SMMU_FEAT_VAX		(1 << 14)
->>   	u32				features;
->>   
->>   #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
->> @@ -1656,6 +1658,8 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
->>   	switch (smmu_domain->stage) {
->>   	case ARM_SMMU_DOMAIN_S1:
->>   		ias = VA_BITS;
->> +		if (VA_BITS > 48 && !(smmu->features & ARM_SMMU_FEAT_VAX))
-> 
-> nit, but I'd rather the if condition was checking ias instead of VA_BITS.
-> 
->> +			ias = 48;
->>   		oas = smmu->ias;
-> 
-> Should we also be sanitising the oas here if the SMMU doesn't support 64k
-> pages? It looks like the ias/oas sanitisation isn't cleanly split between
-> the pgtable code and the SMMU driver.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/common/Kconfig                   |  3 ++
+ arch/arm/common/Makefile                  |  1 +
+ arch/arm/common/krait-l2-accessors.c      | 48 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/krait-l2-accessors.h | 10 +++++++
+ 4 files changed, 62 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
 
-Right, based on my previous argument it would be cleaner to set 48/52 
-here based on the SMMU features, then constrain to VA_BITS in 
-io-pgtable; I think I was more focused on minimising the diff initially.
-
-Robin.
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index e5ad070..c8e1986 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -7,6 +7,9 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
+ 
++config KRAIT_L2_ACCESSORS
++	bool
++
+ config SHARP_LOCOMO
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b4a14..eec6cd1 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -7,6 +7,7 @@ obj-y				+= firmware.o
+ 
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
++obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+new file mode 100644
+index 0000000..9a97dda
+--- /dev/null
++++ b/arch/arm/common/krait-l2-accessors.c
+@@ -0,0 +1,48 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include <linux/spinlock.h>
++#include <linux/export.h>
++
++#include <asm/barrier.h>
++#include <asm/krait-l2-accessors.h>
++
++static DEFINE_RAW_SPINLOCK(krait_l2_lock);
++
++void krait_set_l2_indirect_reg(u32 addr, u32 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then write to the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
++	isb();
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++}
++EXPORT_SYMBOL(krait_set_l2_indirect_reg);
++
++u32 krait_get_l2_indirect_reg(u32 addr)
++{
++	u32 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then read from the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(krait_get_l2_indirect_reg);
+diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+new file mode 100644
+index 0000000..dd7c474
+--- /dev/null
++++ b/arch/arm/include/asm/krait-l2-accessors.h
+@@ -0,0 +1,10 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
++#define __ASMARM_KRAIT_L2_ACCESSORS_H
++
++extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
++extern u32 krait_get_l2_indirect_reg(u32 addr);
++
++#endif
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
