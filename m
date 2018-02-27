@@ -1,60 +1,58 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 27 Feb 2018 10:48:48 +0100
-Subject: [PATCH v2 07/11] perf vendor events: add support for arch
- standard events
-In-Reply-To: <1519401932-205051-8-git-send-email-john.garry@huawei.com>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <1519401932-205051-8-git-send-email-john.garry@huawei.com>
-Message-ID: <20180227094848.GF21033@krava>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Feb 2018 11:11:09 +0100
+Subject: [PATCH] drm: simple_kms_helper: Fix .mode_valid() documentation
+Message-ID: <20180227101109.6088-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 12:05:28AM +0800, John Garry wrote:
+This fixes up the .mode_valid() vtable entry documentation
+by copyediting the documentation from the .mode_valid()
+documentation in the drm_modeset_helper_vtables.h file.
 
-SNIP
+Fixes: 40275dc4edb4 ("drm: simple_kms_helper: Add mode_valid() callback support")
+Suggested-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/drm/drm_simple_kms_helper.h | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
 
-> +static int save_arch_std_events(void *data, char *name, char *event,
-> +				char *desc, char *long_desc, char *pmu,
-> +				char *unit, char *perpkg, char *metric_expr,
-> +				char *metric_name, char *metric_group)
-> +{
-> +	struct event_struct *es;
-> +	struct stat *sb = data;
-> +
-> +	es = malloc(sizeof(*es));
-> +	if (!es)
-> +		return -ENOMEM;
-> +	memset(es, 0, sizeof(*es));
-> +	FOR_ALL_EVENT_STRUCT_FIELDS(ADD_EVENT_FIELD);
-> +	list_add_tail(&es->list, &arch_std_events);
-> +	return 0;
-> +out_free:
-> +	FOR_ALL_EVENT_STRUCT_FIELDS(FREE_EVENT_FIELD);
-> +	free(es);
-> +	return -ENOMEM;
-> +}
-> +
->  static void print_events_table_suffix(FILE *outfp)
->  {
->  	fprintf(outfp, "{\n");
-> @@ -391,6 +469,27 @@ static char *real_event(const char *name, char *event)
->  	return event;
->  }
->  
-> +static int
-> +try_fixup(const char *fn, char *arch_std, char **event, char **desc,
-> +	  char **name, char **long_desc, char **pmu, char **filter,
-> +	  char **perpkg, char **unit, char **metric_expr, char **metric_name,
-> +	  char **metric_group)
-> +{
-> +	/* try to find matching event from arch standard values */
-> +	struct event_struct *es;
-> +
-> +	list_for_each_entry(es, &arch_std_events, list) {
-> +		if (!strcmp(arch_std, es->event+sizeof(EVENT_PREFIX))) {
-
-I spent some time figuring out how this can work when there's on '=' in EVENT_PREFIX
-is this because sizeof returns +1 size for NULL char also?
-
-thanks,
-jirka
+diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+index d9e4c3c3f009..0d700a869cc8 100644
+--- a/include/drm/drm_simple_kms_helper.h
++++ b/include/drm/drm_simple_kms_helper.h
+@@ -24,9 +24,30 @@ struct drm_simple_display_pipe_funcs {
+ 	/**
+ 	 * @mode_valid:
+ 	 *
+-	 * This function is called to filter out valid modes from the
+-	 * suggestions suggested by the bridge or display. This optional
+-	 * hook is passed in when initializing the pipeline.
++	 * This callback is used to check if a specific mode is valid in the
++	 * crtc used in this simple display pipe. This should be implemented
++	 * if the display pipe has some sort of restriction in the modes
++	 * it can display. For example, a given display pipe may be responsible
++	 * to set a clock value. If the clock can not produce all the values
++	 * for the available modes then this callback can be used to restrict
++	 * the number of modes to only the ones that can be displayed. Another
++	 * reason can be bandwidth mitigation: the memory port on the display
++	 * controller can have bandwidth limitations not allowing pixel data
++	 * to be fetched at any rate.
++	 *
++	 * This hook is used by the probe helpers to filter the mode list in
++	 * drm_helper_probe_single_connector_modes(), and it is used by the
++	 * atomic helpers to validate modes supplied by userspace in
++	 * drm_atomic_helper_check_modeset().
++	 *
++	 * This function is optional.
++	 *
++	 * NOTE:
++	 *
++	 * Since this function is both called from the check phase of an atomic
++	 * commit, and the mode validation in the probe paths it is not allowed
++	 * to look at anything else but the passed-in mode, and validate it
++	 * against configuration-invariant hardware constraints.
+ 	 *
+ 	 * RETURNS:
+ 	 *
+-- 
+2.14.3
