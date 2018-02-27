@@ -1,188 +1,50 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 27 Feb 2018 08:11:34 +0100
-Subject: [PATCH v5 6/6] drm/bridge/sii8620: use micro-USB cable detection
- logic to detect MHL
-In-Reply-To: <20180227071134.28063-1-a.hajda@samsung.com>
-References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071142eucas1p10203dac2558db034a4a3287220213601@eucas1p1.samsung.com>
-Message-ID: <20180227071134.28063-7-a.hajda@samsung.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Feb 2018 08:12:11 +0100
+Subject: [RFC PATCH] ARM: configs: sunxi: Set ondemand govenor as default
+In-Reply-To: <15992664-76be-2584-0f8d-424eadc23925@gmail.com>
+References: <20180217142235.28541-1-embed3d@gmail.com>
+ <20180219081050.vvfhnbw4foved2fb@flea.lan>
+ <15992664-76be-2584-0f8d-424eadc23925@gmail.com>
+Message-ID: <20180227071211.4c5okbwcp5qjx4ok@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maciej Purski <m.purski@samsung.com>
+On Mon, Feb 26, 2018 at 10:29:29PM +0100, Philipp Rossak wrote:
+> 
+> 
+> On 19.02.2018 09:10, Maxime Ripard wrote:
+> > On Sat, Feb 17, 2018 at 03:22:35PM +0100, Philipp Rossak wrote:
+> > > Right now the performance govenor is the default frequency govenor on
+> > > sunxi devices. This causes some general problems.
+> > > When the cpu is idle the cpu runs with its maximum frequency.
+> > > This causes a higher cpu temperature in the idle state. When the cpu is
+> > > now under load the cpu gets with that higher idle temperature now faster
+> > > to its thermal limits.
+> > > An other big problem of the performace govenor is the missing
+> > > thermal throttling. Some tests with cpuburn resulted in a system crash
+> > > when the soc reached its thermal limits since no thermal throttling
+> > > occurred.
+> > 
+> > This won't change anything with cpuburn. While cpuburn will be
+> > running, ondemand will increase the frequency of the cores to the
+> > maximum frequency, putting yourself in the exact same situation.
+>
+> I see here a totally different behavior on the hardware (Bananapi M2, A31s).
+> First ondemand increases the cpu frequency, when the maximum temperature is
+> reached, then it throttles down the cpu step by step to its minimum.
 
-Currently MHL chip must be turned on permanently to detect MHL cable. It
-duplicates micro-USB controller's (MUIC) functionality and consumes
-unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
-only if it detects MHL cable.
+This is the thermal throttling, not the cpufreq governor.
 
-Signed-off-by: Maciej Purski <m.purski@samsung.com>
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
-v5: updated extcon API
+Maxime
 
-This is rework of the patch by Maciej with following changes:
-- use micro-USB port bindings to get extcon, instead of extcon property,
-- fixed remove sequence,
-- fixed extcon get state logic.
-
-Code finding extcon node is hacky IMO, I guess ultimately it should be done
-via some framework (maybe even extcon), or at least via helper, I hope it
-can stay as is until the proper solution will be merged.
-
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
- drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 94 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
-index 9e785b8e0ea2..62b0adabcac2 100644
---- a/drivers/gpu/drm/bridge/sil-sii8620.c
-+++ b/drivers/gpu/drm/bridge/sil-sii8620.c
-@@ -17,6 +17,7 @@
- 
- #include <linux/clk.h>
- #include <linux/delay.h>
-+#include <linux/extcon.h>
- #include <linux/gpio/consumer.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
-@@ -25,6 +26,7 @@
- #include <linux/list.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
-+#include <linux/of_graph.h>
- #include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- 
-@@ -81,6 +83,10 @@ struct sii8620 {
- 	struct edid *edid;
- 	unsigned int gen2_write_burst:1;
- 	enum sii8620_mt_state mt_state;
-+	struct extcon_dev *extcon;
-+	struct notifier_block extcon_nb;
-+	struct work_struct extcon_wq;
-+	int cable_state;
- 	struct list_head mt_queue;
- 	struct {
- 		int r_size;
-@@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
- 	ctx->rc_dev = rc_dev;
- }
- 
-+static void sii8620_cable_out(struct sii8620 *ctx)
-+{
-+	disable_irq(to_i2c_client(ctx->dev)->irq);
-+	sii8620_hw_off(ctx);
-+}
-+
-+static void sii8620_extcon_work(struct work_struct *work)
-+{
-+	struct sii8620 *ctx =
-+		container_of(work, struct sii8620, extcon_wq);
-+	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
-+
-+	if (state == ctx->cable_state)
-+		return;
-+
-+	ctx->cable_state = state;
-+
-+	if (state > 0)
-+		sii8620_cable_in(ctx);
-+	else
-+		sii8620_cable_out(ctx);
-+}
-+
-+static int sii8620_extcon_notifier(struct notifier_block *self,
-+			unsigned long event, void *ptr)
-+{
-+	struct sii8620 *ctx =
-+		container_of(self, struct sii8620, extcon_nb);
-+
-+	schedule_work(&ctx->extcon_wq);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static int sii8620_extcon_init(struct sii8620 *ctx)
-+{
-+	struct extcon_dev *edev;
-+	struct device_node *musb, *muic;
-+	int ret;
-+
-+	/* get micro-USB connector node */
-+	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
-+	/* next get micro-USB Interface Controller node */
-+	muic = of_get_next_parent(musb);
-+
-+	if (!muic) {
-+		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
-+		return 0;
-+	}
-+
-+	edev = extcon_find_edev_by_node(muic);
-+	of_node_put(muic);
-+	if (IS_ERR(edev)) {
-+		if (PTR_ERR(edev) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(ctx->dev, "Invalid or missing extcon\n");
-+		return PTR_ERR(edev);
-+	}
-+
-+	ctx->extcon = edev;
-+	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
-+	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
-+	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
-+	if (ret) {
-+		dev_err(ctx->dev, "failed to register notifier for MHL\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
- {
- 	return container_of(bridge, struct sii8620, bridge);
-@@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
- 	if (ret)
- 		return ret;
- 
-+	ret = sii8620_extcon_init(ctx);
-+	if (ret < 0) {
-+		dev_err(ctx->dev, "failed to initialize EXTCON\n");
-+		return ret;
-+	}
-+
- 	i2c_set_clientdata(client, ctx);
- 
- 	ctx->bridge.funcs = &sii8620_bridge_funcs;
- 	ctx->bridge.of_node = dev->of_node;
- 	drm_bridge_add(&ctx->bridge);
- 
--	sii8620_cable_in(ctx);
-+	if (!ctx->extcon)
-+		sii8620_cable_in(ctx);
- 
- 	return 0;
- }
-@@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
- {
- 	struct sii8620 *ctx = i2c_get_clientdata(client);
- 
--	disable_irq(to_i2c_client(ctx->dev)->irq);
--	sii8620_hw_off(ctx);
-+	if (ctx->extcon) {
-+		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
-+					   &ctx->extcon_nb);
-+		flush_work(&ctx->extcon_wq);
-+		if (ctx->cable_state > 0)
-+			sii8620_cable_out(ctx);
-+	} else {
-+		sii8620_cable_out(ctx);
-+	}
- 	drm_bridge_remove(&ctx->bridge);
- 
- 	return 0;
 -- 
-2.16.2
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/1b88cb25/attachment.sig>
