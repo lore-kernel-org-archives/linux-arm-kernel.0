@@ -1,78 +1,85 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 27 Feb 2018 13:48:11 +0900
-Subject: [PATCH 4/7] x86: kexec_file: remove X86_64 dependency from
- prepare_elf64_headers()
+Date: Tue, 27 Feb 2018 13:48:13 +0900
+Subject: [PATCH 6/7] x86: kexec_file: clean up prepare_elf64_headers()
 In-Reply-To: <20180227044814.24808-1-takahiro.akashi@linaro.org>
 References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
-Message-ID: <20180227044814.24808-5-takahiro.akashi@linaro.org>
+Message-ID: <20180227044814.24808-7-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code guarded by CONFIG_X86_64 is necessary on some architectures
-which have a dedicated kernel mapping outside of linear memory mapping.
-(arm64 is among those.)
-
-In this patch, an additional argument, kernel_map, is added to enable/
-disable the code removing #ifdef.
+removing bufp variable in prepare_elf64_headers() makes the code simpler
+and more understandable.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Dave Young <dyoung@redhat.com>
 Cc: Vivek Goyal <vgoyal@redhat.com>
 Cc: Baoquan He <bhe@redhat.com>
 ---
- arch/x86/kernel/crash.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ arch/x86/kernel/crash.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
 diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
-index 2123fa0efc17..913fd8021f8a 100644
+index bfc37ad20d4a..a842fd847684 100644
 --- a/arch/x86/kernel/crash.c
 +++ b/arch/x86/kernel/crash.c
-@@ -347,7 +347,7 @@ static int prepare_elf64_ram_headers_callback(struct resource *res, void *arg)
- 	return 0;
- }
- 
--static int prepare_elf64_headers(struct crash_elf_data *ced,
-+static int prepare_elf64_headers(struct crash_elf_data *ced, int kernel_map,
- 		void **addr, unsigned long *sz)
- {
+@@ -334,7 +334,7 @@ static int prepare_elf64_headers(struct crash_mem *cmem, int kernel_map,
  	Elf64_Ehdr *ehdr;
-@@ -414,17 +414,17 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
- 	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
- 	(ehdr->e_phnum)++;
+ 	Elf64_Phdr *phdr;
+ 	unsigned long nr_cpus = num_possible_cpus(), nr_phdr, elf_sz;
+-	unsigned char *buf, *bufp;
++	unsigned char *buf;
+ 	unsigned int cpu, i;
+ 	unsigned long long notes_addr;
+ 	unsigned long mstart, mend;
+@@ -359,9 +359,8 @@ static int prepare_elf64_headers(struct crash_mem *cmem, int kernel_map,
+ 	if (!buf)
+ 		return -ENOMEM;
  
--#ifdef CONFIG_X86_64
- 	/* Prepare PT_LOAD type program header for kernel text region */
+-	bufp = buf;
+-	ehdr = (Elf64_Ehdr *)bufp;
+-	bufp += sizeof(Elf64_Ehdr);
++	ehdr = (Elf64_Ehdr *)buf;
++	phdr = (Elf64_Phdr *)(ehdr + 1);
+ 	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
+ 	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
+ 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+@@ -377,33 +376,30 @@ static int prepare_elf64_headers(struct crash_mem *cmem, int kernel_map,
+ 
+ 	/* Prepare one phdr of type PT_NOTE for each present cpu */
+ 	for_each_present_cpu(cpu) {
+-		phdr = (Elf64_Phdr *)bufp;
+-		bufp += sizeof(Elf64_Phdr);
+ 		phdr->p_type = PT_NOTE;
+ 		notes_addr = per_cpu_ptr_to_phys(per_cpu_ptr(crash_notes, cpu));
+ 		phdr->p_offset = phdr->p_paddr = notes_addr;
+ 		phdr->p_filesz = phdr->p_memsz = sizeof(note_buf_t);
+ 		(ehdr->e_phnum)++;
++		phdr++;
+ 	}
+ 
+ 	/* Prepare one PT_NOTE header for vmcoreinfo */
 -	phdr = (Elf64_Phdr *)bufp;
 -	bufp += sizeof(Elf64_Phdr);
--	phdr->p_type = PT_LOAD;
--	phdr->p_flags = PF_R|PF_W|PF_X;
--	phdr->p_vaddr = (Elf64_Addr)_text;
--	phdr->p_filesz = phdr->p_memsz = _end - _text;
--	phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
--	(ehdr->e_phnum)++;
--#endif
-+	if (kernel_map) {
-+		phdr = (Elf64_Phdr *)bufp;
-+		bufp += sizeof(Elf64_Phdr);
-+		phdr->p_type = PT_LOAD;
-+		phdr->p_flags = PF_R|PF_W|PF_X;
-+		phdr->p_vaddr = (Elf64_Addr)_text;
-+		phdr->p_filesz = phdr->p_memsz = _end - _text;
-+		phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
-+		(ehdr->e_phnum)++;
-+	}
+ 	phdr->p_type = PT_NOTE;
+ 	phdr->p_offset = phdr->p_paddr = paddr_vmcoreinfo_note();
+ 	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
+ 	(ehdr->e_phnum)++;
++	phdr++;
+ 
+ 	/* Prepare PT_LOAD type program header for kernel text region */
+ 	if (kernel_map) {
+-		phdr = (Elf64_Phdr *)bufp;
+-		bufp += sizeof(Elf64_Phdr);
+ 		phdr->p_type = PT_LOAD;
+ 		phdr->p_flags = PF_R|PF_W|PF_X;
+ 		phdr->p_vaddr = (Elf64_Addr)_text;
+ 		phdr->p_filesz = phdr->p_memsz = _end - _text;
+ 		phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
+-		(ehdr->e_phnum)++;
++		ehdr->e_phnum++;
++		phdr++;
+ 	}
  
  	/* Go through all the ranges in cmem->ranges[] and prepare phdr */
- 	for (i = 0; i < cmem->nr_ranges; i++) {
-@@ -477,7 +477,8 @@ static int prepare_elf_headers(struct kimage *image, void **addr,
- 		goto out;
- 
- 	/* By default prepare 64bit headers */
--	ret =  prepare_elf64_headers(ced, addr, sz);
-+	ret =  prepare_elf64_headers(ced,
-+				(int)IS_ENABLED(CONFIG_X86_64), addr, sz);
- 	if (ret)
- 		goto out;
- 
 -- 
 2.16.2
