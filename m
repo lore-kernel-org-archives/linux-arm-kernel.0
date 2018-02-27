@@ -1,148 +1,74 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 27 Feb 2018 14:37:47 +0100
-Subject: [PATCH] ARM: reorder mach-*/Kconfig inclusions
-Message-ID: <20180227133747.23517-1-alexandre.belloni@bootlin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Feb 2018 14:39:11 +0100
+Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
+ 'select MFD_SYSCON'
+In-Reply-To: <CAK7LNASOzMdk_ej-U_T3_m-OtseJUOs+TqUv-BqZFLvS3e0kww@mail.gmail.com>
+References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+ <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
+ <CAK8P3a3zMG4wV9SWg78NGmk=BU9yq5paxZvJ=coHCWxVgNhO2w@mail.gmail.com>
+ <CAK7LNAQBLTk7rduT2eQQKRhRiGTw-8MRhpz2ZJdEwKTx=-zY-Q@mail.gmail.com>
+ <CAK8P3a1cEcBTiH7_gcUPZtsuRaeoOYaH3H4cYxkUBQiLMTMq=A@mail.gmail.com>
+ <CAK7LNASOzMdk_ej-U_T3_m-OtseJUOs+TqUv-BqZFLvS3e0kww@mail.gmail.com>
+Message-ID: <CAK8P3a2t9a=qzSpxSQ7j5r20i_cR2G=kAZE9amT2fFypU0whzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder the mach-* inclusions so the comment about them being ordered
-alphabetically ends up being true.
+On Tue, Feb 27, 2018 at 11:22 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2018-02-27 18:03 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Tue, Feb 27, 2018 at 1:46 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>> But, we need to decide what the right solution is.
+>>
+>> I think for consistency, we should change the existing
+>> 'depends on MFD_SYSCON' to 'select MFD_SYSCON'. This
+>> matches what we do with REGMAP_MMIO.
+>>
+>> MFD_SYSCON is really a thin wrapper around REGMAP_MMIO,
+>> so I would keep using the same conventions here, even though
+>> we normally prefer to not 'select' any user-visible options.
+>>
+>> It might be possible to make MFD_SYSCON a silent symbol
+>> as well, but we'd have to make sure that all users select the symbol
+>> then.
+>>
+>>         Arnd
+>
+>
+> If we agree, I can send the following three patches.
+>
+>
+> [1] Add "depends on HAS_IOMEM"
+>     to all drivers selecting MFD_SYSCON
+>     (Unmet dependencies will be fixed by this)
+>
+> [2] For consistency, convert existing "depends on MFD_SYSCON"
+>     to "select MFD_SYSCON" + "depends on HAS_IOMEM"
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- arch/arm/Kconfig | 52 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
+Those sound good.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7e3d53575486..d868983faf20 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -709,8 +709,6 @@ config ARCH_VIRT
- # Kconfigs may be included either alphabetically (according to the
- # plat- suffix) or along side the corresponding mach-* source.
- #
--source "arch/arm/mach-mvebu/Kconfig"
--
- source "arch/arm/mach-actions/Kconfig"
- 
- source "arch/arm/mach-alpine/Kconfig"
-@@ -719,6 +717,8 @@ source "arch/arm/mach-artpec/Kconfig"
- 
- source "arch/arm/mach-asm9260/Kconfig"
- 
-+source "arch/arm/mach-aspeed/Kconfig"
-+
- source "arch/arm/mach-at91/Kconfig"
- 
- source "arch/arm/mach-axxia/Kconfig"
-@@ -739,6 +739,9 @@ source "arch/arm/mach-dove/Kconfig"
- 
- source "arch/arm/mach-ep93xx/Kconfig"
- 
-+source "arch/arm/mach-exynos/Kconfig"
-+source "arch/arm/plat-samsung/Kconfig"
-+
- source "arch/arm/mach-footbridge/Kconfig"
- 
- source "arch/arm/mach-gemini/Kconfig"
-@@ -747,31 +750,33 @@ source "arch/arm/mach-highbank/Kconfig"
- 
- source "arch/arm/mach-hisi/Kconfig"
- 
-+source "arch/arm/mach-imx/Kconfig"
-+
- source "arch/arm/mach-integrator/Kconfig"
- 
-+source "arch/arm/mach-iop13xx/Kconfig"
-+
- source "arch/arm/mach-iop32x/Kconfig"
- 
- source "arch/arm/mach-iop33x/Kconfig"
- 
--source "arch/arm/mach-iop13xx/Kconfig"
--
- source "arch/arm/mach-ixp4xx/Kconfig"
- 
- source "arch/arm/mach-keystone/Kconfig"
- 
- source "arch/arm/mach-ks8695/Kconfig"
- 
-+source "arch/arm/mach-mediatek/Kconfig"
-+
- source "arch/arm/mach-meson/Kconfig"
- 
--source "arch/arm/mach-moxart/Kconfig"
-+source "arch/arm/mach-mmp/Kconfig"
- 
--source "arch/arm/mach-aspeed/Kconfig"
-+source "arch/arm/mach-moxart/Kconfig"
- 
- source "arch/arm/mach-mv78xx0/Kconfig"
- 
--source "arch/arm/mach-imx/Kconfig"
--
--source "arch/arm/mach-mediatek/Kconfig"
-+source "arch/arm/mach-mvebu/Kconfig"
- 
- source "arch/arm/mach-mxs/Kconfig"
- 
-@@ -789,23 +794,31 @@ source "arch/arm/mach-omap2/Kconfig"
- 
- source "arch/arm/mach-orion5x/Kconfig"
- 
-+source "arch/arm/mach-oxnas/Kconfig"
-+
- source "arch/arm/mach-picoxcell/Kconfig"
- 
-+source "arch/arm/mach-prima2/Kconfig"
-+
- source "arch/arm/mach-pxa/Kconfig"
- source "arch/arm/plat-pxa/Kconfig"
- 
--source "arch/arm/mach-mmp/Kconfig"
--
--source "arch/arm/mach-oxnas/Kconfig"
--
- source "arch/arm/mach-qcom/Kconfig"
- 
- source "arch/arm/mach-realview/Kconfig"
- 
- source "arch/arm/mach-rockchip/Kconfig"
- 
-+source "arch/arm/mach-s3c24xx/Kconfig"
-+
-+source "arch/arm/mach-s3c64xx/Kconfig"
-+
-+source "arch/arm/mach-s5pv210/Kconfig"
-+
- source "arch/arm/mach-sa1100/Kconfig"
- 
-+source "arch/arm/mach-shmobile/Kconfig"
-+
- source "arch/arm/mach-socfpga/Kconfig"
- 
- source "arch/arm/mach-spear/Kconfig"
-@@ -814,21 +827,8 @@ source "arch/arm/mach-sti/Kconfig"
- 
- source "arch/arm/mach-stm32/Kconfig"
- 
--source "arch/arm/mach-s3c24xx/Kconfig"
--
--source "arch/arm/mach-s3c64xx/Kconfig"
--
--source "arch/arm/mach-s5pv210/Kconfig"
--
--source "arch/arm/mach-exynos/Kconfig"
--source "arch/arm/plat-samsung/Kconfig"
--
--source "arch/arm/mach-shmobile/Kconfig"
--
- source "arch/arm/mach-sunxi/Kconfig"
- 
--source "arch/arm/mach-prima2/Kconfig"
--
- source "arch/arm/mach-tango/Kconfig"
- 
- source "arch/arm/mach-tegra/Kconfig"
--- 
-2.16.2
+> [3] Change MFD_SYSCON to user-unconfigurable option.
+>     But, for COMPILE_TEST, allow users to enable it independently.
+>     Like follows:
+>
+>     config MFD_SYSCON
+>         bool "System Controller Register R/W Based on Regmap" if COMPILE_TEST
+>         select REGMAP_MMIO
+>         help
+>           Select this option to enable accessing system control registers
+>           via regmap.
+>
+>
+> Is this OK?
+
+I'm unsure about the third one, since we have drivers that can optionally
+use syscon, depending on the platform. With this change, any user that
+manually enabled syscon to use that with a driver that requires it on their
+platform but not on others will see a regression.
+
+If we do make MFD_SYSCON a silent option like that, we should remove
+the #else section in include/linux/mfd/syscon.h to force a build error,
+and require all drivers to 'select MFD_SYSCON' if they are able to use it.
+
+       Arnd
