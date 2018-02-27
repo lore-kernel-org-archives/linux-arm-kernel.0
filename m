@@ -1,87 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Feb 2018 10:03:50 +0100
-Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
- 'select MFD_SYSCON'
-In-Reply-To: <CAK7LNAQBLTk7rduT2eQQKRhRiGTw-8MRhpz2ZJdEwKTx=-zY-Q@mail.gmail.com>
-References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
- <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
- <CAK8P3a3zMG4wV9SWg78NGmk=BU9yq5paxZvJ=coHCWxVgNhO2w@mail.gmail.com>
- <CAK7LNAQBLTk7rduT2eQQKRhRiGTw-8MRhpz2ZJdEwKTx=-zY-Q@mail.gmail.com>
-Message-ID: <CAK8P3a1cEcBTiH7_gcUPZtsuRaeoOYaH3H4cYxkUBQiLMTMq=A@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Feb 2018 10:09:13 +0100
+Subject: [PATCH v4] rtc: ac100: Fix ac100 determine rate bug
+In-Reply-To: <20180226211901.9805-1-embed3d@gmail.com>
+References: <20180226211901.9805-1-embed3d@gmail.com>
+Message-ID: <20180227090913.3vb6yudd4nh2wlyh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 1:46 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2018-02-26 21:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->> On Mon, Feb 26, 2018 at 12:53 PM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->>> 2018-02-26 17:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->>>> On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
->>>> <yamada.masahiro@socionext.com> wrote:
->>>>> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
->>>>> used with care - it forces a lower limit of another symbol, ignoring
->>>>> the dependency.
->>>>>
->>>>> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
->>>>> select it.
->>>>>
->>>>> This causes unmet dependencies for architecture without HAS_IOMEM.
->>>>>
->>>>>   $ make ARCH=score randconfig
->>>>>   scripts/kconfig/conf  --randconfig Kconfig
->>>>>   KCONFIG_SEED=0x27C47F43
->>>>>   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
->>>>>   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
->>>>>
->>>>> Use 'depends on' to observe the dependency.
->>>>>
->>>>> This commit was created by the following command:
->>>>>
->>>>>   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
->>>>>     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
->>>>>
->>>>> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
->>>>>
->>>>> Also, make MFD_SYSCON 'default y' because some defconfig files may
->>>>> rely on someone select's MFD_SYSCON.
->>>>>
->>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>>> ---
->>>>>
->>>>> If you have a better idea to fix 'unmet dependencies',
->>>>> please suggest.
->>>>
->>>> Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
->>>> of defconfig configurations, I'd rather not do that.
->>>
->>>
->>> Could you explain why?
->>>
->>> I set 'default y' for MFD_SYSCON.
->>>
->>> Would it still break defconfig configurations?
->>
->> No, you are right, that would not break defconfigs, it would just mean one
->> useless driver being enabled for many configurations that don't need it.
->
-> If we are unhappy about this,
-> we can send per-arch patches
-> to add CONFIG_MTD_SYSCON=y to defconfigs that need it.
->
-> But, we need to decide what the right solution is.
+On Mon, Feb 26, 2018 at 10:19:01PM +0100, Philipp Rossak wrote:
+> This patch fixes a bug, that prevents the Allwinner A83T and the A80
+> from a successful boot.
+> 
+> The bug is there since v4.16-rc1 and appeared after the clk branch was
+> merged.
+> 
+> You can find the shortend trace below:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address
+> 00000000
+> pgd = (ptrval)
+> [00000000] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 49 Comm: kworker/0:1 Not tainted 4.15.0-10190-gb89e32ccd1be #2
+> Hardware name: Allwinner sun8i Family
+> Workqueue: events deferred_probe_work_func
+> PC is at clk_hw_get_rate+0x0/0x34
+> LR is at ac100_clkout_determine_rate+0x48/0x19c
+> 
+> [ ... ]
+> 
+> (clk_hw_get_rate) from (ac100_clkout_determine_rate+0x48/0x19c)
+> (ac100_clkout_determine_rate) from  (clk_core_set_rate_nolock+0x3c/0x1a0)
+> (clk_core_set_rate_nolock) from (clk_set_rate+0x30/0x88)
+> (clk_set_rate) from (of_clk_set_defaults+0x200/0x364)
+> (of_clk_set_defaults) from (platform_drv_probe+0x18/0xb0)
+> 
+> To fix that bug, we first check if the return of the
+> clk_hw_get_parent_by_index is non zero. If it is zero we skip that
+> clock parent.
+> 
+> The BUG report could be found here: https://lkml.org/lkml/2018/2/10/198
+> 
+> Fixes: 04940631b8d2 ("rtc: ac100: Add clk output support")
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 
-I think for consistency, we should change the existing
-'depends on MFD_SYSCON' to 'select MFD_SYSCON'. This
-matches what we do with REGMAP_MMIO.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-MFD_SYSCON is really a thin wrapper around REGMAP_MMIO,
-so I would keep using the same conventions here, even though
-we normally prefer to not 'select' any user-visible options.
+Thanks!
+Maxime
 
-It might be possible to make MFD_SYSCON a silent symbol
-as well, but we'd have to make sure that all users select the symbol
-then.
-
-        Arnd
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/4edf82fe/attachment.sig>
