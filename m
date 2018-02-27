@@ -1,37 +1,72 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 27 Feb 2018 13:55:31 +0000
-Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
-Message-ID: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Feb 2018 13:57:34 +0000
+Subject: [PATCH v2 4/4] iommu/arm-smmu-v3: Support 52-bit virtual address
+In-Reply-To: <20180226180508.GE26147@arm.com>
+References: <cover.1512038236.git.robin.murphy@arm.com>
+ <15d196d9a8e160c5df0e0340e23a432482389f9f.1512038236.git.robin.murphy@arm.com>
+ <20180226180508.GE26147@arm.com>
+Message-ID: <7275370d-747d-5be9-3cfd-70809b07c2ce@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the controller does not support the end-of-busy IRQ, don't use it.
-Otherwise, on older SD cards you will get lots of these messages:
-"mmc0: Got data interrupt 0x00000002 even though no data operation was in progress"
+On 26/02/18 18:05, Will Deacon wrote:
+> On Thu, Dec 14, 2017 at 04:58:53PM +0000, Robin Murphy wrote:
+>> Stage 1 input addresses are effectively 64-bit in SMMUv3 anyway, so
+>> really all that's involved is letting io-pgtable know the appropriate
+>> upper bound for T0SZ.
+>>
+>> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: No change
+>>
+>>   drivers/iommu/arm-smmu-v3.c | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index c9c4e6132e27..7059a0805bd1 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -102,6 +102,7 @@
+>>   #define IDR5_OAS_44_BIT			(4 << IDR5_OAS_SHIFT)
+>>   #define IDR5_OAS_48_BIT			(5 << IDR5_OAS_SHIFT)
+>>   #define IDR5_OAS_52_BIT			(6 << IDR5_OAS_SHIFT)
+>> +#define IDR5_VAX			(1 << 10)
+> 
+> I think this is actually a two-bit field, so we should check the whole
+> thing.
 
-This has been reported on Xilinx devices that also use the Arasan IP.
-See https://patchwork.kernel.org/patch/8062871/
+Yes, I either overlooked that or took a cheeky shortcut; will fix.
 
-This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC.
+>>   
+>>   #define ARM_SMMU_CR0			0x20
+>>   #define CR0_CMDQEN			(1 << 3)
+>> @@ -604,6 +605,7 @@ struct arm_smmu_device {
+>>   #define ARM_SMMU_FEAT_STALLS		(1 << 11)
+>>   #define ARM_SMMU_FEAT_HYP		(1 << 12)
+>>   #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
+>> +#define ARM_SMMU_FEAT_VAX		(1 << 14)
+>>   	u32				features;
+>>   
+>>   #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+>> @@ -1656,6 +1658,8 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+>>   	switch (smmu_domain->stage) {
+>>   	case ARM_SMMU_DOMAIN_S1:
+>>   		ias = VA_BITS;
+>> +		if (VA_BITS > 48 && !(smmu->features & ARM_SMMU_FEAT_VAX))
+> 
+> nit, but I'd rather the if condition was checking ias instead of VA_BITS.
+> 
+>> +			ias = 48;
+>>   		oas = smmu->ias;
+> 
+> Should we also be sanitising the oas here if the SMMU doesn't support 64k
+> pages? It looks like the ias/oas sanitisation isn't cleanly split between
+> the pgtable code and the SMMU driver.
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
----
- drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Right, based on my previous argument it would be cleaner to set 48/52 
+here based on the SMMU features, then constrain to VA_BITS in 
+io-pgtable; I think I was more focused on minimising the diff initially.
 
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index c33a5f7..ab66e32 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
- 	.ops = &sdhci_arasan_ops,
- 	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
- 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
--			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
-+			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
-+			SDHCI_QUIRK2_STOP_WITH_TC,
- };
- 
- static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
--- 
-2.7.4
+Robin.
