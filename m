@@ -1,46 +1,79 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 27 Feb 2018 15:36:07 +0100
-Subject: [PATCH] ARM: mach-stm32: restore reboot capabilities
-Message-ID: <20180227143607.5583-1-benjamin.gaignard@st.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 27 Feb 2018 22:42:03 +0800
+Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
+In-Reply-To: <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
+ <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
+ <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+Message-ID: <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to reboot the platform we need to use armv7m_restart for STM32
-SoCs using ARMv7 cores.
+On 2018/2/27 22:31, Phil Edworthy wrote:
+> Hi Shawn,
+> 
+> On 27 February 2018 14:28, Shawn Lin wrote:
+>> ? 2018/2/27 21:55, Phil Edworthy ??:
+>>> Since the controller does not support the end-of-busy IRQ, don't use it.
+>>> Otherwise, on older SD cards you will get lots of these messages:
+>>> "mmc0: Got data interrupt 0x00000002 even though no data operation was
+>> in progress"
+>>>
+>>
+>> I'm afraid you have to explain which version of arasan's IP suffer from this
+>> and what does the "older SD cards" mean?
+> Ok, I'll try to find out the IP version...
+> For "older SD cards", I can provide a list of a few cards that exhibit this problem
+> and others that don't, is that enough info?
 
-Fixes: e0644101bd2f ("ARM: mach-stm32: prepare stm32 family to welcome armv7 architecture)
+What I meant is could you elaborate more about what kind of cards, e.g,
+are them the  legacy SDSC cards or SDHC cards, or maybe they are only
+running with defaut speed? or whatever, but not just with a vague
+"older" cards. :)
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
-NOTE: This patch should be applied only on
-git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git stm32-next
-until this patch: https://lkml.org/lkml/2018/2/26/386
-find it way to mainline KBuild will complain about it.
+> 
+> Thanks
+> Phil
+> 
+>>> This has been reported on Xilinx devices that also use the Arasan IP.
+>>> See https://patchwork.kernel.org/patch/8062871/
+>>>
+>>> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC.
+>>>
+>>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+>>> ---
+>>>    drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
+>>>    1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+>>> b/drivers/mmc/host/sdhci-of-arasan.c
+>>> index c33a5f7..ab66e32 100644
+>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>>> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data
+>> sdhci_arasan_pdata = {
+>>>    	.ops = &sdhci_arasan_ops,
+>>>    	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+>>>    	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+>>> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>>> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+>>> +			SDHCI_QUIRK2_STOP_WITH_TC,
+>>>    };
+>>>
+>>>    static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32
+>>> intmask)
+>>>
+>>
+>>
+>> --
+>> Best Regards
+>> Shawn Lin
+> 
+> 
+> 
+> 
 
- arch/arm/mach-stm32/board-dt.c | 6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-index 06911ad60cea..011d57b488c2 100644
---- a/arch/arm/mach-stm32/board-dt.c
-+++ b/arch/arm/mach-stm32/board-dt.c
-@@ -7,6 +7,9 @@
- 
- #include <linux/kernel.h>
- #include <asm/mach/arch.h>
-+#ifdef CONFIG_ARM_SINGLE_ARMV7M
-+#include <asm/v7m.h>
-+#endif
- 
- static const char *const stm32_compat[] __initconst = {
- 	"st,stm32f429",
-@@ -20,4 +23,7 @@ static const char *const stm32_compat[] __initconst = {
- 
- DT_MACHINE_START(STM32DT, "STM32 (Device Tree Support)")
- 	.dt_compat = stm32_compat,
-+#ifdef CONFIG_ARM_SINGLE_ARMV7M
-+	.restart = armv7m_restart,
-+#endif
- MACHINE_END
 -- 
-2.15.0
+Best Regards
+Shawn Lin
