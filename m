@@ -1,28 +1,27 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 27 Feb 2018 18:04:25 +0100
-Subject: [PATCH] mailmap:  Update email address for Gregory CLEMENT
-Message-ID: <20180227170425.30510-1-gregory.clement@bootlin.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 Feb 2018 17:05:19 +0000
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
+References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+ <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
+ <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
+Message-ID: <20180227170518.56tvxkdh5fiochdd@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As now Free Electrons is Bootlin.
+On Tue, Feb 27, 2018 at 09:44:09AM -0500, Jonathan Toppins wrote:
+> For arm64 DT is suppose to *not* be the preferred method, 
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- .mailmap | 1 +
- 1 file changed, 1 insertion(+)
+This has never been the upstream position.
 
-diff --git a/.mailmap b/.mailmap
-index e18cab73e209..a2ce89a456c2 100644
---- a/.mailmap
-+++ b/.mailmap
-@@ -62,6 +62,7 @@ Frank Zago <fzago@systemfabricworks.com>
- Greg Kroah-Hartman <greg@echidna.(none)>
- Greg Kroah-Hartman <gregkh@suse.de>
- Greg Kroah-Hartman <greg@kroah.com>
-+Gregory CLEMENT <gregory.clement@bootlin.com> <gregory.clement@free-electrons.com>
- Henk Vergonet <Henk.Vergonet@gmail.com>
- Henrik Kretzschmar <henne@nachtwindheim.de>
- Henrik Rydberg <rydberg@bitmath.org>
--- 
-2.16.1
+DT has been the default since day one, and changing this would be a
+regression, as has been stated several times in the past.
+
+If *the system vendor* intends that the system only uses ACPI, they
+would not provide a DT.
+
+If *you* prefer to use ACPI, feel free to alter your kernel command
+line.
+
+Thanks,
+Mark.
