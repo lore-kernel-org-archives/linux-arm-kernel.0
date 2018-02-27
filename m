@@ -1,114 +1,129 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:33:56 +0100
-Subject: [PATCH v5 07/40] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
- kvm_vcpu_put_sysregs
+Date: Tue, 27 Feb 2018 12:34:14 +0100
+Subject: [PATCH v5 25/40] KVM: arm64: Introduce framework for accessing
+ deferred sysregs
 In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
 References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-8-cdall@kernel.org>
+Message-ID: <20180227113429.637-26-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-As we are about to move a bunch of save/restore logic for VHE kernels to
-the load and put functions, we need some infrastructure to do this.
+We are about to defer saving and restoring some groups of system
+registers to vcpu_put and vcpu_load on supported systems.  This means
+that we need some infrastructure to access system registes which
+supports either accessing the memory backing of the register or directly
+accessing the system registers, depending on the state of the system
+when we access the register.
 
+We do this by defining read/write accessor functions, which can handle
+both "immediate" and "deferrable" system registers.  Immediate registers
+are always saved/restored in the world-switch path, but deferrable
+registers are only saved/restored in vcpu_put/vcpu_load when supported
+and sysregs_loaded_on_cpu will be set in that case.
+
+Note that we don't use the deferred mechanism yet in this patch, but only
+introduce infrastructure.  This is to improve convenience of review in
+the subsequent patches where it is clear which registers become
+deferred.
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
-    Changes since v1:
-     - Reworded comments as suggested by Drew
+    Changes since v4:
+     - Slightly reworded commentary based on Drew's feedback
+    
+    Changes since v3:
+     - Changed to a switch-statement based approach to improve
+       readability.
+    
+    Changes since v2:
+     - New patch (deferred register handling has been reworked)
 
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm64/include/asm/kvm_host.h |  3 +++
- arch/arm64/kvm/hyp/sysreg-sr.c    | 30 ++++++++++++++++++++++++++++++
- virt/kvm/arm/arm.c                |  2 ++
- 4 files changed, 38 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |  8 ++++++--
+ arch/arm64/kvm/sys_regs.c         | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 6137195ab815..c6a749568dd6 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -312,4 +312,7 @@ static inline bool kvm_arm_harden_branch_predictor(void)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 179bb9d5760b..ab46bc70add6 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -284,6 +284,10 @@ struct kvm_vcpu_arch {
+ 
+ 	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
+ 	u64 vsesr_el2;
++
++	/* True when deferrable sysregs are loaded on the physical CPU,
++	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
++	bool sysregs_loaded_on_cpu;
+ };
+ 
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+@@ -296,8 +300,8 @@ struct kvm_vcpu_arch {
+  */
+ #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+ 
+-#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
+-#define vcpu_write_sys_reg(v,n,r)	do { __vcpu_sys_reg(v,r) = n; } while (0)
++u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
++void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, u64 val, int reg);
+ 
+ /*
+  * CP14 and CP15 live in the same array, as they are backed by the
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 7514db002430..c809f0d1a059 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -35,6 +35,7 @@
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
++#include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/perf_event.h>
+ #include <asm/sysreg.h>
+@@ -76,6 +77,38 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
  	return false;
  }
  
-+static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index b027a7f025d4..c30fc96992df 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -435,4 +435,7 @@ static inline bool kvm_arm_harden_branch_predictor(void)
- 	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
- }
- 
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 43b7dd65e3e6..434f0fc9cfb3 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -190,6 +190,36 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
- 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
- }
- 
-+/**
-+ * kvm_vcpu_load_sysregs - Load guest system registers to the physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * Load system registers that do not affect the host's execution, for
-+ * example EL1 system registers on a VHE system where the host kernel
-+ * runs at EL2.  This function is called from KVM's vcpu_load() function
-+ * and loading system register state early avoids having to load them on
-+ * every entry to the VM.
-+ */
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
++u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
 +{
++	if (!vcpu->arch.sysregs_loaded_on_cpu)
++		goto immediate_read;
++
++	/*
++	 * System registers listed in the switch are not saved on every
++	 * exit from the guest but are only saved on vcpu_put.
++	 */
++	switch (reg) {
++	}
++
++immediate_read:
++	return __vcpu_sys_reg(vcpu, reg);
 +}
 +
-+/**
-+ * kvm_vcpu_put_sysregs - Restore host system registers to the physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * Save guest system registers that do not affect the host's execution, for
-+ * example EL1 system registers on a VHE system where the host kernel
-+ * runs at EL2.  This function is called from KVM's vcpu_put() function
-+ * and deferring saving system register state until we're no longer running the
-+ * VCPU avoids having to save them on every exit from the VM.
-+ */
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
++void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, u64 val, int reg)
 +{
++	if (!vcpu->arch.sysregs_loaded_on_cpu)
++		goto immediate_write;
++
++	/*
++	 * System registers listed in the switch are not restored on every
++	 * entry to the guest but are only restored on vcpu_load.
++	 */
++	switch (reg) {
++	}
++
++immediate_write:
++	 __vcpu_sys_reg(vcpu, reg) = val;
 +}
 +
- void __hyp_text __kvm_set_tpidr_el2(u64 tpidr_el2)
- {
- 	asm("msr tpidr_el2, %0": : "r" (tpidr_el2));
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 49d13510e9c2..2062d9357971 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -362,10 +362,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_arm_set_running_vcpu(vcpu);
- 	kvm_vgic_load(vcpu);
- 	kvm_timer_vcpu_load(vcpu);
-+	kvm_vcpu_load_sysregs(vcpu);
- }
- 
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- {
-+	kvm_vcpu_put_sysregs(vcpu);
- 	kvm_timer_vcpu_put(vcpu);
- 	kvm_vgic_put(vcpu);
+ /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+ static u32 cache_levels;
  
 -- 
 2.14.2
