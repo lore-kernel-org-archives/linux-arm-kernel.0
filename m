@@ -1,49 +1,39 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 27 Feb 2018 16:54:33 +0100
-Subject: [PATCH] ARM: dts: stm32: Add push button to stm32f469 Discovery
- board
-In-Reply-To: <20180117094005.20728-3-benjamin.gaignard@st.com>
-References: <20180117094005.20728-1-benjamin.gaignard@st.com>
- <20180117094005.20728-3-benjamin.gaignard@st.com>
-Message-ID: <05594721-12b9-e286-8494-031314c0662d@st.com>
+Date: Tue, 27 Feb 2018 16:55:12 +0100
+Subject: [PATCH] ARM: dts: stm32: Fix HSE clock frequency for
+ stm32h743i-disco board
+In-Reply-To: <1516983819-6567-1-git-send-email-patrice.chotard@st.com>
+References: <1516983819-6567-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <08bbd782-7311-5d0a-a4c6-90700f26793a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
+Hi Patrice,
 
-On 01/17/2018 10:40 AM, Benjamin Gaignard wrote:
-> Add node for user push button.
+On 01/26/2018 05:23 PM, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> The HSE oscillator frequency was wrongly set to 125MHz instead of 25MHz.
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 > ---
->   arch/arm/boot/dts/stm32f469-disco.dts | 12 ++++++++++++
->   1 file changed, 12 insertions(+)
+>   arch/arm/boot/dts/stm32h743i-disco.dts | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-> index 5e9994840a24..c93d83d53bc8 100644
-> --- a/arch/arm/boot/dts/stm32f469-disco.dts
-> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
-> @@ -86,6 +86,18 @@
->   			gpios = <&gpiok 3 1>;
->   	};
+> diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
+> index 79e841d94079..45e088c55741 100644
+> --- a/arch/arm/boot/dts/stm32h743i-disco.dts
+> +++ b/arch/arm/boot/dts/stm32h743i-disco.dts
+> @@ -63,7 +63,7 @@
+>   };
 >   
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		autorepeat;
-> +		button at 0 {
-> +			label = "User";
-> +			linux,code = <KEY_WAKEUP>;
-> +			gpios = <&gpioa 0 0>;
-> +		};
-> +	};
-> +
->   	/* This turns on vbus for otg for host mode (dwc2) */
->   	vcc5v_otg: vcc5v-otg-regulator {
->   		compatible = "regulator-fixed";
+>   &clk_hse {
+> -	clock-frequency = <125000000>;
+> +	clock-frequency = <25000000>;
+>   };
+>   
+>   &usart2 {
 > 
-
 
 Applied on stm32-next.
 
