@@ -1,57 +1,93 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 27 Feb 2018 17:48:17 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add registers clock
- for sata node
-In-Reply-To: <20180215134423.11800-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Thu, 15 Feb 2018 14:44:23 +0100")
-References: <20180215134423.11800-1-gregory.clement@bootlin.com>
-Message-ID: <87muzujs4u.fsf@bootlin.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Feb 2018 16:59:13 +0000
+Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <5A8FEBC6.4000408@rock-chips.com>
+References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
+ <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+ <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
+ <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
+ <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
+ <5A72F7D2.1050201@rock-chips.com> <5A8FEBC6.4000408@rock-chips.com>
+Message-ID: <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., f?vr. 15 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+On 23/02/18 10:24, JeffyChen wrote:
+> Hi guys,
+> 
+> On 02/01/2018 07:19 PM, JeffyChen wrote:
+>>>>>>
+>>>>>>
+>>>>>> diff --git
+>>>>>> a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>>>>> b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>>>>> index 2098f7732264..33dd853359fa 100644
+>>>>>> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>>>>> @@ -14,6 +14,13 @@ Required properties:
+>>>>>> ????????????????????? "single-master" device, and needs no
+>>>>>> additional information
+>>>>>> ????????????????????? to associate with its master device.? See:
+>>>>>>
+>>>>>> Documentation/devicetree/bindings/iommu/iommu.txt
+>>>>>> +Optional properties:
+>>>>>> +- clocks : A list of master clocks requires for the IOMMU to be
+>>>>>> accessible
+>>>>>> +?????????? by the host CPU. The number of clocks depends on the
+>>>>>> master
+>>>>>> +?????????? block and might as well be zero. See [1] for generic 
+>>>>>> clock
+>>>>>> +?????????? bindings description.
+>>>>>
+>>>>> Hardware blocks don't have a variable number of clock connections.
+>>>>
+>>>> I think you underestimate the imagination of hardware designers. :)
+>>>
+>>> Learned long ago to never do that. If there are 2 ways to do
+>>> something, they will find a 3rd way.
+>>>
+>>>> For Rockchip IOMMU, there is a set of clocks, which all need to be
+>>>> enabled for IOMMU register access to succeed. The clocks are not
+>>>> directly fed to the IOMMU, but they are needed for the various buses
+>>>> and intermediate blocks on the way to the IOMMU to work.
+>>>
+>>> The binding should describe the clock connections, not what clocks a
+>>> driver needs (currently). It sounds like a lack of managing bus clocks
+>>> to me.
+>>>
+>>> In any case, the binding must be written so it can be verified. If you
+>>> can have any number of clocks with any names, there's no point in
+>>> documenting.
+>>
+>> the rockchip IOMMU is part of the master block in hardware, so it needs
+>> to control the master's power domain and some of the master's clocks
+>> when access it's registers.
+>>
+>> and the number of clocks needed here, might be different between each
+>> IOMMUs(according to which master block it belongs), it's a little like
+>> our power domain:
+>> https://elixir.free-electrons.com/linux/latest/source/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L935 
+>>
+>>
+>>
+>> i'm not sure how to describe this correctly, is it ok use something like
+>> "the same as it's master block"?
+> 
+> would it make sense to add a property to specify the master who owns the 
+> iommu, and we can get all clocks(only some of those clocks are actually 
+> needed) from it in the of_xlate()? and we can also reuse the clock-names 
+> of that master to build clk_bulk_data and log errors in clk_bulk_get.
 
-> This extra clock is needed to access the registers of the AHCI SATA
-> controller used on the Armada 7K/8K SoCs.
->
-> The ahci drivers was already designed to support up to 5 clocks so there
-> is only need to update the device tree to use it. It was not noticed
-> until now because of wrong assumption in the clock drivers, but as this
-> IP really needs 2 clocks, we had to declare both of them.
->
+I'm inclined to agree with Rob here - if we're to add anything to the 
+binding, it should only be whatever clock inputs are defined for the 
+IOMMU IP block itself. If Linux doesn't properly handle the interconnect 
+clock hierarchy external to a particular integration, that's a separate 
+issue and it's not the binding's problem.
 
+I actually quite like the hack of "borrowing" the clocks from 
+dev->of_node in of_xlate() - you shouldn't need any DT changes for that, 
+because you already know that each IOMMU instance only has the one 
+master device anyway.
 
-Applied on mvebu/dt64
-
-Gregory
-
-
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index 50038434dd53..b8cf1497dc22 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -236,7 +236,8 @@
->  			"generic-ahci";
->  			reg = <0x540000 0x30000>;
->  			interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&CP110_LABEL(clk) 1 15>;
-> +			clocks = <&CP110_LABEL(clk) 1 15>,
-> +				 <&CP110_LABEL(clk) 1 16>;
->  			status = "disabled";
->  		};
->  
-> -- 
-> 2.15.1
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Robin.
