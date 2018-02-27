@@ -1,64 +1,53 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 27 Feb 2018 09:20:39 +0100
-Subject: [PATCH v8 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
-References: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <1519719639.3402.2.camel@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Feb 2018 09:22:39 +0100
+Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
+ Salvator-X board
+In-Reply-To: <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
+References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+ <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-02-27 at 10:07 +0800, Yong Deng wrote:
-> Add binding documentation for Allwinner V3s CSI.
+On Mon, Feb 26, 2018 at 07:03:44PM +0100, Geert Uytterhoeven wrote:
+> The Renesas Salvator-X development board can be equipped with an R-Car
+> H3, M3-W, or M3-N SiP, which are pin-compatible.
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> Document board part number and compatible values for the version with
+> R-Car M3-N.
+> 
+> The board part number was extracted from a big patch by Takeshi Kihara
+> in the BSP.
+
+That I have verified.
+
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+>  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> new file mode 100644
-> index 000000000000..2ff47a9507a6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,59 @@
-> +Allwinner V3s Camera Sensor Interface
-> +-------------------------------------
-> +
-> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> +interface and CSI1 is used for parallel interface.
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * bus: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +Each CSI node should contain one 'port' child node with one child 'endpoint'
-> +node, according to the bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
-> +Bt656 for CSI1.
-> +
-> +Endpoint node properties for CSI1
-> +---------------------------------
-> +
-> +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-> +			   node
-> +- bus-width:		: (required) must be 8, 10, 12 or 16
-> +- pclk-sample		: (optional) (default: sample on falling edge)
+> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> index 82908a9447e4b051..51e4428856be4557 100644
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -108,6 +108,8 @@ Boards:
+>      compatible = "renesas,salvator-x", "renesas,r8a7795"
+>    - Salvator-X (RTP0RC7796SIPB0011S)
 
-It would be helpful to state that 1 is rising edge and 0 is falling
-edge, see for example ov5640.txt
+Here we have: Name (Part No)
 
-regards
-Philipp
+>      compatible = "renesas,salvator-x", "renesas,r8a7796"
+> +  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
+
+Here we have: Name (Part No (SoC))
+
+> +    compatible = "renesas,salvator-x", "renesas,r8a77965"
+>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+
+And here we have: Name (Version, Part No)
+
+>      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+
+Can we think about making this more consistent?
