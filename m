@@ -1,58 +1,62 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 27 Feb 2018 23:26:50 +0100
-Subject: [PATCH v2 05/16] dt-bindings: display: sun4i-drm: Add compatibles for
- H3 HDMI pipeline
+Date: Tue, 27 Feb 2018 23:26:54 +0100
+Subject: [PATCH v2 09/16] drm/sun4i: Fix polarity configuration for DW HDMI PHY
 In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
 References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <20180227222701.9716-6-jernej.skrabec@siol.net>
+Message-ID: <20180227222701.9716-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing compatibles for H3 HDMI pipeline. These compatibles can also
-be used with H5 SoC.
+Current polarity configuration code is cleary wrong since it compares
+same flag two times. However, even if flag name is fixed, it won't work
+well for resolutions which have one polarity positive and another
+negative.
+
+Fix that by properly set each bit according to each polarity. Since
+those two bits are not described in any documentation, relationships
+were obtained by experimentation.
+
+Fixes: b7c7436a5ff0 ("drm/sun4i: Implement A83T HDMI driver")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index b995bfee734a..8bdef4920edc 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -102,6 +102,7 @@ DWC HDMI PHY
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-a83t-hdmi-phy
-+    * allwinner,sun8i-h3-hdmi-phy
-   - reg: base address and size of memory-mapped region
-   - clocks: phandles to the clocks feeding the HDMI PHY
-     * bus: the HDMI PHY interface clock
-@@ -110,6 +111,9 @@ Required properties:
-   - resets: phandle to the reset controller driving the PHY
-   - reset-names: must be "phy"
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index e5bfcdd43ec9..9d2f11ca3538 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -10,7 +10,8 @@
+ #define SUN8I_HDMI_PHY_DBG_CTRL_REG	0x0000
+ #define SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK		BIT(0)
+ #define SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK	GENMASK(15, 8)
+-#define SUN8I_HDMI_PHY_DBG_CTRL_POL(val)	(val << 8)
++#define SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC	BIT(8)
++#define SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC	BIT(9)
+ #define SUN8I_HDMI_PHY_DBG_CTRL_ADDR_MASK	GENMASK(23, 16)
+ #define SUN8I_HDMI_PHY_DBG_CTRL_ADDR(addr)	(addr << 16)
  
-+H3 HDMI PHY requires additional clock:
-+  - pll-0: parent of phy clock
+@@ -35,14 +36,14 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+ 	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
+ 	u32 val = 0;
+ 
+-	if ((mode->flags & DRM_MODE_FLAG_NHSYNC) &&
+-	    (mode->flags & DRM_MODE_FLAG_NHSYNC)) {
+-		val = 0x03;
+-	}
++	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
++		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC;
 +
- TV Encoder
- ----------
++	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
++		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC;
  
-@@ -275,6 +279,7 @@ Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-a83t-de2-mixer-0
-     * allwinner,sun8i-a83t-de2-mixer-1
-+    * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-@@ -305,6 +310,7 @@ Required properties:
-     * allwinner,sun7i-a20-display-engine
-     * allwinner,sun8i-a33-display-engine
-     * allwinner,sun8i-a83t-display-engine
-+    * allwinner,sun8i-h3-display-engine
-     * allwinner,sun8i-v3s-display-engine
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
+-			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK,
+-			   SUN8I_HDMI_PHY_DBG_CTRL_POL(val));
++			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK, val);
  
-   - allwinner,pipelines: list of phandle to the display engine
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
 -- 
 2.16.2
