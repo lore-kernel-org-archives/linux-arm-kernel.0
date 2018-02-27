@@ -1,60 +1,148 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 27 Feb 2018 14:35:27 +0100
-Subject: [PATCH v5 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-In-Reply-To: <20180227113429.637-14-cdall@kernel.org>
-References: <20180227113429.637-1-cdall@kernel.org>
- <20180227113429.637-14-cdall@kernel.org>
-Message-ID: <20180227133527.efdcaqtpdjpz7gul@kamzik.brq.redhat.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 27 Feb 2018 14:37:47 +0100
+Subject: [PATCH] ARM: reorder mach-*/Kconfig inclusions
+Message-ID: <20180227133747.23517-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 12:34:02PM +0100, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> So far this is mostly (see below) a copy of the legacy non-VHE switch
-> function, but we will start reworking these functions in separate
-> directions to work on VHE and non-VHE in the most optimal way in later
-> patches.
-> 
-> The only difference after this patch between the VHE and non-VHE run
-> functions is that we omit the branch-predictor variant-2 hardening for
-> QC Falkor CPUs, because this workaround is specific to a series of
-> non-VHE ARMv8.0 CPUs.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> 
-> Notes:
->     Changes since v4:
->      - Unified has_vhe() conditional calls in kvm_arch_vcpu_ioctl_run
->      - Added isb() on exit path of VHE-specific kvm_vcpu_run(), because
->        otherwise 32-bit guests can crash the system on reentry to the
->        guest, because writes to FPEXC32_EL2 will cause a trap at EL2
->        which leads to a hyp panic.  This can be observed on the model
->        where writing FPEN to CPACR_EL1 on guest exit doesn't take effect
->        prior to entering the guest again.
->     
->     Changes since v3:
->      - Added BUG() to 32-bit ARM VHE run function
->      - Omitted QC Falkor BP Hardening functionality from VHE-specific
->        function
->     
->     Changes since v2:
->      - Reworded commit message
->     
->     Changes since v1:
->      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
->        __kvm_vcpu_run_nvhe
->      - Removed stray whitespace line
-> 
->  arch/arm/include/asm/kvm_asm.h    |  5 ++-
->  arch/arm/kvm/hyp/switch.c         |  2 +-
->  arch/arm64/include/asm/kvm_asm.h  |  4 ++-
->  arch/arm64/include/asm/kvm_host.h |  7 +++++
->  arch/arm64/kvm/hyp/switch.c       | 66 ++++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/arm.c                | 12 ++++---
->  6 files changed, 87 insertions(+), 9 deletions(-)
->
+Reorder the mach-* inclusions so the comment about them being ordered
+alphabetically ends up being true.
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ arch/arm/Kconfig | 52 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e3d53575486..d868983faf20 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -709,8 +709,6 @@ config ARCH_VIRT
+ # Kconfigs may be included either alphabetically (according to the
+ # plat- suffix) or along side the corresponding mach-* source.
+ #
+-source "arch/arm/mach-mvebu/Kconfig"
+-
+ source "arch/arm/mach-actions/Kconfig"
+ 
+ source "arch/arm/mach-alpine/Kconfig"
+@@ -719,6 +717,8 @@ source "arch/arm/mach-artpec/Kconfig"
+ 
+ source "arch/arm/mach-asm9260/Kconfig"
+ 
++source "arch/arm/mach-aspeed/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-axxia/Kconfig"
+@@ -739,6 +739,9 @@ source "arch/arm/mach-dove/Kconfig"
+ 
+ source "arch/arm/mach-ep93xx/Kconfig"
+ 
++source "arch/arm/mach-exynos/Kconfig"
++source "arch/arm/plat-samsung/Kconfig"
++
+ source "arch/arm/mach-footbridge/Kconfig"
+ 
+ source "arch/arm/mach-gemini/Kconfig"
+@@ -747,31 +750,33 @@ source "arch/arm/mach-highbank/Kconfig"
+ 
+ source "arch/arm/mach-hisi/Kconfig"
+ 
++source "arch/arm/mach-imx/Kconfig"
++
+ source "arch/arm/mach-integrator/Kconfig"
+ 
++source "arch/arm/mach-iop13xx/Kconfig"
++
+ source "arch/arm/mach-iop32x/Kconfig"
+ 
+ source "arch/arm/mach-iop33x/Kconfig"
+ 
+-source "arch/arm/mach-iop13xx/Kconfig"
+-
+ source "arch/arm/mach-ixp4xx/Kconfig"
+ 
+ source "arch/arm/mach-keystone/Kconfig"
+ 
+ source "arch/arm/mach-ks8695/Kconfig"
+ 
++source "arch/arm/mach-mediatek/Kconfig"
++
+ source "arch/arm/mach-meson/Kconfig"
+ 
+-source "arch/arm/mach-moxart/Kconfig"
++source "arch/arm/mach-mmp/Kconfig"
+ 
+-source "arch/arm/mach-aspeed/Kconfig"
++source "arch/arm/mach-moxart/Kconfig"
+ 
+ source "arch/arm/mach-mv78xx0/Kconfig"
+ 
+-source "arch/arm/mach-imx/Kconfig"
+-
+-source "arch/arm/mach-mediatek/Kconfig"
++source "arch/arm/mach-mvebu/Kconfig"
+ 
+ source "arch/arm/mach-mxs/Kconfig"
+ 
+@@ -789,23 +794,31 @@ source "arch/arm/mach-omap2/Kconfig"
+ 
+ source "arch/arm/mach-orion5x/Kconfig"
+ 
++source "arch/arm/mach-oxnas/Kconfig"
++
+ source "arch/arm/mach-picoxcell/Kconfig"
+ 
++source "arch/arm/mach-prima2/Kconfig"
++
+ source "arch/arm/mach-pxa/Kconfig"
+ source "arch/arm/plat-pxa/Kconfig"
+ 
+-source "arch/arm/mach-mmp/Kconfig"
+-
+-source "arch/arm/mach-oxnas/Kconfig"
+-
+ source "arch/arm/mach-qcom/Kconfig"
+ 
+ source "arch/arm/mach-realview/Kconfig"
+ 
+ source "arch/arm/mach-rockchip/Kconfig"
+ 
++source "arch/arm/mach-s3c24xx/Kconfig"
++
++source "arch/arm/mach-s3c64xx/Kconfig"
++
++source "arch/arm/mach-s5pv210/Kconfig"
++
+ source "arch/arm/mach-sa1100/Kconfig"
+ 
++source "arch/arm/mach-shmobile/Kconfig"
++
+ source "arch/arm/mach-socfpga/Kconfig"
+ 
+ source "arch/arm/mach-spear/Kconfig"
+@@ -814,21 +827,8 @@ source "arch/arm/mach-sti/Kconfig"
+ 
+ source "arch/arm/mach-stm32/Kconfig"
+ 
+-source "arch/arm/mach-s3c24xx/Kconfig"
+-
+-source "arch/arm/mach-s3c64xx/Kconfig"
+-
+-source "arch/arm/mach-s5pv210/Kconfig"
+-
+-source "arch/arm/mach-exynos/Kconfig"
+-source "arch/arm/plat-samsung/Kconfig"
+-
+-source "arch/arm/mach-shmobile/Kconfig"
+-
+ source "arch/arm/mach-sunxi/Kconfig"
+ 
+-source "arch/arm/mach-prima2/Kconfig"
+-
+ source "arch/arm/mach-tango/Kconfig"
+ 
+ source "arch/arm/mach-tegra/Kconfig"
+-- 
+2.16.2
