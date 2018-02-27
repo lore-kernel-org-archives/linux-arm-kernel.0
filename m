@@ -1,48 +1,59 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 27 Feb 2018 22:27:46 +0800
-Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
-In-Reply-To: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
-References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
+From: jtoppins@redhat.com (Jonathan Toppins)
+Date: Tue, 27 Feb 2018 09:28:52 -0500
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <CAKv+Gu9FVD18v6WA8MMG5LFX9GPObq_79hFuYv6j+S98a5Ej6w@mail.gmail.com>
+References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+ <CAKv+Gu9FVD18v6WA8MMG5LFX9GPObq_79hFuYv6j+S98a5Ej6w@mail.gmail.com>
+Message-ID: <1454e833-e3b9-780b-c5db-a6f73e799352@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018/2/27 21:55, Phil Edworthy ??:
-> Since the controller does not support the end-of-busy IRQ, don't use it.
-> Otherwise, on older SD cards you will get lots of these messages:
-> "mmc0: Got data interrupt 0x00000002 even though no data operation was in progress"
+On 02/27/2018 02:22 AM, Ard Biesheuvel wrote:
+> Hi Jonathan,
 > 
+> On 27 February 2018 at 06:05, Jonathan Toppins <jtoppins@redhat.com> wrote:
+>> This patch allows a user to configure ACPI to be preferred over
+>> device-tree.
+>>
+> 
+> This comes up once a year or so, and the consensus has been so far
+> that it is not up to the kernel to reason about whether DT or ACPI
+> should be preferred if both are supplied, Instead, it is up to the
+> firmware to ensure that only one of those is provided, and we added a
+> generic driver to EDK2 that implements this.
 
-I'm afraid you have to explain which version of arasan's IP suffer from
-this and what does the "older SD cards" mean?
+I am assuming EDK2 is some sort of firmware code base, not that I have
+ever heard of it before. This logic compared with the implementation in
+the kernel seems divergent. The kernel is clearly making a choice about
+which boot table (DT vs ACPI) to configure with. So to claim it is not
+the kernel's job to reason about which to use is clearly incorrect. The
+only thing this patch is doing is making it easier for distributions to
+configure which preference the kernel has.
 
-> This has been reported on Xilinx devices that also use the Arasan IP.
-> See https://patchwork.kernel.org/patch/8062871/
 > 
-> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC.
+>> Currently for ACPI to be used a user either has to set acpi=on on the
+>> kernel command line or make sure any device tree passed to the kernel
+>> is empty. If the dtb passed to the kernel is non-empty then device-tree
+>> will be chosen as the boot method of choice even if it is not correct.
 > 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> ---
->   drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index c33a5f7..ab66e32 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
->   	.ops = &sdhci_arasan_ops,
->   	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
->   	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
-> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
-> +			SDHCI_QUIRK2_STOP_WITH_TC,
->   };
->   
->   static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
-> 
+> Your firmware is terminally broken if it provides an incorrect DT, and
+> we should not be fixing it in the kernel.
 
+This logic would seem akin to me asking Bjorn to remove all PCI quirks
+from the kernel, because the systems that use them are "terminally
+broken" or "don't follow the standard". This doesn't seem like a valid
+reason to deny a change that would allow the kernel to boot on more
+hardware. Further it seems rather rigid to effectively say that we only
+run on perfect firmware.
 
--- 
-Best Regards
-Shawn Lin
+> 
+>> To prevent this situation where a system is only intended to be booted
+>> via ACPI a user can set this kernel configuration so it ignores
+>> device-tree settings unless ACPI table checks fail.
+>>
+> 
+> 'only intended to be booted via ACPI' is a property of the system, not
+> of the OS. If you need this functionality for development, you can
+> append 'acpi=on' to the kernel command line via kconfig.
+
+This is not for development this is for production rate shipping firmware.
