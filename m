@@ -1,112 +1,128 @@
-From: yong.deng@magewell.com (Yong)
-Date: Tue, 27 Feb 2018 09:18:47 +0800
-Subject: [PATCH v7 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <ce3a30b9-f017-61b6-1fe6-f5dcc8bd3ec3@xs4all.nl>
-References: <1517217696-17816-1-git-send-email-yong.deng@magewell.com>
- <c86097d7-dade-01e5-3826-3f22f9ca4b4f@infradead.org>
- <20180130104833.a06e44c558c7ddc6b38e20b3@magewell.com>
- <ce3a30b9-f017-61b6-1fe6-f5dcc8bd3ec3@xs4all.nl>
-Message-ID: <20180227091847.e67a1aeffff94eb37c7fff1e@magewell.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Mon, 26 Feb 2018 17:53:57 -0800
+Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
+ from any CPU
+In-Reply-To: <20180224084106.GC25201@hirez.programming.kicks-ass.net>
+References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
+ <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
+ <20180224084106.GC25201@hirez.programming.kicks-ass.net>
+Message-ID: <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, 26 Feb 2018 12:06:37 +0100
-Hans Verkuil <hverkuil@xs4all.nl> wrote:
-
-> Hi all,
+On 2018-02-24 00:41, Peter Zijlstra wrote:
+> On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
+>> Some PMUs events can be read from any CPU. So allow the PMU to mark
+>> events as such. For these events, we don't need to reject reads or
+>> make smp calls to the event's CPU and cause unnecessary wake ups.
+>> 
+>> Good examples of such events would be events from caches shared across
+>> all CPUs.
 > 
-> On 01/30/2018 03:48 AM, Yong wrote:
-> > Hi,
-> > 
-> > On Mon, 29 Jan 2018 13:49:14 -0800
-> > Randy Dunlap <rdunlap@infradead.org> wrote:
-> > 
-> >> On 01/29/2018 01:21 AM, Yong Deng wrote:
-> >>> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> >>> interface and CSI1 is used for parallel interface. This is not
-> >>> documented in datasheet but by test and guess.
-> >>>
-> >>> This patch implement a v4l2 framework driver for it.
-> >>>
-> >>> Currently, the driver only support the parallel interface. MIPI-CSI2,
-> >>> ISP's support are not included in this patch.
-> >>>
-> >>> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> >>> ---
-> >>
-> >>
-> >> A previous version (I think v6) had a build error with the use of
-> >> PHYS_OFFSET, so Kconfig was modified to depend on ARM and ARCH_SUNXI
-> >> (one of which seems to be overkill).  As is here, the COMPILE_TEST piece is
-> >> meaningless for all arches except ARM.  If you care enough for COMPILE_TEST
-> >> (and I would), then you could make COMPILE_TEST useful on any arch by
-> >> removing the "depends on ARM" (the ARCH_SUNXI takes care of that) and by
-> >> having an alternate value for PHYS_OFFSET, like so:
-> >>
-> >> +#if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
-> >> +#define PHYS_OFFSET	0
-> >> +#endif
-> >>
-> >> With those 2 changes, the driver builds for me on x86_64.
-> > 
-> > I have considered this method.
-> > But it's so sick to put these code in dirver (for my own). I mean 
-> > this is meaningless for the driver itself and make people confused.
-> > 
-> > I grepped the driver/ code and I found many drivers writing Kconfig
-> > like this. For example:
-> > ARM && COMPILE_TEST
-> > MIPS && COMPILE_TEST
-> > PPC64 && COMPILE_TEST
-> > 
-> > BTW, for my own, I do not care about COMPILE_TEST.
-> 
-> There was a discussion about this in the v6 patch, but it petered out.
-> 
-> I want to merge this driver, but I would very much prefer that this
-> compiles with COMPILE_TEST. So unless someone has a better solution, then
-> adding 'hack' that defines PHYS_OFFSET to 0 for COMPILE_TEST would be required.
+> So why would the existing ACTIVE_PKG not work for you? Because clearly
+> your example does not cross a package.
 
-If so, I will take the advice of Randy.
+Because based on testing it on hardware, it looks like the two clusters 
+in an ARM DynamIQ design are not considered part of the same "package". 
+When I say clusters, I using the more common interpretation of 
+"homogeneous CPUs running on the same clock"/CPUs in a cpufreq policy 
+and not ARM's new redefinition of cluster. So, on a SoC with 4 little 
+and 4 big cores, it'll still trigger a lot of unnecessary smp calls/IPIs 
+that cause unnecessary wakeups.
+
+Although, I like Mark's suggestion of just giving a cpumask for every 
+event and using that instead. Because the meaning of "active package" is 
+very ambiguous. For example if a SoC has 2 DynamIQ blocks (not sure if 
+that's possible), what's considered a package? CPUs that are sitting on 
+one L3 can't read the PMU counters of a different L3. In that case, 
+neither "Any CPU" nor "Active Package" is correct/usable for reducing 
+IPIs.
 
 > 
-> Otherwise this driver looks good, so it is just this issue blocking it.
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>> ---
+>>  include/linux/perf_event.h |  3 +++
+>>  kernel/events/core.c       | 10 ++++++++--
+>>  2 files changed, 11 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+>> index 7546822..ee8978f 100644
+>> --- a/include/linux/perf_event.h
+>> +++ b/include/linux/perf_event.h
+>> @@ -510,9 +510,12 @@ typedef void (*perf_overflow_handler_t)(struct 
+>> perf_event *,
+>>   * PERF_EV_CAP_SOFTWARE: Is a software event.
+>>   * PERF_EV_CAP_READ_ACTIVE_PKG: A CPU event (or cgroup event) that 
+>> can be read
+>>   * from any CPU in the package where it is active.
+>> + * PERF_EV_CAP_READ_ANY_CPU: A CPU event (or cgroup event) that can 
+>> be read
+>> + * from any CPU.
+>>   */
+>>  #define PERF_EV_CAP_SOFTWARE		BIT(0)
+>>  #define PERF_EV_CAP_READ_ACTIVE_PKG	BIT(1)
+>> +#define PERF_EV_CAP_READ_ANY_CPU	BIT(2)
+>> 
+>>  #define SWEVENT_HLIST_BITS		8
+>>  #define SWEVENT_HLIST_SIZE		(1 << SWEVENT_HLIST_BITS)
+>> diff --git a/kernel/events/core.c b/kernel/events/core.c
+>> index 5d3df58..570187b 100644
+>> --- a/kernel/events/core.c
+>> +++ b/kernel/events/core.c
+>> @@ -3484,6 +3484,10 @@ static int __perf_event_read_cpu(struct 
+>> perf_event *event, int event_cpu)
+>>  {
+>>  	u16 local_pkg, event_pkg;
+>> 
+>> +	if (event->group_caps & PERF_EV_CAP_READ_ANY_CPU) {
+>> +		return smp_processor_id();
+>> +	}
+>> +
+>>  	if (event->group_caps & PERF_EV_CAP_READ_ACTIVE_PKG) {
+>>  		int local_cpu = smp_processor_id();
+>> 
 > 
-> Regards,
+>> @@ -3575,6 +3579,7 @@ int perf_event_read_local(struct perf_event 
+>> *event, u64 *value,
+>>  {
+>>  	unsigned long flags;
+>>  	int ret = 0;
+>> +	bool is_any_cpu = !!(event->group_caps & PERF_EV_CAP_READ_ANY_CPU);
+>> 
+>>  	/*
+>>  	 * Disabling interrupts avoids all counter scheduling (context
+>> @@ -3600,7 +3605,8 @@ int perf_event_read_local(struct perf_event 
+>> *event, u64 *value,
+>> 
+>>  	/* If this is a per-CPU event, it must be for this CPU */
+>>  	if (!(event->attach_state & PERF_ATTACH_TASK) &&
+>> -	    event->cpu != smp_processor_id()) {
+>> +	    event->cpu != smp_processor_id() &&
+>> +	    !is_any_cpu) {
+>>  		ret = -EINVAL;
+>>  		goto out;
+>>  	}
+>> @@ -3610,7 +3616,7 @@ int perf_event_read_local(struct perf_event 
+>> *event, u64 *value,
+>>  	 * or local to this CPU. Furthermore it means its ACTIVE (otherwise
+>>  	 * oncpu == -1).
+>>  	 */
+>> -	if (event->oncpu == smp_processor_id())
+>> +	if (event->oncpu == smp_processor_id() || is_any_cpu)
+>>  		event->pmu->read(event);
+>> 
+>>  	*value = local64_read(&event->count);
 > 
-> 	Hans
-> 
-> > 
-> >>
-> >>> diff --git a/drivers/media/platform/sunxi/sun6i-csi/Kconfig b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
-> >>> new file mode 100644
-> >>> index 0000000..f80c965
-> >>> --- /dev/null
-> >>> +++ b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
-> >>> @@ -0,0 +1,10 @@
-> >>> +config VIDEO_SUN6I_CSI
-> >>> +	tristate "Allwinner V3s Camera Sensor Interface driver"
-> >>> +	depends on ARM
-> >>> +	depends on VIDEO_V4L2 && COMMON_CLK && VIDEO_V4L2_SUBDEV_API && HAS_DMA
-> >>> +	depends on ARCH_SUNXI || COMPILE_TEST
-> >>> +	select VIDEOBUF2_DMA_CONTIG
-> >>> +	select REGMAP_MMIO
-> >>> +	select V4L2_FWNODE
-> >>> +	---help---
-> >>> +	   Support for the Allwinner Camera Sensor Interface Controller on V3s.
-> >>
-> >> thanks,
-> >> -- 
-> >> ~Randy
-> > 
-> > 
-> > Thanks,
-> > Yong
-> > 
+> And why are you modifying read_local for this? That didn't support
+> ACTIVE_PKG, so why should it support this?
 
+Maybe I'll make a separate patch to first have perf_event_read_local() 
+also handle ACTIVE_PACKAGE? Because in those cases, the smp call made by 
+read_local is unnecessary too.
 
-Thanks,
-Yong
+> 
+> And again, where are the users?
+
+The DynamIQ PMU driver would be the user.
+
+-Saravana
