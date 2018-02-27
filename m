@@ -1,151 +1,76 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:34:20 +0100
-Subject: [PATCH v5 31/40] KVM: arm64: Move common VHE/non-VHE trap config in
- separate functions
+Date: Tue, 27 Feb 2018 12:33:54 +0100
+Subject: [PATCH v5 05/40] KVM: arm64: Move HCR_INT_OVERRIDE to default HCR_EL2
+ guest flag
 In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
 References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-32-cdall@kernel.org>
+Message-ID: <20180227113429.637-6-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Shih-Wei Li <shihwei@cs.columbia.edu>
 
-As we are about to be more lazy with some of the trap configuration
-register read/writes for VHE systems, move the logic that is currently
-shared between VHE and non-VHE into a separate function which can be
-called from either the world-switch path or from vcpu_load/vcpu_put.
+We always set the IMO and FMO bits in the HCR_EL2 when running the
+guest, regardless if we use the vgic or not.  By moving these flags to
+HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
+HCR_EL2 in the world switch code, and we can also soon get rid of the
+other one.
+
+This is safe, because even though the IMO and FMO bits control both
+taking the interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1 when
+executed at EL1, as long as we ensure that these bits are clear when
+running the EL1 host, we're OK, because we reset the HCR_EL2 to only
+have the HCR_RW bit set when returning to EL1 on non-VHE systems.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
-    Changes since v4:
-     - Added blank newline to separate logic blocks in
-       __activate_traps_common.
-    
     Changes since v3:
-     - Separate fpsimd32 trap configuration into a separate function
-       which is still called from __activate_traps, because we no longer
-       defer saving/restoring of VFP registers to load/put.
+     - Slightly reworded the commit message
 
- arch/arm64/kvm/hyp/switch.c | 77 +++++++++++++++++++++++++++------------------
- 1 file changed, 46 insertions(+), 31 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 4 ++--
+ arch/arm64/kvm/hyp/switch.c      | 3 ---
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 1b438c334463..6dd285e979c9 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -83,9 +83,9 @@
+  */
+ #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+ 			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+-			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR)
++			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR | \
++			 HCR_FMO | HCR_IMO)
+ #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+-#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+ #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+ 
+ /* TCR_EL2 Registers bits */
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 9b0380d3c9c3..9d90bda3c2cc 100644
+index 579d9a263853..4117717548b0 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -56,7 +56,46 @@ static void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
- 	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
- }
- 
--static void __hyp_text __activate_traps_vhe(void)
-+static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
-+{
-+	/*
-+	 * We are about to set CPTR_EL2.TFP to trap all floating point
-+	 * register accesses to EL2, however, the ARM ARM clearly states that
-+	 * traps are only taken to EL2 if the operation would not otherwise
-+	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-+	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-+	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
-+	 * it will cause an exception.
-+	 */
-+	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
-+		write_sysreg(1 << 30, fpexc32_el2);
-+		isb();
-+	}
-+}
-+
-+static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
-+{
-+	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
-+	write_sysreg(1 << 15, hstr_el2);
-+
-+	/*
-+	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
-+	 * PMSELR_EL0 to make sure it never contains the cycle
-+	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF at
-+	 * EL1 instead of being trapped to EL2.
-+	 */
-+	write_sysreg(0, pmselr_el0);
-+	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
-+	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-+}
-+
-+static void __hyp_text __deactivate_traps_common(void)
-+{
-+	write_sysreg(0, hstr_el2);
-+	write_sysreg(0, pmuserenr_el0);
-+}
-+
-+static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
- 
-@@ -68,7 +107,7 @@ static void __hyp_text __activate_traps_vhe(void)
- 	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
- }
- 
--static void __hyp_text __activate_traps_nvhe(void)
-+static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
- 
-@@ -85,37 +124,14 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- {
- 	u64 hcr = vcpu->arch.hcr_el2;
- 
--	/*
--	 * We are about to set CPTR_EL2.TFP to trap all floating point
--	 * register accesses to EL2, however, the ARM ARM clearly states that
--	 * traps are only taken to EL2 if the operation would not otherwise
--	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
--	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
--	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
--	 * it will cause an exception.
--	 */
--	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
--		write_sysreg(1 << 30, fpexc32_el2);
--		isb();
--	}
-+	write_sysreg(hcr, hcr_el2);
- 
- 	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
- 		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
- 
--	write_sysreg(hcr, hcr_el2);
+@@ -174,8 +174,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+ 		__vgic_v3_save_state(vcpu);
+ 	else
+ 		__vgic_v2_save_state(vcpu);
 -
--	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
--	write_sysreg(1 << 15, hstr_el2);
--	/*
--	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
--	 * PMSELR_EL0 to make sure it never contains the cycle
--	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF at
--	 * EL1 instead of being trapped to EL2.
--	 */
--	write_sysreg(0, pmselr_el0);
--	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
--	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
--	__activate_traps_arch()();
-+	__activate_traps_fpsimd32(vcpu);
-+	__activate_traps_common(vcpu);
-+	__activate_traps_arch()(vcpu);
+-	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
  }
  
- static void __hyp_text __deactivate_traps_vhe(void)
-@@ -160,9 +176,8 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- 	if (vcpu->arch.hcr_el2 & HCR_VSE)
- 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+@@ -183,7 +181,6 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ 	u64 val;
  
-+	__deactivate_traps_common();
- 	__deactivate_traps_arch()();
--	write_sysreg(0, hstr_el2);
--	write_sysreg(0, pmuserenr_el0);
- }
+ 	val = read_sysreg(hcr_el2);
+-	val |= 	HCR_INT_OVERRIDE;
+ 	val |= vcpu->arch.irq_lines;
+ 	write_sysreg(val, hcr_el2);
  
- static void __hyp_text __activate_vm(struct kvm *kvm)
 -- 
 2.14.2
