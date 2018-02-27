@@ -1,82 +1,188 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 27 Feb 2018 08:11:30 +0100
-Subject: [PATCH v5 2/6] dt-bindings: add bindings for Samsung micro-USB
- 11-pin connector
+Date: Tue, 27 Feb 2018 08:11:34 +0100
+Subject: [PATCH v5 6/6] drm/bridge/sii8620: use micro-USB cable detection
+ logic to detect MHL
 In-Reply-To: <20180227071134.28063-1-a.hajda@samsung.com>
 References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071139eucas1p125ee35ada221fbed1dc85b7fc250f9ca@eucas1p1.samsung.com>
-Message-ID: <20180227071134.28063-3-a.hajda@samsung.com>
+ <CGME20180227071142eucas1p10203dac2558db034a4a3287220213601@eucas1p1.samsung.com>
+Message-ID: <20180227071134.28063-7-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung micro-USB 11-pin connector beside standard micro-USB pins,
-has pins dedicated to route MHL traffic.
+From: Maciej Purski <m.purski@samsung.com>
+
+Currently MHL chip must be turned on permanently to detect MHL cable. It
+duplicates micro-USB controller's (MUIC) functionality and consumes
+unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
+only if it detects MHL cable.
+
+Signed-off-by: Maciej Purski <m.purski@samsung.com>
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+v5: updated extcon API
+
+This is rework of the patch by Maciej with following changes:
+- use micro-USB port bindings to get extcon, instead of extcon property,
+- fixed remove sequence,
+- fixed extcon get state logic.
+
+Code finding extcon node is hacky IMO, I guess ultimately it should be done
+via some framework (maybe even extcon), or at least via helper, I hope it
+can stay as is until the proper solution will be merged.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-v4:
-- removed description of property inherited from usb-connector (Rob),
-- fixed example description.
----
- .../connector/samsung,usb-connector-11pin.txt      | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
+ drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 94 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
-new file mode 100644
-index 000000000000..22256e295a7a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
-@@ -0,0 +1,49 @@
-+Samsung micro-USB 11-pin connector
-+==================================
+diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
+index 9e785b8e0ea2..62b0adabcac2 100644
+--- a/drivers/gpu/drm/bridge/sil-sii8620.c
++++ b/drivers/gpu/drm/bridge/sil-sii8620.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/delay.h>
++#include <linux/extcon.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
+@@ -25,6 +26,7 @@
+ #include <linux/list.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
++#include <linux/of_graph.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/slab.h>
+ 
+@@ -81,6 +83,10 @@ struct sii8620 {
+ 	struct edid *edid;
+ 	unsigned int gen2_write_burst:1;
+ 	enum sii8620_mt_state mt_state;
++	struct extcon_dev *extcon;
++	struct notifier_block extcon_nb;
++	struct work_struct extcon_wq;
++	int cable_state;
+ 	struct list_head mt_queue;
+ 	struct {
+ 		int r_size;
+@@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
+ 	ctx->rc_dev = rc_dev;
+ }
+ 
++static void sii8620_cable_out(struct sii8620 *ctx)
++{
++	disable_irq(to_i2c_client(ctx->dev)->irq);
++	sii8620_hw_off(ctx);
++}
 +
-+Samsung micro-USB 11-pin connector is an extension of micro-USB connector.
-+It is present in multiple Samsung mobile devices.
-+It has additional pins to route MHL traffic simultanously with USB.
++static void sii8620_extcon_work(struct work_struct *work)
++{
++	struct sii8620 *ctx =
++		container_of(work, struct sii8620, extcon_wq);
++	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
 +
-+The bindings are superset of usb-connector bindings for micro-USB connector[1].
++	if (state == ctx->cable_state)
++		return;
 +
-+Required properties:
-+- compatible: must be: "samsung,usb-connector-11pin", "usb-b-connector",
-+- type: must be "micro".
++	ctx->cable_state = state;
 +
-+Required nodes:
-+- any data bus to the connector should be modeled using the OF graph bindings
-+  specified in bindings/graph.txt, unless the bus is between parent node and
-+  the connector. Since single connector can have multpile data buses every bus
-+  has assigned OF graph port number as follows:
-+    0: High Speed (HS),
-+    3: Mobile High-Definition Link (MHL), specific to 11-pin Samsung micro-USB.
++	if (state > 0)
++		sii8620_cable_in(ctx);
++	else
++		sii8620_cable_out(ctx);
++}
 +
-+[1]: bindings/connector/usb-connector.txt
++static int sii8620_extcon_notifier(struct notifier_block *self,
++			unsigned long event, void *ptr)
++{
++	struct sii8620 *ctx =
++		container_of(self, struct sii8620, extcon_nb);
 +
-+Example
-+-------
++	schedule_work(&ctx->extcon_wq);
 +
-+Micro-USB connector with HS lines routed via controller (MUIC) and MHL lines
-+connected to HDMI-MHL bridge (sii8620):
++	return NOTIFY_DONE;
++}
 +
-+muic-max77843 at 66 {
-+	...
-+	usb_con: connector {
-+		compatible = "samsung,usb-connector-11pin", "usb-b-connector";
-+		label = "micro-USB";
-+		type = "micro";
++static int sii8620_extcon_init(struct sii8620 *ctx)
++{
++	struct extcon_dev *edev;
++	struct device_node *musb, *muic;
++	int ret;
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++	/* get micro-USB connector node */
++	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
++	/* next get micro-USB Interface Controller node */
++	muic = of_get_next_parent(musb);
 +
-+			port at 3 {
-+				reg = <3>;
-+				usb_con_mhl: endpoint {
-+					remote-endpoint = <&sii8620_mhl>;
-+				};
-+			};
-+		};
-+	};
-+};
++	if (!muic) {
++		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
++		return 0;
++	}
++
++	edev = extcon_find_edev_by_node(muic);
++	of_node_put(muic);
++	if (IS_ERR(edev)) {
++		if (PTR_ERR(edev) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(ctx->dev, "Invalid or missing extcon\n");
++		return PTR_ERR(edev);
++	}
++
++	ctx->extcon = edev;
++	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
++	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
++	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
++	if (ret) {
++		dev_err(ctx->dev, "failed to register notifier for MHL\n");
++		return ret;
++	}
++
++	return 0;
++}
++
+ static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
+ {
+ 	return container_of(bridge, struct sii8620, bridge);
+@@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
+ 	if (ret)
+ 		return ret;
+ 
++	ret = sii8620_extcon_init(ctx);
++	if (ret < 0) {
++		dev_err(ctx->dev, "failed to initialize EXTCON\n");
++		return ret;
++	}
++
+ 	i2c_set_clientdata(client, ctx);
+ 
+ 	ctx->bridge.funcs = &sii8620_bridge_funcs;
+ 	ctx->bridge.of_node = dev->of_node;
+ 	drm_bridge_add(&ctx->bridge);
+ 
+-	sii8620_cable_in(ctx);
++	if (!ctx->extcon)
++		sii8620_cable_in(ctx);
+ 
+ 	return 0;
+ }
+@@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
+ {
+ 	struct sii8620 *ctx = i2c_get_clientdata(client);
+ 
+-	disable_irq(to_i2c_client(ctx->dev)->irq);
+-	sii8620_hw_off(ctx);
++	if (ctx->extcon) {
++		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
++					   &ctx->extcon_nb);
++		flush_work(&ctx->extcon_wq);
++		if (ctx->cable_state > 0)
++			sii8620_cable_out(ctx);
++	} else {
++		sii8620_cable_out(ctx);
++	}
+ 	drm_bridge_remove(&ctx->bridge);
+ 
+ 	return 0;
 -- 
 2.16.2
