@@ -1,50 +1,114 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Feb 2018 08:12:11 +0100
-Subject: [RFC PATCH] ARM: configs: sunxi: Set ondemand govenor as default
-In-Reply-To: <15992664-76be-2584-0f8d-424eadc23925@gmail.com>
-References: <20180217142235.28541-1-embed3d@gmail.com>
- <20180219081050.vvfhnbw4foved2fb@flea.lan>
- <15992664-76be-2584-0f8d-424eadc23925@gmail.com>
-Message-ID: <20180227071211.4c5okbwcp5qjx4ok@flea>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 27 Feb 2018 16:20:12 +0900
+Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
+In-Reply-To: <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-3-takahiro.akashi@linaro.org>
+ <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
+Message-ID: <20180227072011.GG6019@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 10:29:29PM +0100, Philipp Rossak wrote:
+Hi Kees,
+
+On Mon, Feb 26, 2018 at 07:57:10PM -0800, Kees Cook wrote:
+> On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+> > Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
+> > initialized by irq chip (gic), is called from exception entry.
+> > This patch fixes this problem.
 > 
+> As in, this symbol is not known a lkdtm setup time? Hm, seems like
+> we'd want a more generalized approach here.
+
+Hmm. See my comments below.
+
+> >
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > ---
+> >  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
+> >  1 file changed, 18 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+> > index ba92291508dc..e20343543053 100644
+> > --- a/drivers/misc/lkdtm_core.c
+> > +++ b/drivers/misc/lkdtm_core.c
+> > @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
+> >         if (lkdtm_kprobe != NULL)
+> >                 unregister_kprobe(lkdtm_kprobe);
+> >
+> > +       if (IS_ENABLED(CONFIG_ARM64) &&
+> > +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
+> > +               extern void (*handle_arch_irq)(struct pt_regs *regs);
 > 
-> On 19.02.2018 09:10, Maxime Ripard wrote:
-> > On Sat, Feb 17, 2018 at 03:22:35PM +0100, Philipp Rossak wrote:
-> > > Right now the performance govenor is the default frequency govenor on
-> > > sunxi devices. This causes some general problems.
-> > > When the cpu is idle the cpu runs with its maximum frequency.
-> > > This causes a higher cpu temperature in the idle state. When the cpu is
-> > > now under load the cpu gets with that higher idle temperature now faster
-> > > to its thermal limits.
-> > > An other big problem of the performace govenor is the missing
-> > > thermal throttling. Some tests with cpuburn resulted in a system crash
-> > > when the soc reached its thermal limits since no thermal throttling
-> > > occurred.
-> > 
-> > This won't change anything with cpuburn. While cpuburn will be
-> > running, ondemand will increase the frequency of the cores to the
-> > maximum frequency, putting yourself in the exact same situation.
->
-> I see here a totally different behavior on the hardware (Bananapi M2, A31s).
-> First ondemand increases the cpu frequency, when the maximum temperature is
-> reached, then it throttles down the cpu step by step to its minimum.
+> I don't like this extern -- can handle_arch_irq be properly exported somewhere?
 
-This is the thermal throttling, not the cpufreq governor.
+Define a weak function, get_handle_irq(), in linux/irq.h and
+a real one in arch code. Then
 
-Maxime
+        if (!kallsyms_lookup_name(crashpoint->symbol_name)) {
+                if (!strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
+                        func = get_handle_irq();
+                        if (func) {
+                                crashpoint->kprobe.addr = func;
+                                crashpoint->kprobe.symbol_name = NULL;
+                        } else {
+                                /* error */
+                        }
+                } /* anything else? */
+        }
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/1b88cb25/attachment.sig>
+Do you like this code better?
+
+> 
+> > +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
+> 
+> I don't think the * is needed here: it's already a function pointer.
+
+Will check.
+
+> > +               /*
+> > +                * Instantiating kprobe.symbol_name here, say
+> > +                * with lookup_symbol_name(*handle_arch_irq),
+> > +                * would cause register_kprobe() to fail.
+> > +                */
+> > +               crashpoint->kprobe.symbol_name = NULL;
+> 
+> Is kprobe.addr sufficient for register_kprobe?
+
+Yes as Masami explained.
+Leaving symbol_name ends up failure of register_kprobe().
+
+> > +       }
+> >         lkdtm_crashpoint = crashpoint;
+> >         lkdtm_crashtype = crashtype;
+> >         lkdtm_kprobe = &crashpoint->kprobe;
+> >         ret = register_kprobe(lkdtm_kprobe);
+> >         if (ret < 0) {
+> > -               pr_info("Couldn't register kprobe %s\n",
+> > -                       crashpoint->kprobe.symbol_name);
+> > +               if (IS_ENABLED(CONFIG_ARM64))
+> > +                       pr_info("Couldn't register kprobe 0x%lx\n",
+> > +                               (unsigned long)crashpoint->kprobe.addr);
+> > +               else
+> > +                       pr_info("Couldn't register kprobe %s\n",
+> > +                               crashpoint->kprobe.symbol_name);
+> >                 lkdtm_kprobe = NULL;
+> >                 lkdtm_crashpoint = NULL;
+> >                 lkdtm_crashtype = NULL;
+> 
+> So I can replicate, how did you test this?
+
+All what I did in my arm64 test is
+# echo PANIC > /sys/kernel/debug/provoke-crash/INT_HARDWARE_ENTRY
+
+The probe point will hit sooner or later and we will see a panic
+(and kdump kicks in).
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> -- 
+> Kees Cook
+> Pixel Security
