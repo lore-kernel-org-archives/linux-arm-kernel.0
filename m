@@ -1,51 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 27 Feb 2018 09:35:09 +0100
-Subject: [PATCH 0/8] R-Car M3-N: Enable EtherAVB device node
-In-Reply-To: <20180227082838.GA23738@w540>
-References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdXwxhT7MP5xs3HLP3oFX+V9rhCM5jQycXUiCyBOKOUg1Q@mail.gmail.com>
- <20180227082838.GA23738@w540>
-Message-ID: <20180227083509.6qrp2g3wstq7j24x@verge.net.au>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Tue, 27 Feb 2018 08:41:13 +0000
+Subject: [PATCH 4/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
+ Salvator-XS board
+In-Reply-To: <20180227082514.h2pfc7a5qpceb2mb@verge.net.au>
+References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+ <1519668225-12548-5-git-send-email-geert+renesas@glider.be>
+ <20180227082514.h2pfc7a5qpceb2mb@verge.net.au>
+Message-ID: <TY1PR06MB0702A5B4087711A3EF947893B7C00@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 09:28:38AM +0100, jacopo mondi wrote:
-> Hi Geert,
-> 
-> On Mon, Feb 26, 2018 at 07:28:47PM +0100, Geert Uytterhoeven wrote:
-> > Hi Jacopo,
-> >
-> > On Mon, Feb 26, 2018 at 6:57 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > >   as discussed with you Sergei and Geert, in order to enable EtherAVB for
-> > > R8A77965 we first wanted to make the phy-mode "rgmii-txid" a board specific
-> > > property for all other SoCs.
-> >
-> > Thanks for your series!
-> >
-> > > This series adds  the phy-mode property to salvator-common.dtsi and reset the
-> > > one for R8A77965/R8A7796/R8A77995 to "rgmii".
-> >
-> > I forgot that r8a7795.dtsi and r8a7796.dtsi are used for the ULCB boards, too.
-> > So to avoid regressions, you need to make a similar change to ulcb.dtsi like you
-> > made for salvator-common.dtsi.
-> >
-> > In addition, r8a77995.dtsi is only used for the Draak board.
-> > So you have to update r8a7795-draak.dtsi first, too.
-> 
-> Of course! I forgot about ULCB (and had a patch for Draak I lost while
-> rebasing :/ )
-> >
-> > > Then, in order to enable EtherAVB for R-Car M3-N, iommu nodes had to be added
-> > > as they are referenced by the "avb" device node (CC the iommu list for the
-> > > series for that reason).
-> >
-> > I don't think we need the iommu properties and nodes at this early stage.
-> > Ethernet works fine without them. Simon, do you agree?
-> 
-> I'll wait for Simon reply and then resend, possibly without iommu and
-> ULCB and Draak patches!
+Hello Simon,
 
-I don't feel strongly about this but I don't think iommu is a strict
-dependency of enabling Ethernet and I think its good not to include extra
-dependencies - if it was me I'd try to get Ethernet accepted then follow-up
-on iommu.
+> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
+> owner at vger.kernel.org] On Behalf Of Simon Horman
+> Sent: 27 February 2018 08:25
+> 
+> On Mon, Feb 26, 2018 at 07:03:45PM +0100, Geert Uytterhoeven wrote:
+> > The Renesas Salvator-XS development board can be equipped with an
+> > R-Car H3, M3-W, or M3-N SiP, which are pin-compatible.
+> >
+> > Document board part number and compatible values for the version with
+> > R-Car M3-N.
+> >
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> >  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt
+> > b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > index 51e4428856be4557..303f04e639431837 100644
+> > --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> > +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > @@ -114,6 +114,8 @@ Boards:
+> >      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+> >    - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+> >      compatible = "renesas,salvator-xs", "renesas,r8a7796"
+> > +  - Salvator-XS (Salvator-X 2nd version, RTP0RC77965SIPB012S)
+> > +    compatible = "renesas,salvator-xs", "renesas,r8a77965"
+> 
+> I am unsure how to verify this part number, can anyone help?
+
+This matches the label on the board.
+
+Kind regards, Chris
+
+
+> Also, the syntax seems inconsistent with that of patch 3/4.
+> 
+> >    - SILK (RTP0RC7794LCB00011S)
+> >      compatible = "renesas,silk", "renesas,r8a7794"
+> >    - SK-RZG1E (YR8A77450S000BE)
+> > --
+> > 2.7.4
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
