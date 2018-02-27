@@ -1,31 +1,77 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 27 Feb 2018 23:26:52 +0100
-Subject: [PATCH v2 07/16] drm/sun4i: Add support for H3 display engine
-In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
-References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <20180227222701.9716-8-jernej.skrabec@siol.net>
+Date: Tue, 27 Feb 2018 23:26:45 +0100
+Subject: [PATCH v2 00/16] Implement H3/H5 HDMI driver
+Message-ID: <20180227222701.9716-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H3 display engine has two mixers which are connected to HDMI and TV
-output.
+This series implements H3/H5 HDMI driver. It was tested on OrangePi 2 (H3),
+OrangePi Plus2e (H3) and OrangePi PC2 (H5) with many resolutions and it
+works well. Bug, which prevented correct operation for some resolutions,
+is also fixed.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+Code is based on linux-next, next-20180226 tag.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 3957c2ff6870..a0f43b81c64c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -359,6 +359,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun7i-a20-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
-+	{ .compatible = "allwinner,sun8i-h3-display-engine" },
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
- 	{ }
- };
+Best regards,
+Jernej
+
+Changes from v1:
+- Fixed build warning on arm64
+- Fixed condition in determine_rate function in HDMI PHY clock driver
+- Added defines for polarity settings in HDMI PHY
+- Added patch to skip LVDS code path altogether if TCON doesn't support it.
+- round_rate for NM PLLs now rounds to minimal rate if requested rate is
+  lower.
+- set_rate for NM PLLs doesn't fail if requested rate is lower than minimal
+  (round_rate is called before which already guarantees that rate is not
+   lower than minimal).
+
+Jernej Skrabec (16):
+  clk: sunxi-ng: Add check for minimal rate to NM PLLs
+  clk: sunxi-ng: h3: h5: Add minimal rate for video PLL
+  clk: sunxi-ng: h3: h5: Allow some clocks to set parent rate
+  clk: sunxi-ng: h3: h5: export CLK_PLL_VIDEO
+  dt-bindings: display: sun4i-drm: Add compatibles for H3 HDMI pipeline
+  drm/sun4i: Don't process LVDS if TCON doesn't support it
+  drm/sun4i: Add support for H3 display engine
+  drm/sun4i: Add support for H3 mixer 0
+  drm/sun4i: Fix polarity configuration for DW HDMI PHY
+  drm/sun4i: Add support for variants to DW HDMI PHY
+  drm/sun4i: Move and expand DW HDMI PHY register macros
+  drm/sun4i: Add support for H3 HDMI PHY variant
+  drm/sun4i: Allow building on arm64
+  ARM: dts: sunxi: h3/h5: Add HDMI pipeline
+  ARM: dts: sun8i: h3: Enable HDMI output on H3 boards
+  ARM64: dts: sun50i: h5: Enable HDMI output on H5 boards
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |   6 +
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  25 ++
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  25 ++
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts |  25 ++
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           |  25 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  25 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  25 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  24 ++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  25 ++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 108 ++++++
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  25 ++
+ .../dts/allwinner/sun50i-h5-orangepi-prime.dts     |  25 ++
+ .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    |  25 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  32 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   4 +-
+ drivers/clk/sunxi-ng/ccu_nm.c                      |  11 +-
+ drivers/clk/sunxi-ng/ccu_nm.h                      |  27 ++
+ drivers/gpu/drm/sun4i/Kconfig                      |   2 +-
+ drivers/gpu/drm/sun4i/Makefile                     |   1 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   1 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 120 +++----
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h              | 157 ++++++++-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c             | 369 ++++++++++++++++++---
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c         | 132 ++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                |  12 +
+ include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
+ 26 files changed, 1129 insertions(+), 129 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+
 -- 
 2.16.2
