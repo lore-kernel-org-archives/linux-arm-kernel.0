@@ -1,69 +1,43 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 27 Feb 2018 14:12:55 +0100
-Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
-In-Reply-To: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
-References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
-Message-ID: <20180227141255.177ea751@xps13>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 27 Feb 2018 14:25:34 +0100
+Subject: [PATCH v3 00/14] Add MMCI support for STM32F SoCs family
+In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <c4f78733-2544-6cef-97e5-fedcc23de404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+Hi Patrice,
 
-On Thu, 22 Feb 2018 20:30:56 +0000, Gabriel Matni
-<gabriel.matni@exfo.com> wrote:
-
-> From: Gabriel Matni <gabriel.matni@exfo.com>
+On 01/18/2018 03:34 PM, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
-> transmitter holding is ready to receive a new byte. Polling TX_EMPTY isn't
-> enough as the hardware buffer can become empty but not yet ready for CPU to
-> write the next byte.
-
-I am kind of sceptic with the explanation. My understanding is that:
-- TX_EMPTY means the FIFO is empty
-- TX_RDY means the FIFO is not full, neither empty, it is a "half
-  loaded" state.
-Polling TX_RDY instead of TX_EMPTY should work too, but I don't see
-why it would fix the loss of character by filling the FIFO when there
-are bytes in it rather than when it is fully empty.
-
+> This series reworks patches submitted one year ago by Andrea Merello [1]
+> but without succeed to merged it.
 > 
-> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
-> ---
-> drivers/tty/serial/mvebu-uart.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+> STM32F4 and STM32F7 SoCs families embeds a variant of the ARM PrimeCell
+> PL18x SD host controller, for which the mmci driver exists.
+> This series adds support for these SoCs to the mmci driver.
 > 
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index a100e98259d7..f0df0640208e 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
->    u32 val;
+> As other variants, this one need some specific quirks, that this
+> series address.
 > 
->    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> -             (val & STAT_TX_EMP), 1, 10000);
-> +             (val & STAT_TX_RDY(port)), 1, 10000);
-
-However, this change might have brought one noticeable difference: the
-bit polled is a per-port bit while the TX_EMPTY bit looks global. So
-maybe you faced the issue because you are using the ports quite
-intensively in parallel?
-
-Also it could explain why you only face the issue at slow baudrates:
-bytes will remain longer in the FIFO, increasing the probability of
-collision.
-
-> }
+> This series has been tested on following boards :
+> 	_ stm32f429-eval
+> 	_ stm32f469-disco
+> 	_ stm32f746-eval
+> 	_ stm32f769-disco
 > 
-> static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
-> --
-> 2.7.4
+> DT update for stm32f7 pinctrl, stm32f746-eval and stm32f769-disco boards
+> will be sent later to avoid conflict with pending stm32f7 series [1] which
+> is not yet merged on kernel mainline.
+> 
+> [1] https://www.spinics.net/lists/linux-mmc/msg41616.html
+> [2] https://patchwork.kernel.org/patch/10104447/
+>
+...
 
-Thanks,
-Miqu?l
+Patches 6 to 13 (DT/SoC/configs) applied on stm32-next.
 
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks
+Alex
