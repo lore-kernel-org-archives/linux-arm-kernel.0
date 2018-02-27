@@ -1,48 +1,51 @@
-From: mayhs11saini@gmail.com (shyam saini)
-Date: Tue, 27 Feb 2018 21:29:03 +0530
-Subject: [PATCH] ARM: dts: imx6dl-icore-rqs: Fix invalid PHY address
- assignment for ethernet
-Message-ID: <1519747143-3036-1-git-send-email-mayhs11saini@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 27 Feb 2018 17:59:20 +0200
+Subject: [PATCH v3 0/2] add support for Socionext SynQuacer I2C controller
+In-Reply-To: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
+References: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAHp75Vc_AUD2b5m-6CzKhAWJDudyObGs_oUUiFRk_BQv2QT7Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shyam Saini <shyam@amarulasolutions.com>
+On Tue, Feb 27, 2018 at 1:01 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Add a binding and a driver for the I2C IP found in the Socionext SynQuacer
+> SoC, which is essentially a rebranded version of the Fujitsu F_I2C controller.
+>
 
-Add "reg" property for ethernet to fix this issue.
+Thanks for an update!
+FWIW,
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-Errors in boot logs:
-mdio_bus 2188000.ethernet-1:
-/soc/aips-bus at 02100000/ethernet at 02188000/mdio/ethernet-phy
-has invalid PHY address
+P.S. clk_prepare_enable() may fail in ->probe() as well.
 
-mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 0
-mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 1
-mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 2
-mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 3
+> v3:
+> - incorporate more of Andy's review comments (#2), especially regarding the
+>   bus speed and clock source handling for ACPI
+> - patch #1 unchanged.
+>
+> v2:
+> - incorporate Andy's review comments (#2)
+> - patch #1 unchanged.
+>
+> Ard Biesheuvel (2):
+>   dt-bindings: i2c: add binding for Socionext SynQuacer I2C
+>   i2c: add support for Socionext SynQuacer I2C controller
+>
+>  Documentation/devicetree/bindings/i2c/i2c-synquacer.txt |  29 +
+>  drivers/i2c/busses/Kconfig                              |  10 +
+>  drivers/i2c/busses/Makefile                             |   1 +
+>  drivers/i2c/busses/i2c-synquacer.c                      | 787 ++++++++++++++++++++
+>  4 files changed, 827 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+>  create mode 100644 drivers/i2c/busses/i2c-synquacer.c
+>
+> --
+> 2.11.0
+>
 
-Reported-by: Shyam Saini <shyam@amarulasolutions.com>
-Suggested-by: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Shyam Saini <shyam@amarulasolutions.com>
----
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-index 49daa2b7892d..acc3b11fba2a 100644
---- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-@@ -200,7 +200,11 @@
- 	status = "okay";
- 
- 	mdio {
--		eth_phy: ethernet-phy {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		eth_phy: ethernet-phy at 0 {
-+			reg = <0x0>;
- 			rxc-skew-ps = <1140>;
- 			txc-skew-ps = <1140>;
- 			txen-skew-ps = <600>;
+
 -- 
-2.7.4
+With Best Regards,
+Andy Shevchenko
