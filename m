@@ -1,122 +1,104 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Tue, 27 Feb 2018 22:29:15 +0100
-Subject: [PATCH v2] ARM: imx: avic: set low-power interrupt mask for imx25
-In-Reply-To: <1518628894-8328-1-git-send-email-martin@kaiser.cx>
-References: <1518628894-8328-1-git-send-email-martin@kaiser.cx>
-Message-ID: <1519766955-4302-1-git-send-email-martin@kaiser.cx>
+From: gabriel.matni@exfo.com (Gabriel Matni)
+Date: Tue, 27 Feb 2018 21:56:03 +0000
+Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
+In-Reply-To: <20180227141255.177ea751@xps13>
+References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
+ <20180227141255.177ea751@xps13>
+Message-ID: <3B588D51285A4A4D8D39C94212E07826271B70@SPQCMBX02.exfo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx25 contains two registers (LPIMR0 and 1) to define which interrupts
-are enabled in low-power mode. As of today, those two registers are
-configured to enable all interrupts. Before going to low-power mode, the
-AVIC's INTENABLEH and INTENABLEL registers are configured to enable only
-those interrupts which are used as wakeup sources.
+Hi Miqu?l,
 
-It turned out that this approach is not sufficient if we want the imx25
-to go into stop mode during suspend-to-ram. (Stop mode is the low-power
-mode that consumes the least power. The peripheral master clock is
-switched off in this mode). For stop mode to work, the LPIMR0 and 1
-registers have to be configured with the set of interrupts that are
-allowed in low-power mode. Fortunately, the bits in the LPIMR registers
-are assigned to the same interrupts as the bits in INTENABLEH and
-INTENABLEL. However, LPIMR uses 1 to mask an interrupt whereas the
-INTENABLE registers use 1 to enable an interrupt.
+> -----Original Message-----
+> From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
+> Sent: February 27, 2018 8:13 AM
+> To: Gabriel Matni <gabriel.matni@exfo.com>
+> Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
+> Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
+> <thomas.petazzoni@bootlin.com>
+> Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
+> 
+> Hi Gabriel,
+> 
+> On Thu, 22 Feb 2018 20:30:56 +0000, Gabriel Matni
+> <gabriel.matni@exfo.com> wrote:
+> 
+> > From: Gabriel Matni <gabriel.matni@exfo.com>
+> >
+> > Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> > The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
+> > transmitter holding is ready to receive a new byte. Polling TX_EMPTY
+> > isn't enough as the hardware buffer can become empty but not yet ready
+> > for CPU to write the next byte.
+> 
+> I am kind of sceptic with the explanation. My understanding is that:
+> - TX_EMPTY means the FIFO is empty
+> - TX_RDY means the FIFO is not full, neither empty, it is a "half
+>   loaded" state.
+> Polling TX_RDY instead of TX_EMPTY should work too, but I don't see why it
+> would fix the loss of character by filling the FIFO when there are bytes in it
+> rather than when it is fully empty.
 
-This patch sets the LPIMR registers to the inverted bitmask of the
-INTENABLE registers during suspend and goes back to "all interrupts
-masked" when we wake up again. We also make this the default at startup.
+TX_READY is set whenever the UART Transmitter Holding register is ready to
+receive a new byte. It gets cleared as soon as a new byte is written to the
+register. If the FIFO is empty or still has room, the ready will be set.
 
-As far as I know, the other supported imx architectures have no similar
-mechanism. Since the LPIMR registers are part of the CCM module, we
-query the device tree for an imx25 ccm node in order to detect if we're
-running on imx25.
+TX_EMPTY tells us when it is possible to send a break sequence via
+SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+empty, it does not guarantee that a new byte can be written just yet. I am
+unsure about the FIFO status in this case as I can encounter TX_FIFO_EMP=0
+while TX_EMP=1, which suggests that the FIFO isn't necessarily empty when
+TX_EMP is set.
 
-Signed-off-by: Martin Kaiser <martin@kaiser.cx>
----
-changes in v2
-   - keep declarations of avic_base and mx25_ccm_base separate
-   - newlines before mx25-specific code
+Therefore, the driver can either poll TX_FIFO_EMP or TX_READY to know
+whether it can output a new byte. I personally like TX_READY as it takes
+advantage of the FIFO.
 
- arch/arm/mach-imx/avic.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+> >
+> > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
+> > ---
+> > drivers/tty/serial/mvebu-uart.c | 2 +-
+> > 1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/tty/serial/mvebu-uart.c
+> > b/drivers/tty/serial/mvebu-uart.c index a100e98259d7..f0df0640208e
+> > 100644
+> > --- a/drivers/tty/serial/mvebu-uart.c
+> > +++ b/drivers/tty/serial/mvebu-uart.c
+> > @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+> >    u32 val;
+> >
+> >    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+> > -             (val & STAT_TX_EMP), 1, 10000);
+> > +             (val & STAT_TX_RDY(port)), 1, 10000);
+> 
+> However, this change might have brought one noticeable difference: the bit
+> polled is a per-port bit while the TX_EMPTY bit looks global. So maybe you
+> faced the issue because you are using the ports quite intensively in parallel?
+> 
+> Also it could explain why you only face the issue at slow baudrates:
+> bytes will remain longer in the FIFO, increasing the probability of collision.
+> 
 
-diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index 1afccae..c0434a3 100644
---- a/arch/arm/mach-imx/avic.c
-+++ b/arch/arm/mach-imx/avic.c
-@@ -22,6 +22,7 @@
- #include <linux/irqdomain.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <asm/mach/irq.h>
- #include <asm/exception.h>
- 
-@@ -51,7 +52,12 @@
- 
- #define AVIC_NUM_IRQS 64
- 
-+/* low power interrupt mask registers */
-+#define MX25_CCM_LPIMR0	0x68
-+#define MX25_CCM_LPIMR1	0x6C
-+
- static void __iomem *avic_base;
-+static void __iomem *mx25_ccm_base;
- static struct irq_domain *domain;
- 
- #ifdef CONFIG_FIQ
-@@ -93,6 +99,18 @@ static void avic_irq_suspend(struct irq_data *d)
- 
- 	avic_saved_mask_reg[idx] = imx_readl(avic_base + ct->regs.mask);
- 	imx_writel(gc->wake_active, avic_base + ct->regs.mask);
-+
-+	if (mx25_ccm_base) {
-+		u8 offs = d->hwirq < AVIC_NUM_IRQS / 2 ?
-+			MX25_CCM_LPIMR0 : MX25_CCM_LPIMR1;
-+		/*
-+		 * The interrupts which are still enabled will be used as wakeup
-+		 * sources. Allow those interrupts in low-power mode.
-+		 * The LPIMR registers use 0 to allow an interrupt, the AVIC
-+		 * registers use 1.
-+		 */
-+		imx_writel(~gc->wake_active, mx25_ccm_base + offs);
-+	}
- }
- 
- static void avic_irq_resume(struct irq_data *d)
-@@ -102,6 +120,13 @@ static void avic_irq_resume(struct irq_data *d)
- 	int idx = d->hwirq >> 5;
- 
- 	imx_writel(avic_saved_mask_reg[idx], avic_base + ct->regs.mask);
-+
-+	if (mx25_ccm_base) {
-+		u8 offs = d->hwirq < AVIC_NUM_IRQS / 2 ?
-+			MX25_CCM_LPIMR0 : MX25_CCM_LPIMR1;
-+
-+		imx_writel(0xffffffff, mx25_ccm_base + offs);
-+	}
- }
- 
- #else
-@@ -158,6 +183,18 @@ void __init mxc_init_irq(void __iomem *irqbase)
- 
- 	avic_base = irqbase;
- 
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-ccm");
-+	mx25_ccm_base = of_iomap(np, 0);
-+
-+	if (mx25_ccm_base) {
-+		/*
-+		 * By default, we mask all interrupts. We set the actual mask
-+		 * before we go into low-power mode.
-+		 */
-+		imx_writel(0xffffffff, mx25_ccm_base + MX25_CCM_LPIMR0);
-+		imx_writel(0xffffffff, mx25_ccm_base + MX25_CCM_LPIMR1);
-+	}
-+
- 	/* put the AVIC into the reset value with
- 	 * all interrupts disabled
- 	 */
--- 
-2.1.4
+In both cases, they are per-port bits, however since UARTS are not
+identical (normal vs extended), the driver implementation treats them
+differently.  For instance, STAT_TX_EMP maps to bit 6 of the status
+register regardless of the UART, however TX_RDY(port) maps to SR bit 5 on
+UART1 and SR bit 15 on UART2.
+
+> > }
+> >
+> > static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+> > --
+> > 2.7.4
+> 
+> Thanks,
+> Miqu?l
+> 
+> --
+> Miquel Raynal, Bootlin (formerly Free Electrons) Embedded Linux and Kernel
+> engineering https://bootlin.com
+
+Regards,
+Gabriel
