@@ -1,104 +1,229 @@
-From: gabriel.matni@exfo.com (Gabriel Matni)
-Date: Tue, 27 Feb 2018 21:56:03 +0000
-Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
-In-Reply-To: <20180227141255.177ea751@xps13>
-References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
- <20180227141255.177ea751@xps13>
-Message-ID: <3B588D51285A4A4D8D39C94212E07826271B70@SPQCMBX02.exfo.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 28 Feb 2018 07:26:51 +0900
+Subject: [PATCH v5 6/6] drm/bridge/sii8620: use micro-USB cable
+ detection logic to detect MHL
+In-Reply-To: <87dd3281-0471-ab2a-90c6-3f2d4bdf4750@samsung.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071142eucas1p10203dac2558db034a4a3287220213601@eucas1p1.samsung.com>
+ <20180227071134.28063-7-a.hajda@samsung.com> <5A953C21.5020007@samsung.com>
+ <87dd3281-0471-ab2a-90c6-3f2d4bdf4750@samsung.com>
+Message-ID: <5A95DB2B.6000003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miqu?l,
+Hi,
 
-> -----Original Message-----
-> From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
-> Sent: February 27, 2018 8:13 AM
-> To: Gabriel Matni <gabriel.matni@exfo.com>
-> Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
-> Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
-> <thomas.petazzoni@bootlin.com>
-> Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
+On 2018? 02? 27? 21:05, Andrzej Hajda wrote:
+> On 27.02.2018 12:08, Chanwoo Choi wrote:
+>> Hi,
+>>
+>> On 2018? 02? 27? 16:11, Andrzej Hajda wrote:
+>>> From: Maciej Purski <m.purski@samsung.com>
+>>>
+>>> Currently MHL chip must be turned on permanently to detect MHL cable. It
+>>> duplicates micro-USB controller's (MUIC) functionality and consumes
+>>> unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
+>>> only if it detects MHL cable.
+>>>
+>>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>> v5: updated extcon API
+>>>
+>>> This is rework of the patch by Maciej with following changes:
+>>> - use micro-USB port bindings to get extcon, instead of extcon property,
+>>> - fixed remove sequence,
+>>> - fixed extcon get state logic.
+>>>
+>>> Code finding extcon node is hacky IMO, I guess ultimately it should be done
+>>> via some framework (maybe even extcon), or at least via helper, I hope it
+>>> can stay as is until the proper solution will be merged.
+>>>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>>  drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
+>>>  1 file changed, 94 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
+>>> index 9e785b8e0ea2..62b0adabcac2 100644
+>>> --- a/drivers/gpu/drm/bridge/sil-sii8620.c
+>>> +++ b/drivers/gpu/drm/bridge/sil-sii8620.c
+>>> @@ -17,6 +17,7 @@
+>>>  
+>>>  #include <linux/clk.h>
+>>>  #include <linux/delay.h>
+>>> +#include <linux/extcon.h>
+>>>  #include <linux/gpio/consumer.h>
+>>>  #include <linux/i2c.h>
+>>>  #include <linux/interrupt.h>
+>>> @@ -25,6 +26,7 @@
+>>>  #include <linux/list.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/mutex.h>
+>>> +#include <linux/of_graph.h>
+>>>  #include <linux/regulator/consumer.h>
+>>>  #include <linux/slab.h>
+>>>  
+>>> @@ -81,6 +83,10 @@ struct sii8620 {
+>>>  	struct edid *edid;
+>>>  	unsigned int gen2_write_burst:1;
+>>>  	enum sii8620_mt_state mt_state;
+>>> +	struct extcon_dev *extcon;
+>>> +	struct notifier_block extcon_nb;
+>>> +	struct work_struct extcon_wq;
+>>> +	int cable_state;
+>>>  	struct list_head mt_queue;
+>>>  	struct {
+>>>  		int r_size;
+>>> @@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
+>>>  	ctx->rc_dev = rc_dev;
+>>>  }
+>>>  
+>>> +static void sii8620_cable_out(struct sii8620 *ctx)
+>>> +{
+>>> +	disable_irq(to_i2c_client(ctx->dev)->irq);
+>>> +	sii8620_hw_off(ctx);
+>>> +}
+>>> +
+>>> +static void sii8620_extcon_work(struct work_struct *work)
+>>> +{
+>>> +	struct sii8620 *ctx =
+>>> +		container_of(work, struct sii8620, extcon_wq);
+>>> +	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
+>>> +
+>>> +	if (state == ctx->cable_state)
+>>> +		return;
+>>> +
+>>> +	ctx->cable_state = state;
+>>> +
+>>> +	if (state > 0)
+>>> +		sii8620_cable_in(ctx);
+>>> +	else
+>>> +		sii8620_cable_out(ctx);
+>>> +}
+>>> +
+>>> +static int sii8620_extcon_notifier(struct notifier_block *self,
+>>> +			unsigned long event, void *ptr)
+>>> +{
+>>> +	struct sii8620 *ctx =
+>>> +		container_of(self, struct sii8620, extcon_nb);
+>>> +
+>>> +	schedule_work(&ctx->extcon_wq);
+>>> +
+>>> +	return NOTIFY_DONE;
+>>> +}
+>>> +
+>>> +static int sii8620_extcon_init(struct sii8620 *ctx)
+>>> +{
+>>> +	struct extcon_dev *edev;
+>>> +	struct device_node *musb, *muic;
+>>> +	int ret;
+>>> +
+>>> +	/* get micro-USB connector node */
+>>> +	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
+>>> +	/* next get micro-USB Interface Controller node */
+>>> +	muic = of_get_next_parent(musb);
+>>> +
+>>> +	if (!muic) {
+>>> +		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
+>>> +		return 0;
+>>> +	}
+>>> +
+>>> +	edev = extcon_find_edev_by_node(muic);
+>>> +	of_node_put(muic);
+>>> +	if (IS_ERR(edev)) {
+>>> +		if (PTR_ERR(edev) == -EPROBE_DEFER)
+>>> +			return -EPROBE_DEFER;
+>>> +		dev_err(ctx->dev, "Invalid or missing extcon\n");
+>>> +		return PTR_ERR(edev);
+>>> +	}
+>>> +
+>>> +	ctx->extcon = edev;
+>>> +	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
+>>> +	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
+>>> +	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
+>> You better to use devm_extcon_register_notifier().
 > 
-> Hi Gabriel,
-> 
-> On Thu, 22 Feb 2018 20:30:56 +0000, Gabriel Matni
-> <gabriel.matni@exfo.com> wrote:
-> 
-> > From: Gabriel Matni <gabriel.matni@exfo.com>
-> >
-> > Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> > The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
-> > transmitter holding is ready to receive a new byte. Polling TX_EMPTY
-> > isn't enough as the hardware buffer can become empty but not yet ready
-> > for CPU to write the next byte.
-> 
-> I am kind of sceptic with the explanation. My understanding is that:
-> - TX_EMPTY means the FIFO is empty
-> - TX_RDY means the FIFO is not full, neither empty, it is a "half
->   loaded" state.
-> Polling TX_RDY instead of TX_EMPTY should work too, but I don't see why it
-> would fix the loss of character by filling the FIFO when there are bytes in it
-> rather than when it is fully empty.
+> With devm version I risk that in case of device unbind notification will
+> be called after .remove callback, it seems to me quite dangerous. Or am
+> I missing something?
 
-TX_READY is set whenever the UART Transmitter Holding register is ready to
-receive a new byte. It gets cleared as soon as a new byte is written to the
-register. If the FIFO is empty or still has room, the ready will be set.
+If you use the cancel_work_sync() in remove() instead of flush_work(),
+you can use the 'devm_extcon_*'.
 
-TX_EMPTY tells us when it is possible to send a break sequence via
-SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-empty, it does not guarantee that a new byte can be written just yet. I am
-unsure about the FIFO status in this case as I can encounter TX_FIFO_EMP=0
-while TX_EMP=1, which suggests that the FIFO isn't necessarily empty when
-TX_EMP is set.
-
-Therefore, the driver can either poll TX_FIFO_EMP or TX_READY to know
-whether it can output a new byte. I personally like TX_READY as it takes
-advantage of the FIFO.
-
-> >
-> > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
-> > ---
-> > drivers/tty/serial/mvebu-uart.c | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serial/mvebu-uart.c
-> > b/drivers/tty/serial/mvebu-uart.c index a100e98259d7..f0df0640208e
-> > 100644
-> > --- a/drivers/tty/serial/mvebu-uart.c
-> > +++ b/drivers/tty/serial/mvebu-uart.c
-> > @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
-> >    u32 val;
-> >
-> >    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> > -             (val & STAT_TX_EMP), 1, 10000);
-> > +             (val & STAT_TX_RDY(port)), 1, 10000);
 > 
-> However, this change might have brought one noticeable difference: the bit
-> polled is a per-port bit while the TX_EMPTY bit looks global. So maybe you
-> faced the issue because you are using the ports quite intensively in parallel?
+> Regards
+> Andrzej
 > 
-> Also it could explain why you only face the issue at slow baudrates:
-> bytes will remain longer in the FIFO, increasing the probability of collision.
-> 
-
-In both cases, they are per-port bits, however since UARTS are not
-identical (normal vs extended), the driver implementation treats them
-differently.  For instance, STAT_TX_EMP maps to bit 6 of the status
-register regardless of the UART, however TX_RDY(port) maps to SR bit 5 on
-UART1 and SR bit 15 on UART2.
-
-> > }
-> >
-> > static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
-> > --
-> > 2.7.4
-> 
-> Thanks,
-> Miqu?l
+>>
+>>> +	if (ret) {
+>>> +		dev_err(ctx->dev, "failed to register notifier for MHL\n");
+>>> +		return ret;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>>  static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
+>>>  {
+>>>  	return container_of(bridge, struct sii8620, bridge);
+>>> @@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
+>>>  	if (ret)
+>>>  		return ret;
+>>>  
+>>> +	ret = sii8620_extcon_init(ctx);
+>>> +	if (ret < 0) {
+>>> +		dev_err(ctx->dev, "failed to initialize EXTCON\n");
+>>> +		return ret;
+>>> +	}
+>>> +
+>>>  	i2c_set_clientdata(client, ctx);
+>>>  
+>>>  	ctx->bridge.funcs = &sii8620_bridge_funcs;
+>>>  	ctx->bridge.of_node = dev->of_node;
+>>>  	drm_bridge_add(&ctx->bridge);
+>>>  
+>>> -	sii8620_cable_in(ctx);
+>>> +	if (!ctx->extcon)
+>>> +		sii8620_cable_in(ctx);
+>>>  
+>>>  	return 0;
+>>>  }
+>>> @@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
+>>>  {
+>>>  	struct sii8620 *ctx = i2c_get_clientdata(client);
+>>>  
+>>> -	disable_irq(to_i2c_client(ctx->dev)->irq);
+>>> -	sii8620_hw_off(ctx);
+>>> +	if (ctx->extcon) {
+>>> +		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
+>>> +					   &ctx->extcon_nb);
+>> Don't need to unregister the notifier if using devm_extcon_register_notifier().
+>>
+>>> +		flush_work(&ctx->extcon_wq);
+>>> +		if (ctx->cable_state > 0)
+>>> +			sii8620_cable_out(ctx);
+>>> +	} else {
+>>> +		sii8620_cable_out(ctx);
+>>> +	}
+>>>  	drm_bridge_remove(&ctx->bridge);
+>>>  
+>>>  	return 0;
+>>>
+>> If you use the resource managed function (devm_extcon_register_notifier), Looks good to me.
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
 > 
 > --
-> Miquel Raynal, Bootlin (formerly Free Electrons) Embedded Linux and Kernel
-> engineering https://bootlin.com
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
 
-Regards,
-Gabriel
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
