@@ -1,44 +1,95 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 27 Feb 2018 10:02:56 -0500
-Subject: [PATCH] ARM: dts: NSP: Fix amount of RAM on BCM958625HR
-In-Reply-To: <20180227010312.7495-1-f.fainelli@gmail.com>
-References: <20180227010312.7495-1-f.fainelli@gmail.com>
-Message-ID: <CAC3K-4rqYMUBtbwaojWBF-0biEV-WSPpe=0bDocL4TUrrL4gGQ@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Tue, 27 Feb 2018 15:05:46 +0000
+Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
+In-Reply-To: <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
+References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
+ <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
+ <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+ <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
+Message-ID: <HK2PR0601MB139380F295EF5CE849288F91F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 8:03 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Jon attempted to fix the amount of RAM on the BCM958625HR in commit
-> c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
-> but it seems like we tripped over some poorly documented schematics.
->
-> The top-level page of the schematics says the board has 2GB, but when
-> you end-up scrolling to page 6, you see two chips of 4GiB (512MB) but
-> what the bootloader really initializes only 512MB, any attempt to use
-> more than that results in data aborts. Fix this again back to 512MB.
->
-> Fixes: c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Hi Shawn,
 
-Acked-by: Jon Mason <jon.mason@broadcom.com>
+On 27 February 2018 14:42, Shawn Lin wrote:
+> On 2018/2/27 22:31, Phil Edworthy wrote:
+> > Hi Shawn,
+> >
+> > On 27 February 2018 14:28, Shawn Lin wrote:
+> >> ? 2018/2/27 21:55, Phil Edworthy ??:
+> >>> Since the controller does not support the end-of-busy IRQ, don't use it.
+> >>> Otherwise, on older SD cards you will get lots of these messages:
+> >>> "mmc0: Got data interrupt 0x00000002 even though no data operation
+> >>> was
+> >> in progress"
+> >>>
+> >>
+> >> I'm afraid you have to explain which version of arasan's IP suffer
+> >> from this and what does the "older SD cards" mean?
+> > Ok, I'll try to find out the IP version...
+> > For "older SD cards", I can provide a list of a few cards that exhibit
+> > this problem and others that don't, is that enough info?
+> 
+> What I meant is could you elaborate more about what kind of cards, e.g, are
+> them the  legacy SDSC cards or SDHC cards, or maybe they are only running
+> with defaut speed? or whatever, but not just with a vague "older" cards. :)
+Unfortunately, I have one SDHC card that works, one that doesn't. Both cards
+are running with a 50MHz SD clock. All I know is this:
 
-> ---
->  arch/arm/boot/dts/bcm958625hr.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-> index 6a44b8021702..f0e2008f7490 100644
-> --- a/arch/arm/boot/dts/bcm958625hr.dts
-> +++ b/arch/arm/boot/dts/bcm958625hr.dts
-> @@ -49,7 +49,7 @@
->
->         memory {
->                 device_type = "memory";
-> -               reg = <0x60000000 0x80000000>;
-> +               reg = <0x60000000 0x20000000>;
->         };
->
->         gpio-restart {
+SD cards that report unexpected interrupts:
+2GB Sandisk Extreme III                     (e624 SD02G 1.89 GiB)
+8GB Sandisk (SDHC class 4)              (aaaa SU08G 7.40 GiB)
+8GB Sandisk Extreme III (SDHC class 6)    (bb4e SD08G 7.61 GiB)
+
+SD cards that work ok:
+16GB Samsung (microSDHC U1 class 10)          (0001 00000 14.6 GiB)
+16GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL16G 14.8 GiB)
+32GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL32G 29.7 GiB)
+
+Thanks
+Phil
+
+> >>> This has been reported on Xilinx devices that also use the Arasan IP.
+> >>> See https://patchwork.kernel.org/patch/8062871/
+> >>>
+> >>> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1
+> SoC.
+> >>>
+> >>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> >>> ---
+> >>>    drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
+> >>>    1 file changed, 2 insertions(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+> >>> b/drivers/mmc/host/sdhci-of-arasan.c
+> >>> index c33a5f7..ab66e32 100644
+> >>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> >>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> >>> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data
+> >> sdhci_arasan_pdata = {
+> >>>    	.ops = &sdhci_arasan_ops,
+> >>>    	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+> >>>    	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+> >>> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+> >>> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+> >>> +			SDHCI_QUIRK2_STOP_WITH_TC,
+> >>>    };
+> >>>
+> >>>    static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32
+> >>> intmask)
+> >>>
+> >>
+> >>
+> >> --
+> >> Best Regards
+> >> Shawn Lin
+> >
+> >
+> >
+> >
+> 
+> 
 > --
-> 2.14.1
->
+> Best Regards
+> Shawn Lin
