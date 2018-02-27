@@ -1,79 +1,63 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 27 Feb 2018 22:42:03 +0800
-Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
-In-Reply-To: <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
-References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
- <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
- <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
-Message-ID: <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
+From: jtoppins@redhat.com (Jonathan Toppins)
+Date: Tue, 27 Feb 2018 09:44:09 -0500
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
+References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+ <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
+Message-ID: <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/2/27 22:31, Phil Edworthy wrote:
-> Hi Shawn,
+On 02/27/2018 07:40 AM, Bhupesh Sharma wrote:
+> Hi,
 > 
-> On 27 February 2018 14:28, Shawn Lin wrote:
->> ? 2018/2/27 21:55, Phil Edworthy ??:
->>> Since the controller does not support the end-of-busy IRQ, don't use it.
->>> Otherwise, on older SD cards you will get lots of these messages:
->>> "mmc0: Got data interrupt 0x00000002 even though no data operation was
->> in progress"
->>>
+> On Tue, Feb 27, 2018 at 11:35 AM, Jonathan Toppins <jtoppins@redhat.com> wrote:
+>> This patch allows a user to configure ACPI to be preferred over
+>> device-tree.
 >>
->> I'm afraid you have to explain which version of arasan's IP suffer from this
->> and what does the "older SD cards" mean?
-> Ok, I'll try to find out the IP version...
-> For "older SD cards", I can provide a list of a few cards that exhibit this problem
-> and others that don't, is that enough info?
+>> Currently for ACPI to be used a user either has to set acpi=on on the
+>> kernel command line or make sure any device tree passed to the kernel
+>> is empty. If the dtb passed to the kernel is non-empty then device-tree
+>> will be chosen as the boot method of choice even if it is not correct.
+> 
+> Hmm. Not sure if I correctly understand what you mean here by the term
+> 'incorrect device tree'. Do you mean a corrupted device tree blob (but
+> normally we can catch those cases via the device tree header) or a
+> deliberate (or a broken) firmware attempt to pass an incorrect device
+> tree blob to the OS.
 
-What I meant is could you elaborate more about what kind of cards, e.g,
-are them the  legacy SDSC cards or SDHC cards, or maybe they are only
-running with defaut speed? or whatever, but not just with a vague
-"older" cards. :)
+I mean a device tree that doesn't list all devices in the SOC. So it is
+more incomplete than incorrect. It could also be incorrect in that it
+doesn't list proper timings, memory/pci/etc.
 
 > 
-> Thanks
-> Phil
+> If its the later, I think the onus should be on the firmware (u-boot
+> or UEFI or others.. ) to fix the problems. I know we carry a lot of
+> fixes in the kernel for x86 firmware quirks but then we have several
+> broken x86 machines on which kernel has been running since several
+> years now.
 > 
->>> This has been reported on Xilinx devices that also use the Arasan IP.
->>> See https://patchwork.kernel.org/patch/8062871/
->>>
->>> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC.
->>>
->>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
->>> ---
->>>    drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
->>>    1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
->>> b/drivers/mmc/host/sdhci-of-arasan.c
->>> index c33a5f7..ab66e32 100644
->>> --- a/drivers/mmc/host/sdhci-of-arasan.c
->>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->>> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data
->> sdhci_arasan_pdata = {
->>>    	.ops = &sdhci_arasan_ops,
->>>    	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
->>>    	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
->>> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
->>> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
->>> +			SDHCI_QUIRK2_STOP_WITH_TC,
->>>    };
->>>
->>>    static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32
->>> intmask)
->>>
->>
->>
->> --
->> Best Regards
->> Shawn Lin
+> IMO, if we have a known firmware quirk (to fix the broken DTB being
+> passed from the firmware), we can look at adding it in the early arm64
+> kernel code (similar to the quirk handling we do in the x86 early
+> kernel code for broken firmware), rather than forcing ACPI as the boot
+> method.
 > 
+>> To prevent this situation where a system is only intended to be booted
+>> via ACPI a user can set this kernel configuration so it ignores
+>> device-tree settings unless ACPI table checks fail.
 > 
-> 
-> 
+> Or, if decide to depreciate DTB as the boot method for such boards,
+> can we look at setting 'acpi=force' in the bootagrs always to make
+> sure that ACPI (and no fallback on DTB) is forced as the boot method
+> for such arm64 machines.
 
+For arm64 DT is suppose to *not* be the preferred method, yet still DT
+is preferred if the firmware provides both tables to the kernel. So it
+seems reasonable to eventually have a default that effectively does
+acpi=force for arm64. This patch was taking the halfway approach to just
+have the kernel prefer acpi. I would prefer to just change to kernel
+bool values instead of compiling in kernel command line args, as command
+line args are usually left for the end user to play with.
 
--- 
-Best Regards
-Shawn Lin
+-Jon
