@@ -1,207 +1,144 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 27 Feb 2018 13:05:25 +0100
-Subject: [PATCH v5 6/6] drm/bridge/sii8620: use micro-USB cable
- detection logic to detect MHL
-In-Reply-To: <5A953C21.5020007@samsung.com>
-References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071142eucas1p10203dac2558db034a4a3287220213601@eucas1p1.samsung.com>
- <20180227071134.28063-7-a.hajda@samsung.com> <5A953C21.5020007@samsung.com>
-Message-ID: <87dd3281-0471-ab2a-90c6-3f2d4bdf4750@samsung.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Tue, 27 Feb 2018 12:34:22 +0100
+Subject: [PATCH v5 33/40] KVM: arm64: Configure c15, PMU,
+ and debug register traps on cpu load/put for VHE
+In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
+References: <20180227113429.637-1-cdall@kernel.org>
+Message-ID: <20180227113429.637-34-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.02.2018 12:08, Chanwoo Choi wrote:
-> Hi,
->
-> On 2018? 02? 27? 16:11, Andrzej Hajda wrote:
->> From: Maciej Purski <m.purski@samsung.com>
->>
->> Currently MHL chip must be turned on permanently to detect MHL cable. It
->> duplicates micro-USB controller's (MUIC) functionality and consumes
->> unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
->> only if it detects MHL cable.
->>
->> Signed-off-by: Maciej Purski <m.purski@samsung.com>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> ---
->> v5: updated extcon API
->>
->> This is rework of the patch by Maciej with following changes:
->> - use micro-USB port bindings to get extcon, instead of extcon property,
->> - fixed remove sequence,
->> - fixed extcon get state logic.
->>
->> Code finding extcon node is hacky IMO, I guess ultimately it should be done
->> via some framework (maybe even extcon), or at least via helper, I hope it
->> can stay as is until the proper solution will be merged.
->>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> ---
->>  drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
->>  1 file changed, 94 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
->> index 9e785b8e0ea2..62b0adabcac2 100644
->> --- a/drivers/gpu/drm/bridge/sil-sii8620.c
->> +++ b/drivers/gpu/drm/bridge/sil-sii8620.c
->> @@ -17,6 +17,7 @@
->>  
->>  #include <linux/clk.h>
->>  #include <linux/delay.h>
->> +#include <linux/extcon.h>
->>  #include <linux/gpio/consumer.h>
->>  #include <linux/i2c.h>
->>  #include <linux/interrupt.h>
->> @@ -25,6 +26,7 @@
->>  #include <linux/list.h>
->>  #include <linux/module.h>
->>  #include <linux/mutex.h>
->> +#include <linux/of_graph.h>
->>  #include <linux/regulator/consumer.h>
->>  #include <linux/slab.h>
->>  
->> @@ -81,6 +83,10 @@ struct sii8620 {
->>  	struct edid *edid;
->>  	unsigned int gen2_write_burst:1;
->>  	enum sii8620_mt_state mt_state;
->> +	struct extcon_dev *extcon;
->> +	struct notifier_block extcon_nb;
->> +	struct work_struct extcon_wq;
->> +	int cable_state;
->>  	struct list_head mt_queue;
->>  	struct {
->>  		int r_size;
->> @@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
->>  	ctx->rc_dev = rc_dev;
->>  }
->>  
->> +static void sii8620_cable_out(struct sii8620 *ctx)
->> +{
->> +	disable_irq(to_i2c_client(ctx->dev)->irq);
->> +	sii8620_hw_off(ctx);
->> +}
->> +
->> +static void sii8620_extcon_work(struct work_struct *work)
->> +{
->> +	struct sii8620 *ctx =
->> +		container_of(work, struct sii8620, extcon_wq);
->> +	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
->> +
->> +	if (state == ctx->cable_state)
->> +		return;
->> +
->> +	ctx->cable_state = state;
->> +
->> +	if (state > 0)
->> +		sii8620_cable_in(ctx);
->> +	else
->> +		sii8620_cable_out(ctx);
->> +}
->> +
->> +static int sii8620_extcon_notifier(struct notifier_block *self,
->> +			unsigned long event, void *ptr)
->> +{
->> +	struct sii8620 *ctx =
->> +		container_of(self, struct sii8620, extcon_nb);
->> +
->> +	schedule_work(&ctx->extcon_wq);
->> +
->> +	return NOTIFY_DONE;
->> +}
->> +
->> +static int sii8620_extcon_init(struct sii8620 *ctx)
->> +{
->> +	struct extcon_dev *edev;
->> +	struct device_node *musb, *muic;
->> +	int ret;
->> +
->> +	/* get micro-USB connector node */
->> +	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
->> +	/* next get micro-USB Interface Controller node */
->> +	muic = of_get_next_parent(musb);
->> +
->> +	if (!muic) {
->> +		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
->> +		return 0;
->> +	}
->> +
->> +	edev = extcon_find_edev_by_node(muic);
->> +	of_node_put(muic);
->> +	if (IS_ERR(edev)) {
->> +		if (PTR_ERR(edev) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		dev_err(ctx->dev, "Invalid or missing extcon\n");
->> +		return PTR_ERR(edev);
->> +	}
->> +
->> +	ctx->extcon = edev;
->> +	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
->> +	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
->> +	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
-> You better to use devm_extcon_register_notifier().
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-With devm version I risk that in case of device unbind notification will
-be called after .remove callback, it seems to me quite dangerous. Or am
-I missing something?
+We do not have to change the c15 trap setting on each switch to/from the
+guest on VHE systems, because this setting only affects guest EL1/EL0
+(and therefore not the VHE host).
 
-Regards
-Andrzej
+The PMU and debug trap configuration can also be done on vcpu load/put
+instead, because they don't affect how the VHE host kernel can access the
+debug registers while executing KVM kernel code.
 
->
->> +	if (ret) {
->> +		dev_err(ctx->dev, "failed to register notifier for MHL\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->>  static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
->>  {
->>  	return container_of(bridge, struct sii8620, bridge);
->> @@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
->>  	if (ret)
->>  		return ret;
->>  
->> +	ret = sii8620_extcon_init(ctx);
->> +	if (ret < 0) {
->> +		dev_err(ctx->dev, "failed to initialize EXTCON\n");
->> +		return ret;
->> +	}
->> +
->>  	i2c_set_clientdata(client, ctx);
->>  
->>  	ctx->bridge.funcs = &sii8620_bridge_funcs;
->>  	ctx->bridge.of_node = dev->of_node;
->>  	drm_bridge_add(&ctx->bridge);
->>  
->> -	sii8620_cable_in(ctx);
->> +	if (!ctx->extcon)
->> +		sii8620_cable_in(ctx);
->>  
->>  	return 0;
->>  }
->> @@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
->>  {
->>  	struct sii8620 *ctx = i2c_get_clientdata(client);
->>  
->> -	disable_irq(to_i2c_client(ctx->dev)->irq);
->> -	sii8620_hw_off(ctx);
->> +	if (ctx->extcon) {
->> +		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
->> +					   &ctx->extcon_nb);
-> Don't need to unregister the notifier if using devm_extcon_register_notifier().
->
->> +		flush_work(&ctx->extcon_wq);
->> +		if (ctx->cable_state > 0)
->> +			sii8620_cable_out(ctx);
->> +	} else {
->> +		sii8620_cable_out(ctx);
->> +	}
->>  	drm_bridge_remove(&ctx->bridge);
->>  
->>  	return 0;
->>
-> If you use the resource managed function (devm_extcon_register_notifier), Looks good to me.
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+
+Notes:
+    Changes since v4:
+     - Clarified commit message
+
+ arch/arm64/include/asm/kvm_hyp.h |  3 +++
+ arch/arm64/kvm/hyp/switch.c      | 31 ++++++++++++++++++++++---------
+ arch/arm64/kvm/hyp/sysreg-sr.c   |  4 ++++
+ 3 files changed, 29 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 2b1fda90dde4..949f2e77ae58 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -147,6 +147,9 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ bool __fpsimd_enabled(void);
+ 
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
++void deactivate_traps_vhe_put(void);
++
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 5fbb77bd4e90..eab433fa1442 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -102,6 +102,8 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	__activate_traps_common(vcpu);
++
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+ 	write_sysreg(val, cptr_el2);
+@@ -121,20 +123,12 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
+ 
+ 	__activate_traps_fpsimd32(vcpu);
+-	__activate_traps_common(vcpu);
+ 	__activate_traps_arch()(vcpu);
+ }
+ 
+ static void __hyp_text __deactivate_traps_vhe(void)
+ {
+ 	extern char vectors[];	/* kernel exception vectors */
+-	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+-
+-	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
+-		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
+-		    MDCR_EL2_TPMS;
+-
+-	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+ 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+@@ -144,6 +138,8 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+ {
+ 	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+ 
++	__deactivate_traps_common();
++
+ 	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+ 	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+ 
+@@ -167,10 +163,27 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	if (vcpu->arch.hcr_el2 & HCR_VSE)
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ 
+-	__deactivate_traps_common();
+ 	__deactivate_traps_arch()();
+ }
+ 
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
++{
++	__activate_traps_common(vcpu);
++}
++
++void deactivate_traps_vhe_put(void)
++{
++	u64 mdcr_el2 = read_sysreg(mdcr_el2);
++
++	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
++		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
++		    MDCR_EL2_TPMS;
++
++	write_sysreg(mdcr_el2, mdcr_el2);
++
++	__deactivate_traps_common();
++}
++
+ static void __hyp_text __activate_vm(struct kvm *kvm)
+ {
+ 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index aacba4636871..b3894df6bf1a 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -254,6 +254,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	__sysreg_restore_el1_state(guest_ctxt);
+ 
+ 	vcpu->arch.sysregs_loaded_on_cpu = true;
++
++	activate_traps_vhe_load(vcpu);
+ }
+ 
+ /**
+@@ -275,6 +277,8 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ 	if (!has_vhe())
+ 		return;
+ 
++	deactivate_traps_vhe_put();
++
+ 	__sysreg_save_el1_state(guest_ctxt);
+ 	__sysreg_save_user_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+-- 
+2.14.2
