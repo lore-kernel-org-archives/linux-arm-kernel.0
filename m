@@ -1,51 +1,90 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 27 Feb 2018 16:01:57 +0000
-Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: increase speed of i2c0 to
- 400kHz
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 27 Feb 2018 16:02:02 +0000
+Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: add SFP module support
 In-Reply-To: <20180227160135.GU9418@n2100.armlinux.org.uk>
 References: <20180227160135.GU9418@n2100.armlinux.org.uk>
-Message-ID: <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eqhha-0004l3-Rd@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the devices on I2C0 support fast mode, so increase the bus speed
-to match.  The Armada 388 is known to have a timing issue when in
-standard mode, which we believe causes the ficticious device at 0x64
-to appear.
+Add SFP module support for Clearfog using the SFP phylink support.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/armada-388-clearfog.dtsi | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/armada-388-clearfog.dtsi | 45 ++++++++----------------------
+ 1 file changed, 12 insertions(+), 33 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 68acfc968706..0e3b1f140e6d 100644
+index 0e3b1f140e6d..a44bf20ab7f8 100644
 --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
 +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -143,8 +143,7 @@
+@@ -117,6 +117,16 @@
+ 			};
+ 		};
+ 	};
++
++	sfp: sfp {
++		compatible = "sff,sfp";
++		i2c-bus = <&i2c1>;
++		los-gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&expander0 15 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&expander0 14 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio = <&expander0 13 GPIO_ACTIVE_HIGH>;
++		maximum-power-milliwatt = <2000>;
++	};
+ };
+ 
+ &eth1 {
+@@ -133,13 +143,10 @@
+ 	bm,pool-long = <3>;
+ 	bm,pool-short = <1>;
+ 	buffer-manager = <&bm>;
++	managed = "in-band-status";
+ 	phy-mode = "sgmii";
++	sfp = <&sfp>;
+ 	status = "okay";
+-
+-	fixed-link {
+-		speed = <1000>;
+-		full-duplex;
+-	};
  };
  
  &i2c0 {
--	/* Is there anything on this? */
--	clock-frequency = <100000>;
-+	clock-frequency = <400000>;
- 	pinctrl-0 = <&i2c0_pins>;
- 	pinctrl-names = "default";
- 	status = "okay";
-@@ -239,13 +238,11 @@
+@@ -208,34 +215,6 @@
+ 			output-low;
+ 			line-name = "m.2 devslp";
  		};
+-		sfp_los {
+-			/* SFP loss of signal */
+-			gpio-hog;
+-			gpios = <12 GPIO_ACTIVE_HIGH>;
+-			input;
+-			line-name = "sfp-los";
+-		};
+-		sfp_tx_fault {
+-			/* SFP laser fault */
+-			gpio-hog;
+-			gpios = <13 GPIO_ACTIVE_HIGH>;
+-			input;
+-			line-name = "sfp-tx-fault";
+-		};
+-		sfp_tx_disable {
+-			/* SFP transmit disable */
+-			gpio-hog;
+-			gpios = <14 GPIO_ACTIVE_HIGH>;
+-			output-low;
+-			line-name = "sfp-tx-disable";
+-		};
+-		sfp_mod_def0 {
+-			/* SFP module present */
+-			gpio-hog;
+-			gpios = <15 GPIO_ACTIVE_LOW>;
+-			input;
+-			line-name = "sfp-mod-def0";
+-		};
  	};
  
--	/* The MCP3021 is 100kHz clock only */
-+	/* The MCP3021 supports standard and fast modes */
- 	mikrobus_adc: mcp3021 at 4c {
- 		compatible = "microchip,mcp3021";
- 		reg = <0x4c>;
- 	};
--
--	/* Also something at 0x64 */
- };
- 
- &i2c1 {
+ 	/* The MCP3021 supports standard and fast modes */
 -- 
 2.7.4
