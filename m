@@ -1,41 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Feb 2018 11:52:25 +0000
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180224084106.GC25201@hirez.programming.kicks-ass.net>
- <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
-Message-ID: <20180227115224.rmtfy4eif3g4hmmr@lakrids.cambridge.arm.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Tue, 27 Feb 2018 12:34:26 +0100
+Subject: [PATCH v5 37/40] KVM: arm/arm64: Move arm64-only vgic-v2-sr.c file to
+ arm64
+In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
+References: <20180227113429.637-1-cdall@kernel.org>
+Message-ID: <20180227113429.637-38-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 05:53:57PM -0800, skannan at codeaurora.org wrote:
-> On 2018-02-24 00:41, Peter Zijlstra wrote:
-> > On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
-> > > Some PMUs events can be read from any CPU. So allow the PMU to mark
-> > > events as such. For these events, we don't need to reject reads or
-> > > make smp calls to the event's CPU and cause unnecessary wake ups.
-> > > 
-> > > Good examples of such events would be events from caches shared across
-> > > all CPUs.
-> > 
-> > So why would the existing ACTIVE_PKG not work for you? Because clearly
-> > your example does not cross a package.
-> 
-> Because based on testing it on hardware, it looks like the two clusters in
-> an ARM DynamIQ design are not considered part of the same "package". 
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-I don't think we should consider the topology masks at all for system
-PMU affinity. Due to the number of ways these can be integrated, and the
-lack of a standard(ish) topology across arm platforms.
+The vgic-v2-sr.c file now only contains the logic to replay unaligned
+accesses to the virtual CPU interface on 16K and 64K page systems, which
+is only relevant on 64-bit platforms.  Therefore move this file to the
+arm64 KVM tree, remove the compile directive from the 32-bit side
+makefile, and remove the ifdef in the C file.
 
-IIUC, there's ongoing work to try to clean that up, but that won't give
-us anything meaningful for PMU affinity.
+Since this file also no longer saves/restores anything, rename the file
+to vgic-v2-cpuif-proxy.c to more accurately describe the logic in this
+file.
 
-If we need a mask, that should be something the FW description of the
-PMU provides, and the PMU driver provides to the core code.
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
 
-Thanks,
-Mark.
+Notes:
+    Changes since v4:
+     - Renamed file to vgic-v2-cpuif-proxy.c as suggested by Marc.
+
+ arch/arm/kvm/hyp/Makefile                                               | 1 -
+ arch/arm64/kvm/hyp/Makefile                                             | 2 +-
+ .../arm/hyp/vgic-v2-sr.c => arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c    | 2 --
+ 3 files changed, 1 insertion(+), 4 deletions(-)
+ rename virt/kvm/arm/hyp/vgic-v2-sr.c => arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c (98%)
+
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 5638ce0c9524..1964111c984a 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -7,7 +7,6 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+ 
+ KVM=../../../../virt/kvm
+ 
+-obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+ 
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index f04400d494b7..4313f7475333 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -7,10 +7,10 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+ 
+ KVM=../../../../virt/kvm
+ 
+-obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+ 
++obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-cpuif-proxy.o
+ obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+similarity index 98%
+rename from virt/kvm/arm/hyp/vgic-v2-sr.c
+rename to arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+index 0bbafdfd4adb..97f357ea9c72 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+@@ -23,7 +23,6 @@
+ #include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ 
+-#ifdef CONFIG_ARM64
+ /*
+  * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+  *				     guest.
+@@ -77,4 +76,3 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 
+ 	return 1;
+ }
+-#endif
+-- 
+2.14.2
