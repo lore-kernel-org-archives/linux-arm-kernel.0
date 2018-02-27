@@ -1,37 +1,67 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Feb 2018 08:25:24 +0100
-Subject: [PATCH v8 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <1519697566-32600-1-git-send-email-yong.deng@magewell.com>
-References: <1519697566-32600-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <20180227072524.5pjoxoo4yowfw43v@flea>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 27 Feb 2018 08:32:50 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <20180227070415.GB18666@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
+ <20180227070415.GB18666@localhost>
+Message-ID: <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 10:12:46AM +0800, Yong Deng wrote:
-> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> interface and CSI1 is used for parallel interface. This is not
-> documented in datasheet but by test and guess.
-> 
-> This patch implement a v4l2 framework driver for it.
-> 
-> Currently, the driver only support the parallel interface. MIPI-CSI2,
-> ISP's support are not included in this patch.
-> 
-> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+Hi Johan,
 
-Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Am 27.02.2018 um 08:04 schrieb Johan Hovold <johan@kernel.org>:
+> 
+> On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
+>> Hi!
+>> 
+>>>> Let's restart this discussion and focus on the main roadblock (others
+>>>> are minor details which can be sorted out later).
+>>>> 
+>>>> If it feels like a hack, the key issue seems to me to be the choice of
+>>>> the API to present the GPS data to user space. Right?
+>>> 
+>>> Or even more fundamentally, does this belong in the kernel at all?
+>> 
+>> Yes, it does.
 
-Maxime
+Thanks, Pavel for supporting our view.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/b61918bb/attachment.sig>
+> 
+> But not necessarily in its current form.
+
+Is this a "yes after some code fixes"?
+
+Pavel mentioned an example where such an evolutionary approach was taken.
+
+> 
+>>> Now, if we'd ever have a proper GPS framework that handled everything in
+>>> kernel space (i.e. no more gpsd) then we would be able to write kernel
+>>> drivers that also take care of PM. But perhaps that's unlikely to ever
+>>> be realised given the state of things (proprietary protocols, numerous
+>>> quirky implementations, etc).
+>> 
+>> That is what needs to happen.
+>> 
+>>> The kernel is probably not the place to be working around issues like
+>>> that, even if serdev at least allows for such hacks to be fairly
+>>> isolated in drivers (unlike some of the earlier proposals touching core
+>>> code).
+>> 
+>> Oh, kernel is indeed right place to provide hardware abstraction --
+>> and that includes bug workarounds.
+> 
+> Right, at least when such hacks can be confined to a driver and not be
+> spread all over the place.
+
+It seems that you forgot that the driver we propose is not spread all over
+the place. It *is* confined to a single driver thanks to the serdev api.
+
+BR and thanks,
+Nikolaus
