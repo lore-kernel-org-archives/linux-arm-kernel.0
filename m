@@ -1,60 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 27 Feb 2018 22:14:32 +0100
-Subject: [PATCH 2/4] dt-bindings: arm: Document Renesas V3MSK and Wheat
- board part numbers
-In-Reply-To: <20180227081711.nnd2r35mu3h7rjz5@verge.net.au>
-References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
- <1519668225-12548-3-git-send-email-geert+renesas@glider.be>
- <20180227081711.nnd2r35mu3h7rjz5@verge.net.au>
-Message-ID: <CAMuHMdWqdFKH7AoFNAX5tHrCSn+cT5KTW38d8_CxYWJ76xGBMg@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 27 Feb 2018 15:24:34 -0600
+Subject: [PATCH v4 4/6] arm64: dts: exynos: add OF graph between MHL and
+ USB connector
+In-Reply-To: <20180221085541.14556-5-a.hajda@samsung.com>
+References: <CGME20180221085607eucas1p1a08c82fac832049d79705b4222422fa9@eucas1p1.samsung.com>
+ <20180221085541.14556-1-a.hajda@samsung.com>
+ <20180221085541.14556-5-a.hajda@samsung.com>
+Message-ID: <CAL_JsqKGVwvqu36D57WbB7bPMt2tOZmvq+ukFuNHbhgiWYuw-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, Feb 27, 2018 at 9:17 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 26, 2018 at 07:03:43PM +0100, Geert Uytterhoeven wrote:
->> The DT binding documentation for the Renesas V3MSK and Wheat boards
->> lacked board part numbers.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->>  Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
->> index ded2cd3b5f4df0c8..82908a9447e4b051 100644
->> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
->> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
->> @@ -120,9 +120,9 @@ Boards:
->>      compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
->>    - Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
->>      compatible = "renesas,stout", "renesas,r8a7790"
->> -  - V3MSK
->> +  - V3MSK (Y-ASK-RCAR-V3M-WS10)
->>      compatible = "renesas,v3msk", "renesas,r8a77970"
+On Wed, Feb 21, 2018 at 2:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+> OF graph describes MHL data lanes between MHL and respective USB
+> connector.
 >
-> Google also tells me there is WS20, but I guess WS10 what is
-> currently supported upstream.
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+> v4:
+> - added missing reg property in connector's port node (Krzysztof)
+> ---
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 32 ++++++++++++++++++++--
+>  1 file changed, 29 insertions(+), 3 deletions(-)
 >
->> -  - Wheat
->> +  - Wheat (RTP0RC7792ASKB0010JE)
->>      compatible = "renesas,wheat", "renesas,r8a7792"
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> index f604f6b1a9c2..2ed506df94d0 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> @@ -817,9 +817,22 @@
+>                 clocks = <&pmu_system_controller 0>;
+>                 clock-names = "xtal";
 >
-> I'm unable to confirm the above. Can anyone help?
+> -               port {
+> -                       mhl_to_hdmi: endpoint {
+> -                               remote-endpoint = <&hdmi_to_mhl>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               mhl_to_hdmi: endpoint {
+> +                                       remote-endpoint = <&hdmi_to_mhl>;
+> +                               };
+> +                       };
+> +
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               mhl_to_musb_con: endpoint {
+> +                                       remote-endpoint = <&musb_con_to_mhl>;
+> +                               };
 
-https://elinux.org/R-Car/Boards/Wheat
+These ports are mutually exclusive, right? If so, it should be 1 port
+with 2 endpoints. Ports should represent independent data flows.
+Something muxed or replicated (1 to many connection) should be be
+endpoints.
 
-Looks like I misinterpreted the pictures, and
-RTP0RC7792ASKB0000JE is the correct part number for Wheat.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Rob
