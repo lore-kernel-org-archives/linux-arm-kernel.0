@@ -1,34 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 27 Feb 2018 13:27:45 +0530
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.17
-In-Reply-To: <20180227075745.23970-1-nsekhar@ti.com>
-References: <20180227075745.23970-1-nsekhar@ti.com>
-Message-ID: <20180227075745.23970-3-nsekhar@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 27 Feb 2018 09:00:23 +0100
+Subject: [PATCH v2] ARM: dts: imx6dl-colibri-eval-v3: Add chosen node
+Message-ID: <20180227080023.17682-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+Add Colibri UART_A as default serial console.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.17/defconfig
-
-for you to fetch changes up to 35ba26772c827dbfc03be8adc3af8ff0d294b38f:
-
-  ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y (2018-02-26 11:41:53 +0530)
-
-----------------------------------------------------------------
-DaVinci defconfig updates for v4.17
-
-Enable SYSCON_REBOOT_MODE needed for Lego EV3 and build the DaVinci
-watchdog driver in so reboot works even when modules are not loaded.
-
-----------------------------------------------------------------
-David Lechner (2):
-      ARM: davinci_all_defconfig: enable SYSCON_REBOOT_MODE
-      ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y
-
- arch/arm/configs/davinci_all_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+index dcf9206f3e0d..d4f5c6862d27 100644
+--- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+@@ -63,6 +63,10 @@
+ 		rtc1 = &snvs_rtc;
+ 	};
+ 
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	clocks {
+ 		/* Fixed crystal dedicated to mcp251x */
+ 		clk16m: clk at 1 {
+-- 
+2.16.2
