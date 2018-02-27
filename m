@@ -1,92 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 27 Feb 2018 07:22:29 +0000
-Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
-In-Reply-To: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
-References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
-Message-ID: <CAKv+Gu9FVD18v6WA8MMG5LFX9GPObq_79hFuYv6j+S98a5Ej6w@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Feb 2018 08:25:24 +0100
+Subject: [PATCH v8 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <1519697566-32600-1-git-send-email-yong.deng@magewell.com>
+References: <1519697566-32600-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20180227072524.5pjoxoo4yowfw43v@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On Tue, Feb 27, 2018 at 10:12:46AM +0800, Yong Deng wrote:
+> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> interface and CSI1 is used for parallel interface. This is not
+> documented in datasheet but by test and guess.
+> 
+> This patch implement a v4l2 framework driver for it.
+> 
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
+> 
+> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-On 27 February 2018 at 06:05, Jonathan Toppins <jtoppins@redhat.com> wrote:
-> This patch allows a user to configure ACPI to be preferred over
-> device-tree.
->
+Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-This comes up once a year or so, and the consensus has been so far
-that it is not up to the kernel to reason about whether DT or ACPI
-should be preferred if both are supplied, Instead, it is up to the
-firmware to ensure that only one of those is provided, and we added a
-generic driver to EDK2 that implements this.
+Maxime
 
-> Currently for ACPI to be used a user either has to set acpi=on on the
-> kernel command line or make sure any device tree passed to the kernel
-> is empty. If the dtb passed to the kernel is non-empty then device-tree
-> will be chosen as the boot method of choice even if it is not correct.
-
-Your firmware is terminally broken if it provides an incorrect DT, and
-we should not be fixing it in the kernel.
-
-> To prevent this situation where a system is only intended to be booted
-> via ACPI a user can set this kernel configuration so it ignores
-> device-tree settings unless ACPI table checks fail.
->
-
-'only intended to be booted via ACPI' is a property of the system, not
-of the OS. If you need this functionality for development, you can
-append 'acpi=on' to the kernel command line via kconfig.
-
-
-> Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
-> ---
->
->  arch/arm64/Kconfig       | 13 +++++++++++++
->  arch/arm64/kernel/acpi.c |  2 +-
->  2 files changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7381eeb7ef8e..da8d9ab62825 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1170,6 +1170,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
->           protocol even if the corresponding data is present in the ACPI
->           MADT table.
->
-> +config ARM64_PREFER_ACPI
-> +       bool "Prefer usage of ACPI boot tables over device-tree"
-> +       depends on ACPI
-> +       help
-> +         Normally device-tree is preferred over ACPI on arm64 unless
-> +         explicitly preferred via kernel command line, something like: acpi=on
-> +         This configuration changes this default behaviour by pretending
-> +         the user set acpi=on on the command line. This configuration still
-> +         allows the user to turn acpi table parsing off via acpi=off. If
-> +         for some reason the table checks fail the system will still fall
-> +         back to using device-tree unless the user explicitly sets acpi=force
-> +         on the command line.
-> +
->  config CMDLINE
->         string "Default kernel command string"
->         default ""
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..315b001c45f1 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -44,7 +44,7 @@ int acpi_pci_disabled = 1;    /* skip ACPI PCI scan and IRQ initialization */
->  EXPORT_SYMBOL(acpi_pci_disabled);
->
->  static bool param_acpi_off __initdata;
-> -static bool param_acpi_on __initdata;
-> +static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
->  static bool param_acpi_force __initdata;
->
->  static int __init parse_acpi(char *arg)
-> --
-> 2.13.6
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/b61918bb/attachment.sig>
