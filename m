@@ -1,128 +1,168 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Mon, 26 Feb 2018 17:53:57 -0800
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <20180224084106.GC25201@hirez.programming.kicks-ass.net>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180224084106.GC25201@hirez.programming.kicks-ass.net>
-Message-ID: <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 27 Feb 2018 11:03:07 +0900
+Subject: [PATCH v8 03/13] kexec_file, x86, powerpc: factor out
+ kexec_file_ops functions
+In-Reply-To: <20180226121718.3432bbd6@ThinkPad>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-4-takahiro.akashi@linaro.org>
+ <20180226121718.3432bbd6@ThinkPad>
+Message-ID: <20180227020304.GE6019@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-24 00:41, Peter Zijlstra wrote:
-> On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
->> Some PMUs events can be read from any CPU. So allow the PMU to mark
->> events as such. For these events, we don't need to reject reads or
->> make smp calls to the event's CPU and cause unnecessary wake ups.
->> 
->> Good examples of such events would be events from caches shared across
->> all CPUs.
+On Mon, Feb 26, 2018 at 12:17:18PM +0100, Philipp Rudo wrote:
+> Hi AKASHI
 > 
-> So why would the existing ACTIVE_PKG not work for you? Because clearly
-> your example does not cross a package.
-
-Because based on testing it on hardware, it looks like the two clusters 
-in an ARM DynamIQ design are not considered part of the same "package". 
-When I say clusters, I using the more common interpretation of 
-"homogeneous CPUs running on the same clock"/CPUs in a cpufreq policy 
-and not ARM's new redefinition of cluster. So, on a SoC with 4 little 
-and 4 big cores, it'll still trigger a lot of unnecessary smp calls/IPIs 
-that cause unnecessary wakeups.
-
-Although, I like Mark's suggestion of just giving a cpumask for every 
-event and using that instead. Because the meaning of "active package" is 
-very ambiguous. For example if a SoC has 2 DynamIQ blocks (not sure if 
-that's possible), what's considered a package? CPUs that are sitting on 
-one L3 can't read the PMU counters of a different L3. In that case, 
-neither "Any CPU" nor "Active Package" is correct/usable for reducing 
-IPIs.
-
+> On Thu, 22 Feb 2018 20:17:22 +0900
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 > 
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->> ---
->>  include/linux/perf_event.h |  3 +++
->>  kernel/events/core.c       | 10 ++++++++--
->>  2 files changed, 11 insertions(+), 2 deletions(-)
->> 
->> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
->> index 7546822..ee8978f 100644
->> --- a/include/linux/perf_event.h
->> +++ b/include/linux/perf_event.h
->> @@ -510,9 +510,12 @@ typedef void (*perf_overflow_handler_t)(struct 
->> perf_event *,
->>   * PERF_EV_CAP_SOFTWARE: Is a software event.
->>   * PERF_EV_CAP_READ_ACTIVE_PKG: A CPU event (or cgroup event) that 
->> can be read
->>   * from any CPU in the package where it is active.
->> + * PERF_EV_CAP_READ_ANY_CPU: A CPU event (or cgroup event) that can 
->> be read
->> + * from any CPU.
->>   */
->>  #define PERF_EV_CAP_SOFTWARE		BIT(0)
->>  #define PERF_EV_CAP_READ_ACTIVE_PKG	BIT(1)
->> +#define PERF_EV_CAP_READ_ANY_CPU	BIT(2)
->> 
->>  #define SWEVENT_HLIST_BITS		8
->>  #define SWEVENT_HLIST_SIZE		(1 << SWEVENT_HLIST_BITS)
->> diff --git a/kernel/events/core.c b/kernel/events/core.c
->> index 5d3df58..570187b 100644
->> --- a/kernel/events/core.c
->> +++ b/kernel/events/core.c
->> @@ -3484,6 +3484,10 @@ static int __perf_event_read_cpu(struct 
->> perf_event *event, int event_cpu)
->>  {
->>  	u16 local_pkg, event_pkg;
->> 
->> +	if (event->group_caps & PERF_EV_CAP_READ_ANY_CPU) {
->> +		return smp_processor_id();
->> +	}
->> +
->>  	if (event->group_caps & PERF_EV_CAP_READ_ACTIVE_PKG) {
->>  		int local_cpu = smp_processor_id();
->> 
+> [...]
 > 
->> @@ -3575,6 +3579,7 @@ int perf_event_read_local(struct perf_event 
->> *event, u64 *value,
->>  {
->>  	unsigned long flags;
->>  	int ret = 0;
->> +	bool is_any_cpu = !!(event->group_caps & PERF_EV_CAP_READ_ANY_CPU);
->> 
->>  	/*
->>  	 * Disabling interrupts avoids all counter scheduling (context
->> @@ -3600,7 +3605,8 @@ int perf_event_read_local(struct perf_event 
->> *event, u64 *value,
->> 
->>  	/* If this is a per-CPU event, it must be for this CPU */
->>  	if (!(event->attach_state & PERF_ATTACH_TASK) &&
->> -	    event->cpu != smp_processor_id()) {
->> +	    event->cpu != smp_processor_id() &&
->> +	    !is_any_cpu) {
->>  		ret = -EINVAL;
->>  		goto out;
->>  	}
->> @@ -3610,7 +3616,7 @@ int perf_event_read_local(struct perf_event 
->> *event, u64 *value,
->>  	 * or local to this CPU. Furthermore it means its ACTIVE (otherwise
->>  	 * oncpu == -1).
->>  	 */
->> -	if (event->oncpu == smp_processor_id())
->> +	if (event->oncpu == smp_processor_id() || is_any_cpu)
->>  		event->pmu->read(event);
->> 
->>  	*value = local64_read(&event->count);
+> > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > index 990adae52151..a6d14a768b3e 100644
+> > --- a/kernel/kexec_file.c
+> > +++ b/kernel/kexec_file.c
+> > @@ -26,34 +26,83 @@
+> >  #include <linux/vmalloc.h>
+> >  #include "kexec_internal.h"
+> > 
+> > +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+> > +
 > 
-> And why are you modifying read_local for this? That didn't support
-> ACTIVE_PKG, so why should it support this?
+> Having a weak definition of kexec_file_loaders causes trouble on s390 with 
+> gcc 4.8 (newer versions seem to work fine). For me it looks like that in this
+> version gcc doesn't recognize __weak but use the default value for
+> optimization. This leads to _kexec_kernel_image_probe to always return ENOEXEC
+> because the for-loop gets optimized out.
 
-Maybe I'll make a separate patch to first have perf_event_read_local() 
-also handle ACTIVE_PACKAGE? Because in those cases, the smp call made by 
-read_local is unnecessary too.
+I gave it a try to compile with gcc 4.9 (not 4.8) for arm64
+and didn't see any errors or warnings, but
 
+> The problem can easily be worked around by declaring kexec_file_loaders in
+> include/linux/kexec.h and defining it in arch code. In particular doing this
 > 
-> And again, where are the users?
+> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> index 37e9dce518aa..fc0788540d90 100644
+> --- a/include/linux/kexec.h
+> +++ b/include/linux/kexec.h
+> @@ -139,6 +139,8 @@ struct kexec_file_ops {
+>  #endif
+>  };
+>  
+> +extern const struct kexec_file_ops * const kexec_file_loaders[];
+> +
+>  /**
+>   * struct kexec_buf - parameters for finding a place for a buffer in memory
+>   * @image:	kexec image in which memory to search.
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 17ba407d0e79..4e3d1e4bc7f6 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -31,8 +31,6 @@
+>  #include <linux/vmalloc.h>
+>  #include "kexec_internal.h"
+>  
+> -const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+> -
+>  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+>  static int kexec_calculate_store_digests(struct kimage *image);
+>  #else
 
-The DynamIQ PMU driver would be the user.
+Your change is just fine with me, too.
+I will incorporate it in my next version.
 
--Saravana
+Thanks,
+-Takahiro AKASHI
+
+> A nice side effect of this solution is, that a developer who forgets to define
+> kexec_file_loaders gets a linker error. So he directly knows what's missing
+> instead of first having to find out where/why an error gets returned.
+> 
+> Otherwise the series is fine for me.
+> 
+> Thanks
+> Philipp
+> 
+> >  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+> >  static int kexec_calculate_store_digests(struct kimage *image);
+> >  #else
+> >  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
+> >  #endif
+> > 
+> > +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > +			     unsigned long buf_len)
+> > +{
+> > +	const struct kexec_file_ops * const *fops;
+> > +	int ret = -ENOEXEC;
+> > +
+> > +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
+> > +		ret = (*fops)->probe(buf, buf_len);
+> > +		if (!ret) {
+> > +			image->fops = *fops;
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  /* Architectures can provide this probe function */
+> >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> >  					 unsigned long buf_len)
+> >  {
+> > -	return -ENOEXEC;
+> > +	return _kexec_kernel_image_probe(image, buf, buf_len);
+> > +}
+> > +
+> > +void *_kexec_kernel_image_load(struct kimage *image)
+> > +{
+> > +	if (!image->fops || !image->fops->load)
+> > +		return ERR_PTR(-ENOEXEC);
+> > +
+> > +	return image->fops->load(image, image->kernel_buf,
+> > +				 image->kernel_buf_len, image->initrd_buf,
+> > +				 image->initrd_buf_len, image->cmdline_buf,
+> > +				 image->cmdline_buf_len);
+> >  }
+> > 
+> >  void * __weak arch_kexec_kernel_image_load(struct kimage *image)
+> >  {
+> > -	return ERR_PTR(-ENOEXEC);
+> > +	return _kexec_kernel_image_load(image);
+> > +}
+> > +
+> > +int _kimage_file_post_load_cleanup(struct kimage *image)
+> > +{
+> > +	if (!image->fops || !image->fops->cleanup)
+> > +		return 0;
+> > +
+> > +	return image->fops->cleanup(image->image_loader_data);
+> >  }
+> > 
+> >  int __weak arch_kimage_file_post_load_cleanup(struct kimage *image)
+> >  {
+> > -	return -EINVAL;
+> > +	return _kimage_file_post_load_cleanup(image);
+> >  }
+> > 
+> >  #ifdef CONFIG_KEXEC_VERIFY_SIG
+> > +int _kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> > +			    unsigned long buf_len)
+> > +{
+> > +	if (!image->fops || !image->fops->verify_sig) {
+> > +		pr_debug("kernel loader does not support signature verification.\n");
+> > +		return -EKEYREJECTED;
+> > +	}
+> > +
+> > +	return image->fops->verify_sig(buf, buf_len);
+> > +}
+> > +
+> >  int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
+> >  					unsigned long buf_len)
+> >  {
+> > -	return -EKEYREJECTED;
+> > +	return _kexec_kernel_verify_sig(image, buf, buf_len);
+> >  }
+> >  #endif
+> > 
+> 
