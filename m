@@ -1,58 +1,75 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 27 Feb 2018 15:24:34 -0600
-Subject: [PATCH v4 4/6] arm64: dts: exynos: add OF graph between MHL and
- USB connector
-In-Reply-To: <20180221085541.14556-5-a.hajda@samsung.com>
-References: <CGME20180221085607eucas1p1a08c82fac832049d79705b4222422fa9@eucas1p1.samsung.com>
- <20180221085541.14556-1-a.hajda@samsung.com>
- <20180221085541.14556-5-a.hajda@samsung.com>
-Message-ID: <CAL_JsqKGVwvqu36D57WbB7bPMt2tOZmvq+ukFuNHbhgiWYuw-w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 27 Feb 2018 22:25:42 +0100
+Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
+ Salvator-X board
+In-Reply-To: <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
+References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+ <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
+ <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
+Message-ID: <CAMuHMdXkpEoKxT-z0FunnfdjUpUZZP8GvbC5wAuj-qseQCVkzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 2:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
-> OF graph describes MHL data lanes between MHL and respective USB
-> connector.
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
-> v4:
-> - added missing reg property in connector's port node (Krzysztof)
-> ---
->  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 32 ++++++++++++++++++++--
->  1 file changed, 29 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> index f604f6b1a9c2..2ed506df94d0 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> @@ -817,9 +817,22 @@
->                 clocks = <&pmu_system_controller 0>;
->                 clock-names = "xtal";
->
-> -               port {
-> -                       mhl_to_hdmi: endpoint {
-> -                               remote-endpoint = <&hdmi_to_mhl>;
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               mhl_to_hdmi: endpoint {
-> +                                       remote-endpoint = <&hdmi_to_mhl>;
-> +                               };
-> +                       };
-> +
-> +                       port at 1 {
-> +                               reg = <1>;
-> +                               mhl_to_musb_con: endpoint {
-> +                                       remote-endpoint = <&musb_con_to_mhl>;
-> +                               };
+Hi Simon,
 
-These ports are mutually exclusive, right? If so, it should be 1 port
-with 2 endpoints. Ports should represent independent data flows.
-Something muxed or replicated (1 to many connection) should be be
-endpoints.
+On Tue, Feb 27, 2018 at 9:22 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Feb 26, 2018 at 07:03:44PM +0100, Geert Uytterhoeven wrote:
+>> The Renesas Salvator-X development board can be equipped with an R-Car
+>> H3, M3-W, or M3-N SiP, which are pin-compatible.
+>>
+>> Document board part number and compatible values for the version with
+>> R-Car M3-N.
+>>
+>> The board part number was extracted from a big patch by Takeshi Kihara
+>> in the BSP.
 
-Rob
+>> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+>> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+>> @@ -108,6 +108,8 @@ Boards:
+>>      compatible = "renesas,salvator-x", "renesas,r8a7795"
+>>    - Salvator-X (RTP0RC7796SIPB0011S)
+>
+> Here we have: Name (Part No)
+
+That's the standard (highest number of occurrences) way.
+
+>>      compatible = "renesas,salvator-x", "renesas,r8a7796"
+>> +  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
+>
+> Here we have: Name (Part No (SoC))
+
+This one is special: it's basically an M3-N prototype board made by taking
+a Salvator-X/M3-W board, and replacing the M3-W SiP by an M3-N SiP.
+Hence the board part number is the same.
+
+>> +    compatible = "renesas,salvator-x", "renesas,r8a77965"
+>>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+>
+> And here we have: Name (Version, Part No)
+
+AFAIU, "Salvator-XS" really means "Salvator-X 2nd version".
+So it's not "Version", but "Alternative Board Name".
+There's a similar thing with the ULCB boards:
+
+  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
+    H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
+  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+
+>>      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+>>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+>
+> Can we think about making this more consistent?
+
+I'm afraid not. Naming seems to become only more complex over time...
+Unless you have great hands and great ideas ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
