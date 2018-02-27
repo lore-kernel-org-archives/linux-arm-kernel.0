@@ -1,47 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Feb 2018 11:23:54 -0800
-Subject: [PATCH 1/6] clocksource: timer-ti-dm: Make unexported functions
- static
-In-Reply-To: <20180227190752.GC1961@lenoch>
-References: <20180223101254.GA5746@lenoch> <20180223101346.GB5746@lenoch>
- <20180227180641.GE5448@atomide.com> <20180227190752.GC1961@lenoch>
-Message-ID: <20180227192354.GG5448@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Feb 2018 19:46:29 +0000
+Subject: [PATCH 0/3] STM32 Extended TrustZone Protection driver
+In-Reply-To: <CA+M3ks6qV_pGdE6mr3n7TiY9VhbqEkrdH6tN=8e-A=oa4UbDHw@mail.gmail.com>
+References: <20180227140926.22996-1-benjamin.gaignard@st.com>
+ <20180227171124.h2yjhicmlfrwr4nh@lakrids.cambridge.arm.com>
+ <CA+M3ks6qV_pGdE6mr3n7TiY9VhbqEkrdH6tN=8e-A=oa4UbDHw@mail.gmail.com>
+Message-ID: <11c3ceb2-8b8d-de59-a0be-0777a42f63a7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ladislav Michl <ladis@linux-mips.org> [180227 19:09]:
-> On Tue, Feb 27, 2018 at 10:06:41AM -0800, Tony Lindgren wrote:
-> > * Ladislav Michl <ladis@linux-mips.org> [180223 10:14]:
-> > > As dmtimer no longer exports functions, make those previously
-> > > exported static (this requires few functions to be moved around
-> > > as their prototypes were deleted).
-> > 
-> > Looks like this one fails to build with omap1_defconfig:
-> > 
-> > drivers/clocksource/timer-ti-dm.c:935:14: error:
-> > 'omap_dm_timer_get_fclk' undeclared here 
+On 27/02/18 19:16, Benjamin Gaignard wrote:
+> 2018-02-27 18:11 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+>> On Tue, Feb 27, 2018 at 03:09:23PM +0100, Benjamin Gaignard wrote:
+>>> On early boot stages STM32MP1 platform is able to dedicate some hardware blocks
+>>> to a secure OS running in TrustZone.
+>>> We need to avoid using those hardware blocks on non-secure context (i.e. kernel)
+>>> because read/write access will all be discarded.
+>>>
+>>> Extended TrustZone Protection driver register itself as listener of
+>>> BUS_NOTIFY_BIND_DRIVER and check, given the device address, if the hardware block
+>>> could be used in a Linux context. If not it returns NOTIFY_BAD to driver core
+>>> to stop driver probing.
+>>
+>> Huh?
+>>
+>> If these devices are not usable from the non-secure side, why are they
+>> not removed form the DT (or marked disabled)?
+>>
+>> In other cases, where resources are carved out for the secure side (e.g.
+>> DRAM carveouts), that's how we handle things.
+>>
 > 
-> Umm, it compiled fine on top of previous versions, so I didn't bother
-> to retest. I'm sorry about it.
-> 
-> > Other than that the first three patches seem like nice
-> > clean-up :)
-> 
-> So are you okay with sending those separately as cleanup with above
-> issue fixed?
+> That true you can parse and disable a device a boot time but if DT doesn't
+> exactly reflect etzpc status bits we will in trouble when try to get access to
+> the device.
 
-Yeah seems like those first three are suitable for applying
-on top of the patches in omap-for-v4.17/timer :)
+Well, yes. If the DT doesn't correctly represent the hardware, things 
+will probably go wrong; that's hardly a novel concept, and it's 
+certainly not unique to this particular SoC.
 
-> But to be honest, I'm more interested how to do the last two patches
-> right ;-)
+> Changing the DT is a software protection while etzpc is an hardware protection
+> so we need to check it anyway.
 
-Yeah well if patch 4 can be sent separately as a fix, then
-send that separately to Thierry?
+There are several in-tree DT and code examples where devices are marked 
+as disabled on certain boards/SoC variants/etc. because attempting to 
+access them can abort/lock up/trigger a secure watchdog reset/etc. The 
+only "special" thing in this particular situation is apparently that 
+this device even allows its secure configuration to be probed from the 
+non-secure side at all.
 
-Then you're just left with the pending pwm changes that
-still need work it seems.
+Implementing a boardfile so that you can "check" the DT makes very 
+little sense to me; Linux is not a firmware validation suite.
 
-Regards,
-
-Tony
+Robin.
