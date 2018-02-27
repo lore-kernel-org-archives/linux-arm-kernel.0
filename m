@@ -1,62 +1,76 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Tue, 27 Feb 2018 09:28:38 +0100
-Subject: [PATCH 0/8] R-Car M3-N: Enable EtherAVB device node
-In-Reply-To: <CAMuHMdXwxhT7MP5xs3HLP3oFX+V9rhCM5jQycXUiCyBOKOUg1Q@mail.gmail.com>
-References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdXwxhT7MP5xs3HLP3oFX+V9rhCM5jQycXUiCyBOKOUg1Q@mail.gmail.com>
-Message-ID: <20180227082838.GA23738@w540>
+From: yong.deng@magewell.com (Yong)
+Date: Tue, 27 Feb 2018 16:31:00 +0800
+Subject: [PATCH v8 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1519719639.3402.2.camel@pengutronix.de>
+References: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
+ <1519719639.3402.2.camel@pengutronix.de>
+Message-ID: <20180227163100.af7828ff4930b91cda54fd46@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Tue, 27 Feb 2018 09:20:39 +0100
+Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-On Mon, Feb 26, 2018 at 07:28:47PM +0100, Geert Uytterhoeven wrote:
-> Hi Jacopo,
->
-> On Mon, Feb 26, 2018 at 6:57 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> >   as discussed with you Sergei and Geert, in order to enable EtherAVB for
-> > R8A77965 we first wanted to make the phy-mode "rgmii-txid" a board specific
-> > property for all other SoCs.
->
-> Thanks for your series!
->
-> > This series adds  the phy-mode property to salvator-common.dtsi and reset the
-> > one for R8A77965/R8A7796/R8A77995 to "rgmii".
->
-> I forgot that r8a7795.dtsi and r8a7796.dtsi are used for the ULCB boards, too.
-> So to avoid regressions, you need to make a similar change to ulcb.dtsi like you
-> made for salvator-common.dtsi.
->
-> In addition, r8a77995.dtsi is only used for the Draak board.
-> So you have to update r8a7795-draak.dtsi first, too.
+> On Tue, 2018-02-27 at 10:07 +0800, Yong Deng wrote:
+> > Add binding documentation for Allwinner V3s CSI.
+> > 
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > ---
+> >  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > new file mode 100644
+> > index 000000000000..2ff47a9507a6
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > @@ -0,0 +1,59 @@
+> > +Allwinner V3s Camera Sensor Interface
+> > +-------------------------------------
+> > +
+> > +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > +interface and CSI1 is used for parallel interface.
+> > +
+> > +Required properties:
+> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> > +  - reg: base address and size of the memory-mapped region.
+> > +  - interrupts: interrupt associated to this IP
+> > +  - clocks: phandles to the clocks feeding the CSI
+> > +    * bus: the CSI interface clock
+> > +    * mod: the CSI module clock
+> > +    * ram: the CSI DRAM clock
+> > +  - clock-names: the clock names mentioned above
+> > +  - resets: phandles to the reset line driving the CSI
+> > +
+> > +Each CSI node should contain one 'port' child node with one child 'endpoint'
+> > +node, according to the bindings defined in
+> > +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
+> > +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
+> > +Bt656 for CSI1.
+> > +
+> > +Endpoint node properties for CSI1
+> > +---------------------------------
+> > +
+> > +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
+> > +			   node
+> > +- bus-width:		: (required) must be 8, 10, 12 or 16
+> > +- pclk-sample		: (optional) (default: sample on falling edge)
+> 
+> It would be helpful to state that 1 is rising edge and 0 is falling
+> edge, see for example ov5640.txt
 
-Of course! I forgot about ULCB (and had a patch for Draak I lost while
-rebasing :/ )
->
-> > Then, in order to enable EtherAVB for R-Car M3-N, iommu nodes had to be added
-> > as they are referenced by the "avb" device node (CC the iommu list for the
-> > series for that reason).
->
-> I don't think we need the iommu properties and nodes at this early stage.
-> Ethernet works fine without them. Simon, do you agree?
+I think this is already documented at 
+Documentation/devicetree/bindings/media/video-interfaces.txt.
 
-I'll wait for Simon reply and then resend, possibly without iommu and
-ULCB and Draak patches!
+> 
+> regards
+> Philipp
 
-Thanks
-   j
 
->
-> P.S. scripts/dtc/dtx_diff is a great tool to compare DTBs before and after your
->       changes. It would have revealed the changes for ULCB and Draak.
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Thanks,
+Yong
