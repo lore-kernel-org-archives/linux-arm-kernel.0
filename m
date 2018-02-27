@@ -1,51 +1,40 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 27 Feb 2018 19:36:59 +0530
-Subject: [PATCH v8 12/15] dt-bindings: clock: Document qcom,krait-cc
-In-Reply-To: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1519740422-3835-13-git-send-email-sricharan@codeaurora.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 27 Feb 2018 15:09:24 +0100
+Subject: [PATCH 1/3] driver core: check notifier_call_chain return value
+In-Reply-To: <20180227140926.22996-1-benjamin.gaignard@st.com>
+References: <20180227140926.22996-1-benjamin.gaignard@st.com>
+Message-ID: <20180227140926.22996-2-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+When being notified that a driver is about to be bind a listener
+could return NOTIFY_BAD.
+Check the return to be sure that the driver could be bind.
 
-The Krait clock controller controls the krait CPU and the L2 clocks
-consisting a primary mux and secondary mux. Add document for that.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- .../devicetree/bindings/clock/qcom,krait-cc.txt    | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
+ drivers/base/dd.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt b/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
-new file mode 100644
-index 0000000..874138f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
-@@ -0,0 +1,22 @@
-+Krait Clock Controller
-+
-+PROPERTIES
-+
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be one of:
-+			"qcom,krait-cc-v1"
-+			"qcom,krait-cc-v2"
-+
-+- #clock-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 1
-+
-+Example:
-+
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v1";
-+		#clock-cells = <1>;
-+	};
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index de6fd092bf2f..9275f2c0fed2 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -304,9 +304,12 @@ static int driver_sysfs_add(struct device *dev)
+ {
+ 	int ret;
+ 
+-	if (dev->bus)
+-		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+-					     BUS_NOTIFY_BIND_DRIVER, dev);
++	if (dev->bus) {
++		if (blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
++						 BUS_NOTIFY_BIND_DRIVER, dev) ==
++						 NOTIFY_BAD)
++			return -EINVAL;
++	}
+ 
+ 	ret = sysfs_create_link(&dev->driver->p->kobj, &dev->kobj,
+ 				kobject_name(&dev->kobj));
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.15.0
