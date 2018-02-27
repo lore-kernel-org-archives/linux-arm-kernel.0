@@ -1,245 +1,315 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 27 Feb 2018 19:36:53 +0530
-Subject: [PATCH v8 06/15] clk: qcom: Add MSM8960/APQ8064's HFPLLs
-In-Reply-To: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1519740422-3835-7-git-send-email-sricharan@codeaurora.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 27 Feb 2018 15:09:26 +0100
+Subject: [PATCH 3/3] ARM: mach-stm32: Add Extended TrustZone Protection driver
+In-Reply-To: <20180227140926.22996-1-benjamin.gaignard@st.com>
+References: <20180227140926.22996-1-benjamin.gaignard@st.com>
+Message-ID: <20180227140926.22996-4-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Before binding a driver Extended TrustZone Protection (ETZPC) driver
+checks that the hardware block is accessible to non-secure world.
+Hardware blocks split between secure and non-secure is done at early
+boot stage so the driver only needs to read the status (2 bits) for each
+of the block.
 
-Describe the HFPLLs present on MSM8960 and APQ8064 devices.
+Hardware blocks status bits location in the registers is computed
+from device address index in the array.
 
-Acked-by: Rob Herring <robh@kernel.org> (bindings)
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+To avoid to bind a device which will not be accessible ETZPC driver
+must be probed early, at least before platform driver, so just after
+core initialisation.
+
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
- 2 files changed, 174 insertions(+)
+ arch/arm/mach-stm32/Kconfig       |   7 ++
+ arch/arm/mach-stm32/Makefile      |   1 +
+ arch/arm/mach-stm32/stm32-etzpc.c | 252 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 260 insertions(+)
+ create mode 100644 arch/arm/mach-stm32/stm32-etzpc.c
 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index eb551c7..809f16a 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -30,6 +30,7 @@
- #include "clk-pll.h"
- #include "clk-rcg.h"
- #include "clk-branch.h"
-+#include "clk-hfpll.h"
- #include "reset.h"
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index 5bc7f5ab61cd..a3ef308642be 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -44,6 +44,13 @@ config MACH_STM32MP157
+ 	bool "STMicroelectronics STM32MP157"
+ 	default y
  
- static struct clk_pll pll3 = {
-@@ -86,6 +87,164 @@
- 	},
- };
++config STM32_ETZPC
++	bool "STM32 Extended TrustZone Protection"
++	depends on MACH_STM32MP157
++	help
++	  Select y to enable STM32 Extended TrustZone Protection
++	  Controller (ETZPC)
++
+ endif # ARMv7-A
  
-+static struct hfpll_data hfpll0_data = {
-+	.mode_reg = 0x3200,
-+	.l_reg = 0x3208,
-+	.m_reg = 0x320c,
-+	.n_reg = 0x3210,
-+	.config_reg = 0x3204,
-+	.status_reg = 0x321c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3214,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
+ endif
+diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
+index bd0b7b5d6e9d..2e1e729a68c9 100644
+--- a/arch/arm/mach-stm32/Makefile
++++ b/arch/arm/mach-stm32/Makefile
+@@ -1 +1,2 @@
+ obj-y += board-dt.o
++obj-$(CONFIG_STM32_ETZPC) += stm32-etzpc.o
+diff --git a/arch/arm/mach-stm32/stm32-etzpc.c b/arch/arm/mach-stm32/stm32-etzpc.c
+new file mode 100644
+index 000000000000..b338d219d5a8
+--- /dev/null
++++ b/arch/arm/mach-stm32/stm32-etzpc.c
+@@ -0,0 +1,252 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
++ */
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/notifier.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#define ETZPC_DECPROT0		0x10
++#define ETZPC_IP_VER		0x3F4
++
++#define IP_VER_MP1		0x00000020
++
++#define DECPROT_MASK		0x03
++#define NB_PROT_PER_REG		0x10
++#define DECPROT_NB_BITS		2
++
++struct stm32_etzpc_cfg {
++	const u32 *addr;
++	const int size;
++	const int version;
 +};
 +
-+static struct clk_hfpll hfpll0 = {
-+	.d = &hfpll0_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll0",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
++struct stm32_etzpc {
++	void __iomem *base;
++	const struct stm32_etzpc_cfg *cfg;
++	struct notifier_block nb;
++};
++
++static inline struct stm32_etzpc *to_stm32_etzpc(struct notifier_block *nb)
++{
++	return container_of(nb, struct stm32_etzpc, nb);
++}
++
++static const u32 stm32mp1_ip_addr[] = {
++	0x5c008000,	/* 00 stgenc */
++	0x54000000,	/* 01 bkpsram */
++	0x5c003000,	/* 02 iwdg1 */
++	0x5c000000,	/* 03 usart1 */
++	0x5c001000,	/* 04 spi6 */
++	0x5c002000,	/* 05 i2c4 */
++	0xffffffff,	/* 06 reserved */
++	0x54003000,	/* 07 rng1 */
++	0x54002000,	/* 08 hash1 */
++	0x54001000,	/* 09 cryp1 */
++	0x5a003000,	/* 0A ddrctrl */
++	0x5a004000,	/* 0B ddrphyc */
++	0x5c009000,	/* 0C i2c6 */
++	0xffffffff,	/* 0D reserved */
++	0xffffffff,	/* 0E reserved */
++	0xffffffff,	/* 0F reserved */
++	0x40000000,	/* 10 tim2 */
++	0x40001000,	/* 11 tim3 */
++	0x40002000,	/* 12 tim4 */
++	0x40003000,	/* 13 tim5 */
++	0x40004000,	/* 14 tim6 */
++	0x40005000,	/* 15 tim7 */
++	0x40006000,	/* 16 tim12 */
++	0x40007000,	/* 17 tim13 */
++	0x40008000,	/* 18 tim14 */
++	0x40009000,	/* 19 lptim1 */
++	0x4000a000,	/* 1A wwdg1 */
++	0x4000b000,	/* 1B spi2 */
++	0x4000c000,	/* 1C spi3 */
++	0x4000d000,	/* 1D spdifrx */
++	0x4000e000,	/* 1E usart2 */
++	0x4000f000,	/* 1F usart3 */
++	0x40010000,	/* 20 uart4 */
++	0x40011000,	/* 21 uart5 */
++	0x40012000,	/* 22 i2c1 */
++	0x40013000,	/* 23 i2c2 */
++	0x40014000,	/* 24 i2c3 */
++	0x40015000,	/* 25 i2c5 */
++	0x40016000,	/* 26 cec */
++	0x40017000,	/* 27 dac */
++	0x40018000,	/* 28 uart7 */
++	0x40019000,	/* 29 uart8 */
++	0xffffffff,	/* 2A reserved */
++	0xffffffff,	/* 2B reserved */
++	0x4001c000,	/* 2C mdios */
++	0xffffffff,	/* 2D reserved */
++	0xffffffff,	/* 2E reserved */
++	0xffffffff,	/* 2F reserved */
++	0x44000000,	/* 30 tim1 */
++	0x44001000,	/* 31 tim8 */
++	0xffffffff,	/* 32 reserved */
++	0x44003000,	/* 33 usart6 */
++	0x44004000,	/* 34 spi1 */
++	0x44005000,	/* 35 spi4 */
++	0x44006000,	/* 36 tim15 */
++	0x44007000,	/* 37 tim16 */
++	0x44008000,	/* 38 tim17 */
++	0x44009000,	/* 39 spi5 */
++	0x4400a000,	/* 3A sai1 */
++	0x4400b000,	/* 3B sai2 */
++	0x4400c000,	/* 3C sai3 */
++	0x4400d000,	/* 3D dfsdm */
++	0x4400e000,	/* 3E tt_fdcan */
++	0xffffffff,	/* 3F reserved */
++	0x50021000,	/* 40 lptim2 */
++	0x50022000,	/* 41 lptim3 */
++	0x50023000,	/* 42 lptim4 */
++	0x50024000,	/* 43 lptim5 */
++	0x50027000,	/* 44 sai4 */
++	0x50025000,	/* 45 vrefbuf */
++	0x4c006000,	/* 46 dcmi */
++	0x4c004000,	/* 47 crc2 */
++	0x48003000,	/* 48 adc */
++	0x4c002000,	/* 49 hash2 */
++	0x4c003000,	/* 4A rng2 */
++	0x4c005000,	/* 4B cryp2 */
++	0xffffffff,	/* 4C reserved */
++	0xffffffff,	/* 4D reserved */
++	0xffffffff,	/* 4E reserved */
++	0xffffffff,	/* 4F reserved */
++	0xffffffff,	/* 50 sram1 */
++	0xffffffff,	/* 51 sram2 */
++	0xffffffff,	/* 52 sram3 */
++	0xffffffff,	/* 53 sram4 */
++	0xffffffff,	/* 54 retram */
++	0x49000000,	/* 55 otg */
++	0x48004000,	/* 56 sdmmc3 */
++	0x48005000,	/* 57 dlybsd3 */
++	0x48000000,	/* 58 dma1 */
++	0x48001000,	/* 59 dma2 */
++	0x48002000,	/* 5A dmamux */
++	0x58002000,	/* 5B fmc */
++	0x58003000,	/* 5C qspi */
++	0x58004000,	/* 5D dlybq */
++	0x5800a000,	/* 5E eth */
++	0xffffffff,	/* 5F reserved */
++};
++
++static const struct stm32_etzpc_cfg stm32_etzpc_mp1_cfg = {
++	.addr = stm32mp1_ip_addr,
++	.size = ARRAY_SIZE(stm32mp1_ip_addr),
++	.version = IP_VER_MP1
++};
++
++static const struct of_device_id stm32_etzpc_of_match[] = {
++	{
++		.compatible = "st,stm32mp1-etzpc",
++		.data = (void *)&stm32_etzpc_mp1_cfg,
 +	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll0.lock),
++	{ /* end node */ },
 +};
++MODULE_DEVICE_TABLE(of, stm32_etzpc_of_match);
 +
-+static struct hfpll_data hfpll1_8064_data = {
-+	.mode_reg = 0x3240,
-+	.l_reg = 0x3248,
-+	.m_reg = 0x324c,
-+	.n_reg = 0x3250,
-+	.config_reg = 0x3244,
-+	.status_reg = 0x325c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3254,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
++static int stm32_etzpc_notifier_call(struct notifier_block *nb,
++				     unsigned long event, void *data)
++{
++	struct stm32_etzpc *etzpc = to_stm32_etzpc(nb);
++	struct device *dev = data;
++	struct resource res;
++	int i;
 +
-+static struct hfpll_data hfpll1_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
++	if (event != BUS_NOTIFY_BIND_DRIVER)
++		return NOTIFY_DONE;
 +
-+static struct clk_hfpll hfpll1 = {
-+	.d = &hfpll1_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll1",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll1.lock),
-+};
++	if (of_address_to_resource(dev->of_node, 0, &res))
++		return NOTIFY_DONE;
 +
-+static struct hfpll_data hfpll2_data = {
-+	.mode_reg = 0x3280,
-+	.l_reg = 0x3288,
-+	.m_reg = 0x328c,
-+	.n_reg = 0x3290,
-+	.config_reg = 0x3284,
-+	.status_reg = 0x329c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3294,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
++	for (i = 0; i < etzpc->cfg->size; i++) {
++		if (etzpc->cfg->addr[i] == res.start) {
++			/*
++			 * Each hardware block protection status is defined by
++			 * a 2 bits field and all of them are packed into
++			 * 32 bits registers. Do some computation to get
++			 * register offset and the shift.
++			 */
++			u32 status;
++			int offset = (i / NB_PROT_PER_REG) * sizeof(u32);
++			int shift = (i % NB_PROT_PER_REG) * DECPROT_NB_BITS;
 +
-+static struct clk_hfpll hfpll2 = {
-+	.d = &hfpll2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll2.lock),
-+};
++			status = readl(etzpc->base + ETZPC_DECPROT0 + offset);
++			status &= DECPROT_MASK << shift;
 +
-+static struct hfpll_data hfpll3_data = {
-+	.mode_reg = 0x32c0,
-+	.l_reg = 0x32c8,
-+	.m_reg = 0x32cc,
-+	.n_reg = 0x32d0,
-+	.config_reg = 0x32c4,
-+	.status_reg = 0x32dc,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x32d4,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll3 = {
-+	.d = &hfpll3_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll3",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll3.lock),
-+};
-+
-+static struct hfpll_data hfpll_l2_8064_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct hfpll_data hfpll_l2_data = {
-+	.mode_reg = 0x3400,
-+	.l_reg = 0x3408,
-+	.m_reg = 0x340c,
-+	.n_reg = 0x3410,
-+	.config_reg = 0x3404,
-+	.status_reg = 0x341c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3414,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll_l2 = {
-+	.d = &hfpll_l2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll_l2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll_l2.lock),
-+};
-+
- static struct clk_pll pll14 = {
- 	.l_reg = 0x31c4,
- 	.m_reg = 0x31c8,
-@@ -3112,6 +3271,9 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
- };
- 
- static const struct qcom_reset_map gcc_msm8960_resets[] = {
-@@ -3323,6 +3485,11 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
-+	[PLL16] = &hfpll2.clkr,
-+	[PLL17] = &hfpll3.clkr,
- };
- 
- static const struct qcom_reset_map gcc_apq8064_resets[] = {
-@@ -3482,6 +3649,11 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	if (match->data == &gcc_apq8064_desc) {
-+		hfpll1.d = &hfpll1_8064_data;
-+		hfpll_l2.d = &hfpll_l2_8064_data;
++			return (status == DECPROT_MASK << shift) ?
++				NOTIFY_DONE : NOTIFY_BAD;
++		}
 +	}
 +
- 	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
- 					      NULL, 0);
- 	if (IS_ERR(tsens))
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8960.h b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-index 7d20eed..e02742f 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8960.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-@@ -319,5 +319,7 @@
- #define CE3_SRC					303
- #define CE3_CORE_CLK				304
- #define CE3_H_CLK				305
-+#define PLL16					306
-+#define PLL17					307
- 
- #endif
++	return NOTIFY_DONE;
++}
++
++static int stm32_etzpc_probe(struct device_node *np,
++			     const struct of_device_id *match)
++{
++	struct stm32_etzpc *etzpc;
++	int version, ret;
++
++	etzpc = kzalloc(sizeof(*etzpc), GFP_KERNEL);
++	if (!etzpc)
++		return -ENOMEM;
++
++	etzpc->base = of_iomap(np, 0);
++	if (IS_ERR(etzpc->base)) {
++		ret = PTR_ERR(etzpc->base);
++		goto failed;
++	}
++
++	etzpc->cfg = (const struct stm32_etzpc_cfg *)match->data;
++
++	version = readl(etzpc->base + ETZPC_IP_VER);
++	if (version != etzpc->cfg->version) {
++		pr_err("Wrong ETZPC version\n");
++		ret = -EINVAL;
++		goto failed;
++	}
++
++	etzpc->nb.notifier_call = stm32_etzpc_notifier_call,
++	ret = bus_register_notifier(&platform_bus_type, &etzpc->nb);
++	if (!ret)
++		return 0;
++
++failed:
++	kfree(etzpc);
++	return ret;
++}
++
++/*
++ * stm32_etzpc_init needs to be called before starting to probe
++ * platform drivers to be able to catch all bind notifications
++ * that's why it is tagged as postcore_initcall
++ */
++static int __init stm32_etzpc_init(void)
++{
++	struct device_node *np;
++	const struct of_device_id *m;
++	int ret;
++
++	np = of_find_matching_node_and_match(NULL, stm32_etzpc_of_match, &m);
++
++	if (!np)
++		return -ENODEV;
++
++	if (!of_device_is_available(np)) {
++		of_node_put(np);
++		return -ENODEV;
++	}
++
++	ret = stm32_etzpc_probe(np, m);
++
++	of_node_put(np);
++
++	return ret;
++}
++postcore_initcall(stm32_etzpc_init);
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.15.0
