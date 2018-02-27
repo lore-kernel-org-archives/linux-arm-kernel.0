@@ -1,188 +1,94 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:34:18 +0100
-Subject: [PATCH v5 29/40] KVM: arm64: Prepare to handle deferred save/restore
- of 32-bit registers
+Date: Tue, 27 Feb 2018 12:34:23 +0100
+Subject: [PATCH v5 34/40] KVM: arm64: Cleanup __activate_traps and
+ __deactive_traps for VHE and non-VHE
 In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
 References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-30-cdall@kernel.org>
+Message-ID: <20180227113429.637-35-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-32-bit registers are not used by a 64-bit host kernel and can be
-deferred, but we need to rework the accesses to these register to access
-the latest values depending on whether or not guest system registers are
-loaded on the CPU or only reside in memory.
+To make the code more readable and to avoid the overhead of a function
+call, let's get rid of a pair of the alternative function selectors and
+explicitly call the VHE and non-VHE functions using the has_vhe() static
+key based selector instead, telling the compiler to try to inline the
+static function if it can.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
     Changes since v4:
-     - Fixed typos in commit message
-     - Moved change to read/write sysreg to the following patch as
-       suggested by Drew
-    
-    Changes since v3:
-     - Don't also try to write hardware spsr when sysregs are not loaded
-     - Adapted patch to use switch-based sysreg save/restore approach
-     - (Kept additional BUG_ON() in vcpu_read_spsr32() to keep the compiler happy)
-    
-    Changes since v2:
-     - New patch (deferred register handling has been reworked)
+     - Removed inline attributes from static functions in arch/arm64/kvm/hyp/switch.c
 
- arch/arm64/include/asm/kvm_emulate.h | 32 +++++------------
- arch/arm64/kvm/regmap.c              | 67 +++++++++++++++++++++++++++---------
- 2 files changed, 59 insertions(+), 40 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 6ed18ce0d638..23b33e8ea03a 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -33,7 +33,8 @@
- #include <asm/virt.h>
- 
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
--unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu);
-+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v);
- 
- bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
-@@ -162,41 +163,26 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
- 
- static inline unsigned long vcpu_read_spsr(const struct kvm_vcpu *vcpu)
- {
--	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
--
--	if (vcpu_mode_is_32bit(vcpu)) {
--		unsigned long *p_32bit = vcpu_spsr32(vcpu);
--
--		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
--		if (p_32bit != p)
--			return *p_32bit;
--	}
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return vcpu_read_spsr32(vcpu);
- 
- 	if (vcpu->arch.sysregs_loaded_on_cpu)
- 		return read_sysreg_el1(spsr);
- 	else
--		return *p;
-+		return vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index eab433fa1442..67c66b4e237e 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -86,7 +86,7 @@ static void __hyp_text __deactivate_traps_common(void)
+ 	write_sysreg(0, pmuserenr_el0);
  }
  
--static inline void vcpu_write_spsr(const struct kvm_vcpu *vcpu, unsigned long v)
-+static inline void vcpu_write_spsr(struct kvm_vcpu *vcpu, unsigned long v)
+-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++static void activate_traps_vhe(struct kvm_vcpu *vcpu)
  {
--	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
--
--	/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
- 	if (vcpu_mode_is_32bit(vcpu)) {
--		unsigned long *p_32bit = vcpu_spsr32(vcpu);
--
--		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
--		if (p_32bit != p) {
--			*p_32bit = v;
--			return;
--		}
-+		vcpu_write_spsr32(vcpu, v);
-+		return;
- 	}
+ 	u64 val;
  
- 	if (vcpu->arch.sysregs_loaded_on_cpu)
- 		write_sysreg_el1(v, spsr);
- 	else
--		*p = v;
-+		vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1] = v;
+@@ -109,10 +109,6 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, cptr_el2);
  }
  
- static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
-index bbc6ae32e4af..eefe403a2e63 100644
---- a/arch/arm64/kvm/regmap.c
-+++ b/arch/arm64/kvm/regmap.c
-@@ -141,28 +141,61 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
- /*
-  * Return the SPSR for the current mode of the virtual CPU.
-  */
--unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
-+static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
+-static hyp_alternate_select(__activate_traps_arch,
+-			    __activate_traps_nvhe, __activate_traps_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
  {
- 	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
- 	switch (mode) {
--	case COMPAT_PSR_MODE_SVC:
--		mode = KVM_SPSR_SVC;
--		break;
--	case COMPAT_PSR_MODE_ABT:
--		mode = KVM_SPSR_ABT;
--		break;
--	case COMPAT_PSR_MODE_UND:
--		mode = KVM_SPSR_UND;
--		break;
--	case COMPAT_PSR_MODE_IRQ:
--		mode = KVM_SPSR_IRQ;
--		break;
--	case COMPAT_PSR_MODE_FIQ:
--		mode = KVM_SPSR_FIQ;
--		break;
-+	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
-+	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
-+	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
-+	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
-+	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
-+	default: BUG();
-+	}
-+}
-+
-+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
-+{
-+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-+
-+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-+		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
-+
-+	switch (spsr_idx) {
-+	case KVM_SPSR_SVC:
-+		return read_sysreg_el1(spsr);
-+	case KVM_SPSR_ABT:
-+		return read_sysreg(spsr_abt);
-+	case KVM_SPSR_UND:
-+		return read_sysreg(spsr_und);
-+	case KVM_SPSR_IRQ:
-+		return read_sysreg(spsr_irq);
-+	case KVM_SPSR_FIQ:
-+		return read_sysreg(spsr_fiq);
- 	default:
- 		BUG();
- 	}
-+}
-+
-+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
-+{
-+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-+
-+	if (!vcpu->arch.sysregs_loaded_on_cpu) {
-+		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
-+		return;
-+	}
+ 	u64 hcr = vcpu->arch.hcr_el2;
+@@ -123,10 +119,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
  
--	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
-+	switch (spsr_idx) {
-+	case KVM_SPSR_SVC:
-+		write_sysreg_el1(v, spsr);
-+	case KVM_SPSR_ABT:
-+		write_sysreg(v, spsr_abt);
-+	case KVM_SPSR_UND:
-+		write_sysreg(v, spsr_und);
-+	case KVM_SPSR_IRQ:
-+		write_sysreg(v, spsr_irq);
-+	case KVM_SPSR_FIQ:
-+		write_sysreg(v, spsr_fiq);
-+	}
+ 	__activate_traps_fpsimd32(vcpu);
+-	__activate_traps_arch()(vcpu);
++	if (has_vhe())
++		activate_traps_vhe(vcpu);
++	else
++		__activate_traps_nvhe(vcpu);
  }
+ 
+-static void __hyp_text __deactivate_traps_vhe(void)
++static void deactivate_traps_vhe(void)
+ {
+ 	extern char vectors[];	/* kernel exception vectors */
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+@@ -148,10 +147,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+ 	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+ 
+-static hyp_alternate_select(__deactivate_traps_arch,
+-			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ {
+ 	/*
+@@ -163,7 +158,10 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	if (vcpu->arch.hcr_el2 & HCR_VSE)
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ 
+-	__deactivate_traps_arch()();
++	if (has_vhe())
++		deactivate_traps_vhe();
++	else
++		__deactivate_traps_nvhe();
+ }
+ 
+ void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
 -- 
 2.14.2
