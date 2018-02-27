@@ -1,19 +1,19 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:34:21 +0100
-Subject: [PATCH v5 32/40] KVM: arm64: Directly call VHE and non-VHE FPSIMD
- enabled functions
+Date: Tue, 27 Feb 2018 12:34:16 +0100
+Subject: [PATCH v5 27/40] KVM: arm64: Prepare to handle deferred save/restore
+ of ELR_EL1
 In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
 References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-33-cdall@kernel.org>
+Message-ID: <20180227113429.637-28-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-There is no longer a need for an alternative to choose the right
-function to tell us whether or not FPSIMD was enabled for the VM,
-because we can simply can the appropriate functions directly from within
-the _vhe and _nvhe run functions.
+ELR_EL1 is not used by a VHE host kernel and can be deferred, but we
+need to rework the accesses to this register to access the latest value
+depending on whether or not guest system registers are loaded on the CPU
+or only reside in memory.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
@@ -21,55 +21,67 @@ Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
-    Changes since v3:
-     - New patch since we no longer defer FPSIMD handling to load/put
+    Changes since v2:
+     - New patch (deferred register handling has been reworked)
 
- arch/arm64/kvm/hyp/switch.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/kvm_emulate.h | 18 +++++++++++++++++-
+ arch/arm64/kvm/inject_fault.c        |  4 ++--
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 9d90bda3c2cc..5fbb77bd4e90 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -33,20 +33,11 @@ static bool __hyp_text __fpsimd_enabled_nvhe(void)
- 	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index f32640132e26..6ed18ce0d638 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -90,11 +90,27 @@ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
  }
  
--static bool __hyp_text __fpsimd_enabled_vhe(void)
-+static bool fpsimd_enabled_vhe(void)
+-static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
++static inline unsigned long *__vcpu_elr_el1(const struct kvm_vcpu *vcpu)
  {
- 	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
  }
  
--static hyp_alternate_select(__fpsimd_is_enabled,
--			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
--			    ARM64_HAS_VIRT_HOST_EXTN);
--
--bool __hyp_text __fpsimd_enabled(void)
--{
--	return __fpsimd_is_enabled()();
--}
--
- /* Save the 32-bit only FPSIMD system register state */
- static void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
++static inline unsigned long vcpu_read_elr_el1(const struct kvm_vcpu *vcpu)
++{
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		return read_sysreg_el1(elr);
++	else
++		return *__vcpu_elr_el1(vcpu);
++}
++
++static inline void vcpu_write_elr_el1(const struct kvm_vcpu *vcpu, unsigned long v)
++{
++	if (vcpu->arch.sysregs_loaded_on_cpu)
++		write_sysreg_el1(v, elr);
++	else
++		*__vcpu_elr_el1(vcpu) = v;
++}
++
+ static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
  {
-@@ -414,7 +405,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 7f8d2a4e420f..d8e71659ba7e 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -67,7 +67,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
+ 	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
+ 	u32 esr = 0;
  
--	fp_enabled = __fpsimd_enabled();
-+	fp_enabled = fpsimd_enabled_vhe();
+-	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
+ 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
  
- 	sysreg_save_guest_state_vhe(guest_ctxt);
- 	__vgic_save_state(vcpu);
-@@ -481,7 +472,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 		}
- 	}
+ 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+@@ -102,7 +102,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+ 	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
  
--	fp_enabled = __fpsimd_enabled();
-+	fp_enabled = __fpsimd_enabled_nvhe();
+-	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
+ 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
  
- 	__sysreg_save_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
+ 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
 -- 
 2.14.2
