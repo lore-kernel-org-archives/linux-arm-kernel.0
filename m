@@ -1,96 +1,64 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 27 Feb 2018 09:21:00 +0100
-Subject: [PATCH 5/7] iio: adc: stm32-dfsdm: misc style improvements and
- fixes
-In-Reply-To: <20180224130309.7129e79f@archlinux>
-References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
- <1519390261-25453-6-git-send-email-fabrice.gasnier@st.com>
- <20180224130309.7129e79f@archlinux>
-Message-ID: <62c19775-b013-a721-6f14-a8af88984b4b@st.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 Feb 2018 09:20:39 +0100
+Subject: [PATCH v8 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
+References: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <1519719639.3402.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2018 02:03 PM, Jonathan Cameron wrote:
-> On Fri, 23 Feb 2018 13:50:59 +0100
-> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On Tue, 2018-02-27 at 10:07 +0800, Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
 > 
->> Misc fixes & style improvements:
->> - checkpatch warns about line over 80 characters.
->> - remove extra spaces and a blank line (e.g. checkpatch --strict)
->> - remove bad error message always printed in probe routine.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> I'd have preferred this as 3 patches doing one type fo fix each.
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> new file mode 100644
+> index 000000000000..2ff47a9507a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,59 @@
+> +Allwinner V3s Camera Sensor Interface
+> +-------------------------------------
+> +
+> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> +interface and CSI1 is used for parallel interface.
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * bus: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +Each CSI node should contain one 'port' child node with one child 'endpoint'
+> +node, according to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
+> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
+> +Bt656 for CSI1.
+> +
+> +Endpoint node properties for CSI1
+> +---------------------------------
+> +
+> +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
+> +			   node
+> +- bus-width:		: (required) must be 8, 10, 12 or 16
+> +- pclk-sample		: (optional) (default: sample on falling edge)
 
-Hi Jonathan,
+It would be helpful to state that 1 is rising edge and 0 is falling
+edge, see for example ov5640.txt
 
-I was wondering about this as well. Do you wish I send a new series with
-this patch, split into (3 or maybe 4) separate patches ?
-
-In this case, do I need also resend two last patches of this series ?
-
-Please let me know.
-Many thanks,
-Fabrice
-> 
-> Anyhow, I'll need to hold this until the fixes have made there
-> way upstream.  Give me a poke if I seem to have forgotten
-> and the dependencies have made it back to my togreg branch.
-> 
-> Thanks,
-> 
-> Jonathan
-> 
->> ---
->>  drivers/iio/adc/stm32-dfsdm-adc.c | 9 ++++-----
->>  1 file changed, 4 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
->> index 01422d1..57bcb45 100644
->> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
->> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
->> @@ -253,7 +253,8 @@ static int stm32_dfsdm_start_filter(struct stm32_dfsdm *dfsdm,
->>  				  DFSDM_CR1_RSWSTART(1));
->>  }
->>  
->> -static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
->> +static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm,
->> +				    unsigned int fl_id)
->>  {
->>  	/* Disable conversion */
->>  	regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
->> @@ -337,7 +338,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
->>  					    "st,adc-channel-types", chan_idx,
->>  					    &of_str);
->>  	if (!ret) {
->> -		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
->> +		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
->>  		if (val < 0)
->>  			return val;
->>  	} else {
->> @@ -349,7 +350,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
->>  					    "st,adc-channel-clk-src", chan_idx,
->>  					    &of_str);
->>  	if (!ret) {
->> -		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
->> +		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
->>  		if (val < 0)
->>  			return val;
->>  	} else {
->> @@ -1093,7 +1094,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
->>  	char *name;
->>  	int ret, irq, val;
->>  
->> -
->>  	dev_data = of_device_get_match_data(dev);
->>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
->>  	if (!iio) {
->> @@ -1161,7 +1161,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
->>  	if (ret < 0)
->>  		goto err_cleanup;
->>  
->> -	dev_err(dev, "of_platform_populate\n");
->>  	if (dev_data->type == DFSDM_AUDIO) {
->>  		ret = of_platform_populate(np, NULL, NULL, dev);
->>  		if (ret < 0) {
-> 
+regards
+Philipp
