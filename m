@@ -1,21 +1,115 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 27 Feb 2018 23:23:39 +0300
-Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
-In-Reply-To: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
-References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
-Message-ID: <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 27 Feb 2018 12:45:19 -0800
+Subject: [PATCH] ARM: dts: NSP: Switch to port 8 for CPU port
+Message-ID: <20180227204520.24122-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2018 11:06 PM, Sergei Shtylyov wrote:
+Now that we have added support for pre-pended Broadcom tags with commit
+11606039604c ("net: dsa: b53: Support prepended Broadcom tags") we can
+switch all the Northstar Plus reference boards to use port 8 for the CPU
+port. This allows us to prepare room for supporting the Flow Accelerator
+2 NAPT offload, and frees up port 5 to be made fully configurable for
+the modes that it supports: internal, SGMII, RGMII etc.
 
-> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
-> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
-> output (we're omitting the LVDS decoder for now). These patches depend on
-> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/bcm958622hr.dts | 6 +++---
+ arch/arm/boot/dts/bcm958623hr.dts | 6 +++---
+ arch/arm/boot/dts/bcm958625hr.dts | 6 +++---
+ arch/arm/boot/dts/bcm958625k.dts  | 6 +++---
+ arch/arm/boot/dts/bcm988312hr.dts | 6 +++---
+ 5 files changed, 15 insertions(+), 15 deletions(-)
 
-   Need to mention that the DU driver silently fails to probe now. I do hope that
-this is not due to my updates. :-)
-
-MBR, Sergei
+diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
+index fd8b8c689ffe..ecd05e26c262 100644
+--- a/arch/arm/boot/dts/bcm958622hr.dts
++++ b/arch/arm/boot/dts/bcm958622hr.dts
+@@ -204,10 +204,10 @@
+ 			reg = <4>;
+ 		};
+ 
+-		port at 5 {
+-			ethernet = <&amac0>;
++		port at 8 {
++			ethernet = <&amac2>;
+ 			label = "cpu";
+-			reg = <5>;
++			reg = <8>;
+ 			fixed-link {
+ 				speed = <1000>;
+ 				full-duplex;
+diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
+index b8bde13de90a..f5e85b301497 100644
+--- a/arch/arm/boot/dts/bcm958623hr.dts
++++ b/arch/arm/boot/dts/bcm958623hr.dts
+@@ -208,10 +208,10 @@
+ 			reg = <4>;
+ 		};
+ 
+-		port at 5 {
+-			ethernet = <&amac0>;
++		port at 8 {
++			ethernet = <&amac2>;
+ 			label = "cpu";
+-			reg = <5>;
++			reg = <8>;
+ 			fixed-link {
+ 				speed = <1000>;
+ 				full-duplex;
+diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
+index 6a44b8021702..094db4ba8eb3 100644
+--- a/arch/arm/boot/dts/bcm958625hr.dts
++++ b/arch/arm/boot/dts/bcm958625hr.dts
+@@ -210,10 +210,10 @@
+ 			reg = <4>;
+ 		};
+ 
+-		port at 5 {
+-			ethernet = <&amac0>;
++		port at 8 {
++			ethernet = <&amac2>;
+ 			label = "cpu";
+-			reg = <5>;
++			reg = <8>;
+ 			fixed-link {
+ 				speed = <1000>;
+ 				full-duplex;
+diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
+index 2cf2392483b2..3ea5f739e90b 100644
+--- a/arch/arm/boot/dts/bcm958625k.dts
++++ b/arch/arm/boot/dts/bcm958625k.dts
+@@ -245,10 +245,10 @@
+ 			reg = <4>;
+ 		};
+ 
+-		port at 5 {
+-			ethernet = <&amac0>;
++		port at 8 {
++			ethernet = <&amac2>;
+ 			label = "cpu";
+-			reg = <5>;
++			reg = <8>;
+ 			fixed-link {
+ 				speed = <1000>;
+ 				full-duplex;
+diff --git a/arch/arm/boot/dts/bcm988312hr.dts b/arch/arm/boot/dts/bcm988312hr.dts
+index bce251a68591..ea9a0806b446 100644
+--- a/arch/arm/boot/dts/bcm988312hr.dts
++++ b/arch/arm/boot/dts/bcm988312hr.dts
+@@ -216,10 +216,10 @@
+ 			reg = <4>;
+ 		};
+ 
+-		port at 5 {
+-			ethernet = <&amac0>;
++		port at 8 {
++			ethernet = <&amac2>;
+ 			label = "cpu";
+-			reg = <5>;
++			reg = <8>;
+ 			fixed-link {
+ 				speed = <1000>;
+ 				full-duplex;
+-- 
+2.14.1
