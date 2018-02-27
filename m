@@ -1,114 +1,120 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:33:51 +0100
-Subject: [PATCH v5 02/40] KVM: arm/arm64: Move vcpu_load call after
- kvm_vcpu_first_run_init
+Date: Tue, 27 Feb 2018 12:33:53 +0100
+Subject: [PATCH v5 04/40] KVM: arm64: Rework hyp_panic for VHE and non-VHE
 In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
 References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-3-cdall@kernel.org>
+Message-ID: <20180227113429.637-5-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
-we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
-there is also no need to do vcpu_load() for things such as handling the
-immediate_exit flag.
+VHE actually doesn't rely on clearing the VTTBR when returning to the
+host kernel, and that is the current key mechanism of hyp_panic to
+figure out how to attempt to return to a state good enough to print a
+panic statement.
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Therefore, we split the hyp_panic function into two functions, a VHE and
+a non-VHE, keeping the non-VHE version intact, but changing the VHE
+behavior.
+
+The vttbr_el2 check on VHE doesn't really make that much sense, because
+the only situation where we can get here on VHE is when the hypervisor
+assembly code actually called into hyp_panic, which only happens when
+VBAR_EL2 has been set to the KVM exception vectors.  On VHE, we can
+always safely disable the traps and restore the host registers at this
+point, so we simply do that unconditionally and call into the panic
+function directly.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c     |  4 ----
- virt/kvm/arm/arm.c            | 22 ++++++++--------------
- virt/kvm/arm/vgic/vgic-init.c | 11 -----------
- 3 files changed, 8 insertions(+), 29 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index f7278358f133..872e1fbd94dc 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -854,11 +854,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return ret;
+Notes:
+    Changes since v1:
+     - Fixed typos in the commit message
+     - Still use the generic __deactivte_traps() function in the hyp panic
+       code until we rework that logic later.
+
+ arch/arm64/kvm/hyp/switch.c | 42 +++++++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 46717da75643..579d9a263853 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -439,10 +439,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
  
- no_vgic:
--	preempt_disable();
- 	timer->enabled = 1;
--	kvm_timer_vcpu_load(vcpu);
--	preempt_enable();
--
- 	return 0;
- }
+ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+-					     struct kvm_vcpu *vcpu)
++					     struct kvm_cpu_context *__host_ctxt)
+ {
++	struct kvm_vcpu *vcpu;
+ 	unsigned long str_va;
  
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 53572304843b..932e61858c55 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -632,27 +632,22 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
- 		return -ENOEXEC;
- 
--	vcpu_load(vcpu);
--
- 	ret = kvm_vcpu_first_run_init(vcpu);
- 	if (ret)
--		goto out;
-+		return ret;
- 
- 	if (run->exit_reason == KVM_EXIT_MMIO) {
- 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
- 		if (ret)
--			goto out;
--		if (kvm_arm_handle_step_debug(vcpu, vcpu->run)) {
--			ret = 0;
--			goto out;
--		}
--
-+			return ret;
-+		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
-+			return 0;
- 	}
- 
--	if (run->immediate_exit) {
--		ret = -EINTR;
--		goto out;
--	}
-+	if (run->immediate_exit)
-+		return -EINTR;
++	vcpu = __host_ctxt->__hyp_running_vcpu;
 +
-+	vcpu_load(vcpu);
- 
- 	kvm_sigset_activate(vcpu);
- 
-@@ -811,7 +806,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	kvm_sigset_deactivate(vcpu);
- 
--out:
- 	vcpu_put(vcpu);
- 	return ret;
++	if (read_sysreg(vttbr_el2)) {
++		__timer_disable_traps(vcpu);
++		__deactivate_traps(vcpu);
++		__deactivate_vm(vcpu);
++		__sysreg_restore_host_state(__host_ctxt);
++	}
++
+ 	/*
+ 	 * Force the panic string to be loaded from the literal pool,
+ 	 * making sure it is a kernel address and not a PC-relative
+@@ -456,37 +466,31 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+ 		       read_sysreg(hpfar_el2), par, vcpu);
  }
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 743ca5cb05ef..3e8209a07585 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -302,17 +302,6 @@ int vgic_init(struct kvm *kvm)
  
- 	dist->initialized = true;
+-static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
+-					    struct kvm_vcpu *vcpu)
++static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
++				 struct kvm_cpu_context *host_ctxt)
+ {
++	struct kvm_vcpu *vcpu;
++	vcpu = host_ctxt->__hyp_running_vcpu;
++
++	__deactivate_traps(vcpu);
++	__sysreg_restore_host_state(host_ctxt);
++
+ 	panic(__hyp_panic_string,
+ 	      spsr,  elr,
+ 	      read_sysreg_el2(esr),   read_sysreg_el2(far),
+ 	      read_sysreg(hpfar_el2), par, vcpu);
+ }
  
--	/*
--	 * If we're initializing GICv2 on-demand when first running the VCPU
--	 * then we need to load the VGIC state onto the CPU.  We can detect
--	 * this easily by checking if we are in between vcpu_load and vcpu_put
--	 * when we just initialized the VGIC.
--	 */
--	preempt_disable();
--	vcpu = kvm_arm_get_running_vcpu();
--	if (vcpu)
--		kvm_vgic_load(vcpu);
--	preempt_enable();
- out:
- 	return ret;
+-static hyp_alternate_select(__hyp_call_panic,
+-			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+ void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
+ {
+-	struct kvm_vcpu *vcpu = NULL;
+-
+ 	u64 spsr = read_sysreg_el2(spsr);
+ 	u64 elr = read_sysreg_el2(elr);
+ 	u64 par = read_sysreg(par_el1);
+ 
+-	if (read_sysreg(vttbr_el2)) {
+-		vcpu = host_ctxt->__hyp_running_vcpu;
+-		__timer_disable_traps(vcpu);
+-		__deactivate_traps(vcpu);
+-		__deactivate_vm(vcpu);
+-		__sysreg_restore_host_state(host_ctxt);
+-	}
+-
+-	/* Call panic for real */
+-	__hyp_call_panic()(spsr, elr, par, vcpu);
++	if (!has_vhe())
++		__hyp_call_panic_nvhe(spsr, elr, par, host_ctxt);
++	else
++		__hyp_call_panic_vhe(spsr, elr, par, host_ctxt);
+ 
+ 	unreachable();
  }
 -- 
 2.14.2
