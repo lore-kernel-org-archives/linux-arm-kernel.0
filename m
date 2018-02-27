@@ -1,117 +1,234 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 27 Feb 2018 23:26:46 +0100
-Subject: [PATCH v2 01/16] clk: sunxi-ng: Add check for minimal rate to NM PLLs
+Date: Tue, 27 Feb 2018 23:26:55 +0100
+Subject: [PATCH v2 10/16] drm/sun4i: Add support for variants to DW HDMI PHY
 In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
 References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <20180227222701.9716-2-jernej.skrabec@siol.net>
+Message-ID: <20180227222701.9716-11-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some NM PLLs doesn't work well when their output clock rate is set below
-certain rate.
+There are multiple variants of DW HDMI PHYs in Allwinner SoCs. While
+some things like clock and reset setup are the same, PHY configuration
+differs a lot.
 
-Add support for that constrain.
+Split out code which is PHY specific to separate functions and create
+a structure which holds pointers to those functions.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nm.c | 11 +++++++----
- drivers/clk/sunxi-ng/ccu_nm.h | 27 +++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  | 20 ++++++--
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 89 +++++++++++++++++++++++-----------
+ 2 files changed, 76 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-index a16de092bf94..7fc743c78c1b 100644
---- a/drivers/clk/sunxi-ng/ccu_nm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nm.c
-@@ -20,7 +20,7 @@ struct _ccu_nm {
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index d8d0684fc8aa..1e9eb6072615 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -12,11 +12,23 @@
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
++struct sun8i_hdmi_phy;
++
++struct sun8i_hdmi_phy_variant {
++	void (*phy_init)(struct sun8i_hdmi_phy *phy);
++	void (*phy_disable)(struct dw_hdmi *hdmi,
++			    struct sun8i_hdmi_phy *phy);
++	int  (*phy_config)(struct dw_hdmi *hdmi,
++			   struct sun8i_hdmi_phy *phy,
++			   unsigned int clk_rate);
++};
++
+ struct sun8i_hdmi_phy {
+-	struct clk		*clk_bus;
+-	struct clk		*clk_mod;
+-	struct regmap		*regs;
+-	struct reset_control	*rst_phy;
++	struct clk			*clk_bus;
++	struct clk			*clk_mod;
++	struct regmap			*regs;
++	struct reset_control		*rst_phy;
++	struct sun8i_hdmi_phy_variant	*variant;
  };
  
- static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
--			     struct _ccu_nm *nm)
-+			     unsigned long min_rate, struct _ccu_nm *nm)
+ struct sun8i_dw_hdmi {
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 9d2f11ca3538..17aada64bafd 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -30,21 +30,10 @@
+  */
+ #define I2C_ADDR	0x69
+ 
+-static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+-				 struct drm_display_mode *mode)
++static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
++				      struct sun8i_hdmi_phy *phy,
++				      unsigned int clk_rate)
  {
- 	unsigned long best_rate = 0;
- 	unsigned long best_n = 0, best_m = 0;
-@@ -30,7 +30,7 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
- 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
- 			unsigned long tmp_rate = parent * _n  / _m;
- 
--			if (tmp_rate > rate)
-+			if (tmp_rate > rate || tmp_rate < min_rate)
- 				continue;
- 
- 			if ((rate - tmp_rate) < (rate - best_rate)) {
-@@ -117,6 +117,9 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate *= nm->fixed_post_div;
- 
-+	if (rate < nm->min_rate)
-+		rate = nm->min_rate;
-+
- 	if (ccu_frac_helper_has_rate(&nm->common, &nm->frac, rate)) {
- 		if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 			rate /= nm->fixed_post_div;
-@@ -134,7 +137,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
- 	_nm.min_m = 1;
- 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
- 
--	ccu_nm_find_best(*parent_rate, rate, &_nm);
-+	ccu_nm_find_best(*parent_rate, rate, nm->min_rate, &_nm);
- 	rate = *parent_rate * _nm.n / _nm.m;
- 
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-@@ -186,7 +189,7 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
- 					   &_nm.m, &_nm.n);
- 	} else {
- 		ccu_sdm_helper_disable(&nm->common, &nm->sdm);
--		ccu_nm_find_best(parent_rate, rate, &_nm);
-+		ccu_nm_find_best(parent_rate, rate, nm->min_rate, &_nm);
- 	}
- 
- 	spin_lock_irqsave(nm->common.lock, flags);
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.h b/drivers/clk/sunxi-ng/ccu_nm.h
-index eba586b4c7d0..1d8b459c50b7 100644
---- a/drivers/clk/sunxi-ng/ccu_nm.h
-+++ b/drivers/clk/sunxi-ng/ccu_nm.h
-@@ -37,6 +37,7 @@ struct ccu_nm {
- 	struct ccu_sdm_internal		sdm;
- 
- 	unsigned int		fixed_post_div;
-+	unsigned int		min_rate;
- 
- 	struct ccu_common	common;
+-	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
+-	u32 val = 0;
+-
+-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+-		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC;
+-
+-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+-		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC;
+-
+-	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
+-			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK, val);
+-
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
+@@ -64,21 +53,21 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+ 	 * release any documentation, explanation of this values can
+ 	 * be found in i.MX 6Dual/6Quad Reference Manual.
+ 	 */
+-	if (mode->crtc_clock <= 27000) {
++	if (clk_rate <= 27000000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x01e0, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x08da, 0x10);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0007, 0x19);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0318, 0x0e);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x8009, 0x09);
+-	} else if (mode->crtc_clock <= 74250) {
++	} else if (clk_rate <= 74250000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0540, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x10);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0007, 0x19);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x02b5, 0x0e);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x8009, 0x09);
+-	} else if (mode->crtc_clock <= 148500) {
++	} else if (clk_rate <= 148500000) {
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x04a0, 0x06);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
+ 		dw_hdmi_phy_i2c_write(hdmi, 0x0000, 0x10);
+@@ -103,10 +92,27 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
+ 	return 0;
  };
-@@ -88,6 +89,32 @@ struct ccu_nm {
- 		},							\
- 	}
  
-+#define SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(_struct, _name, _parent,	\
-+					     _reg, _min_rate,		\
-+					     _nshift, _nwidth,		\
-+					     _mshift, _mwidth,		\
-+					     _frac_en, _frac_sel,	\
-+					     _frac_rate_0, _frac_rate_1,\
-+					     _gate, _lock, _flags)	\
-+	struct ccu_nm _struct = {					\
-+		.enable		= _gate,				\
-+		.lock		= _lock,				\
-+		.n		= _SUNXI_CCU_MULT(_nshift, _nwidth),	\
-+		.m		= _SUNXI_CCU_DIV(_mshift, _mwidth),	\
-+		.frac		= _SUNXI_CCU_FRAC(_frac_en, _frac_sel,	\
-+						  _frac_rate_0,		\
-+						  _frac_rate_1),	\
-+		.min_rate	= _min_rate,				\
-+		.common		= {					\
-+			.reg		= _reg,				\
-+			.features	= CCU_FEATURE_FRACTIONAL,	\
-+			.hw.init	= CLK_HW_INIT(_name,		\
-+						      _parent,		\
-+						      &ccu_nm_ops,	\
-+						      _flags),		\
-+		},							\
-+	}
+-static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
++static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
++				 struct drm_display_mode *mode)
+ {
+ 	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
++	u32 val = 0;
 +
- #define SUNXI_CCU_NM_WITH_GATE_LOCK(_struct, _name, _parent, _reg,	\
- 				    _nshift, _nwidth,			\
- 				    _mshift, _mwidth,			\
++	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
++		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC;
+ 
++	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
++		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC;
++
++	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
++			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK, val);
++
++	return phy->variant->phy_config(hdmi, phy, mode->crtc_clock * 1000);
++};
++
++static void sun8i_hdmi_phy_disable_a83t(struct dw_hdmi *hdmi,
++					struct sun8i_hdmi_phy *phy)
++{
+ 	dw_hdmi_phy_gen2_txpwron(hdmi, 0);
+ 	dw_hdmi_phy_gen2_pddq(hdmi, 1);
+ 
+@@ -114,6 +120,13 @@ static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
+ 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN, 0);
+ }
+ 
++static void sun8i_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
++{
++	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
++
++	phy->variant->phy_disable(hdmi, phy);
++}
++
+ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
+ 	.init = &sun8i_hdmi_phy_config,
+ 	.disable = &sun8i_hdmi_phy_disable,
+@@ -122,16 +135,8 @@ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
+ 	.setup_hpd = &dw_hdmi_phy_setup_hpd,
+ };
+ 
+-void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
++static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
+ {
+-	/* enable read access to HDMI controller */
+-	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
+-		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
+-
+-	/* unscramble register offsets */
+-	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
+-		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
+-
+ 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK,
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK);
+@@ -145,6 +150,19 @@ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
+ 			   SUN8I_HDMI_PHY_DBG_CTRL_ADDR(I2C_ADDR));
+ }
+ 
++void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
++{
++	/* enable read access to HDMI controller */
++	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
++		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
++
++	/* unscramble register offsets */
++	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
++		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
++
++	phy->variant->phy_init(phy);
++}
++
+ const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void)
+ {
+ 	return &sun8i_hdmi_phy_ops;
+@@ -158,20 +176,31 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ 	.name		= "phy"
+ };
+ 
++static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
++	.phy_init = &sun8i_hdmi_phy_init_a83t,
++	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
++	.phy_config = &sun8i_hdmi_phy_config_a83t,
++};
++
+ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
+-	{ .compatible = "allwinner,sun8i-a83t-hdmi-phy" },
++	{
++		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
++		.data = &sun8i_a83t_hdmi_phy,
++	},
+ 	{ /* sentinel */ }
+ };
+ 
+ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ {
++	const struct of_device_id *match;
+ 	struct device *dev = hdmi->dev;
+ 	struct sun8i_hdmi_phy *phy;
+ 	struct resource res;
+ 	void __iomem *regs;
+ 	int ret;
+ 
+-	if (!of_match_node(sun8i_hdmi_phy_of_table, node)) {
++	match = of_match_node(sun8i_hdmi_phy_of_table, node);
++	if (!match) {
+ 		dev_err(dev, "Incompatible HDMI PHY\n");
+ 		return -EINVAL;
+ 	}
+@@ -180,6 +209,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	if (!phy)
+ 		return -ENOMEM;
+ 
++	phy->variant = (struct sun8i_hdmi_phy_variant *)match->data;
++
+ 	ret = of_address_to_resource(node, 0, &res);
+ 	if (ret) {
+ 		dev_err(dev, "phy: Couldn't get our resources\n");
 -- 
 2.16.2
