@@ -1,36 +1,35 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 27 Feb 2018 11:22:47 +0100
-Subject: [PATCH v2 03/10] arm64: dts: renesas: draak: Override EtherAVB
- phy-mode
+Date: Tue, 27 Feb 2018 11:22:50 +0100
+Subject: [PATCH v2 06/10] arm64: dts: renesas: r8a7796: Set EtherAVB phy mode
+ to "rgmii"
 In-Reply-To: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519726974-23160-4-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1519726974-23160-7-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the PHY interface installed on the Draak board, provides TX
-channel delay, make the "phy-mode" property a board-specific one, meant
-to override the one specified in the SoC DTSI.
-
-Follow up patches will reset the r8a77995 SoC DTSI to use "rgmii" mode
-and let the board file override that.
+Set the "phy-mode" property of EtherAVB device to "rgmii" and let board
+files override it if the installed PHY layer provides delays for the
+RX/TX channels.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index af07da2..af18a09 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -108,6 +108,7 @@
- 	pinctrl-names = "default";
- 	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
-+	phy-mode = "rgmii-txid";
- 	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 6075511..a99b0b2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -974,7 +974,7 @@
+ 			clocks = <&cpg CPG_MOD 812>;
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			resets = <&cpg 812>;
+-			phy-mode = "rgmii-txid";
++			phy-mode = "rgmii";
+ 			iommus = <&ipmmu_ds0 16>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 2.7.4
