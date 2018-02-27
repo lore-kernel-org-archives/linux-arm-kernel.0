@@ -1,75 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 27 Feb 2018 22:25:42 +0100
-Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
- Salvator-X board
-In-Reply-To: <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
-References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
- <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
- <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
-Message-ID: <CAMuHMdXkpEoKxT-z0FunnfdjUpUZZP8GvbC5wAuj-qseQCVkzQ@mail.gmail.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Tue, 27 Feb 2018 22:25:17 +0100
+Subject: [PATCH RFC] ARM: imx: avic: set low-power interrupt mask for imx25
+In-Reply-To: <20180224073408.GE3217@dragon>
+References: <1518180203-9698-1-git-send-email-martin@kaiser.cx>
+ <20180224073408.GE3217@dragon>
+Message-ID: <20180227212517.GA5227@botnar.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hello Shawn and all,
 
-On Tue, Feb 27, 2018 at 9:22 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 26, 2018 at 07:03:44PM +0100, Geert Uytterhoeven wrote:
->> The Renesas Salvator-X development board can be equipped with an R-Car
->> H3, M3-W, or M3-N SiP, which are pin-compatible.
->>
->> Document board part number and compatible values for the version with
->> R-Car M3-N.
->>
->> The board part number was extracted from a big patch by Takeshi Kihara
->> in the BSP.
+Thus wrote Shawn Guo (shawnguo at kernel.org):
 
->> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
->> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
->> @@ -108,6 +108,8 @@ Boards:
->>      compatible = "renesas,salvator-x", "renesas,r8a7795"
->>    - Salvator-X (RTP0RC7796SIPB0011S)
->
-> Here we have: Name (Part No)
+> > +static void __iomem *avic_base, *mx25_ccm_base;
 
-That's the standard (highest number of occurrences) way.
+> Keep avic_base line untouched, and add a new one for mx25_ccm_base.
 
->>      compatible = "renesas,salvator-x", "renesas,r8a7796"
->> +  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
->
-> Here we have: Name (Part No (SoC))
+ok
 
-This one is special: it's basically an M3-N prototype board made by taking
-a Salvator-X/M3-W board, and replacing the M3-W SiP by an M3-N SiP.
-Hence the board part number is the same.
+> >  static struct irq_domain *domain;
 
->> +    compatible = "renesas,salvator-x", "renesas,r8a77965"
->>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
->
-> And here we have: Name (Version, Part No)
+> >  #ifdef CONFIG_FIQ
+> > @@ -93,6 +97,11 @@ static void avic_irq_suspend(struct irq_data *d)
 
-AFAIU, "Salvator-XS" really means "Salvator-X 2nd version".
-So it's not "Version", but "Alternative Board Name".
-There's a similar thing with the ULCB boards:
+> >  	avic_saved_mask_reg[idx] = imx_readl(avic_base + ct->regs.mask);
+> >  	imx_writel(gc->wake_active, avic_base + ct->regs.mask);
 
-  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
-    H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
-  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+> Have a newline here.
 
->>      compatible = "renesas,salvator-xs", "renesas,r8a7795"
->>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
->
-> Can we think about making this more consistent?
+ok
 
-I'm afraid not. Naming seems to become only more complex over time...
-Unless you have great hands and great ideas ;-)
+> >  static void avic_irq_resume(struct irq_data *d)
+> > @@ -102,6 +111,11 @@ static void avic_irq_resume(struct irq_data *d)
+> >  	int idx = d->hwirq >> 5;
 
-Gr{oetje,eeting}s,
+> >  	imx_writel(avic_saved_mask_reg[idx], avic_base + ct->regs.mask);
 
-                        Geert
+> Ditto
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ok
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Please note that, as there were no fundamental doubts about my approach,
+I submitted a "regular patch" based on this RFC patch a couple of days
+later.
+
+I'll update this regular patch and submit a v2.
+
+Best regards,
+
+   Martin
