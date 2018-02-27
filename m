@@ -1,87 +1,119 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 27 Feb 2018 11:22:54 +0100
-Subject: [PATCH v2 10/10] arm64: dts: renesas: r8a77965: Add EtherAVB device
- node
-In-Reply-To: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1519726974-23160-11-git-send-email-jacopo+renesas@jmondi.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 27 Feb 2018 19:22:56 +0900
+Subject: [RFC PATCH] drivers: use 'depends on MFD_SYSCON' instead of
+ 'select MFD_SYSCON'
+In-Reply-To: <CAK8P3a1cEcBTiH7_gcUPZtsuRaeoOYaH3H4cYxkUBQiLMTMq=A@mail.gmail.com>
+References: <1519483851-31135-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK8P3a26kkcmzT450326=xHXjynG=uNYi2w07w6T+T01zQOQag@mail.gmail.com>
+ <CAK7LNAT8sRDNZKbcpXY+e98O+sJHw9vUM9bKvdmVZNuEEQoMdA@mail.gmail.com>
+ <CAK8P3a3zMG4wV9SWg78NGmk=BU9yq5paxZvJ=coHCWxVgNhO2w@mail.gmail.com>
+ <CAK7LNAQBLTk7rduT2eQQKRhRiGTw-8MRhpz2ZJdEwKTx=-zY-Q@mail.gmail.com>
+ <CAK8P3a1cEcBTiH7_gcUPZtsuRaeoOYaH3H4cYxkUBQiLMTMq=A@mail.gmail.com>
+Message-ID: <CAK7LNASOzMdk_ej-U_T3_m-OtseJUOs+TqUv-BqZFLvS3e0kww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate the ethernet at e6800000 device node to enable Ethernet interface
-for R-Car M3-N (R8A77965) SoC.
+2018-02-27 18:03 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tue, Feb 27, 2018 at 1:46 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> 2018-02-26 21:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>>> On Mon, Feb 26, 2018 at 12:53 PM, Masahiro Yamada
+>>> <yamada.masahiro@socionext.com> wrote:
+>>>> 2018-02-26 17:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>>>>> On Sat, Feb 24, 2018 at 3:50 PM, Masahiro Yamada
+>>>>> <yamada.masahiro@socionext.com> wrote:
+>>>>>> As Documentation/kbuild/kconfig-language.txt notes, 'select' should be
+>>>>>> used with care - it forces a lower limit of another symbol, ignoring
+>>>>>> the dependency.
+>>>>>>
+>>>>>> MFD_SYSCON depends on HAS_IOMEM, but several drivers with COMPILE_TEST
+>>>>>> select it.
+>>>>>>
+>>>>>> This causes unmet dependencies for architecture without HAS_IOMEM.
+>>>>>>
+>>>>>>   $ make ARCH=score randconfig
+>>>>>>   scripts/kconfig/conf  --randconfig Kconfig
+>>>>>>   KCONFIG_SEED=0x27C47F43
+>>>>>>   warning: (HWSPINLOCK_QCOM && AHCI_MTK && STMMAC_PLATFORM && ...)
+>>>>>>   selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+>>>>>>
+>>>>>> Use 'depends on' to observe the dependency.
+>>>>>>
+>>>>>> This commit was created by the following command:
+>>>>>>
+>>>>>>   $ find drivers -name 'Kconfig*' | xargs sed -i -e \
+>>>>>>     's/select MFD_SYSCON$/depends on MFD_SYSCON/'
+>>>>>>
+>>>>>> Then, COMMON_CLK_NXP and S3C2410_WATCHDOG were fixed up manually.
+>>>>>>
+>>>>>> Also, make MFD_SYSCON 'default y' because some defconfig files may
+>>>>>> rely on someone select's MFD_SYSCON.
+>>>>>>
+>>>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>>>>> ---
+>>>>>>
+>>>>>> If you have a better idea to fix 'unmet dependencies',
+>>>>>> please suggest.
+>>>>>
+>>>>> Changing 'select MFD_SYSCON' to 'depends on' will definitely break lots
+>>>>> of defconfig configurations, I'd rather not do that.
+>>>>
+>>>>
+>>>> Could you explain why?
+>>>>
+>>>> I set 'default y' for MFD_SYSCON.
+>>>>
+>>>> Would it still break defconfig configurations?
+>>>
+>>> No, you are right, that would not break defconfigs, it would just mean one
+>>> useless driver being enabled for many configurations that don't need it.
+>>
+>> If we are unhappy about this,
+>> we can send per-arch patches
+>> to add CONFIG_MTD_SYSCON=y to defconfigs that need it.
+>>
+>> But, we need to decide what the right solution is.
+>
+> I think for consistency, we should change the existing
+> 'depends on MFD_SYSCON' to 'select MFD_SYSCON'. This
+> matches what we do with REGMAP_MMIO.
+>
+> MFD_SYSCON is really a thin wrapper around REGMAP_MMIO,
+> so I would keep using the same conventions here, even though
+> we normally prefer to not 'select' any user-visible options.
+>
+> It might be possible to make MFD_SYSCON a silent symbol
+> as well, but we'd have to make sure that all users select the symbol
+> then.
+>
+>         Arnd
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
----
-v1 -> v2:
-- Replace ALWAYS_ON power area identifier with numeric constant
-v2 -> v3:
-- Send as part of a dedicated series reworking "rgmii" properties in all
-  mainline Renesas boards/SoC
-- Add iommu dependencies
-v3 -> v4:
-- Remove iommu dependencies
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 43 ++++++++++++++++++++++++++++---
- 1 file changed, 40 insertions(+), 3 deletions(-)
+If we agree, I can send the following three patches.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 8c9648a..1f25934 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -522,11 +522,48 @@
- 		};
- 
- 		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a77965",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 812>;
-+			phy-mode = "rgmii";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--
--			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
--			/* placeholder */
-+			status = "disabled";
- 		};
- 
- 		csi20: csi2 at fea80000 {
+
+[1] Add "depends on HAS_IOMEM"
+    to all drivers selecting MFD_SYSCON
+    (Unmet dependencies will be fixed by this)
+
+[2] For consistency, convert existing "depends on MFD_SYSCON"
+    to "select MFD_SYSCON" + "depends on HAS_IOMEM"
+
+[3] Change MFD_SYSCON to user-unconfigurable option.
+    But, for COMPILE_TEST, allow users to enable it independently.
+    Like follows:
+
+    config MFD_SYSCON
+        bool "System Controller Register R/W Based on Regmap" if COMPILE_TEST
+        select REGMAP_MMIO
+        help
+          Select this option to enable accessing system control registers
+          via regmap.
+
+
+Is this OK?
+
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
