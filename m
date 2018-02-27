@@ -1,47 +1,102 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 27 Feb 2018 08:06:18 +0100
-Subject: [PATCH v4 4/6] arm64: dts: exynos: add OF graph between MHL and
- USB connector
-In-Reply-To: <CAJKOXPczu67vPQEzQZvFRZGVNBpk0U6GJhSnb4dYWSgTY+Unog@mail.gmail.com>
-References: <CGME20180221085607eucas1p1a08c82fac832049d79705b4222422fa9@eucas1p1.samsung.com>
- <20180221085541.14556-1-a.hajda@samsung.com>
- <20180221085541.14556-5-a.hajda@samsung.com>
- <CAJKOXPczu67vPQEzQZvFRZGVNBpk0U6GJhSnb4dYWSgTY+Unog@mail.gmail.com>
-Message-ID: <513ee866-a44e-5969-4584-0385029e0356@samsung.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Feb 2018 08:07:35 +0100
+Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
+ output on H3 boards
+In-Reply-To: <CAGRGNgU8-uJuns7mAzS-gc81qvVAkS9JS2Tm13p2Qp7dMDCNkg@mail.gmail.com>
+References: <20180224214545.3740-1-jernej.skrabec@siol.net>
+ <2676311.2IEVhXnSIE@jernej-laptop>
+ <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
+ <2342395.9m6rrqTry7@jernej-laptop>
+ <CAGRGNgU8-uJuns7mAzS-gc81qvVAkS9JS2Tm13p2Qp7dMDCNkg@mail.gmail.com>
+Message-ID: <20180227070735.ml3mc4nr4vpge57u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.02.2018 16:21, Krzysztof Kozlowski wrote:
-> On Wed, Feb 21, 2018 at 9:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
->> OF graph describes MHL data lanes between MHL and respective USB
->> connector.
->>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> ---
->> v4:
->> - added missing reg property in connector's port node (Krzysztof)
->> ---
->>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 32 ++++++++++++++++++++--
->>  1 file changed, 29 insertions(+), 3 deletions(-)
-> You have a duplicated '};' so kbuild complains so I assume there will
-> be next iteration of this. Beside that I am okay with both, so I will
-> take next version when your bindings and driver changes get
-> acked/accepted.
+On Tue, Feb 27, 2018 at 01:29:27PM +1100, Julian Calaby wrote:
+> Hi Jernej,
+> 
+> On Tue, Feb 27, 2018 at 3:27 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> > Hi,
+> >
+> > Dne ponedeljek, 26. februar 2018 ob 17:21:05 CET je Icenowy Zheng napisal(a):
+> >> ? 2018?2?27? GMT+08:00 ??12:16:44, "Jernej ?krabec"
+> > <jernej.skrabec@siol.net> ??:
+> >> >Hi Julian,
+> >> >
+> >> >Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby
+> >> >
+> >> >napisal(a):
+> >> >> Hi Jernej,
+> >> >>
+> >> >> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
+> >> >
+> >> ><jernej.skrabec@siol.net>
+> >> >
+> >> >wrote:
+> >> >> > Enable HDMI output on all boards which have HDMI connector.
+> >> >> >
+> >> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> >> >> > ---
+> >> >> >
+> >> >> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
+> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+> >> >> >
+> >> >> >   | 25 ++++++++++++++++++++++
+> >> >> >
+> >> >> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
+> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+> >> >> >
+> >> >> >   | 25 ++++++++++++++++++++++
+> >> >
+> >> >arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> >> >
+> >> >> >         | 25 ++++++++++++++++++++++
+> >> >> >
+> >> >> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
+> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+> >> >> >
+> >> >> >   | 24 +++++++++++++++++++++
+> >> >
+> >> >arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> >> >
+> >> >> >        | 25 ++++++++++++++++++++++ 8 files changed, 199
+> >> >
+> >> >insertions(+)
+> >> >
+> >> >> As I understand it, the H2+ is just a slightly trimmed down H3. In
+> >> >> terms of HDMI support, the difference is that the H2+ can't output
+> >> >
+> >> >4k.
+> >> >
+> >> >> If this code is compatible with the H2+, could you please add the
+> >> >> necessary bits and pieces to the h2-plus DTSs too?
+> >> >
+> >> >There are only 3 H2+ boards in kernel and none of them has HDMI
+> >> >connector, so
+> >>
+> >> BPi M2 Zero has miniHDMI connector.
+> >
+> > Ah, sorry, I missed that one. Since I don't have it (or any other board with
+> > H2+) I'm not really comfortable including such patch. If anyone will test it,
+> > I can include it in next revision.
+> 
+> I have one of those (this is why I'm interested in this patchset) so
+> I'm willing to test, however I can't guarantee I'll get to it quickly.
 
-Yes, test robot already reported it, thanks for looking at it.
-I have postponed next iteration in case anything new is spotted, but
-since it is calm I will send it in few minutes.
+Then I guess the best way forward will be to keep the current patch as
+is, and you'll send a patch whenever you have the time to test it.
 
-Regards
-Andrzej
+Thanks!
+Maxime
 
->
-> Best Regards,
-> Krzysztof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/8ac0c881/attachment.sig>
