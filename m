@@ -1,77 +1,59 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 26 Feb 2018 19:57:10 -0800
-Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
-In-Reply-To: <20180201093459.20477-3-takahiro.akashi@linaro.org>
-References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
- <20180201093459.20477-3-takahiro.akashi@linaro.org>
-Message-ID: <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 27 Feb 2018 13:48:07 +0900
+Subject: [PATCH 0/7] kexec_file: refactoring for other architecutres 
+Message-ID: <20180227044814.24808-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
-> initialized by irq chip (gic), is called from exception entry.
-> This patch fixes this problem.
+subject: 
 
-As in, this symbol is not known a lkdtm setup time? Hm, seems like
-we'd want a more generalized approach here.
+This is a preparatory patch set for adding kexec_file support on arm64.
 
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-> index ba92291508dc..e20343543053 100644
-> --- a/drivers/misc/lkdtm_core.c
-> +++ b/drivers/misc/lkdtm_core.c
-> @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
->         if (lkdtm_kprobe != NULL)
->                 unregister_kprobe(lkdtm_kprobe);
->
-> +       if (IS_ENABLED(CONFIG_ARM64) &&
-> +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
-> +               extern void (*handle_arch_irq)(struct pt_regs *regs);
+It was originally included in a arm64 patch set[1], but Philipp is also
+working on their kexec_file support on s390[2] and some changes are now
+conflicting.
 
-I don't like this extern -- can handle_arch_irq be properly exported somewhere?
+So these common part was extracted and put into a separate patch set for
+better integration. What's more, my original patch#4 was split into a few
+small chunks for easier review after Dave's comment.
 
-> +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
+As such, the resulting code is basically identical with my original, and
+the only difference is that kexec_file_loaders[] is now declared in kexec.h
+after Phillipp's comment[3]. Other than that, this patch set doesn't
+require any changes on the rest of my original patch set(#1, #6 to #13).
 
-I don't think the * is needed here: it's already a function pointer.
+Patch#1 allows making a use of purgatory optional, particularly useful
+for arm64.
+Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
+verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
+Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
+exclude_mem_range(), to be made best re-use of.
 
-> +               /*
-> +                * Instantiating kprobe.symbol_name here, say
-> +                * with lookup_symbol_name(*handle_arch_irq),
-> +                * would cause register_kprobe() to fail.
-> +                */
-> +               crashpoint->kprobe.symbol_name = NULL;
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
+[2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/562041.html
 
-Is kprobe.addr sufficient for register_kprobe?
+AKASHI Takahiro (7):
+  kexec_file: make an use of purgatory optional
+  kexec_file,x86,powerpc: factor out kexec_file_ops functions
+  x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
+  x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
+  x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
+  x86: kexec_file: clean up prepare_elf64_headers()
+  kexec_file, x86: move re-factored code to generic side
 
-> +       }
->         lkdtm_crashpoint = crashpoint;
->         lkdtm_crashtype = crashtype;
->         lkdtm_kprobe = &crashpoint->kprobe;
->         ret = register_kprobe(lkdtm_kprobe);
->         if (ret < 0) {
-> -               pr_info("Couldn't register kprobe %s\n",
-> -                       crashpoint->kprobe.symbol_name);
-> +               if (IS_ENABLED(CONFIG_ARM64))
-> +                       pr_info("Couldn't register kprobe 0x%lx\n",
-> +                               (unsigned long)crashpoint->kprobe.addr);
-> +               else
-> +                       pr_info("Couldn't register kprobe %s\n",
-> +                               crashpoint->kprobe.symbol_name);
->                 lkdtm_kprobe = NULL;
->                 lkdtm_crashpoint = NULL;
->                 lkdtm_crashtype = NULL;
-
-So I can replicate, how did you test this?
-
--Kees
+ arch/powerpc/Kconfig                        |   3 +
+ arch/powerpc/include/asm/kexec.h            |   2 +-
+ arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
+ arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
+ arch/x86/Kconfig                            |   3 +
+ arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
+ arch/x86/kernel/crash.c                     | 332 +++++-----------------------
+ arch/x86/kernel/kexec-bzimage64.c           |   2 +-
+ arch/x86/kernel/machine_kexec_64.c          |  45 +---
+ include/linux/kexec.h                       |  36 ++-
+ kernel/kexec_file.c                         | 236 +++++++++++++++++++-
+ 11 files changed, 336 insertions(+), 366 deletions(-)
 
 -- 
-Kees Cook
-Pixel Security
+2.16.2
