@@ -1,34 +1,35 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Tue, 27 Feb 2018 17:34:05 -0500
-Subject: [RFC 0/3] perf stat: improvements for handling of multiple PMUs
-Message-ID: <1519770848-26738-1-git-send-email-agustinv@codeaurora.org>
+From: ak@linux.intel.com (Andi Kleen)
+Date: Tue, 27 Feb 2018 15:05:39 -0800
+Subject: [RFC 1/3] perf, tools: Support wildcards on pmu name in dynamic
+ pmu events
+In-Reply-To: <1519770848-26738-2-git-send-email-agustinv@codeaurora.org>
+References: <1519770848-26738-1-git-send-email-agustinv@codeaurora.org>
+ <1519770848-26738-2-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20180227230539.GF21543@tassilo.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches adds some simple improvements to the way perf stat
-handles PMUs that have multiple instances by:
+On Tue, Feb 27, 2018 at 05:34:06PM -0500, Agustin Vega-Frias wrote:
+> Starting on v4.12 event parsing code for dynamic pmu events already
+> supports prefix-based matching of multiple pmus when creating dynamic
+> events. E.g., in a system with the following dynamic pmus:
+> 
+>     mypmu_0
+>     mypmu_1
+>     mypmu_2
+>     mypmu_4
+> 
+> passing mypmu/<config>/ as an event spec will result in the creation
+> of the event in all of the pmus. This change expands this matching
+> through the use of fnmatch so glob-like expressions can be used to
+> create events in multiple pmus. E.g., in the system described above
+> if a user only wants to create the event in mypmu_0 and mypmu_1,
+> mypmu_[01]/<config>/ can be passed.
 
-1. Adding glob-like matching in addition to the prefix-based matching
-   introduced previously (patch 1).
-2. Adding the ability to recover the PMU names when printing the events
-   separately with the --no-merge option (patch 2).
-3. Restoring auto-merge for events created by prefix or glob-like match
-   (patch 3). Note that this still keeps the behavior that disables
-   auto-merging of legacy symbolic events (e.g. cycles).
+Missing documentation for the globbing.
 
-Agustin Vega-Frias (3):
-  perf, tools: Support wildcards on pmu name in dynamic pmu events
-  perf, tools: Display pmu name when printing unmerged events in stat
-  perf pmu: Restore auto-merging of PMU events created by prefix match
+The rest looked ok to me. 
 
- tools/perf/builtin-stat.c      | 29 ++++++++++++++++++++++++++++-
- tools/perf/util/evsel.c        |  1 +
- tools/perf/util/evsel.h        |  1 +
- tools/perf/util/parse-events.c | 21 ++++++++++-----------
- tools/perf/util/parse-events.h |  2 +-
- tools/perf/util/parse-events.l |  2 +-
- tools/perf/util/parse-events.y |  7 ++++---
- 7 files changed, 46 insertions(+), 17 deletions(-)
+Reviewed-by: Andi Kleen <ak@linux.intel.com>
 
---
-2.7.4
+-Andi
