@@ -1,43 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Feb 2018 17:34:26 +0000
-Subject: [RFC PATCH v2 08/12] arm64: cmpxchg: Include build_bug.h instead
- of bug.h for BUILD_BUG
-In-Reply-To: <20180227173322.GK29123@arm.com>
-References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
- <1519657500-15094-9-git-send-email-will.deacon@arm.com>
- <20180226154848.ejqxw5lkbiqqxlsf@salmiak>
- <20180227173322.GK29123@arm.com>
-Message-ID: <20180227173426.h7easaoophd76sqo@lakrids.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 Feb 2018 09:39:06 -0800
+Subject: [PATCH v5 0/4] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume
+ support
+In-Reply-To: <58006020-85d9-9681-f80a-2f9eda1e863a@oracle.com>
+References: <20180223154357.23504-1-d-gerlach@ti.com>
+ <a56830af-cf81-3603-ba58-2a2c65c49f34@oracle.com>
+ <20180226212650.GB16043@atomide.com>
+ <58006020-85d9-9681-f80a-2f9eda1e863a@oracle.com>
+Message-ID: <20180227173906.GC5448@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 05:33:23PM +0000, Will Deacon wrote:
-> On Mon, Feb 26, 2018 at 03:48:49PM +0000, Mark Rutland wrote:
-> > On Mon, Feb 26, 2018 at 03:04:56PM +0000, Will Deacon wrote:
-> > > Having asm/cmpxchg.h pull in linux/bug.h is problematic because this
-> > > ends up pulling in the atomic bitops which themselves may be built on
-> > > top of atomic.h and cmpxchg.h.
-> > > 
-> > > Instead, just include build_bug.h for the definition of BUILD_BUG.
+* santosh.shilimkar at oracle.com <santosh.shilimkar@oracle.com> [180227 00:19]:
+> On 2/26/18 1:26 PM, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@oracle.com> [180225 23:36]:
+> > > > Dave Gerlach (4):
+> > > >     ARM: OMAP2+: Introduce low-level suspend code for AM33XX
+> > > >     ARM: OMAP2+: Introduce low-level suspend code for AM43XX
+> > > >     ARM: OMAP2+: pm33xx-core: Add platform code needed for PM
+> > > >     soc: ti: Add pm33xx driver for basic suspend support
+> > > > 
+> > > Are you going to pickup this series ?
 > > 
-> > We also use VM_BUG_ON(), defined in <linux/mmdebug.h>, which includes
-> > <linux/bug.h>.
+> > Yes planning to apply it today or tomorrow.
 > > 
-> > ... so I think we still have some fragility here, albeit no worse than before.
-> > 
-> > We also miss includes for:
-> > 
-> > * <linux/percpu-defs.h> (raw_cpu_ptr)
-> > * <linux/preempt.h> (preempt_disable, preempt_enable)
+> Sounds good.
 > 
-> Hmm, we can't include this one because it pulls in linux/bitops.h. I've
-> moved the percpu cmpxchg stuff into asm/percpu.h, but that too is missing
-> the linux/preempt.h #include, so I've added that as well.
-> 
-> Generally, I think if we want to clean up our #includes then that's better
-> done as a separate series rather than as a piecemeal effort, which will
-> likely fail to identify many of the underlying problems.
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-Sure thing; the above shouldn't hold up this series.
+Applied and pushed out into omap-for-v4.17/ampm.
 
-Mark.
+Thanks,
+
+Tony
