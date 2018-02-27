@@ -1,9 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Feb 2018 12:32:02 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: Add RAVE SP device
-In-Reply-To: <20180226144943.9835-1-andrew.smirnov@gmail.com>
+Date: Tue, 27 Feb 2018 12:32:18 -0300
+Subject: [PATCH 2/2] ARM: dts: imx51-zii-rdu1: Add node for RAVE SP device
+In-Reply-To: <20180226144943.9835-2-andrew.smirnov@gmail.com>
 References: <20180226144943.9835-1-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5D-FrBK0wDQ7cp8G9h3iAES-AS5qXSF9SYGEUfjKzjisQ@mail.gmail.com>
+ <20180226144943.9835-2-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5B8Ugvw7tDUuRSqVva3VRVdkPU5HwiXmMAoT_r96Cd3oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,7 +13,7 @@ On Mon, Feb 26, 2018 at 11:49 AM, Andrey Smirnov
 > With MFD and watchdog drivers for RAVE SP device support added by
 > 538ee27290fa ("mfd: Add driver for RAVE Supervisory Processor") and
 > c3bb33345721 ("watchdog: Add RAVE SP watchdog driver") add
-> corresponding DT node for RDU2.
+> corresponding DT node for RDU.
 >
 > Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
