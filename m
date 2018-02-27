@@ -1,32 +1,48 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 27 Feb 2018 16:57:12 +0100
-Subject: [PATCH 0/3] USB OTG on STM32F7 boards
-In-Reply-To: <1518710080-18164-1-git-send-email-amelie.delaunay@st.com>
-References: <1518710080-18164-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <06730939-11f4-c8da-02a8-7bab37f194ce@st.com>
+From: mayhs11saini@gmail.com (shyam saini)
+Date: Tue, 27 Feb 2018 21:29:03 +0530
+Subject: [PATCH] ARM: dts: imx6dl-icore-rqs: Fix invalid PHY address
+ assignment for ethernet
+Message-ID: <1519747143-3036-1-git-send-email-mayhs11saini@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie
+From: Shyam Saini <shyam@amarulasolutions.com>
 
-On 02/15/2018 04:54 PM, Amelie Delaunay wrote:
-> This patchset adds support for Peripheral mode on stm32f746 by adding
-> dwc2 gadget fifo sizes and enables USB OTG HS in OTG (DRD) mode on
-> stm32746g-eval and stm32f769-disco. It possible to use OTG HS in
-> Peripheral or Host mode, depending on the USB connector.
-> 
-> Amelie Delaunay (3):
->    ARM: dts: stm32: add gadget fifo sizes to usbotg_hs on stm32f746
->    ARM: dts: stm32: select otg mode for usbotg_hs on stm32746g_eval
->    ARM: dts: stm32: enable USB HS on stm32f769-disco
-> 
->   arch/arm/boot/dts/stm32746g-eval.dts  |  2 +-
->   arch/arm/boot/dts/stm32f746.dtsi      |  3 +++
->   arch/arm/boot/dts/stm32f769-disco.dts | 15 +++++++++++++++
->   3 files changed, 19 insertions(+), 1 deletion(-)
-> 
+Add "reg" property for ethernet to fix this issue.
 
-Series applied on stm32-next.
+Errors in boot logs:
+mdio_bus 2188000.ethernet-1:
+/soc/aips-bus at 02100000/ethernet at 02188000/mdio/ethernet-phy
+has invalid PHY address
 
-Regards
-Alex
+mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 0
+mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 1
+mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 2
+mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 3
+
+Reported-by: Shyam Saini <shyam@amarulasolutions.com>
+Suggested-by: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Shyam Saini <shyam@amarulasolutions.com>
+---
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+index 49daa2b7892d..acc3b11fba2a 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -200,7 +200,11 @@
+ 	status = "okay";
+ 
+ 	mdio {
+-		eth_phy: ethernet-phy {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		eth_phy: ethernet-phy at 0 {
++			reg = <0x0>;
+ 			rxc-skew-ps = <1140>;
+ 			txc-skew-ps = <1140>;
+ 			txen-skew-ps = <600>;
+-- 
+2.7.4
