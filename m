@@ -1,59 +1,213 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 27 Feb 2018 13:48:07 +0900
-Subject: [PATCH 0/7] kexec_file: refactoring for other architecutres 
-Message-ID: <20180227044814.24808-1-takahiro.akashi@linaro.org>
+Date: Tue, 27 Feb 2018 13:48:10 +0900
+Subject: [PATCH 3/7] x86: kexec_file: purge system-ram walking from
+ prepare_elf64_headers()
+In-Reply-To: <20180227044814.24808-1-takahiro.akashi@linaro.org>
+References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
+Message-ID: <20180227044814.24808-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-subject: 
+While prepare_elf64_headers() in x86 looks pretty generic for other
+architectures' use, it contains some code which tries to list crash memory
+regions by walking through system resources, which is not always
+architecture agnostic.
+To make this function more generic, the related code should be purged.
 
-This is a preparatory patch set for adding kexec_file support on arm64.
+In this patch, prepare_elf64_headers() simply scans crash_mem buffer passed
+and add all the listed regions to elf header as a PT_LOAD segment.
+So walk_system_ram_res(prepare_elf64_headers_callback) have been moved
+forward before prepare_elf64_headers() where the callback,
+prepare_elf64_headers_callback(), is now responsible for filling up
+crash_mem buffer.
 
-It was originally included in a arm64 patch set[1], but Philipp is also
-working on their kexec_file support on s390[2] and some changes are now
-conflicting.
+Meanwhile exclude_elf_header_ranges() used to be called every time in
+this callback it is rather redundant and now called only once in
+prepare_elf_headers() as well.
 
-So these common part was extracted and put into a separate patch set for
-better integration. What's more, my original patch#4 was split into a few
-small chunks for easier review after Dave's comment.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Dave Young <dyoung@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Baoquan He <bhe@redhat.com>
+---
+ arch/x86/kernel/crash.c | 121 +++++++++++++++++++++++-------------------------
+ 1 file changed, 58 insertions(+), 63 deletions(-)
 
-As such, the resulting code is basically identical with my original, and
-the only difference is that kexec_file_loaders[] is now declared in kexec.h
-after Phillipp's comment[3]. Other than that, this patch set doesn't
-require any changes on the rest of my original patch set(#1, #6 to #13).
-
-Patch#1 allows making a use of purgatory optional, particularly useful
-for arm64.
-Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
-verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
-Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
-exclude_mem_range(), to be made best re-use of.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
-[2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/562041.html
-
-AKASHI Takahiro (7):
-  kexec_file: make an use of purgatory optional
-  kexec_file,x86,powerpc: factor out kexec_file_ops functions
-  x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
-  x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
-  x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
-  x86: kexec_file: clean up prepare_elf64_headers()
-  kexec_file, x86: move re-factored code to generic side
-
- arch/powerpc/Kconfig                        |   3 +
- arch/powerpc/include/asm/kexec.h            |   2 +-
- arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
- arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
- arch/x86/Kconfig                            |   3 +
- arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
- arch/x86/kernel/crash.c                     | 332 +++++-----------------------
- arch/x86/kernel/kexec-bzimage64.c           |   2 +-
- arch/x86/kernel/machine_kexec_64.c          |  45 +---
- include/linux/kexec.h                       |  36 ++-
- kernel/kexec_file.c                         | 236 +++++++++++++++++++-
- 11 files changed, 336 insertions(+), 366 deletions(-)
-
+diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
+index 10e74d4778a1..2123fa0efc17 100644
+--- a/arch/x86/kernel/crash.c
++++ b/arch/x86/kernel/crash.c
+@@ -316,18 +316,11 @@ static int exclude_mem_range(struct crash_mem *mem,
+  * Look for any unwanted ranges between mstart, mend and remove them. This
+  * might lead to split and split ranges are put in ced->mem.ranges[] array
+  */
+-static int elf_header_exclude_ranges(struct crash_elf_data *ced,
+-		unsigned long long mstart, unsigned long long mend)
++static int elf_header_exclude_ranges(struct crash_elf_data *ced)
+ {
+ 	struct crash_mem *cmem = &ced->mem;
+ 	int ret = 0;
+ 
+-	memset(cmem->ranges, 0, sizeof(cmem->ranges));
+-
+-	cmem->ranges[0].start = mstart;
+-	cmem->ranges[0].end = mend;
+-	cmem->nr_ranges = 1;
+-
+ 	/* Exclude crashkernel region */
+ 	ret = exclude_mem_range(cmem, crashk_res.start, crashk_res.end);
+ 	if (ret)
+@@ -345,53 +338,13 @@ static int elf_header_exclude_ranges(struct crash_elf_data *ced,
+ static int prepare_elf64_ram_headers_callback(struct resource *res, void *arg)
+ {
+ 	struct crash_elf_data *ced = arg;
+-	Elf64_Ehdr *ehdr;
+-	Elf64_Phdr *phdr;
+-	unsigned long mstart, mend;
+-	struct kimage *image = ced->image;
+-	struct crash_mem *cmem;
+-	int ret, i;
+-
+-	ehdr = ced->ehdr;
+-
+-	/* Exclude unwanted mem ranges */
+-	ret = elf_header_exclude_ranges(ced, res->start, res->end);
+-	if (ret)
+-		return ret;
+-
+-	/* Go through all the ranges in ced->mem.ranges[] and prepare phdr */
+-	cmem = &ced->mem;
+-
+-	for (i = 0; i < cmem->nr_ranges; i++) {
+-		mstart = cmem->ranges[i].start;
+-		mend = cmem->ranges[i].end;
+-
+-		phdr = ced->bufp;
+-		ced->bufp += sizeof(Elf64_Phdr);
++	struct crash_mem *cmem = &ced->mem;
+ 
+-		phdr->p_type = PT_LOAD;
+-		phdr->p_flags = PF_R|PF_W|PF_X;
+-		phdr->p_offset  = mstart;
++	cmem->ranges[cmem->nr_ranges].start = res->start;
++	cmem->ranges[cmem->nr_ranges].end = res->end;
++	cmem->nr_ranges++;
+ 
+-		/*
+-		 * If a range matches backup region, adjust offset to backup
+-		 * segment.
+-		 */
+-		if (mstart == image->arch.backup_src_start &&
+-		    (mend - mstart + 1) == image->arch.backup_src_sz)
+-			phdr->p_offset = image->arch.backup_load_addr;
+-
+-		phdr->p_paddr = mstart;
+-		phdr->p_vaddr = (unsigned long long) __va(mstart);
+-		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
+-		phdr->p_align = 0;
+-		ehdr->e_phnum++;
+-		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
+-			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
+-			ehdr->e_phnum, phdr->p_offset);
+-	}
+-
+-	return ret;
++	return 0;
+ }
+ 
+ static int prepare_elf64_headers(struct crash_elf_data *ced,
+@@ -401,9 +354,10 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
+ 	Elf64_Phdr *phdr;
+ 	unsigned long nr_cpus = num_possible_cpus(), nr_phdr, elf_sz;
+ 	unsigned char *buf, *bufp;
+-	unsigned int cpu;
++	unsigned int cpu, i;
+ 	unsigned long long notes_addr;
+-	int ret;
++	struct crash_mem *cmem = &ced->mem;
++	unsigned long mstart, mend;
+ 
+ 	/* extra phdr for vmcoreinfo elf note */
+ 	nr_phdr = nr_cpus + 1;
+@@ -472,13 +426,25 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
+ 	(ehdr->e_phnum)++;
+ #endif
+ 
+-	/* Prepare PT_LOAD headers for system ram chunks. */
+-	ced->ehdr = ehdr;
+-	ced->bufp = bufp;
+-	ret = walk_system_ram_res(0, -1, ced,
+-			prepare_elf64_ram_headers_callback);
+-	if (ret < 0)
+-		return ret;
++	/* Go through all the ranges in cmem->ranges[] and prepare phdr */
++	for (i = 0; i < cmem->nr_ranges; i++) {
++		mstart = cmem->ranges[i].start;
++		mend = cmem->ranges[i].end;
++
++		phdr->p_type = PT_LOAD;
++		phdr->p_flags = PF_R|PF_W|PF_X;
++		phdr->p_offset  = mstart;
++
++		phdr->p_paddr = mstart;
++		phdr->p_vaddr = (unsigned long long) __va(mstart);
++		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
++		phdr->p_align = 0;
++		ehdr->e_phnum++;
++		phdr++;
++		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
++			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
++			ehdr->e_phnum, phdr->p_offset);
++	}
+ 
+ 	*addr = buf;
+ 	*sz = elf_sz;
+@@ -490,7 +456,9 @@ static int prepare_elf_headers(struct kimage *image, void **addr,
+ 					unsigned long *sz)
+ {
+ 	struct crash_elf_data *ced;
+-	int ret;
++	Elf64_Ehdr *ehdr;
++	Elf64_Phdr *phdr;
++	int ret, i;
+ 
+ 	ced = kzalloc(sizeof(*ced), GFP_KERNEL);
+ 	if (!ced)
+@@ -498,8 +466,35 @@ static int prepare_elf_headers(struct kimage *image, void **addr,
+ 
+ 	fill_up_crash_elf_data(ced, image);
+ 
++	ret = walk_system_ram_res(0, -1, ced,
++				prepare_elf64_ram_headers_callback);
++	if (ret)
++		goto out;
++
++	/* Exclude unwanted mem ranges */
++	ret = elf_header_exclude_ranges(ced);
++	if (ret)
++		goto out;
++
+ 	/* By default prepare 64bit headers */
+ 	ret =  prepare_elf64_headers(ced, addr, sz);
++	if (ret)
++		goto out;
++
++	/*
++	 * If a range matches backup region, adjust offset to backup
++	 * segment.
++	 */
++	ehdr = (Elf64_Ehdr *)*addr;
++	phdr = (Elf64_Phdr *)(ehdr + 1);
++	for (i = 0; i < ehdr->e_phnum; phdr++, i++)
++		if (phdr->p_type == PT_LOAD &&
++				phdr->p_paddr == image->arch.backup_src_start &&
++				phdr->p_memsz == image->arch.backup_src_sz) {
++			phdr->p_offset = image->arch.backup_load_addr;
++			break;
++		}
++out:
+ 	kfree(ced);
+ 	return ret;
+ }
 -- 
 2.16.2
