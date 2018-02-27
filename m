@@ -1,46 +1,64 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 27 Feb 2018 11:22:30 +0530
-Subject: [PATCH] ARM: omap2: set CONFIG_LIRC=y in defconfig
-In-Reply-To: <20180226204105.2858838-1-arnd@arndb.de>
-References: <20180226204105.2858838-1-arnd@arndb.de>
-Message-ID: <6f0e6593-27c3-2df4-b0ef-f3d3e77c81de@ti.com>
+From: jtoppins@redhat.com (Jonathan Toppins)
+Date: Tue, 27 Feb 2018 01:05:32 -0500
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+Message-ID: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch allows a user to configure ACPI to be preferred over
+device-tree.
 
+Currently for ACPI to be used a user either has to set acpi=on on the
+kernel command line or make sure any device tree passed to the kernel
+is empty. If the dtb passed to the kernel is non-empty then device-tree
+will be chosen as the boot method of choice even if it is not correct.
+To prevent this situation where a system is only intended to be booted
+via ACPI a user can set this kernel configuration so it ignores
+device-tree settings unless ACPI table checks fail.
 
-On Tuesday 27 February 2018 02:10 AM, Arnd Bergmann wrote:
-> The CONFIG_LIRC symbol has changed from 'tristate' to 'bool, so we now
-> get a warning for omap2plus_defconfig:
-> 
-> arch/arm/configs/omap2plus_defconfig:322:warning: symbol value 'm' invalid for LIRC
-> 
-> This changes the file to mark the symbol as built-in to get rid of the
-> warning.
-> 
-> Fixes: a60d64b15c20 ("media: lirc: lirc interface should not be a raw decoder")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
+---
 
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+ arch/arm64/Kconfig       | 13 +++++++++++++
+ arch/arm64/kernel/acpi.c |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-Thank and regards,
-Lokesh
-
-> ---
->  arch/arm/configs/omap2plus_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 2f145c4af93a..92674f247a12 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -319,7 +319,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_RC_CORE=m
->  CONFIG_MEDIA_CONTROLLER=y
->  CONFIG_VIDEO_V4L2_SUBDEV_API=y
-> -CONFIG_LIRC=m
-> +CONFIG_LIRC=y
->  CONFIG_RC_DEVICES=y
->  CONFIG_IR_RX51=m
->  CONFIG_V4L_PLATFORM_DRIVERS=y
-> 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb7ef8e..da8d9ab62825 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1170,6 +1170,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
+ 	  protocol even if the corresponding data is present in the ACPI
+ 	  MADT table.
+ 
++config ARM64_PREFER_ACPI
++	bool "Prefer usage of ACPI boot tables over device-tree"
++	depends on ACPI
++	help
++	  Normally device-tree is preferred over ACPI on arm64 unless
++	  explicitly preferred via kernel command line, something like: acpi=on
++	  This configuration changes this default behaviour by pretending
++	  the user set acpi=on on the command line. This configuration still
++	  allows the user to turn acpi table parsing off via acpi=off. If
++	  for some reason the table checks fail the system will still fall
++	  back to using device-tree unless the user explicitly sets acpi=force
++	  on the command line.
++
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7b09487ff8fb..315b001c45f1 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -44,7 +44,7 @@ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
+ static bool param_acpi_off __initdata;
+-static bool param_acpi_on __initdata;
++static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
+ static bool param_acpi_force __initdata;
+ 
+ static int __init parse_acpi(char *arg)
+-- 
+2.13.6
