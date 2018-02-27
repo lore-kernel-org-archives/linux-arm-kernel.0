@@ -1,37 +1,21 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Feb 2018 14:15:07 -0600
-Subject: [PATCH V3 0/6] PCI: handle CRS response following Hot Reset and
- D3hot->D0
-In-Reply-To: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-References: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180227201507.GB127842@bhelgaas-glaptop.roam.corp.google.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 27 Feb 2018 23:23:39 +0300
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+In-Reply-To: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+Message-ID: <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 12:00:17PM -0500, Sinan Kaya wrote:
-> Rev 3.1 Sec 2.3.1 Request Handling Rules:
-> Valid reset conditions after which a device is permitted to return CRS
-> are:
-> * Cold, Warm, and Hot Resets,
-> * FLR
-> * A reset initiated in response to a D3hot to D0 uninitialized
-> 
-> Try to reuse FLR implementation towards other reset types.
-> 
-> Changes from v2:
-> * Correct Conventional PCI spec reference for AF_FLR
-> * Commit message update to capitilize the first word following colon
-> 
-> Sinan Kaya (6):
->   PCI: Protect restore with device lock to be consistent
->   PCI: Handle FLR failure and allow other reset types
->   PCI: Make pci_flr_wait() generic and rename to pci_dev_wait()
->   PCI: Wait device ready after pci_pm_reset()
->   PCI: Add a return type for pci_reset_bridge_secondary_bus()
->   PCI: Add device wait after slot and bus reset
-> 
->  drivers/pci/pci.c   | 70 ++++++++++++++++++++++++++++++++++-------------------
->  include/linux/pci.h |  4 +--
->  2 files changed, 47 insertions(+), 27 deletions(-)
+On 02/27/2018 11:06 PM, Sergei Shtylyov wrote:
 
-Applied to pci/virtualization for v4.17, thanks!
+> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+> output (we're omitting the LVDS decoder for now). These patches depend on
+> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+
+   Need to mention that the DU driver silently fails to probe now. I do hope that
+this is not due to my updates. :-)
+
+MBR, Sergei
