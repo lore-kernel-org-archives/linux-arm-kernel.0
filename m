@@ -1,90 +1,37 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 27 Feb 2018 16:02:02 +0000
-Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: add SFP module support
-In-Reply-To: <20180227160135.GU9418@n2100.armlinux.org.uk>
-References: <20180227160135.GU9418@n2100.armlinux.org.uk>
-Message-ID: <E1eqhha-0004l3-Rd@rmk-PC.armlinux.org.uk>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 27 Feb 2018 17:04:09 +0100
+Subject: [PATCH v2 0/3] USB OTG on STM32H743
+In-Reply-To: <1519029988-9261-1-git-send-email-amelie.delaunay@st.com>
+References: <1519029988-9261-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <05b1ec7e-8db3-20df-fb1c-3a8853f99307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SFP module support for Clearfog using the SFP phylink support.
+Hi Am?lie,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/armada-388-clearfog.dtsi | 45 ++++++++----------------------
- 1 file changed, 12 insertions(+), 33 deletions(-)
+On 02/19/2018 09:46 AM, Amelie Delaunay wrote:
+> This patchset adds support for USB OTG HS and FS on stm32h743 SoC.
+> It also enables USB OTG HS on stm32h743i-eval board in OTG (DRD) mode. It is
+> possible to use OTG HS in Peripheral or Host mode depending on the USB
+> connector.
+> 
+> ---
+> 
+> Changes in v2:
+> - Fix compatible string (https://patchwork.kernel.org/patch/10222153/)
+> 
+> Amelie Delaunay (3):
+>    ARM: dts: stm32: add USB OTG HS support for STM32H743 SoC
+>    ARM: dts: stm32: add USB OTG FS support for STM32H743 SoC
+>    ARM: dts: stm32: enable USB OTG HS on stm32h743i-eval
+> 
+>   arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 20 ++++++++++++++++++++
+>   arch/arm/boot/dts/stm32h743.dtsi         | 21 +++++++++++++++++++++
+>   arch/arm/boot/dts/stm32h743i-eval.dts    | 16 ++++++++++++++++
+>   3 files changed, 57 insertions(+)
+> 
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 0e3b1f140e6d..a44bf20ab7f8 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -117,6 +117,16 @@
- 			};
- 		};
- 	};
-+
-+	sfp: sfp {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c1>;
-+		los-gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&expander0 15 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&expander0 14 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&expander0 13 GPIO_ACTIVE_HIGH>;
-+		maximum-power-milliwatt = <2000>;
-+	};
- };
- 
- &eth1 {
-@@ -133,13 +143,10 @@
- 	bm,pool-long = <3>;
- 	bm,pool-short = <1>;
- 	buffer-manager = <&bm>;
-+	managed = "in-band-status";
- 	phy-mode = "sgmii";
-+	sfp = <&sfp>;
- 	status = "okay";
--
--	fixed-link {
--		speed = <1000>;
--		full-duplex;
--	};
- };
- 
- &i2c0 {
-@@ -208,34 +215,6 @@
- 			output-low;
- 			line-name = "m.2 devslp";
- 		};
--		sfp_los {
--			/* SFP loss of signal */
--			gpio-hog;
--			gpios = <12 GPIO_ACTIVE_HIGH>;
--			input;
--			line-name = "sfp-los";
--		};
--		sfp_tx_fault {
--			/* SFP laser fault */
--			gpio-hog;
--			gpios = <13 GPIO_ACTIVE_HIGH>;
--			input;
--			line-name = "sfp-tx-fault";
--		};
--		sfp_tx_disable {
--			/* SFP transmit disable */
--			gpio-hog;
--			gpios = <14 GPIO_ACTIVE_HIGH>;
--			output-low;
--			line-name = "sfp-tx-disable";
--		};
--		sfp_mod_def0 {
--			/* SFP module present */
--			gpio-hog;
--			gpios = <15 GPIO_ACTIVE_LOW>;
--			input;
--			line-name = "sfp-mod-def0";
--		};
- 	};
- 
- 	/* The MCP3021 supports standard and fast modes */
--- 
-2.7.4
+I squashed patch 1&2 and applied series on stm32-next.
+
+Regards.
+Alex
