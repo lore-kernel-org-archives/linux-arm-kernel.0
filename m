@@ -1,68 +1,46 @@
-From: masami.hiramatsu@linaro.org (Masami Hiramatsu)
-Date: Tue, 27 Feb 2018 14:07:00 +0900
-Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
-In-Reply-To: <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
-References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
- <20180201093459.20477-3-takahiro.akashi@linaro.org>
- <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
-Message-ID: <CAA93ih0CUzJVhpOpbtcH_REZOO_pSjBV1sJhjnY6vhySP3fB3A@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 27 Feb 2018 11:22:30 +0530
+Subject: [PATCH] ARM: omap2: set CONFIG_LIRC=y in defconfig
+In-Reply-To: <20180226204105.2858838-1-arnd@arndb.de>
+References: <20180226204105.2858838-1-arnd@arndb.de>
+Message-ID: <6f0e6593-27c3-2df4-b0ef-f3d3e77c81de@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-2018-02-27 12:57 GMT+09:00 Kees Cook <keescook@chromium.org>:
-> On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
->> Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
->> initialized by irq chip (gic), is called from exception entry.
->> This patch fixes this problem.
->
-> As in, this symbol is not known a lkdtm setup time? Hm, seems like
-> we'd want a more generalized approach here.
->
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
->>  1 file changed, 18 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
->> index ba92291508dc..e20343543053 100644
->> --- a/drivers/misc/lkdtm_core.c
->> +++ b/drivers/misc/lkdtm_core.c
->> @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
->>         if (lkdtm_kprobe != NULL)
->>                 unregister_kprobe(lkdtm_kprobe);
->>
->> +       if (IS_ENABLED(CONFIG_ARM64) &&
->> +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
->> +               extern void (*handle_arch_irq)(struct pt_regs *regs);
->
-> I don't like this extern -- can handle_arch_irq be properly exported somewhere?
->
->> +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
->
-> I don't think the * is needed here: it's already a function pointer.
 
-Since the addr is no void *, gcc warns this assignment from
-incompatible pointer type.
-Hmm, maybe better casting it to void *.
+On Tuesday 27 February 2018 02:10 AM, Arnd Bergmann wrote:
+> The CONFIG_LIRC symbol has changed from 'tristate' to 'bool, so we now
+> get a warning for omap2plus_defconfig:
+> 
+> arch/arm/configs/omap2plus_defconfig:322:warning: symbol value 'm' invalid for LIRC
+> 
+> This changes the file to mark the symbol as built-in to get rid of the
+> warning.
+> 
+> Fixes: a60d64b15c20 ("media: lirc: lirc interface should not be a raw decoder")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
->
->> +               /*
->> +                * Instantiating kprobe.symbol_name here, say
->> +                * with lookup_symbol_name(*handle_arch_irq),
->> +                * would cause register_kprobe() to fail.
->> +                */
->> +               crashpoint->kprobe.symbol_name = NULL;
->
-> Is kprobe.addr sufficient for register_kprobe?
+Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-Yes, if symbol_name is NULL, register_kprobe uses only kprobe.addr to
-find the probe point.
+Thank and regards,
+Lokesh
 
-Thank you,
-
--- 
-Masami Hiramatsu
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 2f145c4af93a..92674f247a12 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -319,7 +319,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_RC_CORE=m
+>  CONFIG_MEDIA_CONTROLLER=y
+>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+> -CONFIG_LIRC=m
+> +CONFIG_LIRC=y
+>  CONFIG_RC_DEVICES=y
+>  CONFIG_IR_RX51=m
+>  CONFIG_V4L_PLATFORM_DRIVERS=y
+> 
