@@ -1,41 +1,57 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 27 Feb 2018 17:34:58 +0100
-Subject: [PATCH] MAINTAINERS: update entries for ARM/STM32
-Message-ID: <1519749298-27515-1-git-send-email-alexandre.torgue@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 27 Feb 2018 17:48:17 +0100
+Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add registers clock
+ for sata node
+In-Reply-To: <20180215134423.11800-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Thu, 15 Feb 2018 14:44:23 +0100")
+References: <20180215134423.11800-1-gregory.clement@bootlin.com>
+Message-ID: <87muzujs4u.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes old git repository to the maintained one and adds more patterns.
-
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-
----
-
-Hi Arnd, olof and Kevin,
-
-Is it possible to have this patch merged on 4.16-rcx cycle ?
-Currently git repository for STM32 is not the maintained one and it could
-cause missunderstanding for people looking at this file.
-
-Thanks in advance
-Alex
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3bdc260..802b984 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1999,8 +1999,10 @@ M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
- M:	Alexandre Torgue <alexandre.torgue@st.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git stm32-next
- N:	stm32
-+F:	arch/arm/boot/dts/stm32*
-+F:	arch/arm/mach-stm32/
- F:	drivers/clocksource/armv7m_systick.c
+Hi,
  
- ARM/TANGO ARCHITECTURE
+ On jeu., f?vr. 15 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+
+> This extra clock is needed to access the registers of the AHCI SATA
+> controller used on the Armada 7K/8K SoCs.
+>
+> The ahci drivers was already designed to support up to 5 clocks so there
+> is only need to update the device tree to use it. It was not noticed
+> until now because of wrong assumption in the clock drivers, but as this
+> IP really needs 2 clocks, we had to declare both of them.
+>
+
+
+Applied on mvebu/dt64
+
+Gregory
+
+
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index 50038434dd53..b8cf1497dc22 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -236,7 +236,8 @@
+>  			"generic-ahci";
+>  			reg = <0x540000 0x30000>;
+>  			interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&CP110_LABEL(clk) 1 15>;
+> +			clocks = <&CP110_LABEL(clk) 1 15>,
+> +				 <&CP110_LABEL(clk) 1 16>;
+>  			status = "disabled";
+>  		};
+>  
+> -- 
+> 2.15.1
+>
+
 -- 
-2.7.4
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
