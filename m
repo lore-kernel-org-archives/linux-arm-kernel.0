@@ -1,29 +1,69 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 27 Feb 2018 13:10:36 +0000
-Subject: [PATCH 0/2] arm: Support for Renesas RZ/N1D (R9A06G032)
-In-Reply-To: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <HK2PR0601MB1393B2D7E0C96590482C3726F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 27 Feb 2018 14:12:55 +0100
+Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
+In-Reply-To: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
+References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
+Message-ID: <20180227141255.177ea751@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Gabriel,
 
-On 26 February 2018, Michel Pollet wrote:
+On Thu, 22 Feb 2018 20:30:56 +0000, Gabriel Matni
+<gabriel.matni@exfo.com> wrote:
+
+> From: Gabriel Matni <gabriel.matni@exfo.com>
 > 
-> This series adds the plain basic support for booting a bare
-> kernel on the RZ/N1D-DB Board. It's been trimmed to the strict
-> minimum as a 'base', further patches that will add the
-> rest of the support, pinctrl, clock architecture and quite
-> a few others.
-I spoke to Magnus about helping to get the RZ/N1 patches upstream.
-We're trying to sort out making the device manual and board schematics
-available, hopefully it won't take too long. We're also trying to sort out
-access to a board... that might take a bit longer.
+> Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
+> transmitter holding is ready to receive a new byte. Polling TX_EMPTY isn't
+> enough as the hardware buffer can become empty but not yet ready for CPU to
+> write the next byte.
 
-btw, what do you want to do about shmobile_defconfig? Should we add
-any changes needed for RZ/N1 to it? Note that only one IP block is the
-same as R-Car.
+I am kind of sceptic with the explanation. My understanding is that:
+- TX_EMPTY means the FIFO is empty
+- TX_RDY means the FIFO is not full, neither empty, it is a "half
+  loaded" state.
+Polling TX_RDY instead of TX_EMPTY should work too, but I don't see
+why it would fix the loss of character by filling the FIFO when there
+are bytes in it rather than when it is fully empty.
 
-Thanks
-Phil
+> 
+> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
+> ---
+> drivers/tty/serial/mvebu-uart.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index a100e98259d7..f0df0640208e 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+>    u32 val;
+> 
+>    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+> -             (val & STAT_TX_EMP), 1, 10000);
+> +             (val & STAT_TX_RDY(port)), 1, 10000);
+
+However, this change might have brought one noticeable difference: the
+bit polled is a per-port bit while the TX_EMPTY bit looks global. So
+maybe you faced the issue because you are using the ports quite
+intensively in parallel?
+
+Also it could explain why you only face the issue at slow baudrates:
+bytes will remain longer in the FIFO, increasing the probability of
+collision.
+
+> }
+> 
+> static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+> --
+> 2.7.4
+
+Thanks,
+Miqu?l
+
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
