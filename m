@@ -1,114 +1,92 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 27 Feb 2018 16:20:12 +0900
-Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
-In-Reply-To: <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
-References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
- <20180201093459.20477-3-takahiro.akashi@linaro.org>
- <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
-Message-ID: <20180227072011.GG6019@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 27 Feb 2018 07:22:29 +0000
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+Message-ID: <CAKv+Gu9FVD18v6WA8MMG5LFX9GPObq_79hFuYv6j+S98a5Ej6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+Hi Jonathan,
 
-On Mon, Feb 26, 2018 at 07:57:10PM -0800, Kees Cook wrote:
-> On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
-> > Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
-> > initialized by irq chip (gic), is called from exception entry.
-> > This patch fixes this problem.
-> 
-> As in, this symbol is not known a lkdtm setup time? Hm, seems like
-> we'd want a more generalized approach here.
+On 27 February 2018 at 06:05, Jonathan Toppins <jtoppins@redhat.com> wrote:
+> This patch allows a user to configure ACPI to be preferred over
+> device-tree.
+>
 
-Hmm. See my comments below.
+This comes up once a year or so, and the consensus has been so far
+that it is not up to the kernel to reason about whether DT or ACPI
+should be preferred if both are supplied, Instead, it is up to the
+firmware to ensure that only one of those is provided, and we added a
+generic driver to EDK2 that implements this.
 
-> >
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > ---
-> >  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
-> >  1 file changed, 18 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-> > index ba92291508dc..e20343543053 100644
-> > --- a/drivers/misc/lkdtm_core.c
-> > +++ b/drivers/misc/lkdtm_core.c
-> > @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
-> >         if (lkdtm_kprobe != NULL)
-> >                 unregister_kprobe(lkdtm_kprobe);
-> >
-> > +       if (IS_ENABLED(CONFIG_ARM64) &&
-> > +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
-> > +               extern void (*handle_arch_irq)(struct pt_regs *regs);
-> 
-> I don't like this extern -- can handle_arch_irq be properly exported somewhere?
+> Currently for ACPI to be used a user either has to set acpi=on on the
+> kernel command line or make sure any device tree passed to the kernel
+> is empty. If the dtb passed to the kernel is non-empty then device-tree
+> will be chosen as the boot method of choice even if it is not correct.
 
-Define a weak function, get_handle_irq(), in linux/irq.h and
-a real one in arch code. Then
+Your firmware is terminally broken if it provides an incorrect DT, and
+we should not be fixing it in the kernel.
 
-        if (!kallsyms_lookup_name(crashpoint->symbol_name)) {
-                if (!strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
-                        func = get_handle_irq();
-                        if (func) {
-                                crashpoint->kprobe.addr = func;
-                                crashpoint->kprobe.symbol_name = NULL;
-                        } else {
-                                /* error */
-                        }
-                } /* anything else? */
-        }
+> To prevent this situation where a system is only intended to be booted
+> via ACPI a user can set this kernel configuration so it ignores
+> device-tree settings unless ACPI table checks fail.
+>
 
-Do you like this code better?
+'only intended to be booted via ACPI' is a property of the system, not
+of the OS. If you need this functionality for development, you can
+append 'acpi=on' to the kernel command line via kconfig.
 
-> 
-> > +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
-> 
-> I don't think the * is needed here: it's already a function pointer.
 
-Will check.
-
-> > +               /*
-> > +                * Instantiating kprobe.symbol_name here, say
-> > +                * with lookup_symbol_name(*handle_arch_irq),
-> > +                * would cause register_kprobe() to fail.
-> > +                */
-> > +               crashpoint->kprobe.symbol_name = NULL;
-> 
-> Is kprobe.addr sufficient for register_kprobe?
-
-Yes as Masami explained.
-Leaving symbol_name ends up failure of register_kprobe().
-
-> > +       }
-> >         lkdtm_crashpoint = crashpoint;
-> >         lkdtm_crashtype = crashtype;
-> >         lkdtm_kprobe = &crashpoint->kprobe;
-> >         ret = register_kprobe(lkdtm_kprobe);
-> >         if (ret < 0) {
-> > -               pr_info("Couldn't register kprobe %s\n",
-> > -                       crashpoint->kprobe.symbol_name);
-> > +               if (IS_ENABLED(CONFIG_ARM64))
-> > +                       pr_info("Couldn't register kprobe 0x%lx\n",
-> > +                               (unsigned long)crashpoint->kprobe.addr);
-> > +               else
-> > +                       pr_info("Couldn't register kprobe %s\n",
-> > +                               crashpoint->kprobe.symbol_name);
-> >                 lkdtm_kprobe = NULL;
-> >                 lkdtm_crashpoint = NULL;
-> >                 lkdtm_crashtype = NULL;
-> 
-> So I can replicate, how did you test this?
-
-All what I did in my arm64 test is
-# echo PANIC > /sys/kernel/debug/provoke-crash/INT_HARDWARE_ENTRY
-
-The probe point will hit sooner or later and we will see a panic
-(and kdump kicks in).
-
-Thanks,
--Takahiro AKASHI
-
-> 
-> -- 
-> Kees Cook
-> Pixel Security
+> Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
+> ---
+>
+>  arch/arm64/Kconfig       | 13 +++++++++++++
+>  arch/arm64/kernel/acpi.c |  2 +-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7381eeb7ef8e..da8d9ab62825 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1170,6 +1170,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
+>           protocol even if the corresponding data is present in the ACPI
+>           MADT table.
+>
+> +config ARM64_PREFER_ACPI
+> +       bool "Prefer usage of ACPI boot tables over device-tree"
+> +       depends on ACPI
+> +       help
+> +         Normally device-tree is preferred over ACPI on arm64 unless
+> +         explicitly preferred via kernel command line, something like: acpi=on
+> +         This configuration changes this default behaviour by pretending
+> +         the user set acpi=on on the command line. This configuration still
+> +         allows the user to turn acpi table parsing off via acpi=off. If
+> +         for some reason the table checks fail the system will still fall
+> +         back to using device-tree unless the user explicitly sets acpi=force
+> +         on the command line.
+> +
+>  config CMDLINE
+>         string "Default kernel command string"
+>         default ""
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 7b09487ff8fb..315b001c45f1 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -44,7 +44,7 @@ int acpi_pci_disabled = 1;    /* skip ACPI PCI scan and IRQ initialization */
+>  EXPORT_SYMBOL(acpi_pci_disabled);
+>
+>  static bool param_acpi_off __initdata;
+> -static bool param_acpi_on __initdata;
+> +static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
+>  static bool param_acpi_force __initdata;
+>
+>  static int __init parse_acpi(char *arg)
+> --
+> 2.13.6
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
