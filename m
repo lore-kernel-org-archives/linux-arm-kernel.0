@@ -1,27 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Feb 2018 10:06:41 -0800
-Subject: [PATCH 1/6] clocksource: timer-ti-dm: Make unexported functions
- static
-In-Reply-To: <20180223101346.GB5746@lenoch>
-References: <20180223101254.GA5746@lenoch>
- <20180223101346.GB5746@lenoch>
-Message-ID: <20180227180641.GE5448@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 27 Feb 2018 15:17:24 -0300
+Subject: [PATCH 2/5] ARM: dts: vf: Add memory node unit name
+In-Reply-To: <1519755447-9666-1-git-send-email-festevam@gmail.com>
+References: <1519755447-9666-1-git-send-email-festevam@gmail.com>
+Message-ID: <1519755447-9666-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ladislav Michl <ladis@linux-mips.org> [180223 10:14]:
-> As dmtimer no longer exports functions, make those previously
-> exported static (this requires few functions to be moved around
-> as their prototypes were deleted).
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Looks like this one fails to build with omap1_defconfig:
+Include memory node unit name in order to fix the following W=1
+warnings:
 
-drivers/clocksource/timer-ti-dm.c:935:14: error:
-'omap_dm_timer_get_fclk' undeclared here 
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-Other than that the first three patches seem like nice
-clean-up :)
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/vf500-colibri.dtsi  | 2 +-
+ arch/arm/boot/dts/vf610-colibri.dtsi  | 2 +-
+ arch/arm/boot/dts/vf610-cosmic.dts    | 2 +-
+ arch/arm/boot/dts/vf610-twr.dts       | 2 +-
+ arch/arm/boot/dts/vf610-zii-dev.dtsi  | 2 +-
+ arch/arm/boot/dts/vf610m4-colibri.dts | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
+index 515c4d2f..2e7e3ce 100644
+--- a/arch/arm/boot/dts/vf500-colibri.dtsi
++++ b/arch/arm/boot/dts/vf500-colibri.dtsi
+@@ -46,7 +46,7 @@
+ 	model = "Toradex Colibri VF50 COM";
+ 	compatible = "toradex,vf610-colibri_vf50", "fsl,vf500";
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x8000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+index 395812c..aeaf99f 100644
+--- a/arch/arm/boot/dts/vf610-colibri.dtsi
++++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+@@ -46,7 +46,7 @@
+ 	model = "Toradex Colibri VF61 COM";
+ 	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x10000000>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
+index 5447f25..a3014e8 100644
+--- a/arch/arm/boot/dts/vf610-cosmic.dts
++++ b/arch/arm/boot/dts/vf610-cosmic.dts
+@@ -19,7 +19,7 @@
+ 		bootargs = "console=ttyLP1,115200";
+ 	};
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x10000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 6f787e67..6be7a82 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -50,7 +50,7 @@
+ 		bootargs = "console=ttyLP1,115200";
+ 	};
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x8000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/vf610-zii-dev.dtsi b/arch/arm/boot/dts/vf610-zii-dev.dtsi
+index aadd36d..4890b8a 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev.dtsi
++++ b/arch/arm/boot/dts/vf610-zii-dev.dtsi
+@@ -49,7 +49,7 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+index 7198e8c..2b237ef 100644
+--- a/arch/arm/boot/dts/vf610m4-colibri.dts
++++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+@@ -54,7 +54,7 @@
+ 		linux,stdout-path = "&uart2";
+ 	};
+ 
+-	memory {
++	memory at 8c000000 {
+ 		reg = <0x8c000000 0x3000000>;
+ 	};
+ };
+-- 
+2.7.4
