@@ -1,52 +1,22 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Tue, 27 Feb 2018 20:02:45 +0000
-Subject: =?utf-8?B?UmU6IOetlOWkjTogW1JGQyBwYXRjaF0gaW9yZW1hcDogZG9uJ3Qgc2V0IHVw?=
- =?utf-8?Q?_huge_I/O_mappings_when_p4d/pud/pmd_is_zero?=
-In-Reply-To: <20180227195919.GA5348@arm.com>
-References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
- <861128ce-966f-7006-45ba-6a7298918686@codeaurora.org>
- <1519175992.16384.121.camel@hpe.com>
- <etPan.5a8d2180.1dbfd272.49b8@localhost> <20180221115758.GA7614@arm.com>
- <32c9b1c3-086b-ba54-f9e9-aefa50066730@huawei.com>
- <20180226110422.GD8736@arm.com>
- <a80e540f-f3bd-53da-185d-7fffe801f10c@huawei.com>
- <1519763686.2693.2.camel@hpe.com> <20180227195919.GA5348@arm.com>
-Message-ID: <1519764469.2693.4.camel@hpe.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 27 Feb 2018 23:06:10 +0300
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+Message-ID: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-02-27 at 19:59 +0000, Will Deacon wrote:
-> On Tue, Feb 27, 2018 at 07:49:42PM +0000, Kani, Toshi wrote:
-> > On Mon, 2018-02-26 at 20:53 +0800, Hanjun Guo wrote:
-> > > On 2018/2/26 19:04, Will Deacon wrote:
-> > > > On Mon, Feb 26, 2018 at 06:57:20PM +0800, Hanjun Guo wrote:
-> > > > > Simply do something below at now (before the broken code is fixed)?
-> > > > > 
-> > > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > > > index b2b95f7..a86148c 100644
-> > > > > --- a/arch/arm64/Kconfig
-> > > > > +++ b/arch/arm64/Kconfig
-> > > > > @@ -84,7 +84,6 @@ config ARM64
-> > > > >         select HAVE_ALIGNED_STRUCT_PAGE if SLUB
-> > > > >         select HAVE_ARCH_AUDITSYSCALL
-> > > > >         select HAVE_ARCH_BITREVERSE
-> > > > > -   select HAVE_ARCH_HUGE_VMAP
-> > > > >         select HAVE_ARCH_JUMP_LABEL
-> > > > >         select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-> > > > >         select HAVE_ARCH_KGDB
-> > > > 
-> > > > No, that actually breaks with the use of block mappings for the kernel
-> > > > text. Anyway, see:
-> > > > 
-> > > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=15122ee2c515a253b0c66a3e618bc7ebe35105eb
-> > > 
-> > > Sorry, just back from holidays and didn't catch up with all the emails,
-> > > thanks for taking care of this.
-> > 
-> > I will work on a fix for the common/x86 code.
-> 
-> Ace, thanks. I'm more than happy to review any changes you make to the core
-> code from a break-before-make perspective. Just stick me on cc.
+Hello!
 
-Thanks Will!  I will definitely keep you cc'd.
--Toshi
+Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+output (we're omitting the LVDS decoder for now). These patches depend on
+the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+
+[1/5] arm64: dts: renesas: r8a77970: add FCPVD support
+[2/5] arm64: dts: renesas: r8a77970: add VSPD support
+[3/5] arm64: dts: renesas: r8a77970: add DU support
+[4/5] arm64: dts: renesas: r8a77970: add LVDS support
+[5/5] arm64: dts: renesas: v3msk: add DU/LVDS/HDMI support
+
+WBR, Sergei
