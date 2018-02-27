@@ -1,63 +1,55 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Tue, 27 Feb 2018 15:15:46 -0800
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <20180227114313.mtvyo6rdavqfj2hy@lakrids.cambridge.arm.com>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180225143802.denbkubqjg2dc7af@salmiak>
- <90e7ff7d7dc1054db356fb1740ddb990@codeaurora.org>
- <20180227114313.mtvyo6rdavqfj2hy@lakrids.cambridge.arm.com>
-Message-ID: <3a57c8261e0f10b72e0533c39d9abe19@codeaurora.org>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Tue, 27 Feb 2018 15:24:25 -0800
+Subject: [PATCH 1/2] dt-bindings: soc: Add ZynqMP PM bindings
+In-Reply-To: <1519773866-18196-1-git-send-email-jollys@xilinx.com>
+References: <1519773866-18196-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1519773866-18196-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-27 03:43, Mark Rutland wrote:
-> On Mon, Feb 26, 2018 at 06:11:45PM -0800, skannan at codeaurora.org wrote:
->> On 2018-02-25 06:38, Mark Rutland wrote:
->> > On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
->> > > Some PMUs events can be read from any CPU. So allow the PMU to mark
->> > > events as such. For these events, we don't need to reject reads or
->> > > make smp calls to the event's CPU and cause unnecessary wake ups.
->> > >
->> > > Good examples of such events would be events from caches shared across
->> > > all CPUs.
->> >
->> > I think that if we need to generalize PERF_EV_CAP_READ_ACTIVE_PKG, it
->> > would be
->> > better to give events a pointer to a cpumask. That could then cover all
->> > cases
->> > quite trivially:
->> >
->> > static int __perf_event_read_cpu(struct perf_event *event, int
->> > event_cpu)
->> > {
->> > 	int local_cpu = smp_processor_id();
->> >
->> > 	if (event->read_mask &&
->> > 	    cpumask_test_cpu(local_cpu, event->read_mask))
->> > 		event_cpu = local_cpu;
->> >
->> > 	return event_cpu;
->> > }
->> 
->> This is a good improvement on my attempt. If I send a patch for this, 
->> is
->> that something you'd be willing to incorporate into your patch set and 
->> make
->> sure the DSU pmu driver handles it correctly?
-> 
-> As I commented, I don't think that willl work without more invasive
-> changes as the DSU PMU's pmu::read() function has side effects on
-> hwc->prev_count and event_count, and could race with an IRQ handler on
-> another CPU.
-> 
-> Is the IPI really a problem in practice?
-> 
+Add documentation to describe Xilinx ZynqMP power management
+bindings.
 
-There are a bunch of cases, but the simplest one is if you try to 
-collect DSU stats (for analysis) while measuring power, it completely 
-messes up the power measurements.
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+---
+ .../bindings/soc/xilinx/xlnx,zynqmp-power.txt      | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
 
-Thanks,
-Saravana
+diff --git a/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
+new file mode 100644
+index 0000000..5b7d963
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
+@@ -0,0 +1,28 @@
++Xilinx Zynq MPSoC Power Management Device Tree Bindings
++
++The zynqmp-power node describes the power management configurations.
++
++Required properties:
++ - compatible	: Must contain:  "xlnx,zynqmp-power"
++ - mbox-names	: Name given to channels seen in the 'mboxes' property.
++		  "rx" - Mailbox corresponding to receive path
++		  "tx" - Mailbox corresponding to transmit path
++ - mboxes	: Standard property to specify a Mailbox. Each value of
++		  the mboxes property should contain a phandle to the
++		  mailbox controller device node and an args specifier
++		  that will be the phandle to the intended sub-mailbox
++		  child node to be used for communication. See
++		  Documentation/devicetree/bindings/mailbox/mailbox.txt
++		  for more details about the generic mailbox controller
++		  and client driver bindings. Also see
++		  Documentation/devicetree/bindings/mailbox/ \
++		  xlnx,zynqmp-ipi-mailbox.txt for typical controller that
++		  is used to communicate with this System controllers.
++
++Examples:
++	zynqmp_power: zynqmp-power {
++		compatible = "xlnx,zynqmp-power";
++		mboxes = <&ipi_mailbox_pmu0 0>,
++			 <&ipi_mailbox_pmu0 1>;
++		mbox-names = "tx", "rx";
++	};
+-- 
+2.7.4
