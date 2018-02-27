@@ -1,214 +1,101 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 27 Feb 2018 12:34:08 +0100
-Subject: [PATCH v5 19/40] KVM: arm64: Introduce separate VHE/non-VHE sysreg
- save/restore functions
-In-Reply-To: <20180227113429.637-1-cdall@kernel.org>
-References: <20180227113429.637-1-cdall@kernel.org>
-Message-ID: <20180227113429.637-20-cdall@kernel.org>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 27 Feb 2018 13:40:58 +0200
+Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
+In-Reply-To: <20180227105444.lo4pee7vh4we3foq@oak.lan>
+References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
+ <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
+ <20180222123308.mypx2r7n6o63mj5z@oak.lan> <87po4s2hve.fsf@intel.com>
+ <3a70b89c-b470-3723-760c-5294d0a75230@microchip.com>
+ <20180227105444.lo4pee7vh4we3foq@oak.lan>
+Message-ID: <8e1d3b30-3543-56fd-7be6-7fe6edcb40d9@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
 
-As we are about to handle system registers quite differently between VHE
-and non-VHE systems.  In preparation for that, we need to split some of
-the handling functions between VHE and non-VHE functionality.
 
-For now, we simply copy the non-VHE functions, but we do change the use
-of static keys for VHE and non-VHE functionality now that we have
-separate functions.
+On 27.02.2018 12:54, Daniel Thompson wrote:
+> On Mon, Feb 26, 2018 at 04:24:15PM +0200, Claudiu Beznea wrote:
+>> On 26.02.2018 11:57, Jani Nikula wrote:
+>>> On Thu, 22 Feb 2018, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+>>>> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
+>>>>> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
+>>>>> were adapted to this change.
+>>>>>
+>>>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>>>> ---
+>>>>>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
+>>>>>  drivers/bus/ts-nbus.c                |  2 +-
+>>>>>  drivers/clk/clk-pwm.c                |  3 ++-
+>>>>>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
+>>>>>  drivers/hwmon/pwm-fan.c              |  2 +-
+>>>>>  drivers/input/misc/max77693-haptic.c |  2 +-
+>>>>>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
+>>>>>  drivers/leds/leds-pwm.c              |  5 ++++-
+>>>>>  drivers/media/rc/ir-rx51.c           |  5 ++++-
+>>>>>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
+>>>>>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
+>>>>>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
+>>>>>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
+>>>>>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
+>>>>>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
+>>>>>  include/linux/pwm.h                  |  6 ++++--
+>>>>>  16 files changed, 70 insertions(+), 21 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
+>>>>> index 2030a6b77a09..696fa25dafd2 100644
+>>>>> --- a/drivers/video/backlight/lm3630a_bl.c
+>>>>> +++ b/drivers/video/backlight/lm3630a_bl.c
+>>>>> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
+>>>>>  {
+>>>>>  	unsigned int period = pchip->pdata->pwm_period;
+>>>>>  	unsigned int duty = br * period / br_max;
+>>>>> +	struct pwm_caps caps = { };
+>>>>>  
+>>>>> -	pwm_config(pchip->pwmd, duty, period);
+>>>>> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
+>>>>> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
+>>>>
+>>>> Well... I admit I've only really looked at the patches that impact 
+>>>> backlight but dispersing this really odd looking bit twiddling 
+>>>> throughout the kernel doesn't strike me a great API design.
+>>>>
+>>>> IMHO callers should not be required to find the first set bit in
+>>>> some specially crafted set of capability bits simply to get sane 
+>>>> default behaviour.
+>>>
+>>> Agreed. IMHO the regular use case becomes rather tedious, ugly, and
+>>> error prone.
+>>
+>> Using simply PWM_MODE(NORMAL) instead of BIT(ffs(caps.modes) - 1) would be OK
+>> from your side?
+>>
+>> Or, what about using a function like pwm_mode_first() to get the first supported
+>> mode by PWM channel?
+>>
+>> Or, would you prefer to solve this inside pwm_config() function, let's say, in
+>> case an invalid mode is passed as argument, to let pwm_config() to choose the
+>> first available PWM mode for PWM channel passed as argument?
+> 
+> What is it that actually needs solving?
+> 
+> If a driver requests normal mode and the PWM driver cannot support it
+> why not just return an error an move on.
+Because, simply, I wasn't aware of what these PWM client drivers needs for.
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/asm/kvm_hyp.h | 12 ++++++++----
- arch/arm64/kvm/hyp/switch.c      | 20 ++++++++++----------
- arch/arm64/kvm/hyp/sysreg-sr.c   | 40 ++++++++++++++++++++++++++++++++--------
- 3 files changed, 50 insertions(+), 22 deletions(-)
+> 
+> Put another way, what is the use case for secretly adopting a mode the
+> caller didn't want? Under what circumstances is this a good thing?
+No one... But I wasn't aware of what the PWM clients needs for from their PWM
+controllers. At this moment having BIT(ffs(caps.modes)) instead of
+PWM_MODE(NORMAL) is mostly the same since all the driver that has not explicitly
+registered PWM caps will use PWM normal mode.
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index aeda2a777365..23c09d9af343 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -131,10 +131,14 @@ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
- void __timer_enable_traps(struct kvm_vcpu *vcpu);
- void __timer_disable_traps(struct kvm_vcpu *vcpu);
- 
--void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 307f8c1fcc2f..d60d3a018882 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -373,7 +373,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state(host_ctxt);
-+	sysreg_save_host_state_vhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu->kvm);
-@@ -385,7 +385,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	do {
-@@ -397,13 +397,13 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 
- 	fp_enabled = __fpsimd_enabled();
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	sysreg_save_guest_state_vhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__vgic_save_state(vcpu);
- 
- 	__deactivate_traps(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
- 
- 	if (fp_enabled) {
- 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
-@@ -433,7 +433,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state(host_ctxt);
-+	__sysreg_save_host_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(kern_hyp_va(vcpu->kvm));
-@@ -446,7 +446,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	__sysreg_restore_guest_state_nvhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	do {
-@@ -468,7 +468,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 
- 	fp_enabled = __fpsimd_enabled();
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	__sysreg_save_guest_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_disable_traps(vcpu);
- 	__vgic_save_state(vcpu);
-@@ -476,7 +476,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	__deactivate_traps(vcpu);
- 	__deactivate_vm(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	__sysreg_restore_host_state_nvhe(host_ctxt);
- 
- 	if (fp_enabled) {
- 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
-@@ -506,7 +506,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 		__timer_disable_traps(vcpu);
- 		__deactivate_traps(vcpu);
- 		__deactivate_vm(vcpu);
--		__sysreg_restore_host_state(__host_ctxt);
-+		__sysreg_restore_host_state_nvhe(__host_ctxt);
- 	}
- 
- 	/*
-@@ -529,7 +529,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
- 	vcpu = host_ctxt->__hyp_running_vcpu;
- 
- 	__deactivate_traps(vcpu);
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
- 
- 	panic(__hyp_panic_string,
- 	      spsr,  elr,
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 51b557226170..18801ab56e8b 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -78,15 +78,27 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- 		ctxt->sys_regs[DISR_EL1] = read_sysreg_s(SYS_VDISR_EL2);
- }
- 
--void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
- }
- 
--void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
-@@ -142,15 +154,27 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- 		write_sysreg_s(ctxt->sys_regs[DISR_EL1], SYS_VDISR_EL2);
- }
- 
--void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
-+
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
- }
- 
--void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
--- 
-2.14.2
+I will use PWM_MODE(NORMAL) instead of this in all the cases if this is OK from
+your side.
+
+Thank you,
+Claudiu Beznea
+> 
+> 
+> Daniel.
+> 
