@@ -1,54 +1,207 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Feb 2018 11:43:14 +0000
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <90e7ff7d7dc1054db356fb1740ddb990@codeaurora.org>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180225143802.denbkubqjg2dc7af@salmiak>
- <90e7ff7d7dc1054db356fb1740ddb990@codeaurora.org>
-Message-ID: <20180227114313.mtvyo6rdavqfj2hy@lakrids.cambridge.arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 27 Feb 2018 13:05:25 +0100
+Subject: [PATCH v5 6/6] drm/bridge/sii8620: use micro-USB cable
+ detection logic to detect MHL
+In-Reply-To: <5A953C21.5020007@samsung.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071142eucas1p10203dac2558db034a4a3287220213601@eucas1p1.samsung.com>
+ <20180227071134.28063-7-a.hajda@samsung.com> <5A953C21.5020007@samsung.com>
+Message-ID: <87dd3281-0471-ab2a-90c6-3f2d4bdf4750@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 06:11:45PM -0800, skannan at codeaurora.org wrote:
-> On 2018-02-25 06:38, Mark Rutland wrote:
-> > On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
-> > > Some PMUs events can be read from any CPU. So allow the PMU to mark
-> > > events as such. For these events, we don't need to reject reads or
-> > > make smp calls to the event's CPU and cause unnecessary wake ups.
-> > > 
-> > > Good examples of such events would be events from caches shared across
-> > > all CPUs.
-> > 
-> > I think that if we need to generalize PERF_EV_CAP_READ_ACTIVE_PKG, it
-> > would be
-> > better to give events a pointer to a cpumask. That could then cover all
-> > cases
-> > quite trivially:
-> > 
-> > static int __perf_event_read_cpu(struct perf_event *event, int
-> > event_cpu)
-> > {
-> > 	int local_cpu = smp_processor_id();
-> > 
-> > 	if (event->read_mask &&
-> > 	    cpumask_test_cpu(local_cpu, event->read_mask))
-> > 		event_cpu = local_cpu;
-> > 
-> > 	return event_cpu;
-> > }
-> 
-> This is a good improvement on my attempt. If I send a patch for this, is
-> that something you'd be willing to incorporate into your patch set and make
-> sure the DSU pmu driver handles it correctly?
+On 27.02.2018 12:08, Chanwoo Choi wrote:
+> Hi,
+>
+> On 2018? 02? 27? 16:11, Andrzej Hajda wrote:
+>> From: Maciej Purski <m.purski@samsung.com>
+>>
+>> Currently MHL chip must be turned on permanently to detect MHL cable. It
+>> duplicates micro-USB controller's (MUIC) functionality and consumes
+>> unnecessary power. Lets use extcon attached to MUIC to enable MHL chip
+>> only if it detects MHL cable.
+>>
+>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> ---
+>> v5: updated extcon API
+>>
+>> This is rework of the patch by Maciej with following changes:
+>> - use micro-USB port bindings to get extcon, instead of extcon property,
+>> - fixed remove sequence,
+>> - fixed extcon get state logic.
+>>
+>> Code finding extcon node is hacky IMO, I guess ultimately it should be done
+>> via some framework (maybe even extcon), or at least via helper, I hope it
+>> can stay as is until the proper solution will be merged.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> ---
+>>  drivers/gpu/drm/bridge/sil-sii8620.c | 97 ++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 94 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/sil-sii8620.c b/drivers/gpu/drm/bridge/sil-sii8620.c
+>> index 9e785b8e0ea2..62b0adabcac2 100644
+>> --- a/drivers/gpu/drm/bridge/sil-sii8620.c
+>> +++ b/drivers/gpu/drm/bridge/sil-sii8620.c
+>> @@ -17,6 +17,7 @@
+>>  
+>>  #include <linux/clk.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/extcon.h>
+>>  #include <linux/gpio/consumer.h>
+>>  #include <linux/i2c.h>
+>>  #include <linux/interrupt.h>
+>> @@ -25,6 +26,7 @@
+>>  #include <linux/list.h>
+>>  #include <linux/module.h>
+>>  #include <linux/mutex.h>
+>> +#include <linux/of_graph.h>
+>>  #include <linux/regulator/consumer.h>
+>>  #include <linux/slab.h>
+>>  
+>> @@ -81,6 +83,10 @@ struct sii8620 {
+>>  	struct edid *edid;
+>>  	unsigned int gen2_write_burst:1;
+>>  	enum sii8620_mt_state mt_state;
+>> +	struct extcon_dev *extcon;
+>> +	struct notifier_block extcon_nb;
+>> +	struct work_struct extcon_wq;
+>> +	int cable_state;
+>>  	struct list_head mt_queue;
+>>  	struct {
+>>  		int r_size;
+>> @@ -2175,6 +2181,77 @@ static void sii8620_init_rcp_input_dev(struct sii8620 *ctx)
+>>  	ctx->rc_dev = rc_dev;
+>>  }
+>>  
+>> +static void sii8620_cable_out(struct sii8620 *ctx)
+>> +{
+>> +	disable_irq(to_i2c_client(ctx->dev)->irq);
+>> +	sii8620_hw_off(ctx);
+>> +}
+>> +
+>> +static void sii8620_extcon_work(struct work_struct *work)
+>> +{
+>> +	struct sii8620 *ctx =
+>> +		container_of(work, struct sii8620, extcon_wq);
+>> +	int state = extcon_get_state(ctx->extcon, EXTCON_DISP_MHL);
+>> +
+>> +	if (state == ctx->cable_state)
+>> +		return;
+>> +
+>> +	ctx->cable_state = state;
+>> +
+>> +	if (state > 0)
+>> +		sii8620_cable_in(ctx);
+>> +	else
+>> +		sii8620_cable_out(ctx);
+>> +}
+>> +
+>> +static int sii8620_extcon_notifier(struct notifier_block *self,
+>> +			unsigned long event, void *ptr)
+>> +{
+>> +	struct sii8620 *ctx =
+>> +		container_of(self, struct sii8620, extcon_nb);
+>> +
+>> +	schedule_work(&ctx->extcon_wq);
+>> +
+>> +	return NOTIFY_DONE;
+>> +}
+>> +
+>> +static int sii8620_extcon_init(struct sii8620 *ctx)
+>> +{
+>> +	struct extcon_dev *edev;
+>> +	struct device_node *musb, *muic;
+>> +	int ret;
+>> +
+>> +	/* get micro-USB connector node */
+>> +	musb = of_graph_get_remote_node(ctx->dev->of_node, 1, -1);
+>> +	/* next get micro-USB Interface Controller node */
+>> +	muic = of_get_next_parent(musb);
+>> +
+>> +	if (!muic) {
+>> +		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
+>> +		return 0;
+>> +	}
+>> +
+>> +	edev = extcon_find_edev_by_node(muic);
+>> +	of_node_put(muic);
+>> +	if (IS_ERR(edev)) {
+>> +		if (PTR_ERR(edev) == -EPROBE_DEFER)
+>> +			return -EPROBE_DEFER;
+>> +		dev_err(ctx->dev, "Invalid or missing extcon\n");
+>> +		return PTR_ERR(edev);
+>> +	}
+>> +
+>> +	ctx->extcon = edev;
+>> +	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
+>> +	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
+>> +	ret = extcon_register_notifier(edev, EXTCON_DISP_MHL, &ctx->extcon_nb);
+> You better to use devm_extcon_register_notifier().
 
-As I commented, I don't think that willl work without more invasive
-changes as the DSU PMU's pmu::read() function has side effects on
-hwc->prev_count and event_count, and could race with an IRQ handler on
-another CPU.
+With devm version I risk that in case of device unbind notification will
+be called after .remove callback, it seems to me quite dangerous. Or am
+I missing something?
 
-Is the IPI really a problem in practice?
+Regards
+Andrzej
 
-Thanks,
-Mark.
+>
+>> +	if (ret) {
+>> +		dev_err(ctx->dev, "failed to register notifier for MHL\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
+>>  {
+>>  	return container_of(bridge, struct sii8620, bridge);
+>> @@ -2307,13 +2384,20 @@ static int sii8620_probe(struct i2c_client *client,
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> +	ret = sii8620_extcon_init(ctx);
+>> +	if (ret < 0) {
+>> +		dev_err(ctx->dev, "failed to initialize EXTCON\n");
+>> +		return ret;
+>> +	}
+>> +
+>>  	i2c_set_clientdata(client, ctx);
+>>  
+>>  	ctx->bridge.funcs = &sii8620_bridge_funcs;
+>>  	ctx->bridge.of_node = dev->of_node;
+>>  	drm_bridge_add(&ctx->bridge);
+>>  
+>> -	sii8620_cable_in(ctx);
+>> +	if (!ctx->extcon)
+>> +		sii8620_cable_in(ctx);
+>>  
+>>  	return 0;
+>>  }
+>> @@ -2322,8 +2406,15 @@ static int sii8620_remove(struct i2c_client *client)
+>>  {
+>>  	struct sii8620 *ctx = i2c_get_clientdata(client);
+>>  
+>> -	disable_irq(to_i2c_client(ctx->dev)->irq);
+>> -	sii8620_hw_off(ctx);
+>> +	if (ctx->extcon) {
+>> +		extcon_unregister_notifier(ctx->extcon, EXTCON_DISP_MHL,
+>> +					   &ctx->extcon_nb);
+> Don't need to unregister the notifier if using devm_extcon_register_notifier().
+>
+>> +		flush_work(&ctx->extcon_wq);
+>> +		if (ctx->cable_state > 0)
+>> +			sii8620_cable_out(ctx);
+>> +	} else {
+>> +		sii8620_cable_out(ctx);
+>> +	}
+>>  	drm_bridge_remove(&ctx->bridge);
+>>  
+>>  	return 0;
+>>
+> If you use the resource managed function (devm_extcon_register_notifier), Looks good to me.
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>
