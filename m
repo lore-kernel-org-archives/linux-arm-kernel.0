@@ -1,102 +1,126 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Feb 2018 08:07:35 +0100
-Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <CAGRGNgU8-uJuns7mAzS-gc81qvVAkS9JS2Tm13p2Qp7dMDCNkg@mail.gmail.com>
-References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <2676311.2IEVhXnSIE@jernej-laptop>
- <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
- <2342395.9m6rrqTry7@jernej-laptop>
- <CAGRGNgU8-uJuns7mAzS-gc81qvVAkS9JS2Tm13p2Qp7dMDCNkg@mail.gmail.com>
-Message-ID: <20180227070735.ml3mc4nr4vpge57u@flea>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 27 Feb 2018 08:11:29 +0100
+Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical connector
+In-Reply-To: <20180227071134.28063-1-a.hajda@samsung.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
+Message-ID: <20180227071134.28063-2-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 01:29:27PM +1100, Julian Calaby wrote:
-> Hi Jernej,
-> 
-> On Tue, Feb 27, 2018 at 3:27 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> > Hi,
-> >
-> > Dne ponedeljek, 26. februar 2018 ob 17:21:05 CET je Icenowy Zheng napisal(a):
-> >> ? 2018?2?27? GMT+08:00 ??12:16:44, "Jernej ?krabec"
-> > <jernej.skrabec@siol.net> ??:
-> >> >Hi Julian,
-> >> >
-> >> >Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby
-> >> >
-> >> >napisal(a):
-> >> >> Hi Jernej,
-> >> >>
-> >> >> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
-> >> >
-> >> ><jernej.skrabec@siol.net>
-> >> >
-> >> >wrote:
-> >> >> > Enable HDMI output on all boards which have HDMI connector.
-> >> >> >
-> >> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> >> > ---
-> >> >> >
-> >> >> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
-> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-> >> >> >
-> >> >> >   | 25 ++++++++++++++++++++++
-> >> >> >
-> >> >> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
-> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-> >> >> >
-> >> >> >   | 25 ++++++++++++++++++++++
-> >> >
-> >> >arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> >> >
-> >> >> >         | 25 ++++++++++++++++++++++
-> >> >> >
-> >> >> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
-> >> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> >> >> >
-> >> >> >   | 24 +++++++++++++++++++++
-> >> >
-> >> >arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> >> >
-> >> >> >        | 25 ++++++++++++++++++++++ 8 files changed, 199
-> >> >
-> >> >insertions(+)
-> >> >
-> >> >> As I understand it, the H2+ is just a slightly trimmed down H3. In
-> >> >> terms of HDMI support, the difference is that the H2+ can't output
-> >> >
-> >> >4k.
-> >> >
-> >> >> If this code is compatible with the H2+, could you please add the
-> >> >> necessary bits and pieces to the h2-plus DTSs too?
-> >> >
-> >> >There are only 3 H2+ boards in kernel and none of them has HDMI
-> >> >connector, so
-> >>
-> >> BPi M2 Zero has miniHDMI connector.
-> >
-> > Ah, sorry, I missed that one. Since I don't have it (or any other board with
-> > H2+) I'm not really comfortable including such patch. If anyone will test it,
-> > I can include it in next revision.
-> 
-> I have one of those (this is why I'm interested in this patchset) so
-> I'm willing to test, however I can't guarantee I'll get to it quickly.
+These bindings allow to describe most known standard USB connectors
+and it should be possible to extend it if necessary.
+USB connectors, beside USB can be used to route other protocols,
+for example UART, Audio, MHL. In such case every device passing data
+through the connector should have appropriate graph bindings.
 
-Then I guess the best way forward will be to keep the current patch as
-is, and you'll send a patch whenever you have the time to test it.
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+v4:
+- improved 'type' description (Rob),
+- improved description of 2nd example (Rob).
+v3:
+- removed MHL port (samsung connector will have separate bindings),
+- added 2nd example for USB-C,
+- improved formatting.
+v2:
+- moved connector type(A,B,C) to compatible string (Rob),
+- renamed size property to type (Rob),
+- changed type description to be less confusing (Laurent),
+- removed vendor specific compatibles (implied by graph port number),
+- added requirement of connector being a child of IC (Rob),
+- removed max-mode (subtly suggested by Rob, it should be detected anyway
+  by USB Controller in runtime, downside is that device is not able to
+  report its real capabilities, maybe better would be to make it optional(?)),
+- assigned port numbers to data buses (Rob).
 
-Thanks!
-Maxime
+Regards
+Andrzej
+---
+ .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
 
+diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+new file mode 100644
+index 000000000000..e1463f14af38
+--- /dev/null
++++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+@@ -0,0 +1,75 @@
++USB Connector
++=============
++
++USB connector node represents physical USB connector. It should be
++a child of USB interface controller.
++
++Required properties:
++- compatible: describes type of the connector, must be one of:
++    "usb-a-connector",
++    "usb-b-connector",
++    "usb-c-connector".
++
++Optional properties:
++- label: symbolic name for the connector,
++- type: size of the connector, should be specified in case of USB-A, USB-B
++  non-fullsize connectors: "mini", "micro".
++
++Required nodes:
++- any data bus to the connector should be modeled using the OF graph bindings
++  specified in bindings/graph.txt, unless the bus is between parent node and
++  the connector. Since single connector can have multpile data buses every bus
++  has assigned OF graph port number as follows:
++    0: High Speed (HS), present in all connectors,
++    1: Super Speed (SS), present in SS capable connectors,
++    2: Sideband use (SBU), present in USB-C.
++
++Examples
++--------
++
++1. Micro-USB connector with HS lines routed via controller (MUIC):
++
++muic-max77843 at 66 {
++	...
++	usb_con: connector {
++		compatible = "usb-b-connector";
++		label = "micro-USB";
++		type = "micro";
++	};
++};
++
++2. USB-C connector attached to CC controller (s2mm005), HS lines routed
++to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
++DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
++
++ccic: s2mm005 at 33 {
++	...
++	usb_con: connector {
++		compatible = "usb-c-connector";
++		label = "USB-C";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				usb_con_hs: endpoint {
++					remote-endpoint = <&max77865_usbc_hs>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				usb_con_ss: endpoint {
++					remote-endpoint = <&usbdrd_phy_ss>;
++				};
++			};
++			port at 2 {
++				reg = <2>;
++				usb_con_sbu: endpoint {
++					remote-endpoint = <&dp_aux>;
++				};
++			};
++		};
++	};
++};
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/8ac0c881/attachment.sig>
+2.16.2
