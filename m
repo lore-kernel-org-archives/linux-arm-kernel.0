@@ -1,50 +1,47 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 27 Feb 2018 08:04:15 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20180212152618.GC13962@amd>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
-Message-ID: <20180227070415.GB18666@localhost>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 27 Feb 2018 08:06:18 +0100
+Subject: [PATCH v4 4/6] arm64: dts: exynos: add OF graph between MHL and
+ USB connector
+In-Reply-To: <CAJKOXPczu67vPQEzQZvFRZGVNBpk0U6GJhSnb4dYWSgTY+Unog@mail.gmail.com>
+References: <CGME20180221085607eucas1p1a08c82fac832049d79705b4222422fa9@eucas1p1.samsung.com>
+ <20180221085541.14556-1-a.hajda@samsung.com>
+ <20180221085541.14556-5-a.hajda@samsung.com>
+ <CAJKOXPczu67vPQEzQZvFRZGVNBpk0U6GJhSnb4dYWSgTY+Unog@mail.gmail.com>
+Message-ID: <513ee866-a44e-5969-4584-0385029e0356@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > > Let's restart this discussion and focus on the main roadblock (others
-> > > are minor details which can be sorted out later).
-> > > 
-> > > If it feels like a hack, the key issue seems to me to be the choice of
-> > > the API to present the GPS data to user space. Right?
-> > 
-> > Or even more fundamentally, does this belong in the kernel at all?
-> 
-> Yes, it does.
+On 26.02.2018 16:21, Krzysztof Kozlowski wrote:
+> On Wed, Feb 21, 2018 at 9:55 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>> OF graph describes MHL data lanes between MHL and respective USB
+>> connector.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> ---
+>> v4:
+>> - added missing reg property in connector's port node (Krzysztof)
+>> ---
+>>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 32 ++++++++++++++++++++--
+>>  1 file changed, 29 insertions(+), 3 deletions(-)
+> You have a duplicated '};' so kbuild complains so I assume there will
+> be next iteration of this. Beside that I am okay with both, so I will
+> take next version when your bindings and driver changes get
+> acked/accepted.
 
-But not necessarily in its current form.
+Yes, test robot already reported it, thanks for looking at it.
+I have postponed next iteration in case anything new is spotted, but
+since it is calm I will send it in few minutes.
 
-> > Now, if we'd ever have a proper GPS framework that handled everything in
-> > kernel space (i.e. no more gpsd) then we would be able to write kernel
-> > drivers that also take care of PM. But perhaps that's unlikely to ever
-> > be realised given the state of things (proprietary protocols, numerous
-> > quirky implementations, etc).
-> 
-> That is what needs to happen.
-> 
-> > The kernel is probably not the place to be working around issues like
-> > that, even if serdev at least allows for such hacks to be fairly
-> > isolated in drivers (unlike some of the earlier proposals touching core
-> > code).
-> 
-> Oh, kernel is indeed right place to provide hardware abstraction --
-> and that includes bug workarounds.
+Regards
+Andrzej
 
-Right, at least when such hacks can be confined to a driver and not be
-spread all over the place.
-
-Johan
+>
+> Best Regards,
+> Krzysztof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
