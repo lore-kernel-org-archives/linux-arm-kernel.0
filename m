@@ -1,51 +1,40 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 27 Feb 2018 17:59:20 +0200
-Subject: [PATCH v3 0/2] add support for Socionext SynQuacer I2C controller
-In-Reply-To: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
-References: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAHp75Vc_AUD2b5m-6CzKhAWJDudyObGs_oUUiFRk_BQv2QT7Xg@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 27 Feb 2018 17:00:53 +0100
+Subject: [PATCH] ARM: dts: stm32: enable RTC on stm32f769-disco
+In-Reply-To: <1518788832-21714-1-git-send-email-amelie.delaunay@st.com>
+References: <1518788832-21714-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <b4e88f63-f48b-8333-ca79-0d6f1617a449@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 1:01 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Add a binding and a driver for the I2C IP found in the Socionext SynQuacer
-> SoC, which is essentially a rebranded version of the Fujitsu F_I2C controller.
->
+Hi Am?lie
 
-Thanks for an update!
-FWIW,
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+On 02/16/2018 02:47 PM, Amelie Delaunay wrote:
+> This patch enables RTC on stm32f769-disco.
+> 
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>   arch/arm/boot/dts/stm32f769-disco.dts | 4 ++++
+>   1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
+> index 4463ca1..48cb47f 100644
+> --- a/arch/arm/boot/dts/stm32f769-disco.dts
+> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
+> @@ -73,6 +73,10 @@
+>   	clock-frequency = <25000000>;
+>   };
+>   
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+>   &usart1 {
+>   	pinctrl-0 = <&usart1_pins_a>;
+>   	pinctrl-names = "default";
+> 
 
-P.S. clk_prepare_enable() may fail in ->probe() as well.
+Applied on stm32-next.
 
-> v3:
-> - incorporate more of Andy's review comments (#2), especially regarding the
->   bus speed and clock source handling for ACPI
-> - patch #1 unchanged.
->
-> v2:
-> - incorporate Andy's review comments (#2)
-> - patch #1 unchanged.
->
-> Ard Biesheuvel (2):
->   dt-bindings: i2c: add binding for Socionext SynQuacer I2C
->   i2c: add support for Socionext SynQuacer I2C controller
->
->  Documentation/devicetree/bindings/i2c/i2c-synquacer.txt |  29 +
->  drivers/i2c/busses/Kconfig                              |  10 +
->  drivers/i2c/busses/Makefile                             |   1 +
->  drivers/i2c/busses/i2c-synquacer.c                      | 787 ++++++++++++++++++++
->  4 files changed, 827 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
->  create mode 100644 drivers/i2c/busses/i2c-synquacer.c
->
-> --
-> 2.11.0
->
-
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks.
+Alex
