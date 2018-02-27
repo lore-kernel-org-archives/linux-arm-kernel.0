@@ -1,48 +1,58 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 27 Feb 2018 23:26:53 +0100
-Subject: [PATCH v2 08/16] drm/sun4i: Add support for H3 mixer 0
+Date: Tue, 27 Feb 2018 23:26:50 +0100
+Subject: [PATCH v2 05/16] dt-bindings: display: sun4i-drm: Add compatibles for
+ H3 HDMI pipeline
 In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
 References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <20180227222701.9716-9-jernej.skrabec@siol.net>
+Message-ID: <20180227222701.9716-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mixer supports 1 VI plane, 3 UI plane and HW scaling on all planes.
+Add missing compatibles for H3 HDMI pipeline. These compatibles can also
+be used with H5 SoC.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 9b0256d31a61..126899d6f0d3 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -492,6 +492,14 @@ static const struct sun8i_mixer_cfg sun8i_a83t_mixer1_cfg = {
- 	.vi_num		= 1,
- };
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index b995bfee734a..8bdef4920edc 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -102,6 +102,7 @@ DWC HDMI PHY
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-hdmi-phy
++    * allwinner,sun8i-h3-hdmi-phy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the HDMI PHY
+     * bus: the HDMI PHY interface clock
+@@ -110,6 +111,9 @@ Required properties:
+   - resets: phandle to the reset controller driving the PHY
+   - reset-names: must be "phy"
  
-+static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
-+	.ccsc		= 0,
-+	.mod_rate	= 432000000,
-+	.scaler_mask	= 0xf,
-+	.ui_num		= 3,
-+	.vi_num		= 1,
-+};
++H3 HDMI PHY requires additional clock:
++  - pll-0: parent of phy clock
 +
- static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
-@@ -509,6 +517,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
- 		.compatible = "allwinner,sun8i-a83t-de2-mixer-1",
- 		.data = &sun8i_a83t_mixer1_cfg,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
-+		.data = &sun8i_h3_mixer0_cfg,
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
- 		.data = &sun8i_v3s_mixer_cfg,
+ TV Encoder
+ ----------
+ 
+@@ -275,6 +279,7 @@ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-de2-mixer-0
+     * allwinner,sun8i-a83t-de2-mixer-1
++    * allwinner,sun8i-h3-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -305,6 +310,7 @@ Required properties:
+     * allwinner,sun7i-a20-display-engine
+     * allwinner,sun8i-a33-display-engine
+     * allwinner,sun8i-a83t-display-engine
++    * allwinner,sun8i-h3-display-engine
+     * allwinner,sun8i-v3s-display-engine
+ 
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 2.16.2
