@@ -1,11 +1,11 @@
 From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Tue, 27 Feb 2018 10:17:13 -0500
+Date: Tue, 27 Feb 2018 10:18:38 -0500
 Subject: [Patch v8 12/12] Documention: v4l: Documentation for HEVC CIDs
 In-Reply-To: <1517574348-22111-13-git-send-email-smitha.t@samsung.com>
 References: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
  <CGME20180202125020epcas2p2052bfe072a33069cffd3d9bfe7856ae5@epcas2p2.samsung.com>
  <1517574348-22111-13-git-send-email-smitha.t@samsung.com>
-Message-ID: <1519744633.1116.10.camel@ndufresne.ca>
+Message-ID: <1519744718.1116.11.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -175,11 +175,11 @@ Le vendredi 02 f?vrier 2018 ? 17:55 +0530, Smitha T Murthy a ?crit :
 > +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE``
 > +      - Main still picture profile.
 > +    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN10``
+
+Just a nit pick, but we have in AVC HIGH_10, to be consistent should be
+name this one MAIN_10 ?
+
 > +      - Main 10 profile.
-
-This is the profiles from v1, shouldn't we add the other (20+)
-extensions that came in v2, v3 and v4 ?
-
 > +
 > +.. raw:: latex
 > +
@@ -505,4 +505,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 195 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/991109b7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/0c5545f0/attachment.sig>
