@@ -1,79 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 27 Feb 2018 13:28:31 +0000
-Subject: [PATCH v2 1/4] iommu/arm-smmu-v3: Clean up address masking
-In-Reply-To: <20180226180455.GB26147@arm.com>
-References: <cover.1512038236.git.robin.murphy@arm.com>
- <24f90689e35a90a337601943a48902a7ab6a7c4d.1512038236.git.robin.murphy@arm.com>
- <20180226180455.GB26147@arm.com>
-Message-ID: <0734679d-d94a-92e7-8cea-dcf0c07b0620@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 27 Feb 2018 14:35:27 +0100
+Subject: [PATCH v5 13/40] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
+In-Reply-To: <20180227113429.637-14-cdall@kernel.org>
+References: <20180227113429.637-1-cdall@kernel.org>
+ <20180227113429.637-14-cdall@kernel.org>
+Message-ID: <20180227133527.efdcaqtpdjpz7gul@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 26/02/18 18:04, Will Deacon wrote:
-> Hi Robin,
+On Tue, Feb 27, 2018 at 12:34:02PM +0100, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> On Thu, Dec 14, 2017 at 04:58:50PM +0000, Robin Murphy wrote:
->> Before trying to add the SMMUv3.1 support for 52-bit addresses, make
->> things bearable by cleaning up the various address mask definitions to
->> use GENMASK_ULL() consistently. The fact that doing so reveals (and
->> fixes) a latent off-by-one in Q_BASE_ADDR_MASK only goes to show what a
->> jolly good idea it is...
->>
->> Tested-by: Nate Watterson <nwatters@codeaurora.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: Clean up one more now-unnecessary linewrap
->>
->>   drivers/iommu/arm-smmu-v3.c | 53 ++++++++++++++++++---------------------------
->>   1 file changed, 21 insertions(+), 32 deletions(-)
+> So far this is mostly (see below) a copy of the legacy non-VHE switch
+> function, but we will start reworking these functions in separate
+> directions to work on VHE and non-VHE in the most optimal way in later
+> patches.
 > 
-> Whilst I agree that using GENMASK is better, this patch does mean that the
-> driver is (more) inconsistent with its _MASK terminology in that you can't
-> generally tell whether a definition that ends in _MASK is shifted or not,
-> and this isn't even consistent for fields within the same register.
+> The only difference after this patch between the VHE and non-VHE run
+> functions is that we omit the branch-predictor variant-2 hardening for
+> QC Falkor CPUs, because this workaround is specific to a series of
+> non-VHE ARMv8.0 CPUs.
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> Notes:
+>     Changes since v4:
+>      - Unified has_vhe() conditional calls in kvm_arch_vcpu_ioctl_run
+>      - Added isb() on exit path of VHE-specific kvm_vcpu_run(), because
+>        otherwise 32-bit guests can crash the system on reentry to the
+>        guest, because writes to FPEXC32_EL2 will cause a trap at EL2
+>        which leads to a hyp panic.  This can be observed on the model
+>        where writing FPEN to CPACR_EL1 on guest exit doesn't take effect
+>        prior to entering the guest again.
+>     
+>     Changes since v3:
+>      - Added BUG() to 32-bit ARM VHE run function
+>      - Omitted QC Falkor BP Hardening functionality from VHE-specific
+>        function
+>     
+>     Changes since v2:
+>      - Reworded commit message
+>     
+>     Changes since v1:
+>      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
+>        __kvm_vcpu_run_nvhe
+>      - Removed stray whitespace line
+> 
+>  arch/arm/include/asm/kvm_asm.h    |  5 ++-
+>  arch/arm/kvm/hyp/switch.c         |  2 +-
+>  arch/arm64/include/asm/kvm_asm.h  |  4 ++-
+>  arch/arm64/include/asm/kvm_host.h |  7 +++++
+>  arch/arm64/kvm/hyp/switch.c       | 66 ++++++++++++++++++++++++++++++++++++++-
+>  virt/kvm/arm/arm.c                | 12 ++++---
+>  6 files changed, 87 insertions(+), 9 deletions(-)
+>
 
-The apparently slightly-less-than-obvious internal consistency is that 
-every mask used for an *address field* is now in-place, while other 
-types of field are still handled as inconsistently as they were before. 
-It should also be the case that every x_MASK without a corresponding 
-x_SHIFT defined next to it is unshifted.
-
-Either way it's certainly no *worse* than the current situation where 
-address masks sometimes have a nonzero shift, sometimes have zero bits 
-at the bottom and a shift of 0, and sometimes have no shift defined at all.
-
-Thinking about it some more, the address masks should only ever be 
-needed when *extracting* an address from a register/structure word, or 
-validating them in the context of an address *before* inserting into a 
-field - if we can't trust input to be correct then just silently masking 
-off bits probably isn't the best idea either way - so IMHO there is 
-plenty of contextual disambiguation too.
-
-> Should we be using GENMASK/BIT for all fields instead and removing all of
-> the _SHIFT definitions?
-
-I'm all aboard using BIT() consistently for single-bit boolean fields, 
-but for multi-bit fields in general we do have to keep an explicit shift 
-defined *somewhere* in order to make sensible use of the value, i.e. either:
-
-	val = (reg >> 22) & 0x1f;
-	reg = (val & 0x1f) << 22;
-
-or:
-	val = (reg & 0x07c00000) >> 22;
-	reg = (val << 22) & 0x07c00000;
-
-[ but ideally not this mess we currently have in some places:
-
-	val = (reg & 0x1f << 22) >> 22;
-]
-
-Again, I'd gladly clean everything up to at least be self-consistent 
-(and line up more with how we did things in SMMUv2) if you think it's 
-worthwhile. Although I guess that means I'd get the job of fixing up 
-future stable backport conflicts too ;)
-
-Robin.
+Reviewed-by: Andrew Jones <drjones@redhat.com>
