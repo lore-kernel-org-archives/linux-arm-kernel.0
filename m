@@ -1,43 +1,79 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 27 Feb 2018 14:25:34 +0100
-Subject: [PATCH v3 00/14] Add MMCI support for STM32F SoCs family
-In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <c4f78733-2544-6cef-97e5-fedcc23de404@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Feb 2018 13:28:31 +0000
+Subject: [PATCH v2 1/4] iommu/arm-smmu-v3: Clean up address masking
+In-Reply-To: <20180226180455.GB26147@arm.com>
+References: <cover.1512038236.git.robin.murphy@arm.com>
+ <24f90689e35a90a337601943a48902a7ab6a7c4d.1512038236.git.robin.murphy@arm.com>
+ <20180226180455.GB26147@arm.com>
+Message-ID: <0734679d-d94a-92e7-8cea-dcf0c07b0620@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
+Hi Will,
 
-On 01/18/2018 03:34 PM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
+On 26/02/18 18:04, Will Deacon wrote:
+> Hi Robin,
 > 
-> This series reworks patches submitted one year ago by Andrea Merello [1]
-> but without succeed to merged it.
+> On Thu, Dec 14, 2017 at 04:58:50PM +0000, Robin Murphy wrote:
+>> Before trying to add the SMMUv3.1 support for 52-bit addresses, make
+>> things bearable by cleaning up the various address mask definitions to
+>> use GENMASK_ULL() consistently. The fact that doing so reveals (and
+>> fixes) a latent off-by-one in Q_BASE_ADDR_MASK only goes to show what a
+>> jolly good idea it is...
+>>
+>> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v2: Clean up one more now-unnecessary linewrap
+>>
+>>   drivers/iommu/arm-smmu-v3.c | 53 ++++++++++++++++++---------------------------
+>>   1 file changed, 21 insertions(+), 32 deletions(-)
 > 
-> STM32F4 and STM32F7 SoCs families embeds a variant of the ARM PrimeCell
-> PL18x SD host controller, for which the mmci driver exists.
-> This series adds support for these SoCs to the mmci driver.
-> 
-> As other variants, this one need some specific quirks, that this
-> series address.
-> 
-> This series has been tested on following boards :
-> 	_ stm32f429-eval
-> 	_ stm32f469-disco
-> 	_ stm32f746-eval
-> 	_ stm32f769-disco
-> 
-> DT update for stm32f7 pinctrl, stm32f746-eval and stm32f769-disco boards
-> will be sent later to avoid conflict with pending stm32f7 series [1] which
-> is not yet merged on kernel mainline.
-> 
-> [1] https://www.spinics.net/lists/linux-mmc/msg41616.html
-> [2] https://patchwork.kernel.org/patch/10104447/
->
-...
+> Whilst I agree that using GENMASK is better, this patch does mean that the
+> driver is (more) inconsistent with its _MASK terminology in that you can't
+> generally tell whether a definition that ends in _MASK is shifted or not,
+> and this isn't even consistent for fields within the same register.
 
-Patches 6 to 13 (DT/SoC/configs) applied on stm32-next.
+The apparently slightly-less-than-obvious internal consistency is that 
+every mask used for an *address field* is now in-place, while other 
+types of field are still handled as inconsistently as they were before. 
+It should also be the case that every x_MASK without a corresponding 
+x_SHIFT defined next to it is unshifted.
 
-Thanks
-Alex
+Either way it's certainly no *worse* than the current situation where 
+address masks sometimes have a nonzero shift, sometimes have zero bits 
+at the bottom and a shift of 0, and sometimes have no shift defined at all.
+
+Thinking about it some more, the address masks should only ever be 
+needed when *extracting* an address from a register/structure word, or 
+validating them in the context of an address *before* inserting into a 
+field - if we can't trust input to be correct then just silently masking 
+off bits probably isn't the best idea either way - so IMHO there is 
+plenty of contextual disambiguation too.
+
+> Should we be using GENMASK/BIT for all fields instead and removing all of
+> the _SHIFT definitions?
+
+I'm all aboard using BIT() consistently for single-bit boolean fields, 
+but for multi-bit fields in general we do have to keep an explicit shift 
+defined *somewhere* in order to make sensible use of the value, i.e. either:
+
+	val = (reg >> 22) & 0x1f;
+	reg = (val & 0x1f) << 22;
+
+or:
+	val = (reg & 0x07c00000) >> 22;
+	reg = (val << 22) & 0x07c00000;
+
+[ but ideally not this mess we currently have in some places:
+
+	val = (reg & 0x1f << 22) >> 22;
+]
+
+Again, I'd gladly clean everything up to at least be self-consistent 
+(and line up more with how we did things in SMMUv2) if you think it's 
+worthwhile. Although I guess that means I'd get the job of fixing up 
+future stable backport conflicts too ;)
+
+Robin.
