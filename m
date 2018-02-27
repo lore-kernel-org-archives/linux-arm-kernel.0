@@ -1,67 +1,57 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 27 Feb 2018 08:32:50 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20180227070415.GB18666@localhost>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
- <20180227070415.GB18666@localhost>
-Message-ID: <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 27 Feb 2018 08:44:55 +0100
+Subject: [PATCH] i2c-stm32f4: remove redundant initialization of pointer
+ reg
+In-Reply-To: <20180226200639.tfll2y4efepm2sos@ninjato>
+References: <20180116174404.19464-1-colin.king@canonical.com>
+ <20180226200639.tfll2y4efepm2sos@ninjato>
+Message-ID: <25b0397b-5df3-2f5c-a18f-238db83205da@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johan,
+Hi,
 
-> Am 27.02.2018 um 08:04 schrieb Johan Hovold <johan@kernel.org>:
+On 02/26/2018 09:06 PM, Wolfram Sang wrote:
+> On Tue, Jan 16, 2018 at 05:44:04PM +0000, Colin King wrote:
+>> From: Colin Ian King <colin.king@canonical.com>
+>>
+>> The pointer reg is assigned a value that is never read, it is later
+>> overwritten with a new value, hence the redundant initialization can
+>> be removed.
+>>
+>> Cleans up clang warning:
+>> drivers/i2c/busses/i2c-stm32f4.c:352:16: warning: Value stored to 'reg'
+>> during its initialization is never read
+>>
+>> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 > 
-> On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
->> Hi!
->> 
->>>> Let's restart this discussion and focus on the main roadblock (others
->>>> are minor details which can be sorted out later).
->>>> 
->>>> If it feels like a hack, the key issue seems to me to be the choice of
->>>> the API to present the GPS data to user space. Right?
->>> 
->>> Or even more fundamentally, does this belong in the kernel at all?
->> 
->> Yes, it does.
+> Maxime? Alexandre? Are you OK with this patch?
 
-Thanks, Pavel for supporting our view.
+Sorry for delay.
+
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+regards
+alex
 
 > 
-> But not necessarily in its current form.
-
-Is this a "yes after some code fixes"?
-
-Pavel mentioned an example where such an evolutionary approach was taken.
-
-> 
->>> Now, if we'd ever have a proper GPS framework that handled everything in
->>> kernel space (i.e. no more gpsd) then we would be able to write kernel
->>> drivers that also take care of PM. But perhaps that's unlikely to ever
->>> be realised given the state of things (proprietary protocols, numerous
->>> quirky implementations, etc).
->> 
->> That is what needs to happen.
->> 
->>> The kernel is probably not the place to be working around issues like
->>> that, even if serdev at least allows for such hacks to be fairly
->>> isolated in drivers (unlike some of the earlier proposals touching core
->>> code).
->> 
->> Oh, kernel is indeed right place to provide hardware abstraction --
->> and that includes bug workarounds.
-> 
-> Right, at least when such hacks can be confined to a driver and not be
-> spread all over the place.
-
-It seems that you forgot that the driver we propose is not spread all over
-the place. It *is* confined to a single driver thanks to the serdev api.
-
-BR and thanks,
-Nikolaus
+>> ---
+>>   drivers/i2c/busses/i2c-stm32f4.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+>> index 47c8d00de53f..ba600d77a3f8 100644
+>> --- a/drivers/i2c/busses/i2c-stm32f4.c
+>> +++ b/drivers/i2c/busses/i2c-stm32f4.c
+>> @@ -349,7 +349,7 @@ static void stm32f4_i2c_read_msg(struct stm32f4_i2c_dev *i2c_dev)
+>>   static void stm32f4_i2c_terminate_xfer(struct stm32f4_i2c_dev *i2c_dev)
+>>   {
+>>   	struct stm32f4_i2c_msg *msg = &i2c_dev->msg;
+>> -	void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
+>> +	void __iomem *reg;
+>>   
+>>   	stm32f4_i2c_disable_irq(i2c_dev);
+>>   
+>> -- 
+>> 2.15.1
+>>
