@@ -1,108 +1,122 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 27 Feb 2018 15:38:12 +0000
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <8e1d3b30-3543-56fd-7be6-7fe6edcb40d9@microchip.com>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180222123308.mypx2r7n6o63mj5z@oak.lan>
- <87po4s2hve.fsf@intel.com>
- <3a70b89c-b470-3723-760c-5294d0a75230@microchip.com>
- <20180227105444.lo4pee7vh4we3foq@oak.lan>
- <8e1d3b30-3543-56fd-7be6-7fe6edcb40d9@microchip.com>
-Message-ID: <20180227153812.txt2vsdygfnobo33@oak.lan>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 27 Feb 2018 07:46:15 -0800
+Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
+In-Reply-To: <20180227072011.GG6019@linaro.org>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-3-takahiro.akashi@linaro.org>
+ <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
+ <20180227072011.GG6019@linaro.org>
+Message-ID: <CAGXu5jKbGw++rsn5PbxcVE2Z62tbOxtgCvMYK7RLxWhXG2Yj+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 01:40:58PM +0200, Claudiu Beznea wrote:
-> On 27.02.2018 12:54, Daniel Thompson wrote:
-> > On Mon, Feb 26, 2018 at 04:24:15PM +0200, Claudiu Beznea wrote:
-> >> On 26.02.2018 11:57, Jani Nikula wrote:
-> >>> On Thu, 22 Feb 2018, Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> >>>> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
-> >>>>> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
-> >>>>> were adapted to this change.
-> >>>>>
-> >>>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> >>>>> ---
-> >>>>>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
-> >>>>>  drivers/bus/ts-nbus.c                |  2 +-
-> >>>>>  drivers/clk/clk-pwm.c                |  3 ++-
-> >>>>>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
-> >>>>>  drivers/hwmon/pwm-fan.c              |  2 +-
-> >>>>>  drivers/input/misc/max77693-haptic.c |  2 +-
-> >>>>>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
-> >>>>>  drivers/leds/leds-pwm.c              |  5 ++++-
-> >>>>>  drivers/media/rc/ir-rx51.c           |  5 ++++-
-> >>>>>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
-> >>>>>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
-> >>>>>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
-> >>>>>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
-> >>>>>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
-> >>>>>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
-> >>>>>  include/linux/pwm.h                  |  6 ++++--
-> >>>>>  16 files changed, 70 insertions(+), 21 deletions(-)
-> >>>>>
-> >>>>> diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
-> >>>>> index 2030a6b77a09..696fa25dafd2 100644
-> >>>>> --- a/drivers/video/backlight/lm3630a_bl.c
-> >>>>> +++ b/drivers/video/backlight/lm3630a_bl.c
-> >>>>> @@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
-> >>>>>  {
-> >>>>>  	unsigned int period = pchip->pdata->pwm_period;
-> >>>>>  	unsigned int duty = br * period / br_max;
-> >>>>> +	struct pwm_caps caps = { };
-> >>>>>  
-> >>>>> -	pwm_config(pchip->pwmd, duty, period);
-> >>>>> +	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
-> >>>>> +	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
-> >>>>
-> >>>> Well... I admit I've only really looked at the patches that impact 
-> >>>> backlight but dispersing this really odd looking bit twiddling 
-> >>>> throughout the kernel doesn't strike me a great API design.
-> >>>>
-> >>>> IMHO callers should not be required to find the first set bit in
-> >>>> some specially crafted set of capability bits simply to get sane 
-> >>>> default behaviour.
-> >>>
-> >>> Agreed. IMHO the regular use case becomes rather tedious, ugly, and
-> >>> error prone.
-> >>
-> >> Using simply PWM_MODE(NORMAL) instead of BIT(ffs(caps.modes) - 1) would be OK
-> >> from your side?
-> >>
-> >> Or, what about using a function like pwm_mode_first() to get the first supported
-> >> mode by PWM channel?
-> >>
-> >> Or, would you prefer to solve this inside pwm_config() function, let's say, in
-> >> case an invalid mode is passed as argument, to let pwm_config() to choose the
-> >> first available PWM mode for PWM channel passed as argument?
-> > 
-> > What is it that actually needs solving?
-> > 
-> > If a driver requests normal mode and the PWM driver cannot support it
-> > why not just return an error an move on.
-> Because, simply, I wasn't aware of what these PWM client drivers needs for.
+On Mon, Feb 26, 2018 at 11:20 PM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Hi Kees,
+>
+> On Mon, Feb 26, 2018 at 07:57:10PM -0800, Kees Cook wrote:
+>> On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>> > Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
+>> > initialized by irq chip (gic), is called from exception entry.
+>> > This patch fixes this problem.
+>>
+>> As in, this symbol is not known a lkdtm setup time? Hm, seems like
+>> we'd want a more generalized approach here.
+>
+> Hmm. See my comments below.
+>
+>> >
+>> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> > ---
+>> >  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
+>> >  1 file changed, 18 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+>> > index ba92291508dc..e20343543053 100644
+>> > --- a/drivers/misc/lkdtm_core.c
+>> > +++ b/drivers/misc/lkdtm_core.c
+>> > @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
+>> >         if (lkdtm_kprobe != NULL)
+>> >                 unregister_kprobe(lkdtm_kprobe);
+>> >
+>> > +       if (IS_ENABLED(CONFIG_ARM64) &&
+>> > +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
+>> > +               extern void (*handle_arch_irq)(struct pt_regs *regs);
+>>
+>> I don't like this extern -- can handle_arch_irq be properly exported somewhere?
+>
+> Define a weak function, get_handle_irq(), in linux/irq.h and
+> a real one in arch code. Then
+>
+>         if (!kallsyms_lookup_name(crashpoint->symbol_name)) {
+>                 if (!strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
+>                         func = get_handle_irq();
+>                         if (func) {
+>                                 crashpoint->kprobe.addr = func;
+>                                 crashpoint->kprobe.symbol_name = NULL;
+>                         } else {
+>                                 /* error */
+>                         }
+>                 } /* anything else? */
+>         }
+>
+> Do you like this code better?
 
-I'm afraid you have confused me here.
+Yeah, this is more generalized; thanks! If we end up with other
+late-defined functions we can further generalize this, but this is
+fine for our one case. :)
 
-Didn't you just *add* the whole concept of PWM caps with your patches?
-How could any existing call site expect anything except normal mode.
-Until now there has been no possiblity to request anything else.
+>
+>>
+>> > +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
+>>
+>> I don't think the * is needed here: it's already a function pointer.
+>
+> Will check.
+>
+>> > +               /*
+>> > +                * Instantiating kprobe.symbol_name here, say
+>> > +                * with lookup_symbol_name(*handle_arch_irq),
+>> > +                * would cause register_kprobe() to fail.
+>> > +                */
+>> > +               crashpoint->kprobe.symbol_name = NULL;
+>>
+>> Is kprobe.addr sufficient for register_kprobe?
+>
+> Yes as Masami explained.
+> Leaving symbol_name ends up failure of register_kprobe().
+>
+>> > +       }
+>> >         lkdtm_crashpoint = crashpoint;
+>> >         lkdtm_crashtype = crashtype;
+>> >         lkdtm_kprobe = &crashpoint->kprobe;
+>> >         ret = register_kprobe(lkdtm_kprobe);
+>> >         if (ret < 0) {
+>> > -               pr_info("Couldn't register kprobe %s\n",
+>> > -                       crashpoint->kprobe.symbol_name);
+>> > +               if (IS_ENABLED(CONFIG_ARM64))
+>> > +                       pr_info("Couldn't register kprobe 0x%lx\n",
+>> > +                               (unsigned long)crashpoint->kprobe.addr);
+>> > +               else
+>> > +                       pr_info("Couldn't register kprobe %s\n",
+>> > +                               crashpoint->kprobe.symbol_name);
+>> >                 lkdtm_kprobe = NULL;
+>> >                 lkdtm_crashpoint = NULL;
+>> >                 lkdtm_crashtype = NULL;
+>>
+>> So I can replicate, how did you test this?
+>
+> All what I did in my arm64 test is
+> # echo PANIC > /sys/kernel/debug/provoke-crash/INT_HARDWARE_ENTRY
+>
+> The probe point will hit sooner or later and we will see a panic
+> (and kdump kicks in).
 
+Great, thanks!
 
-> > Put another way, what is the use case for secretly adopting a mode the
-> > caller didn't want? Under what circumstances is this a good thing?
-> No one... But I wasn't aware of what the PWM clients needs for from their PWM
-> controllers. At this moment having BIT(ffs(caps.modes)) instead of
-> PWM_MODE(NORMAL) is mostly the same since all the driver that has not explicitly
-> registered PWM caps will use PWM normal mode.
-> 
-> I will use PWM_MODE(NORMAL) instead of this in all the cases if this is OK from
-> your side.
-> 
-> Thank you,
-> Claudiu Beznea
-> > 
-> > 
-> > Daniel.
-> > 
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
