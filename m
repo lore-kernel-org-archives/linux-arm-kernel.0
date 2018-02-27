@@ -1,58 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Feb 2018 11:11:09 +0100
-Subject: [PATCH] drm: simple_kms_helper: Fix .mode_valid() documentation
-Message-ID: <20180227101109.6088-1-linus.walleij@linaro.org>
+Date: Tue, 27 Feb 2018 11:12:00 +0100
+Subject: [PATCH] bridge: Elaborate a bit on dumb VGA bridges in Kconfig
+Message-ID: <20180227101200.6173-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes up the .mode_valid() vtable entry documentation
-by copyediting the documentation from the .mode_valid()
-documentation in the drm_modeset_helper_vtables.h file.
+It's better if we explain a bit that this pertains to
+passive VGA DAC bridges.
 
-Fixes: 40275dc4edb4 ("drm: simple_kms_helper: Add mode_valid() callback support")
-Suggested-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- include/drm/drm_simple_kms_helper.h | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/bridge/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
-index d9e4c3c3f009..0d700a869cc8 100644
---- a/include/drm/drm_simple_kms_helper.h
-+++ b/include/drm/drm_simple_kms_helper.h
-@@ -24,9 +24,30 @@ struct drm_simple_display_pipe_funcs {
- 	/**
- 	 * @mode_valid:
- 	 *
--	 * This function is called to filter out valid modes from the
--	 * suggestions suggested by the bridge or display. This optional
--	 * hook is passed in when initializing the pipeline.
-+	 * This callback is used to check if a specific mode is valid in the
-+	 * crtc used in this simple display pipe. This should be implemented
-+	 * if the display pipe has some sort of restriction in the modes
-+	 * it can display. For example, a given display pipe may be responsible
-+	 * to set a clock value. If the clock can not produce all the values
-+	 * for the available modes then this callback can be used to restrict
-+	 * the number of modes to only the ones that can be displayed. Another
-+	 * reason can be bandwidth mitigation: the memory port on the display
-+	 * controller can have bandwidth limitations not allowing pixel data
-+	 * to be fetched at any rate.
-+	 *
-+	 * This hook is used by the probe helpers to filter the mode list in
-+	 * drm_helper_probe_single_connector_modes(), and it is used by the
-+	 * atomic helpers to validate modes supplied by userspace in
-+	 * drm_atomic_helper_check_modeset().
-+	 *
-+	 * This function is optional.
-+	 *
-+	 * NOTE:
-+	 *
-+	 * Since this function is both called from the check phase of an atomic
-+	 * commit, and the mode validation in the probe paths it is not allowed
-+	 * to look at anything else but the passed-in mode, and validate it
-+	 * against configuration-invariant hardware constraints.
- 	 *
- 	 * RETURNS:
- 	 *
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 3b99d5a06c16..7cee8f291e7f 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -30,7 +30,8 @@ config DRM_DUMB_VGA_DAC
+ 	depends on OF
+ 	select DRM_KMS_HELPER
+ 	help
+-	  Support for RGB to VGA DAC based bridges
++	  Support for passive RGB to VGA DAC based bridges such
++	  as ADI ADV7123 or TI THS8134 and THS8135.
+ 
+ config DRM_LVDS_ENCODER
+ 	tristate "Transparent parallel to LVDS encoder support"
 -- 
 2.14.3
