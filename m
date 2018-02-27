@@ -1,116 +1,102 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 27 Feb 2018 11:17:12 +0100
-Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
-In-Reply-To: <20180227011033.GV3217@dragon>
-References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
- <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
- <20180224074543.GF3217@dragon>
- <20180226134741.neqkpge33zo3pfzt@earth.universe>
- <20180227011033.GV3217@dragon>
-Message-ID: <20180227101712.3zwobvs4ox4jchcj@earth.universe>
+From: richard.sandiford@arm.com (Richard Sandiford)
+Date: Tue, 27 Feb 2018 10:21:49 +0000
+Subject: [PATCH 1/2] stackleak: Update for arm64
+In-Reply-To: <97090ca6-efad-7c03-6084-a97674ae61c7@linux.com> (Alexander
+ Popov's message of "Thu, 22 Feb 2018 22:22:14 +0300")
+References: <20180221011303.20392-1-labbott@redhat.com>
+ <20180221011303.20392-2-labbott@redhat.com>
+ <20180222165834.GC18421@arm.com>
+ <97090ca6-efad-7c03-6084-a97674ae61c7@linux.com>
+Message-ID: <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Alexander,
 
-On Tue, Feb 27, 2018 at 09:10:34AM +0800, Shawn Guo wrote:
-> On Mon, Feb 26, 2018 at 02:47:41PM +0100, Sebastian Reichel wrote:
-> > On Sat, Feb 24, 2018 at 03:45:44PM +0800, Shawn Guo wrote:
-> > > On Mon, Feb 12, 2018 at 01:39:44PM +0100, Sebastian Reichel wrote:
-> > > > On i.MX53 it is necessary to set the DBG_EN bit in the
-> > > > platform GPC register to enable access to PMU counters
-> > > > other than the cycle counter.
-> > > > 
-> > > > Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> > > > ---
-> > > >  arch/arm/mach-imx/mach-imx53.c | 39 ++++++++++++++++++++++++++++++++++++++-
-> > > >  1 file changed, 38 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> > > > index 07c2e8dca494..658e28604dca 100644
-> > > > --- a/arch/arm/mach-imx/mach-imx53.c
-> > > > +++ b/arch/arm/mach-imx/mach-imx53.c
-> > > > @@ -28,10 +28,47 @@ static void __init imx53_init_early(void)
-> > > >  	mxc_set_cpu_type(MXC_CPU_MX53);
-> > > >  }
-> > > >  
-> > > > +#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
-> > > 
-> > > The base address should be retrieved from device tree.
-> > 
-> > DT has no entry for 0x63fa0000-0x63fa3fff. iMX53 TRM lists it as "ARM Platform"
-> > with 8 platform specific 32 bit registers. Do you think it's worth the trouble
-> > adding a new binding? Do you have a suggestion for a compatible value?
-> 
-> Looking at it more closely, I feel that patching every single platform
-> which needs to set up additional register for secure-reg-access support
-> doesn't really scale.  Can we have pmu driver do it with a phandle in
-> DT pointing to the register and bit that need to be configured?
+Sorry for the slow reply, been caught up in an office move.
 
-The PMU driver used to have a feature for initialising platform
-specific bits, but it is currently being removed to make the PMU
-code more maintainable. My understanding is, that it's very uncommon
-to require platform specific setup to get secure-reg-access working.
-I.e. it is not needed for newer iMX platforms.
+Alexander Popov <alex.popov@linux.com> writes:
+> Hello Will, Richard and GCC folks!
+>
+> On 22.02.2018 19:58, Will Deacon wrote:
+>> On Tue, Feb 20, 2018 at 05:13:02PM -0800, Laura Abbott wrote:
+>>>
+>>> arm64 has another layer of indirection in the RTL.
+>>> Account for this in the plugin.
+>>>
+>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>> ---
+>>>  scripts/gcc-plugins/stackleak_plugin.c | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/scripts/gcc-plugins/stackleak_plugin.c b/scripts/gcc-plugins/stackleak_plugin.c
+>>> index 6fc991c98d8b..7dfaa027423f 100644
+>>> --- a/scripts/gcc-plugins/stackleak_plugin.c
+>>> +++ b/scripts/gcc-plugins/stackleak_plugin.c
+>>> @@ -244,6 +244,11 @@ static unsigned int stackleak_final_execute(void)
+>>>  		 * that insn.
+>>>  		 */
+>>>  		body = PATTERN(insn);
+>>> +		/* arm64 is different */
+>>> +		if (GET_CODE(body) == PARALLEL) {
+>>> +			body = XEXP(body, 0);
+>>> +			body = XEXP(body, 0);
+>>> +		}
+>> 
+>> Like most kernel developers, I don't know the first thing about GCC internals
+>> so I asked our GCC team and Richard (CC'd) reckons this should be:
+>> 
+>> 	if (GET_CODE(body) == PARALLEL)
+>> 		body = XVECEXP(body, 0, 0);
+>> 
+>> instead of the hunk above. Can you give that a go instead, please?
+>
+> Thanks a lot!
+>
+> Would you be so kind to take a look at the whole STACKLEAK plugin?
+> http://www.openwall.com/lists/kernel-hardening/2018/02/16/4
+> https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/commit/?h=kspp/gcc-plugin/stackleak&id=57a0a6763b12e82dd462593d0f42be610e93cdc9
+>
+> It's not very big. I documented it in detail. I would be really grateful for the
+> review!
 
--- Sebastian
+Looks good to me FWIW.  Just a couple of minor things:
 
-> 
-> Shawn
-> 
-> > > > +#define GPC_DBG_EN BIT(16)
-> > > > +
-> > > > +/*
-> > > > + * This enables the DBGEN bit in ARM_GPC register, which is
-> > > > + * required for accessing some performance counter features.
-> > > > + * Technically it is only required while perf is used, but to
-> > > > + * keep the source code simple we just enable it all the time
-> > > > + * when the kernel configuration allows using the feature.
-> > > > + */
-> > > > +static void imx53_pmu_init(void)
-> > > > +{
-> > > > +	void __iomem *gpc_reg;
-> > > > +	struct device_node *node;
-> > > > +	u32 gpc;
-> > > > +
-> > > > +	if (!IS_ENABLED(CONFIG_ARM_PMU))
-> > > > +		return;
-> > > > +
-> > > > +	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a8-pmu");
-> > > > +	if (!node)
-> > > > +		return;
-> > > > +
-> > > > +	if (!of_property_read_bool(node, "secure-reg-access"))
-> > > > +		return;
-> > > > +
-> > > > +	gpc_reg = ioremap(MXC_CORTEXA8_PLAT_GPC, 4);
-> > > > +	if (!gpc_reg) {
-> > > > +		pr_warning("unable to map GPC to enable perf\n");
-> > > > +		return;
-> > > > +	}
-> > > > +
-> > > > +	gpc = readl_relaxed(gpc_reg);
-> > > > +	gpc |= GPC_DBG_EN;
-> > > > +	writel_relaxed(gpc, gpc_reg);
-> > > > +}
-> > > > +
-> > > >  static void __init imx53_dt_init(void)
-> > > >  {
-> > > >  	imx_src_init();
-> > > > -
-> > > > +	imx53_pmu_init();
-> > > >  	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
-> > > >  }
-> > > >  
-> > > > -- 
-> > > > 2.15.1
-> > > > 
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180227/44a8f9a7/attachment.sig>
+> +	/*
+> +	 * 1. Loop through the GIMPLE statements in each of cfun basic blocks.
+> +	 * cfun is a global variable which represents the function that is
+> +	 * currently processed.
+> +	 */
+> +	FOR_EACH_BB_FN(bb, cfun) {
+> +		for (gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi)) {
+> +			gimple stmt;
+> +
+> +			stmt = gsi_stmt(gsi);
+> +
+> +			/* Leaf function is a function which makes no calls */
+> +			if (is_gimple_call(stmt))
+> +				is_leaf = false;
+
+It's probably not going to matter in practice, but it might be worth
+emphasising in the comments that this leafness is only approximate.
+It will sometimes be a false positive, because we could still
+end up creating calls to libgcc functions from non-call statements
+(or for target-specific reasons).  It can also be a false negative,
+since call statements can be to built-in or internal functions that
+end up being open-coded.
+
+> +	/*
+> +	 * The stackleak_final pass should be executed before the "final" pass,
+> +	 * which turns the RTL (Register Transfer Language) into assembly.
+> +	 */
+> +	PASS_INFO(stackleak_final, "final", 1, PASS_POS_INSERT_BEFORE);
+
+This might be too late, since it happens e.g. after addresses have
+been calculated for branch ranges, and after machine-specific passes
+(e.g. bundling on ia64).
+
+The stack size is final after reload, so inserting the pass after that
+might be better.
+
+Thanks,
+Richard
