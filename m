@@ -1,97 +1,225 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 27 Feb 2018 18:10:29 +0530
-Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
-In-Reply-To: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
-References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
-Message-ID: <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 27 Feb 2018 13:54:40 +0100
+Subject: [PATCH 2/2] arm: dts: zynq: Extract common Digilent Zybo board
+ support
+In-Reply-To: <20180226005949.31259-2-nobuhiro.iwamatsu@cybertrust.co.jp>
+References: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
+ <20180226005949.31259-2-nobuhiro.iwamatsu@cybertrust.co.jp>
+Message-ID: <e681d34a-3884-4586-9ac6-ce9852a78a05@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 27, 2018 at 11:35 AM, Jonathan Toppins <jtoppins@redhat.com> wrote:
-> This patch allows a user to configure ACPI to be preferred over
-> device-tree.
->
-> Currently for ACPI to be used a user either has to set acpi=on on the
-> kernel command line or make sure any device tree passed to the kernel
-> is empty. If the dtb passed to the kernel is non-empty then device-tree
-> will be chosen as the boot method of choice even if it is not correct.
-
-Hmm. Not sure if I correctly understand what you mean here by the term
-'incorrect device tree'. Do you mean a corrupted device tree blob (but
-normally we can catch those cases via the device tree header) or a
-deliberate (or a broken) firmware attempt to pass an incorrect device
-tree blob to the OS.
-
-If its the later, I think the onus should be on the firmware (u-boot
-or UEFI or others.. ) to fix the problems. I know we carry a lot of
-fixes in the kernel for x86 firmware quirks but then we have several
-broken x86 machines on which kernel has been running since several
-years now.
-
-IMO, if we have a known firmware quirk (to fix the broken DTB being
-passed from the firmware), we can look at adding it in the early arm64
-kernel code (similar to the quirk handling we do in the x86 early
-kernel code for broken firmware), rather than forcing ACPI as the boot
-method.
-
-> To prevent this situation where a system is only intended to be booted
-> via ACPI a user can set this kernel configuration so it ignores
-> device-tree settings unless ACPI table checks fail.
-
-Or, if decide to depreciate DTB as the boot method for such boards,
-can we look at setting 'acpi=force' in the bootagrs always to make
-sure that ACPI (and no fallback on DTB) is forced as the boot method
-for such arm64 machines.
-
-Regards,
-Bhupesh
-
-> Signed-off-by: Jonathan Toppins <jtoppins@redhat.com>
+On 26.2.2018 01:59, Nobuhiro Iwamatsu wrote:
+> The Digilent Zybo and Zybo Z7 boards are very similar.
+> To avoid duplication, this extract common board parts into own dtsi file.
+> 
+> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu@cybertrust.co.jp>
 > ---
->
->  arch/arm64/Kconfig       | 13 +++++++++++++
->  arch/arm64/kernel/acpi.c |  2 +-
->  2 files changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7381eeb7ef8e..da8d9ab62825 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1170,6 +1170,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
->           protocol even if the corresponding data is present in the ACPI
->           MADT table.
->
-> +config ARM64_PREFER_ACPI
-> +       bool "Prefer usage of ACPI boot tables over device-tree"
-> +       depends on ACPI
-> +       help
-> +         Normally device-tree is preferred over ACPI on arm64 unless
-> +         explicitly preferred via kernel command line, something like: acpi=on
-> +         This configuration changes this default behaviour by pretending
-> +         the user set acpi=on on the command line. This configuration still
-> +         allows the user to turn acpi table parsing off via acpi=off. If
-> +         for some reason the table checks fail the system will still fall
-> +         back to using device-tree unless the user explicitly sets acpi=force
-> +         on the command line.
+>  arch/arm/boot/dts/zynq-zybo-common.dtsi | 58 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/zynq-zybo-z7.dts      | 45 ++-----------------------
+>  arch/arm/boot/dts/zynq-zybo.dts         | 43 +-----------------------
+>  3 files changed, 61 insertions(+), 85 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/zynq-zybo-common.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/zynq-zybo-common.dtsi b/arch/arm/boot/dts/zynq-zybo-common.dtsi
+> new file mode 100644
+> index 000000000000..9c9a92d59cc7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/zynq-zybo-common.dtsi
+> @@ -0,0 +1,58 @@
+> +/*
+> + *  Copyright (C) 2011 - 2014 Xilinx
+> + *  Copyright (C) 2012 National Instruments Corp.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +/dts-v1/;
+> +#include "zynq-7000.dtsi"
 > +
->  config CMDLINE
->         string "Default kernel command string"
->         default ""
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..315b001c45f1 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -44,7 +44,7 @@ int acpi_pci_disabled = 1;    /* skip ACPI PCI scan and IRQ initialization */
->  EXPORT_SYMBOL(acpi_pci_disabled);
->
->  static bool param_acpi_off __initdata;
-> -static bool param_acpi_on __initdata;
-> +static bool param_acpi_on __initdata = IS_ENABLED(CONFIG_ARM64_PREFER_ACPI);
->  static bool param_acpi_force __initdata;
->
->  static int __init parse_acpi(char *arg)
-> --
-> 2.13.6
->
+> +/ {
+> +	aliases {
+> +		ethernet0 = &gem0;
+> +		serial0 = &uart1;
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x20000000>;
+> +	};
+> +
+> +	usb_phy0: phy0 {
+> +		#phy-cells = <0>;
+> +		compatible = "usb-nop-xceiv";
+> +		reset-gpios = <&gpio0 46 1>;
+> +	};
+> +};
+> +
+> +&gem0 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy>;
+> +
+> +	ethernet_phy: ethernet-phy at 0 {
+> +		reg = <0>;
+> +		device_type = "ethernet-phy";
+> +	};
+> +};
+> +
+> +&sdhci0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +	usb-phy = <&usb_phy0>;
+> +};
+> diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts b/arch/arm/boot/dts/zynq-zybo-z7.dts
+> index 97e487913f8f..bd94147792cd 100644
+> --- a/arch/arm/boot/dts/zynq-zybo-z7.dts
+> +++ b/arch/arm/boot/dts/zynq-zybo-z7.dts
+> @@ -7,59 +7,18 @@
+>   *  SPDX-License-Identifier:	GPL-2.0+
+>   */
+>  /dts-v1/;
+> -#include "zynq-7000.dtsi"
+> +#include "zynq-zybo-common.dtsi"
+>  
+>  / {
+> -	model = "Zynq ZYBO Z7 Development Board";
+> +	model = "Zynq Zybo Z7 Development Board";
+>  	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
+>  
+> -	aliases {
+> -		ethernet0 = &gem0;
+> -		serial0 = &uart1;
+> -	};
+> -
+> -	memory {
+> -		device_type = "memory";
+> -		reg = <0x0 0x20000000>;
+> -	};
+> -
+>  	chosen {
+>  		bootargs = "";
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> -
+> -	usb_phy0: phy0 {
+> -		#phy-cells = <0>;
+> -		compatible = "usb-nop-xceiv";
+> -		reset-gpios = <&gpio0 46 1>;
+> -	};
+>  };
+>  
+>  &clkc {
+>  	ps-clk-frequency = <33333333>;
+>  };
+> -
+> -&gem0 {
+> -	status = "okay";
+> -	phy-mode = "rgmii-id";
+> -	phy-handle = <&ethernet_phy>;
+> -
+> -	ethernet_phy: ethernet-phy at 0 {
+> -		reg = <0>;
+> -		device_type = "ethernet-phy";
+> -	};
+> -};
+> -
+> -&sdhci0 {
+> -	status = "okay";
+> -};
+> -
+> -&uart1 {
+> -	status = "okay";
+> -};
+> -
+> -&usb0 {
+> -	status = "okay";
+> -	dr_mode = "host";
+> -	usb-phy = <&usb_phy0>;
+> -};
+> diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
+> index e40cafc5ee5b..920294f41aff 100644
+> --- a/arch/arm/boot/dts/zynq-zybo.dts
+> +++ b/arch/arm/boot/dts/zynq-zybo.dts
+> @@ -12,59 +12,18 @@
+>   * GNU General Public License for more details.
+>   */
+>  /dts-v1/;
+> -#include "zynq-7000.dtsi"
+> +#include "zynq-zybo-common.dtsi"
+>  
+>  / {
+>  	model = "Zynq ZYBO Development Board";
+>  	compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
+>  
+> -	aliases {
+> -		ethernet0 = &gem0;
+> -		serial0 = &uart1;
+> -	};
+> -
+> -	memory at 0 {
+> -		device_type = "memory";
+> -		reg = <0x0 0x20000000>;
+> -	};
+> -
+>  	chosen {
+>  		bootargs = "";
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> -
+> -	usb_phy0: phy0 {
+> -		#phy-cells = <0>;
+> -		compatible = "usb-nop-xceiv";
+> -		reset-gpios = <&gpio0 46 1>;
+> -	};
+>  };
+>  
+>  &clkc {
+>  	ps-clk-frequency = <50000000>;
+>  };
+> -
+> -&gem0 {
+> -	status = "okay";
+> -	phy-mode = "rgmii-id";
+> -	phy-handle = <&ethernet_phy>;
+> -
+> -	ethernet_phy: ethernet-phy at 0 {
+> -		reg = <0>;
+> -		device_type = "ethernet-phy";
+> -	};
+> -};
+> -
+> -&sdhci0 {
+> -	status = "okay";
+> -};
+> -
+> -&uart1 {
+> -	status = "okay";
+> -};
+> -
+> -&usb0 {
+> -	status = "okay";
+> -	dr_mode = "host";
+> -	usb-phy = <&usb_phy0>;
+> -};
+> 
+
+TBH: I wouldn't bother with this. It is not huge duplication anyway.
+If that file is huge that not a problem with it but it is pretty small
+that's why I can't see a reason for it.
+
+M
