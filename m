@@ -1,90 +1,77 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 27 Feb 2018 13:29:27 +1100
-Subject: [linux-sunxi] [PATCH 14/15] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <2342395.9m6rrqTry7@jernej-laptop>
-References: <20180224214545.3740-1-jernej.skrabec@siol.net>
- <2676311.2IEVhXnSIE@jernej-laptop>
- <4AA78C45-E139-417E-BE89-FE0BFBC409B0@aosc.io>
- <2342395.9m6rrqTry7@jernej-laptop>
-Message-ID: <CAGRGNgU8-uJuns7mAzS-gc81qvVAkS9JS2Tm13p2Qp7dMDCNkg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 26 Feb 2018 19:57:10 -0800
+Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
+In-Reply-To: <20180201093459.20477-3-takahiro.akashi@linaro.org>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-3-takahiro.akashi@linaro.org>
+Message-ID: <CAGXu5j+FZ4085UkjPQXnmTDhFMSdmZ7Rk5YXZ+p4OkyEfCOB1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
+On Thu, Feb 1, 2018 at 1:34 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
+> initialized by irq chip (gic), is called from exception entry.
+> This patch fixes this problem.
 
-On Tue, Feb 27, 2018 at 3:27 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Hi,
+As in, this symbol is not known a lkdtm setup time? Hm, seems like
+we'd want a more generalized approach here.
+
 >
-> Dne ponedeljek, 26. februar 2018 ob 17:21:05 CET je Icenowy Zheng napisal(a):
->> ? 2018?2?27? GMT+08:00 ??12:16:44, "Jernej ?krabec"
-> <jernej.skrabec@siol.net> ??:
->> >Hi Julian,
->> >
->> >Dne nedelja, 25. februar 2018 ob 09:11:34 CET je Julian Calaby
->> >
->> >napisal(a):
->> >> Hi Jernej,
->> >>
->> >> On Sun, Feb 25, 2018 at 8:45 AM, Jernej Skrabec
->> >
->> ><jernej.skrabec@siol.net>
->> >
->> >wrote:
->> >> > Enable HDMI output on all boards which have HDMI connector.
->> >> >
->> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> > ---
->> >> >
->> >> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 25
->> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
->> >> >
->> >> >   | 25 ++++++++++++++++++++++
->> >> >
->> >> >  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 25
->> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
->> >> >
->> >> >   | 25 ++++++++++++++++++++++
->> >
->> >arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
->> >
->> >> >         | 25 ++++++++++++++++++++++
->> >> >
->> >> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 25
->> >> >  ++++++++++++++++++++++ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
->> >> >
->> >> >   | 24 +++++++++++++++++++++
->> >
->> >arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->> >
->> >> >        | 25 ++++++++++++++++++++++ 8 files changed, 199
->> >
->> >insertions(+)
->> >
->> >> As I understand it, the H2+ is just a slightly trimmed down H3. In
->> >> terms of HDMI support, the difference is that the H2+ can't output
->> >
->> >4k.
->> >
->> >> If this code is compatible with the H2+, could you please add the
->> >> necessary bits and pieces to the h2-plus DTSs too?
->> >
->> >There are only 3 H2+ boards in kernel and none of them has HDMI
->> >connector, so
->>
->> BPi M2 Zero has miniHDMI connector.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
 >
-> Ah, sorry, I missed that one. Since I don't have it (or any other board with
-> H2+) I'm not really comfortable including such patch. If anyone will test it,
-> I can include it in next revision.
+> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+> index ba92291508dc..e20343543053 100644
+> --- a/drivers/misc/lkdtm_core.c
+> +++ b/drivers/misc/lkdtm_core.c
+> @@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
+>         if (lkdtm_kprobe != NULL)
+>                 unregister_kprobe(lkdtm_kprobe);
+>
+> +       if (IS_ENABLED(CONFIG_ARM64) &&
+> +                       !strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
+> +               extern void (*handle_arch_irq)(struct pt_regs *regs);
 
-I have one of those (this is why I'm interested in this patchset) so
-I'm willing to test, however I can't guarantee I'll get to it quickly.
+I don't like this extern -- can handle_arch_irq be properly exported somewhere?
 
-Thanks,
+> +               crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
+
+I don't think the * is needed here: it's already a function pointer.
+
+> +               /*
+> +                * Instantiating kprobe.symbol_name here, say
+> +                * with lookup_symbol_name(*handle_arch_irq),
+> +                * would cause register_kprobe() to fail.
+> +                */
+> +               crashpoint->kprobe.symbol_name = NULL;
+
+Is kprobe.addr sufficient for register_kprobe?
+
+> +       }
+>         lkdtm_crashpoint = crashpoint;
+>         lkdtm_crashtype = crashtype;
+>         lkdtm_kprobe = &crashpoint->kprobe;
+>         ret = register_kprobe(lkdtm_kprobe);
+>         if (ret < 0) {
+> -               pr_info("Couldn't register kprobe %s\n",
+> -                       crashpoint->kprobe.symbol_name);
+> +               if (IS_ENABLED(CONFIG_ARM64))
+> +                       pr_info("Couldn't register kprobe 0x%lx\n",
+> +                               (unsigned long)crashpoint->kprobe.addr);
+> +               else
+> +                       pr_info("Couldn't register kprobe %s\n",
+> +                               crashpoint->kprobe.symbol_name);
+>                 lkdtm_kprobe = NULL;
+>                 lkdtm_crashpoint = NULL;
+>                 lkdtm_crashtype = NULL;
+
+So I can replicate, how did you test this?
+
+-Kees
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Kees Cook
+Pixel Security
