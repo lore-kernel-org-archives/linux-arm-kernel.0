@@ -1,107 +1,38 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 27 Feb 2018 20:45:11 +0530
-Subject: [PATCH] dmaengine: mv_xor_v2: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180214162733.4591-1-gregory.clement@bootlin.com>
-References: <20180214162733.4591-1-gregory.clement@bootlin.com>
-Message-ID: <20180227151511.GC15443@localhost>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 27 Feb 2018 16:16:10 +0100
+Subject: [PATCH] ARM: dts: imx7: add CPU PMU support
+Message-ID: <20180227151610.21887-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pls do CC DT folks and Rob for bindings update
+Enable support for ARM Performance Monitoring Units available
+on the Cortex-A7 CPU. There is only a single interrupt for the
+PMU in both variants of the family, i.MX 7Solo and 7Dual.
 
-On Wed, Feb 14, 2018 at 05:27:33PM +0100, Gregory CLEMENT wrote:
-> On the CP110 components whic are present on the Armada 7K/8K SoC we need
+Tested with perf on a i.MX 7Dual:
+  hw perfevents: enabled with armv7_cortex_a7 PMU driver, 5 counters available
 
-/s/whic/which
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> to explicitly enable the registers clock. However it is not needed for
-
-/s/registers/register
-
-> the AP8xx componenet, that's why this clock is optional.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  .../devicetree/bindings/dma/mv-xor-v2.txt          |  6 +++++-
->  drivers/dma/mv_xor_v2.c                            | 23 +++++++++++++++++-----
->  2 files changed, 23 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-> index 217a90eaabe7..9c38bbe7e6d7 100644
-> --- a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-> +++ b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-> @@ -11,7 +11,11 @@ Required properties:
->    interrupts.
->  
->  Optional properties:
-> -- clocks: Optional reference to the clock used by the XOR engine.
-> +- clocks: Optional reference to the clocks used by the XOR engine.
-> +- clock-names: mandatory if there is a second clock, in this case the
-> +   name must be "core" for the first clock and "reg" for the second
-> +   one
-> +
->  
->  Example:
->  
-> diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-> index f652a0e0f5a2..93b3d80ce701 100644
-> --- a/drivers/dma/mv_xor_v2.c
-> +++ b/drivers/dma/mv_xor_v2.c
-> @@ -163,6 +163,7 @@ struct mv_xor_v2_device {
->  	void __iomem *dma_base;
->  	void __iomem *glob_base;
->  	struct clk *clk;
-> +	struct clk *reg_clk;
->  	struct tasklet_struct irq_tasklet;
->  	struct list_head free_sw_desc;
->  	struct dma_device dmadev;
-> @@ -749,13 +750,24 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> -	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
-> +	xor_dev->reg_clk = devm_clk_get(&pdev->dev, "reg");
-
-is this an exiting property?
-
-> +	if (!IS_ERR(xor_dev->reg_clk)) {
-> +		ret = clk_prepare_enable(xor_dev->reg_clk);
-> +		if (ret)
-> +			return ret;
-> +	} else if (PTR_ERR(xor_dev->reg_clk) == -EPROBE_DEFER) {
->  		return -EPROBE_DEFER;
-> +	}
-> +
-> +	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
-> +		ret = EPROBE_DEFER;
-> +		goto disable_reg_clk;
-> +	}
->  	if (!IS_ERR(xor_dev->clk)) {
->  		ret = clk_prepare_enable(xor_dev->clk);
->  		if (ret)
-> -			return ret;
-> +			goto disable_reg_clk;
->  	}
->  
->  	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
-> @@ -866,8 +878,9 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
->  free_msi_irqs:
->  	platform_msi_domain_free_irqs(&pdev->dev);
->  disable_clk:
-> -	if (!IS_ERR(xor_dev->clk))
-> -		clk_disable_unprepare(xor_dev->clk);
-> +	clk_disable_unprepare(xor_dev->clk);
-> +disable_reg_clk:
-> +	clk_disable_unprepare(xor_dev->reg_clk);
->  	return ret;
->  }
->  
-> -- 
-> 2.15.1
-> 
-
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 9aa2bb998552..a6d8f35c4255 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -130,6 +130,12 @@
+ 		#phy-cells = <0>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupt-parent = <&gpc>;
++		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>;
++	};
+ 
+ 	replicator {
+ 		/*
 -- 
-~Vinod
+2.16.2
