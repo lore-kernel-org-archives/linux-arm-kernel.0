@@ -1,32 +1,48 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 27 Feb 2018 23:26:58 +0100
-Subject: [PATCH v2 13/16] drm/sun4i: Allow building on arm64
+Date: Tue, 27 Feb 2018 23:26:53 +0100
+Subject: [PATCH v2 08/16] drm/sun4i: Add support for H3 mixer 0
 In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
 References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <20180227222701.9716-14-jernej.skrabec@siol.net>
+Message-ID: <20180227222701.9716-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-64-bit ARM SoCs from Allwinner have DE2/TCON/HDMI periphery which
-is compatible to 32-bit SoCs, so allow building DRM driver for
-arm64 architecture.
+This mixer supports 1 VI plane, 3 UI plane and HW scaling on all planes.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index 7327da3bc94f..eee6bc0eaf97 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -1,6 +1,6 @@
- config DRM_SUN4I
- 	tristate "DRM Support for Allwinner A10 Display Engine"
--	depends on DRM && ARM && COMMON_CLK
-+	depends on DRM && (ARM || ARM64) && COMMON_CLK
- 	depends on ARCH_SUNXI || COMPILE_TEST
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_HELPER
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 9b0256d31a61..126899d6f0d3 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -492,6 +492,14 @@ static const struct sun8i_mixer_cfg sun8i_a83t_mixer1_cfg = {
+ 	.vi_num		= 1,
+ };
+ 
++static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
++	.ccsc		= 0,
++	.mod_rate	= 432000000,
++	.scaler_mask	= 0xf,
++	.ui_num		= 3,
++	.vi_num		= 1,
++};
++
+ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.vi_num = 2,
+ 	.ui_num = 1,
+@@ -509,6 +517,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun8i-a83t-de2-mixer-1",
+ 		.data = &sun8i_a83t_mixer1_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
++		.data = &sun8i_h3_mixer0_cfg,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
 -- 
 2.16.2
