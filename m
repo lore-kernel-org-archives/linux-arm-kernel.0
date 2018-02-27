@@ -1,86 +1,65 @@
-From: yong.deng@magewell.com (Yong Deng)
-Date: Tue, 27 Feb 2018 10:07:36 +0800
-Subject: [PATCH v8 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
- Interface (CSI)
-Message-ID: <1519697256-32472-1-git-send-email-yong.deng@magewell.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Mon, 26 Feb 2018 18:11:45 -0800
+Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
+ from any CPU
+In-Reply-To: <20180225143802.denbkubqjg2dc7af@salmiak>
+References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
+ <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
+ <20180225143802.denbkubqjg2dc7af@salmiak>
+Message-ID: <90e7ff7d7dc1054db356fb1740ddb990@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for Allwinner V3s CSI.
+On 2018-02-25 06:38, Mark Rutland wrote:
+> On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
+>> Some PMUs events can be read from any CPU. So allow the PMU to mark
+>> events as such. For these events, we don't need to reject reads or
+>> make smp calls to the event's CPU and cause unnecessary wake ups.
+>> 
+>> Good examples of such events would be events from caches shared across
+>> all CPUs.
+> 
+> I think that if we need to generalize PERF_EV_CAP_READ_ACTIVE_PKG, it 
+> would be
+> better to give events a pointer to a cpumask. That could then cover all 
+> cases
+> quite trivially:
+> 
+> static int __perf_event_read_cpu(struct perf_event *event, int 
+> event_cpu)
+> {
+> 	int local_cpu = smp_processor_id();
+> 
+> 	if (event->read_mask &&
+> 	    cpumask_test_cpu(local_cpu, event->read_mask))
+> 		event_cpu = local_cpu;
+> 
+> 	return event_cpu;
+> }
+> 
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Yong Deng <yong.deng@magewell.com>
----
- .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+This is a good improvement on my attempt. If I send a patch for this, is 
+that something you'd be willing to incorporate into your patch set and 
+make sure the DSU pmu driver handles it correctly?
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-new file mode 100644
-index 000000000000..2ff47a9507a6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -0,0 +1,59 @@
-+Allwinner V3s Camera Sensor Interface
-+-------------------------------------
-+
-+Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-+interface and CSI1 is used for parallel interface.
-+
-+Required properties:
-+  - compatible: value must be "allwinner,sun8i-v3s-csi"
-+  - reg: base address and size of the memory-mapped region.
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the CSI
-+    * bus: the CSI interface clock
-+    * mod: the CSI module clock
-+    * ram: the CSI DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset line driving the CSI
-+
-+Each CSI node should contain one 'port' child node with one child 'endpoint'
-+node, according to the bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-+above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
-+Bt656 for CSI1.
-+
-+Endpoint node properties for CSI1
-+---------------------------------
-+
-+- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-+			   node
-+- bus-width:		: (required) must be 8, 10, 12 or 16
-+- pclk-sample		: (optional) (default: sample on falling edge)
-+- hsync-active		: (only required for parallel)
-+- vsync-active		: (only required for parallel)
-+
-+Example:
-+
-+csi1: csi at 1cb4000 {
-+	compatible = "allwinner,sun8i-v3s-csi";
-+	reg = <0x01cb4000 0x1000>;
-+	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&ccu CLK_BUS_CSI>,
-+		 <&ccu CLK_CSI1_SCLK>,
-+		 <&ccu CLK_DRAM_CSI>;
-+	clock-names = "bus", "mod", "ram";
-+	resets = <&ccu RST_BUS_CSI>;
-+
-+	port {
-+		/* Parallel bus endpoint */
-+		csi1_ep: endpoint {
-+			remote-endpoint = <&adv7611_ep>;
-+			bus-width = <16>;
-+
-+			/* If hsync-active/vsync-active are missing,
-+			   embedded BT.656 sync is used */
-+			hsync-active = <0>; /* Active low */
-+			vsync-active = <0>; /* Active low */
-+			pclk-sample = <1>;  /* Rising */
-+		};
-+	};
-+};
--- 
-1.8.3.1
+> ... in the PERF_EV_CAP_READ_ACTIVE_PKG case, we can use the exiting(?) 
+> package
+> masks, and more generally we can re-use the PMU's affinit mask if it 
+> has one.
+> 
+> That said, I see that many pmu::read() implementations have 
+> side-effects on
+> hwc->prev_count, and event->count, so I worry that this won't be sfe in 
+> general
+> (e.g. if we race with the IRQ handler on another CPU).
+> 
+
+Yeah, this doesn't have to be mandatory. It can be an optional mask the 
+PMU can set up during perf event init.
+
+Peter,
+
+Is this something that's acceptable to you?
+
+Thanks,
+Saravana
