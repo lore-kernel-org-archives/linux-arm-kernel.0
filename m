@@ -1,20 +1,29 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Feb 2018 12:28:38 -0300
-Subject: [PATCH] ARM: dts: imx7: add CPU PMU support
-In-Reply-To: <20180227151610.21887-1-stefan@agner.ch>
-References: <20180227151610.21887-1-stefan@agner.ch>
-Message-ID: <CAOMZO5DD1atSkWjGR0b1VVfQWdsNsL2GN6Z0yJ7YmM38vQSUxA@mail.gmail.com>
+Date: Tue, 27 Feb 2018 12:32:02 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: Add RAVE SP device
+In-Reply-To: <20180226144943.9835-1-andrew.smirnov@gmail.com>
+References: <20180226144943.9835-1-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5D-FrBK0wDQ7cp8G9h3iAES-AS5qXSF9SYGEUfjKzjisQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 12:16 PM, Stefan Agner <stefan@agner.ch> wrote:
-> Enable support for ARM Performance Monitoring Units available
-> on the Cortex-A7 CPU. There is only a single interrupt for the
-> PMU in both variants of the family, i.MX 7Solo and 7Dual.
+On Mon, Feb 26, 2018 at 11:49 AM, Andrey Smirnov
+<andrew.smirnov@gmail.com> wrote:
+> With MFD and watchdog drivers for RAVE SP device support added by
+> 538ee27290fa ("mfd: Add driver for RAVE Supervisory Processor") and
+> c3bb33345721 ("watchdog: Add RAVE SP watchdog driver") add
+> corresponding DT node for RDU2.
 >
-> Tested with perf on a i.MX 7Dual:
->   hw perfevents: enabled with armv7_cortex_a7 PMU driver, 5 counters available
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
