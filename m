@@ -1,47 +1,47 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 27 Feb 2018 20:23:20 +0100
-Subject: [PATCH 3/3] ARM: mach-stm32: Add Extended TrustZone Protection
- driver
-In-Reply-To: <20180227171419.3nlz23qzptvew2as@lakrids.cambridge.arm.com>
-References: <20180227140926.22996-1-benjamin.gaignard@st.com>
- <20180227140926.22996-4-benjamin.gaignard@st.com>
- <20180227171419.3nlz23qzptvew2as@lakrids.cambridge.arm.com>
-Message-ID: <CA+M3ks5xreBsZOoVFrDcP8DxgfNe6d4kduB-Fz=RgHSdT045QQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 Feb 2018 11:23:54 -0800
+Subject: [PATCH 1/6] clocksource: timer-ti-dm: Make unexported functions
+ static
+In-Reply-To: <20180227190752.GC1961@lenoch>
+References: <20180223101254.GA5746@lenoch> <20180223101346.GB5746@lenoch>
+ <20180227180641.GE5448@atomide.com> <20180227190752.GC1961@lenoch>
+Message-ID: <20180227192354.GG5448@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-27 18:14 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
-> On Tue, Feb 27, 2018 at 03:09:26PM +0100, Benjamin Gaignard wrote:
->  +
->> +static const u32 stm32mp1_ip_addr[] = {
->> +     0x5c008000,     /* 00 stgenc */
->> +     0x54000000,     /* 01 bkpsram */
->> +     0x5c003000,     /* 02 iwdg1 */
->> +     0x5c000000,     /* 03 usart1 */
->> +     0x5c001000,     /* 04 spi6 */
->> +     0x5c002000,     /* 05 i2c4 */
->
-> ...
->
-> This duplicates information that is in the DT, which is unfortunate.
+* Ladislav Michl <ladis@linux-mips.org> [180227 19:09]:
+> On Tue, Feb 27, 2018 at 10:06:41AM -0800, Tony Lindgren wrote:
+> > * Ladislav Michl <ladis@linux-mips.org> [180223 10:14]:
+> > > As dmtimer no longer exports functions, make those previously
+> > > exported static (this requires few functions to be moved around
+> > > as their prototypes were deleted).
+> > 
+> > Looks like this one fails to build with omap1_defconfig:
+> > 
+> > drivers/clocksource/timer-ti-dm.c:935:14: error:
+> > 'omap_dm_timer_get_fclk' undeclared here 
+> 
+> Umm, it compiled fine on top of previous versions, so I didn't bother
+> to retest. I'm sorry about it.
+> 
+> > Other than that the first three patches seem like nice
+> > clean-up :)
+> 
+> So are you okay with sending those separately as cleanup with above
+> issue fixed?
 
-Yes I would have prefer to be able to get this information from etzpc
-hardware itself
-but that isn't the case so I need this table to found the status bits
-of each device.
+Yeah seems like those first three are suitable for applying
+on top of the patches in omap-for-v4.17/timer :)
 
->
-> Why can these not be marked disabled inthe DT instead?
->
-> If it's dynamic form boot-to-boot, then the FW can probe this prior to
-> entering Linux, and patch the DT appropriately.
+> But to be honest, I'm more interested how to do the last two patches
+> right ;-)
 
-I know that is one software way to do, but let discusted about that in
-cover letter thread.
+Yeah well if patch 4 can be sent separately as a fix, then
+send that separately to Thierry?
 
-Thanks,
-Benjamin
+Then you're just left with the pending pwm changes that
+still need work it seems.
 
->
-> Thanks,
-> Mark.
+Regards,
+
+Tony
