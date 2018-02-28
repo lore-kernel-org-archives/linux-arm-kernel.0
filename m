@@ -1,59 +1,33 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 28 Feb 2018 16:06:12 -0600
-Subject: [PATCH v7 06/13] ACPI: Enable PPTT support on ARM64
+Date: Wed, 28 Feb 2018 16:06:18 -0600
+Subject: [PATCH v7 12/13] ACPI: Add PPTT to injectable table list
 In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
 References: <20180228220619.6992-1-jeremy.linton@arm.com>
-Message-ID: <20180228220619.6992-7-jeremy.linton@arm.com>
+Message-ID: <20180228220619.6992-13-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a PPTT parser, in preparation for its use
-on arm64, lets build it.
+Add ACPI_SIG_PPTT to the table so initrd's can override the
+system topology.
 
+Signed-off-by: Geoffrey Blake <geoffrey.blake@arm.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/Kconfig    | 1 +
- drivers/acpi/Kconfig  | 3 +++
- drivers/acpi/Makefile | 1 +
- 3 files changed, 5 insertions(+)
+ drivers/acpi/tables.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb7ef8e..439684a71e18 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -7,6 +7,7 @@ config ARM64
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ACPI_MCFG if ACPI
- 	select ACPI_SPCR_TABLE if ACPI
-+	select ACPI_PPTT if ACPI
- 	select ARCH_CLOCKSOURCE_DATA
- 	select ARCH_HAS_DEBUG_VIRTUAL
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index f505e9a01b2d..55aa9789d474 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -534,6 +534,9 @@ config ACPI_CONFIGFS
+diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+index 7bcb66ccccf3..b2efaa503c34 100644
+--- a/drivers/acpi/tables.c
++++ b/drivers/acpi/tables.c
+@@ -457,7 +457,7 @@ static const char * const table_sigs[] = {
+ 	ACPI_SIG_UEFI, ACPI_SIG_WAET, ACPI_SIG_WDAT, ACPI_SIG_WDDT,
+ 	ACPI_SIG_WDRT, ACPI_SIG_DSDT, ACPI_SIG_FADT, ACPI_SIG_PSDT,
+ 	ACPI_SIG_RSDT, ACPI_SIG_XSDT, ACPI_SIG_SSDT, ACPI_SIG_IORT,
+-	NULL };
++	ACPI_SIG_PPTT, NULL };
  
- if ARM64
- source "drivers/acpi/arm64/Kconfig"
-+
-+config ACPI_PPTT
-+	bool
- endif
+ #define ACPI_HEADER_SIZE sizeof(struct acpi_table_header)
  
- config TPS68470_PMIC_OPREGION
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 41954a601989..b6056b566df4 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -87,6 +87,7 @@ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
- obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
- obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
- obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
-+obj-$(CONFIG_ACPI_PPTT) 	+= pptt.o
- 
- # processor has its own "processor." module_param namespace
- processor-y			:= processor_driver.o
 -- 
 2.13.6
