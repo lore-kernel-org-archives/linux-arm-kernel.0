@@ -1,13 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:40:45 -0800
-Subject: [PATCH v4 01/22] nvmem: Document struct nvmem_config
+Date: Wed, 28 Feb 2018 06:40:53 -0800
+Subject: [PATCH v4 09/22] nvmem: rockchip-efuse: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-2-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-10-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple description of struct nvmem_config and its fields.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -23,41 +25,39 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- include/linux/nvmem-provider.h | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/nvmem/rockchip-efuse.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 497706f5adca..27e599222ec1 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -22,6 +22,28 @@ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
- typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
- 				 void *val, size_t bytes);
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index f13a8335f364..8ebb103abe23 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -289,25 +289,15 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 	econfig.reg_read = match->data;
+ 	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
  
-+/**
-+ * struct nvmem_config - NVMEM device configuration
-+ *
-+ * @dev:	Parent device.
-+ * @name:	Optional name.
-+ * @id:		Optional device ID used in full name. Ignored if name is NULL.
-+ * @owner:	Pointer to exporter module. Used for refcounting.
-+ * @cells:	Optional array of pre-defined NVMEM cells.
-+ * @ncells:	Number of elements in cells.
-+ * @read_only:	Device is read-only.
-+ * @root_only:	Device is accessibly to root only.
-+ * @reg_read:	Callback to read data.
-+ * @reg_write:	Callback to write data.
-+ * @size:	Device size.
-+ * @word_size:	Minimum read/write access granularity.
-+ * @stride:	Minimum read/write access stide.
-+ * @priv:	User context passed to read/write callbacks.
-+ *
-+ * Note: A default "nvmem<id>" name will be assigned to the device if
-+ * no name is specified in its configuration. In such case "<id>" is
-+ * generated with ida_simple_get() and provided id field is ignored.
-+ */
- struct nvmem_config {
- 	struct device		*dev;
- 	const char		*name;
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+-static int rockchip_efuse_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct platform_driver rockchip_efuse_driver = {
+ 	.probe = rockchip_efuse_probe,
+-	.remove = rockchip_efuse_remove,
+ 	.driver = {
+ 		.name = "rockchip-efuse",
+ 		.of_match_table = rockchip_efuse_match,
 -- 
 2.14.3
