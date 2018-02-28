@@ -1,155 +1,82 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Wed, 28 Feb 2018 18:09:54 +0300
-Subject: [PATCH 1/2] stackleak: Update for arm64
-In-Reply-To: <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
-References: <20180221011303.20392-1-labbott@redhat.com>
- <20180221011303.20392-2-labbott@redhat.com> <20180222165834.GC18421@arm.com>
- <97090ca6-efad-7c03-6084-a97674ae61c7@linux.com>
- <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
-Message-ID: <5d10c6ad-b4b6-eb27-79f0-ca235b73e7eb@linux.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 28 Feb 2018 09:13:21 -0600
+Subject: [SPAM]Re: [PATCH v3 4/5] dt-bindings: clock: mediatek: update
+ audsys documentation to adapt MFD device
+In-Reply-To: <1519272878.1907.87.camel@mtkswgap22>
+References: <cover.1518424204.git.ryder.lee@mediatek.com>
+ <61928ad523a7aeffb8f16d4caad56836b65ae407.1518424204.git.ryder.lee@mediatek.com>
+ <CAL_JsqJgo0pKJjrs2fdw+q=DJYwht0X5L3Bomz8gf98mEN7hkg@mail.gmail.com>
+ <1519193048.18794.42.camel@mtkswgap22>
+ <CAL_JsqLjcMpS=bLzAV0arLJY143O1XefjSR0djM73E8uC4oJHg@mail.gmail.com>
+ <1519272878.1907.87.camel@mtkswgap22>
+Message-ID: <CAL_Jsq+NK-sUY-qOZ2Xv1ZfWVm-vG0tyAgN_auKeaQxMq58vkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.02.2018 13:21, Richard Sandiford wrote:
-> Hi Alexander,
-> 
-> Sorry for the slow reply, been caught up in an office move.
-
-Thank you very much for the review, Richard!
-
-> Alexander Popov <alex.popov@linux.com> writes:
->> Would you be so kind to take a look at the whole STACKLEAK plugin?
->> http://www.openwall.com/lists/kernel-hardening/2018/02/16/4
->> https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/commit/?h=kspp/gcc-plugin/stackleak&id=57a0a6763b12e82dd462593d0f42be610e93cdc9
+On Wed, Feb 21, 2018 at 10:14 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> On Wed, 2018-02-21 at 08:10 -0600, Rob Herring wrote:
+>> On Wed, Feb 21, 2018 at 12:04 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+>> > On Mon, 2018-02-19 at 12:29 -0600, Rob Herring wrote:
+>> >> On Mon, Feb 12, 2018 at 5:28 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+>> >> > The MediaTek audio hardware block that exposes functionalities that are
+>> >> > handled by separate subsystems in the kernel.  These functions are all
+>> >> > mapped somewhere at 0x112xxxxx, and there are some control bits are mixed
+>> >> > up with other functions within the same registers.
+>> >>
+>> >> I still don't think this change is necessary.
+>> >>
+>> >> Just because a hardware block in DT maps to different subsystems in a
+>> >> particular OS doesn't mean you need a DT node for each OS subsystem.
+>> >> What we have subsystems for changes over time and DT shouldn't really
+>> >> be changing based on that. And DT is not the only way to instantiate
+>> >> drivers.
+>> >>
+>> >
+>> > Apart right now we have the definition of both functions. The other
+>> > location is here:../sonud/mt2701-afe-pcm.txt. The ways I could come up
+>> > with are:
 >>
->> It's not very big. I documented it in detail. I would be really grateful for the
->> review!
-> 
-> Looks good to me FWIW.  Just a couple of minor things:
-> 
->> +	/*
->> +	 * 1. Loop through the GIMPLE statements in each of cfun basic blocks.
->> +	 * cfun is a global variable which represents the function that is
->> +	 * currently processed.
->> +	 */
->> +	FOR_EACH_BB_FN(bb, cfun) {
->> +		for (gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi)) {
->> +			gimple stmt;
->> +
->> +			stmt = gsi_stmt(gsi);
->> +
->> +			/* Leaf function is a function which makes no calls */
->> +			if (is_gimple_call(stmt))
->> +				is_leaf = false;
-> 
-> It's probably not going to matter in practice, but it might be worth
-> emphasising in the comments that this leafness is only approximate.
+>> There are several problems you need to fix. First,
+>> "mediatek,mt2701-audsys" is not documented. It is only used in the
+>> example. Second, bindings/arm/mediatek/mediatek,audsys.txt should move
+>> to bindings/sound/ if it is only audio related functions. Or perhaps
+>> just combine the 2 documents because it is all inconsistent currently.
+>
+> Because the series crossed subsystems but didn't apply at the same time.
+>
+>> The 2 documents are inconsistent as to what is the relationship of
+>> -audsys and -audio (afe) nodes. mt2701-afe-pcm.txt shows that the AFE
+>> is already a child of -audsys. The -audsys node should have
+>> #clock-cells. It should also not be a simple-mfd (another
+>> inconsistency in the binding) because it needs to probe first to
+>> provide clocks to child nodes, and then trigger probing the child
+>> nodes.
+>
+> This is the 1st version I sent before, and the clock parts still under
+> review :( .  But yes, the 2 inconsistent documents should be fixed -
+> this may depend on what we end up doing with the DT appearance.
+>
+> IMHO, apart from overlapping regions with other functions I didn't see
+> any difference between audsys and other clock drivers (providers).
+>
+> For the sake of uniformity, I make the 2 sub-devices parallel and move
+> "simple-mfd" to the top, and the sequences should actually be handled
+> through "probe deferral mechanism" - that would make this kind of
+> situations much easier to manage.
 
-That's important, thank you! May I ask why you think it's not going to matter in
-practice?
+If a child node has a dependency on the parent, probe deferral is not
+the correct solution. The parent should probe first and control
+probing of the chlidren. "simple-mfd" is intended for cases where
+there is no dependency on the parent node.
 
-> It will sometimes be a false positive, because we could still
-> end up creating calls to libgcc functions from non-call statements
-> (or for target-specific reasons).  It can also be a false negative,
-> since call statements can be to built-in or internal functions that
-> end up being open-coded.
+> BTW, I could make the AFE driver be instantiated/probed from the clock
+> driver but this seems superfluous to me.  Just make sure is this what
+> you want?
 
-Oh, that raises the question: how does this leafness inaccuracy affect in my
-particular case?
+I would think it would be the other way around. The AFE driver creates
+some clocks. Whether that's a separate driver or a single driver is a
+kernel issue that has nothing to do with the binding. IIRC, there's
+several examples in display controllers and camera interfaces where
+those drivers are also clock providers.
 
-is_leaf is currently used for finding the special cases to skip the
-track_stack() call insertion:
-
-/*
- * Special cases to skip the instrumentation.
- *
- * Taking the address of static inline functions materializes them,
- * but we mustn't instrument some of them as the resulting stack
- * alignment required by the function call ABI will break other
- * assumptions regarding the expected (but not otherwise enforced)
- * register clobbering ABI.
- *
- * Case in point: native_save_fl on amd64 when optimized for size
- * clobbers rdx if it were instrumented here.
- *
- * TODO: any more special cases?
- */
-if (is_leaf &&
-    !TREE_PUBLIC(current_function_decl) &&
-    DECL_DECLARED_INLINE_P(current_function_decl)) {
-	return 0;
-}
-
-
-And now it seems to me that the stackleak plugin should not instrument all
-static inline functions, regardless of is_leaf. Do you agree?
-
->> +	/*
->> +	 * The stackleak_final pass should be executed before the "final" pass,
->> +	 * which turns the RTL (Register Transfer Language) into assembly.
->> +	 */
->> +	PASS_INFO(stackleak_final, "final", 1, PASS_POS_INSERT_BEFORE);
-> 
-> This might be too late, since it happens e.g. after addresses have
-> been calculated for branch ranges, and after machine-specific passes
-> (e.g. bundling on ia64).
-> 
-> The stack size is final after reload, so inserting the pass after that
-> might be better.
-
-Thanks for that notice. May I ask for the additional clarification?
-
-I specified -fdump-passes and see a lot of passes between reload and final:
-  ...
-  rtl-sched1                                       :  OFF
-  rtl-ira                                          :  ON
-  rtl-reload                                       :  ON
-  rtl-vzeroupper                                   :  OFF
-  *all-postreload                                  :  OFF
-     rtl-postreload                                :  OFF
-     rtl-gcse2                                     :  OFF
-     rtl-split2                                    :  ON
-     rtl-ree                                       :  ON
-     rtl-cmpelim                                   :  OFF
-     rtl-btl1                                      :  OFF
-     rtl-pro_and_epilogue                          :  ON
-     rtl-dse2                                      :  ON
-     rtl-csa                                       :  ON
-     rtl-jump2                                     :  ON
-     rtl-compgotos                                 :  ON
-     rtl-sched_fusion                              :  OFF
-     rtl-peephole2                                 :  ON
-     rtl-ce3                                       :  ON
-     rtl-rnreg                                     :  OFF
-     rtl-cprop_hardreg                             :  ON
-     rtl-rtl_dce                                   :  ON
-     rtl-bbro                                      :  ON
-     rtl-btl2                                      :  OFF
-     *leaf_regs                                    :  ON
-     rtl-split4                                    :  ON
-     rtl-sched2                                    :  ON
-     *stack_regs                                   :  ON
-        rtl-split3                                 :  OFF
-        rtl-stack                                  :  ON
-  *all-late_compilation                            :  OFF
-     rtl-alignments                                :  ON
-     rtl-vartrack                                  :  ON
-     *free_cfg                                     :  ON
-     rtl-mach                                      :  ON
-     rtl-barriers                                  :  ON
-     rtl-dbr                                       :  OFF
-     rtl-split5                                    :  OFF
-     rtl-eh_ranges                                 :  OFF
-     rtl-shorten                                   :  ON
-     rtl-nothrow                                   :  ON
-     rtl-dwarf2                                    :  ON
-     rtl-stackleak_final                           :  ON
-     rtl-final                                     :  ON
-  rtl-dfinish                                      :  ON
-clean_state                                        :  ON
-
-Where exactly would you recommend me to insert the stackleak_final pass, which
-removes the unneeded track_stack() calls?
-
-Best regards,
-Alexander
+Rob
