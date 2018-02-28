@@ -1,18 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 11:04:38 +0800
-Subject: [PATCH] ARM: imx: pm-imx6: Return the error directly
-In-Reply-To: <1519436524-24583-1-git-send-email-festevam@gmail.com>
-References: <1519436524-24583-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180228030437.GD3217@dragon>
+Date: Wed, 28 Feb 2018 11:11:07 +0800
+Subject: [PATCH v2] ARM: dts: imx6dl-colibri-eval-v3: Add chosen node
+In-Reply-To: <20180227080023.17682-1-stefan@agner.ch>
+References: <20180227080023.17682-1-stefan@agner.ch>
+Message-ID: <20180228031106.GE3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 10:42:04PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, Feb 27, 2018 at 09:00:23AM +0100, Stefan Agner wrote:
+> Add Colibri UART_A as default serial console.
 > 
-> Simplify the error path by returning the error code directly rather
-> than jumping to a label.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
 Applied, thanks.
