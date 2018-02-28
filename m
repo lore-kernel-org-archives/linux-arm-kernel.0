@@ -1,40 +1,47 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Feb 2018 16:55:59 +0100
-Subject: [PATCH] drm/sun4i: init dclk_min_div & dclk_max_div inside
- encoder init functions
-In-Reply-To: <1519822318-3974-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1519822318-3974-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20180228155559.lqm22dzeiptrwyxe@flea>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 28 Feb 2018 15:58:11 +0000
+Subject: [PATCH] arm64: dts: juno: fix size of GICv2m MSI frames
+In-Reply-To: <36126393-ee37-40f1-9d5d-1c7f25c648dc@arm.com>
+References: <20180207143255.17003-3-marc.zyngier@arm.com>
+ <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
+ <36126393-ee37-40f1-9d5d-1c7f25c648dc@arm.com>
+Message-ID: <f4ce910b-f263-a4e1-710c-875ac152d4bf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Feb 28, 2018 at 01:51:58PM +0100, Giulio Benetti wrote:
-> sun4i_dclk_round_rate is called before sun4i_tcon_mode_set,
-> so it finds dclk_min_div and dclk_max_div set to 0 and fails
-> adding crtc.
+
+On 28/02/18 15:51, Robin Murphy wrote:
+> Hi Sudeep,
 > 
-> Move dclk_min_div and dclk_max_div to encoders init functions.
+> Cheers for sorting it out...
 > 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> On 28/02/18 15:48, Sudeep Holla wrote:
+>> Currently the size of GICv2m MSI frames are listed as 4kB while the
+>> Juno TRM specifies 64kB for each of these MSI frames.
+>>
+>> Though the devices connected themself might just use the first 4kB,
+> 
+> s/themself/themselves/
+> 
+>> to be consistent with the genaral practice of 64kB boundary alignment
+> 
+> s/genaral/general/
+> 
 
-I sent a similar patch there:
-https://lists.freedesktop.org/archives/dri-devel/2018-February/166666.html
+Fixed those now.
 
-I guess eventually, we'll want to remove the usage of the clock
-framework entirely, but it's not really the scope of a fix.
+>> to all the devices, lets keep the size as 64kB. This might also help
+>> in avoiding any surprise when passing the device to a VM.
+>>
+>> This patch increase the size of each GICv2m MSI frames from 4kB to 64kB
+>> as per the specification.
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> 
 
-Maxime
+Thanks.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180228/a9de232c/attachment.sig>
+Regards,
+Sudeep
