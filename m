@@ -1,42 +1,36 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 28 Feb 2018 14:27:38 -0800
-Subject: [PATCH 0/3] drivers: clk: Add ZynqMp clock driver support
-Message-ID: <1519856861-31384-1-git-send-email-jollys@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Feb 2018 23:28:16 +0100
+Subject: [GIT PULL 2/2] Broadcom drivers fixes for 4.16
+In-Reply-To: <20180228005130.31856-2-f.fainelli@gmail.com>
+References: <20180228005130.31856-1-f.fainelli@gmail.com>
+ <20180228005130.31856-2-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a29ZuAZYAFHL0PECavND8Ht1u33Lt8TKHaAN4h2VY-PKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock driver for ZynqMp. 
-This patchset has dependency on below drivers:
-Firmware Driver:     https://patchwork.kernel.org/patch/10230773/
+On Wed, Feb 28, 2018 at 1:51 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/drivers-fixes
+>
+> for you to fetch changes up to fee5f1ef6cf76f87d9799596d06979c9e6589f2b:
+>
+>   memory: brcmstb: dpfe: support new way of passing data from the DCPU (2018-02-23 10:56:59 -0800)
+>
+> ----------------------------------------------------------------
+> This pull request contains Broadcom SoCs drivers fixes for 4.16, please
+> pull the following:
+>
+> - Markus provides two minor fixes to the Broadcom STB DPFE driver, one
+>   to properly mask bits, and a second one to use the correct type. The
+>   third commit is a consequence of a newer DFPE firmware which would
+>   unfortunately crash without appropriate kernel changes.
+>
 
-Jolly Shah (3):
-  drivers: clk: Add clk_get_children support
-  dt-bindings: clock: Add bindings for ZynqMP clock driver
-  drivers: clk: Add ZynqMP clock driver
+Pulled into fixes, thanks!
 
- .../devicetree/bindings/clock/xlnx,zynqmp-clk.txt  | 163 +++++
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk.c                                  |  28 +
- drivers/clk/zynqmp/Kconfig                         |  10 +
- drivers/clk/zynqmp/Makefile                        |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c               | 156 +++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c                | 189 ++++++
- drivers/clk/zynqmp/clkc.c                          | 712 +++++++++++++++++++++
- drivers/clk/zynqmp/divider.c                       | 245 +++++++
- drivers/clk/zynqmp/pll.c                           | 382 +++++++++++
- include/linux/clk-provider.h                       |   1 +
- include/linux/clk/zynqmp.h                         |  45 ++
- 13 files changed, 1937 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/xlnx,zynqmp-clk.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 include/linux/clk/zynqmp.h
-
--- 
-2.7.4
+      Arnd
