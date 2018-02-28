@@ -1,29 +1,52 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 27 Feb 2018 16:39:19 -0800
-Subject: [PATCH] ARM: dts: NSP: Fix amount of RAM on BCM958625HR
-In-Reply-To: <CAC3K-4rqYMUBtbwaojWBF-0biEV-WSPpe=0bDocL4TUrrL4gGQ@mail.gmail.com>
-References: <20180227010312.7495-1-f.fainelli@gmail.com>
- <CAC3K-4rqYMUBtbwaojWBF-0biEV-WSPpe=0bDocL4TUrrL4gGQ@mail.gmail.com>
-Message-ID: <cf9e6bc5-094a-e658-cdd6-6495fbe99da6@gmail.com>
+Date: Tue, 27 Feb 2018 16:51:29 -0800
+Subject: [GIT PULL 1/2] Broadcom devicetree fixes for 4.16
+Message-ID: <20180228005130.31856-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2018 07:02 AM, Jon Mason wrote:
-> On Mon, Feb 26, 2018 at 8:03 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> Jon attempted to fix the amount of RAM on the BCM958625HR in commit
->> c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
->> but it seems like we tripped over some poorly documented schematics.
->>
->> The top-level page of the schematics says the board has 2GB, but when
->> you end-up scrolling to page 6, you see two chips of 4GiB (512MB) but
->> what the bootloader really initializes only 512MB, any attempt to use
->> more than that results in data aborts. Fix this again back to 512MB.
->>
->> Fixes: c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Acked-by: Jon Mason <jon.mason@broadcom.com>
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Applied to devicetree/fixes
--- 
-Florian
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the git repository at:
+
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/devicetree-fixes
+
+for you to fetch changes up to 2944866ac5b37e24ce1e646d2aaf472148e4a43e:
+
+  ARM: dts: bcm283x: Move arm-pmu out of soc node (2018-02-27 16:42:09 -0800)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree fixes for
+4.16, please pull the following:
+
+- Mathieu fixes leading 0x and 0's from bindings and Device Tree source
+  files, he has done this treewide and most of his changes are already in
+  4.16
+
+- Stefan provides two changes to the BCM283x DTS files in order to fix
+  DTC warnings
+
+- Florian fixes the amount of RAM on the BCM958625HR reference board to
+  properly limit to what is initialized by the bootloader
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      ARM: dts: NSP: Fix amount of RAM on BCM958625HR
+
+Mathieu Malaterre (1):
+      ARM: BCM: dts: Remove leading 0x and 0s from bindings notation
+
+Stefan Wahren (2):
+      ARM: dts: bcm283x: Fix unit address of local_intc
+      ARM: dts: bcm283x: Move arm-pmu out of soc node
+
+ arch/arm/boot/dts/bcm11351.dtsi   |  2 +-
+ arch/arm/boot/dts/bcm21664.dtsi   |  2 +-
+ arch/arm/boot/dts/bcm2835.dtsi    |  6 +++---
+ arch/arm/boot/dts/bcm2836.dtsi    | 12 ++++++------
+ arch/arm/boot/dts/bcm2837.dtsi    |  2 +-
+ arch/arm/boot/dts/bcm283x.dtsi    |  2 +-
+ arch/arm/boot/dts/bcm958625hr.dts |  2 +-
+ 7 files changed, 14 insertions(+), 14 deletions(-)
