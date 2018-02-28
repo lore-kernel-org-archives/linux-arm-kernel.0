@@ -1,37 +1,85 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 28 Feb 2018 23:30:37 +0900
-Subject: [kernel-hardening] [PATCH 2/2] arm: Kconfig: Add
- ARCH_HAS_FORTIFY_SOURCE
-Message-ID: <20180228143037.GA3150@pjb1027-Latitude-E5410>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 28 Feb 2018 15:35:53 +0100
+Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a register
+ clock
+Message-ID: <20180228143553.12485-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_FORTIFY_SOURCE detects various overflows at compile-time.
-(6974f0c4555e ("include/linux/string.h:
-add the option of fortified string.h functions)
+On Armada 7K/8K we need to explicitly enable the register clock. This
+clock is optional because not all the SoCs using this IP need it but at
+least for Armada 7K/8K it is actually mandatory.
 
-ARCH_HAS_FORTIFY_SOURCE means that the architecture can be built and
-run with CONFIG_FORTIFY_SOURCE.
+The binding documentation is updated accordingly.
 
-Since ARM can be built and run with that flag like other architectures,
-select ARCH_HAS_FORTIFY_SOURCE as default.
-
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
+ drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7e3d535..3765336 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -7,6 +7,7 @@ config ARM
- 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
-+	select ARCH_HAS_FORTIFY_SOURCE
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_PHYS_TO_DMA
- 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+index c08fb477b3c6..4ee9813bf88f 100644
+--- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+@@ -14,7 +14,11 @@ Required properties:
+ - #address-cells: shall be set to 1. Encode the NAND CS.
+ - #size-cells: shall be set to 0.
+ - interrupts: shall define the NAND controller interrupt.
+-- clocks: shall reference the NAND controller clock.
++- clocks: shall reference the NAND controller clocks, the second one is
++  optional but needed for the Armada 7K/8K SoCs
++- clock-names: mandatory if there is a second clock, in this case the
++   name must be "core" for the first clock and "reg" for the second
++   one
+ - marvell,system-controller: Set to retrieve the syscon node that handles
+   NAND controller related registers (only required with the
+   "marvell,armada-8k-nand[-controller]" compatibles).
+diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
+index 2196f2a233d6..be874c636b5f 100644
+--- a/drivers/mtd/nand/marvell_nand.c
++++ b/drivers/mtd/nand/marvell_nand.c
+@@ -321,6 +321,7 @@ struct marvell_nfc {
+ 	struct device *dev;
+ 	void __iomem *regs;
+ 	struct clk *ecc_clk;
++	struct clk *reg_clk;
+ 	struct completion complete;
+ 	unsigned long assigned_cs;
+ 	struct list_head chips;
+@@ -2747,6 +2748,17 @@ static int marvell_nfc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
++	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) == -EPROBE_DEFER) {
++		clk_disable_unprepare(nfc->ecc_clk);
++		return -EPROBE_DEFER;
++	}
++	if (!IS_ERR(nfc->reg_clk)) {
++		ret = clk_prepare_enable(nfc->reg_clk);
++		if (ret)
++			goto unprepare_clk;
++	}
++
+ 	marvell_nfc_disable_int(nfc, NDCR_ALL_INT);
+ 	marvell_nfc_clear_int(nfc, NDCR_ALL_INT);
+ 	ret = devm_request_irq(dev, irq, marvell_nfc_isr,
+@@ -2780,6 +2792,7 @@ static int marvell_nfc_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ unprepare_clk:
++	clk_disable_unprepare(nfc->reg_clk);
+ 	clk_disable_unprepare(nfc->ecc_clk);
+ 
+ 	return ret;
+@@ -2797,6 +2810,7 @@ static int marvell_nfc_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	clk_disable_unprepare(nfc->ecc_clk);
++	clk_disable_unprepare(nfc->reg_clk);
+ 
+ 	return 0;
+ }
 -- 
-1.9.1
+2.16.1
