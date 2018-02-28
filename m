@@ -1,48 +1,36 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 28 Feb 2018 13:39:44 -0800
-Subject: [GIT PULL 1/2] bcm2835-dt-next-2018-02-28
-Message-ID: <20180228213945.6781-1-eric@anholt.net>
+Date: Wed, 28 Feb 2018 13:39:45 -0800
+Subject: [GIT PULL 2/2] bcm2835-defconfig-next-2018-02-28
+In-Reply-To: <20180228213945.6781-1-eric@anholt.net>
+References: <20180228213945.6781-1-eric@anholt.net>
+Message-ID: <20180228213945.6781-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Florian,
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
 are available in the Git repository at:
 
-  git://github.com/anholt/linux tags/bcm2835-dt-next-2018-02-28
+  git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-02-28
 
-for you to fetch changes up to bcc76c4014dce4e3834dbd5b7f6593cbcfbfebe0:
+for you to fetch changes up to bb9d91a4e5c87cabfa2c9d35761374aa11150c2d:
 
-  ARM: dts: bcm2835-rpi-zero-w: Enable OTG mode (2018-02-26 15:02:23 -0800)
-
-----------------------------------------------------------------
-This pull request adds automatic BT probing to the Pi Zero W, OTG mode
-for the Zero W, the GPIO expander on the Pi3, and fixes I2S probe
-(which is disabled by default, but often used downstream)
+  ARM: multi_v7_defconfig: Enable thermal driver for RPi 2/3 (2018-02-26 15:30:43 -0800)
 
 ----------------------------------------------------------------
-Baruch Siach (2):
-      ARM: dts: bcm2835: make the firmware node into a bus
-      ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+This pull request enables several recent drivers for the Raspberry Pi
+family in the defconfigs (thermal, BT, aux serial).
 
-Henry Zhang (1):
-      ARM: dts: bcm283x: Fix pin function of JTAG pins
+----------------------------------------------------------------
+Stefan Wahren (2):
+      ARM: bcm2385_defconfig: Enable BT support for BCM43438
+      ARM: multi_v7_defconfig: Enable thermal driver for RPi 2/3
 
-Stefan Wahren (5):
-      dt-bindings: bcm283x: Fix register ranges of bcm2835-i2s
-      ARM: dts: bcm283x: Fix probing of bcm2835-i2s
-      ARM: dts: bcm283x: Apply pull settings to Zero W relevant groups
-      ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial slave
-      ARM: dts: bcm2835-rpi-zero-w: Enable OTG mode
+Tuomas Tynkkynen (1):
+      ARM: multi_v7_defconfig: Enable serial console on RPi 3
 
- .../devicetree/bindings/dma/brcm,bcm2835-dma.txt        |  4 ++--
- .../devicetree/bindings/sound/brcm,bcm2835-i2s.txt      |  9 ++++-----
- arch/arm/boot/dts/bcm2835-rpi-zero-w.dts                | 16 ++++++++++++++--
- arch/arm/boot/dts/bcm2835-rpi.dtsi                      |  4 +++-
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts                   | 17 +++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi                          |  9 ++++++---
- 6 files changed, 46 insertions(+), 13 deletions(-)
+ arch/arm/configs/bcm2835_defconfig  | 4 ++++
+ arch/arm/configs/multi_v7_defconfig | 4 ++++
+ 2 files changed, 8 insertions(+)
