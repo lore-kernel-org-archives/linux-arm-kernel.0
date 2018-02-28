@@ -1,54 +1,26 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 28 Feb 2018 13:22:51 +0000
-Subject: [PATCH v2 0/4] Enable DMA on STM32 MCU based on cortex-M7
-In-Reply-To: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
-References: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <c6e0906d-a181-720c-d2ef-73e1d517232a@arm.com>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Wed, 28 Feb 2018 14:24:28 +0100
+Subject: [PATCH 0/2] mailbox: introduce STMicroelectronics STM32 IPCC driver
+Message-ID: <1519824270-7134-1-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/18 13:10, Alexandre Torgue wrote:
-> This series enable DMA on several STM32 MCU based on cortex-M7.
-> To make it possible, a dedicated dma pool memory area has to be
-> created. This patchset activate also ARM_MPU flag which will configure 
-> MPU (Memory Protection Unit) according to devicetree information (mem
-> and dma-pool). Note that on cortex-M7 DMA has to use a NO cache-able 
-> memory region.
-> 
-> 
-> v2:
-> -select ARM_MPU in mach-stm32 Kconfig instead of add it in stm32 defconfig
-> -Remove XIP configuration from stm32_defconfig: ARM_MPU flag imposes XIP image
-> to be aligned on 1MB. It is currently not the case. I had choice to either
-> modify current XIP start address to be aligned on 1MB or to remove global
-> configuration. I make choice to remove XIP configuration. Indeed, SD card
-> support has been recently added for most of STM32 MCU boards (except for
-> stm32f429-disco). As kernel is growing up for stm32 it will be more and more
-> difficult to flash it in embeded flash (max size: 2MB).
+The STMicroelectronics STM32 Inter-Processor Communication Controller
+(IPCC) is used for communicating data between two processors.
+It provides a non blocking signaling mechanism to post and retrieve
+communication data in an atomic way.
 
-It is sad we are loosing XIP configuration - it used to uncover some bugs
-in a past. Probably, you might consider to have stm32 tiny (+xip) defconfig
-for those who do not want/need all-in-one kernel.
+Fabien Dessenne (2):
+  dt-bindings: mailbox: add STMicroelectronics STM32 IPCC binding
+  mailbox: add STMicroelectronics STM32 IPCC driver
 
-Cheers
-Vladimir
+ .../devicetree/bindings/mailbox/stm32-ipcc.txt     |  48 +++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/stm32-ipcc.c                       | 403 +++++++++++++++++++++
+ 4 files changed, 461 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
+ create mode 100644 drivers/mailbox/stm32-ipcc.c
 
-> -fix typo in commit message
-> 
-> Regards
-> Alex
-> 
-> Alexandre Torgue (4):
->   ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
->   ARM: configs: stm32: remove XIP configuration
->   ARM: stm32: Select ARM_MPU for cortex-M7 machines
->   ARM: dts: stm32: enable dma on MCU which embed a cortex-M7
-> 
->  arch/arm/boot/dts/stm32746g-eval.dts   | 21 +++++++++++++++++++++
->  arch/arm/boot/dts/stm32f769-disco.dts  | 21 +++++++++++++++++++++
->  arch/arm/boot/dts/stm32h743i-disco.dts | 21 +++++++++++++++++++++
->  arch/arm/boot/dts/stm32h743i-eval.dts  | 21 +++++++++++++++++++++
->  arch/arm/configs/stm32_defconfig       |  2 --
->  arch/arm/mach-stm32/Kconfig            |  3 +++
->  6 files changed, 87 insertions(+), 2 deletions(-)
-> 
+-- 
+2.7.4
