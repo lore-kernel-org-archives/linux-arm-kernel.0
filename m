@@ -1,15 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:40:53 -0800
-Subject: [PATCH v4 09/22] nvmem: rockchip-efuse: Convert to use
- devm_nvmem_register()
+Date: Wed, 28 Feb 2018 06:40:46 -0800
+Subject: [PATCH v4 02/22] nvmem: core: Allow specifying device name verbatim
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-10-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+Add code to allow avoid having nvmem core append a numeric suffix to
+the end of the name by passing config->id of -1.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,39 +24,45 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/core.c           | 11 ++++++++---
+ include/linux/nvmem-provider.h |  3 +++
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index f13a8335f364..8ebb103abe23 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -289,25 +289,15 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	econfig.reg_read = match->data;
- 	econfig.priv = efuse;
- 	econfig.dev = efuse->dev;
--	nvmem = nvmem_register(&econfig);
-+	nvmem = devm_nvmem_register(dev, &econfig);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 35a3dbeea324..99e04cfcc723 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -473,9 +473,14 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 	nvmem->reg_read = config->reg_read;
+ 	nvmem->reg_write = config->reg_write;
+ 	nvmem->dev.of_node = config->dev->of_node;
+-	dev_set_name(&nvmem->dev, "%s%d",
+-		     config->name ? : "nvmem",
+-		     config->name ? config->id : nvmem->id);
++
++	if (config->id == -1 && config->name) {
++		dev_set_name(&nvmem->dev, "%s", config->name);
++	} else {
++		dev_set_name(&nvmem->dev, "%s%d",
++			     config->name ? : "nvmem",
++			     config->name ? config->id : nvmem->id);
++	}
  
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int rockchip_efuse_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static struct platform_driver rockchip_efuse_driver = {
- 	.probe = rockchip_efuse_probe,
--	.remove = rockchip_efuse_remove,
- 	.driver = {
- 		.name = "rockchip-efuse",
- 		.of_match_table = rockchip_efuse_match,
+ 	nvmem->read_only = device_property_present(config->dev, "read-only") |
+ 			   config->read_only;
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 27e599222ec1..4889a6c62a81 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -43,6 +43,9 @@ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
+  * Note: A default "nvmem<id>" name will be assigned to the device if
+  * no name is specified in its configuration. In such case "<id>" is
+  * generated with ida_simple_get() and provided id field is ignored.
++ *
++ * Note: Specifying name and setting id to -1 implies a unique device
++ * whose name is provided as-is (kept unaltered).
+  */
+ struct nvmem_config {
+ 	struct device		*dev;
 -- 
 2.14.3
