@@ -1,38 +1,31 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 28 Feb 2018 23:44:32 +0530
-Subject: [PATCH v3 10/10] MAINTAINERS: Add Actions Semi S900 pinctrl and gpio
- entries
+Date: Wed, 28 Feb 2018 23:44:31 +0530
+Subject: [PATCH v3 09/10] MAINTAINERS: Add reviewer for ACTIONS platforms
 In-Reply-To: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
 References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180228181432.26847-11-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180228181432.26847-10-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add S900 pinctrl and gpio entries under ARCH_ACTIONS
+Since I'll be working on improving support for ACTIONS platforms, adding
+myself as the reviewer.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- MAINTAINERS | 4 ++++
- 1 file changed, 4 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 640dabc4c311..d63793ee545e 100644
+index 9a7f76eadae9..640dabc4c311 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1125,10 +1125,14 @@ F:	arch/arm/mach-actions/
- F:	arch/arm/boot/dts/owl-*
- F:	arch/arm64/boot/dts/actions/
- F:	drivers/clocksource/owl-*
-+F:	drivers/gpio/gpio-owl.c
-+F:	drivers/pinctrl/actions/*
- F:	drivers/soc/actions/
- F:	include/dt-bindings/power/owl-*
- F:	include/linux/soc/actions/
- F:	Documentation/devicetree/bindings/arm/actions.txt
-+F:	Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-+F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
- F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
- F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+@@ -1117,6 +1117,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
  
+ ARM/ACTIONS SEMI ARCHITECTURE
+ M:	Andreas F?rber <afaerber@suse.de>
++R:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ N:	owl
 -- 
 2.14.1
