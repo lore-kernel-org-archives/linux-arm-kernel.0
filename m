@@ -1,101 +1,69 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 28 Feb 2018 16:06:13 -0600
-Subject: [PATCH v7 07/13] drivers: base cacheinfo: Add support for ACPI based
- firmware tables
+Date: Wed, 28 Feb 2018 16:06:14 -0600
+Subject: [PATCH v7 08/13] arm64: Add support for ACPI based firmware tables
 In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
 References: <20180228220619.6992-1-jeremy.linton@arm.com>
-Message-ID: <20180228220619.6992-8-jeremy.linton@arm.com>
+Message-ID: <20180228220619.6992-9-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call ACPI cache parsing routines from base cacheinfo code if ACPI
-is enable. Also stub out cache_setup_acpi() so that individual
-architectures can enable ACPI topology parsing.
+The /sys cache entries should support ACPI/PPTT generated cache
+topology information. Lets detect ACPI systems and call
+an arch specific cache_setup_acpi() routine to update the hardware
+probed cache topology.
+
+For arm64, if ACPI is enabled, determine the max number of cache
+levels and populate them using the PPTT table if one is available.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/acpi/pptt.c       |  1 +
- drivers/base/cacheinfo.c  | 14 ++++++++++----
- include/linux/cacheinfo.h |  9 +++++++++
- 3 files changed, 20 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/cacheinfo.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-index 883e4318c6cd..c98f94ebd272 100644
---- a/drivers/acpi/pptt.c
-+++ b/drivers/acpi/pptt.c
-@@ -343,6 +343,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
- {
- 	int valid_flags = 0;
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+index 380f2e2fbed5..0bf0a835122f 100644
+--- a/arch/arm64/kernel/cacheinfo.c
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
-+	this_leaf->fw_token = cpu_node;
- 	if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
- 		this_leaf->size = found_cache->size;
- 		valid_flags++;
-diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-index 597aacb233fc..2880e2ab01f5 100644
---- a/drivers/base/cacheinfo.c
-+++ b/drivers/base/cacheinfo.c
-@@ -206,7 +206,7 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
- 					   struct cacheinfo *sib_leaf)
- {
- 	/*
--	 * For non-DT systems, assume unique level 1 cache, system-wide
-+	 * For non-DT/ACPI systems, assume unique level 1 caches, system-wide
- 	 * shared caches for all other levels. This will be used only if
- 	 * arch specific code has not populated shared_cpu_map
- 	 */
-@@ -214,6 +214,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
- }
- #endif
++#include <linux/acpi.h>
+ #include <linux/cacheinfo.h>
+ #include <linux/of.h>
  
-+int __weak cache_setup_acpi(unsigned int cpu)
-+{
-+	return -ENOTSUPP;
-+}
-+
- static int cache_shared_cpu_map_setup(unsigned int cpu)
+@@ -46,7 +47,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+ 
+ static int __init_cache_level(unsigned int cpu)
  {
+-	unsigned int ctype, level, leaves, of_level;
++	unsigned int ctype, level, leaves, fw_level;
  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-@@ -227,8 +232,8 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
- 	if (of_have_populated_dt())
- 		ret = cache_setup_of_node(cpu);
- 	else if (!acpi_disabled)
--		/* No cache property/hierarchy support yet in ACPI */
--		ret = -ENOTSUPP;
-+		ret = cache_setup_acpi(cpu);
-+
- 	if (ret)
- 		return ret;
  
-@@ -279,7 +284,8 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
- 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
- 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
- 		}
--		of_node_put(this_leaf->fw_token);
-+		if (of_have_populated_dt())
-+			of_node_put(this_leaf->fw_token);
+ 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+@@ -59,15 +60,19 @@ static int __init_cache_level(unsigned int cpu)
+ 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
  	}
- }
  
-diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
-index 0c6f658054d2..1446d3f053a2 100644
---- a/include/linux/cacheinfo.h
-+++ b/include/linux/cacheinfo.h
-@@ -97,6 +97,15 @@ int func(unsigned int cpu)					\
- struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
- int init_cache_level(unsigned int cpu);
- int populate_cache_leaves(unsigned int cpu);
-+int cache_setup_acpi(unsigned int cpu);
-+int acpi_find_last_cache_level(unsigned int cpu);
-+#ifndef CONFIG_ACPI
-+int acpi_find_last_cache_level(unsigned int cpu)
-+{
-+	/* ACPI kernels should be built with PPTT support */
-+	return 0;
-+}
-+#endif
+-	of_level = of_find_last_cache_level(cpu);
+-	if (level < of_level) {
++	if (acpi_disabled)
++		fw_level = of_find_last_cache_level(cpu);
++	else
++		fw_level = acpi_find_last_cache_level(cpu);
++
++	if (level < fw_level) {
+ 		/*
+ 		 * some external caches not specified in CLIDR_EL1
+ 		 * the information may be available in the device tree
+ 		 * only unified external caches are considered here
+ 		 */
+-		leaves += (of_level - level);
+-		level = of_level;
++		leaves += (fw_level - level);
++		level = fw_level;
+ 	}
  
- const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
- 
+ 	this_cpu_ci->num_levels = level;
 -- 
 2.13.6
