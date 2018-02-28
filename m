@@ -1,40 +1,36 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Wed, 28 Feb 2018 10:51:17 +0000
-Subject: [PATCH 1/2] dt-bindings: serial: stm32: add wakeup option using note
-In-Reply-To: <1519815044-22669-1-git-send-email-bich.hemon@st.com>
-References: <1519815044-22669-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1519815044-22669-2-git-send-email-bich.hemon@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Feb 2018 11:52:36 +0100
+Subject: [PATCH v2 2/2] arm64: dts: renesas: eagle: add I2C0 support
+In-Reply-To: <f830570f-f7e7-b277-172a-360a20de1aaf@cogentembedded.com>
+References: <3aaa4464-fc85-3fb4-2026-5d9df357bdff@cogentembedded.com>
+ <f830570f-f7e7-b277-172a-360a20de1aaf@cogentembedded.com>
+Message-ID: <CAMuHMdW7Uo+xJ---VeRReWcSvGfc9P0GrwwAAoPK9PW-gVxw=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update bindings with interrupt-names and wakeup-source information
+On Mon, Feb 26, 2018 at 9:55 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the Eagle board dependent part of the I2C0 device node.
+>
+> The I2C0 bus is populated by ON Semiconductor PCA9653 I/O expander and
+> Analog Devices ADV7511W HDMI transmitter (but we're only describing the
+> former chip now).
+>
+> Based on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Bich Hemon <bich.hemon@st.com>
----
- Documentation/devicetree/bindings/serial/st,stm32-usart.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+(lost)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-index d150b04..aaeb564 100644
---- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -10,6 +10,7 @@ Required properties:
- - interrupts:
-   - The interrupt line for the USART instance,
-   - An optional wake-up interrupt.
-+- interrupt-names: Contains "event" for the USART interrupt line.
- - clocks: The input clock of the USART instance
- 
- Optional properties:
-@@ -17,6 +18,9 @@ Optional properties:
- - st,hw-flow-ctrl: bool flag to enable hardware flow control.
- - dmas: phandle(s) to DMA controller node(s). Refer to stm32-dma.txt
- - dma-names: "rx" and/or "tx"
-+- wakeup-source: bool flag to indicate this device has wakeup capabilities
-+- interrupt-names : Should contain "wakeup" if optional wake-up interrupt is
-+  used.
- 
- Examples:
- usart4: serial at 40004c00 {
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
