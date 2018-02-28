@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 27 Feb 2018 16:51:29 -0800
-Subject: [GIT PULL 1/2] Broadcom devicetree fixes for 4.16
-Message-ID: <20180228005130.31856-1-f.fainelli@gmail.com>
+Date: Tue, 27 Feb 2018 16:51:30 -0800
+Subject: [GIT PULL 2/2] Broadcom drivers fixes for 4.16
+In-Reply-To: <20180228005130.31856-1-f.fainelli@gmail.com>
+References: <20180228005130.31856-1-f.fainelli@gmail.com>
+Message-ID: <20180228005130.31856-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,42 +13,26 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
 are available in the git repository at:
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/devicetree-fixes
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/drivers-fixes
 
-for you to fetch changes up to 2944866ac5b37e24ce1e646d2aaf472148e4a43e:
+for you to fetch changes up to fee5f1ef6cf76f87d9799596d06979c9e6589f2b:
 
-  ARM: dts: bcm283x: Move arm-pmu out of soc node (2018-02-27 16:42:09 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs Device Tree fixes for
-4.16, please pull the following:
-
-- Mathieu fixes leading 0x and 0's from bindings and Device Tree source
-  files, he has done this treewide and most of his changes are already in
-  4.16
-
-- Stefan provides two changes to the BCM283x DTS files in order to fix
-  DTC warnings
-
-- Florian fixes the amount of RAM on the BCM958625HR reference board to
-  properly limit to what is initialized by the bootloader
+  memory: brcmstb: dpfe: support new way of passing data from the DCPU (2018-02-23 10:56:59 -0800)
 
 ----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: dts: NSP: Fix amount of RAM on BCM958625HR
+This pull request contains Broadcom SoCs drivers fixes for 4.16, please
+pull the following:
 
-Mathieu Malaterre (1):
-      ARM: BCM: dts: Remove leading 0x and 0s from bindings notation
+- Markus provides two minor fixes to the Broadcom STB DPFE driver, one
+  to properly mask bits, and a second one to use the correct type. The
+  third commit is a consequence of a newer DFPE firmware which would
+  unfortunately crash without appropriate kernel changes.
 
-Stefan Wahren (2):
-      ARM: dts: bcm283x: Fix unit address of local_intc
-      ARM: dts: bcm283x: Move arm-pmu out of soc node
+----------------------------------------------------------------
+Markus Mayer (3):
+      memory: brcmstb: dpfe: properly mask vendor error bits
+      memory: brcmstb: dpfe: fix type declaration of variable "ret"
+      memory: brcmstb: dpfe: support new way of passing data from the DCPU
 
- arch/arm/boot/dts/bcm11351.dtsi   |  2 +-
- arch/arm/boot/dts/bcm21664.dtsi   |  2 +-
- arch/arm/boot/dts/bcm2835.dtsi    |  6 +++---
- arch/arm/boot/dts/bcm2836.dtsi    | 12 ++++++------
- arch/arm/boot/dts/bcm2837.dtsi    |  2 +-
- arch/arm/boot/dts/bcm283x.dtsi    |  2 +-
- arch/arm/boot/dts/bcm958625hr.dts |  2 +-
- 7 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/memory/brcmstb_dpfe.c | 74 +++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 60 insertions(+), 14 deletions(-)
