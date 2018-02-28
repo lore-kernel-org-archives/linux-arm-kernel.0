@@ -1,35 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Feb 2018 15:23:28 +0100
-Subject: [PATCH] arm_pmu: Use disable_irq_nosync when disabling SPI in CPU
- teardown hook
-In-Reply-To: <20180228135704.vuhk5mb6mqgc6jlr@lakrids.cambridge.arm.com>
-References: <1519661456-30445-1-git-send-email-will.deacon@arm.com>
- <20180228135704.vuhk5mb6mqgc6jlr@lakrids.cambridge.arm.com>
-Message-ID: <CAMuHMdWdua0+wsaMnkqRceOO=C5r23F-8jdnkwuR6kLBpUPb2g@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 28 Feb 2018 15:27:22 +0100
+Subject: [PATCH 1/2] hwrng: omap - Remove useless test before
+ clk_disable_unprepare
+In-Reply-To: <20180228142723.11562-1-gregory.clement@bootlin.com>
+References: <20180228142723.11562-1-gregory.clement@bootlin.com>
+Message-ID: <20180228142723.11562-2-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 2:57 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Feb 26, 2018 at 04:10:56PM +0000, Will Deacon wrote:
->> Commit 6de3f79112cc ("arm_pmu: explicitly enable/disable SPIs at hotplug")
->> moved all of the arm_pmu IRQ enable/disable calls to the CPU hotplug hooks,
->> regardless of whether they are implemented as PPIs or SPIs. This can
->> lead to us sleeping from atomic context due to disable_irq blocking:
->
->> Acked-by: Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-> I think something went wrong here when you applied the tag. ;)
+clk_disable_unprepare() already checks that the clock pointer is valid.
+No need to test it before calling it.
 
-In case of respinning:
-Fixes: 6de3f79112cc26bf ("arm_pmu: explicitly enable/disable SPIs at hotplug")
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/char/hw_random/omap-rng.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+index 74d11ae6abe9..159d4a1347b8 100644
+--- a/drivers/char/hw_random/omap-rng.c
++++ b/drivers/char/hw_random/omap-rng.c
+@@ -499,8 +499,7 @@ static int omap_rng_probe(struct platform_device *pdev)
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+-	if (!IS_ERR(priv->clk))
+-		clk_disable_unprepare(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ err_ioremap:
+ 	dev_err(dev, "initialization failed.\n");
+ 	return ret;
+@@ -517,8 +516,7 @@ static int omap_rng_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+-	if (!IS_ERR(priv->clk))
+-		clk_disable_unprepare(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	return 0;
+ }
+-- 
+2.16.1
