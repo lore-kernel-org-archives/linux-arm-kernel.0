@@ -1,72 +1,83 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Wed, 28 Feb 2018 15:49:17 +0800
-Subject: [PATCH v2 4/4] pintcrl: support bias-disable of generic and
- special pins simultaneously
-In-Reply-To: <1519803217.8089.31.camel@mtkswgap22>
-References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
- <1519634042-12063-5-git-send-email-zhiyong.tao@mediatek.com>
- <1519803217.8089.31.camel@mtkswgap22>
-Message-ID: <1519804157.23198.9.camel@mhfsdcap03>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 28 Feb 2018 08:53:28 +0100
+Subject: [PATCH 0/3] STM32 Extended TrustZone Protection driver
+In-Reply-To: <11c3ceb2-8b8d-de59-a0be-0777a42f63a7@arm.com>
+References: <20180227140926.22996-1-benjamin.gaignard@st.com>
+ <20180227171124.h2yjhicmlfrwr4nh@lakrids.cambridge.arm.com>
+ <CA+M3ks6qV_pGdE6mr3n7TiY9VhbqEkrdH6tN=8e-A=oa4UbDHw@mail.gmail.com>
+ <11c3ceb2-8b8d-de59-a0be-0777a42f63a7@arm.com>
+Message-ID: <CA+M3ks5qR++8Vwwk8=5Oh6DBdT9NF3ysqfjayq4Gze-oke8Ayg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-28 at 15:33 +0800, Sean Wang wrote:
-> On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
-> > For generic pins, parameter "arg" is 0 or 1.
-> > For special pins, bias-disable is set by R0R1,
-> > so we need transmited "00" to set bias-disable
-> > When we set "bias-disable" as high-z property,
-> > the parameter should be "MTK_PUPD_SET_R1R0_00".
-> > 
-> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > ---
-> >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 13 +++++++++++--
-> >  1 file changed, 11 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > index 3cf384f..e88ba04 100644
-> > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > @@ -301,8 +301,17 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
-> >  	 * resistor bit, so we need this special handle.
-> >  	 */
-> >  	if (pctl->devdata->spec_pull_set) {
-> > -		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> > -			pin, pctl->devdata->port_align, isup, arg);
-> > +		if (enable) {
-> > +			ret = pctl->devdata->spec_pull_set(
-> > +				mtk_get_regmap(pctl, pin), pin,
-> > +				pctl->devdata->port_align, isup,
-> > +				arg);
-> > +		} else {
-> > +			ret = pctl->devdata->spec_pull_set(
-> > +				mtk_get_regmap(pctl, pin), pin,
-> > +				pctl->devdata->port_align, isup,
-> > +				MTK_PUPD_SET_R1R0_00);
-> > +		}
-> 
-> 
-> it looks like you can use as following snippet with reusing original
-> logic and less effort on maintaining these common code (?)
-==> Thanks for your suggestion very much. It seems better.
-I will change it in v3.
-> 
-> 
-> if (pctl->devdata->spec_pull_set) {
-> 	+ if (!enable)
-> 	+ 	arg = MTK_PUPD_SET_R1R0_00;
-> 
-> 	ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> 		pin, pctl->devdata->port_align, isup, arg);
-> 
-> 
-> Also, it's better to add more comments to such kind of special path for
-> allowing future SoCs to follow and extend more easily.
+2018-02-27 20:46 GMT+01:00 Robin Murphy <robin.murphy@arm.com>:
+> On 27/02/18 19:16, Benjamin Gaignard wrote:
+>>
+>> 2018-02-27 18:11 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+>>>
+>>> On Tue, Feb 27, 2018 at 03:09:23PM +0100, Benjamin Gaignard wrote:
+>>>>
+>>>> On early boot stages STM32MP1 platform is able to dedicate some hardware
+>>>> blocks
+>>>> to a secure OS running in TrustZone.
+>>>> We need to avoid using those hardware blocks on non-secure context (i.e.
+>>>> kernel)
+>>>> because read/write access will all be discarded.
+>>>>
+>>>> Extended TrustZone Protection driver register itself as listener of
+>>>> BUS_NOTIFY_BIND_DRIVER and check, given the device address, if the
+>>>> hardware block
+>>>> could be used in a Linux context. If not it returns NOTIFY_BAD to driver
+>>>> core
+>>>> to stop driver probing.
+>>>
+>>>
+>>> Huh?
+>>>
+>>> If these devices are not usable from the non-secure side, why are they
+>>> not removed form the DT (or marked disabled)?
+>>>
+>>> In other cases, where resources are carved out for the secure side (e.g.
+>>> DRAM carveouts), that's how we handle things.
+>>>
+>>
+>> That true you can parse and disable a device a boot time but if DT doesn't
+>> exactly reflect etzpc status bits we will in trouble when try to get
+>> access to
+>> the device.
+>
+>
+> Well, yes. If the DT doesn't correctly represent the hardware, things will
+> probably go wrong; that's hardly a novel concept, and it's certainly not
+> unique to this particular SoC.
+>
+>> Changing the DT is a software protection while etzpc is an hardware
+>> protection
+>> so we need to check it anyway.
+>
+>
+> There are several in-tree DT and code examples where devices are marked as
+> disabled on certain boards/SoC variants/etc. because attempting to access
+> them can abort/lock up/trigger a secure watchdog reset/etc. The only
+> "special" thing in this particular situation is apparently that this device
+> even allows its secure configuration to be probed from the non-secure side
+> at all.
+>
+> Implementing a boardfile so that you can "check" the DT makes very little
+> sense to me; Linux is not a firmware validation suite.
 
-==> Thanks for your suggestion very much. I will add more comments here.
-> 
-> >  		if (!ret)
-> >  			return 0;
-> >  	}
-> 
-> 
+It is not about to "check" the DT but if Linux could get access to the hardware.
+Hardware block assignment to secure or non-secure world could change at runtime
+for example I2C block could be manage by secure OS for a trusted
+application and when
+it have finish "release" the it for Linux. I don't think that could be
+done by changing DT.
+
+I think that dhecking hardware blocks status bits before probe them is
+also more robust than let
+each driver discover at probe time that it hardware isn't responding.
+
+Benjamin
+
+>
+> Robin.
