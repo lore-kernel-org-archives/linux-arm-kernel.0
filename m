@@ -1,165 +1,116 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 28 Feb 2018 16:25:37 +0000
-Subject: [PATCH 37/37] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <1e76c66c-952e-71bd-d831-d3a1ded9559c@codeaurora.org>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-38-jean-philippe.brucker@arm.com>
- <1e76c66c-952e-71bd-d831-d3a1ded9559c@codeaurora.org>
-Message-ID: <e428976f-c381-309a-be57-264fea5c9b18@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 28 Feb 2018 17:24:12 +0100
+Subject: [PATCH 2/2] usb: host: xhci-plat: Fix clock resource by adding a
+ register clock
+In-Reply-To: <da059a0e-d6f3-73e4-b58d-b3db074c0601@codeaurora.org> (Manu
+ Gautam's message of "Wed, 28 Feb 2018 21:39:05 +0530")
+References: <20180214161620.4401-1-gregory.clement@bootlin.com>
+ <20180214161620.4401-3-gregory.clement@bootlin.com>
+ <da059a0e-d6f3-73e4-b58d-b3db074c0601@codeaurora.org>
+Message-ID: <87zi3tdqvn.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/18 01:26, Sinan Kaya wrote:
-[...]
->> +static int vfio_iommu_sva_init(struct device *dev, void *data)
->> +{
-> 
-> data is not getting used.
+Hi Manu,
+ 
+ On mer., f?vr. 28 2018, Manu Gautam <mgautam@codeaurora.org> wrote:
 
-That's the pointer passed to "iommu_group_for_each_dev", NULL at the
-moment. Next version of this patch will keep some state in data to
-ensure one device per group.
-
->> +
->> +	int ret;
->> +
->> +	ret = iommu_sva_device_init(dev, IOMMU_SVA_FEAT_PASID |
->> +				    IOMMU_SVA_FEAT_IOPF, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return iommu_register_mm_exit_handler(dev, vfio_iommu_mm_exit);
->> +}
->> +
->> +static int vfio_iommu_sva_shutdown(struct device *dev, void *data)
->> +{
->> +	iommu_sva_device_shutdown(dev);
->> +	iommu_unregister_mm_exit_handler(dev);
->> +
->> +	return 0;
->> +}
->> +
->> +static int vfio_iommu_bind_group(struct vfio_iommu *iommu,
->> +				 struct vfio_group *group,
->> +				 struct vfio_mm *vfio_mm)
->> +{
->> +	int ret;
->> +	int pasid;
->> +
->> +	if (!group->sva_enabled) {
->> +		ret = iommu_group_for_each_dev(group->iommu_group, NULL,
->> +					       vfio_iommu_sva_init);
+> Hi,
+>
+>
+> On 2/14/2018 9:46 PM, Gregory CLEMENT wrote:
+>> On Armada 7K/8K we need to explicitly enable the register clock. This
+>> clock is optional because not all the SoCs using this IP need it but at
+>> least for Armada 7K/8K it is actually mandatory.
+>>
+>> The change was done at xhci-plat level and not at a xhci-mvebu.c because,
+>> it is expected that other SoC would have this kind of constraint.
+>>
+>> The binding documentation is updating accordingly.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-xhci.txt |  5 +++-
+>>  drivers/usb/host/xhci-plat.c                       | 33 ++++++++++++++++++----
+>>  drivers/usb/host/xhci.h                            |  3 +-
+>>  3 files changed, 33 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> index e2ea59bbca93..e4b14511f4f8 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> @@ -27,7 +27,10 @@ Required properties:
+>>    - interrupts: one XHCI interrupt should be described here.
+>>  
+>>  Optional properties:
+>> -  - clocks: reference to a clock
+>> +  - clocks: reference to the clocks
+>> +  - clock-names: mandatory if there is a second clock, in this case
+>> +    the name must be "core" for the first clock and "reg" for the
+>> +    second one
+>>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 79afaac57ef6..fd0c399013a2 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -157,6 +157,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>  	struct resource         *res;
+>>  	struct usb_hcd		*hcd;
+>>  	struct clk              *clk;
+>> +	struct clk              *reg_clk;
+>>  	int			ret;
+>>  	int			irq;
+>>  
+>> @@ -226,17 +227,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>  	hcd->rsrc_len = resource_size(res);
+>>  
+>>  	/*
+>> -	 * Not all platforms have a clk so it is not an error if the
+>> -	 * clock does not exists.
+>> +	 * Not all platforms have clks so it is not an error if the
+>> +	 * clock do not exist.
+>>  	 */
+>> +	reg_clk = devm_clk_get(&pdev->dev, "reg");
+>> +	if (!IS_ERR(reg_clk)) {
+>> +		ret = clk_prepare_enable(reg_clk);
 >> +		if (ret)
->> +			return ret;
->> +
->> +		group->sva_enabled = true;
+>> +			goto put_hcd;
+>> +	} else if (PTR_ERR(reg_clk) == -EPROBE_DEFER) {
+>> +		ret = -EPROBE_DEFER;
+>> +		goto put_hcd;
 >> +	}
 >> +
->> +	ret = iommu_sva_bind_group(group->iommu_group, vfio_mm->mm, &pasid,
->> +				   IOMMU_SVA_FEAT_PASID | IOMMU_SVA_FEAT_IOPF,
->> +				   vfio_mm);
->> +	if (ret)
->> +		return ret;
-> 
-> don't you need to clean up the work done by vfio_iommu_sva_init() here.
+>
+> How about using clk_bulk_ APIs?
 
-Yes I suppose we can, if we enabled during this bind
-
-[...]
->> +static long vfio_iommu_type1_bind_process(struct vfio_iommu *iommu,
->> +					  void __user *arg,
->> +					  struct vfio_iommu_type1_bind *bind)
->> +{
->> +	struct vfio_iommu_type1_bind_process params;
->> +	struct vfio_domain *domain;
->> +	struct vfio_group *group;
->> +	struct vfio_mm *vfio_mm;
->> +	struct mm_struct *mm;
->> +	unsigned long minsz;
->> +	int ret = 0;
->> +
->> +	minsz = sizeof(*bind) + sizeof(params);
->> +	if (bind->argsz < minsz)
->> +		return -EINVAL;
->> +
->> +	arg += sizeof(*bind);
->> +	if (copy_from_user(&params, arg, sizeof(params)))
->> +		return -EFAULT;
->> +
->> +	if (params.flags & ~VFIO_IOMMU_BIND_PID)
->> +		return -EINVAL;
->> +
->> +	if (params.flags & VFIO_IOMMU_BIND_PID) {
->> +		mm = vfio_iommu_get_mm_by_vpid(params.pid);
->> +		if (IS_ERR(mm))
->> +			return PTR_ERR(mm);
->> +	} else {
->> +		mm = get_task_mm(current);
->> +		if (!mm)
->> +			return -EINVAL;
->> +	}
-> 
-> I think you can merge mm failure in both states.
-
-Yes, I think vfio_iommu_get_mm_by_vpid could return NULL instead of an
-error pointer, and we can throw -ESRCH in all cases (the existing
-get_task_mm() failure in this driver does return -ESRCH, so it would be
-consistent.)
-
-[...]
->> +	/*
->> +	 * We can't simply unbind a foreign process by PASID, because the
->> +	 * process might have died and the PASID might have been reallocated to
->> +	 * another process. Instead we need to fetch that process mm by PID
->> +	 * again to make sure we remove the right vfio_mm. In addition, holding
->> +	 * the mm guarantees that mm_users isn't dropped while we unbind and the
->> +	 * exit_mm handler doesn't fire. While not strictly necessary, not
->> +	 * having to care about that race simplifies everyone's life.
->> +	 */
->> +	if (params.flags & VFIO_IOMMU_BIND_PID) {
->> +		mm = vfio_iommu_get_mm_by_vpid(params.pid);
->> +		if (IS_ERR(mm))
->> +			return PTR_ERR(mm);
->> +	} else {
->> +		mm = get_task_mm(current);
->> +		if (!mm)
->> +			return -EINVAL;
->> +	}
->> +
-> 
-> I think you can merge mm failure in both states.
-
-ok
-
->> +	ret = -ESRCH;
->> +	mutex_lock(&iommu->lock);
->> +	list_for_each_entry(vfio_mm, &iommu->mm_list, next) {
->> +		if (vfio_mm->mm != mm)
->> +			continue;
->> +
-> 
-> these loops look wierd 
-> 1. for loops + break 
-> 2. for loops + goto
-> 
-> how about closing the for loop here. and then return here if not vfio_mm
-> not found.
-
-ok
-
->> +		vfio_iommu_unbind(iommu, vfio_mm);
->> +		list_del(&vfio_mm->next);
->> +		kfree(vfio_mm);
->> +		ret = 0;
->> +		break;
->> +	}
->> +	mutex_unlock(&iommu->lock);
->> +	mmput(mm);
->> +
->> +	return ret;
->> +}
->> +
-> 
+I didn't know this API, but after having a look on it, it didn't match
+what I need. Indeed the second clock is "optional" to handle the
+backward compatibility. With the clk_bulk_ APIS all the clocks are
+mandatory.
 
 Thanks,
-Jean
+
+Gregory
+
+>
+>>  	clk = devm_clk_get(&pdev->dev, NULL);
+>>  	if (!IS_ERR(clk)) {
+>>  		ret = clk_prepare_enable(clk);
+>>
+>
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
