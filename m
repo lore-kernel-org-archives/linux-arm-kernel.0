@@ -1,93 +1,113 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:27 +0800
-Subject: [PATCH 05/29] arm64: mm: Invalidate both kernel and user ASIDs when
- performing TLBI
+Date: Wed, 28 Feb 2018 11:56:28 +0800
+Subject: [PATCH 06/29] arm64: factor out entry stack manipulation
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-6-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-7-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-commit 9b0de864b5bc upstream.
+commit b11e5759bfac upstream.
 
-Since an mm has both a kernel and a user ASID, we need to ensure that
-broadcast TLB maintenance targets both address spaces so that things
-like CoW continue to work with the uaccess primitives in the kernel.
+In subsequent patches, we will detect stack overflow in our exception
+entry code, by verifying the SP after it has been decremented to make
+space for the exception regs.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+This verification code is small, and we can minimize its impact by
+placing it directly in the vectors. To avoid redundant modification of
+the SP, we also need to move the initial decrement of the SP into the
+vectors.
+
+As a preparatory step, this patch introduces kernel_ventry, which
+performs this decrement, and updates the entry code accordingly.
+Subsequent patches will fold SP verification into kernel_ventry.
+
+There should be no functional change as a result of this patch.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[Mark: turn into prep patch, expand commit msg]
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/tlbflush.h | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/entry.S | 47 ++++++++++++++++++++++++++---------------------
+ 1 file changed, 26 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index deab523..ad6bd8b 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -23,6 +23,7 @@
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b4c7db4..f5aa8f0 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -68,8 +68,13 @@
+ #define BAD_FIQ		2
+ #define BAD_ERROR	3
  
- #include <linux/sched.h>
- #include <asm/cputype.h>
-+#include <asm/mmu.h>
- 
- /*
-  * Raw TLBI operations.
-@@ -42,6 +43,11 @@
- 
- #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
- 
-+#define __tlbi_user(op, arg) do {						\
-+	if (arm64_kernel_unmapped_at_el0())					\
-+		__tlbi(op, (arg) | USER_ASID_FLAG);				\
-+} while (0)
+-	.macro	kernel_entry, el, regsize = 64
++	.macro kernel_ventry	label
++	.align 7
+ 	sub	sp, sp, #S_FRAME_SIZE
++	b	\label
++	.endm
 +
- /*
-  *	TLB Management
-  *	==============
-@@ -103,6 +109,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
++	.macro	kernel_entry, el, regsize = 64
+ 	.if	\regsize == 32
+ 	mov	w0, w0				// zero upper 32 bits of x0
+ 	.endif
+@@ -257,31 +262,31 @@ tsk	.req	x28		// current thread_info
  
- 	dsb(ishst);
- 	__tlbi(aside1is, asid);
-+	__tlbi_user(aside1is, asid);
- 	dsb(ish);
- }
+ 	.align	11
+ ENTRY(vectors)
+-	ventry	el1_sync_invalid		// Synchronous EL1t
+-	ventry	el1_irq_invalid			// IRQ EL1t
+-	ventry	el1_fiq_invalid			// FIQ EL1t
+-	ventry	el1_error_invalid		// Error EL1t
++	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
++	kernel_ventry	el1_irq_invalid			// IRQ EL1t
++	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
++	kernel_ventry	el1_error_invalid		// Error EL1t
  
-@@ -113,6 +120,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+-	ventry	el1_sync			// Synchronous EL1h
+-	ventry	el1_irq				// IRQ EL1h
+-	ventry	el1_fiq_invalid			// FIQ EL1h
+-	ventry	el1_error_invalid		// Error EL1h
++	kernel_ventry	el1_sync			// Synchronous EL1h
++	kernel_ventry	el1_irq				// IRQ EL1h
++	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
++	kernel_ventry	el1_error_invalid		// Error EL1h
  
- 	dsb(ishst);
- 	__tlbi(vale1is, addr);
-+	__tlbi_user(vale1is, addr);
- 	dsb(ish);
- }
+-	ventry	el0_sync			// Synchronous 64-bit EL0
+-	ventry	el0_irq				// IRQ 64-bit EL0
+-	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+-	ventry	el0_error_invalid		// Error 64-bit EL0
++	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
++	kernel_ventry	el0_irq				// IRQ 64-bit EL0
++	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
++	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
  
-@@ -139,10 +147,13 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 
- 	dsb(ishst);
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
--		if (last_level)
-+		if (last_level) {
- 			__tlbi(vale1is, addr);
--		else
-+			__tlbi_user(vale1is, addr);
-+		} else {
- 			__tlbi(vae1is, addr);
-+			__tlbi_user(vae1is, addr);
-+		}
- 	}
- 	dsb(ish);
- }
-@@ -182,6 +193,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- 	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
- 
- 	__tlbi(vae1is, addr);
-+	__tlbi_user(vae1is, addr);
- 	dsb(ish);
- }
+ #ifdef CONFIG_COMPAT
+-	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+-	ventry	el0_irq_compat			// IRQ 32-bit EL0
+-	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
+-	ventry	el0_error_invalid_compat	// Error 32-bit EL0
++	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
++	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
++	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
++	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
+ #else
+-	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
+-	ventry	el0_irq_invalid			// IRQ 32-bit EL0
+-	ventry	el0_fiq_invalid			// FIQ 32-bit EL0
+-	ventry	el0_error_invalid		// Error 32-bit EL0
++	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
++	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
++	kernel_ventry	el0_fiq_invalid			// FIQ 32-bit EL0
++	kernel_ventry	el0_error_invalid		// Error 32-bit EL0
+ #endif
+ END(vectors)
  
 -- 
 2.7.4
