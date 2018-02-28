@@ -1,41 +1,34 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 28 Feb 2018 15:40:40 -0600
-Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <1519071723-31790-11-git-send-email-david@lechnology.com>
- <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
-Message-ID: <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 28 Feb 2018 22:43:30 +0100
+Subject: [PATCH v2 06/16] drm/sun4i: Don't process LVDS if TCON doesn't
+ support it
+In-Reply-To: <20180228073608.r2zd3qkiudm2uarm@flea>
+References: <20180227222701.9716-1-jernej.skrabec@siol.net>
+ <20180227222701.9716-7-jernej.skrabec@siol.net>
+ <20180228073608.r2zd3qkiudm2uarm@flea>
+Message-ID: <5333678.QYsGi30oEL@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
-> 
-> I think I found the reason for the strange crashes we were
-> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
-> me in the right direction.
-> 
-> The mdio driver fails to probe with v7 due to the supplied clock rate
-> being wrong. Before failing we register the emac clock with
-> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
-> reference count of the clock, but we never actually increased it in
-> the first place in the line above. The core clock code then destroys
-> the associated clk_core structure. When the next user comes around (in
-> our case the clk debug functions) the system crashes.
-> 
-> I believe there to be two issues: one is with v7 - we need to increase
-> the clock reference count in davinci_psc_genpd_attach_dev().
-> 
-> Second is the error path in the clock framework - we should remove the
-> destroyed clk_core from the debug list, which is not being done now.
-> 
-> Why we even need to track the refcount of clk_core is a mistery for me
-> though. Stephen, Mike?
-> 
-> Best regards,
-> Bartosz Golaszewski
+Hi Maxime,
 
-Great find. I figured it had to be something like this, but I wasn't
-able to reproduce the problem yet.
+Dne sreda, 28. februar 2018 ob 08:36:08 CET je Maxime Ripard napisal(a):
+> On Tue, Feb 27, 2018 at 11:26:51PM +0100, Jernej Skrabec wrote:
+> > TCON checks for LVDS properties even if it doesn't support it. Add a
+> > check to skip that part of the code if TCON doesn't support channel 0.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> 
+> I have already sent a similar patch here:
+> https://lists.freedesktop.org/archives/dri-devel/2018-February/166665.html
 
-I suppose it is time to spin up a v8 with some fixes.
+Right. However, check last chunk in my patch. There is no need to call 
+sun4i_rgb_init() if TCON doesn't support channel 0. It doesn't do anything, 
+except producing warning. Will you add that this change to your patch and then 
+I can remove this patch from next revision?
+
+BTW, your patch won't apply cleanly, since you didn't base it on latest code 
+(every TCON variant has at least one entry now).
+
+Best regards,
+Jernej
