@@ -1,38 +1,72 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 28 Feb 2018 02:27:57 +0000
-Subject: [PATCH V4 2/2] thermal: imx: add i.MX7 thermal sensor support
-In-Reply-To: <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
-References: <1519459369-29083-1-git-send-email-Anson.Huang@nxp.com>
- <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <AM3PR04MB306CAA99F88AE8F580422EF80C70@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 28 Feb 2018 11:03:29 +0800
+Subject: [PATCH] ARM: dts: mx5: Pass the memory unit-address
+In-Reply-To: <1519784015-16507-1-git-send-email-festevam@gmail.com>
+References: <1519784015-16507-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180228030328.GC3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Anson Huang [mailto:Anson.Huang at nxp.com]
-> Sent: Saturday, February 24, 2018 4:03 PM
-> To: rui.zhang at intel.com; edubezval at gmail.com; robh+dt at kernel.org;
-> mark.rutland at arm.com; shawnguo at kernel.org; kernel at pengutronix.de;
-> Fabio Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk
-> Cc: dl-linux-imx <linux-imx@nxp.com>; linux-pm at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: [PATCH V4 2/2] thermal: imx: add i.MX7 thermal sensor support
+On Tue, Feb 27, 2018 at 11:13:35PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> This patch adds i.MX7 thermal sensor support, most of the i.MX7 thermal
-> sensor functions are same with
-> i.MX6 except the registers offset/layout, so we move those registers
-> offset/layout definitions to soc data structure.
+> Pass the memory unit-address to fix the following build warnings with W=1:
 > 
-> i.MX7 uses single calibration data @25C, the calibration data is located at
-> OCOTP offset 0x4F0, bit[17:9], the formula is as below:
+> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/imx53-tx53-x03x.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/imx53-tx53-x13x.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 > 
-> Tmeas = (Nmeas - n1) + 25; n1 is the fuse value for 25C.
+> In theses cases an empty memory node is passed, which will be filled
+> by the bootloader. Passing the memory base address still allows the
+> bootloader to fill the memory size.
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+One thing I'm unsure is which memory node will be fixed up with correct
+memory configuration, considering we will have two memory nodes.  One is
+the following that defined in imx51.dtsi.
 
-Regards
-Dong Aisheng
+ memory { device_type = "memory"; };
+
+And the other is memory at 90000000.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx51-zii-rdu1.dts | 4 ++--
+>  arch/arm/boot/dts/imx53-tx53.dtsi    | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index aa36204..14f4d57 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -52,8 +52,8 @@
+>  	};
+>  
+>  	/* Will be filled by the bootloader */
+> -	memory {
+> -		reg = <0 0>;
+> +	memory at 90000000 {
+> +		reg = <0x90000000 0>;
+>  	};
+>  
+>  	aliases {
+> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+> index e77dd0a..69a2af7 100644
+> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+> @@ -50,8 +50,8 @@
+>  	compatible = "karo,tx53", "fsl,imx53";
+>  
+>  	/* Will be filled by the bootloader */
+> -	memory {
+> -		reg = <0 0>;
+> +	memory at 70000000 {
+> +		reg = <0x70000000 0>;
+>  	};
+>  
+>  	aliases {
+> -- 
+> 2.7.4
+> 
