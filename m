@@ -1,149 +1,150 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:29 +0800
-Subject: [PATCH 07/29] arm64: entry.S: move SError handling into a C function
- for future expansion
+Date: Wed, 28 Feb 2018 11:56:30 +0800
+Subject: [PATCH 08/29] module: extend 'rodata=off' boot cmdline parameter to
+ module mappings
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-8-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-9-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-commit a92d4d1454ab upstream.
+commit 39290b389ea upstream.
 
-Today SError is taken using the inv_entry macro that ends up in
-bad_mode.
+The current "rodata=off" parameter disables read-only kernel mappings
+under CONFIG_DEBUG_RODATA:
+    commit d2aa1acad22f ("mm/init: Add 'rodata=off' boot cmdline parameter
+    to disable read-only kernel mappings")
 
-SError can be used by the RAS Extensions to notify either the OS or
-firmware of CPU problems, some of which may have been corrected.
+This patch is a logical extension to module mappings ie. read-only mappings
+at module loading can be disabled even if CONFIG_DEBUG_SET_MODULE_RONX
+(mainly for debug use). Please note, however, that it only affects RO/RW
+permissions, keeping NX set.
 
-To allow this handling to be added, add a do_serror() C function
-that just panic()s. Add the entry.S boiler plate to save/restore the
-CPU registers and unmask debug exceptions. Future patches may change
-do_serror() to return if the SError Interrupt was notification of a
-corrected error.
+This is the first step to make CONFIG_DEBUG_SET_MODULE_RONX mandatory
+(always-on) in the future as CONFIG_DEBUG_RODATA on x86 and arm64.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
-[Split out of a bigger patch, added compat path, renamed, enabled debug
- exceptions]
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-
+Suggested-by: and Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+Link: http://lkml.kernel.org/r/20161114061505.15238-1-takahiro.akashi at linaro.org
+Signed-off-by: Jessica Yu <jeyu@redhat.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	no vmap_stack in arch/arm64/kernel/traps.c
-	using old enable_dbg_and_irq instead of enable_daif in
-		arch/arm64/kernel/entry.S
+	keeping kaiser.h in init/main.c
 ---
- arch/arm64/kernel/entry.S | 36 +++++++++++++++++++++++++++++-------
- arch/arm64/kernel/traps.c | 14 ++++++++++++++
- 2 files changed, 43 insertions(+), 7 deletions(-)
+ include/linux/init.h |  3 +++
+ init/main.c          |  7 +++++--
+ kernel/module.c      | 20 +++++++++++++++++---
+ 3 files changed, 25 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f5aa8f0..60b202a 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -270,18 +270,18 @@ ENTRY(vectors)
- 	kernel_ventry	el1_sync			// Synchronous EL1h
- 	kernel_ventry	el1_irq				// IRQ EL1h
- 	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	el1_error			// Error EL1h
+diff --git a/include/linux/init.h b/include/linux/init.h
+index 8e346d1..4dfe300 100644
+--- a/include/linux/init.h
++++ b/include/linux/init.h
+@@ -133,6 +133,9 @@ void prepare_namespace(void);
+ void __init load_default_modules(void);
+ int __init init_rootfs(void);
  
- 	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
- 	kernel_ventry	el0_irq				// IRQ 64-bit EL0
- 	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	el0_error			// Error 64-bit EL0
- 
- #ifdef CONFIG_COMPAT
- 	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
- 	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	el0_error_compat		// Error 32-bit EL0
- #else
- 	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
- 	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
-@@ -321,10 +321,6 @@ ENDPROC(el0_error_invalid)
- el0_fiq_invalid_compat:
- 	inv_entry 0, BAD_FIQ, 32
- ENDPROC(el0_fiq_invalid_compat)
--
--el0_error_invalid_compat:
--	inv_entry 0, BAD_ERROR, 32
--ENDPROC(el0_error_invalid_compat)
++#if defined(CONFIG_DEBUG_RODATA) || defined(CONFIG_DEBUG_SET_MODULE_RONX)
++extern bool rodata_enabled;
++#endif
+ #ifdef CONFIG_DEBUG_RODATA
+ void mark_rodata_ro(void);
  #endif
+diff --git a/init/main.c b/init/main.c
+index 99f0265..f22957a 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -81,6 +81,7 @@
+ #include <linux/proc_ns.h>
+ #include <linux/io.h>
+ #include <linux/kaiser.h>
++#include <linux/cache.h>
  
- el1_sync_invalid:
-@@ -532,6 +528,10 @@ el0_svc_compat:
- el0_irq_compat:
- 	kernel_entry 0, 32
- 	b	el0_irq_naked
-+
-+el0_error_compat:
-+	kernel_entry 0, 32
-+	b	el0_error_naked
- #endif
+ #include <asm/io.h>
+ #include <asm/bugs.h>
+@@ -914,14 +915,16 @@ static int try_to_run_init_process(const char *init_filename)
  
- el0_da:
-@@ -653,6 +653,28 @@ el0_irq_naked:
- 	b	ret_to_user
- ENDPROC(el0_irq)
+ static noinline void __init kernel_init_freeable(void);
  
-+el1_error:
-+	kernel_entry 1
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	kernel_exit 1
-+ENDPROC(el1_error)
-+
-+el0_error:
-+	kernel_entry 0
-+el0_error_naked:
-+	mrs	x1, esr_el1
-+	enable_dbg
-+	mov	x0, sp
-+	bl	do_serror
-+	enable_dbg_and_irq
-+	ct_user_exit
-+	b	ret_to_user
-+ENDPROC(el0_error)
-+
-+
- /*
-  * Register switch for AArch64. The callee-saved registers need to be saved
-  * and restored. On entry:
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c743d1f..2ef7e33 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -637,6 +637,20 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
- 	force_sig_info(info.si_signo, &info, current);
- }
- 
-+
-+asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
-+{
-+	nmi_enter();
-+
-+	console_verbose();
-+
-+	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
-+		smp_processor_id(), esr, esr_get_class_string(esr));
-+	__show_regs(regs);
-+
-+	panic("Asynchronous SError Interrupt");
-+}
-+
- void __pte_error(const char *file, int line, unsigned long val)
+-#ifdef CONFIG_DEBUG_RODATA
+-static bool rodata_enabled = true;
++#if defined(CONFIG_DEBUG_RODATA) || defined(CONFIG_SET_MODULE_RONX)
++bool rodata_enabled __ro_after_init = true;
+ static int __init set_debug_rodata(char *str)
  {
- 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
+ 	return strtobool(str, &rodata_enabled);
+ }
+ __setup("rodata=", set_debug_rodata);
++#endif
+ 
++#ifdef CONFIG_DEBUG_RODATA
+ static void mark_readonly(void)
+ {
+ 	if (rodata_enabled)
+diff --git a/kernel/module.c b/kernel/module.c
+index 07bfb99..0651f2d 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -1911,6 +1911,9 @@ static void frob_writable_data(const struct module_layout *layout,
+ /* livepatching wants to disable read-only so it can frob module. */
+ void module_disable_ro(const struct module *mod)
+ {
++	if (!rodata_enabled)
++		return;
++
+ 	frob_text(&mod->core_layout, set_memory_rw);
+ 	frob_rodata(&mod->core_layout, set_memory_rw);
+ 	frob_ro_after_init(&mod->core_layout, set_memory_rw);
+@@ -1920,6 +1923,9 @@ void module_disable_ro(const struct module *mod)
+ 
+ void module_enable_ro(const struct module *mod, bool after_init)
+ {
++	if (!rodata_enabled)
++		return;
++
+ 	frob_text(&mod->core_layout, set_memory_ro);
+ 	frob_rodata(&mod->core_layout, set_memory_ro);
+ 	frob_text(&mod->init_layout, set_memory_ro);
+@@ -1952,6 +1958,9 @@ void set_all_modules_text_rw(void)
+ {
+ 	struct module *mod;
+ 
++	if (!rodata_enabled)
++		return;
++
+ 	mutex_lock(&module_mutex);
+ 	list_for_each_entry_rcu(mod, &modules, list) {
+ 		if (mod->state == MODULE_STATE_UNFORMED)
+@@ -1968,6 +1977,9 @@ void set_all_modules_text_ro(void)
+ {
+ 	struct module *mod;
+ 
++	if (!rodata_enabled)
++		return;
++
+ 	mutex_lock(&module_mutex);
+ 	list_for_each_entry_rcu(mod, &modules, list) {
+ 		if (mod->state == MODULE_STATE_UNFORMED)
+@@ -1981,10 +1993,12 @@ void set_all_modules_text_ro(void)
+ 
+ static void disable_ro_nx(const struct module_layout *layout)
+ {
+-	frob_text(layout, set_memory_rw);
+-	frob_rodata(layout, set_memory_rw);
++	if (rodata_enabled) {
++		frob_text(layout, set_memory_rw);
++		frob_rodata(layout, set_memory_rw);
++		frob_ro_after_init(layout, set_memory_rw);
++	}
+ 	frob_rodata(layout, set_memory_x);
+-	frob_ro_after_init(layout, set_memory_rw);
+ 	frob_ro_after_init(layout, set_memory_x);
+ 	frob_writable_data(layout, set_memory_x);
+ }
 -- 
 2.7.4
