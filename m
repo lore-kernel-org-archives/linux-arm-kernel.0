@@ -1,174 +1,201 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 28 Feb 2018 18:55:15 +0000
-Subject: [PATCH v3 01/25] dt-bindings: soc: qcom: Add bindings for APR bus
-In-Reply-To: <465a2ca7-9f74-8977-37ea-29fe3944c27c@linaro.org>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
- <20180213231244.ama4bwsehzuh5sr7@rob-hp-laptop>
- <ae65a9c8-85a3-5494-f4cc-1038fd8c9bd1@linaro.org>
- <20180218230414.dkd6kb6kd35arcyv@rob-hp-laptop>
- <636d4ac2-3bc2-7290-1645-0451c089cb8a@linaro.org>
- <CAL_JsqK3KFBGqpHRaURSrHew1HhObUvFYxuhND-FOQ4tCUaAHg@mail.gmail.com>
- <465a2ca7-9f74-8977-37ea-29fe3944c27c@linaro.org>
-Message-ID: <62ee863c-c3e8-ac81-0d83-8162da8d0458@linaro.org>
+From: samuel@sholland.org (Samuel Holland)
+Date: Wed, 28 Feb 2018 12:56:40 -0600
+Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
+In-Reply-To: <CABb+yY3nfVxoA9wy1ym4mtCTKCZtJjepUTr7OP1uUPmzOEzniA@mail.gmail.com>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-4-samuel@sholland.org>
+ <CABb+yY2uueAK9kzXzU9DT2a4NtV3kK2dc_wtyFWTBn8=Z6Vi7Q@mail.gmail.com>
+ <d9e14058-6ffb-e54a-1565-f228342ee1f0@sholland.org>
+ <CABb+yY3nfVxoA9wy1ym4mtCTKCZtJjepUTr7OP1uUPmzOEzniA@mail.gmail.com>
+Message-ID: <e52b48cb-ce06-f4c4-ce20-9b893139e54d@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/02/18 10:03, Srinivas Kandagatla wrote:
->>> Also the versions of each service are independent to each other.
+On 02/28/18 12:14, Jassi Brar wrote:
+> On Wed, Feb 28, 2018 at 11:21 PM, Samuel Holland <samuel@sholland.org> wrote:
+>> Hi,
 >>
->> Not sure I follow the last statement. Meaning firmware updates change
->> the services?
-> Sorry for not being clear, so the services like AFE, ASM, ADM have 
-> different version numbers for a given SoC/firmware.
-> 
-> Not 100% sure if firmware updates would change the service version 
-> number, even if it does, it can be queried dynamically on new B family 
-> SoCs, and on older A Family SoCs I have not seen the firmware updates in 
-> last 4 years.
-> 
->> I don't see any versioning of services here.
-> 
-> Yes, Plan is that it will be part of the compatible string in cases 
-> where version query is not supported on older QCOM A family SoCs.
-> On B Family SoCs we can query the version dynamically.
-> 
->>
+>> On 02/28/18 03:16, Jassi Brar wrote:
+>>> On Wed, Feb 28, 2018 at 7:57 AM, Samuel Holland <samuel@sholland.org> wrote:
+>>> ....
 >>>
->>>>>
->>>>> apr {
->>>>>           compatible = "qcom,apr-v2";
->>>>>           qcom,smd-channels = "apr_audio_svc";
->>>>>           qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>;
->>>>>
->>>>>           apr-services {
->>>>>                   q6core {
->>>>>                           qcom,apr-svc-name = "CORE";
->>>>>                           qcom,apr-svc-id = <APR_SVC_ADSP_CORE>;
->>>>>                           compatible = "qcom,q6core";
->>>>>                   };
->>>>>
->>>>>                   q6afe: q6afe {
->>>>>                           compatible = "qcom,q6afe";
->>>>>                           qcom,apr-svc-name = "AFE";
->>>>>                           qcom,apr-svc-id = <APR_SVC_AFE>;
->>>>>                           #sound-dai-cells = <1>;
->>>>>                   };
->>>>>
->>>>>                   q6asm: q6asm {
->>>>>                           compatible = "qcom,q6asm";
->>>>>                           qcom,apr-svc-name = "ASM";
->>>>>                           qcom,apr-svc-id = <APR_SVC_ASM>;
->>>>>                           #sound-dai-cells = <1>;
->>>>>                   };
->>>>>
->>>>>                   q6adm: q6adm {, "external-sleep"
->>>>>                           compatible = "qcom,q6adm";
->>>>>                           qcom,apr-svc-name = "ADM";
->>>>>                           qcom,apr-svc-id = <APR_SVC_ADM>;
->>>>>                           #sound-dai-cells = <0>;
->>>>>                   };
+>>>> +/*
+>>>> + * The message box hardware provides 8 unidirectional channels. As the mailbox
+>>>> + * framework expects them to be bidirectional
 >>>>
->>>>
->>>> All these DAI nodes could be a single node and the cell value be the
->>>> svc-id?
->>>
-> So we will have 2 cell values, one representing the apr service and 
-> other the dai.
-> 
->>> No, DAI's here are both backends and frontends, and some of the services
->>> like core, USM are not DAI's
->>>
->>> Are you also saying that we should have a single driver entity for 
->>> all these
->>> services?
+>>> That is incorrect. Mailbox framework does not require a channel to be
+>>> TX and RX capable.
 >>
->> DT nodes do not equate driver entities. A driver can instantiate other 
->> drivers.
+>> Sorry, it would be more accurate to say that the intended mailbox _client_
+>> expects the channels to be bidirectional.
 >>
->> Am I saying a single DT node for this? Yes, perhaps.
-> Yes, I will give that a go.
+> Mailbox clients are very mailbox provider specific. Your client driver
+> is unlikely to be reuseable over another controller+remote combo.
+> Your client has to know already what a physical channel can do (RX, TX
+> or RXTX). There is no api to provide that info.
 
-I did try your suggestion of making audio services into a single node 
-and it ended up more messy and non scalable.
+There's a public specification for SCPI available[1]. I'm writing the remote
+endpoint to follow that protocol specification. (There's even an explicitly
+platform-agnostic update to the protocol called SCMI[2]). Ideally, I should be
+able to reuse the existing Linux client drivers for that protocol. Are you
+suggesting that I need to write a copy of the arm_scpi driver, completely
+identical except that it requests two mailbox channels per client (sending on
+one and receiving on the other) instead of one? In the >1000 line file, this is
+all that I would need to change:
 
-Mainly because q6afe node has more than one interface type of backend 
-dais (child nodes).
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -257,7 +257,8 @@ struct scpi_xfer {
 
-Each of this backend dai may need board specific setting ex: MI2S case 
-where board could wire up specific tx and rx lines from 4 possible lines 
-for that board. Also other type of dais also have some interface 
-specific properties.
+ struct scpi_chan {
+ 	struct mbox_client cl;
+-	struct mbox_chan *chan;
++	struct mbox_chan *tx_chan;
++	struct mbox_chan *rx_chan;
+ 	void __iomem *tx_payload;
+ 	void __iomem *rx_payload;
+ 	struct list_head rx_pending;
+@@ -541,7 +542,7 @@
+ 	msg->rx_len = rx_len;
+ 	reinit_completion(&msg->done);
 
-MI2S example:
-apr {
+-	ret = mbox_send_message(scpi_chan->chan, msg);
++	ret = mbox_send_message(scpi_chan->tx_chan, msg);
+ 	if (ret < 0 || !rx_buf)
+ 		goto out;
+
+@@ -894,8 +895,10 @@
+ {
+ 	int i;
+
+-	for (i = 0; i < count && pchan->chan; i++, pchan++) {
+-		mbox_free_channel(pchan->chan);
++	for (i = 0; i < count && pchan->tx_chan; i++, pchan++) {
++		if (pchan->rx_chan && pchan->rx_chan != pchan->tx_chan)
++			mbox_free_channel(pchan->rx_chan);
++		mbox_free_channel(pchan->tx_chan);
+ 		devm_kfree(dev, pchan->xfers);
+ 		devm_iounmap(dev, pchan->rx_payload);
+ 	}
+@@ -968,6 +971,7 @@
+ 		dev_err(dev, "no mboxes property in '%pOF'\n", np);
+ 		return -ENODEV;
+ 	}
++	count /= 2;
+
+ 	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
+ 	if (!scpi_chan)
+@@ -1009,13 +1013,19 @@
+
+ 		ret = scpi_alloc_xfer_list(dev, pchan);
+ 		if (!ret) {
+-			pchan->chan = mbox_request_channel(cl, idx);
+-			if (!IS_ERR(pchan->chan))
++			pchan->tx_chan = mbox_request_channel(cl, idx * 2);
++			pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
++			/* This isn't quite right, but the idea stands. */
++			if (!IS_ERR(pchan->tx_chan) && !IS_ERR(pchan->rx_chan))
+ 				continue;
+-			ret = PTR_ERR(pchan->chan);
++			ret = PTR_ERR(pchan->tx_chan);
+ 			if (ret != -EPROBE_DEFER)
+ 				dev_err(dev, "failed to get channel%d err %d\n",
+-					idx, ret);
++					idx * 2, ret);
++			ret = PTR_ERR(pchan->rx_chan);
++			if (ret != -EPROBE_DEFER)
++				dev_err(dev, "failed to get channel%d err %d\n",
++					idx * 2 + 1, ret);
+ 		}
+ err:
+ 		scpi_free_channels(dev, scpi_chan, idx);
+
+
+But then there are two copies of almost exactly the same driver! If there was an
+API for determining if a channel was unidirectional or bidirectional, than it
+would be trivial to support both models in one driver:
+
+
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -953,7 +955,7 @@
+
+ static int scpi_probe(struct platform_device *pdev)
+ {
+-	int count, idx, ret;
++	int count, idx, mbox_idx, ret;
+ 	struct resource res;
+ 	struct scpi_chan *scpi_chan;
+ 	struct device *dev = &pdev->dev;
+@@ -971,13 +973,12 @@
+ 		dev_err(dev, "no mboxes property in '%pOF'\n", np);
+ 		return -ENODEV;
+ 	}
+-	count /= 2;
+
+ 	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
+ 	if (!scpi_chan)
+ 		return -ENOMEM;
+
+-	for (idx = 0; idx < count; idx++) {
++	for (idx = 0, mbox_idx = 0; mbox_idx < count; idx++) {
+ 		resource_size_t size;
+ 		struct scpi_chan *pchan = scpi_chan + idx;
+ 		struct mbox_client *cl = &pchan->cl;
+@@ -1014,7 +1015,13 @@
+ 		ret = scpi_alloc_xfer_list(dev, pchan);
+ 		if (!ret) {
+ 			pchan->tx_chan = mbox_request_channel(cl, idx * 2);
+-			pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
++			if (mbox_chan_is_bidirectional(pchan->tx_chan)) {
++				pchan->rx_chan = pchan->tx_chan;
++				mbox_idx += 1;
++			} else {
++				pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
++				mbox_idx += 2;
++			}
+ 			/* This isn't quite right, but the idea stands. */
+ 			if (!IS_ERR(pchan->tx_chan) && !IS_ERR(pchan->rx_chan))
+ 				continue;
+@@ -1034,7 +1041,7 @@
+ 	}
+
+ 	scpi_info->channels = scpi_chan;
+-	scpi_info->num_chans = count;
++	scpi_info->num_chans = idx;
+ 	scpi_info->commands = scpi_std_commands;
+
+ 	platform_set_drvdata(pdev, scpi_info);
+
+
+Obviously this is just proof-of-concept code and would need to be cleaned up a bit.
+
+The are platform-agnostic protocols using mailbox hardware. There's no reason
+that the drivers for them need to be platform-specific. I'd really like to avoid
+duplicating large amounts of code unnecessarily. I'm willing to prepare a patch
+series adding this functionality to the mailbox API, if it would be accepted.
+
+Something like:
+bool mbox_chan_is_bidirectional(struct mbox_chan *chan);
+
+Implemented in drivers like:
+struct mbox_controller {
 	...
-	q6afe: q6afe {
-		compatible = "qcom,q6afe";
-		qcom,apr-svc-name = "AFE";
-		qcom,apr-svc-id = <APR_SVC_AFE>;
-		pinctrl-0 = <&ext_sec_tlmm_lines_act>;
-		pinctrl-names = "default";
-		#sound-dai-cells = <1>;
-
-                 mi2s_prim_rx_dai at 34{
-			reg = <34>;
-			rx-lines = <0>;
-			...
-		};
-
-		mi2s_prim_tx_dai at 35{
-			reg = <35>;
-			tx-lines = <1 2>
-			...
-		};
-	     	...
-	};
+	bool bidirectional_chans;
 };
 
-Here is block diagram to give a quick overview of the components
+or:
+struct mbox_chan_ops {
+	...
+	bool (*is_bidirectional)(struct mbox_chan *chan);
+};
 
+> thanks
 
-   +---------+          +---------+         +---------+
-   |  q6asm  |          |q6routing|         | q6afe   |
-   |  fedai  | <------> |  mixers | <-----> | bedai   |
-   +---------+          +---------+         +---------+
-       ^                     ^                   ^
-       |                     |                   |
-       |  +------------------+----------------+  |
-       |  |                  |                |  |
-       v  v                  v                v  v
-   +---------+          +---------+         +---------+
-   |   q6ASM |          |  q6ADM  |         |   q6AFE |
-   +---------+          +---------+         +---------+
-       ^                     ^                   ^          ^
-       |                     |                   | CPU Side |
-------+---------------------+-------------------+--------
-       |                     |                   |
-       |APR                  |APR                |APR
-       |                     |                   |
-       |  +------------------+----------------+  |
-       |  |                  |                |  |
-+-----+--+-----------------------------------+--+-------
-       |  |                  |                |  | QDSP Side |
-       v  v                  v                v  v           v
-  +---------+          +---------+         +---------+
-  |   ASM   | <------> |   ADM   | <-----> |   AFE   |
-  +---------+          +---------+         +---------+
-                                                ^
-                                                |
-                            +-------------------+
-                            |
----------------------------+--------------------------
-                            |            Audio I/O |
-                            v                      v
-     +--------------------------------------------------+
-     |                Audio devices                     |
-     | CODEC | HDMI-TX | PCM  | SLIMBUS | I2S |MI2S |...|
-     |                                                  |
-     +--------------------------------------------------+
+Regards,
+Samuel
 
-thanks,
-srini
+[1]:
+http://infocenter.arm.com/help/topic/com.arm.doc.dui0922g/scp_message_interface_v1_2_DUI0922G_en.pdf
+[2]:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0056a/DEN0056A_System_Control_and_Management_Interface.pdf
