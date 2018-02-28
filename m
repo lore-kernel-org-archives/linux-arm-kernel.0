@@ -1,64 +1,42 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 28 Feb 2018 15:48:55 +0000
-Subject: [PATCH] arm64: dts: juno: fix size of GICv2m MSI frames
-In-Reply-To: <20180207143255.17003-3-marc.zyngier@arm.com>
-References: <20180207143255.17003-3-marc.zyngier@arm.com>
-Message-ID: <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Feb 2018 15:51:55 +0000
+Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
+ patchset related
+In-Reply-To: <20180228154523.GA29931@akinoame>
+References: <20180228154523.GA29931@akinoame>
+Message-ID: <64e691b2-24be-ef7c-3b31-619e6b373a52@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the size of GICv2m MSI frames are listed as 4kB while the
-Juno TRM specifies 64kB for each of these MSI frames.
+Paolo,
 
-Though the devices connected themself might just use the first 4kB,
-to be consistent with the genaral practice of 64kB boundary alignment
-to all the devices, lets keep the size as 64kB. This might also help
-in avoiding any surprise when passing the device to a VM.
+On 28/02/18 15:45, Paolo Pisati wrote:
+> Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
+> intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
+> (it usually shows up in less than 10 iterations but i tested 32 boots before
+> marking it good).
+> 
+> I bisected it down to this interval in linux-4.14.y:
+> 
+> 2feb36e arm64: kpti: Add ->enable callback to remap swapper using nG mappings
+> ee28fed arm64: mm: Permit transitioning from Global to Non-Global without BBM
+> 6928820 arm64: kpti: Make use of nG dependent on arm64_kernel_unmapped_at_el0()
+> c98c8c2 arm64: Turn on KPTI only on CPUs that need it
+> 
+> c98c8c2 is good, 2feb36e is bad - couldn't bisect in between, since it didn't
+> boot there.
+> And yes, when i tested 2feb36e i applied the "el1 trashing fix" mentioned here:
+> https://www.spinics.net/lists/arm-kernel/msg636489.html
+> 
+> Anything else i can do to help debug this?
 
-This patch increase the size of each GICv2m MSI frames from 4kB to 64kB
-as per the specification.
+What HW are you using? Your command line? Your configuration? How are
+you rebooting your guest (to EFI? directly to the kernel itself?)? How
+comes it didn't boot between these 4 commits? Does the failure affects
+the host or the guest?
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Thanks,
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index f8088c45b060..eb749c50a736 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -72,25 +72,25 @@
- 		v2m_0: v2m at 0 {
- 			compatible = "arm,gic-v2m-frame";
- 			msi-controller;
--			reg = <0 0 0 0x1000>;
-+			reg = <0 0 0 0x10000>;
- 		};
- 
- 		v2m at 10000 {
- 			compatible = "arm,gic-v2m-frame";
- 			msi-controller;
--			reg = <0 0x10000 0 0x1000>;
-+			reg = <0 0x10000 0 0x10000>;
- 		};
- 
- 		v2m at 20000 {
- 			compatible = "arm,gic-v2m-frame";
- 			msi-controller;
--			reg = <0 0x20000 0 0x1000>;
-+			reg = <0 0x20000 0 0x10000>;
- 		};
- 
- 		v2m at 30000 {
- 			compatible = "arm,gic-v2m-frame";
- 			msi-controller;
--			reg = <0 0x30000 0 0x1000>;
-+			reg = <0 0x30000 0 0x10000>;
- 		};
- 	};
- 
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
