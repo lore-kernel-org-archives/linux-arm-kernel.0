@@ -1,57 +1,84 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Wed, 28 Feb 2018 13:03:35 +0530
-Subject: [PATCH 2/2][v5] driver: mtd: update struct map_info's swap as per map
- requirement
-In-Reply-To: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
-References: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180228073335.1758-2-prabhakar.kushwaha@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 28 Feb 2018 08:34:40 +0100
+Subject: [PATCH v2 01/16] clk: sunxi-ng: Add check for minimal rate to NM
+ PLLs
+In-Reply-To: <20180227222701.9716-2-jernej.skrabec@siol.net>
+References: <20180227222701.9716-1-jernej.skrabec@siol.net>
+ <20180227222701.9716-2-jernej.skrabec@siol.net>
+Message-ID: <20180228073440.6ejo3wjdqag6h4nl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-Maps device can be Big endian or little endian.
+Hi,
 
-Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
+On Tue, Feb 27, 2018 at 11:26:46PM +0100, Jernej Skrabec wrote:
+> Some NM PLLs doesn't work well when their output clock rate is set below
+> certain rate.
+> 
+> Add support for that constrain.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/clk/sunxi-ng/ccu_nm.c | 11 +++++++----
+>  drivers/clk/sunxi-ng/ccu_nm.h | 27 +++++++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+> index a16de092bf94..7fc743c78c1b 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nm.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nm.c
+> @@ -20,7 +20,7 @@ struct _ccu_nm {
+>  };
+>  
+>  static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+> -			     struct _ccu_nm *nm)
+> +			     unsigned long min_rate, struct _ccu_nm *nm)
+>  {
+>  	unsigned long best_rate = 0;
+>  	unsigned long best_n = 0, best_m = 0;
+> @@ -30,7 +30,7 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+>  		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
+>  			unsigned long tmp_rate = parent * _n  / _m;
+>  
+> -			if (tmp_rate > rate)
+> +			if (tmp_rate > rate || tmp_rate < min_rate)
+>  				continue;
+>  
+>  			if ((rate - tmp_rate) < (rate - best_rate)) {
+> @@ -117,6 +117,9 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+>  	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>  		rate *= nm->fixed_post_div;
+>  
+> +	if (rate < nm->min_rate)
+> +		rate = nm->min_rate;
+> +
 
-Now update struct map_info's swap field based on device characteristics
-defined in device tree.
+I guess you can just return there. There's no point in trying to find
+the factors at this point, since the minimum should be a value that
+can be reached.
 
-Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
----
-Changes for v2: Incorporated review comments from Boris Brezillon
-http://patchwork.ozlabs.org/patch/758381/
-Changes for v3: None
-Changes for v4: Updated code as per new defined binding of physmap.txt
-Changes for v5: Avoid map.swap set in case of endiannes not defined in dts file
+>  	if (ccu_frac_helper_has_rate(&nm->common, &nm->frac, rate)) {
+>  		if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>  			rate /= nm->fixed_post_div;
+> @@ -134,7 +137,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+>  	_nm.min_m = 1;
+>  	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+>  
+> -	ccu_nm_find_best(*parent_rate, rate, &_nm);
+> +	ccu_nm_find_best(*parent_rate, rate, nm->min_rate, &_nm);
 
- drivers/mtd/maps/physmap_of_core.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Therefore, you don't need to change the prototype there either.
 
-diff --git a/drivers/mtd/maps/physmap_of_core.c b/drivers/mtd/maps/physmap_of_core.c
-index b1bd4faecfb2..527b1682381f 100644
---- a/drivers/mtd/maps/physmap_of_core.c
-+++ b/drivers/mtd/maps/physmap_of_core.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/concat.h>
-+#include <linux/mtd/cfi_endian.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -233,6 +234,11 @@ static int of_flash_probe(struct platform_device *dev)
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
- 		info->list[i].map.device_node = dp;
- 
-+		if (of_property_read_bool(dp, "big-endian"))
-+			info->list[i].map.swap = CFI_BIG_ENDIAN;
-+		else if (of_property_read_bool(dp, "little-endian"))
-+			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-+
- 		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
- 		if (err)
- 			goto err_out;
+Maxime
+
 -- 
-2.14.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180228/81221c2e/attachment.sig>
