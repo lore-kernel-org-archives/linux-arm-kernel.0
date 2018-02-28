@@ -1,48 +1,185 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 27 Feb 2018 17:21:10 -0800
-Subject: [RFC 0/4] Add support for the Gateworks System Controller
-Message-ID: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
+Date: Tue, 27 Feb 2018 17:21:11 -0800
+Subject: [RFC 1/4] dt-bindings: mfd: Add Gateworks System Controller bindings
+In-Reply-To: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
+References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1519780874-8558-2-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the Gateworks System Controller used on Gateworks
-Laguna, Ventana, and Newport product families.
+This patch adds documentation of device-tree bindings for the
+Gateworks System Controller (GSC).
 
-The GSC is an MSP430 I2C slave controller whose firmware embeds the following
-features:
- - I/O expander (16 GPIO's emulating a PCA955x)
- - EEPROM (enumating AT24)
- - RTC (enumating DS1672)
- - HWMON
- - Interrupt controller with tamper detect, user pushbotton
- - Watchdog controller capable of full board power-cycle
- - Power Control capable of full board power-cycle
-
-see http://trac.gateworks.com/wiki/gsc for more details
-
-Tim Harvey (4):
-  dt-bindings: mfd: Add Gateworks System Controller bindings
-  mfd: add Gateworks System Controller core driver
-  hwmon: add Gateworks System Controller support
-  input: misc: Add Gateworks System Controller support
-
- Documentation/devicetree/bindings/mfd/gsc.txt |  69 ++++++
- drivers/hwmon/Kconfig                         |   6 +
- drivers/hwmon/Makefile                        |   1 +
- drivers/hwmon/gsc-hwmon.c                     | 299 +++++++++++++++++++++++
- drivers/input/misc/Kconfig                    |   6 +
- drivers/input/misc/Makefile                   |   1 +
- drivers/input/misc/gsc-input.c                | 196 +++++++++++++++
- drivers/mfd/Kconfig                           |  10 +
- drivers/mfd/Makefile                          |   1 +
- drivers/mfd/gsc.c                             | 330 ++++++++++++++++++++++++++
- include/linux/mfd/gsc.h                       |  79 ++++++
- 11 files changed, 998 insertions(+)
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ Documentation/devicetree/bindings/mfd/gsc.txt | 69 +++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/gsc.txt
- create mode 100644 drivers/hwmon/gsc-hwmon.c
- create mode 100644 drivers/input/misc/gsc-input.c
- create mode 100644 drivers/mfd/gsc.c
- create mode 100644 include/linux/mfd/gsc.h
 
+diff --git a/Documentation/devicetree/bindings/mfd/gsc.txt b/Documentation/devicetree/bindings/mfd/gsc.txt
+new file mode 100644
+index 0000000..7671347
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/gsc.txt
+@@ -0,0 +1,159 @@
++Gateworks System Controller multi-function device
++
++The GSC is a Multifunction I2C slave device with the following submodules:
++- WDT
++- GPIO
++- Pushbutton controller
++- HWMON
++
++Required properties:
++- compatible : Must be "gw,gsc_v1", "gw,gsc_v2", "gw,gsc_v3"
++- reg: I2C address of the device
++- interrupts: interrupt triggered by GSC_IRQ# signal
++- interrupt-parent: Interrupt controller GSC is connected to
++- #interrupt-cells: should be <1>, index of the interrupt within the
++  controller, in accordance with the "one cell" variant of
++  <devicetree/bindings/interrupt-controller/interrupt.txt>
++
++Optional nodes:
++* watchdog:
++The GSC provides a Watchdog monitor which can power cycle the board's
++primary power supply on most board models when tripped.
++
++Required properties:
++- compatible: must be "gw,gsc-watchdog"
++
++* input:
++The GSC provides an input device capable of dispatching Linux Input events
++for user pushbutton events, tamper switch events, etc.
++
++Required properties:
++- compatible: must be "gw,gsc-input"
++
++* hwmon:
++The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
++temperature and/or voltage monitoring.
++
++Required properties:
++- compatible: must be "gw,gsc-hwmon"
++
++Example:
++
++	gsc: gsc at 20 {
++		compatible = "gw,gsc_v2";
++		reg = <0x20>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <4 GPIO_ACTIVE_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++
++		gsc_input {
++			compatible = "gw,gsc-input";
++		};
++
++		gsc_watchdog {
++			compatible = "gw,gsc-watchdog";
++		};
++
++		gsc_hwmon {
++			compatible = "gw,gsc-hwmon";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			hwmon at 0 { /* A0: Board Temperature */
++				type = <0>;
++				reg = <0x00>;
++				label = "temp";
++			};
++
++			hwmon at 1 { /* A1: Input Voltage */
++				type = <1>;
++				reg = <0x02>;
++				label = "Vin";
++			};
++
++			hwmon at 2 { /* A2: 5P0 */
++				type = <1>;
++				reg = <0x0b>;
++				label = "5P0";
++			};
++
++			hwmon at 4 { /* A4: 0-5V input */
++				type = <1>;
++				reg = <0x14>;
++				label = "ANL0";
++			};
++
++			hwmon at 5 { /* A5: 2P5 PCIe/GigE */
++				type = <1>;
++				reg = <0x23>;
++				label = "2P5";
++			};
++
++			hwmon at 6 { /* A6: 1P8 Aud/Vid */
++				type = <1>;
++				reg = <0x1d>;
++				label = "1P8";
++			};
++
++			hwmon at 7 { /* A7: GPS */
++				type = <1>;
++				reg = <0x26>;
++				label = "GPS";
++			};
++
++			hwmon at 12 { /* A12: VDD_CORE */
++				type = <1>;
++				reg = <0x3>;
++				label = "VDD_CORE";
++			};
++
++			hwmon at 13 { /* A13: VDD_SOC */
++				type = <1>;
++				reg = <0x11>;
++				label = "VDD_SOC";
++			};
++
++			hwmon at 14 { /* A14: 1P0 PCIe SW */
++				type = <1>;
++				reg = <0x20>;
++				label = "1P0";
++			};
++
++			hwmon at 15 { /* fan0 */
++				type = <2>;
++				reg = <0x2c>;
++				label = "fan_50p";
++			};
++
++			hwmon at 16 { /* fan1 */
++				type = <2>;
++				reg = <0x2e>;
++				label = "fan_60p";
++			};
++
++			hwmon at 17 { /* fan2 */
++				type = <2>;
++				reg = <0x30>;
++				label = "fan_70p";
++			};
++
++			hwmon at 18 { /* fan3 */
++				type = <2>;
++				reg = <0x32>;
++				label = "fan_80p";
++			};
++
++			hwmon at 19 { /* fan4 */
++				type = <2>;
++				reg = <0x34>;
++				label = "fan_90p";
++			};
++
++			hwmon at 20 { /* fan5 */
++				type = <2>;
++				reg = <0x36>;
++				label = "fan_100p";
++			};
++		};
++	};
 -- 
 2.7.4
