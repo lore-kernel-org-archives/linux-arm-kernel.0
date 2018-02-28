@@ -1,117 +1,49 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 28 Feb 2018 14:10:55 +0100
-Subject: [PATCH v2 1/4] ARM: dts: stm32: add DMA memory pool on MCU which
- embed a cortex-M7
-In-Reply-To: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
-References: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1519823458-27734-2-git-send-email-alexandre.torgue@st.com>
+From: quentin.schulz@bootlin.com (Quentin Schulz)
+Date: Wed, 28 Feb 2018 14:11:21 +0100
+Subject: [PATCH 2/3] ARM: dts: sun8i: a711: set regulator for each cluster of
+ CPUs
+In-Reply-To: <cover.f1ec43f8d2a0151c52434f0952e973b19626f285.1519823347.git-series.quentin.schulz@bootlin.com>
+References: <cover.f1ec43f8d2a0151c52434f0952e973b19626f285.1519823347.git-series.quentin.schulz@bootlin.com>
+Message-ID: <07883d44949420891c1ed2411ff15199d53075c0.1519823347.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On cortex-M7 MCU, DMA have to use a non cache-able memory area. For this
-reason a dedicated memory pool is created for DMA.
-This patch creates a DMA memory pool of 1MB of each STM32 MCU which
-embeds a cortex-M7 except stm32f746-disco. Indeed, as stm32f746-disco has
-only a 8MB SDRAM and it's tricky to reduce memory used by Kernel.
+The Allwinner A83T is a SoC with two clusters of 4 A7 which have a
+different clock and regulator.
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+Set the CPU regulator.
 
-diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index e3f5a83..92651c3 100644
---- a/arch/arm/boot/dts/stm32746g-eval.dts
-+++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -58,6 +58,19 @@
- 		reg = <0xc0000000 0x2000000>;
+Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts |  9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 1de362f..d65162c 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -128,6 +128,14 @@
  	};
+ };
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
 +
-+		linux,dma {
-+			compatible = "shared-dma-pool";
-+			linux,dma-default;
-+			no-map;
-+			reg = <0xc1f00000 0x100000>;
-+		};
-+	};
++&cpu100 {
++	cpu-supply = <&reg_dcdc3>;
++};
 +
- 	aliases {
- 		serial0 = &usart1;
- 	};
-diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-index d712260..c526853 100644
---- a/arch/arm/boot/dts/stm32f769-disco.dts
-+++ b/arch/arm/boot/dts/stm32f769-disco.dts
-@@ -59,6 +59,19 @@
- 		reg = <0xC0000000 0x1000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+ &de {
+ 	status = "okay";
+ };
+@@ -136,6 +144,7 @@
+  * An USB-2 hub is connected here, which also means we don't need to
+  * enable the OHCI controller.
+  */
 +
-+		linux,dma {
-+			compatible = "shared-dma-pool";
-+			linux,dma-default;
-+			no-map;
-+			reg = <0xc0f00000 0x100000>;
-+		};
-+	};
-+
- 	aliases {
- 		serial0 = &usart1;
- 	};
-diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
-index 45e088c..3689e70 100644
---- a/arch/arm/boot/dts/stm32h743i-disco.dts
-+++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-@@ -57,6 +57,19 @@
- 		reg = <0xd0000000 0x2000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		linux,dma {
-+			compatible = "shared-dma-pool";
-+			linux,dma-default;
-+			no-map;
-+			reg = <0xc1f00000 0x100000>;
-+		};
-+	};
-+
- 	aliases {
- 		serial0 = &usart2;
- 	};
-diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts b/arch/arm/boot/dts/stm32h743i-eval.dts
-index c7187e1..b9af696 100644
---- a/arch/arm/boot/dts/stm32h743i-eval.dts
-+++ b/arch/arm/boot/dts/stm32h743i-eval.dts
-@@ -57,6 +57,19 @@
- 		reg = <0xd0000000 0x2000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		linux,dma {
-+			compatible = "shared-dma-pool";
-+			linux,dma-default;
-+			no-map;
-+			reg = <0xc1f00000 0x100000>;
-+		};
-+	};
-+
- 	aliases {
- 		serial0 = &usart1;
- 	};
+ &ehci0 {
+ 	status = "okay";
+ };
 -- 
-2.7.4
+git-series 0.9.1
