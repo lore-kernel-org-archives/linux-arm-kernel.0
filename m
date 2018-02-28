@@ -1,24 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 14:55:07 +0800
-Subject: [PATCH 1/2] clk: imx: imx7d: add the Keypad Port module clock
-In-Reply-To: <20180227160544.11446-1-stefan@agner.ch>
-References: <20180227160544.11446-1-stefan@agner.ch>
-Message-ID: <20180228065506.GK3217@dragon>
+Date: Wed, 28 Feb 2018 15:00:15 +0800
+Subject: [PATCH] ARM: dts: imx7s: add spba-bus abstraction
+In-Reply-To: <20180227163049.18809-1-stefan@agner.ch>
+References: <20180227163049.18809-1-stefan@agner.ch>
+Message-ID: <20180228070014.GL3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 05:05:43PM +0100, Stefan Agner wrote:
-> According to the i.MX7D Reference Manual, the Keypad Port module
-> (KPP) requires this clock gate to be enabled.
+On Tue, Feb 27, 2018 at 05:30:49PM +0100, Stefan Agner wrote:
+> According to the i.MX 7Solo/Dual Application Processor Reference
+> Manual the ECSPI1/2/3, UART1/2/3 and SAI1/2/3 peripherals are
+> connected through the SPBA bus. Other similar SoCs such as i.MX 6UL
+> add this bus abstraction. This adds the bus also to the i.MX 7
+> device tree.
+> 
+> The i.MX SDMA driver uses this abstraction to configure watermark
+> levels slightly differently, so this might change behavior slightly.
+> There have no issues been observed before or after the patch.
 > 
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Applied both.  But for future i.MX clock patches, please also copy
-clk maintainers to give them chance to comment.
-
-Michael Turquette <mturquette@baylibre.com>
-Stephen Boyd <sboyd@kernel.org>
-
-I will eventually need to send i.MX clock patches to them.
-
-Shawn
+Applied, thanks.
