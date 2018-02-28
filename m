@@ -1,51 +1,41 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 28 Feb 2018 13:57:42 +0900
-Subject: [PATCH v2 1/3] arm64: kprobes: Remove unneeded address sanity check
+Date: Wed, 28 Feb 2018 13:57:44 +0900
+Subject: [PATCH v2 3/3] arm64: irq: add get_handle_irq()
 In-Reply-To: <20180228045744.12914-1-takahiro.akashi@linaro.org>
 References: <20180228045744.12914-1-takahiro.akashi@linaro.org>
-Message-ID: <20180228045744.12914-2-takahiro.akashi@linaro.org>
+Message-ID: <20180228045744.12914-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masami Hiramatsu <mhiramat@kernel.org>
+This function is needed for utilizing lkdtm to make a probe hook on
+architecture-specific irq handler entry.
+In arm64 case, arm64 doesn't have "do_IRQ" function, instead
+handle_arch_irq, which is initialized by irq chip driver(gic), is
+called from exception entry code.
+So just add it.
 
-Remove unneeded address sanity check in arch_prepare_kprobe().
-Since do_debug_exception() is already blacklisted for kprobes, no need
-to reject all __exception functions. Also, since generic kprobe
-framework already ensures the address is in kernel text, no need to
-check it is in rodata again.
-
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/probes/kprobes.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm64/kernel/irq.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index d849d9804011..3c487a389252 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
- int __kprobes arch_prepare_kprobe(struct kprobe *p)
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 60e5fc661f74..ddd0759dc859 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -52,6 +52,13 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+ 	handle_arch_irq = handle_irq;
+ }
+ 
++#ifdef CONFIG_LKDTM
++unsigned long get_handle_irq(void)
++{
++	return (unsigned long)handle_arch_irq;
++}
++#endif
++
+ #ifdef CONFIG_VMAP_STACK
+ static void init_irq_stacks(void)
  {
- 	unsigned long probe_addr = (unsigned long)p->addr;
--	extern char __start_rodata[];
--	extern char __end_rodata[];
- 
- 	if (probe_addr & 0x3)
- 		return -EINVAL;
-@@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	/* copy instruction */
- 	p->opcode = le32_to_cpu(*p->addr);
- 
--	if (in_exception_text(probe_addr))
--		return -EINVAL;
--	if (probe_addr >= (unsigned long) __start_rodata &&
--	    probe_addr <= (unsigned long) __end_rodata)
--		return -EINVAL;
--
- 	/* decode instruction */
- 	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
- 	case INSN_REJECTED:	/* insn not supported */
 -- 
 2.16.2
