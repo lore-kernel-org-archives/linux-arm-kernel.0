@@ -1,103 +1,40 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 28 Feb 2018 22:55:03 +0100
-Subject: [PATCH v2 01/16] clk: sunxi-ng: Add check for minimal rate to NM
- PLLs
-In-Reply-To: <20180228073440.6ejo3wjdqag6h4nl@flea>
-References: <20180227222701.9716-1-jernej.skrabec@siol.net>
- <20180227222701.9716-2-jernej.skrabec@siol.net>
- <20180228073440.6ejo3wjdqag6h4nl@flea>
-Message-ID: <3220888.aQMeRaSCkl@jernej-laptop>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 28 Feb 2018 19:25:31 +0200
+Subject: [PATCH V4 2/2] thermal: imx: add i.MX7 thermal sensor support
+In-Reply-To: <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
+References: <1519459369-29083-1-git-send-email-Anson.Huang@nxp.com>
+ <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1519838731.16494.8.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 2018-02-24 at 16:02 +0800, Anson Huang wrote:
+> This patch adds i.MX7 thermal sensor support, most
+> of the i.MX7 thermal sensor functions are same with
+> i.MX6 except the registers offset/layout, so we move
+> those registers offset/layout definitions to soc data
+> structure.
+> 
+> i.MX7 uses single calibration data @25C, the calibration
+> data is located at OCOTP offset 0x4F0, bit[17:9], the
+> formula is as below:
+> 
+> Tmeas = (Nmeas - n1) + 25; n1 is the fuse value for 25C.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
 
-Dne sreda, 28. februar 2018 ob 08:34:40 CET je Maxime Ripard napisal(a):
-> Hi,
-> 
-> On Tue, Feb 27, 2018 at 11:26:46PM +0100, Jernej Skrabec wrote:
-> > Some NM PLLs doesn't work well when their output clock rate is set below
-> > certain rate.
-> > 
-> > Add support for that constrain.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/clk/sunxi-ng/ccu_nm.c | 11 +++++++----
-> >  drivers/clk/sunxi-ng/ccu_nm.h | 27 +++++++++++++++++++++++++++
-> >  2 files changed, 34 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-> > index a16de092bf94..7fc743c78c1b 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_nm.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_nm.c
-> > @@ -20,7 +20,7 @@ struct _ccu_nm {
-> > 
-> >  };
-> >  
-> >  static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
-> > 
-> > -			     struct _ccu_nm *nm)
-> > +			     unsigned long min_rate, struct _ccu_nm *nm)
-> > 
-> >  {
-> >  
-> >  	unsigned long best_rate = 0;
-> >  	unsigned long best_n = 0, best_m = 0;
-> > 
-> > @@ -30,7 +30,7 @@ static void ccu_nm_find_best(unsigned long parent,
-> > unsigned long rate,> 
-> >  		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
-> >  		
-> >  			unsigned long tmp_rate = parent * _n  / _m;
-> > 
-> > -			if (tmp_rate > rate)
-> > +			if (tmp_rate > rate || tmp_rate < min_rate)
-> > 
-> >  				continue;
-> >  			
-> >  			if ((rate - tmp_rate) < (rate - best_rate)) {
-> > 
-> > @@ -117,6 +117,9 @@ static long ccu_nm_round_rate(struct clk_hw *hw,
-> > unsigned long rate,> 
-> >  	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> >  	
-> >  		rate *= nm->fixed_post_div;
-> > 
-> > +	if (rate < nm->min_rate)
-> > +		rate = nm->min_rate;
-> > +
-> 
-> I guess you can just return there. There's no point in trying to find
-> the factors at this point, since the minimum should be a value that
-> can be reached.
-> 
+On imx7d (also 6sx and 6ul) OCOTP read will hang silently if the ocotp
+clk is not enabled. For example this can happen if imx_thermal is built
+as a module or probes after unused clocks are disabled.
 
-Right, I already tested it and it works.
+This driver has support for reading ocotp values through the ocotp
+nvmem driver (which handles clks properly). Since imx7d is a new
+compatible string for upstream maybe you could just make new-style
+bindings mandatory and drop the changes to?imx_init_from_tempmon_data?
 
-Best regards,
-Jernej
+See?commit 2067b757e972 ("ARM: dts: imx6ul: Add imx6ul-tempmon")
 
-> >  	if (ccu_frac_helper_has_rate(&nm->common, &nm->frac, rate)) {
-> >  	
-> >  		if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> >  		
-> >  			rate /= nm->fixed_post_div;
-> > 
-> > @@ -134,7 +137,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw,
-> > unsigned long rate,> 
-> >  	_nm.min_m = 1;
-> >  	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
-> > 
-> > -	ccu_nm_find_best(*parent_rate, rate, &_nm);
-> > +	ccu_nm_find_best(*parent_rate, rate, nm->min_rate, &_nm);
-> 
-> Therefore, you don't need to change the prototype there either.
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+--
+Regards,
+Leonard
