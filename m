@@ -1,34 +1,32 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 28 Feb 2018 16:20:45 +0000
-Subject: [PATCH 01/37] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <AADFC41AFE54684AB9EE6CBC0274A5D19101C8A7@SHSMSX101.ccr.corp.intel.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-2-jean-philippe.brucker@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191002823@SHSMSX101.ccr.corp.intel.com>
- <b3c190e7-1a33-971e-b86c-a9725118ba05@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191003B1B@SHSMSX101.ccr.corp.intel.com>
- <0b579768-3090-dd50-58b1-3385be92ef21@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D19101C8A7@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <f3de53ca-0c3f-47f4-d77b-cf3d9bfd3da6@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Feb 2018 16:18:33 +0000
+Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
+ patchset related
+In-Reply-To: <20180228161256.GA31013@akinoame>
+References: <20180228154523.GA29931@akinoame> <20180228160735.GA22612@arm.com>
+ <20180228161256.GA31013@akinoame>
+Message-ID: <20180228161833.GB22612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/18 06:21, Tian, Kevin wrote:
-[...]
->> Technically nothing prevents it, but now the resv problem discussed on
->> patch 2/37 stands out. For example on x86 you'd probably need to carve
->> the
->> IOAPIC MSI range out of the process address space. On Arm you'd need to
->> create a write-only mapping for MSIs (IOMMU translates it to the IRQ chip
->> address, but thankfully accessing the doorbell from CPU side doesn't
->> trigger an MSI.)
+On Wed, Feb 28, 2018 at 05:12:56PM +0100, Paolo Pisati wrote:
+> On Wed, Feb 28, 2018 at 04:07:35PM +0000, Will Deacon wrote:
+> > On Wed, Feb 28, 2018 at 04:45:23PM +0100, Paolo Pisati wrote:
+> > > Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
+> > > intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
+> > > (it usually shows up in less than 10 iterations but i tested 32 boots before
+> > > marking it good).
+> > 
+> > [...]
+> > 
+> > > Anything else i can do to help debug this?
+> > 
+> > If you could share the crash log, that would be helpful.
 > 
-> so if overlap already exists when binding a process address space
-> (since binding may happen much later than creating the process),
-> I assume the call will simply fail since carve out at this point is not
-> possible?
+> Oops log here:
+> https://launchpadlibrarian.net/358687166/submission_2018-02-26T14.58.17.996524.html#9-1-log
 
-Yes in this case I think it's safer to abort the bind() call
+The patch that Ard linked to should resolve that particular crash.
+I see this is a 4.13-based kernel. Is the source tree available anywhere?
 
-Thanks,
-Jean
+Will
