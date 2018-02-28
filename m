@@ -1,55 +1,62 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 28 Feb 2018 16:47:19 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-Message-ID: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+Date: Wed, 28 Feb 2018 16:47:20 +0100
+Subject: [PATCH V2 1/5] dt-bindings: mmc: document the stm32 sdmmc bindings
+In-Reply-To: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1519832844-28068-2-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch serie adds support of stm32 SDMMC controller.
-stm32h7 is the first SoC to use stm32 SDMMC controller
-(previous SoC had pl180 controller).
+Document the binding for stm32 sdmmc controller.
 
-The SDMMC features include the following:
--Full compliance with MultiMediaCard System Specification Version 4.51.
- Card support for three different databus modes:
- 1-bit (default), 4-bit and 8-bit.
--Full compliance with SD memory card specifications version 4.1.
- SDR104 speed limited to maximum allowed I/O speed, SPI mode and
- UHS-II mode not supported.
--Full compliance with SDIO card specification version 4.0.
-
-change V2:
--dt-bindings: properties name
-st,dir-output-high; st,neg-edge; st,use-ckin
--dt-bindings: node example s/sdmmc@/mmc@/g
--removes return of enable/disable_imask functions
--adds dev_warn if clk divisor is too short.
--replaces overprotection of n_elem by fail of dma_map_sg
--removes shortcut host->base
--Use device_property_present
-
-Ludovic Barre (5):
-  dt-bindings: mmc: document the stm32 sdmmc bindings
-  mmc: add stm32 sdmmc controller driver
-  ARM: dts: stm32: add sdmmc support for stm32h743
-  ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
-  ARM: configs: stm32: add mmc and ext2/3/4 support
-
- .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     |  35 +
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  26 +
- arch/arm/boot/dts/stm32h743.dtsi                   |  26 +
- arch/arm/boot/dts/stm32h743i-eval.dts              |  11 +
- arch/arm/configs/stm32_defconfig                   |   4 +-
- drivers/mmc/host/Kconfig                           |   8 +
- drivers/mmc/host/Makefile                          |   1 +
- drivers/mmc/host/stm32-sdmmc.c                     | 708 +++++++++++++++++++++
- drivers/mmc/host/stm32-sdmmc.h                     | 220 +++++++
- 9 files changed, 1038 insertions(+), 1 deletion(-)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
- create mode 100644 drivers/mmc/host/stm32-sdmmc.c
- create mode 100644 drivers/mmc/host/stm32-sdmmc.h
 
+diff --git a/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+new file mode 100644
+index 0000000..74d0bff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+@@ -0,0 +1,35 @@
++* STMicroelectronics STM32 SDMMC controller
++
++The highspeed MMC host controller on STM32 soc family
++provides an interface for MMC, SD and SDIO types of memory cards.
++
++This file documents differences between the core properties described
++by mmc.txt and the properties used by the sdmmc driver.
++
++Required properties:
++ - compatible: Should be "st,stm32h7-sdmmc"
++ - reg: mmc controller base registers
++ - interrupts: Should contain the interrupt number
++ - clocks: Should contain phandle for the clock feeding the controller
++ - resets: Should contain phandle for the reset feeding the controller
++
++Optional property:
++- st,dir-output-high: Allow to select direction polarity of external voltage
++  transceiver (which manage data and command direction).
++  if set: Voltage transceiver IOs are driven as output when direction signals are high,
++  else: Voltage transceiver IOs are driven as output when direction signals are low.
++- st,neg-edge: generate data & command on sdmmc clock falling edge
++- st,use-ckin: use sdmmc_ckin pin from an external driver to sample
++  the receive data (example: with voltage switch transceiver).
++
++Example:
++	sdmmc1: mmc at 52007000 {
++		compatible = "st,stm32h7-sdmmc";
++		reg = <0x52007000 0x1000>;
++		interrupts = <49>;
++		clocks = <&rcc SDMMC1_CK>;
++		resets = <&rcc SDMMC1_R>;
++		bus-width = <4>;
++		cap-sd-highspeed;
++		cap-mmc-highspeed;
++	};
 -- 
 2.7.4
