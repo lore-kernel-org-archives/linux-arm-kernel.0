@@ -1,201 +1,250 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Wed, 28 Feb 2018 12:56:40 -0600
-Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
-In-Reply-To: <CABb+yY3nfVxoA9wy1ym4mtCTKCZtJjepUTr7OP1uUPmzOEzniA@mail.gmail.com>
-References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228022714.30068-4-samuel@sholland.org>
- <CABb+yY2uueAK9kzXzU9DT2a4NtV3kK2dc_wtyFWTBn8=Z6Vi7Q@mail.gmail.com>
- <d9e14058-6ffb-e54a-1565-f228342ee1f0@sholland.org>
- <CABb+yY3nfVxoA9wy1ym4mtCTKCZtJjepUTr7OP1uUPmzOEzniA@mail.gmail.com>
-Message-ID: <e52b48cb-ce06-f4c4-ce20-9b893139e54d@sholland.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Feb 2018 19:18:47 +0000
+Subject: [PATCH v2] arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache
+ line size)
+In-Reply-To: <20180228184720.25467-1-catalin.marinas@arm.com>
+References: <20180228184720.25467-1-catalin.marinas@arm.com>
+Message-ID: <f85cb667-479a-4bf5-bc07-b3ad2064a9af@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/18 12:14, Jassi Brar wrote:
-> On Wed, Feb 28, 2018 at 11:21 PM, Samuel Holland <samuel@sholland.org> wrote:
->> Hi,
->>
->> On 02/28/18 03:16, Jassi Brar wrote:
->>> On Wed, Feb 28, 2018 at 7:57 AM, Samuel Holland <samuel@sholland.org> wrote:
->>> ....
->>>
->>>> +/*
->>>> + * The message box hardware provides 8 unidirectional channels. As the mailbox
->>>> + * framework expects them to be bidirectional
->>>>
->>> That is incorrect. Mailbox framework does not require a channel to be
->>> TX and RX capable.
->>
->> Sorry, it would be more accurate to say that the intended mailbox _client_
->> expects the channels to be bidirectional.
->>
-> Mailbox clients are very mailbox provider specific. Your client driver
-> is unlikely to be reuseable over another controller+remote combo.
-> Your client has to know already what a physical channel can do (RX, TX
-> or RXTX). There is no api to provide that info.
+Hi Catalin,
 
-There's a public specification for SCPI available[1]. I'm writing the remote
-endpoint to follow that protocol specification. (There's even an explicitly
-platform-agnostic update to the protocol called SCMI[2]). Ideally, I should be
-able to reuse the existing Linux client drivers for that protocol. Are you
-suggesting that I need to write a copy of the arm_scpi driver, completely
-identical except that it requests two mailbox channels per client (sending on
-one and receiving on the other) instead of one? In the >1000 line file, this is
-all that I would need to change:
+On 28/02/18 18:47, Catalin Marinas wrote:
+> Commit 97303480753e ("arm64: Increase the max granular size") increased
+> the cache line size to 128 to match Cavium ThunderX, apparently for some
+> performance benefit which could not be confirmed. This change, however,
+> has an impact on the network packets allocation in certain
+> circumstances, requiring slightly over a 4K page with a significant
+> performance degradation.
+> 
+> This patch reverts L1_CACHE_SHIFT back to 6 (64-byte cache line) while
+> keeping ARCH_DMA_MINALIGN at 128. The cache_line_size() function was
+> changed to default to ARCH_DMA_MINALIGN in the absence of a meaningful
+> CTR_EL0.CWG bit field.
+> 
+> In addition, if a system with ARCH_DMA_MINALIGN < CTR_EL0.CWG is
+> detected, the kernel will force swiotlb bounce buffering for all
+> non-coherent devices since DMA cache maintenance on sub-CWG ranges is
+> not safe, leading to data corruption.
+> 
+> Cc: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> Cc: Timur Tabi <timur@codeaurora.org>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> 
+> Changes since v1:
+>   
+> - Moved CWG check and swiotlb = 1 assignment to arm64_dma_init() following
+>    Robin's comment (swiotlb is __ro_after_init)
+> 
+> - The swiotlb_noncoherent_bounce label is now enabled in arm64_dma_init().
+>    There is a possibility of a platform with large CWG not having any
+>    non-coherent device and dma_capable() being slightly slower. But this
+>    exercise is mostly theoretical anyway
+> 
+> - Removed Will's ack since I've made some small changes.
+> 
+>   arch/arm64/Kconfig                  |  1 +
+>   arch/arm64/include/asm/cache.h      |  6 +++---
+>   arch/arm64/include/asm/dma-direct.h | 43 +++++++++++++++++++++++++++++++++++++
+>   arch/arm64/kernel/cpufeature.c      |  9 ++------
+>   arch/arm64/mm/dma-mapping.c         | 17 +++++++++++++++
+>   arch/arm64/mm/init.c                |  3 ++-
+>   6 files changed, 68 insertions(+), 11 deletions(-)
+>   create mode 100644 arch/arm64/include/asm/dma-direct.h
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7381eeb7ef8e..655c0e99d9fa 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -17,6 +17,7 @@ config ARM64
+>   	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+>   	select ARCH_HAS_KCOV
+>   	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+> +	select ARCH_HAS_PHYS_TO_DMA
+>   	select ARCH_HAS_SET_MEMORY
+>   	select ARCH_HAS_SG_CHAIN
+>   	select ARCH_HAS_STRICT_KERNEL_RWX
+> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+> index ea9bb4e0e9bb..b2e6ece23713 100644
+> --- a/arch/arm64/include/asm/cache.h
+> +++ b/arch/arm64/include/asm/cache.h
+> @@ -29,7 +29,7 @@
+>   #define ICACHE_POLICY_VIPT	2
+>   #define ICACHE_POLICY_PIPT	3
+>   
+> -#define L1_CACHE_SHIFT		7
+> +#define L1_CACHE_SHIFT		(6)
+>   #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+>   
+>   /*
+> @@ -39,7 +39,7 @@
+>    * cache before the transfer is done, causing old data to be seen by
+>    * the CPU.
+>    */
+> -#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
+> +#define ARCH_DMA_MINALIGN	(128)
+>   
+>   #ifndef __ASSEMBLY__
+>   
+> @@ -73,7 +73,7 @@ static inline u32 cache_type_cwg(void)
+>   static inline int cache_line_size(void)
+>   {
+>   	u32 cwg = cache_type_cwg();
+> -	return cwg ? 4 << cwg : L1_CACHE_BYTES;
+> +	return cwg ? 4 << cwg : ARCH_DMA_MINALIGN;
+>   }
+>   
+>   #endif	/* __ASSEMBLY__ */
+> diff --git a/arch/arm64/include/asm/dma-direct.h b/arch/arm64/include/asm/dma-direct.h
+> new file mode 100644
+> index 000000000000..abb1b40ec751
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/dma-direct.h
+> @@ -0,0 +1,43 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +#ifndef __ASM_DMA_DIRECT_H
+> +#define __ASM_DMA_DIRECT_H
+> +
+> +#include <linux/jump_label.h>
+> +#include <linux/swiotlb.h>
+> +
+> +#include <asm/cache.h>
+> +
+> +DECLARE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
+> +
+> +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> +{
+> +	dma_addr_t dev_addr = (dma_addr_t)paddr;
+> +
+> +	return dev_addr - ((dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
+> +}
+> +
+> +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> +{
+> +	phys_addr_t paddr = (phys_addr_t)dev_addr;
+> +
+> +	return paddr + ((phys_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
+> +}
+> +
+> +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+> +{
+> +	if (!dev->dma_mask)
+> +		return false;
+> +
+> +	/*
+> +	 * Force swiotlb buffer bouncing when ARCH_DMA_MINALIGN < CWG. The
+> +	 * swiotlb bounce buffers are aligned to (1 << IO_TLB_SHIFT).
+> +	 */
 
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -257,7 +257,8 @@ struct scpi_xfer {
+The relevance of the second half of that comment isn't entirely obvious 
+- I assume you're referring to the fact that the IOTLB slab size happens 
+to conveniently match the largest possible CWG?
 
- struct scpi_chan {
- 	struct mbox_client cl;
--	struct mbox_chan *chan;
-+	struct mbox_chan *tx_chan;
-+	struct mbox_chan *rx_chan;
- 	void __iomem *tx_payload;
- 	void __iomem *rx_payload;
- 	struct list_head rx_pending;
-@@ -541,7 +542,7 @@
- 	msg->rx_len = rx_len;
- 	reinit_completion(&msg->done);
+I wonder somewhat if it's worth going even further down the ridiculously 
+over-cautious route and adding a BUILD_BUG_ON(IO_TLB_SHIFT < 11), just 
+so we'd get a heads-up in future if this could otherwise become silently 
+broken...
 
--	ret = mbox_send_message(scpi_chan->chan, msg);
-+	ret = mbox_send_message(scpi_chan->tx_chan, msg);
- 	if (ret < 0 || !rx_buf)
- 		goto out;
+Otherwise, the patch looks OK to me now - as horrible as it inherently is ;)
 
-@@ -894,8 +895,10 @@
- {
- 	int i;
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
--	for (i = 0; i < count && pchan->chan; i++, pchan++) {
--		mbox_free_channel(pchan->chan);
-+	for (i = 0; i < count && pchan->tx_chan; i++, pchan++) {
-+		if (pchan->rx_chan && pchan->rx_chan != pchan->tx_chan)
-+			mbox_free_channel(pchan->rx_chan);
-+		mbox_free_channel(pchan->tx_chan);
- 		devm_kfree(dev, pchan->xfers);
- 		devm_iounmap(dev, pchan->rx_payload);
- 	}
-@@ -968,6 +971,7 @@
- 		dev_err(dev, "no mboxes property in '%pOF'\n", np);
- 		return -ENODEV;
- 	}
-+	count /= 2;
-
- 	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
- 	if (!scpi_chan)
-@@ -1009,13 +1013,19 @@
-
- 		ret = scpi_alloc_xfer_list(dev, pchan);
- 		if (!ret) {
--			pchan->chan = mbox_request_channel(cl, idx);
--			if (!IS_ERR(pchan->chan))
-+			pchan->tx_chan = mbox_request_channel(cl, idx * 2);
-+			pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
-+			/* This isn't quite right, but the idea stands. */
-+			if (!IS_ERR(pchan->tx_chan) && !IS_ERR(pchan->rx_chan))
- 				continue;
--			ret = PTR_ERR(pchan->chan);
-+			ret = PTR_ERR(pchan->tx_chan);
- 			if (ret != -EPROBE_DEFER)
- 				dev_err(dev, "failed to get channel%d err %d\n",
--					idx, ret);
-+					idx * 2, ret);
-+			ret = PTR_ERR(pchan->rx_chan);
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(dev, "failed to get channel%d err %d\n",
-+					idx * 2 + 1, ret);
- 		}
- err:
- 		scpi_free_channels(dev, scpi_chan, idx);
-
-
-But then there are two copies of almost exactly the same driver! If there was an
-API for determining if a channel was unidirectional or bidirectional, than it
-would be trivial to support both models in one driver:
-
-
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -953,7 +955,7 @@
-
- static int scpi_probe(struct platform_device *pdev)
- {
--	int count, idx, ret;
-+	int count, idx, mbox_idx, ret;
- 	struct resource res;
- 	struct scpi_chan *scpi_chan;
- 	struct device *dev = &pdev->dev;
-@@ -971,13 +973,12 @@
- 		dev_err(dev, "no mboxes property in '%pOF'\n", np);
- 		return -ENODEV;
- 	}
--	count /= 2;
-
- 	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
- 	if (!scpi_chan)
- 		return -ENOMEM;
-
--	for (idx = 0; idx < count; idx++) {
-+	for (idx = 0, mbox_idx = 0; mbox_idx < count; idx++) {
- 		resource_size_t size;
- 		struct scpi_chan *pchan = scpi_chan + idx;
- 		struct mbox_client *cl = &pchan->cl;
-@@ -1014,7 +1015,13 @@
- 		ret = scpi_alloc_xfer_list(dev, pchan);
- 		if (!ret) {
- 			pchan->tx_chan = mbox_request_channel(cl, idx * 2);
--			pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
-+			if (mbox_chan_is_bidirectional(pchan->tx_chan)) {
-+				pchan->rx_chan = pchan->tx_chan;
-+				mbox_idx += 1;
-+			} else {
-+				pchan->rx_chan = mbox_request_channel(cl, idx * 2 + 1);
-+				mbox_idx += 2;
-+			}
- 			/* This isn't quite right, but the idea stands. */
- 			if (!IS_ERR(pchan->tx_chan) && !IS_ERR(pchan->rx_chan))
- 				continue;
-@@ -1034,7 +1041,7 @@
- 	}
-
- 	scpi_info->channels = scpi_chan;
--	scpi_info->num_chans = count;
-+	scpi_info->num_chans = idx;
- 	scpi_info->commands = scpi_std_commands;
-
- 	platform_set_drvdata(pdev, scpi_info);
-
-
-Obviously this is just proof-of-concept code and would need to be cleaned up a bit.
-
-The are platform-agnostic protocols using mailbox hardware. There's no reason
-that the drivers for them need to be platform-specific. I'd really like to avoid
-duplicating large amounts of code unnecessarily. I'm willing to prepare a patch
-series adding this functionality to the mailbox API, if it would be accepted.
-
-Something like:
-bool mbox_chan_is_bidirectional(struct mbox_chan *chan);
-
-Implemented in drivers like:
-struct mbox_controller {
-	...
-	bool bidirectional_chans;
-};
-
-or:
-struct mbox_chan_ops {
-	...
-	bool (*is_bidirectional)(struct mbox_chan *chan);
-};
-
-> thanks
-
-Regards,
-Samuel
-
-[1]:
-http://infocenter.arm.com/help/topic/com.arm.doc.dui0922g/scp_message_interface_v1_2_DUI0922G_en.pdf
-[2]:
-http://infocenter.arm.com/help/topic/com.arm.doc.den0056a/DEN0056A_System_Control_and_Management_Interface.pdf
+> +	if (static_branch_unlikely(&swiotlb_noncoherent_bounce) &&
+> +	    !is_device_dma_coherent(dev) &&
+> +	    !is_swiotlb_buffer(dma_to_phys(dev, addr)))
+> +		return false;
+> +
+> +	return addr + size - 1 <= *dev->dma_mask;
+> +}
+> +
+> +#endif /* __ASM_DMA_DIRECT_H */
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 2985a067fc13..702901eadf75 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1385,7 +1385,6 @@ bool this_cpu_has_cap(unsigned int cap)
+>   void __init setup_cpu_features(void)
+>   {
+>   	u32 cwg;
+> -	int cls;
+>   
+>   	/* Set the CPU feature capabilies */
+>   	setup_feature_capabilities();
+> @@ -1405,13 +1404,9 @@ void __init setup_cpu_features(void)
+>   	 * Check for sane CTR_EL0.CWG value.
+>   	 */
+>   	cwg = cache_type_cwg();
+> -	cls = cache_line_size();
+>   	if (!cwg)
+> -		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
+> -			cls);
+> -	if (L1_CACHE_BYTES < cls)
+> -		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+> -			L1_CACHE_BYTES, cls);
+> +		pr_warn("No Cache Writeback Granule information, assuming %d\n",
+> +			ARCH_DMA_MINALIGN);
+>   }
+>   
+>   static bool __maybe_unused
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index a96ec0181818..1e9dac8684ca 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -33,6 +33,7 @@
+>   #include <asm/cacheflush.h>
+>   
+>   static int swiotlb __ro_after_init;
+> +DEFINE_STATIC_KEY_FALSE(swiotlb_noncoherent_bounce);
+>   
+>   static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
+>   				 bool coherent)
+> @@ -504,6 +505,14 @@ static int __init arm64_dma_init(void)
+>   	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+>   		swiotlb = 1;
+>   
+> +	if (WARN_TAINT(ARCH_DMA_MINALIGN < cache_line_size(),
+> +		       TAINT_CPU_OUT_OF_SPEC,
+> +		       "ARCH_DMA_MINALIGN smaller than CTR_EL0.CWG (%d < %d)",
+> +		       ARCH_DMA_MINALIGN, cache_line_size())) {
+> +		swiotlb = 1;
+> +		static_branch_enable(&swiotlb_noncoherent_bounce);
+> +	}
+> +
+>   	return atomic_pool_init();
+>   }
+>   arch_initcall(arm64_dma_init);
+> @@ -882,6 +891,14 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   			const struct iommu_ops *iommu, bool coherent)
+>   {
+> +	/*
+> +	 * Enable swiotlb for buffer bouncing if ARCH_DMA_MINALIGN < CWG.
+> +	 * dma_capable() forces the actual bounce if the device is
+> +	 * non-coherent.
+> +	 */
+> +	if (static_branch_unlikely(&swiotlb_noncoherent_bounce) && !coherent)
+> +		iommu = NULL;
+> +
+>   	if (!dev->dma_ops)
+>   		dev->dma_ops = &arm64_swiotlb_dma_ops;
+>   
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 9f3c47acf8ff..664acf177799 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -586,7 +586,8 @@ static void __init free_unused_memmap(void)
+>   void __init mem_init(void)
+>   {
+>   	if (swiotlb_force == SWIOTLB_FORCE ||
+> -	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> +	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT) ||
+> +	    ARCH_DMA_MINALIGN < cache_line_size())
+>   		swiotlb_init(1);
+>   	else
+>   		swiotlb_force = SWIOTLB_NO_FORCE;
+> 
