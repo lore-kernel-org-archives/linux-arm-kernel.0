@@ -1,35 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Feb 2018 16:54:59 +0000
-Subject: [PATCH] arm64: dts: juno: fix size of GICv2m MSI frames
-In-Reply-To: <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
-References: <20180207143255.17003-3-marc.zyngier@arm.com>
- <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <86woyx2gws.wl-marc.zyngier@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Feb 2018 16:55:50 +0000
+Subject: [PATCH] ACPI/IORT: Remove obsolete
+ ACPI_IORT_SMMU_V3_CAVIUM_CN99XX define
+In-Reply-To: <20180228165305.GA14610@e107981-ln.cambridge.arm.com>
+References: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
+ <e6cbbf2a-738c-a77e-efa1-a38a5602ae1c@arm.com>
+ <20180228165305.GA14610@e107981-ln.cambridge.arm.com>
+Message-ID: <35249df2-23a4-7406-e849-6e2a5955290b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Feb 2018 15:48:55 +0000,
-sudeep holla wrote:
+On 28/02/18 16:53, Lorenzo Pieralisi wrote:
+> On Wed, Feb 28, 2018 at 04:35:17PM +0000, Robin Murphy wrote:
+>> Hi Lorenzo,
+>>
+>> On 28/02/18 16:24, Lorenzo Pieralisi wrote:
+>>> To defeat ACPICA<->kernel merge order dependencies a preprocessor define
+>>> value was introduced in the IORT compilation unit according to IORT
+>>> revision C, IORT_SMMU_V3_CAVIUM_CN99XX, so that even if the value was
+>>> not defined in ACPICA headers the IORT kernel layer would still be able
+>>> to function and use it.
+>>>
+>>> Since commit 0c2021c047ba ("ACPICA: IORT: Update SMMU models for
+>>> revision C") finally added the define in ACPICA headers, as required by
+>>> ACPICA IORT support, the preprocessor definition in the IORT kernel
+>>> compilation unit has become obsolete and can be removed.
+>>
+>> Can the version check around iort_get_id_mapping_index() go as well?
 > 
-> Currently the size of GICv2m MSI frames are listed as 4kB while the
-> Juno TRM specifies 64kB for each of these MSI frames.
+> https://marc.info/?l=linux-acpi&m=151817852003174&w=2
 > 
-> Though the devices connected themself might just use the first 4kB,
-> to be consistent with the genaral practice of 64kB boundary alignment
-> to all the devices, lets keep the size as 64kB. This might also help
-> in avoiding any surprise when passing the device to a VM.
-> 
-> This patch increase the size of each GICv2m MSI frames from 4kB to 64kB
-> as per the specification.
-> 
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Gone :) (just did two patches since they were part of different
+> changes), I will batch them up and send them in a pull request for
+> v4.17.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Ah, cool - I hadn't see that one go by.
 
-	M.
+For this one (and the other as well if you like):
 
--- 
-Jazz is not dead, it just smell funny.
+Acked-by: Robin Murphy <robin.murphy@arm.com>
+
+Thanks,
+Robin.
