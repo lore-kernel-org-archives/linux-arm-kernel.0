@@ -1,88 +1,28 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 28 Feb 2018 18:53:52 +0100
-Subject: [PATCH 2/2] drm/sun4i: add lvds mode_valid function
-In-Reply-To: <1519840432-61489-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1519840432-61489-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <1519840432-61489-2-git-send-email-giulio.benetti@micronovasrl.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 28 Feb 2018 20:57:18 +0300
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+In-Reply-To: <20180228132707.mgunezg5o4lul7x5@verge.net.au>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+ <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
+ <20180228132707.mgunezg5o4lul7x5@verge.net.au>
+Message-ID: <f9574ea2-d8ee-7c9f-b850-874074eddad2@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mode_valid function is missing for lvds.
+On 02/28/2018 04:27 PM, Simon Horman wrote:
 
-Add it based on rgb model, also setting up dclk_min_div and dclk_max_div
+>>> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+>>> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+>>> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+>>> output (we're omitting the LVDS decoder for now). These patches depend on
+>>> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+>>
+>>    Need to mention that the DU driver silently fails to probe now. I do
+>>    hope that this is not due to my updates. :-)
+> 
+> Please test that theory.
 
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
- drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+   Yeah, after sucking in the recent versions of the DU/LVDS patches and uncommenting
+and fixing rejects in a couple patches here, the graphical console works again. :-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-index be3f14d..75223ee 100644
---- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-@@ -46,8 +46,63 @@ static int sun4i_lvds_get_modes(struct drm_connector *connector)
- 	return drm_panel_get_modes(tcon->panel);
- }
- 
-+static int sun4i_lvds_mode_valid(struct drm_connector *connector,
-+				struct drm_display_mode *mode)
-+{
-+	struct sun4i_lvds *lvds = drm_connector_to_sun4i_lvds(connector);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+	u32 hsync = mode->hsync_end - mode->hsync_start;
-+	u32 vsync = mode->vsync_end - mode->vsync_start;
-+	unsigned long rate = mode->clock * 1000;
-+	long rounded_rate;
-+
-+	DRM_DEBUG_DRIVER("Validating modes...\n");
-+
-+	if (hsync < 1)
-+		return MODE_HSYNC_NARROW;
-+
-+	if (hsync > 0x3ff)
-+		return MODE_HSYNC_WIDE;
-+
-+	if ((mode->hdisplay < 1) || (mode->htotal < 1))
-+		return MODE_H_ILLEGAL;
-+
-+	if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
-+		return MODE_BAD_HVALUE;
-+
-+	DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
-+
-+	if (vsync < 1)
-+		return MODE_VSYNC_NARROW;
-+
-+	if (vsync > 0x3ff)
-+		return MODE_VSYNC_WIDE;
-+
-+	if ((mode->vdisplay < 1) || (mode->vtotal < 1))
-+		return MODE_V_ILLEGAL;
-+
-+	if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
-+		return MODE_BAD_VVALUE;
-+
-+	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-+
-+	tcon->dclk_min_div = 7;
-+	tcon->dclk_max_div = 18;
-+	rounded_rate = clk_round_rate(tcon->dclk, rate);
-+	if (rounded_rate < rate)
-+		return MODE_CLOCK_LOW;
-+
-+	if (rounded_rate > rate)
-+		return MODE_CLOCK_HIGH;
-+
-+	DRM_DEBUG_DRIVER("Clock rate OK\n");
-+
-+	return MODE_OK;
-+}
-+
- static struct drm_connector_helper_funcs sun4i_lvds_con_helper_funcs = {
- 	.get_modes	= sun4i_lvds_get_modes,
-+	.mode_valid	= sun4i_lvds_mode_valid,
- };
- 
- static void
--- 
-2.7.4
+MBR, Sergei
