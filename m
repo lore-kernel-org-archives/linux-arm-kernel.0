@@ -1,246 +1,81 @@
-From: nobuhiro.iwamatsu@cybertrust.co.jp (Nobuhiro Iwamatsu)
-Date: Wed, 28 Feb 2018 10:49:37 +0900
-Subject: [PATCH 2/2] arm: dts: zynq: Extract common Digilent Zybo board
- support
-In-Reply-To: <e681d34a-3884-4586-9ac6-ce9852a78a05@xilinx.com>
-References: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
- <20180226005949.31259-2-nobuhiro.iwamatsu@cybertrust.co.jp>
- <e681d34a-3884-4586-9ac6-ce9852a78a05@xilinx.com>
-Message-ID: <20180228104937.7444403d@debmouse>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Wed, 28 Feb 2018 01:51:59 +0000
+Subject: [linux-sunxi] [PATCH v2 1/4] dt-bindings: pwm: binding allwinner
+ sun8i.
+In-Reply-To: <20180225135045.GA14508@arx-s1>
+References: <20180225135045.GA14508@arx-s1>
+Message-ID: <56645bca-9f4a-3191-72d8-32b60ebbc26e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Michal.
+Hi,
 
-Thanks for your review.
-
-On Tue, 27 Feb 2018 13:54:40 +0100
-Michal Simek <michal.simek@xilinx.com> wrote:
-
-> On 26.2.2018 01:59, Nobuhiro Iwamatsu wrote:
-> > The Digilent Zybo and Zybo Z7 boards are very similar.
-> > To avoid duplication, this extract common board parts into own dtsi
-> > file.
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu
-> > <nobuhiro.iwamatsu@cybertrust.co.jp> ---
-> >  arch/arm/boot/dts/zynq-zybo-common.dtsi | 58
-> > +++++++++++++++++++++++++++++++++
-> > arch/arm/boot/dts/zynq-zybo-z7.dts      | 45
-> > ++----------------------- arch/arm/boot/dts/zynq-zybo.dts         |
-> > 43 +----------------------- 3 files changed, 61 insertions(+), 85
-> > deletions(-) create mode 100644
-> > arch/arm/boot/dts/zynq-zybo-common.dtsi
-> > 
-> > diff --git a/arch/arm/boot/dts/zynq-zybo-common.dtsi
-> > b/arch/arm/boot/dts/zynq-zybo-common.dtsi new file mode 100644
-> > index 000000000000..9c9a92d59cc7
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/zynq-zybo-common.dtsi
-> > @@ -0,0 +1,58 @@
-> > +/*
-> > + *  Copyright (C) 2011 - 2014 Xilinx
-> > + *  Copyright (C) 2012 National Instruments Corp.
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-> > Public
-> > + * License version 2, as published by the Free Software
-> > Foundation, and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +/dts-v1/;
-> > +#include "zynq-7000.dtsi"
-> > +
-> > +/ {
-> > +	aliases {
-> > +		ethernet0 = &gem0;
-> > +		serial0 = &uart1;
-> > +	};
-> > +
-> > +	memory at 0 {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x20000000>;
-> > +	};
-> > +
-> > +	usb_phy0: phy0 {
-> > +		#phy-cells = <0>;
-> > +		compatible = "usb-nop-xceiv";
-> > +		reset-gpios = <&gpio0 46 1>;
-> > +	};
-> > +};
-> > +
-> > +&gem0 {
-> > +	status = "okay";
-> > +	phy-mode = "rgmii-id";
-> > +	phy-handle = <&ethernet_phy>;
-> > +
-> > +	ethernet_phy: ethernet-phy at 0 {
-> > +		reg = <0>;
-> > +		device_type = "ethernet-phy";
-> > +	};
-> > +};
-> > +
-> > +&sdhci0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&uart1 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usb0 {
-> > +	status = "okay";
-> > +	dr_mode = "host";
-> > +	usb-phy = <&usb_phy0>;
-> > +};
-> > diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts
-> > b/arch/arm/boot/dts/zynq-zybo-z7.dts index
-> > 97e487913f8f..bd94147792cd 100644 ---
-> > a/arch/arm/boot/dts/zynq-zybo-z7.dts +++
-> > b/arch/arm/boot/dts/zynq-zybo-z7.dts @@ -7,59 +7,18 @@
-> >   *  SPDX-License-Identifier:	GPL-2.0+
-> >   */
-> >  /dts-v1/;
-> > -#include "zynq-7000.dtsi"
-> > +#include "zynq-zybo-common.dtsi"
-> >  
-> >  / {
-> > -	model = "Zynq ZYBO Z7 Development Board";
-> > +	model = "Zynq Zybo Z7 Development Board";
-> >  	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
-> >  
-> > -	aliases {
-> > -		ethernet0 = &gem0;
-> > -		serial0 = &uart1;
-> > -	};
-> > -
-> > -	memory {
-> > -		device_type = "memory";
-> > -		reg = <0x0 0x20000000>;
-> > -	};
-> > -
-> >  	chosen {
-> >  		bootargs = "";
-> >  		stdout-path = "serial0:115200n8";
-> >  	};
-> > -
-> > -	usb_phy0: phy0 {
-> > -		#phy-cells = <0>;
-> > -		compatible = "usb-nop-xceiv";
-> > -		reset-gpios = <&gpio0 46 1>;
-> > -	};
-> >  };
-> >  
-> >  &clkc {
-> >  	ps-clk-frequency = <33333333>;
-> >  };
-> > -
-> > -&gem0 {
-> > -	status = "okay";
-> > -	phy-mode = "rgmii-id";
-> > -	phy-handle = <&ethernet_phy>;
-> > -
-> > -	ethernet_phy: ethernet-phy at 0 {
-> > -		reg = <0>;
-> > -		device_type = "ethernet-phy";
-> > -	};
-> > -};
-> > -
-> > -&sdhci0 {
-> > -	status = "okay";
-> > -};
-> > -
-> > -&uart1 {
-> > -	status = "okay";
-> > -};
-> > -
-> > -&usb0 {
-> > -	status = "okay";
-> > -	dr_mode = "host";
-> > -	usb-phy = <&usb_phy0>;
-> > -};
-> > diff --git a/arch/arm/boot/dts/zynq-zybo.dts
-> > b/arch/arm/boot/dts/zynq-zybo.dts index e40cafc5ee5b..920294f41aff
-> > 100644 --- a/arch/arm/boot/dts/zynq-zybo.dts
-> > +++ b/arch/arm/boot/dts/zynq-zybo.dts
-> > @@ -12,59 +12,18 @@
-> >   * GNU General Public License for more details.
-> >   */
-> >  /dts-v1/;
-> > -#include "zynq-7000.dtsi"
-> > +#include "zynq-zybo-common.dtsi"
-> >  
-> >  / {
-> >  	model = "Zynq ZYBO Development Board";
-> >  	compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
-> >  
-> > -	aliases {
-> > -		ethernet0 = &gem0;
-> > -		serial0 = &uart1;
-> > -	};
-> > -
-> > -	memory at 0 {
-> > -		device_type = "memory";
-> > -		reg = <0x0 0x20000000>;
-> > -	};
-> > -
-> >  	chosen {
-> >  		bootargs = "";
-> >  		stdout-path = "serial0:115200n8";
-> >  	};
-> > -
-> > -	usb_phy0: phy0 {
-> > -		#phy-cells = <0>;
-> > -		compatible = "usb-nop-xceiv";
-> > -		reset-gpios = <&gpio0 46 1>;
-> > -	};
-> >  };
-> >  
-> >  &clkc {
-> >  	ps-clk-frequency = <50000000>;
-> >  };
-> > -
-> > -&gem0 {
-> > -	status = "okay";
-> > -	phy-mode = "rgmii-id";
-> > -	phy-handle = <&ethernet_phy>;
-> > -
-> > -	ethernet_phy: ethernet-phy at 0 {
-> > -		reg = <0>;
-> > -		device_type = "ethernet-phy";
-> > -	};
-> > -};
-> > -
-> > -&sdhci0 {
-> > -	status = "okay";
-> > -};
-> > -
-> > -&uart1 {
-> > -	status = "okay";
-> > -};
-> > -
-> > -&usb0 {
-> > -	status = "okay";
-> > -	dr_mode = "host";
-> > -	usb-phy = <&usb_phy0>;
-> > -};
-> >   
+On 25/02/18 13:50, hao_zhang wrote:
+> This patch adds allwinner sun8i pwm binding documents.
 > 
-> TBH: I wouldn't bother with this. It is not huge duplication anyway.
-> If that file is huge that not a problem with it but it is pretty small
-> that's why I can't see a reason for it.
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> new file mode 100644
+> index 0000000..e8c48be
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> @@ -0,0 +1,18 @@
+> +Allwinner sun8i R40/V40/T3 SoC PWM controller
+> +
+> +Required properties:
+> +  - compatible: should be one of:
+> +    - "allwinner,sun8i-r40-pwm"
+> +  - reg: physical base address and length of the controller's registers
+> +  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+> +    the cells format.
+> +  - clocks: From common clock binding, handle to the parent clock.
 
-OK. I withdraw this patch.
+The manual tells me that there are two possible clock sources (24 MHz
+OSC and APB1), with actually two bits for encoding the mux source,
+allowing for two more potential clock sources.
+So can we extend this description to provide up to four clocks, with a
+clock-names property telling the driver how this maps to the mux value?
+Either we use clock names matching the clocks mentioned in the manual:
+	clocks = <&osc24M>, <&ccu CLK_APB1>;
+	clock-names = "osc", "apb1";
+or we encode the mux values in the clock-names:
+	clock-names = "mux-0", "mux-1";
+Don't know what's more widely used in those cases, the latter seems to
+be more future-proof.
+Each channel pair can be configured to use one of the two (or four)
+clocks, so we can be more flexible with multiple clocks.
 
-> M
-> 
-> 
 
-Best regards,
-  Nobuhiro
+Also, can you please add an "interrupts" property here? You don't need
+to use it in the driver right now, but since there are multiple
+registers dealing with the interrupts we should have it in the binding.
+If in need, we can then add support later.
+
+> +
+> +Example:
+> +
+> +pwm: pwm at 1c23400 {
+> +	     compatible = "allwinner,sun8i-pwm";
+
+That should match what you wrote above: allwinner,sun8i-r40-pwm.
+And I believe this is the right compatible name, since there are
+numerous other sun8i SoCs with the sun4i PWM IP, so just sun8i-pwm would
+be misleading and confusing.
+
+> +	     reg = <0x01c23400 0x154>;
+> +	     clocks = <&osc24M>;
+
+This should then be amended to what I sketched above.
+
+> +	     #pwm-cells = <3>;
+
+And then here please add:
+	     interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+
+Cheers,
+Andre
