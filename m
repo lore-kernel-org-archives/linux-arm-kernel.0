@@ -1,55 +1,117 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:40 +0800
-Subject: [PATCH 18/29] arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
+Date: Wed, 28 Feb 2018 11:56:43 +0800
+Subject: [PATCH 21/29] arm64: capabilities: Handle duplicate entries for a
+ capability
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-19-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-22-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-commit 0617052ddde3 upstream.
+commit 67948af41f2e upstream.
 
-Although CONFIG_UNMAP_KERNEL_AT_EL0 does make KASLR more robust, it's
-actually more useful as a mitigation against speculation attacks that
-can leak arbitrary kernel data to userspace through speculation.
+Sometimes a single capability could be listed multiple times with
+differing matches(), e.g, CPU errata for different MIDR versions.
+This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
+we stop checking for a capability on a CPU with the first
+entry in the given table, which is not sufficient. Make sure we
+run the checks for all entries of the same capability. We do
+this by fixing __this_cpu_has_cap() to run through all the
+entries in the given table for a match and reuse it for
+verify_local_cpu_feature().
 
-Reword the Kconfig help message to reflect this, and make the option
-depend on EXPERT so that it is on by default for the majority of users.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/Kconfig | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6b6e9f8..c8471cf 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -734,15 +734,14 @@ config FORCE_MAX_ZONEORDER
- 	  4M allocations matching the default size used by generic code.
+Conflicts:
+	arch/arm64/kernel/cpufeature.c
+---
+ arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
+ 1 file changed, 23 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 4e5dff1..6200b81 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -969,6 +969,26 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
+ 			cap_set_elf_hwcap(hwcaps);
+ }
  
- config UNMAP_KERNEL_AT_EL0
--	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
-+	bool "Unmap kernel when running in userspace (aka \"KAISER\")" if EXPERT
- 	default y
- 	help
--	  Some attacks against KASLR make use of the timing difference between
--	  a permission fault which could arise from a page table entry that is
--	  present in the TLB, and a translation fault which always requires a
--	  page table walk. This option defends against these attacks by unmapping
--	  the kernel whilst running in userspace, therefore forcing translation
--	  faults for all of kernel space.
-+	  Speculation attacks against some high-performance processors can
-+	  be used to bypass MMU permission checks and leak kernel data to
-+	  userspace. This can be defended against by unmapping the kernel
-+	  when running in userspace, mapping it back in on exception entry
-+	  via a trampoline page in the vector table.
++/*
++ * Check if the current CPU has a given feature capability.
++ * Should be called from non-preemptible context.
++ */
++static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
++			       unsigned int cap)
++{
++	const struct arm64_cpu_capabilities *caps;
++
++	if (WARN_ON(preemptible()))
++		return false;
++
++	for (caps = cap_array; caps->desc; caps++)
++		if (caps->capability == cap &&
++		    caps->matches &&
++		    caps->matches(caps, SCOPE_LOCAL_CPU))
++			return true;
++	return false;
++}
++
+ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info)
+ {
+@@ -1037,8 +1057,9 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+ }
  
- 	  If unsure, say Y.
+ static void
+-verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
++verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
+ {
++	const struct arm64_cpu_capabilities *caps = caps_list;
+ 	for (; caps->matches; caps++) {
+ 		if (!cpus_have_cap(caps->capability))
+ 			continue;
+@@ -1046,7 +1067,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+ 		 * If the new CPU misses an advertised feature, we cannot proceed
+ 		 * further, park the cpu.
+ 		 */
+-		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
++		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
+ 			pr_crit("CPU%d: missing feature: %s\n",
+ 					smp_processor_id(), caps->desc);
+ 			cpu_die_early();
+@@ -1099,25 +1120,6 @@ static void __init setup_feature_capabilities(void)
+ 	enable_cpu_capabilities(arm64_features);
+ }
  
+-/*
+- * Check if the current CPU has a given feature capability.
+- * Should be called from non-preemptible context.
+- */
+-static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+-			       unsigned int cap)
+-{
+-	const struct arm64_cpu_capabilities *caps;
+-
+-	if (WARN_ON(preemptible()))
+-		return false;
+-
+-	for (caps = cap_array; caps->desc; caps++)
+-		if (caps->capability == cap && caps->matches)
+-			return caps->matches(caps, SCOPE_LOCAL_CPU);
+-
+-	return false;
+-}
+-
+ extern const struct arm64_cpu_capabilities arm64_errata[];
+ 
+ bool this_cpu_has_cap(unsigned int cap)
 -- 
 2.7.4
