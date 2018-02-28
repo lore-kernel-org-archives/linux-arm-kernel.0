@@ -1,35 +1,86 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 28 Feb 2018 17:56:18 +0100
-Subject: [RFC 0/4] Add support for the Gateworks System Controller
-In-Reply-To: <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
-References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
- <20180228144424.GC12303@lunn.ch>
- <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
-Message-ID: <20180228165618.GC29484@lunn.ch>
+From: jaz@semihalf.com (Grzegorz Jaszczyk)
+Date: Wed, 28 Feb 2018 18:01:00 +0100
+Subject: [PATCH] arm64: kdump: fix interrupt handling done during
+ machine_crash_shutdown
+Message-ID: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim
+Hitherto during machine_kexec_mask_interrupts there was an attempt to
+remove active state using irq_set_irqchip_state() routine and only if it
+failed, the attempt to EOI the interrupt was made. Nevertheless relaying
+on return value from irq_set_irqchip_state inside
+machine_kexec_mask_interrupts is incorrect - it only returns the status
+of the routine but doesn't provide information if the interrupt was
+deactivated correctly or not. Therefore the irq_eoi wasn't call even if
+the interrupt remained active.
 
-Cool. I would say this is done right.
+To determine the sate correctly the irq_get_irqchip_state() could be
+used but according to the ARM Generic Interrupt Controller Architecture
+Spec, non-secure reading from GICD_ISACTIVERn/GICD_ICACTIVERn can be not
+permitted (depending on NS_access setting of Non-secure Access Control
+Registers, a.k.a. GICD_NSACRn). What is more interesting GICD_NSACRn
+is optional Secure register.
 
-> One issue I'm trying to figure out the best way to deal with is the
-> fact that the GSC can 'NAK' transactions occasionally which is why I
-> override the regmap read/write functions and provide retries. This
-> resolves the issue for the mfd core driver and sub-module drivers but
-> doesn't resolve the issue with these 'emulated devices' which have
-> their own stand-alone drivers. I'm not sure how to best deal with that
-> yet. I tried to add retires to the i2c adapter but that wasn't
-> accepted upstream because it was too generic and I was told I need to
-> work around it in device-drivers.
+Moreover de-activating the interrupt via GICD_ISACTIVERn register
+(regardless of the possibility of checking status or not) seems to not
+do the job, when the GIC Distributor is configured to forward the
+interrupts to the CPU interfaces.
 
-How about writing an i2c bus driver which sits directly on top of
-another i2c bus? Basically a one port i2c mux.
+Because of all above the attempt to deactivate interrupts via
+irq_set_irqchip_state() is removed in this patch. Instead the irq_eoi is
+called whenever the interrupt is in progress(irqd_irq_inprogress).
 
-The current mux code does not seem to directly allow it, since it
-calls i2c_transfer() directly on the parent, where as you want it to
-call your own i2c_transfer function. But maybe you could expended the
-core mux code to allow the i2c_mux_core structure to contain a transfer
-function?
+Before this patch the kdump triggered from interrupt context worked
+correctly by accident when the GIC was configured with
+GIC_CPU_CTRL_EOImodeNS == 1 (supports_deactivate == true). In mentioned
+mode GIC_CPU_EOI has priority drop functionality only and
+GIC_CPU_DEACTIVATE is used for interrupt deactivation. Also the
+gic_handle_irq behaviour is a bit different in mentioned mode and
+performs write to the GIC_CPU_EOI which causes the priority drop to the
+idle priority. So even if the irq_eoi wasn't called during
+machine_kexec_mask_interrupts, the interrupts of the crashdump kernel
+was handled due to interrupt preemption (since the priority of still
+active interrupt was dropped to idle priority).
 
-      Andrew
+Nevertheless when the kdump was triggered from interrupt context while
+the GIC was configured to work in GIC_CPU_CTRL_EOImodeNS == 0, the
+crashdump kernel hang in early stage due to lack of timer interrupt
+arrival.
+
+After this fix the kdump behaves correctly when triggered from interrupt
+context independently of GIC_CPU_CTRL_EOImodeNS configuration.
+
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+---
+ arch/arm64/kernel/machine_kexec.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f76ea92..30ad183 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -220,20 +220,12 @@ static void machine_kexec_mask_interrupts(void)
+ 
+ 	for_each_irq_desc(i, desc) {
+ 		struct irq_chip *chip;
+-		int ret;
+ 
+ 		chip = irq_desc_get_chip(desc);
+ 		if (!chip)
+ 			continue;
+ 
+-		/*
+-		 * First try to remove the active state. If this
+-		 * fails, try to EOI the interrupt.
+-		 */
+-		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
+-
+-		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
+-		    chip->irq_eoi)
++		if (irqd_irq_inprogress(&desc->irq_data) && chip->irq_eoi)
+ 			chip->irq_eoi(&desc->irq_data);
+ 
+ 		if (chip->irq_mask)
+-- 
+2.7.4
