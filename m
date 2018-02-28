@@ -1,14 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:41:01 -0800
-Subject: [PATCH v4 17/22] nvmem: snvs_lpgpr: Convert commas to semicolons
+Date: Wed, 28 Feb 2018 06:40:59 -0800
+Subject: [PATCH v4 15/22] nvmem: bcm-ocotp: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-18-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-16-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like commas were accidentally used where semicolons were
-supposed to be. Fix that.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,31 +25,41 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/nvmem/bcm-ocotp.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index 6a2fdd09e74a..90aaf818563b 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->priv = priv;
- 	cfg->name = dev_name(dev);
- 	cfg->dev = dev;
--	cfg->stride = 4,
--	cfg->word_size = 4,
--	cfg->size = 4,
--	cfg->owner = THIS_MODULE,
--	cfg->reg_read  = snvs_lpgpr_read,
--	cfg->reg_write = snvs_lpgpr_write,
-+	cfg->stride = 4;
-+	cfg->word_size = 4;
-+	cfg->size = 4;
-+	cfg->owner = THIS_MODULE;
-+	cfg->reg_read  = snvs_lpgpr_read;
-+	cfg->reg_write = snvs_lpgpr_write;
+diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
+index 5e9e324427f9..24c30fa475cc 100644
+--- a/drivers/nvmem/bcm-ocotp.c
++++ b/drivers/nvmem/bcm-ocotp.c
+@@ -302,27 +302,17 @@ static int bcm_otpc_probe(struct platform_device *pdev)
  
- 	nvmem = devm_nvmem_register(dev, cfg);
- 	if (IS_ERR(nvmem))
+ 	priv->config = &bcm_otpc_nvmem_config;
+ 
+-	nvmem = nvmem_register(&bcm_otpc_nvmem_config);
++	nvmem = devm_nvmem_register(dev, &bcm_otpc_nvmem_config);
+ 	if (IS_ERR(nvmem)) {
+ 		dev_err(dev, "error registering nvmem config\n");
+ 		return PTR_ERR(nvmem);
+ 	}
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+-static int bcm_otpc_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct platform_driver bcm_otpc_driver = {
+ 	.probe	= bcm_otpc_probe,
+-	.remove	= bcm_otpc_remove,
+ 	.driver = {
+ 		.name	= "brcm-otpc",
+ 		.of_match_table = bcm_otpc_dt_ids,
 -- 
 2.14.3
