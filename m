@@ -1,63 +1,37 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 28 Feb 2018 21:00:57 +0800
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
- <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
- <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
- <5A72F7D2.1050201@rock-chips.com> <5A8FEBC6.4000408@rock-chips.com>
- <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
-Message-ID: <5A96A809.2020509@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Feb 2018 14:02:49 +0100
+Subject: [PATCH v2] bridge: Elaborate a bit on dumb VGA bridges in Kconfig
+Message-ID: <20180228130249.22533-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+It's better if we explain a bit that this pertains to
+passive VGA DAC bridges.
 
-Thanks for your reply.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Write that these bridges are non-programmable rather than
+  discrete, as that reflects the name of the bridge being
+  "dumb". Discrete is wrong as it has a specific electronic
+  meaning, as in "non-integrated" and this is integrated.
+---
+ drivers/gpu/drm/bridge/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-On 02/28/2018 12:59 AM, Robin Murphy wrote:
->>> the rockchip IOMMU is part of the master block in hardware, so it needs
->>> to control the master's power domain and some of the master's clocks
->>> when access it's registers.
->>>
->>> and the number of clocks needed here, might be different between each
->>> IOMMUs(according to which master block it belongs), it's a little like
->>> our power domain:
->>> https://elixir.free-electrons.com/linux/latest/source/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L935
->>>
->>>
->>>
->>> i'm not sure how to describe this correctly, is it ok use something like
->>> "the same as it's master block"?
->>
->> would it make sense to add a property to specify the master who owns
->> the iommu, and we can get all clocks(only some of those clocks are
->> actually needed) from it in the of_xlate()? and we can also reuse the
->> clock-names of that master to build clk_bulk_data and log errors in
->> clk_bulk_get.
->
-> I'm inclined to agree with Rob here - if we're to add anything to the
-> binding, it should only be whatever clock inputs are defined for the
-> IOMMU IP block itself. If Linux doesn't properly handle the interconnect
-> clock hierarchy external to a particular integration, that's a separate
-> issue and it's not the binding's problem.
->
-> I actually quite like the hack of "borrowing" the clocks from
-> dev->of_node in of_xlate() - you shouldn't need any DT changes for that,
-> because you already know that each IOMMU instance only has the one
-> master device anyway.
-
-Thanks:) but actually we are going to support sharing IOMMU between 
-multiple masters(one of them is the main master i think) in the newer 
-chips(not yet supported on upstream kernel)...
-
-So we might have to get all clocks from all masters, or find a way to 
-specify the main master...and for the multiple masters case, do it in 
-of_xlate() turns out to be a little racy...maybe we can add a property 
-to specify main master, and get it's clocks in probe()?
-
->
-> Robin.
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 3b99d5a06c16..e1ab948707a0 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -30,7 +30,8 @@ config DRM_DUMB_VGA_DAC
+ 	depends on OF
+ 	select DRM_KMS_HELPER
+ 	help
+-	  Support for RGB to VGA DAC based bridges
++	  Support for non-programmable RGB to VGA DAC based bridges
++	  such as ADI ADV7123 or TI THS8134 and THS8135.
+ 
+ config DRM_LVDS_ENCODER
+ 	tristate "Transparent parallel to LVDS encoder support"
+-- 
+2.14.3
