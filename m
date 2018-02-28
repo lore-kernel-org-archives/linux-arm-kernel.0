@@ -1,15 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:40:51 -0800
-Subject: [PATCH v4 07/22] nvmem: snvs_lgpr: Convert to use
- devm_nvmem_register()
+Date: Wed, 28 Feb 2018 06:40:45 -0800
+Subject: [PATCH v4 01/22] nvmem: Document struct nvmem_config
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-8-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+Add a simple description of struct nvmem_config and its fields.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,44 +23,41 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/snvs_lpgpr.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ include/linux/nvmem-provider.h | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index e5c2a4a17f03..6a2fdd09e74a 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -117,22 +117,13 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->reg_read  = snvs_lpgpr_read,
- 	cfg->reg_write = snvs_lpgpr_write,
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 497706f5adca..27e599222ec1 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -22,6 +22,28 @@ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
+ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
+ 				 void *val, size_t bytes);
  
--	nvmem = nvmem_register(cfg);
-+	nvmem = devm_nvmem_register(dev, cfg);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int snvs_lpgpr_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static const struct of_device_id snvs_lpgpr_dt_ids[] = {
- 	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
- 	{ .compatible = "fsl,imx6ul-snvs-lpgpr",
-@@ -143,7 +134,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
- 
- static struct platform_driver snvs_lpgpr_driver = {
- 	.probe	= snvs_lpgpr_probe,
--	.remove	= snvs_lpgpr_remove,
- 	.driver = {
- 		.name	= "snvs_lpgpr",
- 		.of_match_table = snvs_lpgpr_dt_ids,
++/**
++ * struct nvmem_config - NVMEM device configuration
++ *
++ * @dev:	Parent device.
++ * @name:	Optional name.
++ * @id:		Optional device ID used in full name. Ignored if name is NULL.
++ * @owner:	Pointer to exporter module. Used for refcounting.
++ * @cells:	Optional array of pre-defined NVMEM cells.
++ * @ncells:	Number of elements in cells.
++ * @read_only:	Device is read-only.
++ * @root_only:	Device is accessibly to root only.
++ * @reg_read:	Callback to read data.
++ * @reg_write:	Callback to write data.
++ * @size:	Device size.
++ * @word_size:	Minimum read/write access granularity.
++ * @stride:	Minimum read/write access stide.
++ * @priv:	User context passed to read/write callbacks.
++ *
++ * Note: A default "nvmem<id>" name will be assigned to the device if
++ * no name is specified in its configuration. In such case "<id>" is
++ * generated with ida_simple_get() and provided id field is ignored.
++ */
+ struct nvmem_config {
+ 	struct device		*dev;
+ 	const char		*name;
 -- 
 2.14.3
