@@ -1,25 +1,48 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Wed, 28 Feb 2018 17:25:54 +0100
-Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
- patchset related
-In-Reply-To: <20180228161833.GB22612@arm.com>
-References: <20180228154523.GA29931@akinoame> <20180228160735.GA22612@arm.com>
- <20180228161256.GA31013@akinoame> <20180228161833.GB22612@arm.com>
-Message-ID: <20180228162554.GD31013@akinoame>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 28 Feb 2018 16:32:37 +0000
+Subject: [PATCH 00/12] firmware: arm_scpi: series with smaller improvements
+In-Reply-To: <7hbmhpybbw.fsf@baylibre.com>
+References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
+ <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com> <7hbmhpybbw.fsf@baylibre.com>
+Message-ID: <e931fc0b-301d-b4cb-96e4-a34b84648170@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 04:18:33PM +0000, Will Deacon wrote:
-> > 
-> > Oops log here:
-> > https://launchpadlibrarian.net/358687166/submission_2018-02-26T14.58.17.996524.html#9-1-log
+
+
+On 19/01/18 18:04, Kevin Hilman wrote:
+> Sudeep Holla <sudeep.holla@arm.com> writes:
 > 
-> The patch that Ard linked to should resolve that particular crash.
-> I see this is a 4.13-based kernel. Is the source tree available anywhere?
+>> Hi Heiner,
+>>
+>> (Sorry for the late response, was off for a month)
+>>
+>> On 05/12/17 21:54, Heiner Kallweit wrote:
+>>> After recent revert of all changes since 4.14 this is a resubmit of
+>>> the patch series, reduced to patches which should not cause any
+>>> regression.
+>>> Based on a remark from Kevin I added one patch for improving the
+>>> version info for pre-1.0 firmware that doesn't provide version
+>>> information.
+>>>
+>>> Best should be to apply it to a devel branch first so that the
+>>> Baylibre Amlogic team can test before mainlining.
+>>>
+>>
+>> I am still waiting for tested by from Amlogic team for this series.
+> 
+> I (finally) tested this series on a few of the boards that were failing
+> last time, and those issues are gone.
+> 
+> So, for the series...
+> 
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+> 
 
-https://git.launchpad.net/~p-pisati/ubuntu/+source/linux/log/?h=artful-master-next-arm64-kpti-414-backport
+Thanks, pulled the series[1] with Kevin's tested-by now.
 
-I'll try that patch, thanks.
 -- 
-bye,
-p.
+Regards,
+Sudeep
+
+[1] https://git.kernel.org/sudeep.holla/linux/h/for-next/scpi
