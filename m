@@ -1,46 +1,108 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:46 +0800
-Subject: [PATCH 24/29] arm64: Turn on KPTI only on CPUs that need it
+Date: Wed, 28 Feb 2018 11:56:47 +0800
+Subject: [PATCH 25/29] arm64: kpti: Make use of nG dependent on
+ arm64_kernel_unmapped_at_el0()
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-25-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-26-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jayachandran C <jnair@caviumnetworks.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 0ba2e29c7fc1 upstream.
+commit 41acec624087 upstream.
 
-Whitelist Broadcom Vulcan/Cavium ThunderX2 processors in
-unmap_kernel_at_el0(). These CPUs are not vulnerable to
-CVE-2017-5754 and do not need KPTI when KASLR is off.
+To allow systems which do not require kpti to continue running with
+global kernel mappings (which appears to be a requirement for Cavium
+ThunderX due to a CPU erratum), make the use of nG in the kernel page
+tables dependent on arm64_kernel_unmapped_at_el0(), which is resolved
+at runtime.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/cpufeature.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/include/asm/kernel-pgtable.h | 12 ++----------
+ arch/arm64/include/asm/pgtable-prot.h   | 30 ++++++++++++++----------------
+ 2 files changed, 16 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 6200b81..e62583d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -766,6 +766,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
- 		return true;
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 135e829..be151cc 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -73,16 +73,8 @@
+ /*
+  * Initial memory map attributes.
+  */
+-#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+-
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
+-#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
+-#else
+-#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
+-#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
+-#endif
++#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
  
-+	/* Don't force KPTI for CPUs that are not vulnerable */
-+	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
-+	case MIDR_CAVIUM_THUNDERX2:
-+	case MIDR_BRCM_VULCAN:
-+		return false;
-+	}
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
+ #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 84b5283..f705d96 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -37,13 +37,11 @@
+ #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+ #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
+-#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
+-#else
+-#define PROT_DEFAULT		_PROT_DEFAULT
+-#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++#define PTE_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PTE_NG : 0)
++#define PMD_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PMD_SECT_NG : 0)
 +
- 	/* Defer to CPU feature registers */
- 	return !cpuid_feature_extract_unsigned_field(pfr0,
- 						     ID_AA64PFR0_CSV3_SHIFT);
++#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_MAYBE_NG)
++#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_MAYBE_NG)
+ 
+ #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+@@ -55,22 +53,22 @@
+ #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ 
+-#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+-#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
++#define _PAGE_DEFAULT		(_PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
++#define _HYP_PAGE_DEFAULT	_PAGE_DEFAULT
+ 
+-#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
++#define PAGE_KERNEL		__pgprot(PROT_NORMAL)
++#define PAGE_KERNEL_RO		__pgprot((PROT_NORMAL & ~PTE_WRITE) | PTE_RDONLY)
++#define PAGE_KERNEL_ROX		__pgprot((PROT_NORMAL & ~(PTE_WRITE | PTE_PXN)) | PTE_RDONLY)
++#define PAGE_KERNEL_EXEC	__pgprot(PROT_NORMAL & ~PTE_PXN)
++#define PAGE_KERNEL_EXEC_CONT	__pgprot((PROT_NORMAL & ~PTE_PXN) | PTE_CONT)
+ 
+ #define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+ #define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+ #define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+-#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+-#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
++#define PAGE_S2			__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+ 
+ #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_NG | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
 -- 
 2.7.4
