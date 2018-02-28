@@ -1,104 +1,46 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 28 Feb 2018 10:40:38 +0100
-Subject: [RFC 3/3] perf pmu: Restore auto-merging of PMU events created
- by prefix match
-In-Reply-To: <1519770848-26738-4-git-send-email-agustinv@codeaurora.org>
-References: <1519770848-26738-1-git-send-email-agustinv@codeaurora.org>
- <1519770848-26738-4-git-send-email-agustinv@codeaurora.org>
-Message-ID: <20180228094038.GA9474@krava>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 28 Feb 2018 12:07:22 +0200
+Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
+In-Reply-To: <CACi5LpMv_LB3wi7qn33b6mysdK_weki0YYsG0EkqPhR8FvFq5w@mail.gmail.com>
+References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
+ <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
+ <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
+ <CACi5LpMv_LB3wi7qn33b6mysdK_weki0YYsG0EkqPhR8FvFq5w@mail.gmail.com>
+Message-ID: <1519812442.10722.248.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 05:34:08PM -0500, Agustin Vega-Frias wrote:
-> This was disabled when auto-merging of non-alias events was disabled in
-> commit 63ce844 (perf stat: Only auto-merge events that are PMU aliases).
+On Wed, 2018-02-28 at 00:29 +0530, Bhupesh Sharma wrote:
+> On Tue, Feb 27, 2018 at 8:14 PM, Jonathan Toppins <jtoppins@redhat.com
+> > wrote:
+> > On 02/27/2018 07:40 AM, Bhupesh Sharma wrote:
+> > > 
 
-this changes the output, right? please provide before/after output
+> > For arm64 DT is suppose to *not* be the preferred method, yet still
+> > DT
+> > is preferred if the firmware provides both tables to the kernel.
 
-thanks,
-jirka
+> However several arm64 products in embedded applications are still not
+> SBSA/SBBR compliant (and I have worked on a couple of such
+> implementations earlier) and still use bootloaders like u-boot (and
+> also closed-source implementations) which have no support for ACPI
+> currently and still rely on a DT to pass the system hardware
+> information to the kernel.
 
-> 
-> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
-> ---
->  tools/perf/util/parse-events.c | 13 +++----------
->  tools/perf/util/parse-events.h |  2 +-
->  tools/perf/util/parse-events.y |  4 ++--
->  3 files changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-> index bafc91e..4e80ca3 100644
-> --- a/tools/perf/util/parse-events.c
-> +++ b/tools/perf/util/parse-events.c
-> @@ -1217,7 +1217,7 @@ int parse_events_add_numeric(struct parse_events_state *parse_state,
->  			 get_config_name(head_config), &config_terms);
->  }
-> 
-> -static int __parse_events_add_pmu(struct parse_events_state *parse_state,
-> +int parse_events_add_pmu(struct parse_events_state *parse_state,
->  			 struct list_head *list, char *name,
->  			 struct list_head *head_config, bool auto_merge_stats)
->  {
-> @@ -1287,13 +1287,6 @@ static int __parse_events_add_pmu(struct parse_events_state *parse_state,
->  	return evsel ? 0 : -ENOMEM;
->  }
-> 
-> -int parse_events_add_pmu(struct parse_events_state *parse_state,
-> -			 struct list_head *list, char *name,
-> -			 struct list_head *head_config)
-> -{
-> -	return __parse_events_add_pmu(parse_state, list, name, head_config, false);
-> -}
-> -
->  int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
->  			       char *str, struct list_head **listp)
->  {
-> @@ -1323,8 +1316,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
->  					return -1;
->  				list_add_tail(&term->list, head);
-> 
-> -				if (!__parse_events_add_pmu(parse_state, list,
-> -							    pmu->name, head, true)) {
-> +				if (!parse_events_add_pmu(parse_state, list,
-> +							  pmu->name, head, true)) {
->  					pr_debug("%s -> %s/%s/\n", str,
->  						 pmu->name, alias->str);
->  					ok++;
-> diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
-> index 88108cd..5015cfd 100644
-> --- a/tools/perf/util/parse-events.h
-> +++ b/tools/perf/util/parse-events.h
-> @@ -167,7 +167,7 @@ int parse_events_add_breakpoint(struct list_head *list, int *idx,
->  				void *ptr, char *type, u64 len);
->  int parse_events_add_pmu(struct parse_events_state *parse_state,
->  			 struct list_head *list, char *name,
-> -			 struct list_head *head_config);
-> +			 struct list_head *head_config, bool auto_merge_stats);
-> 
->  int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
->  			       char *str,
-> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-> index c528469..b51278f 100644
-> --- a/tools/perf/util/parse-events.y
-> +++ b/tools/perf/util/parse-events.y
-> @@ -232,7 +232,7 @@ PE_NAME opt_event_config
->  		YYABORT;
-> 
->  	ALLOC_LIST(list);
-> -	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
-> +	if (parse_events_add_pmu(_parse_state, list, $1, $2, false)) {
->  		struct perf_pmu *pmu = NULL;
->  		int ok = 0;
-> 
-> @@ -245,7 +245,7 @@ PE_NAME opt_event_config
->  			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
->  				if (parse_events_copy_term_list(orig_terms, &terms))
->  					YYABORT;
-> -				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms))
-> +				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms, true))
->  					ok++;
->  				parse_events_terms__delete(terms);
->  			}
-> --
-> 2.7.4
-> 
+> So far only open source implementation of a ACPI compliant firmware is
+> EDK2/UEFI which supports ACPI as the preferred boot method
+
+You mean for non-x86?
+
+>  and I am
+> not sure if all u-boot/in-house firmware implementations are planned
+> to be ported over to EDK2/UEFI for embedded applications.
+
+Why do you need that? ACPI (if you are talking about ACPI only, w/o EFI)
+is supported in U-Boot for few x86 SoCs/platforms. Moreover, one of them
+had never been shipped with ACPI/EFI complaint services in firmware and
+ACPI layer is purely done in U-Boot.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
