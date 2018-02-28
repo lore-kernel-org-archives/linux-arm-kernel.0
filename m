@@ -1,99 +1,70 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 28 Feb 2018 07:49:11 +0100
-Subject: [PATCH 2/4] dt-bindings: arm: Document Renesas V3MSK and Wheat
- board part numbers
-In-Reply-To: <CAMuHMdWqdFKH7AoFNAX5tHrCSn+cT5KTW38d8_CxYWJ76xGBMg@mail.gmail.com>
- <36c4cab2-3e41-d5ed-27a4-5a297887cf10@cogentembedded.com>
-Message-ID: <20180228064911.vnax4vyqnq6lry52@verge.net.au>
+Date: Wed, 28 Feb 2018 07:51:50 +0100
+Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based
+ Salvator-X board
+In-Reply-To: <CAMuHMdXkpEoKxT-z0FunnfdjUpUZZP8GvbC5wAuj-qseQCVkzQ@mail.gmail.com>
+References: <1519668225-12548-1-git-send-email-geert+renesas@glider.be>
+ <1519668225-12548-4-git-send-email-geert+renesas@glider.be>
+ <20180227082238.e2kk6s4wogwwltvb@verge.net.au>
+ <CAMuHMdXkpEoKxT-z0FunnfdjUpUZZP8GvbC5wAuj-qseQCVkzQ@mail.gmail.com>
+Message-ID: <20180228065150.zmutu3svbsztfilx@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 01:47:09PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 02/27/2018 11:17 AM, Simon Horman wrote:
-
-...
-
-> >> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-> >> index ded2cd3b5f4df0c8..82908a9447e4b051 100644
-> >> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> >> @@ -120,9 +120,9 @@ Boards:
-> >>      compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
-> >>    - Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
-> >>      compatible = "renesas,stout", "renesas,r8a7790"
-> >> -  - V3MSK
-> >> +  - V3MSK (Y-ASK-RCAR-V3M-WS10)
-> 
->    ACK.
-> 
-> >>      compatible = "renesas,v3msk", "renesas,r8a77970"
-> > 
-> > Google also tells me there is WS20, but I guess WS10 what is
-> > currently supported upstream.
-> 
->    At least that's what I have on my desk. :-)
-> 
-> >> -  - Wheat
-> >> +  - Wheat (RTP0RC7792ASKB0010JE)
-> >>      compatible = "renesas,wheat", "renesas,r8a7792"
-> > 
-> > I'm unable to confirm the above. Can anyone help?
-> 
->    Not me -- my documents don't mention this. :-(
-
-On Tue, Feb 27, 2018 at 10:14:32PM +0100, Geert Uytterhoeven wrote:
+On Tue, Feb 27, 2018 at 10:25:42PM +0100, Geert Uytterhoeven wrote:
 > Hi Simon,
 > 
-> On Tue, Feb 27, 2018 at 9:17 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Feb 26, 2018 at 07:03:43PM +0100, Geert Uytterhoeven wrote:
-
-...
-
-> >> -  - Wheat
-> >> +  - Wheat (RTP0RC7792ASKB0010JE)
-> >>      compatible = "renesas,wheat", "renesas,r8a7792"
+> On Tue, Feb 27, 2018 at 9:22 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Feb 26, 2018 at 07:03:44PM +0100, Geert Uytterhoeven wrote:
+> >> The Renesas Salvator-X development board can be equipped with an R-Car
+> >> H3, M3-W, or M3-N SiP, which are pin-compatible.
+> >>
+> >> Document board part number and compatible values for the version with
+> >> R-Car M3-N.
+> >>
+> >> The board part number was extracted from a big patch by Takeshi Kihara
+> >> in the BSP.
+> 
+> >> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> >> @@ -108,6 +108,8 @@ Boards:
+> >>      compatible = "renesas,salvator-x", "renesas,r8a7795"
+> >>    - Salvator-X (RTP0RC7796SIPB0011S)
 > >
-> > I'm unable to confirm the above. Can anyone help?
+> > Here we have: Name (Part No)
 > 
-> https://elinux.org/R-Car/Boards/Wheat
+> That's the standard (highest number of occurrences) way.
 > 
-> Looks like I misinterpreted the pictures, and
-> RTP0RC7792ASKB0000JE is the correct part number for Wheat.
+> >>      compatible = "renesas,salvator-x", "renesas,r8a7796"
+> >> +  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
+> >
+> > Here we have: Name (Part No (SoC))
+> 
+> This one is special: it's basically an M3-N prototype board made by taking
+> a Salvator-X/M3-W board, and replacing the M3-W SiP by an M3-N SiP.
+> Hence the board part number is the same.
+> 
+> >> +    compatible = "renesas,salvator-x", "renesas,r8a77965"
+> >>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+> >
+> > And here we have: Name (Version, Part No)
+> 
+> AFAIU, "Salvator-XS" really means "Salvator-X 2nd version".
+> So it's not "Version", but "Alternative Board Name".
+> There's a similar thing with the ULCB boards:
+> 
+>   - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
+>     H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
+>   - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+> 
+> >>      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+> >>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7796SIPB0012S)
+> >
+> > Can we think about making this more consistent?
+> 
+> I'm afraid not. Naming seems to become only more complex over time...
+> Unless you have great hands and great ideas ;-)
 
-Thanks. I've applied the following.
+Not so many good ideas this morning.
 
-
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Subject: [PATCH] dt-bindings: arm: Document Renesas V3MSK and Wheat board part
- numbers
-
-The DT binding documentation for the Renesas V3MSK and Wheat boards
-lacked board part numbers.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[simon: corrected Wheat part number]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index a99359e63b0a..66edc1406bb8 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -120,9 +120,9 @@ Boards:
-     compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
-   - Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
-     compatible = "renesas,stout", "renesas,r8a7790"
--  - V3MSK
-+  - V3MSK (Y-ASK-RCAR-V3M-WS10)
-     compatible = "renesas,v3msk", "renesas,r8a77970"
--  - Wheat
-+  - Wheat (RTP0RC7792ASKB0000JE)
-     compatible = "renesas,wheat", "renesas,r8a7792"
- 
- 
--- 
-2.11.0
+I've applied this as is. We can revisit if the need arises.
