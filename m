@@ -1,23 +1,25 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:31 +0800
-Subject: [PATCH 09/29] arm64: entry: Add exception trampoline page for
- exceptions from EL0
+Date: Wed, 28 Feb 2018 11:56:32 +0800
+Subject: [PATCH 10/29] arm64: mm: Map entry trampoline into trampoline and
+ kernel page tables
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-10-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-11-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit c7b9adaf85f8 upstream.
+commit 51a0048beb44 upstream.
 
-To allow unmapping of the kernel whilst running at EL0, we need to
-point the exception vectors at an entry trampoline that can map/unmap
-the kernel on entry/exit respectively.
+The exception entry trampoline needs to be mapped at the same virtual
+address in both the trampoline page table (which maps nothing else)
+and also the kernel page table, so that we can swizzle TTBR1_EL1 on
+exceptions from and return to EL0.
 
-This patch adds the trampoline page, although it is not yet plugged
-into the vector table and is therefore unused.
+This patch maps the trampoline at a fixed virtual address in the fixmap
+area of the kernel virtual address space, which allows the kernel proper
+to be randomized with respect to the trampoline when KASLR is enabled.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
@@ -26,177 +28,104 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	add asm/mmu.h in entry.S for ASID marco
-	add kernel-pgtable.h in entry.S for SWAPPER_DIR_SIZE and
-	RESERVED_TTBR0_SIZE
-	no SW PAN in vmlinux.lds.S
+	no acpi apei in arch/arm64/include/asm/fixmap.h
+	no rodata in arch/arm64/mm/mmu.c
 ---
- arch/arm64/include/asm/kernel-pgtable.h |  2 +
- arch/arm64/kernel/entry.S               | 86 +++++++++++++++++++++++++++++++++
- arch/arm64/kernel/vmlinux.lds.S         | 17 +++++++
- 3 files changed, 105 insertions(+)
+ arch/arm64/include/asm/fixmap.h  |  5 +++++
+ arch/arm64/include/asm/pgtable.h |  1 +
+ arch/arm64/kernel/asm-offsets.c  |  6 +++++-
+ arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++++++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index e4ddac9..135e829 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -54,6 +54,8 @@
- #define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
- #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index caf86be..7b1d88c 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -51,6 +51,11 @@ enum fixed_addresses {
  
-+#define RESERVED_TTBR0_SIZE	(0) /*no CONFIG_ARM64_SW_TTBR0_PAN  introduced */
+ 	FIX_EARLYCON_MEM_BASE,
+ 	FIX_TEXT_POKE0,
 +
- /* Initial memory map size */
- #if ARM64_SWAPPER_USES_SECTION_MAPS
- #define SWAPPER_BLOCK_SHIFT	SECTION_SHIFT
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 60b202a..f0c6b37 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -29,9 +29,11 @@
- #include <asm/esr.h>
- #include <asm/irq.h>
- #include <asm/memory.h>
-+#include <asm/mmu.h>
- #include <asm/thread_info.h>
- #include <asm/asm-uaccess.h>
- #include <asm/unistd.h>
-+#include <asm/kernel-pgtable.h>
- 
- /*
-  * Context tracking subsystem.  Used to instrument transitions
-@@ -828,6 +830,90 @@ __ni_sys_trace:
- 
- 	.popsection				// .entry.text
- 
 +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+/*
-+ * Exception vectors trampoline.
-+ */
-+	.pushsection ".entry.tramp.text", "ax"
-+
-+	.macro tramp_map_kernel, tmp
-+	mrs	\tmp, ttbr1_el1
-+	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	bic	\tmp, \tmp, #USER_ASID_FLAG
-+	msr	ttbr1_el1, \tmp
-+	.endm
-+
-+	.macro tramp_unmap_kernel, tmp
-+	mrs	\tmp, ttbr1_el1
-+	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	orr	\tmp, \tmp, #USER_ASID_FLAG
-+	msr	ttbr1_el1, \tmp
-+	/*
-+	 * We avoid running the post_ttbr_update_workaround here because the
-+	 * user and kernel ASIDs don't have conflicting mappings, so any
-+	 * "blessing" as described in:
-+	 *
-+	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
-+	 *
-+	 * will not hurt correctness. Whilst this may partially defeat the
-+	 * point of using split ASIDs in the first place, it avoids
-+	 * the hit of invalidating the entire I-cache on every return to
-+	 * userspace.
-+	 */
-+	.endm
-+
-+	.macro tramp_ventry, regsize = 64
-+	.align	7
-+1:
-+	.if	\regsize == 64
-+	msr	tpidrro_el0, x30	// Restored in kernel_ventry
-+	.endif
-+	tramp_map_kernel	x30
-+	ldr	x30, =vectors
-+	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
-+	msr	vbar_el1, x30
-+	add	x30, x30, #(1b - tramp_vectors)
-+	isb
-+	br	x30
-+	.endm
-+
-+	.macro tramp_exit, regsize = 64
-+	adr	x30, tramp_vectors
-+	msr	vbar_el1, x30
-+	tramp_unmap_kernel	x30
-+	.if	\regsize == 64
-+	mrs	x30, far_el1
-+	.endif
-+	eret
-+	.endm
-+
-+	.align	11
-+ENTRY(tramp_vectors)
-+	.space	0x400
-+
-+	tramp_ventry
-+	tramp_ventry
-+	tramp_ventry
-+	tramp_ventry
-+
-+	tramp_ventry	32
-+	tramp_ventry	32
-+	tramp_ventry	32
-+	tramp_ventry	32
-+END(tramp_vectors)
-+
-+ENTRY(tramp_exit_native)
-+	tramp_exit
-+END(tramp_exit_native)
-+
-+ENTRY(tramp_exit_compat)
-+	tramp_exit	32
-+END(tramp_exit_compat)
-+
-+	.ltorg
-+	.popsection				// .entry.tramp.text
++	FIX_ENTRY_TRAMP_TEXT,
++#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
 +#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 	__end_of_permanent_fixed_addresses,
+ 
+ 	/*
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7acd3c5..3a30a39 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -692,6 +692,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
+ 
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
++extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+ 
+ /*
+  * Encode and decode a swap entry:
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index c58ddf8..5f4bf3c 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -24,6 +24,7 @@
+ #include <linux/kvm_host.h>
+ #include <linux/suspend.h>
+ #include <asm/cpufeature.h>
++#include <asm/fixmap.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/smp_plat.h>
+@@ -144,11 +145,14 @@ int main(void)
+   DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
+   DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
+   DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
+-
+   BLANK();
+   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
++  BLANK();
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
++#endif
+   return 0;
+ }
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d5cc6d7..84945c9 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -419,6 +419,29 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ 	vm_area_add_early(vma);
+ }
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++static int __init map_entry_trampoline(void)
++{
++	extern char __entry_tramp_text_start[];
++
++	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
++	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
++
++	/* The trampoline is always mapped and can therefore be global */
++	pgprot_val(prot) &= ~PTE_NG;
++
++	/* Map only the text into the trampoline page table */
++	memset(tramp_pg_dir, 0, PGD_SIZE);
++	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
++			     prot, pgd_pgtable_alloc, 0);
++
++	/* ...as well as the kernel page table */
++	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
++	return 0;
++}
++core_initcall(map_entry_trampoline);
++#endif
 +
  /*
-  * Special system call wrappers.
+  * Create fine-grained mappings for the kernel.
   */
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 1105aab..466a43a 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -56,6 +56,17 @@ jiffies = jiffies_64;
- #define HIBERNATE_TEXT
- #endif
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+#define TRAMP_TEXT					\
-+	. = ALIGN(PAGE_SIZE);				\
-+	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
-+	*(.entry.tramp.text)				\
-+	. = ALIGN(PAGE_SIZE);				\
-+	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
-+#else
-+#define TRAMP_TEXT
-+#endif
-+
- /*
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-@@ -128,6 +139,7 @@ SECTIONS
- 			HYPERVISOR_TEXT
- 			IDMAP_TEXT
- 			HIBERNATE_TEXT
-+			TRAMP_TEXT
- 			*(.fixup)
- 			*(.gnu.warning)
- 		. = ALIGN(16);
-@@ -216,6 +228,11 @@ SECTIONS
- 	swapper_pg_dir = .;
- 	. += SWAPPER_DIR_SIZE;
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	tramp_pg_dir = .;
-+	. += PAGE_SIZE;
-+#endif
-+
- 	_end = .;
- 
- 	STABS_DEBUG
 -- 
 2.7.4
