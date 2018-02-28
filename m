@@ -1,36 +1,61 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 28 Feb 2018 22:23:35 +0100
-Subject: [PATCH v2 00/16] Implement H3/H5 HDMI driver
-In-Reply-To: <20180227222701.9716-1-jernej.skrabec@siol.net>
-References: <20180227222701.9716-1-jernej.skrabec@siol.net>
-Message-ID: <2235934.0TF68fluGz@jernej-laptop>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 28 Feb 2018 15:24:17 -0600
+Subject: [PATCH V2] PCI/ASPM: Suppress common clock mode setting failure
+In-Reply-To: <1516651924-21820-1-git-send-email-okaya@codeaurora.org>
+References: <1516651924-21820-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180228212417.GM127842@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-Dne torek, 27. februar 2018 ob 23:26:45 CET je Jernej Skrabec napisal(a):
-> This series implements H3/H5 HDMI driver. It was tested on OrangePi 2 (H3),
-> OrangePi Plus2e (H3) and OrangePi PC2 (H5) with many resolutions and it
-> works well. Bug, which prevented correct operation for some resolutions,
-> is also fixed.
+On Mon, Jan 22, 2018 at 03:12:01PM -0500, Sinan Kaya wrote:
+> Code is emitting warnings when it tries to set the common clock mode for
+> ASPM and ASPM is already configured to common clock mode by the UEFI BIOS.
+> Let's bail out silently in such a case.
 > 
-> Code is based on linux-next, next-20180226 tag.
+> pci 0004:00:00.0: ASPM: Could not configure common clock
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Today I tried on this series on  next-20180228, but resolution switching 
-doesn't really work. The reason for this is use of clk_set_rate_exclusive() in 
-sun4i_tcon1_mode_set(). If I revert it to ordinary clk_set_rate() it works ok. 
-I investigated a bit and it seems that clocks stays at first set even if tcon 
-(the owner of exclusive lock) request the new one. Example:
+Applied to pci/aspm for v4.17, thanks!
 
-[   69.325732] TCON clk wanted: 148500000
-[   69.325740] TCON real clk: 69272728
-[   69.325770] HDMI clk wanted: 148500000
-[   69.325773] HDMI real clk: 138545455
-[   69.325815] HDMI PHY clk wanted: 148500000
-[   69.325819] HDMI PHY real clk: 138545454
-
-Is there anything I can do to help debug this?
-
-Best regards,
-Jernej
+> ---
+>  drivers/pci/pcie/aspm.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+> index 9783e10..913b90d 100644
+> --- a/drivers/pci/pcie/aspm.c
+> +++ b/drivers/pci/pcie/aspm.c
+> @@ -240,6 +240,24 @@ static void pcie_aspm_configure_common_clock(struct pcie_link_state *link)
+>  	if (!(reg16 & PCI_EXP_LNKSTA_SLC))
+>  		same_clock = 0;
+>  
+> +	/* Port might be already in common clock mode */
+> +	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &reg16);
+> +	if (same_clock && (reg16 & PCI_EXP_LNKCTL_CCC)) {
+> +		bool consistent = true;
+> +
+> +		list_for_each_entry(child, &linkbus->devices, bus_list) {
+> +			pcie_capability_read_word(child, PCI_EXP_LNKCTL,
+> +						  &reg16);
+> +			if (!(reg16 & PCI_EXP_LNKCTL_CCC)) {
+> +				consistent = false;
+> +				break;
+> +			}
+> +		}
+> +		if (consistent)
+> +			return;
+> +		dev_warn(&parent->dev, "ASPM: current common clock configuration is broken, reconfiguring\n");
+> +	}
+> +
+>  	/* Configure downstream component, all functions */
+>  	list_for_each_entry(child, &linkbus->devices, bus_list) {
+>  		pcie_capability_read_word(child, PCI_EXP_LNKCTL, &reg16);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
