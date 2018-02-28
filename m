@@ -1,69 +1,91 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 28 Feb 2018 19:22:14 +0100
-Subject: [PATCH] drm/sun4i: init dclk_min_div & dclk_max_div inside
- encoder init functions
-In-Reply-To: <ee7bff10-527a-5481-598b-47e1d7a9eeb6@micronovasrl.com>
-References: <1519822318-3974-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180228155559.lqm22dzeiptrwyxe@flea>
- <ee7bff10-527a-5481-598b-47e1d7a9eeb6@micronovasrl.com>
-Message-ID: <83d1a6d8-0816-9f75-34f6-4b93e84393e4@micronovasrl.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 28 Feb 2018 10:45:55 -0800
+Subject: [PATCH] PM / core: move device and its children to end of dpm list
+Message-ID: <1519843555-982-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When bridge and its endpoint is enumated the devices are added to the
+dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+This causes the bridge to be moved to the end of the dpm list when deferred
+probe kicks in. The order of the dpm list for bridge and endpoint is
+reversed.
 
-Il 28/02/2018 17:34, Giulio Benetti ha scritto:
-> Hi,
-> 
-> Il 28/02/2018 16:55, Maxime Ripard ha scritto:
->> Hi,
->>
->> On Wed, Feb 28, 2018 at 01:51:58PM +0100, Giulio Benetti wrote:
->>> sun4i_dclk_round_rate is called before sun4i_tcon_mode_set,
->>> so it finds dclk_min_div and dclk_max_div set to 0 and fails
->>> adding crtc.
->>>
->>> Move dclk_min_div and dclk_max_div to encoders init functions.
->>>
->>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>
->> I sent a similar patch there:
->> https://lists.freedesktop.org/archives/dri-devel/2018-February/166666.html 
->>
-> 
-> I've missed that.
-> And where you put it is better, since it's called every time set_mode is 
-> called.
-> 
-> On lvds instead I don't see anything about this,
-> it should have the same potential problem.
-> Also I can't understand why it has been set min=7 and max=7 on lvds.
-> With those values I would obtain 77Mhz only.
-> And I can't find values on datasheet for minimum and maximum.
+Add reordering code to re-position the bridge and its children so the order
+for suspend and resume is not altered.
 
-Submitted patchset for that.
+Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Toan Le <toanle@apm.com>
+---
+ drivers/base/core.c    | 20 ++++++++++++++++++++
+ drivers/base/dd.c      |  8 ++++----
+ include/linux/device.h |  3 +++
+ 3 files changed, 27 insertions(+), 4 deletions(-)
 
-> 
->>
->> I guess eventually, we'll want to remove the usage of the clock
->> framework entirely, but it's not really the scope of a fix.
-> 
-> Where would you handle dclk instead of tcon?
-
-Don't mind.
-
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 110230d..0b4ad99 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+ }
+ 
+ /**
++ * device_pm_reorder - reorder device and its children to end of dpm list
++ * @dev: current device pointer
++ *
++ * This is a lock held version of reordering the device to dpm list tail.
++ * This will move the device to the end of the dpm list if it not registered.
++ * Afterward, it will iterate through its children and do the same for them.
++ */
++void device_pm_reorder(struct device *dev)
++{
++	int idx;
++
++	idx = device_links_read_lock();
++	device_pm_lock();
++	device_reorder_to_tail(dev, NULL);
++	device_pm_unlock();
++	device_links_read_unlock(idx);
++}
++EXPORT_SYMBOL_GPL(device_pm_reorder);
++
++/**
+  * device_link_add - Create a link between two devices.
+  * @consumer: Consumer end of the link.
+  * @supplier: Supplier end of the link.
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 2c964f5..3223a30 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+ 		 * Force the device to the end of the dpm_list since
+ 		 * the PM code assumes that the order we add things to
+ 		 * the list is a good order for suspend but deferred
+-		 * probe makes that very unsafe.
++		 * probe makes that very unsafe. Also move any children
++		 * belong to the device to the end of the list as well.
++		 * This way the suspend resume order won't be corrupted.
+ 		 */
+-		device_pm_lock();
+-		device_pm_move_last(dev);
+-		device_pm_unlock();
++		device_pm_reorder(dev);
+ 
+ 		dev_dbg(dev, "Retrying from deferred list\n");
+ 		if (initcall_debug && !initcalls_done)
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 9d32000..1ec12d5 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -1272,6 +1272,9 @@ extern void devm_device_remove_group(struct device *dev,
+ /* debugging and troubleshooting/diagnostic helpers. */
+ extern const char *dev_driver_string(const struct device *dev);
+ 
++/* reorder device and its children to end of dpm list */
++void device_pm_reorder(struct device *dev);
++
+ /* Device links interface. */
+ struct device_link *device_link_add(struct device *consumer,
+ 				    struct device *supplier, u32 flags);
 -- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-> 
-> Thanks
-> 
+1.8.3.1
