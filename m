@@ -1,10 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:40:56 -0800
-Subject: [PATCH v4 12/22] nvmem: meson-efuse: Convert to use
+Date: Wed, 28 Feb 2018 06:40:54 -0800
+Subject: [PATCH v4 10/22] nvmem: mtk-efuse: Convert to use
  devm_nvmem_register()
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-13-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-11-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,19 +25,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/meson-efuse.c | 12 +-----------
+ drivers/nvmem/mtk-efuse.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-index a43c68f90937..66029fc85ba9 100644
---- a/drivers/nvmem/meson-efuse.c
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -60,25 +60,15 @@ static int meson_efuse_probe(struct platform_device *pdev)
- 	econfig.reg_read = meson_efuse_read;
- 	econfig.size = size;
- 
+diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+index 9ee3479cfc7b..97ab7e6a4789 100644
+--- a/drivers/nvmem/mtk-efuse.c
++++ b/drivers/nvmem/mtk-efuse.c
+@@ -72,22 +72,13 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+ 	econfig.size = resource_size(res);
+ 	econfig.priv = priv;
+ 	econfig.dev = dev;
 -	nvmem = nvmem_register(&econfig);
-+	nvmem = devm_nvmem_register(&pdev->dev, &econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -46,18 +46,23 @@ index a43c68f90937..66029fc85ba9 100644
  	return 0;
  }
  
--static int meson_efuse_remove(struct platform_device *pdev)
+-static int mtk_efuse_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver meson_efuse_driver = {
- 	.probe = meson_efuse_probe,
--	.remove = meson_efuse_remove,
+ static const struct of_device_id mtk_efuse_of_match[] = {
+ 	{ .compatible = "mediatek,mt8173-efuse",},
+ 	{ .compatible = "mediatek,efuse",},
+@@ -97,7 +88,6 @@ MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
+ 
+ static struct platform_driver mtk_efuse_driver = {
+ 	.probe = mtk_efuse_probe,
+-	.remove = mtk_efuse_remove,
  	.driver = {
- 		.name = "meson-efuse",
- 		.of_match_table = meson_efuse_match,
+ 		.name = "mediatek,efuse",
+ 		.of_match_table = mtk_efuse_of_match,
 -- 
 2.14.3
