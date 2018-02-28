@@ -1,32 +1,38 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 28 Feb 2018 18:53:51 +0100
-Subject: [PATCH 1/2] drm/sun4i: increase lvds dclk max divisor
-Message-ID: <1519840432-61489-1-git-send-email-giulio.benetti@micronovasrl.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 28 Feb 2018 23:19:06 +0530
+Subject: [PATCH 10/10] MAINTAINERS: Add Actions Semi S900 pinctrl and gpio
+ entries
+In-Reply-To: <20180228174906.22721-1-manivannan.sadhasivam@linaro.org>
+References: <20180228174906.22721-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180228174906.22721-11-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment both min and max dclk div are set to 7.
-This doesn't allow to have lower frequencies.
+Add S900 pinctrl and gpio entries under ARCH_ACTIONS
 
-Increase dclk_max_div to 18 to achieve 30Mhz.
-
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ MAINTAINERS | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 029d2ce..bb35f41 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -278,7 +278,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
- 	u32 reg, val = 0;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 640dabc4c311..d63793ee545e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1125,10 +1125,14 @@ F:	arch/arm/mach-actions/
+ F:	arch/arm/boot/dts/owl-*
+ F:	arch/arm64/boot/dts/actions/
+ F:	drivers/clocksource/owl-*
++F:	drivers/gpio/gpio-owl.c
++F:	drivers/pinctrl/actions/*
+ F:	drivers/soc/actions/
+ F:	include/dt-bindings/power/owl-*
+ F:	include/linux/soc/actions/
+ F:	Documentation/devicetree/bindings/arm/actions.txt
++F:	Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
++F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
  
- 	tcon->dclk_min_div = 7;
--	tcon->dclk_max_div = 7;
-+	tcon->dclk_max_div = 18;
- 	sun4i_tcon0_mode_set_common(tcon, mode);
- 
- 	/* Adjust clock delay */
 -- 
-2.7.4
+2.14.1
