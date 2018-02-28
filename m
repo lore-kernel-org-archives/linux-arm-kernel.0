@@ -1,30 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 14:35:49 +0800
-Subject: [PATCH] ARM: dts: imx6dl-icore-rqs: Fix invalid PHY address
- assignment for ethernet
-In-Reply-To: <1519747143-3036-1-git-send-email-mayhs11saini@gmail.com>
-References: <1519747143-3036-1-git-send-email-mayhs11saini@gmail.com>
-Message-ID: <20180228063548.GJ3217@dragon>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 28 Feb 2018 12:08:11 +0530
+Subject: [PATCH] ARM: davinci: fix the GPIO lookup for omapl138-hawk
+In-Reply-To: <20180227121443.3191-1-brgl@bgdev.pl>
+References: <20180227121443.3191-1-brgl@bgdev.pl>
+Message-ID: <2396d1a7-e4ef-95d7-3d38-309adcc3507e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 09:29:03PM +0530, shyam saini wrote:
-> From: Shyam Saini <shyam@amarulasolutions.com>
+On Tuesday 27 February 2018 05:44 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Add "reg" property for ethernet to fix this issue.
+> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+> mmc can correctly lookup the wp and cp gpios.
 > 
-> Errors in boot logs:
-> mdio_bus 2188000.ethernet-1:
-> /soc/aips-bus at 02100000/ethernet at 02188000/mdio/ethernet-phy
-> has invalid PHY address
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 0
-> mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 1
-> mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 2
-> mdio_bus 2188000.ethernet-1: scan phy ethernet-phy at address 3
-> 
-> Reported-by: Shyam Saini <shyam@amarulasolutions.com>
-> Suggested-by: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Shyam Saini <shyam@amarulasolutions.com>
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index a3e78074be70..62eb7d668890 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
+>  	.dev_id = "da830-mmc.0",
+>  	.table = {
+>  		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
+> -		GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
+> -		GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
+> +		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
+> +		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
 
-Applied, thanks.
+Hmm, shouldn't this just be "davinci_gpio" since we use .id = -1 in
+da8xx_gpio_device?
+
+Also:
+
+Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc pins")
+
+Thanks,
+Sekhar
