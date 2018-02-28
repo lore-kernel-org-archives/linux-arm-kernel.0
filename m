@@ -1,10 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:40:48 -0800
-Subject: [PATCH v4 04/22] nvmem: vf610-ocotp: Convert to use
+Date: Wed, 28 Feb 2018 06:40:56 -0800
+Subject: [PATCH v4 12/22] nvmem: meson-efuse: Convert to use
  devm_nvmem_register()
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-5-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-13-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,49 +25,39 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/vf610-ocotp.c | 12 +-----------
+ drivers/nvmem/meson-efuse.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
-index 5ae9e002f195..752a0983e7fb 100644
---- a/drivers/nvmem/vf610-ocotp.c
-+++ b/drivers/nvmem/vf610-ocotp.c
-@@ -217,13 +217,6 @@ static const struct of_device_id ocotp_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, ocotp_of_match);
+diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
+index a43c68f90937..66029fc85ba9 100644
+--- a/drivers/nvmem/meson-efuse.c
++++ b/drivers/nvmem/meson-efuse.c
+@@ -60,25 +60,15 @@ static int meson_efuse_probe(struct platform_device *pdev)
+ 	econfig.reg_read = meson_efuse_read;
+ 	econfig.size = size;
  
--static int vf610_ocotp_remove(struct platform_device *pdev)
--{
--	struct vf610_ocotp *ocotp_dev = platform_get_drvdata(pdev);
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(&pdev->dev, &econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
+ 
+-	platform_set_drvdata(pdev, nvmem);
 -
--	return nvmem_unregister(ocotp_dev->nvmem);
+ 	return 0;
+ }
+ 
+-static int meson_efuse_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
 -}
 -
- static int vf610_ocotp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -251,13 +244,11 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
- 	ocotp_config.priv = ocotp_dev;
- 	ocotp_config.dev = dev;
- 
--	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
-+	ocotp_dev->nvmem = devm_nvmem_register(dev, &ocotp_config);
- 	if (IS_ERR(ocotp_dev->nvmem))
- 		return PTR_ERR(ocotp_dev->nvmem);
- 
- 	ocotp_dev->dev = dev;
--	platform_set_drvdata(pdev, ocotp_dev);
--
- 	ocotp_dev->timing = vf610_ocotp_calculate_timing(ocotp_dev);
- 
- 	return 0;
-@@ -265,7 +256,6 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
- 
- static struct platform_driver vf610_ocotp_driver = {
- 	.probe = vf610_ocotp_probe,
--	.remove = vf610_ocotp_remove,
+ static struct platform_driver meson_efuse_driver = {
+ 	.probe = meson_efuse_probe,
+-	.remove = meson_efuse_remove,
  	.driver = {
- 		.name = "vf610-ocotp",
- 		.of_match_table = ocotp_of_match,
+ 		.name = "meson-efuse",
+ 		.of_match_table = meson_efuse_match,
 -- 
 2.14.3
