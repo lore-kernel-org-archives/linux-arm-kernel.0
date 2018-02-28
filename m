@@ -1,253 +1,488 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 27 Feb 2018 17:21:14 -0800
-Subject: [RFC 4/4] input: misc: Add Gateworks System Controller support
+Date: Tue, 27 Feb 2018 17:21:12 -0800
+Subject: [RFC 2/4] mfd: add Gateworks System Controller core driver
 In-Reply-To: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
 References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1519780874-8558-5-git-send-email-tharvey@gateworks.com>
+Message-ID: <1519780874-8558-3-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for dispatching Linux Input events for the various interrupts
-the Gateworks System Controller provides.
+The Gateworks System Controller (GSC) is an I2C slave controller
+implemented with an MSP430 micro-controller whose firmware embeds the
+following features:
+ - I/O expander (16 GPIO's) using PCA955x protocol
+ - Real Time Clock using DS1672 protocol
+ - User EEPROM using AT24 protocol
+ - HWMON using custom protocol
+ - Interrupt controller with tamper detect, user pushbotton
+ - Watchdog controller capable of full board power-cycle
+ - Power Control capable of full board power-cycle
+
+see http://trac.gateworks.com/wiki/gsc for more details
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- drivers/input/misc/Kconfig     |   6 ++
- drivers/input/misc/Makefile    |   1 +
- drivers/input/misc/gsc-input.c | 196 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 203 insertions(+)
- create mode 100644 drivers/input/misc/gsc-input.c
+ drivers/mfd/Kconfig     |  10 ++
+ drivers/mfd/Makefile    |   1 +
+ drivers/mfd/gsc.c       | 330 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/gsc.h |  79 ++++++++++++
+ 4 files changed, 420 insertions(+)
+ create mode 100644 drivers/mfd/gsc.c
+ create mode 100644 include/linux/mfd/gsc.h
 
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 9f082a3..3d18a0e 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -117,6 +117,12 @@ config INPUT_E3X0_BUTTON
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called e3x0_button.
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 1d20a80..16dd486 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -341,6 +341,16 @@ config MFD_EXYNOS_LPASS
+ 	  Select this option to enable support for Samsung Exynos Low Power
+ 	  Audio Subsystem.
  
-+config INPUT_GSC
-+	tristate "Gateworks System Controller input support"
-+	depends on MFD_GSC
++config MFD_GSC
++	tristate "Gateworks System Controller"
++	depends on (I2C && OF) || COMPILE_TEST
++	select MFD_CORE
++	select REGMAP_I2C
++	select REGMAP_IRQ
 +	help
-+	  Say Y here if you want Gateworks System Controller input support.
++	  Enable support for the Gateworks System Controller found
++	  on Gateworks Single Board Computers.
 +
- config INPUT_PCSPKR
- 	tristate "PC Speaker support"
- 	depends on PCSPKR_PLATFORM
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index 4b6118d..969debe 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_INPUT_GP2A)		+= gp2ap002a00f.o
- obj-$(CONFIG_INPUT_GPIO_BEEPER)		+= gpio-beeper.o
- obj-$(CONFIG_INPUT_GPIO_TILT_POLLED)	+= gpio_tilt_polled.o
- obj-$(CONFIG_INPUT_GPIO_DECODER)	+= gpio_decoder.o
-+obj-$(CONFIG_INPUT_GSC)			+= gsc-input.o
- obj-$(CONFIG_INPUT_HISI_POWERKEY)	+= hisi_powerkey.o
- obj-$(CONFIG_HP_SDC_RTC)		+= hp_sdc_rtc.o
- obj-$(CONFIG_INPUT_IMS_PCU)		+= ims-pcu.o
-diff --git a/drivers/input/misc/gsc-input.c b/drivers/input/misc/gsc-input.c
+ config MFD_MC13XXX
+ 	tristate
+ 	depends on (SPI_MASTER || I2C)
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index d9474ad..aede0bc 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_MFD_CROS_EC)	+= cros_ec_core.o
+ obj-$(CONFIG_MFD_CROS_EC_I2C)	+= cros_ec_i2c.o
+ obj-$(CONFIG_MFD_CROS_EC_SPI)	+= cros_ec_spi.o
+ obj-$(CONFIG_MFD_EXYNOS_LPASS)	+= exynos-lpass.o
++obj-$(CONFIG_MFD_GSC)		+= gsc.o
+ 
+ rtsx_pci-objs			:= rtsx_pcr.o rts5209.o rts5229.o rtl8411.o rts5227.o rts5249.o
+ obj-$(CONFIG_MFD_RTSX_PCI)	+= rtsx_pci.o
+diff --git a/drivers/mfd/gsc.c b/drivers/mfd/gsc.c
 new file mode 100644
-index 0000000..7cf217c
+index 0000000..2fe4174
 --- /dev/null
-+++ b/drivers/input/misc/gsc-input.c
-@@ -0,0 +1,196 @@
++++ b/drivers/mfd/gsc.c
+@@ -0,0 +1,330 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2018 Gateworks Corporation
++ *
++ * The Gateworks System Controller (GSC) is a family of a multi-function
++ * "Power Management and System Companion Device" chips originally designed for
++ * use in Gateworks Single Board Computers. The control interface is I2C,
++ * at 100kbps, with an interrupt.
++ *
 + */
-+#define DEBUG
-+
-+#include <linux/input.h>
++#include <linux/device.h>
++#include <linux/i2c.h>
 +#include <linux/interrupt.h>
-+#include <linux/kernel.h>
++#include <linux/mfd/core.h>
++#include <linux/mfd/gsc.h>
 +#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
 +#include <linux/platform_device.h>
 +#include <linux/regmap.h>
 +
-+#include <linux/mfd/gsc.h>
++/*
++ * The GSC suffers from an errata where occasionally during
++ * ADC cycles the chip can NAK i2c transactions. To ensure we have reliable
++ * register access we place retries around register access.
++ */
++#define I2C_RETRIES	3
 +
-+struct gsc_irq {
-+	unsigned int irq;
-+	const char *name;
-+	unsigned int virq;
-+};
-+
-+static struct gsc_irq gsc_irqs[] = {
-+	{ GSC_IRQ_PB,		"button" },
-+	{ GSC_IRQ_KEY_ERASED,	"key-erased" },
-+	{ GSC_IRQ_EEPROM_WP,	"eeprom-wp" },
-+	{ GSC_IRQ_TAMPER,	"tamper" },
-+	{ GSC_IRQ_SWITCH_HOLD,	"button-held" },
-+};
-+
-+struct gsc_input_info {
-+	struct device *dev;
-+	struct gsc_dev *gsc;
-+	struct input_dev *input;
-+
-+	int irq;
-+	struct work_struct irq_work;
-+	struct mutex mutex;
-+};
-+
-+static void gsc_input_irq_work(struct work_struct *work)
++static int gsc_regmap_regwrite(void *context, unsigned int reg,
++			       unsigned int val)
 +{
-+	struct gsc_input_info *info = container_of(work, struct gsc_input_info,
-+						   irq_work);
-+	struct gsc_dev *gsc = info->gsc;
-+	int i, ret = 0;
-+	int key, sts;
-+	struct gsc_irq *gsc_irq = NULL;
++	struct i2c_client *client = context;
++	int retry, ret;
 +
-+	dev_dbg(gsc->dev, "%s irq%d\n", __func__, info->irq);
-+	mutex_lock(&info->mutex);
-+
-+	for (i = 0; i < ARRAY_SIZE(gsc_irqs);i++)
-+		if (info->irq == gsc_irqs[i].virq)
-+			gsc_irq = &gsc_irqs[i];
-+	if (!gsc_irq) {
-+		dev_err(info->dev, "interrupt: irq%d occurred\n", info->irq);
-+		mutex_unlock(&info->mutex);
-+		return;
++	for (retry = 0; retry < I2C_RETRIES; retry++) {
++		ret = i2c_smbus_write_byte_data(client, reg, val);
++		/*
++		 * -EAGAIN returned when the i2c host controller is busy
++		 * -EIO returned when i2c device is busy
++		 */
++		if (ret != -EAGAIN && ret != -EIO)
++			break;
 +	}
-+
-+	ret = regmap_read(info->gsc->regmap, GSC_IRQ_STATUS, &sts);
-+	if (ret) {
-+		dev_err(info->dev, "failed to read status register\n");
-+		mutex_unlock(&info->mutex);
-+		return;
-+	}
-+
-+	key = -1;
-+	switch (gsc_irq->virq) {
-+	case GSC_IRQ_PB:
-+		key = BTN_0;
-+		break;
-+	case GSC_IRQ_KEY_ERASED:
-+		key = BTN_1;
-+		break;
-+	case GSC_IRQ_EEPROM_WP:
-+		key = BTN_2;
-+		break;
-+	case GSC_IRQ_GPIO:
-+		key = BTN_3;
-+		break;
-+	case GSC_IRQ_TAMPER:
-+		key = BTN_4;
-+		break;
-+	case GSC_IRQ_SWITCH_HOLD:
-+		key = BTN_5;
-+		break;
-+	}
-+
-+	if (key != -1) {
-+		dev_dbg(&info->input->dev, "bit%d: key=0x%03x %s\n",
-+			gsc_irq->virq, key, gsc_irq->name);
-+		input_report_key(info->input, key, 1);
-+		input_report_key(info->input, key, 0);
-+		input_sync(info->input);
-+	}
-+
-+	mutex_unlock(&info->mutex);
-+}
-+
-+static irqreturn_t gsc_input_irq(int irq, void *data)
-+{
-+	struct gsc_input_info *info = data;
-+
-+	dev_dbg(info->gsc->dev, "%s irq%d\n", __func__, irq);
-+	info->irq = irq;
-+	schedule_work(&info->irq_work);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int gsc_input_probe(struct platform_device *pdev)
-+{
-+	struct gsc_dev *gsc = dev_get_drvdata(pdev->dev.parent);
-+	struct gsc_input_info *info;
-+	struct input_dev *input;
-+	int ret, i;
-+
-+	dev_dbg(&pdev->dev, "%s\n", __func__);
-+	info = devm_kzalloc(&pdev->dev, sizeof(struct gsc_input_info),
-+			    GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+	info->dev = &pdev->dev;
-+	info->gsc = gsc;
-+
-+	/* Register input device */
-+	input = devm_input_allocate_device(&pdev->dev);
-+	if (!input) {
-+		dev_err(&pdev->dev, "Can't allocate input device\n");
-+		return -ENOMEM;
-+	}
-+	info->input = input;
-+
-+	input->name = KBUILD_MODNAME;
-+	input->dev.parent = &pdev->dev;
-+
-+	input_set_capability(input, EV_KEY, BTN_0); /* button */
-+	input_set_capability(input, EV_KEY, BTN_1); /* key erased */
-+	input_set_capability(input, EV_KEY, BTN_2); /* ee wp */
-+	input_set_capability(input, EV_KEY, BTN_3); /* gpio */
-+	input_set_capability(input, EV_KEY, BTN_4); /* tamper */
-+	input_set_capability(input, EV_KEY, BTN_5); /* button held */
-+
-+	ret = input_register_device(input);
 +	if (ret < 0) {
-+		dev_err(&pdev->dev, "Can't register input device: %d\n", ret);
++		dev_err(&client->dev, ">> 0x%02x %d\n", reg, ret);
++		return ret;
++	}
++	dev_dbg(&client->dev, ">> 0x%02x=0x%02x (%d)\n", reg, val, retry);
++
++        return 0;
++}
++
++static int gsc_regmap_regread(void *context, unsigned int reg,
++                                  unsigned int *val)
++{
++	struct i2c_client *client = context;
++	int retry, ret;
++
++	for (retry = 0; retry < I2C_RETRIES; retry++) {
++		ret = i2c_smbus_read_byte_data(client, reg);
++		/*
++		 * -EAGAIN returned when the i2c host controller is busy
++		 * -EIO returned when i2c device is busy
++		 */
++		if (ret != -EAGAIN && ret != -EIO)
++			break;
++	}
++	if (ret < 0) {
++		dev_err(&client->dev, "<< 0x%02x %d\n", reg, ret);
 +		return ret;
 +	}
 +
-+	platform_set_drvdata(pdev, gsc);
-+	mutex_init(&info->mutex);
-+	INIT_WORK(&info->irq_work, gsc_input_irq_work);
++	*val = ret & 0xff;
++	dev_dbg(&client->dev, "<< 0x%02x=0x%02x (%d)\n", reg, *val, retry);
 +
-+	/* Support irq domain */
-+	for (i = 0; i < ARRAY_SIZE(gsc_irqs); i++) {
-+		struct gsc_irq *gsc_irq = &gsc_irqs[i];
-+		int virq;
++        return 0;
++}
 +
-+		virq = regmap_irq_get_virq(gsc->irq_chip_data, gsc_irq->irq);
-+		if (virq <= 0)
-+			return -EINVAL;
-+		gsc_irq->virq = virq;
++static struct regmap_bus regmap_gsc = {
++        .reg_write = gsc_regmap_regwrite,
++        .reg_read = gsc_regmap_regread,
++};
 +
-+		ret = devm_request_threaded_irq(&pdev->dev, virq, NULL,
-+						gsc_input_irq, 0,
-+						gsc_irq->name, info);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"failed: irq request (IRQ: %d, error: %d\n)",
-+				gsc_irq->irq, ret);
-+			return ret;
-+		}
-+	}
++/*
++ * gsc_powerdown - API to use GSC to power down board for a specific time
++ *
++ * secs - number of seconds to remain powered off
++ */
++static int gsc_powerdown(struct gsc_dev *gsc, unsigned long secs)
++{
++	int ret;
++	unsigned char regs[4];
++
++	dev_info(&gsc->i2c->dev, "GSC powerdown for %ld seconds\n",
++		 secs);
++	regs[0] = secs & 0xff;
++	regs[1] = (secs >> 8) & 0xff;
++	regs[2] = (secs >> 16) & 0xff;
++	regs[3] = (secs >> 24) & 0xff;
++	ret = regmap_bulk_write(gsc->regmap, GSC_TIME_ADD, regs, 4);
++
++	return ret;
++}
++
++/*
++ * sysfs hooks
++ */
++static ssize_t gsc_show(struct device *dev, struct device_attribute *attr,
++			char *buf)
++{
++	struct gsc_dev *gsc = dev_get_drvdata(dev);
++	const char *name = attr->attr.name;
++	int rz = 0;
++
++	if (strcasecmp(name, "fw_version") == 0)
++		rz = sprintf(buf, "%d\n", gsc->fwver);
++	else if (strcasecmp(name, "fw_crc") == 0)
++		rz = sprintf(buf, "0x%04x\n", gsc->fwcrc);
++
++	return rz;
++}
++
++static ssize_t gsc_store(struct device *dev, struct device_attribute *attr,
++			 const char *buf, size_t count)
++{
++	struct gsc_dev *gsc = dev_get_drvdata(dev);
++	const char *name = attr->attr.name;
++	int ret;
++
++	if (strcasecmp(name, "powerdown") == 0) {
++		long value;
++
++		ret = kstrtol(buf, 0, &value);
++		if (ret == 0)
++			gsc_powerdown(gsc, value);
++	} else
++		printk(KERN_ERR "invalid name '%s\n", name);
++
++	return count;
++}
++
++
++/*
++ * Create a group of attributes so that we can create and destroy them all
++ * at once.
++ */
++static struct device_attribute attr_fwver =
++	__ATTR(fw_version, 0440, gsc_show, NULL);
++static struct device_attribute attr_fwcrc =
++	__ATTR(fw_crc, 0440, gsc_show, NULL);
++static struct device_attribute attr_pwrdown =
++	__ATTR(powerdown, 0220, NULL, gsc_store);
++
++static struct attribute *gsc_attrs[] = {
++	&attr_fwver.attr,
++	&attr_fwcrc.attr,
++	&attr_pwrdown.attr,
++	NULL,
++};
++
++static struct attribute_group attr_group = {
++	.attrs = gsc_attrs,
++};
++
++static const struct i2c_device_id gsc_i2c_ids[] = {
++	{ "gsc_v1", gsc_v1 },
++	{ "gsc_v2", gsc_v2 },
++	{ "gsc_v3", gsc_v3 },
++	{ },
++};
++
++static const struct of_device_id gsc_of_match[] = {
++	{ .compatible = "gw,gsc_v1", .data = (void *)gsc_v1 },
++	{ .compatible = "gw,gsc_v2", .data = (void *)gsc_v2 },
++	{ .compatible = "gw,gsc_v3", .data = (void *)gsc_v3 },
++	{ }
++};
++
++static const struct regmap_config gsc_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++	.cache_type = REGCACHE_NONE,
++	.max_register = 0xf,
++};
++
++static const struct regmap_config gsc_regmap_hwmon_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++	.cache_type = REGCACHE_NONE,
++	.max_register = 0x37,
++};
++
++static const struct regmap_irq gsc_irqs[] = {
++	REGMAP_IRQ_REG(GSC_IRQ_PB, 0, BIT(GSC_IRQ_PB)),
++	REGMAP_IRQ_REG(GSC_IRQ_KEY_ERASED, 0, BIT(GSC_IRQ_KEY_ERASED)),
++	REGMAP_IRQ_REG(GSC_IRQ_EEPROM_WP, 0, BIT(GSC_IRQ_EEPROM_WP)),
++	REGMAP_IRQ_REG(GSC_IRQ_RESV, 0, BIT(GSC_IRQ_RESV)),
++	REGMAP_IRQ_REG(GSC_IRQ_GPIO, 0, BIT(GSC_IRQ_GPIO)),
++	REGMAP_IRQ_REG(GSC_IRQ_TAMPER, 0, BIT(GSC_IRQ_TAMPER)),
++	REGMAP_IRQ_REG(GSC_IRQ_WDT_TIMEOUT, 0, BIT(GSC_IRQ_WDT_TIMEOUT)),
++	REGMAP_IRQ_REG(GSC_IRQ_SWITCH_HOLD, 0, BIT(GSC_IRQ_SWITCH_HOLD)),
++};
++
++static const struct regmap_irq_chip gsc_irq_chip = {
++	.name = KBUILD_MODNAME,
++	.irqs = gsc_irqs,
++	.num_irqs = ARRAY_SIZE(gsc_irqs),
++	.num_regs = 1,
++	.status_base = GSC_IRQ_STATUS,
++	.mask_base = GSC_IRQ_ENABLE,
++	.mask_invert = true,
++	.ack_base = GSC_IRQ_STATUS,
++	.ack_invert = true,
++};
++
++static int gsc_of_probe(struct device_node *np, struct gsc_dev *gsc)
++{
++	const struct of_device_id *of_id;
++
++	if (!np)
++		return -ENODEV;
++
++	of_id = of_match_device(gsc_of_match, gsc->dev);
++	if (of_id)
++		gsc->type = (enum gsc_type)of_id->data;
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id gsc_input_dt_ids[] = {
-+	{ .compatible = "gw,gsc-input", },
-+	{}
-+};
++static int
++gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	struct device *dev = &client->dev;
++	struct gsc_dev *gsc;
++	int ret;
++	unsigned int reg;
 +
-+static struct platform_driver gsc_input_driver = {
++	gsc = devm_kzalloc(dev, sizeof(*gsc), GFP_KERNEL);
++	if (!gsc)
++		return -ENOMEM;
++
++	gsc->dev = &client->dev;
++	gsc->i2c = client;
++	gsc->irq = client->irq;
++	i2c_set_clientdata(client, gsc);
++
++	gsc->regmap = devm_regmap_init(dev, &regmap_gsc, client,
++				       &gsc_regmap_config);
++	if (IS_ERR(gsc->regmap))
++		return PTR_ERR(gsc->regmap);
++
++	ret = gsc_of_probe(dev->of_node, gsc);
++	if (reg < 0)
++		return ret;
++
++	if (regmap_read(gsc->regmap, GSC_FW_VER, &reg))
++		return -EIO;
++	gsc->fwver = reg;
++	regmap_read(gsc->regmap, GSC_FW_CRC, &reg);
++	gsc->fwcrc = reg;
++	regmap_read(gsc->regmap, GSC_FW_CRC + 1, &reg);
++	gsc->fwcrc |= reg << 8;
++
++	gsc->i2c_hwmon = i2c_new_dummy(client->adapter, GSC_HWMON);
++	if (!gsc->i2c_hwmon) {
++		dev_err(dev, "Failed to allocate I2C device for HWMON\n");
++		return -ENODEV;
++	}
++	i2c_set_clientdata(gsc->i2c_hwmon, gsc);
++
++	gsc->regmap_hwmon = devm_regmap_init(dev, &regmap_gsc, gsc->i2c_hwmon,
++				       &gsc_regmap_hwmon_config);
++	if (IS_ERR(gsc->regmap_hwmon)) {
++		ret = PTR_ERR(gsc->regmap_hwmon);
++		dev_err(dev, "failed to allocate register map: %d\n", ret);
++		goto err_regmap;
++	}
++
++	ret = devm_regmap_add_irq_chip(dev, gsc->regmap, gsc->irq,
++				       IRQF_ONESHOT | IRQF_SHARED |
++				       IRQF_TRIGGER_FALLING, 0,
++				       &gsc_irq_chip, &gsc->irq_chip_data);
++	if (ret)
++		goto err_regmap;
++
++	dev_info(dev, "Gateworks System Controller v%d: fw v%02d 0x%04x\n",
++		 gsc->type, gsc->fwver, gsc->fwcrc);
++
++	/* sysfs hooks */
++	ret = sysfs_create_group(&dev->kobj, &attr_group);
++	if (ret)
++		dev_err(dev, "failed to create sysfs attrs\n");
++
++	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
++	if (ret)
++		goto err_sysfs;
++
++	return 0;
++
++err_sysfs:
++	sysfs_remove_group(&dev->kobj, &attr_group);
++err_regmap:
++	i2c_unregister_device(gsc->i2c_hwmon);
++
++	return ret;
++}
++
++static int gsc_remove(struct i2c_client *client)
++{
++	sysfs_remove_group(&client->dev.kobj, &attr_group);
++
++	return 0;
++}
++
++static struct i2c_driver gsc_driver = {
 +	.driver = {
-+		.name = KBUILD_MODNAME,
-+		.of_match_table = gsc_input_dt_ids,
++		.name	= KBUILD_MODNAME,
++		.of_match_table = of_match_ptr(gsc_of_match),
 +	},
-+	.probe = gsc_input_probe,
++	.probe		= gsc_probe,
++	.remove		= gsc_remove,
++	.id_table	= gsc_i2c_ids,
 +};
 +
-+module_platform_driver(gsc_input_driver);
++module_i2c_driver(gsc_driver);
 +
 +MODULE_AUTHOR("Tim Harvey <tharvey@gateworks.com>");
-+MODULE_DESCRIPTION("GSC input driver");
++MODULE_DESCRIPTION("I2C Core interface for GSC");
 +MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/mfd/gsc.h b/include/linux/mfd/gsc.h
+new file mode 100644
+index 0000000..2a55e0d
+--- /dev/null
++++ b/include/linux/mfd/gsc.h
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 Gateworks Corporation
++ */
++#ifndef __LINUX_MFD_GSC_H_
++#define __LINUX_MFD_GSC_H_
++
++/* Device Addresses */
++#define GSC_MISC	0x20
++#define GSC_UPDATE	0x21
++#define GSC_GPIO	0x23
++#define GSC_HWMON	0x29
++#define GSC_EEPROM0	0x50
++#define GSC_EEPROM1	0x51
++#define GSC_EEPROM2	0x52
++#define GSC_EEPROM3	0x53
++#define GSC_RTC		0x68
++
++/* Register offsets */
++#define GSC_CTRL_0	0x00
++#define GSC_CTRL_1	0x01
++#define GSC_TIME	0x02
++#define GSC_TIME_ADD	0x06
++#define GSC_IRQ_STATUS	0x0A
++#define GSC_IRQ_ENABLE	0x0B
++#define GSC_FW_CRC	0x0C
++#define GSC_FW_VER	0x0E
++#define GSC_WP		0x0F
++
++/* Bit definitions */
++#define GSC_CTRL_0_PB_HARD_RESET	0
++#define GSC_CTRL_0_PB_CLEAR_SECURE_KEY	1
++#define GSC_CTRL_0_PB_SOFT_POWER_DOWN	2
++#define GSC_CTRL_0_PB_BOOT_ALTERNATE	3
++#define GSC_CTRL_0_PERFORM_CRC		4
++#define GSC_CTRL_0_TAMPER_DETECT	5
++#define GSC_CTRL_0_SWITCH_HOLD		6
++
++#define GSC_CTRL_1_SLEEP_ENABLE		0
++#define GSC_CTRL_1_ACTIVATE_SLEEP	1
++#define GSC_CTRL_1_LATCH_SLEEP_ADD	2
++#define GSC_CTRL_1_SLEEP_NOWAKEPB	3
++#define GSC_CTRL_1_WDT_TIME		4
++#define GSC_CTRL_1_WDT_ENABLE		5
++#define GSC_CTRL_1_SWITCH_BOOT_ENABLE	6
++#define GSC_CTRL_1_SWITCH_BOOT_CLEAR	7
++
++#define GSC_IRQ_PB			0
++#define GSC_IRQ_KEY_ERASED		1
++#define GSC_IRQ_EEPROM_WP		2
++#define GSC_IRQ_RESV			3
++#define GSC_IRQ_GPIO			4
++#define GSC_IRQ_TAMPER			5
++#define GSC_IRQ_WDT_TIMEOUT		6
++#define GSC_IRQ_SWITCH_HOLD		7
++
++enum gsc_type {
++	gsc_v1 = 1,
++	gsc_v2 = 2,
++	gsc_v3 = 3,
++};
++
++struct gsc_dev {
++	struct device *dev;
++
++	struct i2c_client *i2c;		/* 0x20: interrupt controller, WDT */
++	struct i2c_client *i2c_hwmon;	/* 0x29: hwmon, fan controller */
++
++	struct regmap *regmap;
++	struct regmap *regmap_hwmon;
++	struct regmap_irq_chip_data *irq_chip_data;
++
++	int irq;
++	enum gsc_type type;
++	unsigned int fwver;
++	unsigned short fwcrc;
++};
++
++#endif /* __LINUX_MFD_GSC_H_ */
 -- 
 2.7.4
