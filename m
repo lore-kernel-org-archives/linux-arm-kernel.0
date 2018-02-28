@@ -1,56 +1,113 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 28 Feb 2018 20:36:30 +0800
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
-Message-ID: <5A96A24E.80401@rock-chips.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 28 Feb 2018 20:38:00 +0800
+Subject: [PATCH v8 03/13] kexec_file,x86,powerpc: factor out
+ kexec_file_ops functions
+In-Reply-To: <20180226100138.GC6019@linaro.org>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-4-takahiro.akashi@linaro.org>
+ <20180223092459.GC4433@dhcp-128-65.nay.redhat.com>
+ <20180226100138.GC6019@linaro.org>
+Message-ID: <20180228123800.GC2228@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 02/26/18 at 07:01pm, AKASHI Takahiro wrote:
+> On Fri, Feb 23, 2018 at 05:24:59PM +0800, Dave Young wrote:
+> > Hi AKASHI,
+> > 
+> > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
+> > > As arch_kexec_kernel_*_{probe,load}(), arch_kimage_file_post_load_cleanup()
+> > > and arch_kexec_kernel_verify_sg can be parameterized with a kexec_file_ops
+> > > array and now duplicated among some architectures, let's factor them out.
+> > > 
+> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > Cc: Dave Young <dyoung@redhat.com>
+> > > Cc: Vivek Goyal <vgoyal@redhat.com>
+> > > Cc: Baoquan He <bhe@redhat.com>
+> > > Cc: Michael Ellerman <mpe@ellerman.id.au>
+> > > Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+> > > ---
+> > >  arch/powerpc/include/asm/kexec.h            |  2 +-
+> > >  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
+> > >  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++------------------
+> > >  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
+> > >  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
+> > >  arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
+> > >  include/linux/kexec.h                       | 15 ++++----
+> > >  kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
+> > >  8 files changed, 70 insertions(+), 94 deletions(-)
+> > > 
+> > 
+> > [snip]
+> > 
+> > > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > > index 990adae52151..a6d14a768b3e 100644
+> > > --- a/kernel/kexec_file.c
+> > > +++ b/kernel/kexec_file.c
+> > > @@ -26,34 +26,83 @@
+> > >  #include <linux/vmalloc.h>
+> > >  #include "kexec_internal.h"
+> > >  
+> > > +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+> > > +
+> > >  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+> > >  static int kexec_calculate_store_digests(struct kimage *image);
+> > >  #else
+> > >  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
+> > >  #endif
+> > >  
+> > > +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > +			     unsigned long buf_len)
+> > > +{
+> > > +	const struct kexec_file_ops * const *fops;
+> > > +	int ret = -ENOEXEC;
+> > > +
+> > > +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
+> > > +		ret = (*fops)->probe(buf, buf_len);
+> > > +		if (!ret) {
+> > > +			image->fops = *fops;
+> > > +			return ret;
+> > > +		}
+> > > +	}
+> > > +
+> > > +	return ret;
+> > > +}
+> > > +
+> > >  /* Architectures can provide this probe function */
+> > >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > >  					 unsigned long buf_len)
+> > >  {
+> > > -	return -ENOEXEC;
+> > > +	return _kexec_kernel_image_probe(image, buf, buf_len);
+> > 
+> > 
+> > I vaguely remember previously I suggest split the _kexec_kernel_image_probe
+> > because arch code can call them, and common code also use it like above.
+> > But in your new series I do not find where else calls this function
+> > except the common code arch_kexec_kernel_image_probe.  If nobody use
+> > them then it is not worth to split them out, it is better to just embed
+> > them in the __weak functions.
+> 
+> Powerpc's arch_kexec_kernel_image_probe() uses
+> _kexec_kekrnel_image_probe() as it needs an extra check to rule out
+> crash dump for now.
 
-Thanks for you reply.
+Oops, I missed that, but what about other similar functions? Such as:
+_kexec_kernel_image_load
+_kimage_file_post_load_cleanup
+_kexec_kernel_verify_sig
 
-On 02/28/2018 08:17 PM, Geert Uytterhoeven wrote:
-> Hi Jeffy,
->
-> On Wed, Feb 28, 2018 at 12:11 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->> Currently we are adding all of the attached devices' clocks as pm clocks
->> and enable them when powering on the power domain.
->>
->> This seems unnecessary, because those clocks are already controlled in
->> the devices' drivers with better error handling.
->>
->> Tested on my chromebook minnie(rk3288) and chromebook kevin(rk3399).
->>
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->
-> Thanks for your patch!
->
-> Just wondering: so you prefer to handle the clocks explicitly in all drivers,
-> instead of delegating this task to Runtime PM?
-hmmm, i think we should control PM clks here, but not all clocks...at 
-least some of the clocks are not required to be enabled while pd power 
-on(waste power?).
+> 
+> Thanks,
+> -Takahiro AKASHI
+> 
+> 
+> > Ditto for other similar functions.
+> > 
+> > [snip]
+> > 
+> > Thanks
+> > Dave
 
-and seems the drivers might have better control for error 
-handling(decide to ignore or fail to probe or else).
-
-also Runtime PM seems optional(could be disabled in config), and some 
-devices(or even chips) don't have PM.
-
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
->
->
->
+Thanks
+Dave
