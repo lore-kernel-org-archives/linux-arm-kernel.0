@@ -1,90 +1,31 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 28 Feb 2018 15:27:23 +0100
-Subject: [PATCH 2/2] hwrng: omap - Fix clock resource by adding a register
- clock
-In-Reply-To: <20180228142723.11562-1-gregory.clement@bootlin.com>
-References: <20180228142723.11562-1-gregory.clement@bootlin.com>
-Message-ID: <20180228142723.11562-3-gregory.clement@bootlin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Feb 2018 14:27:29 +0000
+Subject: [PATCH] arm_pmu: Use disable_irq_nosync when disabling SPI in
+ CPU teardown hook
+In-Reply-To: <CAMuHMdWdua0+wsaMnkqRceOO=C5r23F-8jdnkwuR6kLBpUPb2g@mail.gmail.com>
+References: <1519661456-30445-1-git-send-email-will.deacon@arm.com>
+ <20180228135704.vuhk5mb6mqgc6jlr@lakrids.cambridge.arm.com>
+ <CAMuHMdWdua0+wsaMnkqRceOO=C5r23F-8jdnkwuR6kLBpUPb2g@mail.gmail.com>
+Message-ID: <20180228142729.GA11580@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 7K/8K we need to explicitly enable the register clock. This
-clock is optional because not all the SoCs using this IP need it but at
-least for Armada 7K/8K it is actually mandatory.
+On Wed, Feb 28, 2018 at 03:23:28PM +0100, Geert Uytterhoeven wrote:
+> On Wed, Feb 28, 2018 at 2:57 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Feb 26, 2018 at 04:10:56PM +0000, Will Deacon wrote:
+> >> Commit 6de3f79112cc ("arm_pmu: explicitly enable/disable SPIs at hotplug")
+> >> moved all of the arm_pmu IRQ enable/disable calls to the CPU hotplug hooks,
+> >> regardless of whether they are implemented as PPIs or SPIs. This can
+> >> lead to us sleeping from atomic context due to disable_irq blocking:
+> >
+> >> Acked-by: Acked-by: Mark Rutland <mark.rutland@arm.com>
+> >
+> > I think something went wrong here when you applied the tag. ;)
+> 
+> In case of respinning:
+> Fixes: 6de3f79112cc26bf ("arm_pmu: explicitly enable/disable SPIs at hotplug")
 
-The binding documentation is updating accordingly.
+This is already pushed to fixes/core, so I'll leave it up to Catalin whether
+he wants to rebase it for that.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- Documentation/devicetree/bindings/rng/omap_rng.txt |  7 ++++++-
- drivers/char/hw_random/omap-rng.c                  | 16 ++++++++++++++++
- 2 files changed, 22 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/rng/omap_rng.txt b/Documentation/devicetree/bindings/rng/omap_rng.txt
-index 9cf7876ab434..ea434ce50f36 100644
---- a/Documentation/devicetree/bindings/rng/omap_rng.txt
-+++ b/Documentation/devicetree/bindings/rng/omap_rng.txt
-@@ -13,7 +13,12 @@ Required properties:
- - interrupts : the interrupt number for the RNG module.
- 		Used for "ti,omap4-rng" and "inside-secure,safexcel-eip76"
- - clocks: the trng clock source. Only mandatory for the
--  "inside-secure,safexcel-eip76" compatible.
-+  "inside-secure,safexcel-eip76" compatible, the second clock is
-+  needed for the Armada 7K/8K SoCs
-+- clock-names: mandatory if there is a second clock, in this case the
-+  name must be "core" for the first clock and "reg" for the second
-+  one
-+
- 
- Example:
- /* AM335x */
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index 159d4a1347b8..b65ff6962899 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -150,6 +150,7 @@ struct omap_rng_dev {
- 	const struct omap_rng_pdata	*pdata;
- 	struct hwrng rng;
- 	struct clk 			*clk;
-+	struct clk			*clk_reg;
- };
- 
- static inline u32 omap_rng_read(struct omap_rng_dev *priv, u16 reg)
-@@ -480,6 +481,19 @@ static int omap_rng_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	priv->clk_reg = devm_clk_get(&pdev->dev, "reg");
-+	if (IS_ERR(priv->clk_reg) && PTR_ERR(priv->clk_reg) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!IS_ERR(priv->clk_reg)) {
-+		ret = clk_prepare_enable(priv->clk_reg);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Unable to enable the register clk: %d\n",
-+				ret);
-+			goto err_register;
-+		}
-+	}
-+
- 	ret = (dev->of_node) ? of_get_omap_rng_device_details(priv, pdev) :
- 				get_omap_rng_device_details(priv);
- 	if (ret)
-@@ -499,6 +513,7 @@ static int omap_rng_probe(struct platform_device *pdev)
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	clk_disable_unprepare(priv->clk_reg);
- 	clk_disable_unprepare(priv->clk);
- err_ioremap:
- 	dev_err(dev, "initialization failed.\n");
-@@ -517,6 +532,7 @@ static int omap_rng_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 
- 	clk_disable_unprepare(priv->clk);
-+	clk_disable_unprepare(priv->clk_reg);
- 
- 	return 0;
- }
--- 
-2.16.1
+Will
