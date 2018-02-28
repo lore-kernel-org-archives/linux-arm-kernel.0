@@ -1,117 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 Feb 2018 17:16:48 +0000
-Subject: [PATCH] arm64: kdump: fix interrupt handling done during
- machine_crash_shutdown
-In-Reply-To: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
-References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
-Message-ID: <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 28 Feb 2018 17:17:13 +0000
+Subject: [PATCH 2/3] mailbox: Avoid NULL dereference in
+ mbox_chan_received_data
+In-Reply-To: <20180228022714.30068-3-samuel@sholland.org>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-3-samuel@sholland.org>
+Message-ID: <d4778c2e-9d3b-d1c4-429f-6f006c78deaf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding MarcZ]
+Hi,
 
-On Wed, Feb 28, 2018 at 06:01:00PM +0100, Grzegorz Jaszczyk wrote:
-> Hitherto during machine_kexec_mask_interrupts there was an attempt to
-> remove active state using irq_set_irqchip_state() routine and only if it
-> failed, the attempt to EOI the interrupt was made. Nevertheless relaying
-> on return value from irq_set_irqchip_state inside
-> machine_kexec_mask_interrupts is incorrect - it only returns the status
-> of the routine but doesn't provide information if the interrupt was
-> deactivated correctly or not. 
-
-This doesn't sound right. The return value of irq_set_irqchip_state() is
-certainly supposed to indicate that it did what it was asked to (i.e.
-correctly (de)activated the interrupt).
-
-IIUC, you're saying that there's a problem whereby:
-
-(a) irq_set_irqchip_state() returns succesfully, but:
-
-(b) irq_set_irqchip_state() does not alter the interrupt state to that
-    requested.
-
-... which sounds like a bug. 
-
-When does this happen, exactly?
-
-Thanks,
-Mark.
-
-> Therefore the irq_eoi wasn't call even if the interrupt remained
-> active.
+On 28/02/18 02:27, Samuel Holland wrote:
+> If a reception IRQ is pending when a mailbox channel is shut down (for
+> example, if the controller uses threaded interrupts), it is possible for
+> mbox_chan_received_data to be called while chan->cl is NULL.
 > 
-> To determine the sate correctly the irq_get_irqchip_state() could be
-> used but according to the ARM Generic Interrupt Controller Architecture
-> Spec, non-secure reading from GICD_ISACTIVERn/GICD_ICACTIVERn can be not
-> permitted (depending on NS_access setting of Non-secure Access Control
-> Registers, a.k.a. GICD_NSACRn). What is more interesting GICD_NSACRn
-> is optional Secure register.
+> This was found while developing a mailbox controller driver for use with
+> SCPI. The SCPI protocol driver frees its mailbox channel during probing
+> if the SCP firmware does not respond within a specified timeout. In this
+> case, if the SCP firmware takes slightly too long to respond,
+> mbox_chan_received_data races with mbox_free_channel clearing chan->cl.
 > 
-> Moreover de-activating the interrupt via GICD_ISACTIVERn register
-> (regardless of the possibility of checking status or not) seems to not
-> do the job, when the GIC Distributor is configured to forward the
-> interrupts to the CPU interfaces.
-> 
-> Because of all above the attempt to deactivate interrupts via
-> irq_set_irqchip_state() is removed in this patch. Instead the irq_eoi is
-> called whenever the interrupt is in progress(irqd_irq_inprogress).
-> 
-> Before this patch the kdump triggered from interrupt context worked
-> correctly by accident when the GIC was configured with
-> GIC_CPU_CTRL_EOImodeNS == 1 (supports_deactivate == true). In mentioned
-> mode GIC_CPU_EOI has priority drop functionality only and
-> GIC_CPU_DEACTIVATE is used for interrupt deactivation. Also the
-> gic_handle_irq behaviour is a bit different in mentioned mode and
-> performs write to the GIC_CPU_EOI which causes the priority drop to the
-> idle priority. So even if the irq_eoi wasn't called during
-> machine_kexec_mask_interrupts, the interrupts of the crashdump kernel
-> was handled due to interrupt preemption (since the priority of still
-> active interrupt was dropped to idle priority).
-> 
-> Nevertheless when the kdump was triggered from interrupt context while
-> the GIC was configured to work in GIC_CPU_CTRL_EOImodeNS == 0, the
-> crashdump kernel hang in early stage due to lack of timer interrupt
-> arrival.
-> 
-> After this fix the kdump behaves correctly when triggered from interrupt
-> context independently of GIC_CPU_CTRL_EOImodeNS configuration.
-> 
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> Signed-off-by: Samuel Holland <samuel@sholland.org>
 > ---
->  arch/arm64/kernel/machine_kexec.c | 10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
+>  drivers/mailbox/mailbox.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f76ea92..30ad183 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -220,20 +220,12 @@ static void machine_kexec_mask_interrupts(void)
+> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> index 674b35f402f5..a0258d8672d5 100644
+> --- a/drivers/mailbox/mailbox.c
+> +++ b/drivers/mailbox/mailbox.c
+> @@ -152,9 +152,11 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
+>   */
+>  void mbox_chan_received_data(struct mbox_chan *chan, void *mssg)
+>  {
+> +	struct mbox_client *cl = READ_ONCE(chan->cl);
+> +
+>  	/* No buffering the received data */
+> -	if (chan->cl->rx_callback)
+> -		chan->cl->rx_callback(chan->cl, mssg);
+> +	if (cl && cl->rx_callback)
+> +		cl->rx_callback(cl, mssg);
+
+I don't think this is the proper fix. This sounds like we should have a
+lock here. If mbox_free_channel now frees or clears chan->cl between the
+READ_ONCE and the second part of the "&&", we will have a
+use-after-free. If it's being cleared after the comparison, we will end
+up with a NULL pointer dereference again, IIUC.
+
+Or am I missing something?
+
+Cheers,
+Andre.
+
+>  }
+>  EXPORT_SYMBOL_GPL(mbox_chan_received_data);
 >  
->  	for_each_irq_desc(i, desc) {
->  		struct irq_chip *chip;
-> -		int ret;
->  
->  		chip = irq_desc_get_chip(desc);
->  		if (!chip)
->  			continue;
->  
-> -		/*
-> -		 * First try to remove the active state. If this
-> -		 * fails, try to EOI the interrupt.
-> -		 */
-> -		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
-> -
-> -		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-> -		    chip->irq_eoi)
-> +		if (irqd_irq_inprogress(&desc->irq_data) && chip->irq_eoi)
->  			chip->irq_eoi(&desc->irq_data);
->  
->  		if (chip->irq_mask)
-> -- 
-> 2.7.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
