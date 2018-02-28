@@ -1,89 +1,99 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 28 Feb 2018 15:56:41 +0100
-Subject: [PATCH 1/3] MAINTAINERS: ARM: at91: update entry for ARM/Microchip
-Message-ID: <c00e7bf21945e844c6154b374924b7ff520d1316.1519829594.git.nicolas.ferre@microchip.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 28 Feb 2018 15:53:50 +0100
+Subject: [PATCH 2/2] PCI: armada8k: Fix clock resource by adding a
+ register clock
+In-Reply-To: <20180228144704.12947-3-gregory.clement@bootlin.com>
+References: <20180228144704.12947-1-gregory.clement@bootlin.com>
+ <20180228144704.12947-3-gregory.clement@bootlin.com>
+Message-ID: <20180228155350.0221a90f@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the entry name and move it to its alphabetical location.
-We move to ARM/Microchip instead of ARM/ATMEL to reflect the merger
-that is now nearly 2 years old.
-AT91 is kept as the identity of our community. The atmel pattern is
-obviously kept as well. I removed the names of the different SoCs as
-they are better exposed in the arch/arm/mach-at91/Kconfig entries.
+Hello,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
-Hi,
+On Wed, 28 Feb 2018 15:47:04 +0100, Gregory CLEMENT wrote:
+> On Armada 7K/8K we need to explicitly enable the register clock. This
+> clock is optional because not all the SoCs using this IP need it but at
+> least for Armada 7K/8K it is actually mandatory.
+> 
+> The binding documentation is updated accordingly.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/pci/pci-armada8k.txt |  6 +++++-
+>  drivers/pci/dwc/pcie-armada8k.c                        | 11 +++++++++++
+>  2 files changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pci-armada8k.txt b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> index c1e4c3d10a74..9948b1e9a8e5 100644
+> --- a/Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
+> @@ -12,7 +12,11 @@ Required properties:
+>     - "ctrl" for the control register region
+>     - "config" for the config space region
+>  - interrupts: Interrupt specifier for the PCIe controler
+> -- clocks: reference to the PCIe controller clock
+> +- clocks: reference to the PCIe controller clocks
+> +- clock-names: mandatory if there is a second clock, in this case the
+> +   name must be "core" for the first clock and "reg" for the second
+> +   one
+> +
 
-This patch goes on top of linux-next because Alexandre's email change is taken
-into account (already in arm-soc).
+Unneeded new line added here.
 
-Best regards,
-  Nicolas
+>  
+>  Example:
+>  
+> diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
+> index f9b1aec25c5c..aa4e5cc4ab7b 100644
+> --- a/drivers/pci/dwc/pcie-armada8k.c
+> +++ b/drivers/pci/dwc/pcie-armada8k.c
+> @@ -28,6 +28,7 @@
+>  struct armada8k_pcie {
+>  	struct dw_pcie *pci;
+>  	struct clk *clk;
+> +	struct clk *clk_reg;
+>  };
+>  
+>  #define PCIE_VENDOR_REGS_OFFSET		0x8000
+> @@ -229,6 +230,15 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (IS_ERR(pcie->clk_reg) && PTR_ERR(pcie->clk_reg) == -EPROBE_DEFER) {
+> +		clk_disable_unprepare(pcie->clk);
+> +		return -EPROBE_DEFER;
+> +	}
+> +	if (!IS_ERR(pcie->clk_reg)) {
+> +		ret = clk_prepare_enable(pcie->clk_reg);
+> +		if (ret)
+> +			goto fail;
+> +	}
+>  	/* Get the dw-pcie unit configuration/control registers base. */
 
- MAINTAINERS | 42 +++++++++++++++++++++---------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+Missing new line between the end of the block and the next comment.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 866a5d0c0f64..88759f8a13ba 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1236,27 +1236,6 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
- S:	Maintained
- F:	drivers/clk/at91
- 
--ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
--M:	Nicolas Ferre <nicolas.ferre@microchip.com>
--M:	Alexandre Belloni <alexandre.belloni@bootlin.com>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.linux4sam.org
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
--S:	Supported
--N:	at91
--N:	atmel
--F:	arch/arm/mach-at91/
--F:	include/soc/at91/
--F:	arch/arm/boot/dts/at91*.dts
--F:	arch/arm/boot/dts/at91*.dtsi
--F:	arch/arm/boot/dts/sama*.dts
--F:	arch/arm/boot/dts/sama*.dtsi
--F:	arch/arm/include/debug/at91.S
--F:	drivers/memory/atmel*
--F:	drivers/watchdog/sama5d4_wdt.c
--X:	drivers/input/touchscreen/atmel_mxt_ts.c
--X:	drivers/net/wireless/atmel/
--
- ARM/CALXEDA HIGHBANK ARCHITECTURE
- M:	Rob Herring <robh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-@@ -1656,6 +1635,27 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- F:	arch/arm/mach-ks8695/
- S:	Odd Fixes
- 
-+ARM/Microchip (AT91) SoC support
-+M:	Nicolas Ferre <nicolas.ferre@microchip.com>
-+M:	Alexandre Belloni <alexandre.belloni@bootlin.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+W:	http://www.linux4sam.org
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-+S:	Supported
-+N:	at91
-+N:	atmel
-+F:	arch/arm/mach-at91/
-+F:	include/soc/at91/
-+F:	arch/arm/boot/dts/at91*.dts
-+F:	arch/arm/boot/dts/at91*.dtsi
-+F:	arch/arm/boot/dts/sama*.dts
-+F:	arch/arm/boot/dts/sama*.dtsi
-+F:	arch/arm/include/debug/at91.S
-+F:	drivers/memory/atmel*
-+F:	drivers/watchdog/sama5d4_wdt.c
-+X:	drivers/input/touchscreen/atmel_mxt_ts.c
-+X:	drivers/net/wireless/atmel/
-+
- ARM/MIOA701 MACHINE SUPPORT
- M:	Robert Jarzmik <robert.jarzmik@free.fr>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+Regarding the error handling, doesn't it make more sense to also use a
+goto label to disable pcie->clk when getting the second clock gets a
+-EPROBE_DEFER ?
+
+>  	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
+>  	pci->dbi_base = devm_pci_remap_cfg_resource(dev, base);
+> @@ -247,6 +257,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  fail:
+> +	clk_disable_unprepare(pcie->clk_reg);
+
+So you are disabling/unpreparing the clock, which failed to
+prepare/enable ?
+
+>  	clk_disable_unprepare(pcie->clk);
+>  
+>  	return ret;
+
+Thomas
 -- 
-2.15.1
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
