@@ -1,68 +1,55 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:49 +0800
-Subject: [PATCH 27/29] arm64: Force KPTI to be disabled on Cavium ThunderX
-In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-28-git-send-email-alex.shi@linaro.org>
+Date: Wed, 28 Feb 2018 12:10:28 +0800
+Subject: [PATCH 46/52] arm: Add BTB invalidation on switch_mm for
+ Cortex-A9, A12 and A17
+In-Reply-To: <20180226104505.GB8736@arm.com>
+References: <1519633227-29832-1-git-send-email-alex.shi@linaro.org>
+ <1519633227-29832-47-git-send-email-alex.shi@linaro.org>
+ <20180226100518.GA11378@kroah.com>
+ <3fa9ebcb-fe94-bbd6-49a7-e90c91c3905e@linaro.org>
+ <20180226104505.GB8736@arm.com>
+Message-ID: <a12f1c0c-1d79-768f-97e4-2ef62ebf150c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 6dc52b15c4a4 upstream.
 
-Cavium ThunderX's erratum 27456 results in a corruption of icache
-entries that are loaded from memory that is mapped as non-global
-(i.e. ASID-tagged).
+On 02/26/2018 06:45 PM, Will Deacon wrote:
+> On Mon, Feb 26, 2018 at 06:40:42PM +0800, Alex Shi wrote:
+>>
+>>
+>> On 02/26/2018 06:05 PM, Greg KH wrote:
+>>> On Mon, Feb 26, 2018 at 04:20:20PM +0800, Alex Shi wrote:
+>>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>>
+>>>> ** Not yet queued for inclusion in mainline **
+>>>
+>>> As Marc said, this should have been a HUGE clue that we can't take this
+>>> patch.  Please go re-read
+>>> 	https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
+>>>
+>>
+>> Thanks for comments, Greg!
+>>
+>> I read the rules for several times, and thought it maybe a exception for
+>> this bug fix. But since MarcZ said so. We can wait. :)
+> 
+> The reason I added the disclaimer to the commit message was precisely to
+> avoid these things accidentally going into stable. If stable diverges
+> significantly from mainline, it's just going to make backports of other
+> patches more difficult. So no, we shouldn't be considering an exception
+> for this.
+> 
 
-As KPTI is based on memory being mapped non-global, let's prevent
-it from kicking in if this erratum is detected.
+Hi Will,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-[will: Update comment]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Got it. Thanks for explanations!
+I remove all non upstream patches and put it on
 
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
+git://git.linaro.org/kernel/linux-linaro-stable.git
+v4.9-spectre-upstream-only
 
-Conflicts:
-	using old function read_system_reg/cpus_have_cap to replace
-	read_sanitised_ftr_reg/cpus_have_const_cap in
-	arch/arm64/kernel/cpufeature.c
----
- arch/arm64/kernel/cpufeature.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+If other patches passed review. it could be got as whole branch from there.
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 0fba610..760c851 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -753,12 +753,23 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 				int __unused)
- {
-+	char const *str = "command line option";
- 	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
- 
--	/* Forced on command line? */
-+	/*
-+	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
-+	 * ThunderX leads to apparent I-cache corruption of kernel text, which
-+	 * ends as well as you might imagine. Don't even try.
-+	 */
-+	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_27456)) {
-+		str = "ARM64_WORKAROUND_CAVIUM_27456";
-+		__kpti_forced = -1;
-+	}
-+
-+	/* Forced? */
- 	if (__kpti_forced) {
--		pr_info_once("kernel page table isolation forced %s by command line option\n",
--			     __kpti_forced > 0 ? "ON" : "OFF");
-+		pr_info_once("kernel page table isolation forced %s by %s\n",
-+			     __kpti_forced > 0 ? "ON" : "OFF", str);
- 		return __kpti_forced > 0;
- 	}
- 
--- 
-2.7.4
+Thanks
+Alex
