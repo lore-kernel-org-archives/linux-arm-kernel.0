@@ -1,56 +1,82 @@
 From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 28 Feb 2018 17:14:52 +0100
-Subject: [PATCH] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE
-Message-ID: <1519834492-30559-1-git-send-email-giulio.benetti@micronovasrl.com>
+Date: Wed, 28 Feb 2018 16:56:56 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180216155049.r2mc724nfluwrrbe@flea.lan>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180207103905.mtyzgu73mmifyvvj@flea>
+ <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
+ <20180208204043.mqryuqhx7a6z4v3b@flea>
+ <e5d49c13-9b8f-d597-508c-10fed5300769@micronovasrl.com>
+ <20180216155049.r2mc724nfluwrrbe@flea.lan>
+Message-ID: <b4b4795c-6380-48fd-344f-3fb22968b1c2@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle both positive and negative dclk polarity,
-according to bus_flags.
+Hi,
 
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+Il 16/02/2018 16:50, Maxime Ripard ha scritto:
+> On Thu, Feb 15, 2018 at 07:05:56PM +0100, Giulio Benetti wrote:
+>>> If so, and if remember the captures properly, the sampling would occur
+>>> right before the rise, and not really around the fall.
+>>>
+>>> Would 2/3 be better here?
+>>
+>> Yes, you're right, 2/3 phase is better:
+>>
+>> 1/3 phase: https://pasteboard.co/H4VehON.png
+>> 2/3 phase: https://pasteboard.co/H4Veq8a.png
+>>
+>> Take a look at the bit in middle(yellow) sampled by clock(blue).
+>>
+>> Rising edge is almost in the middle of D0 bit.
+>>
+>>>
+>>>> According to scope captures above on both A20 and A33.
+>>>> Unfortunately I don't have other boards for the other SoCs to take captures.
+>>>>
+>>>> What do you think?
+>>>
+>>> I guess we can make that part applicable to all SoCs, we haven't seen
+>>> any significant differences on those part.
+>>
+>> So let's keep:
+>> - As normal(rising edge) => IO_POL_REG "0x2 => 2/3 phase"
+>> - As inverted(falling edge) => IO_POL_REG "0x0 => normal phase"
+> 
+> I was actually thinking 1/3 for rising, 2/3 for falling.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index aaf911a..534e5ee 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -17,6 +17,7 @@
- #include <drm/drm_encoder.h>
- #include <drm/drm_modes.h>
- #include <drm/drm_of.h>
-+#include <drm/drm_panel.h>
- 
- #include <uapi/drm/drm_mode.h>
- 
-@@ -340,6 +341,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
- static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 				     const struct drm_display_mode *mode)
- {
-+	struct drm_panel *panel = tcon->panel;
-+	struct drm_connector *connector = panel->connector;
-+	struct drm_display_info display_info = connector->display_info;
- 	unsigned int bp, hsync, vsync;
- 	u8 clk_delay;
- 	u32 val = 0;
-@@ -395,8 +399,15 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
- 		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
- 
-+	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
-+		clk_set_phase(tcon->dclk, 240);
-+
-+	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-+		clk_set_phase(tcon->dclk, 0);
-+
- 	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
--			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
-+			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE |
-+			   SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
- 			   val);
- 
- 	/* Map output pins to channel 0 */
+1/3 is almost the same waveform as D0,
+having rising an falling edges almost in sync with D0.
+It's not so clear because DCLK has a bad figure,
+but it is that way.
+
+2/3 instead is almost in the middle of D0 as rising.
+
+Summarizing:
+- use 0/3 as falling, then DRM_BUS_FLAG_PIXDATA_NEGEDGE
+- use 2/3 as rising, then DRM_BUS_FLAG_PIXDATA_POSEDGE
+
+I follow with a new patch using clk_set_phase function.
+
+> 
+> Maxime
+> 
+
+
 -- 
-2.7.4
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
