@@ -1,108 +1,109 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:47 +0800
-Subject: [PATCH 25/29] arm64: kpti: Make use of nG dependent on
- arm64_kernel_unmapped_at_el0()
+Date: Wed, 28 Feb 2018 11:56:34 +0800
+Subject: [PATCH 12/29] arm64: entry: Hook up entry trampoline to exception
+ vectors
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-26-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-13-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 41acec624087 upstream.
+commit 4bf3286d29f3 upstream.
 
-To allow systems which do not require kpti to continue running with
-global kernel mappings (which appears to be a requirement for Cavium
-ThunderX due to a CPU erratum), make the use of nG in the kernel page
-tables dependent on arm64_kernel_unmapped_at_el0(), which is resolved
-at runtime.
+Hook up the entry trampoline to our exception vectors so that all
+exceptions from and returns to EL0 go via the trampoline, which swizzles
+the vector base register accordingly. Transitioning to and from the
+kernel clobbers x30, so we use tpidrro_el0 and far_el1 as scratch
+registers for native tasks.
 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Laura Abbott <labbott@redhat.com>
+Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/kernel-pgtable.h | 12 ++----------
- arch/arm64/include/asm/pgtable-prot.h   | 30 ++++++++++++++----------------
- 2 files changed, 16 insertions(+), 26 deletions(-)
+ arch/arm64/kernel/entry.S | 39 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index 135e829..be151cc 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -73,16 +73,8 @@
- /*
-  * Initial memory map attributes.
-  */
--#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
--#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
--
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
--#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
--#else
--#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
--#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
--#endif
-+#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
-+#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 7b1be51..eccb6d8 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -72,10 +72,26 @@
  
- #if ARM64_SWAPPER_USES_SECTION_MAPS
- #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 84b5283..f705d96 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -37,13 +37,11 @@
- #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
- #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
--#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
--#else
--#define PROT_DEFAULT		_PROT_DEFAULT
--#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+#define PTE_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PTE_NG : 0)
-+#define PMD_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PMD_SECT_NG : 0)
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	.if	\el == 0
++	.if	\regsize == 64
++	mrs	x30, tpidrro_el0
++	msr	tpidrro_el0, xzr
++	.else
++	mov	x30, xzr
++	.endif
++	.endif
++#endif
 +
-+#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_MAYBE_NG)
-+#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_MAYBE_NG)
+ 	sub	sp, sp, #S_FRAME_SIZE
+ 	b	el\()\el\()_\label
+ 	.endm
  
- #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-@@ -55,22 +53,22 @@
- #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
- #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
++	.macro tramp_alias, dst, sym
++	mov_q	\dst, TRAMP_VALIAS
++	add	\dst, \dst, #(\sym - .entry.tramp.text)
++	.endm
++
+ 	.macro	kernel_entry, el, regsize = 64
+ 	.if	\regsize == 32
+ 	mov	w0, w0				// zero upper 32 bits of x0
+@@ -157,18 +173,20 @@
+ 	ct_user_enter
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
++	tst	x22, #PSR_MODE32_BIT		// native task?
++	b.eq	3f
++
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+ alternative_if ARM64_WORKAROUND_845719
+-	tbz	x22, #4, 1f
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ 	mrs	x29, contextidr_el1
+ 	msr	contextidr_el1, x29
+ #else
+ 	msr contextidr_el1, xzr
+ #endif
+-1:
+ alternative_else_nop_endif
+ #endif
++3:
+ 	.endif
+ 	msr	elr_el1, x21			// set up the return data
+ 	msr	spsr_el1, x22
+@@ -189,7 +207,22 @@ alternative_else_nop_endif
+ 	ldp	x28, x29, [sp, #16 * 14]
+ 	ldr	lr, [sp, #S_LR]
+ 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+-	eret					// return to kernel
++
++#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
++	eret
++#else
++	.if	\el == 0
++	bne	4f
++	msr	far_el1, x30
++	tramp_alias	x30, tramp_exit_native
++	br	x30
++4:
++	tramp_alias	x30, tramp_exit_compat
++	br	x30
++	.else
++	eret
++	.endif
++#endif
+ 	.endm
  
--#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
--#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
-+#define _PAGE_DEFAULT		(_PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
-+#define _HYP_PAGE_DEFAULT	_PAGE_DEFAULT
- 
--#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
--#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
--#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
--#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
--#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
-+#define PAGE_KERNEL		__pgprot(PROT_NORMAL)
-+#define PAGE_KERNEL_RO		__pgprot((PROT_NORMAL & ~PTE_WRITE) | PTE_RDONLY)
-+#define PAGE_KERNEL_ROX		__pgprot((PROT_NORMAL & ~(PTE_WRITE | PTE_PXN)) | PTE_RDONLY)
-+#define PAGE_KERNEL_EXEC	__pgprot(PROT_NORMAL & ~PTE_PXN)
-+#define PAGE_KERNEL_EXEC_CONT	__pgprot((PROT_NORMAL & ~PTE_PXN) | PTE_CONT)
- 
- #define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
- #define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
- 
--#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
-+#define PAGE_S2			__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
- 
- #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_NG | PTE_PXN | PTE_UXN)
- #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+ 	.macro	get_thread_info, rd
 -- 
 2.7.4
