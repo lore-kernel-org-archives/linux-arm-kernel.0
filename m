@@ -1,31 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 28 Feb 2018 16:43:18 +0100
-Subject: [PATCH 1/3] MAINTAINERS: ARM: at91: update entry for ARM/Microchip
-In-Reply-To: <c00e7bf21945e844c6154b374924b7ff520d1316.1519829594.git.nicolas.ferre@microchip.com>
-References: <c00e7bf21945e844c6154b374924b7ff520d1316.1519829594.git.nicolas.ferre@microchip.com>
-Message-ID: <20180228154318.GN1479@piout.net>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Wed, 28 Feb 2018 16:45:23 +0100
+Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti patchset
+ related
+Message-ID: <20180228154523.GA29931@akinoame>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/2018 at 15:56:41 +0100, Nicolas Ferre wrote:
-> Change the entry name and move it to its alphabetical location.
-> We move to ARM/Microchip instead of ARM/ATMEL to reflect the merger
-> that is now nearly 2 years old.
-> AT91 is kept as the identity of our community. The atmel pattern is
-> obviously kept as well. I removed the names of the different SoCs as
-> they are better exposed in the arch/arm/mach-at91/Kconfig entries.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
-> Hi,
-> 
-> This patch goes on top of linux-next because Alexandre's email change is taken
-> into account (already in arm-soc).
-> 
+Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
+intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
+(it usually shows up in less than 10 iterations but i tested 32 boots before
+marking it good).
 
-All applied in my at91-soc branch which takes care of the dependency
+I bisected it down to this interval in linux-4.14.y:
 
+2feb36e arm64: kpti: Add ->enable callback to remap swapper using nG mappings
+ee28fed arm64: mm: Permit transitioning from Global to Non-Global without BBM
+6928820 arm64: kpti: Make use of nG dependent on arm64_kernel_unmapped_at_el0()
+c98c8c2 arm64: Turn on KPTI only on CPUs that need it
+
+c98c8c2 is good, 2feb36e is bad - couldn't bisect in between, since it didn't
+boot there.
+And yes, when i tested 2feb36e i applied the "el1 trashing fix" mentioned here:
+https://www.spinics.net/lists/arm-kernel/msg636489.html
+
+Anything else i can do to help debug this?
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+bye,
+p.
