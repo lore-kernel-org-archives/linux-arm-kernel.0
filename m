@@ -1,23 +1,246 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 09:49:21 +0800
-Subject: [PATCH] ARM: dts: imx6: Pass memory unit-adress
-In-Reply-To: <1519319795-18161-1-git-send-email-festevam@gmail.com>
-References: <1519319795-18161-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180228014920.GB3217@dragon>
+From: nobuhiro.iwamatsu@cybertrust.co.jp (Nobuhiro Iwamatsu)
+Date: Wed, 28 Feb 2018 10:49:37 +0900
+Subject: [PATCH 2/2] arm: dts: zynq: Extract common Digilent Zybo board
+ support
+In-Reply-To: <e681d34a-3884-4586-9ac6-ce9852a78a05@xilinx.com>
+References: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
+ <20180226005949.31259-2-nobuhiro.iwamatsu@cybertrust.co.jp>
+ <e681d34a-3884-4586-9ac6-ce9852a78a05@xilinx.com>
+Message-ID: <20180228104937.7444403d@debmouse>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 02:16:35PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Pass the memory unit-adress to fix the following build warnings with W=1:
-> 
-> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> 
-> There are cases where dts passes an empty memory node, which will be filled
-> by the bootloader. Passing the memory base address still allows the 
-> bootloader to fill the memory size.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Hi, Michal.
 
-Applied, thanks.
+Thanks for your review.
+
+On Tue, 27 Feb 2018 13:54:40 +0100
+Michal Simek <michal.simek@xilinx.com> wrote:
+
+> On 26.2.2018 01:59, Nobuhiro Iwamatsu wrote:
+> > The Digilent Zybo and Zybo Z7 boards are very similar.
+> > To avoid duplication, this extract common board parts into own dtsi
+> > file.
+> > 
+> > Signed-off-by: Nobuhiro Iwamatsu
+> > <nobuhiro.iwamatsu@cybertrust.co.jp> ---
+> >  arch/arm/boot/dts/zynq-zybo-common.dtsi | 58
+> > +++++++++++++++++++++++++++++++++
+> > arch/arm/boot/dts/zynq-zybo-z7.dts      | 45
+> > ++----------------------- arch/arm/boot/dts/zynq-zybo.dts         |
+> > 43 +----------------------- 3 files changed, 61 insertions(+), 85
+> > deletions(-) create mode 100644
+> > arch/arm/boot/dts/zynq-zybo-common.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/zynq-zybo-common.dtsi
+> > b/arch/arm/boot/dts/zynq-zybo-common.dtsi new file mode 100644
+> > index 000000000000..9c9a92d59cc7
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/zynq-zybo-common.dtsi
+> > @@ -0,0 +1,58 @@
+> > +/*
+> > + *  Copyright (C) 2011 - 2014 Xilinx
+> > + *  Copyright (C) 2012 National Instruments Corp.
+> > + *
+> > + * This software is licensed under the terms of the GNU General
+> > Public
+> > + * License version 2, as published by the Free Software
+> > Foundation, and
+> > + * may be copied, distributed, and modified under those terms.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +/dts-v1/;
+> > +#include "zynq-7000.dtsi"
+> > +
+> > +/ {
+> > +	aliases {
+> > +		ethernet0 = &gem0;
+> > +		serial0 = &uart1;
+> > +	};
+> > +
+> > +	memory at 0 {
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x20000000>;
+> > +	};
+> > +
+> > +	usb_phy0: phy0 {
+> > +		#phy-cells = <0>;
+> > +		compatible = "usb-nop-xceiv";
+> > +		reset-gpios = <&gpio0 46 1>;
+> > +	};
+> > +};
+> > +
+> > +&gem0 {
+> > +	status = "okay";
+> > +	phy-mode = "rgmii-id";
+> > +	phy-handle = <&ethernet_phy>;
+> > +
+> > +	ethernet_phy: ethernet-phy at 0 {
+> > +		reg = <0>;
+> > +		device_type = "ethernet-phy";
+> > +	};
+> > +};
+> > +
+> > +&sdhci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&uart1 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usb0 {
+> > +	status = "okay";
+> > +	dr_mode = "host";
+> > +	usb-phy = <&usb_phy0>;
+> > +};
+> > diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts
+> > b/arch/arm/boot/dts/zynq-zybo-z7.dts index
+> > 97e487913f8f..bd94147792cd 100644 ---
+> > a/arch/arm/boot/dts/zynq-zybo-z7.dts +++
+> > b/arch/arm/boot/dts/zynq-zybo-z7.dts @@ -7,59 +7,18 @@
+> >   *  SPDX-License-Identifier:	GPL-2.0+
+> >   */
+> >  /dts-v1/;
+> > -#include "zynq-7000.dtsi"
+> > +#include "zynq-zybo-common.dtsi"
+> >  
+> >  / {
+> > -	model = "Zynq ZYBO Z7 Development Board";
+> > +	model = "Zynq Zybo Z7 Development Board";
+> >  	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
+> >  
+> > -	aliases {
+> > -		ethernet0 = &gem0;
+> > -		serial0 = &uart1;
+> > -	};
+> > -
+> > -	memory {
+> > -		device_type = "memory";
+> > -		reg = <0x0 0x20000000>;
+> > -	};
+> > -
+> >  	chosen {
+> >  		bootargs = "";
+> >  		stdout-path = "serial0:115200n8";
+> >  	};
+> > -
+> > -	usb_phy0: phy0 {
+> > -		#phy-cells = <0>;
+> > -		compatible = "usb-nop-xceiv";
+> > -		reset-gpios = <&gpio0 46 1>;
+> > -	};
+> >  };
+> >  
+> >  &clkc {
+> >  	ps-clk-frequency = <33333333>;
+> >  };
+> > -
+> > -&gem0 {
+> > -	status = "okay";
+> > -	phy-mode = "rgmii-id";
+> > -	phy-handle = <&ethernet_phy>;
+> > -
+> > -	ethernet_phy: ethernet-phy at 0 {
+> > -		reg = <0>;
+> > -		device_type = "ethernet-phy";
+> > -	};
+> > -};
+> > -
+> > -&sdhci0 {
+> > -	status = "okay";
+> > -};
+> > -
+> > -&uart1 {
+> > -	status = "okay";
+> > -};
+> > -
+> > -&usb0 {
+> > -	status = "okay";
+> > -	dr_mode = "host";
+> > -	usb-phy = <&usb_phy0>;
+> > -};
+> > diff --git a/arch/arm/boot/dts/zynq-zybo.dts
+> > b/arch/arm/boot/dts/zynq-zybo.dts index e40cafc5ee5b..920294f41aff
+> > 100644 --- a/arch/arm/boot/dts/zynq-zybo.dts
+> > +++ b/arch/arm/boot/dts/zynq-zybo.dts
+> > @@ -12,59 +12,18 @@
+> >   * GNU General Public License for more details.
+> >   */
+> >  /dts-v1/;
+> > -#include "zynq-7000.dtsi"
+> > +#include "zynq-zybo-common.dtsi"
+> >  
+> >  / {
+> >  	model = "Zynq ZYBO Development Board";
+> >  	compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
+> >  
+> > -	aliases {
+> > -		ethernet0 = &gem0;
+> > -		serial0 = &uart1;
+> > -	};
+> > -
+> > -	memory at 0 {
+> > -		device_type = "memory";
+> > -		reg = <0x0 0x20000000>;
+> > -	};
+> > -
+> >  	chosen {
+> >  		bootargs = "";
+> >  		stdout-path = "serial0:115200n8";
+> >  	};
+> > -
+> > -	usb_phy0: phy0 {
+> > -		#phy-cells = <0>;
+> > -		compatible = "usb-nop-xceiv";
+> > -		reset-gpios = <&gpio0 46 1>;
+> > -	};
+> >  };
+> >  
+> >  &clkc {
+> >  	ps-clk-frequency = <50000000>;
+> >  };
+> > -
+> > -&gem0 {
+> > -	status = "okay";
+> > -	phy-mode = "rgmii-id";
+> > -	phy-handle = <&ethernet_phy>;
+> > -
+> > -	ethernet_phy: ethernet-phy at 0 {
+> > -		reg = <0>;
+> > -		device_type = "ethernet-phy";
+> > -	};
+> > -};
+> > -
+> > -&sdhci0 {
+> > -	status = "okay";
+> > -};
+> > -
+> > -&uart1 {
+> > -	status = "okay";
+> > -};
+> > -
+> > -&usb0 {
+> > -	status = "okay";
+> > -	dr_mode = "host";
+> > -	usb-phy = <&usb_phy0>;
+> > -};
+> >   
+> 
+> TBH: I wouldn't bother with this. It is not huge duplication anyway.
+> If that file is huge that not a problem with it but it is pretty small
+> that's why I can't see a reason for it.
+> 
+
+OK. I withdraw this patch.
+
+> M
+> 
+> 
+
+Best regards,
+  Nobuhiro
