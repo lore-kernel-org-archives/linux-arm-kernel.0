@@ -1,38 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 27 Feb 2018 16:51:30 -0800
-Subject: [GIT PULL 2/2] Broadcom drivers fixes for 4.16
-In-Reply-To: <20180228005130.31856-1-f.fainelli@gmail.com>
-References: <20180228005130.31856-1-f.fainelli@gmail.com>
-Message-ID: <20180228005130.31856-2-f.fainelli@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 28 Feb 2018 08:55:56 +0800
+Subject: [PATCH v2] ARM: imx: avic: set low-power interrupt mask for imx25
+In-Reply-To: <1519766955-4302-1-git-send-email-martin@kaiser.cx>
+References: <1518628894-8328-1-git-send-email-martin@kaiser.cx>
+ <1519766955-4302-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20180228005555.GZ3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On Tue, Feb 27, 2018 at 10:29:15PM +0100, Martin Kaiser wrote:
+> imx25 contains two registers (LPIMR0 and 1) to define which interrupts
+> are enabled in low-power mode. As of today, those two registers are
+> configured to enable all interrupts. Before going to low-power mode, the
+> AVIC's INTENABLEH and INTENABLEL registers are configured to enable only
+> those interrupts which are used as wakeup sources.
+> 
+> It turned out that this approach is not sufficient if we want the imx25
+> to go into stop mode during suspend-to-ram. (Stop mode is the low-power
+> mode that consumes the least power. The peripheral master clock is
+> switched off in this mode). For stop mode to work, the LPIMR0 and 1
+> registers have to be configured with the set of interrupts that are
+> allowed in low-power mode. Fortunately, the bits in the LPIMR registers
+> are assigned to the same interrupts as the bits in INTENABLEH and
+> INTENABLEL. However, LPIMR uses 1 to mask an interrupt whereas the
+> INTENABLE registers use 1 to enable an interrupt.
+> 
+> This patch sets the LPIMR registers to the inverted bitmask of the
+> INTENABLE registers during suspend and goes back to "all interrupts
+> masked" when we wake up again. We also make this the default at startup.
+> 
+> As far as I know, the other supported imx architectures have no similar
+> mechanism. Since the LPIMR registers are part of the CCM module, we
+> query the device tree for an imx25 ccm node in order to detect if we're
+> running on imx25.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/drivers-fixes
-
-for you to fetch changes up to fee5f1ef6cf76f87d9799596d06979c9e6589f2b:
-
-  memory: brcmstb: dpfe: support new way of passing data from the DCPU (2018-02-23 10:56:59 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom SoCs drivers fixes for 4.16, please
-pull the following:
-
-- Markus provides two minor fixes to the Broadcom STB DPFE driver, one
-  to properly mask bits, and a second one to use the correct type. The
-  third commit is a consequence of a newer DFPE firmware which would
-  unfortunately crash without appropriate kernel changes.
-
-----------------------------------------------------------------
-Markus Mayer (3):
-      memory: brcmstb: dpfe: properly mask vendor error bits
-      memory: brcmstb: dpfe: fix type declaration of variable "ret"
-      memory: brcmstb: dpfe: support new way of passing data from the DCPU
-
- drivers/memory/brcmstb_dpfe.c | 74 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 60 insertions(+), 14 deletions(-)
+Applied, thanks.
