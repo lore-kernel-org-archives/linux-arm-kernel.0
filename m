@@ -1,24 +1,30 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Wed, 28 Feb 2018 22:04:52 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <20180228194429.GD22932@mithrandir>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180228194429.GD22932@mithrandir>
-Message-ID: <87r2p4hod7.fsf@intel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 28 Feb 2018 15:34:20 -0500
+Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+In-Reply-To: <20180212183352.22730-3-jean-philippe.brucker@arm.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-3-jean-philippe.brucker@arm.com>
+Message-ID: <bce32071-4159-3bdd-1e03-77f540ee4509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Feb 2018, Thierry Reding <thierry.reding@gmail.com> wrote:
-> Anyone that needs something other than normal mode should use the new
-> atomic PWM API.
+On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
+> +int iommu_sva_unbind_group(struct iommu_group *group, int pasid)
+> +{
+> +	struct group_device *device;
+> +
+> +	mutex_lock(&group->mutex);
+> +	list_for_each_entry(device, &group->devices, list)
+> +		iommu_sva_unbind_device(device->dev, pasid);
+> +	mutex_unlock(&group->mutex);
+> +
+> +	return 0;
+> +}
 
-At the risk of revealing my true ignorance, what is the new atomic PWM
-API? Where? Examples of how one would convert old code over to the new
-API?
-
-BR,
-Jani.
+I think we should handle the errors returned by iommu_sva_unbind_device() here
+or at least print a warning if we want to still continue unbinding. 
 
 -- 
-Jani Nikula, Intel Open Source Technology Center
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
