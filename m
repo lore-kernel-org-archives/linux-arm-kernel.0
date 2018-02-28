@@ -1,21 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:41:00 -0800
-Subject: [PATCH v4 16/22] nvmem: meson-efuse: Do no gate COMPILE_TEST with
- MESON_SM
+Date: Wed, 28 Feb 2018 06:41:03 -0800
+Subject: [PATCH v4 19/22] nvmem: vf610-ocotp: Do not use "&pdev->dev"
+ explicitly
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-17-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-20-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Being able to build this driver when COMPILE_TEST is selected is still
-useful even when MESON_SM is not selected, since selecting this
-driver as a module and doing "make modules" will result in successful
-build and would detect trivial coding errors. For an example of type
-of errors that could be prevented see [1] and [2]
-
-[1] lkml.kernel.org/r/20171227225956.14442-12-andrew.smirnov at gmail.com
-[2] https://marc.info/?l=linux-arm-kernel&m=151461599104358&w=2
+There already a "dev" variable for that. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -31,21 +24,22 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/nvmem/vf610-ocotp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index ff505af064ba..42e84e1b2a26 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -147,7 +147,7 @@ config NVMEM_VF610_OCOTP
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 752a0983e7fb..6e6bf7987d9d 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -223,8 +223,7 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct vf610_ocotp *ocotp_dev;
  
- config MESON_EFUSE
- 	tristate "Amlogic Meson GX eFuse Support"
--	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
-+	depends on (ARCH_MESON && MESON_SM) || COMPILE_TEST
- 	help
- 	  This is a driver to retrieve specific values from the eFuse found on
- 	  the Amlogic Meson GX SoCs.
+-	ocotp_dev = devm_kzalloc(&pdev->dev,
+-			sizeof(struct vf610_ocotp), GFP_KERNEL);
++	ocotp_dev = devm_kzalloc(dev, sizeof(struct vf610_ocotp), GFP_KERNEL);
+ 	if (!ocotp_dev)
+ 		return -ENOMEM;
+ 
 -- 
 2.14.3
