@@ -1,44 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Feb 2018 16:55:50 +0000
-Subject: [PATCH] ACPI/IORT: Remove obsolete
- ACPI_IORT_SMMU_V3_CAVIUM_CN99XX define
-In-Reply-To: <20180228165305.GA14610@e107981-ln.cambridge.arm.com>
-References: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
- <e6cbbf2a-738c-a77e-efa1-a38a5602ae1c@arm.com>
- <20180228165305.GA14610@e107981-ln.cambridge.arm.com>
-Message-ID: <35249df2-23a4-7406-e849-6e2a5955290b@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 28 Feb 2018 17:56:18 +0100
+Subject: [RFC 0/4] Add support for the Gateworks System Controller
+In-Reply-To: <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
+References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
+ <20180228144424.GC12303@lunn.ch>
+ <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
+Message-ID: <20180228165618.GC29484@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/18 16:53, Lorenzo Pieralisi wrote:
-> On Wed, Feb 28, 2018 at 04:35:17PM +0000, Robin Murphy wrote:
->> Hi Lorenzo,
->>
->> On 28/02/18 16:24, Lorenzo Pieralisi wrote:
->>> To defeat ACPICA<->kernel merge order dependencies a preprocessor define
->>> value was introduced in the IORT compilation unit according to IORT
->>> revision C, IORT_SMMU_V3_CAVIUM_CN99XX, so that even if the value was
->>> not defined in ACPICA headers the IORT kernel layer would still be able
->>> to function and use it.
->>>
->>> Since commit 0c2021c047ba ("ACPICA: IORT: Update SMMU models for
->>> revision C") finally added the define in ACPICA headers, as required by
->>> ACPICA IORT support, the preprocessor definition in the IORT kernel
->>> compilation unit has become obsolete and can be removed.
->>
->> Can the version check around iort_get_id_mapping_index() go as well?
-> 
-> https://marc.info/?l=linux-acpi&m=151817852003174&w=2
-> 
-> Gone :) (just did two patches since they were part of different
-> changes), I will batch them up and send them in a pull request for
-> v4.17.
+Hi Tim
 
-Ah, cool - I hadn't see that one go by.
+Cool. I would say this is done right.
 
-For this one (and the other as well if you like):
+> One issue I'm trying to figure out the best way to deal with is the
+> fact that the GSC can 'NAK' transactions occasionally which is why I
+> override the regmap read/write functions and provide retries. This
+> resolves the issue for the mfd core driver and sub-module drivers but
+> doesn't resolve the issue with these 'emulated devices' which have
+> their own stand-alone drivers. I'm not sure how to best deal with that
+> yet. I tried to add retires to the i2c adapter but that wasn't
+> accepted upstream because it was too generic and I was told I need to
+> work around it in device-drivers.
 
-Acked-by: Robin Murphy <robin.murphy@arm.com>
+How about writing an i2c bus driver which sits directly on top of
+another i2c bus? Basically a one port i2c mux.
 
-Thanks,
-Robin.
+The current mux code does not seem to directly allow it, since it
+calls i2c_transfer() directly on the parent, where as you want it to
+call your own i2c_transfer function. But maybe you could expended the
+core mux code to allow the i2c_mux_core structure to contain a transfer
+function?
+
+      Andrew
