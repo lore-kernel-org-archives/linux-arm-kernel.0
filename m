@@ -1,40 +1,118 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 28 Feb 2018 19:25:31 +0200
-Subject: [PATCH V4 2/2] thermal: imx: add i.MX7 thermal sensor support
-In-Reply-To: <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
-References: <1519459369-29083-1-git-send-email-Anson.Huang@nxp.com>
- <1519459369-29083-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1519838731.16494.8.camel@nxp.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 28 Feb 2018 16:06:07 -0600
+Subject: [PATCH v7 01/13] drivers: base: cacheinfo: move cache_setup_of_node()
+In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+Message-ID: <20180228220619.6992-2-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-02-24 at 16:02 +0800, Anson Huang wrote:
-> This patch adds i.MX7 thermal sensor support, most
-> of the i.MX7 thermal sensor functions are same with
-> i.MX6 except the registers offset/layout, so we move
-> those registers offset/layout definitions to soc data
-> structure.
-> 
-> i.MX7 uses single calibration data @25C, the calibration
-> data is located at OCOTP offset 0x4F0, bit[17:9], the
-> formula is as below:
-> 
-> Tmeas = (Nmeas - n1) + 25; n1 is the fuse value for 25C.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+In preparation for the next patch, and to aid in
+review of that patch, lets move cache_setup_of_node
+further down in the module without any changes.
 
-On imx7d (also 6sx and 6ul) OCOTP read will hang silently if the ocotp
-clk is not enabled. For example this can happen if imx_thermal is built
-as a module or probes after unused clocks are disabled.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ drivers/base/cacheinfo.c | 80 ++++++++++++++++++++++++------------------------
+ 1 file changed, 40 insertions(+), 40 deletions(-)
 
-This driver has support for reading ocotp values through the ocotp
-nvmem driver (which handles clks properly). Since imx7d is a new
-compatible string for upstream maybe you could just make new-style
-bindings mandatory and drop the changes to?imx_init_from_tempmon_data?
-
-See?commit 2067b757e972 ("ARM: dts: imx6ul: Add imx6ul-tempmon")
-
---
-Regards,
-Leonard
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index edf726267282..09ccef7ddc99 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -32,46 +32,6 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu)
+ }
+ 
+ #ifdef CONFIG_OF
+-static int cache_setup_of_node(unsigned int cpu)
+-{
+-	struct device_node *np;
+-	struct cacheinfo *this_leaf;
+-	struct device *cpu_dev = get_cpu_device(cpu);
+-	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+-	unsigned int index = 0;
+-
+-	/* skip if of_node is already populated */
+-	if (this_cpu_ci->info_list->of_node)
+-		return 0;
+-
+-	if (!cpu_dev) {
+-		pr_err("No cpu device for CPU %d\n", cpu);
+-		return -ENODEV;
+-	}
+-	np = cpu_dev->of_node;
+-	if (!np) {
+-		pr_err("Failed to find cpu%d device node\n", cpu);
+-		return -ENOENT;
+-	}
+-
+-	while (index < cache_leaves(cpu)) {
+-		this_leaf = this_cpu_ci->info_list + index;
+-		if (this_leaf->level != 1)
+-			np = of_find_next_cache_node(np);
+-		else
+-			np = of_node_get(np);/* cpu node itself */
+-		if (!np)
+-			break;
+-		this_leaf->of_node = np;
+-		index++;
+-	}
+-
+-	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
+-		return -ENOENT;
+-
+-	return 0;
+-}
+-
+ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+ 					   struct cacheinfo *sib_leaf)
+ {
+@@ -202,6 +162,46 @@ static void cache_of_override_properties(unsigned int cpu)
+ 		cache_associativity(this_leaf);
+ 	}
+ }
++
++static int cache_setup_of_node(unsigned int cpu)
++{
++	struct device_node *np;
++	struct cacheinfo *this_leaf;
++	struct device *cpu_dev = get_cpu_device(cpu);
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++	unsigned int index = 0;
++
++	/* skip if of_node is already populated */
++	if (this_cpu_ci->info_list->of_node)
++		return 0;
++
++	if (!cpu_dev) {
++		pr_err("No cpu device for CPU %d\n", cpu);
++		return -ENODEV;
++	}
++	np = cpu_dev->of_node;
++	if (!np) {
++		pr_err("Failed to find cpu%d device node\n", cpu);
++		return -ENOENT;
++	}
++
++	while (index < cache_leaves(cpu)) {
++		this_leaf = this_cpu_ci->info_list + index;
++		if (this_leaf->level != 1)
++			np = of_find_next_cache_node(np);
++		else
++			np = of_node_get(np);/* cpu node itself */
++		if (!np)
++			break;
++		this_leaf->of_node = np;
++		index++;
++	}
++
++	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
++		return -ENOENT;
++
++	return 0;
++}
+ #else
+ static void cache_of_override_properties(unsigned int cpu) { }
+ static inline int cache_setup_of_node(unsigned int cpu) { return 0; }
+-- 
+2.13.6
