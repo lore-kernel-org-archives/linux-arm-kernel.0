@@ -1,31 +1,26 @@
 From: p.pisati@gmail.com (Paolo Pisati)
-Date: Wed, 28 Feb 2018 17:12:56 +0100
+Date: Wed, 28 Feb 2018 17:13:45 +0100
 Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
  patchset related
-In-Reply-To: <20180228160735.GA22612@arm.com>
-References: <20180228154523.GA29931@akinoame> <20180228160735.GA22612@arm.com>
-Message-ID: <20180228161256.GA31013@akinoame>
+In-Reply-To: <CAKv+Gu-AkN=PE7+q2R_QADoAcsd=Z+xgPXutTwSqb_oBUr-gpg@mail.gmail.com>
+References: <20180228154523.GA29931@akinoame>
+ <CAKv+Gu-AkN=PE7+q2R_QADoAcsd=Z+xgPXutTwSqb_oBUr-gpg@mail.gmail.com>
+Message-ID: <20180228161345.GB31013@akinoame>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 04:07:35PM +0000, Will Deacon wrote:
-> On Wed, Feb 28, 2018 at 04:45:23PM +0100, Paolo Pisati wrote:
-> > Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
-> > intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
-> > (it usually shows up in less than 10 iterations but i tested 32 boots before
-> > marking it good).
+On Wed, Feb 28, 2018 at 03:51:09PM +0000, Ard Biesheuvel wrote:
 > 
-> [...]
-> 
-> > Anything else i can do to help debug this?
-> 
-> If you could share the crash log, that would be helpful.
+> First of al, v4.4.20 ?!? How on earth could that have anything to do with KPTI?
 
-Oops log here:
-https://launchpadlibrarian.net/358687166/submission_2018-02-26T14.58.17.996524.html#9-1-log
+Sorry, i meant 4.14.20...
 
-I prepared the email, then when i was about to send it out i inadvertently cut out the
-crash...
+> 
+> In any case, you could try whether this patch helps at all, or at
+> least makes your bisect less inconclusive.
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=fixes/core&id=753e8abc36b2c966caea075db0c845563c8a19bf
+
 -- 
 bye,
 p.
