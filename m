@@ -1,201 +1,90 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 28 Feb 2018 06:29:21 -0800
-Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
- based tachometer
-In-Reply-To: <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
-References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
- <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
- <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
- <2510b525-ec36-b49d-5a62-81f335c0d10d@nvidia.com>
- <cfe0d0ce-3a89-bad0-85ba-6edf1135d2dc@roeck-us.net>
- <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
- <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
-Message-ID: <62ba7f67-5a99-51ab-1214-eb68ebb7e642@roeck-us.net>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Wed, 28 Feb 2018 23:29:51 +0900
+Subject: [kernel-hardening] [PATCH 1/2] arm: mm: Define vdso_start, vdso_end
+ as array
+Message-ID: <20180228142951.GA3136@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2018 11:03 PM, Mikko Perttunen wrote:
-> On 02/28/2018 08:12 AM, Rajkumar Rampelli wrote:
->>
->> On Wednesday 28 February 2018 11:28 AM, Guenter Roeck wrote:
->>> On 02/27/2018 09:38 PM, Rajkumar Rampelli wrote:
->>>>
->>>> On Wednesday 21 February 2018 08:20 PM, Guenter Roeck wrote:
->>>>> On 02/20/2018 10:58 PM, Rajkumar Rampelli wrote:
->>>>>> Add generic PWM based tachometer driver via HWMON interface
->>>>>> to report the RPM of motor. This drivers get the period/duty
->>>>>> cycle from PWM IP which captures the motor PWM output.
->>>>>>
->>>>>> This driver implements a simple interface for monitoring the speed of
->>>>>> a fan and exposes it in roatations per minute (RPM) to the user space
->>>>>> by using the hwmon's sysfs interface
->>>>>>
->>>>>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
->>>>>> ---
->>>>>> ? Documentation/hwmon/generic-pwm-tachometer |? 17 +++++
->>>>>> ? drivers/hwmon/Kconfig????????????????????? |? 10 +++
->>>>>> ? drivers/hwmon/Makefile???????????????????? |?? 1 +
->>>>>> ? drivers/hwmon/generic-pwm-tachometer.c???? | 112 +++++++++++++++++++++++++++++
->>>>>> ? 4 files changed, 140 insertions(+)
->>>>>> ? create mode 100644 Documentation/hwmon/generic-pwm-tachometer
->>>>>> ? create mode 100644 drivers/hwmon/generic-pwm-tachometer.c
->>>>>>
->>>>>> diff --git a/Documentation/hwmon/generic-pwm-tachometer b/Documentation/hwmon/generic-pwm-tachometer
->>>>>> new file mode 100644
->>>>>> index 0000000..e0713ee
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/hwmon/generic-pwm-tachometer
->>>>>> @@ -0,0 +1,17 @@
->>>>>> +Kernel driver generic-pwm-tachometer
->>>>>> +====================================
->>>>>> +
->>>>>> +This driver enables the use of a PWM module to monitor a fan. It uses the
->>>>>> +generic PWM interface and can be used on SoCs as along as the SoC supports
->>>>>> +Tachometer controller that moniors the Fan speed in periods.
->>>>>> +
->>>>>> +Author: Rajkumar Rampelli <rrajk@nvidia.com>
->>>>>> +
->>>>>> +Description
->>>>>> +-----------
->>>>>> +
->>>>>> +The driver implements a simple interface for monitoring the Fan speed using
->>>>>> +PWM module and Tachometer controller. It requests period value through PWM
->>>>>> +capture interface to Tachometer and measures the Rotations per minute using
->>>>>> +received period value. It exposes the Fan speed in RPM to the user space by
->>>>>> +using the hwmon's sysfs interface.
->>>>>> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
->>>>>> index ef23553..8912dcb 100644
->>>>>> --- a/drivers/hwmon/Kconfig
->>>>>> +++ b/drivers/hwmon/Kconfig
->>>>>> @@ -1878,6 +1878,16 @@ config SENSORS_XGENE
->>>>>> ??????? If you say yes here you get support for the temperature
->>>>>> ??????? and power sensors for APM X-Gene SoC.
->>>>>> ? +config GENERIC_PWM_TACHOMETER
->>>>>> +??? tristate "Generic PWM based tachometer driver"
->>>>>> +??? depends on PWM
->>>>>> +??? help
->>>>>> +????? Enables a driver to use PWM signal from motor to use
->>>>>> +????? for measuring the motor speed. The RPM is captured by
->>>>>> +????? PWM modules which has PWM capture capability and this
->>>>>> +????? drivers reads the captured data from PWM IP to convert
->>>>>> +????? it to speed in RPM.
->>>>>> +
->>>>>> ? if ACPI
->>>>>> ??? comment "ACPI drivers"
->>>>>> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
->>>>>> index f814b4a..9dcc374 100644
->>>>>> --- a/drivers/hwmon/Makefile
->>>>>> +++ b/drivers/hwmon/Makefile
->>>>>> @@ -175,6 +175,7 @@ obj-$(CONFIG_SENSORS_WM8350)??? += wm8350-hwmon.o
->>>>>> ? obj-$(CONFIG_SENSORS_XGENE)??? += xgene-hwmon.o
->>>>>> ??? obj-$(CONFIG_PMBUS)??????? += pmbus/
->>>>>> +obj-$(CONFIG_GENERIC_PWM_TACHOMETER) += generic-pwm-tachometer.o
->>>>>> ??? ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
->>>>>> ? diff --git a/drivers/hwmon/generic-pwm-tachometer.c b/drivers/hwmon/generic-pwm-tachometer.c
->>>>>> new file mode 100644
->>>>>> index 0000000..9354d43
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/hwmon/generic-pwm-tachometer.c
->>>>>> @@ -0,0 +1,112 @@
->>>>>> +/*
->>>>>> + * Copyright (c) 2017-2018, NVIDIA CORPORATION.? All rights reserved.
->>>>>> + *
->>>>>> + * This program is free software; you can redistribute it and/or modify it
->>>>>> + * under the terms and conditions of the GNU General Public License,
->>>>>> + * version 2, as published by the Free Software Foundation.
->>>>>> + *
->>>>>> + * This program is distributed in the hope it will be useful, but WITHOUT
->>>>>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>>>>> + * FITNESS FOR A PARTICULAR PURPOSE.? See the GNU General Public License for
->>>>>> + * more details.
->>>>>> + *
->>>>>> + */
->>>>>> +
->>>>>> +#include <linux/module.h>
->>>>>> +#include <linux/platform_device.h>
->>>>>> +#include <linux/err.h>
->>>>>> +#include <linux/pwm.h>
->>>>>> +#include <linux/hwmon.h>
->>>>>> +#include <linux/hwmon-sysfs.h>
->>>>>> +
->>>>>> +struct pwm_hwmon_tach {
->>>>>> +??? struct device??????? *dev;
->>>>>> +??? struct pwm_device??? *pwm;
->>>>>> +??? struct device??????? *hwmon;
->>>>>> +};
->>>>>> +
->>>>>> +static ssize_t show_rpm(struct device *dev, struct device_attribute *attr,
->>>>>> +??????????? char *buf)
->>>>>> +{
->>>>>> +??? struct pwm_hwmon_tach *ptt = dev_get_drvdata(dev);
->>>>>> +??? struct pwm_device *pwm = ptt->pwm;
->>>>>> +??? struct pwm_capture result;
->>>>>> +??? int err;
->>>>>> +??? unsigned int rpm = 0;
->>>>>> +
->>>>>> +??? err = pwm_capture(pwm, &result, 0);
->>>>>> +??? if (err < 0) {
->>>>>> +??????? dev_err(ptt->dev, "Failed to capture PWM: %d\n", err);
->>>>>> +??????? return err;
->>>>>> +??? }
->>>>>> +
->>>>>> +??? if (result.period)
->>>>>> +??????? rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
->>>>>> +??????????????????????? result.period);
->>>>>> +
->>>>>> +??? return sprintf(buf, "%u\n", rpm);
->>>>>> +}
->>>>>> +
->>>>>> +static SENSOR_DEVICE_ATTR(rpm, 0444, show_rpm, NULL, 0);
->>>>>> +
->>>>>> +static struct attribute *pwm_tach_attrs[] = {
->>>>>> +??? &sensor_dev_attr_rpm.dev_attr.attr,
->>>>>> +??? NULL,
->>>>>> +};
->>>>>
->>>>> "rpm" is not a standard hwmon sysfs attribute. If you don't provide
->>>>> a single standard hwmon sysfs attribute, having a hwmon driver is pointless.
->>>> Guenter Roeck,
->>>> I will define a new hwmon sysfs attribute node called "hwmon_tachometer_attributes" in hwmon.h like below and update the same in tachometer hwmon driver. Is it fine ?
->>>> enum hwmon_tachometer_attributes {
->>>
->>> Are you kidding me ?
->>>
->>> Guenter
->> Sorry, I just wanted to confirm whether my understanding is correct or not before implementing it actually.
->> Or, shall I add this attribute as a part of fan attributes with "hwmon_fan_rpm" ? or any other way to do it ? I need your inputs in fixing this.
-> 
-> I think he wants the attribute to be named according to the properties in this document: https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface. I guess the attribute would then map to fan1_input, though I'm not sure if that's 100% correct either since this could technically be attached to something other than a fan. But I would think in practice that's not a big concern.
-> 
-> Guenter,
-> Please correct me as well if I'm wrong.
-> 
-You are absolutely correct.
+Define vdso_start, vdso_end as array to avoid compile-time analysis error
+for the case of built with CONFIG_FORTIFY_SOURCE.
 
-While I am not opposed to ABI changes, the merits of those would need to be
-discussed on the mailing list. But replacing "fan1_input" with "rpm" is
-not an acceptable ABI change, even if it may measure something that turns
-but isn't a fan.
+and, since vdso_start, vdso_end are used in vdso.c only,
+move extern-declaration from vdso.h to vdso.c.
 
-If this _is_ in fact supposed to be used for something else but fans, we
-would have to discuss what that might be, and if hwmon is the appropriate
-subsystem to measure and report it. This does to some degree lead back to
-my concern of having the "fan" part of this patch series in the pwm core.
-I am still not sure if that makes sense.
+If kernel is built with CONFIG_FORTIFY_SOURCE,
+compile-time error happens at this code.
+- if (memcmp(&vdso_start, "\177ELF", 4))
 
-Thanks,
-Guenter
+The size of "&vdso_start" is recognized as 1 byte, but n is 4,
+So that compile-time error is reported.
 
-> Thank you,
-> Mikko
-> 
->>
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at? http://vger.kernel.org/majordomo-info.html
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-hwmon" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at? http://vger.kernel.org/majordomo-info.html
-> 
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/include/asm/vdso.h |  2 --
+ arch/arm/kernel/vdso.c      | 12 +++++++-----
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
+index 9c99e81..5b85889 100644
+--- a/arch/arm/include/asm/vdso.h
++++ b/arch/arm/include/asm/vdso.h
+@@ -12,8 +12,6 @@
+ 
+ void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
+ 
+-extern char vdso_start, vdso_end;
+-
+ extern unsigned int vdso_total_pages;
+ 
+ #else /* CONFIG_VDSO */
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index a4d6dc0..f4dd7f9 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -39,6 +39,8 @@
+ 
+ static struct page **vdso_text_pagelist;
+ 
++extern char vdso_start[], vdso_end[];
++
+ /* Total number of pages needed for the data and text portions of the VDSO. */
+ unsigned int vdso_total_pages __ro_after_init;
+ 
+@@ -197,13 +199,13 @@ static int __init vdso_init(void)
+ 	unsigned int text_pages;
+ 	int i;
+ 
+-	if (memcmp(&vdso_start, "\177ELF", 4)) {
++	if (memcmp(vdso_start, "\177ELF", 4)) {
+ 		pr_err("VDSO is not a valid ELF object!\n");
+ 		return -ENOEXEC;
+ 	}
+ 
+-	text_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
+-	pr_debug("vdso: %i text pages at base %p\n", text_pages, &vdso_start);
++	text_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
++	pr_debug("vdso: %i text pages at base %p\n", text_pages, vdso_start);
+ 
+ 	/* Allocate the VDSO text pagelist */
+ 	vdso_text_pagelist = kcalloc(text_pages, sizeof(struct page *),
+@@ -218,7 +220,7 @@ static int __init vdso_init(void)
+ 	for (i = 0; i < text_pages; i++) {
+ 		struct page *page;
+ 
+-		page = virt_to_page(&vdso_start + i * PAGE_SIZE);
++		page = virt_to_page(vdso_start + i * PAGE_SIZE);
+ 		vdso_text_pagelist[i] = page;
+ 	}
+ 
+@@ -229,7 +231,7 @@ static int __init vdso_init(void)
+ 
+ 	cntvct_ok = cntvct_functional();
+ 
+-	patch_vdso(&vdso_start);
++	patch_vdso(vdso_start);
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
