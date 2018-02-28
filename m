@@ -1,99 +1,80 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 28 Feb 2018 15:53:50 +0100
-Subject: [PATCH 2/2] PCI: armada8k: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180228144704.12947-3-gregory.clement@bootlin.com>
-References: <20180228144704.12947-1-gregory.clement@bootlin.com>
- <20180228144704.12947-3-gregory.clement@bootlin.com>
-Message-ID: <20180228155350.0221a90f@windsurf.lan>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Feb 2018 15:06:19 +0000
+Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <5A96A809.2020509@rock-chips.com>
+References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
+ <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+ <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
+ <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
+ <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
+ <5A72F7D2.1050201@rock-chips.com> <5A8FEBC6.4000408@rock-chips.com>
+ <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
+ <5A96A809.2020509@rock-chips.com>
+Message-ID: <34a60ab2-a3af-3302-6612-740cba5460db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 28 Feb 2018 15:47:04 +0100, Gregory CLEMENT wrote:
-> On Armada 7K/8K we need to explicitly enable the register clock. This
-> clock is optional because not all the SoCs using this IP need it but at
-> least for Armada 7K/8K it is actually mandatory.
+On 28/02/18 13:00, JeffyChen wrote:
+> Hi Robin,
 > 
-> The binding documentation is updated accordingly.
+> Thanks for your reply.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  Documentation/devicetree/bindings/pci/pci-armada8k.txt |  6 +++++-
->  drivers/pci/dwc/pcie-armada8k.c                        | 11 +++++++++++
->  2 files changed, 16 insertions(+), 1 deletion(-)
+> On 02/28/2018 12:59 AM, Robin Murphy wrote:
+>>>> the rockchip IOMMU is part of the master block in hardware, so it needs
+>>>> to control the master's power domain and some of the master's clocks
+>>>> when access it's registers.
+>>>>
+>>>> and the number of clocks needed here, might be different between each
+>>>> IOMMUs(according to which master block it belongs), it's a little like
+>>>> our power domain:
+>>>> https://elixir.free-electrons.com/linux/latest/source/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L935 
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> i'm not sure how to describe this correctly, is it ok use something 
+>>>> like
+>>>> "the same as it's master block"?
+>>>
+>>> would it make sense to add a property to specify the master who owns
+>>> the iommu, and we can get all clocks(only some of those clocks are
+>>> actually needed) from it in the of_xlate()? and we can also reuse the
+>>> clock-names of that master to build clk_bulk_data and log errors in
+>>> clk_bulk_get.
+>>
+>> I'm inclined to agree with Rob here - if we're to add anything to the
+>> binding, it should only be whatever clock inputs are defined for the
+>> IOMMU IP block itself. If Linux doesn't properly handle the interconnect
+>> clock hierarchy external to a particular integration, that's a separate
+>> issue and it's not the binding's problem.
+>>
+>> I actually quite like the hack of "borrowing" the clocks from
+>> dev->of_node in of_xlate() - you shouldn't need any DT changes for that,
+>> because you already know that each IOMMU instance only has the one
+>> master device anyway.
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-armada8k.txt b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> index c1e4c3d10a74..9948b1e9a8e5 100644
-> --- a/Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> +++ b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
-> @@ -12,7 +12,11 @@ Required properties:
->     - "ctrl" for the control register region
->     - "config" for the config space region
->  - interrupts: Interrupt specifier for the PCIe controler
-> -- clocks: reference to the PCIe controller clock
-> +- clocks: reference to the PCIe controller clocks
-> +- clock-names: mandatory if there is a second clock, in this case the
-> +   name must be "core" for the first clock and "reg" for the second
-> +   one
-> +
+> Thanks:) but actually we are going to support sharing IOMMU between 
+> multiple masters(one of them is the main master i think) in the newer 
+> chips(not yet supported on upstream kernel)...
 
-Unneeded new line added here.
+Ha! OK, fair enough, back to the first point then...
 
->  
->  Example:
->  
-> diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
-> index f9b1aec25c5c..aa4e5cc4ab7b 100644
-> --- a/drivers/pci/dwc/pcie-armada8k.c
-> +++ b/drivers/pci/dwc/pcie-armada8k.c
-> @@ -28,6 +28,7 @@
->  struct armada8k_pcie {
->  	struct dw_pcie *pci;
->  	struct clk *clk;
-> +	struct clk *clk_reg;
->  };
->  
->  #define PCIE_VENDOR_REGS_OFFSET		0x8000
-> @@ -229,6 +230,15 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	if (IS_ERR(pcie->clk_reg) && PTR_ERR(pcie->clk_reg) == -EPROBE_DEFER) {
-> +		clk_disable_unprepare(pcie->clk);
-> +		return -EPROBE_DEFER;
-> +	}
-> +	if (!IS_ERR(pcie->clk_reg)) {
-> +		ret = clk_prepare_enable(pcie->clk_reg);
-> +		if (ret)
-> +			goto fail;
-> +	}
->  	/* Get the dw-pcie unit configuration/control registers base. */
+> So we might have to get all clocks from all masters, or find a way to 
+> specify the main master...and for the multiple masters case, do it in 
+> of_xlate() turns out to be a little racy...maybe we can add a property 
+> to specify main master, and get it's clocks in probe()?
 
-Missing new line between the end of the block and the next comment.
+I notice that the 4.4 BSP kernel consistently specifies "aclk" and 
+"hclk" for the IOMMU instances - it feels unusual to say "why don't we 
+follow the downstream binding?", but it does look a lot like what I 
+would expect (I'd guess at one for the register slave interface and one 
+for the master interface/general operation?)
 
-Regarding the error handling, doesn't it make more sense to also use a
-goto label to disable pcie->clk when getting the second clock gets a
--EPROBE_DEFER ?
+If we can implement conceptually-correct clock handling based on an 
+accurate binding, which should cover most cases, and *then* look at 
+hacking around those where it doesn't quite work in practice due to 
+shortcomings elsewhere, that would be ideal, and of course a lot nicer 
+than just jumping straight into piles of hacks.
 
->  	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
->  	pci->dbi_base = devm_pci_remap_cfg_resource(dev, base);
-> @@ -247,6 +257,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
->  	return 0;
->  
->  fail:
-> +	clk_disable_unprepare(pcie->clk_reg);
-
-So you are disabling/unpreparing the clock, which failed to
-prepare/enable ?
-
->  	clk_disable_unprepare(pcie->clk);
->  
->  	return ret;
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Robin.
