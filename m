@@ -1,109 +1,61 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:34 +0800
-Subject: [PATCH 12/29] arm64: entry: Hook up entry trampoline to exception
- vectors
+Date: Wed, 28 Feb 2018 11:56:35 +0800
+Subject: [PATCH 13/29] arm64: tls: Avoid unconditional zeroing of tpidrro_el0
+ for native tasks
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-13-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-14-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 4bf3286d29f3 upstream.
+commit 18011eac28c7 upstream.
 
-Hook up the entry trampoline to our exception vectors so that all
-exceptions from and returns to EL0 go via the trampoline, which swizzles
-the vector base register accordingly. Transitioning to and from the
-kernel clobbers x30, so we use tpidrro_el0 and far_el1 as scratch
-registers for native tasks.
+When unmapping the kernel at EL0, we use tpidrro_el0 as a scratch register
+during exception entry from native tasks and subsequently zero it in
+the kernel_ventry macro. We can therefore avoid zeroing tpidrro_el0
+in the context-switch path for native tasks using the entry trampoline.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
 Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kernel/entry.S | 39 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 7b1be51..eccb6d8 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -72,10 +72,26 @@
+Conflicts:
+	fold tls_preserve_current_state() in arch/arm64/kernel/process.c
+---
+ arch/arm64/kernel/process.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 0e73949..0972ce5 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -306,17 +306,17 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
  
- 	.macro kernel_ventry, el, label, regsize = 64
- 	.align 7
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	.if	\el == 0
-+	.if	\regsize == 64
-+	mrs	x30, tpidrro_el0
-+	msr	tpidrro_el0, xzr
-+	.else
-+	mov	x30, xzr
-+	.endif
-+	.endif
-+#endif
-+
- 	sub	sp, sp, #S_FRAME_SIZE
- 	b	el\()\el\()_\label
- 	.endm
+ static void tls_thread_switch(struct task_struct *next)
+ {
+-	unsigned long tpidr, tpidrro;
++	unsigned long tpidr;
  
-+	.macro tramp_alias, dst, sym
-+	mov_q	\dst, TRAMP_VALIAS
-+	add	\dst, \dst, #(\sym - .entry.tramp.text)
-+	.endm
-+
- 	.macro	kernel_entry, el, regsize = 64
- 	.if	\regsize == 32
- 	mov	w0, w0				// zero upper 32 bits of x0
-@@ -157,18 +173,20 @@
- 	ct_user_enter
- 	ldr	x23, [sp, #S_SP]		// load return stack pointer
- 	msr	sp_el0, x23
-+	tst	x22, #PSR_MODE32_BIT		// native task?
-+	b.eq	3f
-+
- #ifdef CONFIG_ARM64_ERRATUM_845719
- alternative_if ARM64_WORKAROUND_845719
--	tbz	x22, #4, 1f
- #ifdef CONFIG_PID_IN_CONTEXTIDR
- 	mrs	x29, contextidr_el1
- 	msr	contextidr_el1, x29
- #else
- 	msr contextidr_el1, xzr
- #endif
--1:
- alternative_else_nop_endif
- #endif
-+3:
- 	.endif
- 	msr	elr_el1, x21			// set up the return data
- 	msr	spsr_el1, x22
-@@ -189,7 +207,22 @@ alternative_else_nop_endif
- 	ldp	x28, x29, [sp, #16 * 14]
- 	ldr	lr, [sp, #S_LR]
- 	add	sp, sp, #S_FRAME_SIZE		// restore sp
--	eret					// return to kernel
-+
-+#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
-+	eret
-+#else
-+	.if	\el == 0
-+	bne	4f
-+	msr	far_el1, x30
-+	tramp_alias	x30, tramp_exit_native
-+	br	x30
-+4:
-+	tramp_alias	x30, tramp_exit_compat
-+	br	x30
-+	.else
-+	eret
-+	.endif
-+#endif
- 	.endm
+ 	tpidr = read_sysreg(tpidr_el0);
+ 	*task_user_tls(current) = tpidr;
  
- 	.macro	get_thread_info, rd
+-	tpidr = *task_user_tls(next);
+-	tpidrro = is_compat_thread(task_thread_info(next)) ?
+-		  next->thread.tp_value : 0;
++	if (is_compat_thread(task_thread_info(next)))
++		write_sysreg(next->thread.tp_value, tpidrro_el0);
++	else if (!arm64_kernel_unmapped_at_el0())
++		write_sysreg(0, tpidrro_el0);
+ 
+-	write_sysreg(tpidr, tpidr_el0);
+-	write_sysreg(tpidrro, tpidrro_el0);
++	write_sysreg(*task_user_tls(next), tpidr_el0);
+ }
+ 
+ /* Restore the UAO state depending on next's addr_limit */
 -- 
 2.7.4
