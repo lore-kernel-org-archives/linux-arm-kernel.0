@@ -1,56 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Feb 2018 13:32:57 +0100
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
-Message-ID: <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 28 Feb 2018 20:33:59 +0800
+Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
+In-Reply-To: <20180226102418.GD6019@linaro.org>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-3-takahiro.akashi@linaro.org>
+ <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
+ <20180226102418.GD6019@linaro.org>
+Message-ID: <20180228123359.GB2228@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 02/26/18 at 07:24pm, AKASHI Takahiro wrote:
+> On Fri, Feb 23, 2018 at 04:49:34PM +0800, Dave Young wrote:
+> > Hi AKASHI,
+> > 
+> > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
+> > > On arm64, no trampline code between old kernel and new kernel will be
+> > > required in kexec_file implementation. This patch introduces a new
+> > > configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
+> > > compiled in only if necessary.
+> > 
+> > Here also need the explanation about why no purgatory is needed, it would be
+> > required for kexec if no strong reason.
+> 
+> OK, I will add the reason:
+> On arm64, crash dump kernel's usable memory is protected by
+> *unmapping* it from kernel virtual space unlike other architectures
+> where the region is just made read-only.
+> So our key developers think that it is highly unlikely that the region
+> is accidentally corrupted and this rationalizes that digest check code
+> be also dropped from purgatory.
+> This greatly simplifies our purgatory without any need for a bit ugly
+> relocation stuff, i.e. arch_kexec_apply_relocations_add().
+> 
+> Please see:
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
+> to find out how simple our purgatory was. All that it does is
+> to shuffle arguments and jump into a new kernel.
+> 
+> Without this patch, we would have to have purgatory with a space for
+> a hash value (purgatory_sha256_digest) which is never checked against.
+> 
+> Do you think it makes sense?
 
-On Wed, Feb 28, 2018 at 1:29 PM, Tomasz Figa <tfiga@chromium.org> wrote:
-> On Wed, Feb 28, 2018 at 9:17 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Wed, Feb 28, 2018 at 12:11 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->>> Currently we are adding all of the attached devices' clocks as pm clocks
->>> and enable them when powering on the power domain.
->>>
->>> This seems unnecessary, because those clocks are already controlled in
->>> the devices' drivers with better error handling.
->>>
->>> Tested on my chromebook minnie(rk3288) and chromebook kevin(rk3399).
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>
->> Thanks for your patch!
->>
->> Just wondering: so you prefer to handle the clocks explicitly in all drivers,
->> instead of delegating this task to Runtime PM?
->
-> Is it already possible to gate clocks immediately when the device
-> idles, but defer turning the power domain off until time long enough
-> to cover the power down and up latency elapses?
+Hmm, it looks reasonable, I remember there could be some performance
+issue for a purgatory because of cache disabled for arm64. I do not
+object this.
 
-I'm not 100% sure.
-Note that clocks are turned off when the device idles, while powering down
-the power domain requires all devices in the domain to be idle.
+[snip]
 
-> Also, how about systems where runtime PM is disabled? I think that's
-> one of the reasons we control the clocks explicitly in the drivers
-> anyway.
-
-On many platforms, Runtime PM is always enabled.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Dave
