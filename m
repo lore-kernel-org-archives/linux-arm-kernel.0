@@ -1,31 +1,54 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 28 Feb 2018 14:19:51 +0100
-Subject: [PATCH 2/3] ARM: dts: sun8i: a711: set regulator for each
- cluster of CPUs
-In-Reply-To: <07883d44949420891c1ed2411ff15199d53075c0.1519823347.git-series.quentin.schulz@bootlin.com>
-References: <cover.f1ec43f8d2a0151c52434f0952e973b19626f285.1519823347.git-series.quentin.schulz@bootlin.com>
- <07883d44949420891c1ed2411ff15199d53075c0.1519823347.git-series.quentin.schulz@bootlin.com>
-Message-ID: <20180228141951.3a06bc11@windsurf.lan>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 28 Feb 2018 13:22:51 +0000
+Subject: [PATCH v2 0/4] Enable DMA on STM32 MCU based on cortex-M7
+In-Reply-To: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
+References: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <c6e0906d-a181-720c-d2ef-73e1d517232a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 28/02/18 13:10, Alexandre Torgue wrote:
+> This series enable DMA on several STM32 MCU based on cortex-M7.
+> To make it possible, a dedicated dma pool memory area has to be
+> created. This patchset activate also ARM_MPU flag which will configure 
+> MPU (Memory Protection Unit) according to devicetree information (mem
+> and dma-pool). Note that on cortex-M7 DMA has to use a NO cache-able 
+> memory region.
+> 
+> 
+> v2:
+> -select ARM_MPU in mach-stm32 Kconfig instead of add it in stm32 defconfig
+> -Remove XIP configuration from stm32_defconfig: ARM_MPU flag imposes XIP image
+> to be aligned on 1MB. It is currently not the case. I had choice to either
+> modify current XIP start address to be aligned on 1MB or to remove global
+> configuration. I make choice to remove XIP configuration. Indeed, SD card
+> support has been recently added for most of STM32 MCU boards (except for
+> stm32f429-disco). As kernel is growing up for stm32 it will be more and more
+> difficult to flash it in embeded flash (max size: 2MB).
 
-On Wed, 28 Feb 2018 14:11:21 +0100, Quentin Schulz wrote:
+It is sad we are loosing XIP configuration - it used to uncover some bugs
+in a past. Probably, you might consider to have stm32 tiny (+xip) defconfig
+for those who do not want/need all-in-one kernel.
 
-> @@ -136,6 +144,7 @@
->   * An USB-2 hub is connected here, which also means we don't need to
->   * enable the OHCI controller.
->   */
-> +
->  &ehci0 {
->  	status = "okay";
->  };
+Cheers
+Vladimir
 
-Spurious change.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+> -fix typo in commit message
+> 
+> Regards
+> Alex
+> 
+> Alexandre Torgue (4):
+>   ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
+>   ARM: configs: stm32: remove XIP configuration
+>   ARM: stm32: Select ARM_MPU for cortex-M7 machines
+>   ARM: dts: stm32: enable dma on MCU which embed a cortex-M7
+> 
+>  arch/arm/boot/dts/stm32746g-eval.dts   | 21 +++++++++++++++++++++
+>  arch/arm/boot/dts/stm32f769-disco.dts  | 21 +++++++++++++++++++++
+>  arch/arm/boot/dts/stm32h743i-disco.dts | 21 +++++++++++++++++++++
+>  arch/arm/boot/dts/stm32h743i-eval.dts  | 21 +++++++++++++++++++++
+>  arch/arm/configs/stm32_defconfig       |  2 --
+>  arch/arm/mach-stm32/Kconfig            |  3 +++
+>  6 files changed, 87 insertions(+), 2 deletions(-)
+> 
