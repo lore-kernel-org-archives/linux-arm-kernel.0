@@ -1,53 +1,38 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 28 Feb 2018 15:02:43 +0100
-Subject: [PATCH 0/2] Allow xhci-plat using a second clock
-In-Reply-To: <20180214161620.4401-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Wed, 14 Feb 2018 17:16:18 +0100")
-References: <20180214161620.4401-1-gregory.clement@bootlin.com>
-Message-ID: <87d10pfbzw.fsf@bootlin.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed, 28 Feb 2018 15:02:51 +0100
+Subject: [PATCH] arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec
+ for rk3399
+Message-ID: <20180228140251.22232-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathias,
- 
- On mer., f?vr. 14 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Enables typec phyter and extcon driver for cable detection that is used by
+USB 3.0 controller for Rockchip rk3399 SoCs.
 
-> Hello,
->
-> The purpose of this series is to allow xhci-plat using a second
-> clock. It is needed on the Armada 7K/8K but could be used by other
-> SoCs.
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Do you have some comments on this series and especially on the second
-patch?
-
-Thanks,
-
-Gregory
-
->
-> The first patch is just a fix found while I was working on this
-> feature.
->
-> Thanks,
->
-> Gregory
->
->
-> Gregory CLEMENT (2):
->   usb: host: xhci-plat: Remove useless test before clk_disable_unprepare
->   usb: host: xhci-plat: Fix clock resource by adding a register clock
->
->  Documentation/devicetree/bindings/usb/usb-xhci.txt |  5 ++-
->  drivers/usb/host/xhci-plat.c                       | 39 ++++++++++++++++------
->  drivers/usb/host/xhci.h                            |  3 +-
->  3 files changed, 35 insertions(+), 12 deletions(-)
->
-> -- 
-> 2.15.1
->
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 78b47bc7dc54..d4c25aa55785 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -544,6 +544,7 @@ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_ARCH_TEGRA_186_SOC=y
+ CONFIG_EXTCON_USB_GPIO=y
++CONFIG_EXTCON_USBC_CROS_EC=y
+ CONFIG_IIO=y
+ CONFIG_EXYNOS_ADC=y
+ CONFIG_ROCKCHIP_SARADC=m
+@@ -564,6 +565,7 @@ CONFIG_PHY_MVEBU_CP110_COMPHY=y
+ CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+ CONFIG_PHY_ROCKCHIP_EMMC=y
+ CONFIG_PHY_ROCKCHIP_PCIE=m
++CONFIG_PHY_ROCKCHIP_TYPEC=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_QCOM_L2_PMU=y
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.16.1
