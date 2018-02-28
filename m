@@ -1,105 +1,35 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 28 Feb 2018 16:06:09 -0600
-Subject: [PATCH v7 03/13] cacheinfo: rename of_node to fw_token
+Date: Wed, 28 Feb 2018 16:06:10 -0600
+Subject: [PATCH v7 04/13] arm64/acpi: Create arch specific cpu to acpi id
+ helper
 In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
 References: <20180228220619.6992-1-jeremy.linton@arm.com>
-Message-ID: <20180228220619.6992-4-jeremy.linton@arm.com>
+Message-ID: <20180228220619.6992-5-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename and change the type of of_node to indicate
-it is a generic pointer which is generally only used
-for comparison purposes. In a later patch we will put
-an ACPI/PPTT token pointer in fw_token so that
-the code which builds the shared cpu masks can be reused.
+Its helpful to be able to lookup the acpi_processor_id associated
+with a logical cpu. Provide an arm64 helper to do this.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/base/cacheinfo.c  | 16 +++++++++-------
- include/linux/cacheinfo.h |  8 +++-----
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/acpi.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-index a872523e8951..597aacb233fc 100644
---- a/drivers/base/cacheinfo.c
-+++ b/drivers/base/cacheinfo.c
-@@ -35,7 +35,7 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu)
- static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
- 					   struct cacheinfo *sib_leaf)
- {
--	return sib_leaf->of_node == this_leaf->of_node;
-+	return sib_leaf->fw_token == this_leaf->fw_token;
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 32f465a80e4e..0db62a4cbce2 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -86,6 +86,10 @@ static inline bool acpi_has_cpu_in_madt(void)
  }
  
- /* OF properties to query for a given cache type */
-@@ -167,9 +167,10 @@ static int cache_setup_of_node(unsigned int cpu)
- 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
- 	unsigned int index = 0;
+ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
++static inline u32 get_acpi_id_for_cpu(unsigned int cpu)
++{
++	return	acpi_cpu_get_madt_gicc(cpu)->uid;
++}
  
--	/* skip if of_node is already populated */
--	if (this_cpu_ci->info_list->of_node)
-+	/* skip if fw_token is already populated */
-+	if (this_cpu_ci->info_list->fw_token) {
- 		return 0;
-+	}
- 
- 	if (!cpu_dev) {
- 		pr_err("No cpu device for CPU %d\n", cpu);
-@@ -190,7 +191,7 @@ static int cache_setup_of_node(unsigned int cpu)
- 		if (!np)
- 			break;
- 		cache_of_set_props(this_leaf, np);
--		this_leaf->of_node = np;
-+		this_leaf->fw_token = np;
- 		index++;
- 	}
- 
-@@ -278,7 +279,7 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
- 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
- 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
- 		}
--		of_node_put(this_leaf->of_node);
-+		of_node_put(this_leaf->fw_token);
- 	}
- }
- 
-@@ -323,8 +324,9 @@ static int detect_cache_attributes(unsigned int cpu)
- 	if (ret)
- 		goto free_ci;
- 	/*
--	 * For systems using DT for cache hierarchy, of_node and shared_cpu_map
--	 * will be set up here only if they are not populated already
-+	 * For systems using DT for cache hierarchy, fw_token
-+	 * and shared_cpu_map will be set up here only if they are
-+	 * not populated already
- 	 */
- 	ret = cache_shared_cpu_map_setup(cpu);
- 	if (ret) {
-diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
-index 3d9805297cda..0c6f658054d2 100644
---- a/include/linux/cacheinfo.h
-+++ b/include/linux/cacheinfo.h
-@@ -34,9 +34,8 @@ enum cache_type {
-  * @shared_cpu_map: logical cpumask representing all the cpus sharing
-  *	this cache node
-  * @attributes: bitfield representing various cache attributes
-- * @of_node: if devicetree is used, this represents either the cpu node in
-- *	case there's no explicit cache node or the cache node itself in the
-- *	device tree
-+ * @fw_token: Unique value used to determine if different cacheinfo
-+ *	structures represent a single hardware cache instance.
-  * @disable_sysfs: indicates whether this node is visible to the user via
-  *	sysfs or not
-  * @priv: pointer to any private data structure specific to particular
-@@ -65,8 +64,7 @@ struct cacheinfo {
- #define CACHE_ALLOCATE_POLICY_MASK	\
- 	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
- #define CACHE_ID		BIT(4)
--
--	struct device_node *of_node;
-+	void *fw_token;
- 	bool disable_sysfs;
- 	void *priv;
- };
+ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ void __init acpi_init_cpus(void);
 -- 
 2.13.6
