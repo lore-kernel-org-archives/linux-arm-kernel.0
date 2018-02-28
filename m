@@ -1,65 +1,55 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 28 Feb 2018 16:47:22 +0100
-Subject: [PATCH V2 3/5] ARM: dts: stm32: add sdmmc support for stm32h743
-In-Reply-To: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1519832844-28068-4-git-send-email-ludovic.Barre@st.com>
+Date: Wed, 28 Feb 2018 16:47:19 +0100
+Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
+Message-ID: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds sdmmc support for stm32h743.
-2?SD/SDIO/MMC interfaces (up to 125 MHz)
+This patch serie adds support of stm32 SDMMC controller.
+stm32h7 is the first SoC to use stm32 SDMMC controller
+(previous SoC had pl180 controller).
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- arch/arm/boot/dts/stm32h743.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+The SDMMC features include the following:
+-Full compliance with MultiMediaCard System Specification Version 4.51.
+ Card support for three different databus modes:
+ 1-bit (default), 4-bit and 8-bit.
+-Full compliance with SD memory card specifications version 4.1.
+ SDR104 speed limited to maximum allowed I/O speed, SPI mode and
+ UHS-II mode not supported.
+-Full compliance with SDIO card specification version 4.0.
 
-diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-index bbfcbac..5e85538 100644
---- a/arch/arm/boot/dts/stm32h743.dtsi
-+++ b/arch/arm/boot/dts/stm32h743.dtsi
-@@ -217,6 +217,19 @@
- 			};
- 		};
- 
-+		sdmmc2: sdmmc at 48022400 {
-+			compatible = "st,stm32h7-sdmmc";
-+			reg = <0x48022400 0x400>;
-+			reg-names = "sdmmc";
-+			interrupts = <124>;
-+			clocks = <&rcc SDMMC2_CK>;
-+			resets = <&rcc STM32H7_AHB2_RESET(SDMMC2)>;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			max-frequency = <125000000>;
-+			status = "disabled";
-+		};
-+
- 		mdma1: dma at 52000000 {
- 			compatible = "st,stm32h7-mdma";
- 			reg = <0x52000000 0x1000>;
-@@ -227,6 +240,19 @@
- 			dma-requests = <32>;
- 		};
- 
-+		sdmmc1: sdmmc at 52007000 {
-+			compatible = "st,stm32h7-sdmmc";
-+			reg = <0x52007000 0x1000>;
-+			reg-names = "sdmmc";
-+			interrupts = <49>;
-+			clocks = <&rcc SDMMC1_CK>;
-+			resets = <&rcc STM32H7_AHB3_RESET(SDMMC1)>;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			max-frequency = <125000000>;
-+			status = "disabled";
-+		};
-+
- 		lptimer2: timer at 58002400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+change V2:
+-dt-bindings: properties name
+st,dir-output-high; st,neg-edge; st,use-ckin
+-dt-bindings: node example s/sdmmc@/mmc@/g
+-removes return of enable/disable_imask functions
+-adds dev_warn if clk divisor is too short.
+-replaces overprotection of n_elem by fail of dma_map_sg
+-removes shortcut host->base
+-Use device_property_present
+
+Ludovic Barre (5):
+  dt-bindings: mmc: document the stm32 sdmmc bindings
+  mmc: add stm32 sdmmc controller driver
+  ARM: dts: stm32: add sdmmc support for stm32h743
+  ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
+  ARM: configs: stm32: add mmc and ext2/3/4 support
+
+ .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     |  35 +
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  26 +
+ arch/arm/boot/dts/stm32h743.dtsi                   |  26 +
+ arch/arm/boot/dts/stm32h743i-eval.dts              |  11 +
+ arch/arm/configs/stm32_defconfig                   |   4 +-
+ drivers/mmc/host/Kconfig                           |   8 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/stm32-sdmmc.c                     | 708 +++++++++++++++++++++
+ drivers/mmc/host/stm32-sdmmc.h                     | 220 +++++++
+ 9 files changed, 1038 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+ create mode 100644 drivers/mmc/host/stm32-sdmmc.c
+ create mode 100644 drivers/mmc/host/stm32-sdmmc.h
+
 -- 
 2.7.4
