@@ -1,81 +1,154 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 28 Feb 2018 01:51:59 +0000
-Subject: [linux-sunxi] [PATCH v2 1/4] dt-bindings: pwm: binding allwinner
- sun8i.
-In-Reply-To: <20180225135045.GA14508@arx-s1>
-References: <20180225135045.GA14508@arx-s1>
-Message-ID: <56645bca-9f4a-3191-72d8-32b60ebbc26e@arm.com>
+From: nobuhiro.iwamatsu@cybertrust.co.jp (Nobuhiro Iwamatsu)
+Date: Wed, 28 Feb 2018 10:52:53 +0900
+Subject: [PATCH 1/2] arm: dts: zynq: Add Digilent Zybo Z7 board
+In-Reply-To: <19b6dce3-4ff0-24a6-4777-71ac33a9e7f6@xilinx.com>
+References: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
+ <19b6dce3-4ff0-24a6-4777-71ac33a9e7f6@xilinx.com>
+Message-ID: <20180228105253.13b8f8f7@debmouse>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Michal.
 
-On 25/02/18 13:50, hao_zhang wrote:
-> This patch adds allwinner sun8i pwm binding documents.
+Thanks for your review.
+
+On Tue, 27 Feb 2018 14:02:24 +0100
+Michal Simek <michal.simek@xilinx.com> wrote:
+
+> On 26.2.2018 01:59, Nobuhiro Iwamatsu wrote:
+> > This add a DTS for the Digilent Zybo Z7 board.
+> > This board is the successor board of Zybo, these are almost the
+> > same except for ps-clk-frequency specifications.
+> > 
+> > Signed-off-by: Nobuhiro Iwamatsu
+> > <nobuhiro.iwamatsu@cybertrust.co.jp> ---
+> >  arch/arm/boot/dts/Makefile         |  3 +-
+> >  arch/arm/boot/dts/zynq-zybo-z7.dts | 65
+> > ++++++++++++++++++++++++++++++++++++++ 2 files changed, 67
+> > insertions(+), 1 deletion(-) create mode 100644
+> > arch/arm/boot/dts/zynq-zybo-z7.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index ade7a38543dc..62605d600681 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -1067,7 +1067,8 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+> >  	zynq-zc702.dtb \
+> >  	zynq-zc706.dtb \
+> >  	zynq-zed.dtb \
+> > -	zynq-zybo.dtb
+> > +	zynq-zybo.dtb \
+> > +	zynq-zybo-z7.dtb
+> >  dtb-$(CONFIG_MACH_ARMADA_370) += \
+> >  	armada-370-db.dtb \
+> >  	armada-370-dlink-dns327l.dtb \
+> > diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts
+> > b/arch/arm/boot/dts/zynq-zybo-z7.dts new file mode 100644
+> > index 000000000000..97e487913f8f
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/zynq-zybo-z7.dts
+> > @@ -0,0 +1,65 @@
+> > +/*
+> > + * Digilent Zybo Z7 board DTS
+> > + *
+> > + *  Copyright (C) 2017 Cybertrust Japan Co., Ltd.
+> > + *  Copyright (C) 2017 Nobuhiro Iwamatsu
+> > <nobuhiro.iwamatsu@cybertrust.co.jp>
+> > + *
+> > + *  SPDX-License-Identifier:	GPL-2.0+  
 > 
-> Signed-off-by: hao_zhang <hao5781286@gmail.com>
-> ---
->  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> This should be the first line with starting //
+
+OK, I'll fix this.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> new file mode 100644
-> index 0000000..e8c48be
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> @@ -0,0 +1,18 @@
-> +Allwinner sun8i R40/V40/T3 SoC PWM controller
-> +
-> +Required properties:
-> +  - compatible: should be one of:
-> +    - "allwinner,sun8i-r40-pwm"
-> +  - reg: physical base address and length of the controller's registers
-> +  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-> +    the cells format.
-> +  - clocks: From common clock binding, handle to the parent clock.
+> > + */
+> > +/dts-v1/;
+> > +#include "zynq-7000.dtsi"
+> > +
+> > +/ {
+> > +	model = "Zynq ZYBO Z7 Development Board";
+> > +	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";  
+> 
+> Please based it on this series:
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1618031.html
+> or https://github.com/Xilinx/linux-xlnx/tree/zynq/dt
+> 
 
-The manual tells me that there are two possible clock sources (24 MHz
-OSC and APB1), with actually two bits for encoding the mux source,
-allowing for two more potential clock sources.
-So can we extend this description to provide up to four clocks, with a
-clock-names property telling the driver how this maps to the mux value?
-Either we use clock names matching the clocks mentioned in the manual:
-	clocks = <&osc24M>, <&ccu CLK_APB1>;
-	clock-names = "osc", "apb1";
-or we encode the mux values in the clock-names:
-	clock-names = "mux-0", "mux-1";
-Don't know what's more widely used in those cases, the latter seems to
-be more future-proof.
-Each channel pair can be configured to use one of the two (or four)
-clocks, so we can be more flexible with multiple clocks.
+OK. I will rebase dt branch.
 
+> And you should record digilent,zynq-zybo-z7 compatible string.
+> 
+> I have not a problem if you want to extend xilinx.txt file with it.
+> Documentation/devicetree/bindings/arm/xilinx.txt
+> 
 
-Also, can you please add an "interrupts" property here? You don't need
-to use it in the driver right now, but since there are multiple
-registers dealing with the interrupts we should have it in the binding.
-If in need, we can then add support later.
+I see. I'll add this into next patch.
 
-> +
-> +Example:
-> +
-> +pwm: pwm at 1c23400 {
-> +	     compatible = "allwinner,sun8i-pwm";
+> 
+> 
+> > +
+> > +	aliases {
+> > +		ethernet0 = &gem0;
+> > +		serial0 = &uart1;
+> > +	};
+> > +
+> > +	memory {  
+> 
+> this should be memory at 0
 
-That should match what you wrote above: allwinner,sun8i-r40-pwm.
-And I believe this is the right compatible name, since there are
-numerous other sun8i SoCs with the sun4i PWM IP, so just sun8i-pwm would
-be misleading and confusing.
+My bad. I will fix it. Thanks!
 
-> +	     reg = <0x01c23400 0x154>;
-> +	     clocks = <&osc24M>;
+> 
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x20000000>;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "";
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> > +
+> > +	usb_phy0: phy0 {
+> > +		#phy-cells = <0>;
+> > +		compatible = "usb-nop-xceiv";
+> > +		reset-gpios = <&gpio0 46 1>;
+> > +	};
+> > +};
+> > +
+> > +&clkc {
+> > +	ps-clk-frequency = <33333333>;
+> > +};
+> > +
+> > +&gem0 {
+> > +	status = "okay";
+> > +	phy-mode = "rgmii-id";
+> > +	phy-handle = <&ethernet_phy>;
+> > +
+> > +	ethernet_phy: ethernet-phy at 0 {
+> > +		reg = <0>;
+> > +		device_type = "ethernet-phy";
+> > +	};
+> > +};
+> > +
+> > +&sdhci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&uart1 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usb0 {
+> > +	status = "okay";
+> > +	dr_mode = "host";
+> > +	usb-phy = <&usb_phy0>;
+> > +};
+> >   
+> 
+> Thanks,
+> Michal
+> 
 
-This should then be amended to what I sketched above.
-
-> +	     #pwm-cells = <3>;
-
-And then here please add:
-	     interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-
-Cheers,
-Andre
+Best regards,
+  Nobuhiro
