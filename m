@@ -1,78 +1,58 @@
 From: samuel@sholland.org (Samuel Holland)
-Date: Wed, 28 Feb 2018 11:52:05 -0600
-Subject: [PATCH 1/3] dt-bindings: Add a binding for the sunxi message box
-In-Reply-To: <20180228082843.fga47gfrv2g5kmiz@flea>
+Date: Wed, 28 Feb 2018 11:51:59 -0600
+Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
+In-Reply-To: <CABb+yY2uueAK9kzXzU9DT2a4NtV3kK2dc_wtyFWTBn8=Z6Vi7Q@mail.gmail.com>
 References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228022714.30068-2-samuel@sholland.org>
- <20180228082843.fga47gfrv2g5kmiz@flea>
-Message-ID: <ce95b875-8503-17e8-06ef-86e4b4b434e5@sholland.org>
+ <20180228022714.30068-4-samuel@sholland.org>
+ <CABb+yY2uueAK9kzXzU9DT2a4NtV3kK2dc_wtyFWTBn8=Z6Vi7Q@mail.gmail.com>
+Message-ID: <d9e14058-6ffb-e54a-1565-f228342ee1f0@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 02/28/18 02:28, Maxime Ripard wrote:
-> On Tue, Feb 27, 2018 at 08:27:12PM -0600, Samuel Holland wrote:
->> This mailbox hardware is present in several Allwinner sun8i and sun50i
->> SoCs. Add a device tree binding for it.
->>
->> Signed-off-by: Samuel Holland <samuel@sholland.org>
->> ---
->>  .../devicetree/bindings/mailbox/sunxi-msgbox.txt   | 40 ++++++++++++++++++++++
->>  1 file changed, 40 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
->> new file mode 100644
->> index 000000000000..3b3ed7f870a0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
->> @@ -0,0 +1,40 @@
->> +Allwinner sunxi Message Box
->> +===========================
->> +
->> +The hardware message box on sunxi SoCs is a two-user mailbox controller
->> +containing 8 unidirectional FIFOs bonded into 4 bidirectional mailbox channels.
->> +An interrupt is raised for received messages, but software must poll to know
->> +when a transmitted message has been acknowledged by the remote user.
->> +
->> +Refer to ./mailbox.txt for generic information about mailbox device-tree
->> +bindings.
->> +
->> +Mailbox Device Node:
->> +====================
->> +
->> +Required properties:
->> +--------------------
->> +- compatible:		Must be "allwinner,sunxi-msgbox".
+On 02/28/18 03:16, Jassi Brar wrote:
+> On Wed, Feb 28, 2018 at 7:57 AM, Samuel Holland <samuel@sholland.org> wrote:
+> ....
 > 
-> The IP change quite often in the Allwinner SoCs, so it would be better
-> to use a more specific compatible there. IIRC that IP was introduced
-> with the A31, so what about sun6i-a31-msgbox?
+>> +/*
+>> + * The message box hardware provides 8 unidirectional channels. As the mailbox
+>> + * framework expects them to be bidirectional
+>>
+> That is incorrect. Mailbox framework does not require a channel to be
+> TX and RX capable.
 
-Ok, I will do this for v2, following Andre's suggestion. (I knew the AR100 was
-introduced with the A31, but I couldn't find any reference to the msgbox in the
-A31 manual).
+Sorry, it would be more accurate to say that the intended mailbox _client_
+expects the channels to be bidirectional.
 
->> +- reg:			Contains the mailbox register address range (base
->> +			address and length).
->> +- clocks:		phandle for the clock controller and specifier.
->> +- clock-names:		Must be "bus".
->> +- resets:		phandle for the reset controller and specifier.
->> +- reset-names:		Must be "bus".
->> +- interrupts:		Contains interrupt information for the mailbox.
->> +- #mbox-cells		Must be 2 - the indexes of the transmit and receive
->> +			channels, respectively.
-> 
-> That would prevent any unidirectional communication, wouldn't it?
-> Other mailboxes driver seem to have two mbox channels, one for each
-> direction, which also seem to mimic our DMA bindings (where we are in
-> pretty much the same situation).
+> You should expose each channel as per its physical capability, let the
+> client configure it for direction (if its bidirectional) and acquire
+> separate channels for RX and TX if it needs to.
 
-I've responded to Jassi's comment about the same issue on patch 3.
+Is there any way for the mailbox framework to inform the client that a channel
+is uni/bidirectional? Or if the channel supports RX/TX specifically? I couldn't
+find any.
 
-> Thanks!
-> Maxime
+It looks like all of the clients assume one case or the other, based on the
+hardware they were initially designed to support. For example arm_scpi expects
+one channel per client, while ti_sci and st_remoteproc expect two separate RX
+and TX channels per client.
+
+Since there's no API for the client to know the hardware properties, modifying
+arm_scpi to support unidirectional mailbox channels would break support for all
+existing bidirectional mailboxes.
+
+To expose the physical channels individually, there would need to be an API to:
+a) Determine if a mailbox channel supports unidirectional or bidirectional
+   operation.
+b) If a channel is unidirectional, determine which direction(s) it supports.
+c) If a unidirectional channel supports both directions, configure which
+   direction it should run in.
+
+Since that API doesn't currently exist, I wrote the driver to match what the
+intended client expected (as all other mailbox controller drivers currently do).
+
+> Cheers!
 
 Regards,
 Samuel
