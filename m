@@ -1,51 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 28 Feb 2018 20:44:30 +0100
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20180228194429.GD22932@mithrandir>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 28 Feb 2018 13:56:41 -0600
+Subject: [PATCH] PM / core: move device and its children to end of dpm list
+In-Reply-To: <1519843555-982-1-git-send-email-fkan@apm.com>
+References: <1519843555-982-1-git-send-email-fkan@apm.com>
+Message-ID: <20180228195641.GI127842@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
-> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
-> were adapted to this change.
+On Wed, Feb 28, 2018 at 10:45:55AM -0800, Feng Kan wrote:
+> When bridge and its endpoint is enumated the devices are added to the
+> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> This causes the bridge to be moved to the end of the dpm list when deferred
+> probe kicks in. The order of the dpm list for bridge and endpoint is
+> reversed.
 > 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
->  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->  drivers/bus/ts-nbus.c                |  2 +-
->  drivers/clk/clk-pwm.c                |  3 ++-
->  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->  drivers/hwmon/pwm-fan.c              |  2 +-
->  drivers/input/misc/max77693-haptic.c |  2 +-
->  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->  drivers/leds/leds-pwm.c              |  5 ++++-
->  drivers/media/rc/ir-rx51.c           |  5 ++++-
->  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->  include/linux/pwm.h                  |  6 ++++--
->  16 files changed, 70 insertions(+), 21 deletions(-)
+> Add reordering code to re-position the bridge and its children so the order
+> for suspend and resume is not altered.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Toan Le <toanle@apm.com>
 
-I don't think it makes sense to leak mode support into the legacy API.
-The pwm_config() function is considered legacy and should eventually go
-away. As such it doesn't make sense to integrate a new feature such as
-PWM modes into it. All users of pwm_config() assume normal mode, and
-that's what pwm_config() should provide.
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 9d32000..1ec12d5 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -1272,6 +1272,9 @@ extern void devm_device_remove_group(struct device *dev,
+>  /* debugging and troubleshooting/diagnostic helpers. */
+>  extern const char *dev_driver_string(const struct device *dev);
+>  
+> +/* reorder device and its children to end of dpm list */
+> +void device_pm_reorder(struct device *dev);
 
-Anyone that needs something other than normal mode should use the new
-atomic PWM API.
+Do you expect drivers to use this, or only the driver core in
+drivers/base/?  There is a drivers/base/base.h; maybe this would fit
+there rather than being exposed to the rest of the kernel via
+include/linux/device.h?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180228/ee4ccbc7/attachment.sig>
+>  /* Device links interface. */
+>  struct device_link *device_link_add(struct device *consumer,
+>  				    struct device *supplier, u32 flags);
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
