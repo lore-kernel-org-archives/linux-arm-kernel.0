@@ -1,105 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 Feb 2018 17:48:26 +0000
-Subject: [PATCH v5] arm64: Add support for new control bits CTR_EL0.DIC
- and CTR_EL0.IDC
-In-Reply-To: <1519474193-25973-1-git-send-email-shankerd@codeaurora.org>
-References: <1519474193-25973-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20180228174826.dgfxu75iqq2y3qsr@lakrids.cambridge.arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 28 Feb 2018 23:18:56 +0530
+Subject: [PATCH 00/10] Add Actions Semi S900 pinctrl and gpio support
+Message-ID: <20180228174906.22721-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
+Pinctrl and gpio subsystems share the common set of register range but
+implemented as individual drivers for making it less complex.
 
-On Sat, Feb 24, 2018 at 06:09:53AM -0600, Shanker Donthineni wrote:
-> +config ARM64_SKIP_CACHE_POU
-> +	bool "Enable support to skip cache POU operations"
+Pinmux functions are only accessible for pin groups while pinconf
+parameters are available for both pin groups and individual pins.
 
-Nit: s/POU/PoU/ in text
+gpio-line-names has been added for the Bubblegum-96 board matching the
+96Boards CE specification v1.0.
 
-> +	default y
-> +	help
-> +	  Explicit point of unification cache operations can be eliminated
-> +	  in software if the hardware handles transparently. The new bits in
-> +	  CTR_EL0, CTR_EL0.DIC and CTR_EL0.IDC indicates the hardware
-> +	  capabilities of ICache and DCache POU requirements.
+Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
 
-Likewise, s/POU/PoU/.
+This patchset depends on the clock driver which is still under review:
+https://lkml.org/lkml/2018/2/9/831
 
-> +
-> +	  Selecting this feature will allow the kernel to optimize the POU
-> +	  cache maintaince operations where it requires 'D{I}C C{I}VAU'
+There is also S500 pinctrl and gpio driver developed by Andreas Farber
+independently to this patchset.
+https://github.com/afaerber/linux/commits/bg96-next
 
-The instruction expansion here is a bit odd. It'd probably be best to
-just say:
-
-  Selecting this feature will allow the kernel to optimize cache
-  maintenance to the PoU.
-
-[...]
-
-> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-> index ea9bb4e..e22178b 100644
-> --- a/arch/arm64/include/asm/cache.h
-> +++ b/arch/arm64/include/asm/cache.h
-> @@ -20,8 +20,13 @@
->  
->  #define CTR_L1IP_SHIFT		14
->  #define CTR_L1IP_MASK		3
-> +#define CTR_DMLINE_SHIFT	16
-> +#define CTR_ERG_SHIFT		20
->  #define CTR_CWG_SHIFT		24
->  #define CTR_CWG_MASK		15
-> +#define CTR_IDC_SHIFT		28
-> +#define CTR_DIC_SHIFT		29
-> +#define CTR_B31_SHIFT		31
-
-I think the CTR_B31_SHIFT define is gratuitous...
-
-[...]
-
->  static const struct arm64_ftr_bits ftr_ctr[] = {
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RES1 */
-
-... and we can/should leave this line as-is.
-
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 29, 1, 1),	/* DIC */
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 28, 1, 1),	/* IDC */
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 20, 4, 0),	/* ERG */
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, CTR_B31_SHIFT, 1, 1),         /* RES1 */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),    /* DIC */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 1),    /* IDC */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_CWG_SHIFT, 4, 0),   /* CWG */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_ERG_SHIFT, 4, 0),   /* ERG */
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DMLINE_SHIFT, 4, 1), /* DminLine */
-
-... though the other changes are fine by me.
-
-[...]
-
-
-> +static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
-> +			  int __unused)
-> +{
-> +	return (read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_IDC_SHIFT));
-> +}
-
-This can be:
-
-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_IDC_SHIFT);
-
-> +static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
-> +			  int __unused)
-> +{
-> +	return (read_sanitised_ftr_reg(SYS_CTR_EL0) & (1UL << CTR_DIC_SHIFT));
-> +}
-
-Likewise:
-
-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
-
-Otherwise, this looks good to me.
+If this patchseries seems to be good enough to add base OWL pinctrl and
+gpio support. Then, we may decide on adding S500 support on top of this later
+by reusing the pinctrl definitions from Andreas.
 
 Thanks,
-Mark.
+Mani
+
+Changes in v3:
+
+* Simplified owl_gpio_set_reg() with _relaxed functions
+* Added interrupt controller properties to gpio node bindings as suggested
+  by Rob
+* Minor code cleanups
+
+Changes in v2:
+
+* Implemented each GPIO bank as its own gpio-controller
+* Added gpio-ranges property
+* Modified pin group to follow pad names instead of register names
+* Incorporated review comments from Andy
+* Incorporated review comments from Andreas
+* Fixed the MODULE_LICENSE with respect to SPDX tag
+* Added Reviewed by tag from Rob for pinctrl binding
+
+Manivannan Sadhasivam (10):
+  dt-bindings: pinctrl: Add bindings for Actions S900 SoC
+  arm64: dts: actions: Add pinctrl node for S900
+  arm64: actions: Enable PINCTRL in platforms Kconfig
+  pinctrl: actions: Add Actions S900 pinctrl driver
+  dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
+  arm64: dts: actions: Add S900 gpio nodes
+  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+  gpio: Add gpio driver for Actions OWL S900 SoC
+  MAINTAINERS: Add reviewer for ACTIONS platforms
+  MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
+
+ .../devicetree/bindings/gpio/actions,owl-gpio.txt  |   95 +
+ .../bindings/pinctrl/actions,s900-pinctrl.txt      |  178 ++
+ MAINTAINERS                                        |    5 +
+ arch/arm64/Kconfig.platforms                       |    1 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  201 ++
+ arch/arm64/boot/dts/actions/s900.dtsi              |   54 +
+ drivers/gpio/Kconfig                               |    8 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-owl.c                            |  218 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/actions/Kconfig                    |   12 +
+ drivers/pinctrl/actions/Makefile                   |    2 +
+ drivers/pinctrl/actions/pinctrl-owl.c              |  571 +++++
+ drivers/pinctrl/actions/pinctrl-owl.h              |  142 ++
+ drivers/pinctrl/actions/pinctrl-s900.c             | 2505 ++++++++++++++++++++
+ 16 files changed, 3995 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ create mode 100644 drivers/gpio/gpio-owl.c
+ create mode 100644 drivers/pinctrl/actions/Kconfig
+ create mode 100644 drivers/pinctrl/actions/Makefile
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.c
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.h
+ create mode 100644 drivers/pinctrl/actions/pinctrl-s900.c
+
+-- 
+2.14.1
