@@ -1,130 +1,139 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 28 Feb 2018 17:40:22 +0000
-Subject: [PATCH v6 01/26] ARM: shmobile: Add watchdog support
-In-Reply-To: <CAMuHMdUx3A_8MeZmrwiBRqUS0oGjwrg13fy1QMsA2SUw+dR0Hg@mail.gmail.com>
-References: <CAMuHMdUx3A_8MeZmrwiBRqUS0oGjwrg13fy1QMsA2SUw+dR0Hg@mail.gmail.com>
-Message-ID: <1519839622-6109-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Feb 2018 17:45:14 +0000
+Subject: [PATCH] arm64: kdump: fix interrupt handling done during
+ machine_crash_shutdown
+In-Reply-To: <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
+ <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+Message-ID: <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
-boot CPUs run a routine designed to bring up SMP and deal with hot plug.
-The value contained in the SBAR registers is not initialized by a WDT
-triggered reset, which means that after a WDT triggered reset we jump
-to the SMP bring up routine, preventing the system from executing the
-bootrom code.
+On 28/02/18 17:16, Mark Rutland wrote:
+> [Adding MarcZ]
+> 
+> On Wed, Feb 28, 2018 at 06:01:00PM +0100, Grzegorz Jaszczyk wrote:
+>> Hitherto during machine_kexec_mask_interrupts there was an attempt to
+>> remove active state using irq_set_irqchip_state() routine and only if it
+>> failed, the attempt to EOI the interrupt was made. Nevertheless relaying
+>> on return value from irq_set_irqchip_state inside
+>> machine_kexec_mask_interrupts is incorrect - it only returns the status
+>> of the routine but doesn't provide information if the interrupt was
+>> deactivated correctly or not. 
+> 
+> This doesn't sound right. The return value of irq_set_irqchip_state() is
+> certainly supposed to indicate that it did what it was asked to (i.e.
+> correctly (de)activated the interrupt).
+> 
+> IIUC, you're saying that there's a problem whereby:
+> 
+> (a) irq_set_irqchip_state() returns succesfully, but:
+> 
+> (b) irq_set_irqchip_state() does not alter the interrupt state to that
+>     requested.
+> 
+> ... which sounds like a bug. 
+> 
+> When does this happen, exactly?
+> 
+> Thanks,
+> Mark.
+> 
+>> Therefore the irq_eoi wasn't call even if the interrupt remained
+>> active.
+>>
+>> To determine the sate correctly the irq_get_irqchip_state() could be
+>> used but according to the ARM Generic Interrupt Controller Architecture
+>> Spec, non-secure reading from GICD_ISACTIVERn/GICD_ICACTIVERn can be not
+>> permitted (depending on NS_access setting of Non-secure Access Control
+>> Registers, a.k.a. GICD_NSACRn). What is more interesting GICD_NSACRn
+>> is optional Secure register.
 
-The purpose of this patch is to jump to the bootrom code in case of a
-WDT triggered reset, and keep the SMP functionality untouched.
-In order to tell if the code had been called due to the WDT overflowing
-we are testing WOVF from register RWTCSRA.
+All the Linux interrupts are either non-secure, or accessible using
+non-secure accessors. I'm afraid you're misunderstanding a thing or two
+about the architecture.
 
-The new function shmobile_boot_vector_gen2 isn't replacing
-shmobile_boot_vector for backward compatibility reasons. The kernel
-will install the best option (either shmobile_boot_vector or
-shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree,
-according to the amount of memory available.
+>>
+>> Moreover de-activating the interrupt via GICD_ISACTIVERn register
+>> (regardless of the possibility of checking status or not) seems to not
+>> do the job, when the GIC Distributor is configured to forward the
+>> interrupts to the CPU interfaces.
 
-Since shmobile_boot_vector has become bigger, "reg" property of nodes
-compatible with "renesas,smp-sram" now need to be set to a value
-greater or equal to "<0 0x60>".
+Then you seem to have really buggy HW.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v5->v6:
-* taken ifdefs out as per Geert's suggestion.
+>>
+>> Because of all above the attempt to deactivate interrupts via
+>> irq_set_irqchip_state() is removed in this patch. Instead the irq_eoi is
+>> called whenever the interrupt is in progress(irqd_irq_inprogress).
+>>
+>> Before this patch the kdump triggered from interrupt context worked
+>> correctly by accident when the GIC was configured with
+>> GIC_CPU_CTRL_EOImodeNS == 1 (supports_deactivate == true). In mentioned
+>> mode GIC_CPU_EOI has priority drop functionality only and
+>> GIC_CPU_DEACTIVATE is used for interrupt deactivation. Also the
+>> gic_handle_irq behaviour is a bit different in mentioned mode and
+>> performs write to the GIC_CPU_EOI which causes the priority drop to the
+>> idle priority. So even if the irq_eoi wasn't called during
+>> machine_kexec_mask_interrupts, the interrupts of the crashdump kernel
+>> was handled due to interrupt preemption (since the priority of still
+>> active interrupt was dropped to idle priority).
+>>
+>> Nevertheless when the kdump was triggered from interrupt context while
+>> the GIC was configured to work in GIC_CPU_CTRL_EOImodeNS == 0, the
+>> crashdump kernel hang in early stage due to lack of timer interrupt
+>> arrival.
+>>
+>> After this fix the kdump behaves correctly when triggered from interrupt
+>> context independently of GIC_CPU_CTRL_EOImodeNS configuration.
+>>
+>> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+>> ---
+>>  arch/arm64/kernel/machine_kexec.c | 10 +---------
+>>  1 file changed, 1 insertion(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>> index f76ea92..30ad183 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -220,20 +220,12 @@ static void machine_kexec_mask_interrupts(void)
+>>  
+>>  	for_each_irq_desc(i, desc) {
+>>  		struct irq_chip *chip;
+>> -		int ret;
+>>  
+>>  		chip = irq_desc_get_chip(desc);
+>>  		if (!chip)
+>>  			continue;
+>>  
+>> -		/*
+>> -		 * First try to remove the active state. If this
+>> -		 * fails, try to EOI the interrupt.
+>> -		 */
+>> -		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
+>> -
+>> -		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
+>> -		    chip->irq_eoi)
+>> +		if (irqd_irq_inprogress(&desc->irq_data) && chip->irq_eoi)
 
- arch/arm/mach-shmobile/common.h  |  4 +++
- arch/arm/mach-shmobile/headsmp.S | 53 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+This really doesn't make any sense. Either you've successfully
+deactivated the interrupt, or you haven't. Doing both is a terrible
+violation of the GIC architecture, don't do that. There is also 0
+guarantee that the interrupt was active on the CPU you're currently
+running. If you activated it on another CPU, good luck.
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index a8fa4f7..43c1ac69 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -7,6 +7,10 @@ extern void shmobile_init_delay(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_size;
-+extern void shmobile_boot_vector_gen2(void);
-+extern unsigned long shmobile_boot_fn_gen2;
-+extern unsigned long shmobile_boot_cpu_gen2;
-+extern unsigned long shmobile_boot_size_gen2;
- extern void shmobile_smp_boot(void);
- extern void shmobile_smp_sleep(void);
- extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 32e0bf6..2ece67c 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -16,6 +16,11 @@
- #include <asm/assembler.h>
- #include <asm/memory.h>
- 
-+#define SCTLR_MMU	0x01
-+#define BOOTROM_ADDRESS	0xE6340000
-+#define RWTCSRA_ADDRESS 0xE6020004
-+#define RWTCSRA_WOVF	0x10
-+
- /*
-  * Reset vector for secondary CPUs.
-  * This will be mapped at address 0 by SBAR register.
-@@ -38,6 +43,54 @@ shmobile_boot_size:
- 	.long	. - shmobile_boot_vector
- 
- /*
-+ * Reset vector for R-Car Gen2 and RZ/G1 secondary CPUs.
-+ * This will be mapped at address 0 by SBAR register.
-+ */
-+ENTRY(shmobile_boot_vector_gen2)
-+	mrc	p15, 0, r0, c0, c0, 5		@ r0 = MPIDR
-+	ldr	r1, shmobile_boot_cpu_gen2
-+	cmp	r0, r1
-+	bne	shmobile_smp_continue_gen2
-+
-+	mrc	p15, 0, r1, c1, c0, 0		@ r1 = SCTLR
-+	and	r0, r1, #SCTLR_MMU
-+	cmp	r0, #SCTLR_MMU
-+	beq	shmobile_smp_continue_gen2
-+
-+	ldr	r0, rwtcsra
-+	mov	r1, #0
-+	ldrb	r1, [r0]
-+	and	r0, r1, #RWTCSRA_WOVF
-+	cmp	r0, #RWTCSRA_WOVF
-+	bne	shmobile_smp_continue_gen2
-+
-+	ldr	r0, bootrom
-+	bx	r0
-+
-+shmobile_smp_continue_gen2:
-+	ldr     r1, shmobile_boot_fn_gen2
-+	bx	r1
-+
-+ENDPROC(shmobile_boot_vector_gen2)
-+
-+	.align	4
-+rwtcsra:
-+	.word	RWTCSRA_ADDRESS
-+bootrom:
-+	.word	BOOTROM_ADDRESS
-+	.globl	shmobile_boot_cpu_gen2
-+shmobile_boot_cpu_gen2:
-+	.word	0x00000000
-+
-+	.align	2
-+	.globl	shmobile_boot_fn_gen2
-+shmobile_boot_fn_gen2:
-+	.space	4
-+	.globl	shmobile_boot_size_gen2
-+shmobile_boot_size_gen2:
-+	.long	. - shmobile_boot_vector_gen2
-+
-+/*
-  * Per-CPU SMP boot function/argument selection code based on MPIDR
-  */
- 
+To echo to Mark's concerns, you don't explain the root cause: Why is
+irq_set_irqchip_state silently failing? With what IRQ type? On what GIC
+implementation?
+
+>>  			chip->irq_eoi(&desc->irq_data);
+>>  
+>>  		if (chip->irq_mask)
+
+As it stands, this patch breaks more things than it should. I'd suggest
+you start from the beginning and explain the issue you're facing.
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
