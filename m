@@ -1,61 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 28 Feb 2018 15:24:17 -0600
-Subject: [PATCH V2] PCI/ASPM: Suppress common clock mode setting failure
-In-Reply-To: <1516651924-21820-1-git-send-email-okaya@codeaurora.org>
-References: <1516651924-21820-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180228212417.GM127842@bhelgaas-glaptop.roam.corp.google.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 28 Feb 2018 15:40:40 -0600
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+Message-ID: <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 03:12:01PM -0500, Sinan Kaya wrote:
-> Code is emitting warnings when it tries to set the common clock mode for
-> ASPM and ASPM is already configured to common clock mode by the UEFI BIOS.
-> Let's bail out silently in such a case.
+On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
 > 
-> pci 0004:00:00.0: ASPM: Could not configure common clock
+> I think I found the reason for the strange crashes we were
+> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
+> me in the right direction.
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> The mdio driver fails to probe with v7 due to the supplied clock rate
+> being wrong. Before failing we register the emac clock with
+> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
+> reference count of the clock, but we never actually increased it in
+> the first place in the line above. The core clock code then destroys
+> the associated clk_core structure. When the next user comes around (in
+> our case the clk debug functions) the system crashes.
+> 
+> I believe there to be two issues: one is with v7 - we need to increase
+> the clock reference count in davinci_psc_genpd_attach_dev().
+> 
+> Second is the error path in the clock framework - we should remove the
+> destroyed clk_core from the debug list, which is not being done now.
+> 
+> Why we even need to track the refcount of clk_core is a mistery for me
+> though. Stephen, Mike?
+> 
+> Best regards,
+> Bartosz Golaszewski
 
-Applied to pci/aspm for v4.17, thanks!
+Great find. I figured it had to be something like this, but I wasn't
+able to reproduce the problem yet.
 
-> ---
->  drivers/pci/pcie/aspm.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-> index 9783e10..913b90d 100644
-> --- a/drivers/pci/pcie/aspm.c
-> +++ b/drivers/pci/pcie/aspm.c
-> @@ -240,6 +240,24 @@ static void pcie_aspm_configure_common_clock(struct pcie_link_state *link)
->  	if (!(reg16 & PCI_EXP_LNKSTA_SLC))
->  		same_clock = 0;
->  
-> +	/* Port might be already in common clock mode */
-> +	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &reg16);
-> +	if (same_clock && (reg16 & PCI_EXP_LNKCTL_CCC)) {
-> +		bool consistent = true;
-> +
-> +		list_for_each_entry(child, &linkbus->devices, bus_list) {
-> +			pcie_capability_read_word(child, PCI_EXP_LNKCTL,
-> +						  &reg16);
-> +			if (!(reg16 & PCI_EXP_LNKCTL_CCC)) {
-> +				consistent = false;
-> +				break;
-> +			}
-> +		}
-> +		if (consistent)
-> +			return;
-> +		dev_warn(&parent->dev, "ASPM: current common clock configuration is broken, reconfiguring\n");
-> +	}
-> +
->  	/* Configure downstream component, all functions */
->  	list_for_each_entry(child, &linkbus->devices, bus_list) {
->  		pcie_capability_read_word(child, PCI_EXP_LNKCTL, &reg16);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I suppose it is time to spin up a v8 with some fixes.
