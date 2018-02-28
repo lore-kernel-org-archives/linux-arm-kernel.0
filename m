@@ -1,158 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Feb 2018 13:33:48 +0000
-Subject: [PATCH v3] usb: host: ehci-platform: add support for optional
- external vbus supply
-In-Reply-To: <1519393611-31367-1-git-send-email-amelie.delaunay@st.com>
-References: <1519393611-31367-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <dc412433-5a96-ea86-6d97-13877fe4806c@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 28 Feb 2018 14:42:18 +0100
+Subject: [PATCH v2 0/4] Enable DMA on STM32 MCU based on cortex-M7
+In-Reply-To: <c6e0906d-a181-720c-d2ef-73e1d517232a@arm.com>
+References: <1519823458-27734-1-git-send-email-alexandre.torgue@st.com>
+ <c6e0906d-a181-720c-d2ef-73e1d517232a@arm.com>
+Message-ID: <c4ed57ed-13ae-2e85-26f8-5dd8c5b9e3a8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amelie,
+Hi Vlad
 
-Just a couple of drive-by coding style comments...
-
-On 23/02/18 13:46, Amelie Delaunay wrote:
-> On some boards, especially when vbus supply requires large current,
-> and the charge pump on the PHY isn't enough, an external vbus power switch
-> may be used.
-> Add support for optional external vbus supply per port in ehci-platform.
+On 02/28/2018 02:22 PM, Vladimir Murzin wrote:
+> On 28/02/18 13:10, Alexandre Torgue wrote:
+>> This series enable DMA on several STM32 MCU based on cortex-M7.
+>> To make it possible, a dedicated dma pool memory area has to be
+>> created. This patchset activate also ARM_MPU flag which will configure
+>> MPU (Memory Protection Unit) according to devicetree information (mem
+>> and dma-pool). Note that on cortex-M7 DMA has to use a NO cache-able
+>> memory region.
+>>
+>>
+>> v2:
+>> -select ARM_MPU in mach-stm32 Kconfig instead of add it in stm32 defconfig
+>> -Remove XIP configuration from stm32_defconfig: ARM_MPU flag imposes XIP image
+>> to be aligned on 1MB. It is currently not the case. I had choice to either
+>> modify current XIP start address to be aligned on 1MB or to remove global
+>> configuration. I make choice to remove XIP configuration. Indeed, SD card
+>> support has been recently added for most of STM32 MCU boards (except for
+>> stm32f429-disco). As kernel is growing up for stm32 it will be more and more
+>> difficult to flash it in embeded flash (max size: 2MB).
 > 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> It is sad we are loosing XIP configuration - it used to uncover some bugs
+> in a past. Probably, you might consider to have stm32 tiny (+xip) defconfig
+> for those who do not want/need all-in-one kernel.
+
+I agree and I don't want to loose XIP configuration. I just want that 
+default stm32_defconfig covers the main MCU boards and the maximum 
+IPs/driver for those boards. SD cards will be the boot support that will 
+be supported in buildroot (except for stm32f429-disco).
+
+But I agree, I could maybe use a frag to have a tiny configuration for 
+stm32 to be able to flash xip in embeded flash and provide a "basic" 
+support (kernel boot + console).
+
+
+Regards
+Alex
 > 
-> ---
-> Changes in v3:
->   * Address Felipe Balbi comments: reduce indentation in
->     ehci_platform_port_power.
->   * Address Roger Quadros and Alan Stern comments: platforms can have one
->     external vbus supply per port, so add support to get as many optional
->     regulator as implemented ports on the host controller.
+> Cheers
+> Vladimir
 > 
-> Changes in v2:
->   * Address Roger Quadros comments: move regulator_enable/disable from
->     ehci_platform_power_on/off to ehci_platform_port_power.
-> ---
->   Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
->   drivers/usb/host/ehci-platform.c                   | 52 +++++++++++++++++++++-
->   2 files changed, 52 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index 3efde12..cd576db 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -19,6 +19,7 @@ Optional properties:
->    - phys : phandle + phy specifier pair
->    - phy-names : "usb"
->    - resets : phandle + reset specifier pair
-> + - portN_vbus-supply : phandle of regulator supplying vbus for port N
->   
->   Example (Sequoia 440EPx):
->       ehci at e0000300 {
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index b065a96..8e9f201 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -29,6 +29,7 @@
->   #include <linux/of.h>
->   #include <linux/phy/phy.h>
->   #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->   #include <linux/reset.h>
->   #include <linux/usb.h>
->   #include <linux/usb/hcd.h>
-> @@ -46,6 +47,7 @@ struct ehci_platform_priv {
->   	struct reset_control *rsts;
->   	struct phy **phys;
->   	int num_phys;
-> +	struct regulator **vbus_supplies;
->   	bool reset_on_resume;
->   };
->   
-> @@ -56,7 +58,8 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->   	struct platform_device *pdev = to_platform_device(hcd->self.controller);
->   	struct usb_ehci_pdata *pdata = dev_get_platdata(&pdev->dev);
->   	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> -	int retval;
-> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
-> +	int portnum, n_ports, retval;
->   
->   	ehci->has_synopsys_hc_bug = pdata->has_synopsys_hc_bug;
->   
-> @@ -71,11 +74,57 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->   	if (retval)
->   		return retval;
->   
-> +	n_ports = HCS_N_PORTS(ehci->hcs_params);
-> +	priv->vbus_supplies = devm_kcalloc(&pdev->dev, n_ports,
-> +					   sizeof(struct regulator *),
-
-Using "sizeof(*priv->vbus_supplies)" here will prevent people sending 
-annoying cleanup patches later.
-
-> +					   GFP_KERNEL);
-> +	if (!priv->vbus_supplies)
-> +		return -ENOMEM;
-> +
-> +	for (portnum = 0; portnum < n_ports; portnum++) {
-> +		struct regulator *vbus_supply;
-> +		char id[20];
-> +
-> +		sprintf(id, "port%d_vbus", portnum);
-> +
-> +		vbus_supply = devm_regulator_get_optional(&pdev->dev, id);
-> +		if (IS_ERR(vbus_supply)) {
-> +			retval = PTR_ERR(vbus_supply);
-> +			if (retval == -ENODEV)
-> +				priv->vbus_supplies[portnum] = NULL;
-
-The array element here hasn't yet been assigned to since kcalloc() 
-initially zeroed it, so this is entirely redundant - you can simply make 
-the comparison a "!=" and remove the "else" case.
-
-Robin.
-
-> +			else
-> +				return retval;
-> +		} else {
-> +			priv->vbus_supplies[portnum] = vbus_supply;
-> +		}
-> +	}
-> +
->   	if (pdata->no_io_watchdog)
->   		ehci->need_io_watchdog = 0;
->   	return 0;
->   }
->   
-> +static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
-> +				    bool enable)
-> +{
-> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
-> +	int ret;
-> +
-> +	if (!priv->vbus_supplies[portnum])
-> +		return 0;
-> +
-> +	if (enable)
-> +		ret = regulator_enable(priv->vbus_supplies[portnum]);
-> +	else
-> +		ret = regulator_disable(priv->vbus_supplies[portnum]);
-> +	if (ret)
-> +		dev_err(hcd->self.controller,
-> +			"failed to %s vbus supply for port %d: %d\n",
-> +			enable ? "enable" : "disable", portnum, ret);
-> +
-> +	return ret;
-> +}
-> +
->   static int ehci_platform_power_on(struct platform_device *dev)
->   {
->   	struct usb_hcd *hcd = platform_get_drvdata(dev);
-> @@ -134,6 +183,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
->   static const struct ehci_driver_overrides platform_overrides __initconst = {
->   	.reset =		ehci_platform_reset,
->   	.extra_priv_size =	sizeof(struct ehci_platform_priv),
-> +	.port_power =		ehci_platform_port_power,
->   };
->   
->   static struct usb_ehci_pdata ehci_platform_defaults = {
+>> -fix typo in commit message
+>>
+>> Regards
+>> Alex
+>>
+>> Alexandre Torgue (4):
+>>    ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
+>>    ARM: configs: stm32: remove XIP configuration
+>>    ARM: stm32: Select ARM_MPU for cortex-M7 machines
+>>    ARM: dts: stm32: enable dma on MCU which embed a cortex-M7
+>>
+>>   arch/arm/boot/dts/stm32746g-eval.dts   | 21 +++++++++++++++++++++
+>>   arch/arm/boot/dts/stm32f769-disco.dts  | 21 +++++++++++++++++++++
+>>   arch/arm/boot/dts/stm32h743i-disco.dts | 21 +++++++++++++++++++++
+>>   arch/arm/boot/dts/stm32h743i-eval.dts  | 21 +++++++++++++++++++++
+>>   arch/arm/configs/stm32_defconfig       |  2 --
+>>   arch/arm/mach-stm32/Kconfig            |  3 +++
+>>   6 files changed, 87 insertions(+), 2 deletions(-)
+>>
 > 
