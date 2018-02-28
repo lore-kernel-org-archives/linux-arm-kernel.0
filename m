@@ -1,107 +1,35 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 28 Feb 2018 08:54:31 -0800
-Subject: [kernel-hardening] [PATCH 1/2] arm: mm: Define vdso_start,
- vdso_end as array
-In-Reply-To: <20180228142951.GA3136@pjb1027-Latitude-E5410>
-References: <20180228142951.GA3136@pjb1027-Latitude-E5410>
-Message-ID: <CAGXu5jKkHAHpzEpmHNJ6iPhXJKXoZH9Wy4mnCnE1=TEgTcHSRw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Feb 2018 16:54:59 +0000
+Subject: [PATCH] arm64: dts: juno: fix size of GICv2m MSI frames
+In-Reply-To: <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
+References: <20180207143255.17003-3-marc.zyngier@arm.com>
+ <1519832935-7338-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <86woyx2gws.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 6:29 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
-> Define vdso_start, vdso_end as array to avoid compile-time analysis error
-> for the case of built with CONFIG_FORTIFY_SOURCE.
->
-> and, since vdso_start, vdso_end are used in vdso.c only,
-> move extern-declaration from vdso.h to vdso.c.
->
-> If kernel is built with CONFIG_FORTIFY_SOURCE,
-> compile-time error happens at this code.
-> - if (memcmp(&vdso_start, "\177ELF", 4))
->
-> The size of "&vdso_start" is recognized as 1 byte, but n is 4,
-> So that compile-time error is reported.
->
-> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+On Wed, 28 Feb 2018 15:48:55 +0000,
+sudeep holla wrote:
+> 
+> Currently the size of GICv2m MSI frames are listed as 4kB while the
+> Juno TRM specifies 64kB for each of these MSI frames.
+> 
+> Though the devices connected themself might just use the first 4kB,
+> to be consistent with the genaral practice of 64kB boundary alignment
+> to all the devices, lets keep the size as 64kB. This might also help
+> in avoiding any surprise when passing the device to a VM.
+> 
+> This patch increase the size of each GICv2m MSI frames from 4kB to 64kB
+> as per the specification.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Thanks!
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Acked-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
-> ---
->  arch/arm/include/asm/vdso.h |  2 --
->  arch/arm/kernel/vdso.c      | 12 +++++++-----
->  2 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
-> index 9c99e81..5b85889 100644
-> --- a/arch/arm/include/asm/vdso.h
-> +++ b/arch/arm/include/asm/vdso.h
-> @@ -12,8 +12,6 @@
->
->  void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
->
-> -extern char vdso_start, vdso_end;
-> -
->  extern unsigned int vdso_total_pages;
->
->  #else /* CONFIG_VDSO */
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index a4d6dc0..f4dd7f9 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -39,6 +39,8 @@
->
->  static struct page **vdso_text_pagelist;
->
-> +extern char vdso_start[], vdso_end[];
-> +
->  /* Total number of pages needed for the data and text portions of the VDSO. */
->  unsigned int vdso_total_pages __ro_after_init;
->
-> @@ -197,13 +199,13 @@ static int __init vdso_init(void)
->         unsigned int text_pages;
->         int i;
->
-> -       if (memcmp(&vdso_start, "\177ELF", 4)) {
-> +       if (memcmp(vdso_start, "\177ELF", 4)) {
->                 pr_err("VDSO is not a valid ELF object!\n");
->                 return -ENOEXEC;
->         }
->
-> -       text_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-> -       pr_debug("vdso: %i text pages at base %p\n", text_pages, &vdso_start);
-> +       text_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-> +       pr_debug("vdso: %i text pages at base %p\n", text_pages, vdso_start);
->
->         /* Allocate the VDSO text pagelist */
->         vdso_text_pagelist = kcalloc(text_pages, sizeof(struct page *),
-> @@ -218,7 +220,7 @@ static int __init vdso_init(void)
->         for (i = 0; i < text_pages; i++) {
->                 struct page *page;
->
-> -               page = virt_to_page(&vdso_start + i * PAGE_SIZE);
-> +               page = virt_to_page(vdso_start + i * PAGE_SIZE);
->                 vdso_text_pagelist[i] = page;
->         }
->
-> @@ -229,7 +231,7 @@ static int __init vdso_init(void)
->
->         cntvct_ok = cntvct_functional();
->
-> -       patch_vdso(&vdso_start);
-> +       patch_vdso(vdso_start);
->
->         return 0;
->  }
-> --
-> 1.9.1
->
-
-
+	M.
 
 -- 
-Kees Cook
-Pixel Security
+Jazz is not dead, it just smell funny.
