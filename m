@@ -1,113 +1,101 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 28 Feb 2018 16:06:06 -0600
-Subject: [PATCH v7 00/13] Support PPTT for ARM64
-Message-ID: <20180228220619.6992-1-jeremy.linton@arm.com>
+Date: Wed, 28 Feb 2018 16:06:13 -0600
+Subject: [PATCH v7 07/13] drivers: base cacheinfo: Add support for ACPI based
+ firmware tables
+In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+Message-ID: <20180228220619.6992-8-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-used to describe the processor and cache topology. Ideally it is
-used to extend/override information provided by the hardware, but
-right now ARM64 is entirely dependent on firmware provided tables.
+Call ACPI cache parsing routines from base cacheinfo code if ACPI
+is enable. Also stub out cache_setup_acpi() so that individual
+architectures can enable ACPI topology parsing.
 
-This patch parses the table for the cache topology and CPU topology.
-When we enable ACPI/PPTT for arm64 we map the physical_id to the
-PPTT node flagged as the physical package by the firmware.
-This results in topologies that match what the remainder of the
-system expects. To avoid inverted scheduler domains we then
-set the MC domain equal to the largest cache within the socket
-below the NUMA domain.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ drivers/acpi/pptt.c       |  1 +
+ drivers/base/cacheinfo.c  | 14 ++++++++++----
+ include/linux/cacheinfo.h |  9 +++++++++
+ 3 files changed, 20 insertions(+), 4 deletions(-)
 
-For example on juno:
-[root at mammon-juno-rh topology]# lstopo-no-graphics
-  Package L#0
-    L2 L#0 (1024KB)
-      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
-      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
-      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
-      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
-    L2 L#1 (2048KB)
-      L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
-      L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
-  HostBridge L#0
-    PCIBridge
-      PCIBridge
-        PCIBridge
-          PCI 1095:3132
-            Block(Disk) L#0 "sda"
-        PCIBridge
-          PCI 1002:68f9
-            GPU L#1 "renderD128"
-            GPU L#2 "card0"
-            GPU L#3 "controlD64"
-        PCIBridge
-          PCI 11ab:4380
-            Net L#4 "enp8s0"
-
-Git tree at:
-http://linux-arm.org/git?p=linux-jlinton.git
-branch: pptt_v7
-
-v6->v7:
-Add additional patch to use the last cache level within the NUMA
-  or socket as the MC domain. This assures the MC domain is
-  equal or smaller than the DIE.
-  
-Various formatting/etc review comments.
-
-Rebase to 4.16rc2
-
-v5->v6:
-Add additional patches which re-factor how the initial DT code sets
-  up the cacheinfo structure so that its not as dependent on the
-  of_node stored in that tree. Once that is done we rename it
-  for use with the ACPI code.
-
-Additionally there were a fair number of minor name/location/etc
-  tweaks scattered about made in response to review comments.
-
-v4->v5:
-Update the cache type from NOCACHE to UNIFIED when all the cache
-  attributes we update are valid. This fixes a problem where caches
-  which are entirely created by the PPTT don't show up in lstopo.
-
-Give the PPTT its own firmware_node in the cache structure instead of
-  sharing it with the of_node.
-
-Move some pieces around between patches.
-
-(see previous cover letters for futher changes)
-
-Jeremy Linton (13):
-  drivers: base: cacheinfo: move cache_setup_of_node()
-  drivers: base: cacheinfo: setup DT cache properties early
-  cacheinfo: rename of_node to fw_token
-  arm64/acpi: Create arch specific cpu to acpi id helper
-  ACPI/PPTT: Add Processor Properties Topology Table parsing
-  ACPI: Enable PPTT support on ARM64
-  drivers: base cacheinfo: Add support for ACPI based firmware tables
-  arm64: Add support for ACPI based firmware tables
-  ACPI/PPTT: Add topology parsing code
-  arm64: topology: rename cluster_id
-  arm64: topology: enable ACPI/PPTT based CPU topology
-  ACPI: Add PPTT to injectable table list
-  arm64: topology: divorce MC scheduling domain from core_siblings
-
- arch/arm64/Kconfig                |   1 +
- arch/arm64/include/asm/acpi.h     |   4 +
- arch/arm64/include/asm/topology.h |   9 +-
- arch/arm64/kernel/cacheinfo.c     |  15 +-
- arch/arm64/kernel/topology.c      | 132 +++++++-
- arch/riscv/kernel/cacheinfo.c     |   1 -
- drivers/acpi/Kconfig              |   3 +
- drivers/acpi/Makefile             |   1 +
- drivers/acpi/pptt.c               | 642 ++++++++++++++++++++++++++++++++++++++
- drivers/acpi/tables.c             |   2 +-
- drivers/base/cacheinfo.c          | 157 +++++-----
- include/linux/acpi.h              |   4 +
- include/linux/cacheinfo.h         |  17 +-
- 13 files changed, 882 insertions(+), 106 deletions(-)
- create mode 100644 drivers/acpi/pptt.c
-
+diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+index 883e4318c6cd..c98f94ebd272 100644
+--- a/drivers/acpi/pptt.c
++++ b/drivers/acpi/pptt.c
+@@ -343,6 +343,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
+ {
+ 	int valid_flags = 0;
+ 
++	this_leaf->fw_token = cpu_node;
+ 	if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
+ 		this_leaf->size = found_cache->size;
+ 		valid_flags++;
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index 597aacb233fc..2880e2ab01f5 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -206,7 +206,7 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+ 					   struct cacheinfo *sib_leaf)
+ {
+ 	/*
+-	 * For non-DT systems, assume unique level 1 cache, system-wide
++	 * For non-DT/ACPI systems, assume unique level 1 caches, system-wide
+ 	 * shared caches for all other levels. This will be used only if
+ 	 * arch specific code has not populated shared_cpu_map
+ 	 */
+@@ -214,6 +214,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+ }
+ #endif
+ 
++int __weak cache_setup_acpi(unsigned int cpu)
++{
++	return -ENOTSUPP;
++}
++
+ static int cache_shared_cpu_map_setup(unsigned int cpu)
+ {
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+@@ -227,8 +232,8 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
+ 	if (of_have_populated_dt())
+ 		ret = cache_setup_of_node(cpu);
+ 	else if (!acpi_disabled)
+-		/* No cache property/hierarchy support yet in ACPI */
+-		ret = -ENOTSUPP;
++		ret = cache_setup_acpi(cpu);
++
+ 	if (ret)
+ 		return ret;
+ 
+@@ -279,7 +284,8 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
+ 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
+ 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
+ 		}
+-		of_node_put(this_leaf->fw_token);
++		if (of_have_populated_dt())
++			of_node_put(this_leaf->fw_token);
+ 	}
+ }
+ 
+diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
+index 0c6f658054d2..1446d3f053a2 100644
+--- a/include/linux/cacheinfo.h
++++ b/include/linux/cacheinfo.h
+@@ -97,6 +97,15 @@ int func(unsigned int cpu)					\
+ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
+ int init_cache_level(unsigned int cpu);
+ int populate_cache_leaves(unsigned int cpu);
++int cache_setup_acpi(unsigned int cpu);
++int acpi_find_last_cache_level(unsigned int cpu);
++#ifndef CONFIG_ACPI
++int acpi_find_last_cache_level(unsigned int cpu)
++{
++	/* ACPI kernels should be built with PPTT support */
++	return 0;
++}
++#endif
+ 
+ const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
+ 
 -- 
 2.13.6
