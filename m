@@ -1,31 +1,78 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 28 Feb 2018 23:19:05 +0530
-Subject: [PATCH 09/10] MAINTAINERS: Add reviewer for ACTIONS platforms
-In-Reply-To: <20180228174906.22721-1-manivannan.sadhasivam@linaro.org>
-References: <20180228174906.22721-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180228174906.22721-10-manivannan.sadhasivam@linaro.org>
+From: samuel@sholland.org (Samuel Holland)
+Date: Wed, 28 Feb 2018 11:52:05 -0600
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the sunxi message box
+In-Reply-To: <20180228082843.fga47gfrv2g5kmiz@flea>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-2-samuel@sholland.org>
+ <20180228082843.fga47gfrv2g5kmiz@flea>
+Message-ID: <ce95b875-8503-17e8-06ef-86e4b4b434e5@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since I'll be working on improving support for ACTIONS platforms, adding
-myself as the reviewer.
+Hi,
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+On 02/28/18 02:28, Maxime Ripard wrote:
+> On Tue, Feb 27, 2018 at 08:27:12PM -0600, Samuel Holland wrote:
+>> This mailbox hardware is present in several Allwinner sun8i and sun50i
+>> SoCs. Add a device tree binding for it.
+>>
+>> Signed-off-by: Samuel Holland <samuel@sholland.org>
+>> ---
+>>  .../devicetree/bindings/mailbox/sunxi-msgbox.txt   | 40 ++++++++++++++++++++++
+>>  1 file changed, 40 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
+>> new file mode 100644
+>> index 000000000000..3b3ed7f870a0
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
+>> @@ -0,0 +1,40 @@
+>> +Allwinner sunxi Message Box
+>> +===========================
+>> +
+>> +The hardware message box on sunxi SoCs is a two-user mailbox controller
+>> +containing 8 unidirectional FIFOs bonded into 4 bidirectional mailbox channels.
+>> +An interrupt is raised for received messages, but software must poll to know
+>> +when a transmitted message has been acknowledged by the remote user.
+>> +
+>> +Refer to ./mailbox.txt for generic information about mailbox device-tree
+>> +bindings.
+>> +
+>> +Mailbox Device Node:
+>> +====================
+>> +
+>> +Required properties:
+>> +--------------------
+>> +- compatible:		Must be "allwinner,sunxi-msgbox".
+> 
+> The IP change quite often in the Allwinner SoCs, so it would be better
+> to use a more specific compatible there. IIRC that IP was introduced
+> with the A31, so what about sun6i-a31-msgbox?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9a7f76eadae9..640dabc4c311 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1117,6 +1117,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
- 
- ARM/ACTIONS SEMI ARCHITECTURE
- M:	Andreas F?rber <afaerber@suse.de>
-+R:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- N:	owl
--- 
-2.14.1
+Ok, I will do this for v2, following Andre's suggestion. (I knew the AR100 was
+introduced with the A31, but I couldn't find any reference to the msgbox in the
+A31 manual).
+
+>> +- reg:			Contains the mailbox register address range (base
+>> +			address and length).
+>> +- clocks:		phandle for the clock controller and specifier.
+>> +- clock-names:		Must be "bus".
+>> +- resets:		phandle for the reset controller and specifier.
+>> +- reset-names:		Must be "bus".
+>> +- interrupts:		Contains interrupt information for the mailbox.
+>> +- #mbox-cells		Must be 2 - the indexes of the transmit and receive
+>> +			channels, respectively.
+> 
+> That would prevent any unidirectional communication, wouldn't it?
+> Other mailboxes driver seem to have two mbox channels, one for each
+> direction, which also seem to mimic our DMA bindings (where we are in
+> pretty much the same situation).
+
+I've responded to Jassi's comment about the same issue on patch 3.
+
+> Thanks!
+> Maxime
+
+Regards,
+Samuel
