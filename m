@@ -1,41 +1,50 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 28 Feb 2018 13:57:44 +0900
-Subject: [PATCH v2 3/3] arm64: irq: add get_handle_irq()
-In-Reply-To: <20180228045744.12914-1-takahiro.akashi@linaro.org>
-References: <20180228045744.12914-1-takahiro.akashi@linaro.org>
-Message-ID: <20180228045744.12914-4-takahiro.akashi@linaro.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 28 Feb 2018 13:06:39 +0800
+Subject: [PATCH v3 3/3] arm64: dts: Hi3660: Add binding for stub clock
+In-Reply-To: <1510910852-2175-4-git-send-email-xuyiping@hisilicon.com>
+References: <1510910852-2175-1-git-send-email-xuyiping@hisilicon.com>
+ <1510910852-2175-4-git-send-email-xuyiping@hisilicon.com>
+Message-ID: <20180228050639.GA20745@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is needed for utilizing lkdtm to make a probe hook on
-architecture-specific irq handler entry.
-In arm64 case, arm64 doesn't have "do_IRQ" function, instead
-handle_arch_irq, which is initialized by irq chip driver(gic), is
-called from exception entry code.
-So just add it.
+Hi Wei,
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/irq.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Fri, Nov 17, 2017 at 05:27:32PM +0800, Xu YiPing wrote:
+> From: Kaihua Zhong <zhongkaihua@huawei.com>
+> 
+> Add DT binding for Hi3660 stub clock driver.
+> 
+> Reviewed-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: Kai Zhao <zhaokai1@hisilicon.com>
+> Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com>
+> Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
+> Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
 
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 60e5fc661f74..ddd0759dc859 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -52,6 +52,13 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
- 	handle_arch_irq = handle_irq;
- }
- 
-+#ifdef CONFIG_LKDTM
-+unsigned long get_handle_irq(void)
-+{
-+	return (unsigned long)handle_arch_irq;
-+}
-+#endif
-+
- #ifdef CONFIG_VMAP_STACK
- static void init_irq_stacks(void)
- {
--- 
-2.16.2
+Could you help to pick up this patch? Thanks!
+
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> index 451b6bf..cbbc7f1 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -293,6 +293,13 @@
+>  			#mbox-cells = <3>;
+>  		};
+>  
+> +		stub_clock: stub_clock at e896b500 {
+> +			compatible = "hisilicon,hi3660-stub-clk";
+> +			reg = <0x0 0xe896b500 0x0 0x0100>;
+> +			#clock-cells = <1>;
+> +			mboxes = <&mailbox 13 3 0>;
+> +		};
+> +
+>  		dual_timer0: timer at fff14000 {
+>  			compatible = "arm,sp804", "arm,primecell";
+>  			reg = <0x0 0xfff14000 0x0 0x1000>;
+> -- 
+> 1.9.1
+> 
