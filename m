@@ -1,40 +1,328 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Wed, 28 Feb 2018 11:10:11 +0100
-Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
-In-Reply-To: <1519812442.10722.248.camel@linux.intel.com>
-References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
- <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
- <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
- <CACi5LpMv_LB3wi7qn33b6mysdK_weki0YYsG0EkqPhR8FvFq5w@mail.gmail.com>
- <1519812442.10722.248.camel@linux.intel.com>
-Message-ID: <395d024f-b710-3626-f004-e069de0b812b@intel.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 28 Feb 2018 18:14:46 +0800
+Subject: [PATCH v2 2/4] clk: imx: add fractional PLL output clock
+In-Reply-To: <20180201175412.9480-2-l.stach@pengutronix.de>
+References: <20180201175412.9480-1-l.stach@pengutronix.de>
+ <20180201175412.9480-2-l.stach@pengutronix.de>
+Message-ID: <20180228101445.GA17222@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/28/2018 11:07 AM, Andy Shevchenko wrote:
-> On Wed, 2018-02-28 at 00:29 +0530, Bhupesh Sharma wrote:
->> On Tue, Feb 27, 2018 at 8:14 PM, Jonathan Toppins <jtoppins@redhat.com
->>> wrote:
->>> On 02/27/2018 07:40 AM, Bhupesh Sharma wrote:
->>> For arm64 DT is suppose to *not* be the preferred method, yet still
->>> DT
->>> is preferred if the firmware provides both tables to the kernel.
->> However several arm64 products in embedded applications are still not
->> SBSA/SBBR compliant (and I have worked on a couple of such
->> implementations earlier) and still use bootloaders like u-boot (and
->> also closed-source implementations) which have no support for ACPI
->> currently and still rely on a DT to pass the system hardware
->> information to the kernel.
->> So far only open source implementation of a ACPI compliant firmware is
->> EDK2/UEFI which supports ACPI as the preferred boot method
-> You mean for non-x86?
->
->>   and I am
->> not sure if all u-boot/in-house firmware implementations are planned
->> to be ported over to EDK2/UEFI for embedded applications.
-> Why do you need that? ACPI (if you are talking about ACPI only, w/o EFI)
-> is supported in U-Boot for few x86 SoCs/platforms. Moreover, one of them
-> had never been shipped with ACPI/EFI complaint services in firmware and
-> ACPI layer is purely done in U-Boot.
->
-Right, let alone Chromebooks. :-)
+On Thu, Feb 01, 2018 at 06:54:10PM +0100, Lucas Stach wrote:
+> This is a new clock type introduced on i.MX8.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/clk/imx/Makefile       |   1 +
+>  drivers/clk/imx/clk-frac-pll.c | 229 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk.h          |   3 +
+>  3 files changed, 233 insertions(+)
+>  create mode 100644 drivers/clk/imx/clk-frac-pll.c
+> 
+> diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+> index f91f2b2e11cd..9892ae63539c 100644
+> --- a/drivers/clk/imx/Makefile
+> +++ b/drivers/clk/imx/Makefile
+> @@ -6,6 +6,7 @@ obj-y += \
+>  	clk-cpu.o \
+>  	clk-fixup-div.o \
+>  	clk-fixup-mux.o \
+> +	clk-frac-pll.o \
+>  	clk-gate-exclusive.o \
+>  	clk-gate2.o \
+>  	clk-pllv1.o \
+> diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
+> new file mode 100644
+> index 000000000000..30736d53dfbe
+> --- /dev/null
+> +++ b/drivers/clk/imx/clk-frac-pll.c
+> @@ -0,0 +1,229 @@
+> +/*
+> + * Copyright 2017 NXP.
+
+Maybe SPDX?
+
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/jiffies.h>
+> +
+> +#include "clk.h"
+> +
+> +#define PLL_CFG0 	0x0
+> +#define PLL_CFG1	0x4
+> +
+> +#define PLL_LOCK_STATUS	(0x1 << 31)
+> +#define PLL_CLKE	21
+> +#define PLL_PD		19
+> +#define PLL_BYPASS	14
+> +#define PLL_NEWDIV_VAL		(1 << 12)
+> +#define PLL_NEWDIV_ACK		(1 << 11)
+
+BIT()?
+
+> +#define PLL_FRAC_DIV_MASK	0xffffff
+> +#define PLL_INT_DIV_MASK	0x7f
+> +#define PLL_FRAC_DENOM		0x1000000
+> +
+> +struct clk_frac_pll {
+> +	struct clk_hw	hw;
+> +	void __iomem	*base;
+> +};
+> +
+> +#define to_clk_frac_pll(_hw) container_of(_hw, struct clk_frac_pll, hw)
+> +
+> +static int clk_wait_lock(struct clk_frac_pll *pll)
+> +{
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+> +
+> +	/* Wait for PLL to lock */
+> +	do {
+> +		if (readl_relaxed(pll->base) & PLL_LOCK_STATUS)
+> +			break;
+> +		if (time_after(jiffies, timeout))
+> +			break;
+> +	} while (1);
+> +
+> +	return readl_relaxed(pll->base) & PLL_LOCK_STATUS ? 0 : -ETIMEDOUT;
+> +}
+
+how about readl_poll_timeout?
+
+> +
+> +static int clk_wait_ack(struct clk_frac_pll *pll)
+> +{
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(50);
+> +
+> +	/* return directly if the pll is in powerdown or in bypass */
+> +	if (readl_relaxed(pll->base) & ((1 << PLL_PD) | (1 << PLL_BYPASS)))
+> +		return 0;
+> +
+> +	/* Wait for the pll's divfi and divff to be reloaded */
+> +	do {
+> +		if (readl_relaxed(pll->base) & PLL_NEWDIV_ACK)
+> +			break;
+> +		if (time_after(jiffies, timeout))
+> +			break;
+> +	} while (1);
+> +
+> +	return readl_relaxed(pll->base) & PLL_NEWDIV_ACK ? 0 : ETIMEDOUT;
+> +}
+
+ditto
+
+> +
+> +static int clk_pll_prepare(struct clk_hw *hw)
+> +{
+> +	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
+> +	u32 val;
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	val &= ~(1 << PLL_PD);
+
+Bitmask
+
+> +	writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +	return clk_wait_lock(pll);
+> +}
+> +
+> +static void clk_pll_unprepare(struct clk_hw *hw)
+> +{
+> +	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
+> +	u32 val;
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	val |= (1 << PLL_PD);
+
+ditto
+
+> +	writel_relaxed(val, pll->base + PLL_CFG0);
+> +}
+> +
+> +static int clk_pll_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
+> +	u32 val;
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	return (val & (1 << PLL_PD)) ? 0 : 1;
+
+ditto
+
+> +}
+> +
+> +static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+> +					 unsigned long parent_rate)
+> +{
+> +	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
+> +	u32 val, divff, divfi, divq;
+> +	u64 temp64;
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	divq = ((val & 0x1f) + 1) * 2;
+
+change 0x1f to PLL_OUTPUT_DIV_MASK?
+
+> +	val = readl_relaxed(pll->base + PLL_CFG1);
+> +	divff = (val >> 7) & PLL_FRAC_DIV_MASK;
+> +	divfi = (val & PLL_INT_DIV_MASK);
+> +
+> +	temp64 = (u64)parent_rate * 8;
+> +	temp64 *= divff;
+> +	do_div(temp64, PLL_FRAC_DENOM);
+> +	temp64 /= divq;
+> +
+> +	return parent_rate * 8 * (divfi + 1) / divq + (unsigned long)temp64;
+> +}
+> +
+> +static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+> +			       unsigned long *prate)
+> +{
+> +	u32 divff, divfi;
+> +	u64 temp64;
+> +	unsigned long parent_rate = *prate;
+
+sort from long to short?
+
+> +
+> +	parent_rate *= 8;
+> +	rate *= 2;
+> +	divfi = rate / parent_rate;
+> +	temp64 = (u64)(rate - divfi * parent_rate);
+> +	temp64 *= PLL_FRAC_DENOM;
+> +	do_div(temp64, parent_rate);
+> +	divff = temp64;
+> +
+> +	temp64 = (u64)parent_rate;
+> +	temp64 *= divff;
+> +	do_div(temp64, PLL_FRAC_DENOM);
+> +
+> +	return (parent_rate * divfi + (unsigned long)temp64) / 2;
+> +}
+> +
+> +/*
+> + * To simplify the clock calculation, we can keep the 'PLL_OUTPUT_VAL' at zero
+> + * (means the PLL output will be divided by 2). So the PLL output can use
+> + * the below formula:
+> + * pllout = parent_rate * 8 / 2 * DIVF_VAL;
+> + * where DIVF_VAL = 1 + DIVFI + DIVFF / 2^24.
+> + */
+> +static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			    unsigned long parent_rate)
+> +{
+> +	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
+> +	u32 val, divfi, divff;
+> +	u64 temp64;
+> +	int ret;
+> +
+> +	parent_rate *= 8;
+> +	rate *= 2;
+> +	divfi = rate / parent_rate;
+> +	temp64 = (u64) (rate - divfi * parent_rate);
+> +	temp64 *= PLL_FRAC_DENOM;
+> +	do_div(temp64, parent_rate);
+> +	divff = temp64;
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG1);
+> +	val &= ~((PLL_FRAC_DIV_MASK << 7) | (PLL_INT_DIV_MASK));
+> +	val |= ((divff << 7) | (divfi - 1));
+> +	writel_relaxed(val, pll->base + PLL_CFG1);
+> +
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	val &= ~0x1f;
+> +	writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +	/* Set the NEV_DIV_VAL to reload the DIVFI and DIVFF */
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	val |= PLL_NEWDIV_VAL;
+> +	writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +	ret = clk_wait_ack(pll);
+> +
+> +	/* clear the NEV_DIV_VAL */
+> +	val = readl_relaxed(pll->base + PLL_CFG0);
+> +	val &= ~PLL_NEWDIV_VAL;
+> +	writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct clk_ops clk_frac_pll_ops = {
+> +	.prepare	= clk_pll_prepare,
+> +	.unprepare	= clk_pll_unprepare,
+> +	.is_prepared	= clk_pll_is_prepared,
+> +	.recalc_rate	= clk_pll_recalc_rate,
+> +	.round_rate	= clk_pll_round_rate,
+> +	.set_rate	= clk_pll_set_rate,
+> +};
+> +
+> +struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
+> +			     void __iomem *base)
+> +{
+> +	struct clk_frac_pll *pll;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +	if (!pll)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	pll->base = base;
+> +	init.name = name;
+> +	init.ops = &clk_frac_pll_ops;
+> +	init.flags = 0;
+
+unneeded
+
+> +	init.parent_names = &parent_name;
+> +	init.num_parents = 1;
+> +
+> +	pll->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &pll->hw);
+
+clk_hw_register?
+
+CLK maintainer requested to use clk_hw APIs before, so i guess
+you may need change all other as well.
+
+Regards
+Dong Aisheng
+
+> +	if (IS_ERR(clk))
+> +		kfree(pll);
+> +
+> +	return clk;
+> +}
+> diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+> index d69c4bbf3597..287610902ea8 100644
+> --- a/drivers/clk/imx/clk.h
+> +++ b/drivers/clk/imx/clk.h
+> @@ -27,6 +27,9 @@ struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
+>  struct clk *imx_clk_pllv2(const char *name, const char *parent,
+>  		void __iomem *base);
+>  
+> +struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
+> +			     void __iomem *base);
+> +
+>  enum imx_pllv3_type {
+>  	IMX_PLLV3_GENERIC,
+>  	IMX_PLLV3_SYS,
+> -- 
+> 2.15.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
