@@ -1,117 +1,46 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:43 +0800
-Subject: [PATCH 21/29] arm64: capabilities: Handle duplicate entries for a
- capability
+Date: Wed, 28 Feb 2018 11:56:46 +0800
+Subject: [PATCH 24/29] arm64: Turn on KPTI only on CPUs that need it
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-22-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-25-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Jayachandran C <jnair@caviumnetworks.com>
 
-commit 67948af41f2e upstream.
+commit 0ba2e29c7fc1 upstream.
 
-Sometimes a single capability could be listed multiple times with
-differing matches(), e.g, CPU errata for different MIDR versions.
-This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
-we stop checking for a capability on a CPU with the first
-entry in the given table, which is not sufficient. Make sure we
-run the checks for all entries of the same capability. We do
-this by fixing __this_cpu_has_cap() to run through all the
-entries in the given table for a match and reuse it for
-verify_local_cpu_feature().
+Whitelist Broadcom Vulcan/Cavium ThunderX2 processors in
+unmap_kernel_at_el0(). These CPUs are not vulnerable to
+CVE-2017-5754 and do not need KPTI when KASLR is off.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
-
-Conflicts:
-	arch/arm64/kernel/cpufeature.c
 ---
- arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
- 1 file changed, 23 insertions(+), 21 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 4e5dff1..6200b81 100644
+index 6200b81..e62583d 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -969,6 +969,26 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
- 			cap_set_elf_hwcap(hwcaps);
- }
+@@ -766,6 +766,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+ 		return true;
  
-+/*
-+ * Check if the current CPU has a given feature capability.
-+ * Should be called from non-preemptible context.
-+ */
-+static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-+			       unsigned int cap)
-+{
-+	const struct arm64_cpu_capabilities *caps;
-+
-+	if (WARN_ON(preemptible()))
++	/* Don't force KPTI for CPUs that are not vulnerable */
++	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
++	case MIDR_CAVIUM_THUNDERX2:
++	case MIDR_BRCM_VULCAN:
 +		return false;
++	}
 +
-+	for (caps = cap_array; caps->desc; caps++)
-+		if (caps->capability == cap &&
-+		    caps->matches &&
-+		    caps->matches(caps, SCOPE_LOCAL_CPU))
-+			return true;
-+	return false;
-+}
-+
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
-@@ -1037,8 +1057,9 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
- }
- 
- static void
--verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
-+verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
- {
-+	const struct arm64_cpu_capabilities *caps = caps_list;
- 	for (; caps->matches; caps++) {
- 		if (!cpus_have_cap(caps->capability))
- 			continue;
-@@ -1046,7 +1067,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
- 		 * If the new CPU misses an advertised feature, we cannot proceed
- 		 * further, park the cpu.
- 		 */
--		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
- 			pr_crit("CPU%d: missing feature: %s\n",
- 					smp_processor_id(), caps->desc);
- 			cpu_die_early();
-@@ -1099,25 +1120,6 @@ static void __init setup_feature_capabilities(void)
- 	enable_cpu_capabilities(arm64_features);
- }
- 
--/*
-- * Check if the current CPU has a given feature capability.
-- * Should be called from non-preemptible context.
-- */
--static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
--			       unsigned int cap)
--{
--	const struct arm64_cpu_capabilities *caps;
--
--	if (WARN_ON(preemptible()))
--		return false;
--
--	for (caps = cap_array; caps->desc; caps++)
--		if (caps->capability == cap && caps->matches)
--			return caps->matches(caps, SCOPE_LOCAL_CPU);
--
--	return false;
--}
--
- extern const struct arm64_cpu_capabilities arm64_errata[];
- 
- bool this_cpu_has_cap(unsigned int cap)
+ 	/* Defer to CPU feature registers */
+ 	return !cpuid_feature_extract_unsigned_field(pfr0,
+ 						     ID_AA64PFR0_CSV3_SHIFT);
 -- 
 2.7.4
