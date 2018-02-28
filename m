@@ -1,39 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 08:55:56 +0800
-Subject: [PATCH v2] ARM: imx: avic: set low-power interrupt mask for imx25
-In-Reply-To: <1519766955-4302-1-git-send-email-martin@kaiser.cx>
-References: <1518628894-8328-1-git-send-email-martin@kaiser.cx>
- <1519766955-4302-1-git-send-email-martin@kaiser.cx>
-Message-ID: <20180228005555.GZ3217@dragon>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 27 Feb 2018 17:21:10 -0800
+Subject: [RFC 0/4] Add support for the Gateworks System Controller
+Message-ID: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 10:29:15PM +0100, Martin Kaiser wrote:
-> imx25 contains two registers (LPIMR0 and 1) to define which interrupts
-> are enabled in low-power mode. As of today, those two registers are
-> configured to enable all interrupts. Before going to low-power mode, the
-> AVIC's INTENABLEH and INTENABLEL registers are configured to enable only
-> those interrupts which are used as wakeup sources.
-> 
-> It turned out that this approach is not sufficient if we want the imx25
-> to go into stop mode during suspend-to-ram. (Stop mode is the low-power
-> mode that consumes the least power. The peripheral master clock is
-> switched off in this mode). For stop mode to work, the LPIMR0 and 1
-> registers have to be configured with the set of interrupts that are
-> allowed in low-power mode. Fortunately, the bits in the LPIMR registers
-> are assigned to the same interrupts as the bits in INTENABLEH and
-> INTENABLEL. However, LPIMR uses 1 to mask an interrupt whereas the
-> INTENABLE registers use 1 to enable an interrupt.
-> 
-> This patch sets the LPIMR registers to the inverted bitmask of the
-> INTENABLE registers during suspend and goes back to "all interrupts
-> masked" when we wake up again. We also make this the default at startup.
-> 
-> As far as I know, the other supported imx architectures have no similar
-> mechanism. Since the LPIMR registers are part of the CCM module, we
-> query the device tree for an imx25 ccm node in order to detect if we're
-> running on imx25.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+This series adds support for the Gateworks System Controller used on Gateworks
+Laguna, Ventana, and Newport product families.
 
-Applied, thanks.
+The GSC is an MSP430 I2C slave controller whose firmware embeds the following
+features:
+ - I/O expander (16 GPIO's emulating a PCA955x)
+ - EEPROM (enumating AT24)
+ - RTC (enumating DS1672)
+ - HWMON
+ - Interrupt controller with tamper detect, user pushbotton
+ - Watchdog controller capable of full board power-cycle
+ - Power Control capable of full board power-cycle
+
+see http://trac.gateworks.com/wiki/gsc for more details
+
+Tim Harvey (4):
+  dt-bindings: mfd: Add Gateworks System Controller bindings
+  mfd: add Gateworks System Controller core driver
+  hwmon: add Gateworks System Controller support
+  input: misc: Add Gateworks System Controller support
+
+ Documentation/devicetree/bindings/mfd/gsc.txt |  69 ++++++
+ drivers/hwmon/Kconfig                         |   6 +
+ drivers/hwmon/Makefile                        |   1 +
+ drivers/hwmon/gsc-hwmon.c                     | 299 +++++++++++++++++++++++
+ drivers/input/misc/Kconfig                    |   6 +
+ drivers/input/misc/Makefile                   |   1 +
+ drivers/input/misc/gsc-input.c                | 196 +++++++++++++++
+ drivers/mfd/Kconfig                           |  10 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/gsc.c                             | 330 ++++++++++++++++++++++++++
+ include/linux/mfd/gsc.h                       |  79 ++++++
+ 11 files changed, 998 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/gsc.txt
+ create mode 100644 drivers/hwmon/gsc-hwmon.c
+ create mode 100644 drivers/input/misc/gsc-input.c
+ create mode 100644 drivers/mfd/gsc.c
+ create mode 100644 include/linux/mfd/gsc.h
+
+-- 
+2.7.4
