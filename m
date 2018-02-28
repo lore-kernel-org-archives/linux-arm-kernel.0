@@ -1,86 +1,231 @@
-From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Wed, 28 Feb 2018 18:01:00 +0100
-Subject: [PATCH] arm64: kdump: fix interrupt handling done during
- machine_crash_shutdown
-Message-ID: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Wed, 28 Feb 2018 17:04:52 +0000
+Subject: [PATCH v2] media: stm32-dcmi: fix lock scheme
+In-Reply-To: <8cc69501-40a4-c6ba-e526-9abd2d938acb@xs4all.nl>
+References: <1519292954-19733-1-git-send-email-hugues.fruchet@st.com>
+ <8cc69501-40a4-c6ba-e526-9abd2d938acb@xs4all.nl>
+Message-ID: <61dbbdac-08ea-4f9b-ba01-f2e243c88df2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hitherto during machine_kexec_mask_interrupts there was an attempt to
-remove active state using irq_set_irqchip_state() routine and only if it
-failed, the attempt to EOI the interrupt was made. Nevertheless relaying
-on return value from irq_set_irqchip_state inside
-machine_kexec_mask_interrupts is incorrect - it only returns the status
-of the routine but doesn't provide information if the interrupt was
-deactivated correctly or not. Therefore the irq_eoi wasn't call even if
-the interrupt remained active.
+Hi Hans,
 
-To determine the sate correctly the irq_get_irqchip_state() could be
-used but according to the ARM Generic Interrupt Controller Architecture
-Spec, non-secure reading from GICD_ISACTIVERn/GICD_ICACTIVERn can be not
-permitted (depending on NS_access setting of Non-secure Access Control
-Registers, a.k.a. GICD_NSACRn). What is more interesting GICD_NSACRn
-is optional Secure register.
+Problem was that lock was held while calling dmaengine APIs, which 
+causes double lock issue when dma callback was called under context of 
+dma_async_issue_pending() (see dcmi_start_dma() & below comments).
+Rest of changes are around spin_lock() changed to spin_lock_irq() for 
+safer lock management.
 
-Moreover de-activating the interrupt via GICD_ISACTIVERn register
-(regardless of the possibility of checking status or not) seems to not
-do the job, when the GIC Distributor is configured to forward the
-interrupts to the CPU interfaces.
+On 02/26/2018 02:56 PM, Hans Verkuil wrote:
+> On 02/22/2018 10:49 AM, Hugues Fruchet wrote:
+>> Fix lock scheme leading to spurious freeze.
+> 
+> Can you elaborate a bit more? It's hard to review since you don't
+> describe what was wrong and why this fixes the problem.
+> 
+> Regards,
+> 
+> 	Hans
+> 
+>>
+>> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+>> ---
+>> version 2:
+>>    - dcmi_buf_queue() refactor to avoid to have "else" after "return"
+>>      (warning detected by checkpatch.pl --strict -f stm32-dcmi.c)
+>>
+>>   drivers/media/platform/stm32/stm32-dcmi.c | 57 +++++++++++++------------------
+>>   1 file changed, 24 insertions(+), 33 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+>> index 2fd8bed..5de18ad 100644
+>> --- a/drivers/media/platform/stm32/stm32-dcmi.c
+>> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
+>> @@ -197,7 +197,7 @@ static void dcmi_dma_callback(void *param)
+>>   	struct dma_tx_state state;
+>>   	enum dma_status status;
+>>   
+>> -	spin_lock(&dcmi->irqlock);
+>> +	spin_lock_irq(&dcmi->irqlock);
+>>   
+>>   	/* Check DMA status */
+>>   	status = dmaengine_tx_status(chan, dcmi->dma_cookie, &state);
+>> @@ -239,7 +239,7 @@ static void dcmi_dma_callback(void *param)
+>>   				dcmi->errors_count++;
+>>   				dcmi->active = NULL;
+>>   
+>> -				spin_unlock(&dcmi->irqlock);
+>> +				spin_unlock_irq(&dcmi->irqlock);
+>>   				return;
+>>   			}
+>>   
+>> @@ -248,13 +248,11 @@ static void dcmi_dma_callback(void *param)
+>>   
+>>   			list_del_init(&dcmi->active->list);
+>>   
+>> -			if (dcmi_start_capture(dcmi)) {
+>> +			spin_unlock_irq(&dcmi->irqlock);
 
-Because of all above the attempt to deactivate interrupts via
-irq_set_irqchip_state() is removed in this patch. Instead the irq_eoi is
-called whenever the interrupt is in progress(irqd_irq_inprogress).
+Lock is released here before calling dcmi_start_capture() which calls 
+dma_async_issue_pending()
 
-Before this patch the kdump triggered from interrupt context worked
-correctly by accident when the GIC was configured with
-GIC_CPU_CTRL_EOImodeNS == 1 (supports_deactivate == true). In mentioned
-mode GIC_CPU_EOI has priority drop functionality only and
-GIC_CPU_DEACTIVATE is used for interrupt deactivation. Also the
-gic_handle_irq behaviour is a bit different in mentioned mode and
-performs write to the GIC_CPU_EOI which causes the priority drop to the
-idle priority. So even if the irq_eoi wasn't called during
-machine_kexec_mask_interrupts, the interrupts of the crashdump kernel
-was handled due to interrupt preemption (since the priority of still
-active interrupt was dropped to idle priority).
+>> +			if (dcmi_start_capture(dcmi))
+>>   				dev_err(dcmi->dev, "%s: Cannot restart capture on DMA complete\n",
+>>   					__func__);
+>> -
+>> -				spin_unlock(&dcmi->irqlock);
+>> -				return;
+>> -			}
+>> +			return;
+>>   		}
+>>   
+>>   		break;
+>> @@ -263,7 +261,7 @@ static void dcmi_dma_callback(void *param)
+>>   		break;
+>>   	}
+>>   
+>> -	spin_unlock(&dcmi->irqlock);
+>> +	spin_unlock_irq(&dcmi->irqlock);
+>>   }
+>>   
+>>   static int dcmi_start_dma(struct stm32_dcmi *dcmi,
+>> @@ -360,7 +358,7 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
+>>   {
+>>   	struct stm32_dcmi *dcmi = arg;
+>>   
+>> -	spin_lock(&dcmi->irqlock);
+>> +	spin_lock_irq(&dcmi->irqlock);
+>>   
+>>   	/* Stop capture is required */
+>>   	if (dcmi->state == STOPPING) {
+>> @@ -370,7 +368,7 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
+>>   
+>>   		complete(&dcmi->complete);
+>>   
+>> -		spin_unlock(&dcmi->irqlock);
+>> +		spin_unlock_irq(&dcmi->irqlock);
+>>   		return IRQ_HANDLED;
+>>   	}
+>>   
+>> @@ -383,35 +381,34 @@ static irqreturn_t dcmi_irq_thread(int irq, void *arg)
+>>   			 __func__);
+>>   
+>>   		dcmi->errors_count++;
+>> -		dmaengine_terminate_all(dcmi->dma_chan);
+>> -
+>>   		dev_dbg(dcmi->dev, "Restarting capture after DCMI error\n");
+>>   
+>> -		if (dcmi_start_capture(dcmi)) {
+>> +		spin_unlock_irq(&dcmi->irqlock);
+Lock is released here before calling dma APIs (terminate then 
+async_issue_pending)
 
-Nevertheless when the kdump was triggered from interrupt context while
-the GIC was configured to work in GIC_CPU_CTRL_EOImodeNS == 0, the
-crashdump kernel hang in early stage due to lack of timer interrupt
-arrival.
+>> +		dmaengine_terminate_all(dcmi->dma_chan);
+>> +
+>> +		if (dcmi_start_capture(dcmi))
+>>   			dev_err(dcmi->dev, "%s: Cannot restart capture on overflow or error\n",
+>>   				__func__);
+>> -
+>> -			spin_unlock(&dcmi->irqlock);
+>> -			return IRQ_HANDLED;
+>> -		}
+>> +		return IRQ_HANDLED;
+>>   	}
+>>   
+>> -	spin_unlock(&dcmi->irqlock);
+>> +	spin_unlock_irq(&dcmi->irqlock);
+>>   	return IRQ_HANDLED;
+>>   }
+>>   
+>>   static irqreturn_t dcmi_irq_callback(int irq, void *arg)
+>>   {
+>>   	struct stm32_dcmi *dcmi = arg;
+>> +	unsigned long flags;
+>>   
+>> -	spin_lock(&dcmi->irqlock);
+>> +	spin_lock_irqsave(&dcmi->irqlock, flags);
+>>   
+>>   	dcmi->misr = reg_read(dcmi->regs, DCMI_MIS);
+>>   
+>>   	/* Clear interrupt */
+>>   	reg_set(dcmi->regs, DCMI_ICR, IT_FRAME | IT_OVR | IT_ERR);
+>>   
+>> -	spin_unlock(&dcmi->irqlock);
+>> +	spin_unlock_irqrestore(&dcmi->irqlock, flags);
+>>   
+>>   	return IRQ_WAKE_THREAD;
+>>   }
+>> @@ -490,9 +487,8 @@ static void dcmi_buf_queue(struct vb2_buffer *vb)
+>>   	struct stm32_dcmi *dcmi =  vb2_get_drv_priv(vb->vb2_queue);
+>>   	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+>>   	struct dcmi_buf *buf = container_of(vbuf, struct dcmi_buf, vb);
+>> -	unsigned long flags = 0;
+>>   
+>> -	spin_lock_irqsave(&dcmi->irqlock, flags);
+>> +	spin_lock_irq(&dcmi->irqlock);
+>>   
+>>   	if ((dcmi->state == RUNNING) && (!dcmi->active)) {
+>>   		dcmi->active = buf;
+>> @@ -500,19 +496,15 @@ static void dcmi_buf_queue(struct vb2_buffer *vb)
+>>   		dev_dbg(dcmi->dev, "Starting capture on buffer[%d] queued\n",
+>>   			buf->vb.vb2_buf.index);
+>>   
+>> -		if (dcmi_start_capture(dcmi)) {
+>> +		spin_unlock_irq(&dcmi->irqlock);
+Lock is released here before calling dma APIs (terminate then 
+async_issue_pending)
 
-After this fix the kdump behaves correctly when triggered from interrupt
-context independently of GIC_CPU_CTRL_EOImodeNS configuration.
+>> +		if (dcmi_start_capture(dcmi))
+>>   			dev_err(dcmi->dev, "%s: Cannot restart capture on overflow or error\n",
+>>   				__func__);
+>> -
+>> -			spin_unlock_irqrestore(&dcmi->irqlock, flags);
+>> -			return;
+>> -		}
+>>   	} else {
+>>   		/* Enqueue to video buffers list */
+>>   		list_add_tail(&buf->list, &dcmi->buffers);
+>> +		spin_unlock_irq(&dcmi->irqlock);
+>>   	}
+>> -
+>> -	spin_unlock_irqrestore(&dcmi->irqlock, flags);
+>>   }
+>>   
+>>   static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+>> @@ -598,20 +590,17 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+>>   
+>>   	dev_dbg(dcmi->dev, "Start streaming, starting capture\n");
+>>   
+>> +	spin_unlock_irq(&dcmi->irqlock);
+>>   	ret = dcmi_start_capture(dcmi);
+>>   	if (ret) {
+>>   		dev_err(dcmi->dev, "%s: Start streaming failed, cannot start capture\n",
+>>   			__func__);
+>> -
+>> -		spin_unlock_irq(&dcmi->irqlock);
+>>   		goto err_subdev_streamoff;
+>>   	}
+>>   
+>>   	/* Enable interruptions */
+>>   	reg_set(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
+>>   
+>> -	spin_unlock_irq(&dcmi->irqlock);
+>> -
+>>   	return 0;
+>>   
+>>   err_subdev_streamoff:
+>> @@ -654,7 +643,9 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
+>>   		dev_err(dcmi->dev, "%s: Failed to stop streaming, subdev streamoff error (%d)\n",
+>>   			__func__, ret);
+>>   
+>> +	spin_lock_irq(&dcmi->irqlock);
+>>   	dcmi->state = STOPPING;
+>> +	spin_unlock_irq(&dcmi->irqlock);
+>>   
+>>   	timeout = wait_for_completion_interruptible_timeout(&dcmi->complete,
+>>   							    time_ms);
+>>
+> 
 
-Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
----
- arch/arm64/kernel/machine_kexec.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
-
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index f76ea92..30ad183 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -220,20 +220,12 @@ static void machine_kexec_mask_interrupts(void)
- 
- 	for_each_irq_desc(i, desc) {
- 		struct irq_chip *chip;
--		int ret;
- 
- 		chip = irq_desc_get_chip(desc);
- 		if (!chip)
- 			continue;
- 
--		/*
--		 * First try to remove the active state. If this
--		 * fails, try to EOI the interrupt.
--		 */
--		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
--
--		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
--		    chip->irq_eoi)
-+		if (irqd_irq_inprogress(&desc->irq_data) && chip->irq_eoi)
- 			chip->irq_eoi(&desc->irq_data);
- 
- 		if (chip->irq_mask)
--- 
-2.7.4
+Best regards,
+Hugues.
