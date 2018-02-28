@@ -1,34 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 28 Feb 2018 13:08:28 +0100
-Subject: [PATCH 01/29] arm64: mm: Use non-global mappings for kernel space
-In-Reply-To: <1519790211-16582-2-git-send-email-alex.shi@linaro.org>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
- <1519790211-16582-2-git-send-email-alex.shi@linaro.org>
-Message-ID: <20180228120828.GB8453@kroah.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Feb 2018 13:17:39 +0100
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+Message-ID: <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 11:56:23AM +0800, Alex Shi wrote:
-> From: Will Deacon <will.deacon@arm.com>
-> 
-> commit e046eb0c9bf2 upstream.
-> 
-> In preparation for unmapping the kernel whilst running in userspace,
-> make the kernel mappings non-global so we can avoid expensive TLB
-> invalidation on kernel exit to userspace.
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Laura Abbott <labbott@redhat.com>
-> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Alex Shi <alex.shi@linaro.org>
-> 
-> Conflicts:
-> 	skip PTE_RDONLY of PAGE_NONE in arch/arm64/include/asm/pgtable-prot.h
+Hi Jeffy,
 
-These "Conflicts:" lines need to be removed, or put below the --- line
-please.
+On Wed, Feb 28, 2018 at 12:11 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> Currently we are adding all of the attached devices' clocks as pm clocks
+> and enable them when powering on the power domain.
+>
+> This seems unnecessary, because those clocks are already controlled in
+> the devices' drivers with better error handling.
+>
+> Tested on my chromebook minnie(rk3288) and chromebook kevin(rk3399).
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-thanks,
+Thanks for your patch!
 
-greg k-h
+Just wondering: so you prefer to handle the clocks explicitly in all drivers,
+instead of delegating this task to Runtime PM?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
