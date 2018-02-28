@@ -1,80 +1,155 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Feb 2018 15:06:19 +0000
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <5A96A809.2020509@rock-chips.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
- <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
- <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
- <5A72F7D2.1050201@rock-chips.com> <5A8FEBC6.4000408@rock-chips.com>
- <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
- <5A96A809.2020509@rock-chips.com>
-Message-ID: <34a60ab2-a3af-3302-6612-740cba5460db@arm.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Wed, 28 Feb 2018 18:09:54 +0300
+Subject: [PATCH 1/2] stackleak: Update for arm64
+In-Reply-To: <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
+References: <20180221011303.20392-1-labbott@redhat.com>
+ <20180221011303.20392-2-labbott@redhat.com> <20180222165834.GC18421@arm.com>
+ <97090ca6-efad-7c03-6084-a97674ae61c7@linux.com>
+ <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
+Message-ID: <5d10c6ad-b4b6-eb27-79f0-ca235b73e7eb@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/18 13:00, JeffyChen wrote:
-> Hi Robin,
+On 27.02.2018 13:21, Richard Sandiford wrote:
+> Hi Alexander,
 > 
-> Thanks for your reply.
-> 
-> On 02/28/2018 12:59 AM, Robin Murphy wrote:
->>>> the rockchip IOMMU is part of the master block in hardware, so it needs
->>>> to control the master's power domain and some of the master's clocks
->>>> when access it's registers.
->>>>
->>>> and the number of clocks needed here, might be different between each
->>>> IOMMUs(according to which master block it belongs), it's a little like
->>>> our power domain:
->>>> https://elixir.free-electrons.com/linux/latest/source/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L935 
->>>>
->>>>
->>>>
->>>>
->>>> i'm not sure how to describe this correctly, is it ok use something 
->>>> like
->>>> "the same as it's master block"?
->>>
->>> would it make sense to add a property to specify the master who owns
->>> the iommu, and we can get all clocks(only some of those clocks are
->>> actually needed) from it in the of_xlate()? and we can also reuse the
->>> clock-names of that master to build clk_bulk_data and log errors in
->>> clk_bulk_get.
+> Sorry for the slow reply, been caught up in an office move.
+
+Thank you very much for the review, Richard!
+
+> Alexander Popov <alex.popov@linux.com> writes:
+>> Would you be so kind to take a look at the whole STACKLEAK plugin?
+>> http://www.openwall.com/lists/kernel-hardening/2018/02/16/4
+>> https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/commit/?h=kspp/gcc-plugin/stackleak&id=57a0a6763b12e82dd462593d0f42be610e93cdc9
 >>
->> I'm inclined to agree with Rob here - if we're to add anything to the
->> binding, it should only be whatever clock inputs are defined for the
->> IOMMU IP block itself. If Linux doesn't properly handle the interconnect
->> clock hierarchy external to a particular integration, that's a separate
->> issue and it's not the binding's problem.
->>
->> I actually quite like the hack of "borrowing" the clocks from
->> dev->of_node in of_xlate() - you shouldn't need any DT changes for that,
->> because you already know that each IOMMU instance only has the one
->> master device anyway.
+>> It's not very big. I documented it in detail. I would be really grateful for the
+>> review!
 > 
-> Thanks:) but actually we are going to support sharing IOMMU between 
-> multiple masters(one of them is the main master i think) in the newer 
-> chips(not yet supported on upstream kernel)...
+> Looks good to me FWIW.  Just a couple of minor things:
+> 
+>> +	/*
+>> +	 * 1. Loop through the GIMPLE statements in each of cfun basic blocks.
+>> +	 * cfun is a global variable which represents the function that is
+>> +	 * currently processed.
+>> +	 */
+>> +	FOR_EACH_BB_FN(bb, cfun) {
+>> +		for (gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi)) {
+>> +			gimple stmt;
+>> +
+>> +			stmt = gsi_stmt(gsi);
+>> +
+>> +			/* Leaf function is a function which makes no calls */
+>> +			if (is_gimple_call(stmt))
+>> +				is_leaf = false;
+> 
+> It's probably not going to matter in practice, but it might be worth
+> emphasising in the comments that this leafness is only approximate.
 
-Ha! OK, fair enough, back to the first point then...
+That's important, thank you! May I ask why you think it's not going to matter in
+practice?
 
-> So we might have to get all clocks from all masters, or find a way to 
-> specify the main master...and for the multiple masters case, do it in 
-> of_xlate() turns out to be a little racy...maybe we can add a property 
-> to specify main master, and get it's clocks in probe()?
+> It will sometimes be a false positive, because we could still
+> end up creating calls to libgcc functions from non-call statements
+> (or for target-specific reasons).  It can also be a false negative,
+> since call statements can be to built-in or internal functions that
+> end up being open-coded.
 
-I notice that the 4.4 BSP kernel consistently specifies "aclk" and 
-"hclk" for the IOMMU instances - it feels unusual to say "why don't we 
-follow the downstream binding?", but it does look a lot like what I 
-would expect (I'd guess at one for the register slave interface and one 
-for the master interface/general operation?)
+Oh, that raises the question: how does this leafness inaccuracy affect in my
+particular case?
 
-If we can implement conceptually-correct clock handling based on an 
-accurate binding, which should cover most cases, and *then* look at 
-hacking around those where it doesn't quite work in practice due to 
-shortcomings elsewhere, that would be ideal, and of course a lot nicer 
-than just jumping straight into piles of hacks.
+is_leaf is currently used for finding the special cases to skip the
+track_stack() call insertion:
 
-Robin.
+/*
+ * Special cases to skip the instrumentation.
+ *
+ * Taking the address of static inline functions materializes them,
+ * but we mustn't instrument some of them as the resulting stack
+ * alignment required by the function call ABI will break other
+ * assumptions regarding the expected (but not otherwise enforced)
+ * register clobbering ABI.
+ *
+ * Case in point: native_save_fl on amd64 when optimized for size
+ * clobbers rdx if it were instrumented here.
+ *
+ * TODO: any more special cases?
+ */
+if (is_leaf &&
+    !TREE_PUBLIC(current_function_decl) &&
+    DECL_DECLARED_INLINE_P(current_function_decl)) {
+	return 0;
+}
+
+
+And now it seems to me that the stackleak plugin should not instrument all
+static inline functions, regardless of is_leaf. Do you agree?
+
+>> +	/*
+>> +	 * The stackleak_final pass should be executed before the "final" pass,
+>> +	 * which turns the RTL (Register Transfer Language) into assembly.
+>> +	 */
+>> +	PASS_INFO(stackleak_final, "final", 1, PASS_POS_INSERT_BEFORE);
+> 
+> This might be too late, since it happens e.g. after addresses have
+> been calculated for branch ranges, and after machine-specific passes
+> (e.g. bundling on ia64).
+> 
+> The stack size is final after reload, so inserting the pass after that
+> might be better.
+
+Thanks for that notice. May I ask for the additional clarification?
+
+I specified -fdump-passes and see a lot of passes between reload and final:
+  ...
+  rtl-sched1                                       :  OFF
+  rtl-ira                                          :  ON
+  rtl-reload                                       :  ON
+  rtl-vzeroupper                                   :  OFF
+  *all-postreload                                  :  OFF
+     rtl-postreload                                :  OFF
+     rtl-gcse2                                     :  OFF
+     rtl-split2                                    :  ON
+     rtl-ree                                       :  ON
+     rtl-cmpelim                                   :  OFF
+     rtl-btl1                                      :  OFF
+     rtl-pro_and_epilogue                          :  ON
+     rtl-dse2                                      :  ON
+     rtl-csa                                       :  ON
+     rtl-jump2                                     :  ON
+     rtl-compgotos                                 :  ON
+     rtl-sched_fusion                              :  OFF
+     rtl-peephole2                                 :  ON
+     rtl-ce3                                       :  ON
+     rtl-rnreg                                     :  OFF
+     rtl-cprop_hardreg                             :  ON
+     rtl-rtl_dce                                   :  ON
+     rtl-bbro                                      :  ON
+     rtl-btl2                                      :  OFF
+     *leaf_regs                                    :  ON
+     rtl-split4                                    :  ON
+     rtl-sched2                                    :  ON
+     *stack_regs                                   :  ON
+        rtl-split3                                 :  OFF
+        rtl-stack                                  :  ON
+  *all-late_compilation                            :  OFF
+     rtl-alignments                                :  ON
+     rtl-vartrack                                  :  ON
+     *free_cfg                                     :  ON
+     rtl-mach                                      :  ON
+     rtl-barriers                                  :  ON
+     rtl-dbr                                       :  OFF
+     rtl-split5                                    :  OFF
+     rtl-eh_ranges                                 :  OFF
+     rtl-shorten                                   :  ON
+     rtl-nothrow                                   :  ON
+     rtl-dwarf2                                    :  ON
+     rtl-stackleak_final                           :  ON
+     rtl-final                                     :  ON
+  rtl-dfinish                                      :  ON
+clean_state                                        :  ON
+
+Where exactly would you recommend me to insert the stackleak_final pass, which
+removes the unneeded track_stack() calls?
+
+Best regards,
+Alexander
