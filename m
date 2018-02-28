@@ -1,222 +1,56 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 28 Feb 2018 08:34:49 -0800
-Subject: [RFC 0/4] Add support for the Gateworks System Controller
-In-Reply-To: <20180228144424.GC12303@lunn.ch>
-References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
- <20180228144424.GC12303@lunn.ch>
-Message-ID: <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Feb 2018 16:35:17 +0000
+Subject: [PATCH] ACPI/IORT: Remove obsolete
+ ACPI_IORT_SMMU_V3_CAVIUM_CN99XX define
+In-Reply-To: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
+References: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
+Message-ID: <e6cbbf2a-738c-a77e-efa1-a38a5602ae1c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 6:44 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Feb 27, 2018 at 05:21:10PM -0800, Tim Harvey wrote:
->> This series adds support for the Gateworks System Controller used on Gateworks
->> Laguna, Ventana, and Newport product families.
->>
->> The GSC is an MSP430 I2C slave controller whose firmware embeds the following
->> features:
->>  - I/O expander (16 GPIO's emulating a PCA955x)
->>  - EEPROM (enumating AT24)
->>  - RTC (enumating DS1672)
->
-> Hi Tim
->
-> Maybe it is in these patches, and i missed it....
->
-> How do these emulated devices work? Does the controller respond to
-> different addresses for these different emulated devices? Or is it an
-> I2c bus mux?
->
+Hi Lorenzo,
 
-Andrew,
+On 28/02/18 16:24, Lorenzo Pieralisi wrote:
+> To defeat ACPICA<->kernel merge order dependencies a preprocessor define
+> value was introduced in the IORT compilation unit according to IORT
+> revision C, IORT_SMMU_V3_CAVIUM_CN99XX, so that even if the value was
+> not defined in ACPICA headers the IORT kernel layer would still be able
+> to function and use it.
+> 
+> Since commit 0c2021c047ba ("ACPICA: IORT: Update SMMU models for
+> revision C") finally added the define in ACPICA headers, as required by
+> ACPICA IORT support, the preprocessor definition in the IORT kernel
+> compilation unit has become obsolete and can be removed.
 
-You didn't miss it - I probably need to explain it better.
+Can the version check around iort_get_id_mapping_index() go as well?
 
-The 'emulated devices' do respond on different slave addresses (which
-match one of or the only the slave addresses those parts support). For
-example the device-tree for the GW54xx has the following which are all
-from the GSC which is the only thing on i2c1:
+Robin.
 
-&i2c1 {
-        clock-frequency = <100000>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_i2c1>;
-        status = "okay";
-
-        gsc: gsc at 20 {
-                compatible = "gw,gsc_v2";
-                reg = <0x20>;
-                interrupt-parent = <&gpio1>;
-                interrupts = <4 GPIO_ACTIVE_LOW>;
-                interrupt-controller;
-                #interrupt-cells = <1>;
-
-                gsc_input {
-                        compatible = "gw,gsc-input";
-                };
-
-                gsc_hwmon {
-                        compatible = "gw,gsc-hwmon";
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-
-                        hwmon at 0 { /* A0: Board Temperature */
-                                type = <0>;
-                                reg = <0x00>;
-                                label = "temp";
-                                /* lookup table */
-                        };
-
-                        hwmon at 1 { /* A1: Input Voltage */
-                                type = <1>;
-                                reg = <0x02>;
-                                label = "Vin";
-                                gw,voltage-divider = <22100 1000>;
-                                gw,offset = <800>;
-                        };
-
-                        hwmon at 2 { /* A2: 5P0 */
-                                type = <1>;
-                                reg = <0x0b>;
-                                label = "5P0";
-                                gw,voltage-divider = <22100 1000>;
-                        };
-
-                        hwmon at 4 { /* A4: 0-5V input */
-                                type = <1>;
-                                reg = <0x14>;
-                                label = "ANL0";
-                                gw,voltage-divider = <10000 10000>;
-                        };
-
-                        hwmon at 5 { /* A5: 2P5 PCIe/GigE */
-                                type = <1>;
-                                reg = <0x23>;
-                                label = "2P5";
-                                gw,voltage-divider = <10000 10000>;
-                        };
-
-                        hwmon at 6 { /* A6: 1P8 Aud/Vid */
-                                type = <1>;
-                                reg = <0x1d>;
-                                label = "1P8";
-                        };
-
-                        hwmon at 7 { /* A7: GPS */
-                                type = <1>;
-                                reg = <0x26>;
-                                label = "GPS";
-                                gw,voltage-divider = <4990 10000>;
-                        };
-
-                        hwmon at 12 { /* A12: VDD_CORE */
-                                type = <1>;
-                                reg = <0x3>;
-                                label = "VDD_CORE";
-                        };
-
-                        hwmon at 13 { /* A13: VDD_SOC */
-                                type = <1>;
-                                reg = <0x11>;
-                                label = "VDD_SOC";
-                        };
-
-                        hwmon at 14 { /* A14: 1P0 PCIe SW */
-                                type = <1>;
-                                reg = <0x20>;
-                                label = "1P0";
-                        };
-
-                        hwmon at 15 { /* fan0 */
-                                type = <2>;
-                                reg = <0x2c>;
-                                label = "fan_50p";
-                        };
-
-                        hwmon at 16 { /* fan1 */
-                                type = <2>;
-                                reg = <0x2e>;
-                                label = "fan_60p";
-                        };
-
-                        hwmon at 17 { /* fan2 */
-                                type = <2>;
-                                reg = <0x30>;
-                                label = "fan_70p";
-                        };
-
-                        hwmon at 18 { /* fan3 */
-                                type = <2>;
-                                reg = <0x32>;
-                                label = "fan_80p";
-                        };
-
-                        hwmon at 19 { /* fan4 */
-                                type = <2>;
-                                reg = <0x34>;
-                                label = "fan_90p";
-                        };
-
-                        hwmon at 20 { /* fan5 */
-                                type = <2>;
-                                reg = <0x36>;
-                                label = "fan_100p";
-                        };
-                };
-        };
-
-        gsc_gpio: pca9555 at 23 {
-                compatible = "nxp,pca9555";
-                reg = <0x23>;
-                gpio-controller;
-                #gpio-cells = <2>;
-                interrupt-parent = <&gsc>;
-                interrupts = <4>;
-        };
-
-        eeprom1: eeprom at 50 {
-                compatible = "atmel,24c02";
-                reg = <0x50>;
-                pagesize = <16>;
-        };
-
-        eeprom2: eeprom at 51 {
-                compatible = "atmel,24c02";
-                reg = <0x51>;
-                pagesize = <16>;
-        };
-
-        eeprom3: eeprom at 52 {
-                compatible = "atmel,24c02";
-                reg = <0x52>;
-                pagesize = <16>;
-        };
-
-        eeprom4: eeprom at 53 {
-                compatible = "atmel,24c02";
-                reg = <0x53>;
-                pagesize = <16>;
-        };
-
-        rtc: ds1672 at 68 {
-                compatible = "dallas,ds1672";
-                reg = <0x68>;
-        };
-};
-
-
-One issue I'm trying to figure out the best way to deal with is the
-fact that the GSC can 'NAK' transactions occasionally which is why I
-override the regmap read/write functions and provide retries. This
-resolves the issue for the mfd core driver and sub-module drivers but
-doesn't resolve the issue with these 'emulated devices' which have
-their own stand-alone drivers. I'm not sure how to best deal with that
-yet. I tried to add retires to the i2c adapter but that wasn't
-accepted upstream because it was too generic and I was told I need to
-work around it in device-drivers. I'm guessing I need to write my own
-sub-module drivers that will largely duplicate whats in the
-stand-alone drivers (ds1672, at24, pca9553x).
-
-Regards,
-
-Tim
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>   drivers/acpi/arm64/iort.c | 5 -----
+>   1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 95255ecfae7c..c87b17ea03b7 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -31,11 +31,6 @@
+>   #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+>   				(1 << ACPI_IORT_NODE_SMMU_V3))
+>   
+> -/* Until ACPICA headers cover IORT rev. C */
+> -#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+> -#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+> -#endif
+> -
+>   struct iort_its_msi_chip {
+>   	struct list_head	list;
+>   	struct fwnode_handle	*fw_node;
+> 
