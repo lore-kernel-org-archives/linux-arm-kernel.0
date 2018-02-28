@@ -1,25 +1,22 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:32 +0800
-Subject: [PATCH 10/29] arm64: mm: Map entry trampoline into trampoline and
- kernel page tables
+Date: Wed, 28 Feb 2018 11:56:36 +0800
+Subject: [PATCH 14/29] arm64: entry: Add fake CPU feature for unmapping the
+ kernel at EL0
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-11-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-15-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 51a0048beb44 upstream.
+commit ea1e3de85e94 upstream.
 
-The exception entry trampoline needs to be mapped at the same virtual
-address in both the trampoline page table (which maps nothing else)
-and also the kernel page table, so that we can swizzle TTBR1_EL1 on
-exceptions from and return to EL0.
-
-This patch maps the trampoline at a fixed virtual address in the fixmap
-area of the kernel virtual address space, which allows the kernel proper
-to be randomized with respect to the trampoline when KASLR is enabled.
+Allow explicit disabling of the entry trampoline on the kernel command
+line (kpti=off) by adding a fake CPU feature (ARM64_UNMAP_KERNEL_AT_EL0)
+that can be used to toggle the alternative sequences in our entry code and
+avoid use of the trampoline altogether if desired. This also allows us to
+make use of a static key in arm64_kernel_unmapped_at_el0().
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
@@ -28,104 +25,149 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	no acpi apei in arch/arm64/include/asm/fixmap.h
-	no rodata in arch/arm64/mm/mmu.c
+	skip non enabled cpu features in
+	arch/arm64/include/asm/cpucaps.h and
+	arch/arm64/kernel/cpufeature.c
+	using cpus_have_cap instead of cpus_have_const_cap in
+	arch/arm64/include/asm/mmu.h
 ---
- arch/arm64/include/asm/fixmap.h  |  5 +++++
- arch/arm64/include/asm/pgtable.h |  1 +
- arch/arm64/kernel/asm-offsets.c  |  6 +++++-
- arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++++++
- 4 files changed, 34 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/cpucaps.h |  3 ++-
+ arch/arm64/include/asm/mmu.h     |  3 ++-
+ arch/arm64/kernel/cpufeature.c   | 41 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry.S        |  9 +++++----
+ 4 files changed, 50 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index caf86be..7b1d88c 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -51,6 +51,11 @@ enum fixed_addresses {
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 87b4465..7ddf233 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -34,7 +34,8 @@
+ #define ARM64_HAS_32BIT_EL0			13
+ #define ARM64_HYP_OFFSET_LOW			14
+ #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
++#define ARM64_UNMAP_KERNEL_AT_EL0		16
  
- 	FIX_EARLYCON_MEM_BASE,
- 	FIX_TEXT_POKE0,
+-#define ARM64_NCAPS				16
++#define ARM64_NCAPS				17
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 279e75b..a813edf 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -34,7 +34,8 @@ typedef struct {
+ 
+ static inline bool arm64_kernel_unmapped_at_el0(void)
+ {
+-	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0);
++	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) &&
++	       cpus_have_cap(ARM64_UNMAP_KERNEL_AT_EL0);
+ }
+ 
+ extern void paging_init(void);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 3a129d4..74b168c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -746,6 +746,40 @@ static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
+ 	return idmap_addr > GENMASK(VA_BITS - 2, 0) && !is_kernel_in_hyp_mode();
+ }
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
 +
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	FIX_ENTRY_TRAMP_TEXT,
-+#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
-+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 	__end_of_permanent_fixed_addresses,
- 
- 	/*
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7acd3c5..3a30a39 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -692,6 +692,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
- 
- extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
- extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
-+extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
- 
- /*
-  * Encode and decode a swap entry:
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index c58ddf8..5f4bf3c 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -24,6 +24,7 @@
- #include <linux/kvm_host.h>
- #include <linux/suspend.h>
- #include <asm/cpufeature.h>
-+#include <asm/fixmap.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/smp_plat.h>
-@@ -144,11 +145,14 @@ int main(void)
-   DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
-   DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
-   DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
--
-   BLANK();
-   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-+  BLANK();
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
-+#endif
-   return 0;
- }
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index d5cc6d7..84945c9 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -419,6 +419,29 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
- 	vm_area_add_early(vma);
- }
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+static int __init map_entry_trampoline(void)
++static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
++				int __unused)
 +{
-+	extern char __entry_tramp_text_start[];
++	/* Forced on command line? */
++	if (__kpti_forced) {
++		pr_info_once("kernel page table isolation forced %s by command line option\n",
++			     __kpti_forced > 0 ? "ON" : "OFF");
++		return __kpti_forced > 0;
++	}
 +
-+	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
-+	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
++	/* Useful for KASLR robustness */
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
++		return true;
 +
-+	/* The trampoline is always mapped and can therefore be global */
-+	pgprot_val(prot) &= ~PTE_NG;
++	return false;
++}
 +
-+	/* Map only the text into the trampoline page table */
-+	memset(tramp_pg_dir, 0, PGD_SIZE);
-+	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
-+			     prot, pgd_pgtable_alloc, 0);
++static int __init parse_kpti(char *str)
++{
++	bool enabled;
++	int ret = strtobool(str, &enabled);
 +
-+	/* ...as well as the kernel page table */
-+	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
++	if (ret)
++		return ret;
++
++	__kpti_forced = enabled ? 1 : -1;
 +	return 0;
 +}
-+core_initcall(map_entry_trampoline);
-+#endif
++__setup("kpti=", parse_kpti);
++#endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
 +
- /*
-  * Create fine-grained mappings for the kernel.
-  */
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -829,6 +863,13 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.def_scope = SCOPE_SYSTEM,
+ 		.matches = hyp_offset_low,
+ 	},
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	{
++		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = unmap_kernel_at_el0,
++	},
++#endif
+ 	{},
+ };
+ 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index eccb6d8..54f35cc 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -73,6 +73,7 @@
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++alternative_if ARM64_UNMAP_KERNEL_AT_EL0
+ 	.if	\el == 0
+ 	.if	\regsize == 64
+ 	mrs	x30, tpidrro_el0
+@@ -81,6 +82,7 @@
+ 	mov	x30, xzr
+ 	.endif
+ 	.endif
++alternative_else_nop_endif
+ #endif
+ 
+ 	sub	sp, sp, #S_FRAME_SIZE
+@@ -208,10 +210,9 @@ alternative_else_nop_endif
+ 	ldr	lr, [sp, #S_LR]
+ 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+ 
+-#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
+-	eret
+-#else
+ 	.if	\el == 0
++alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	bne	4f
+ 	msr	far_el1, x30
+ 	tramp_alias	x30, tramp_exit_native
+@@ -219,10 +220,10 @@ alternative_else_nop_endif
+ 4:
+ 	tramp_alias	x30, tramp_exit_compat
+ 	br	x30
++#endif
+ 	.else
+ 	eret
+ 	.endif
+-#endif
+ 	.endm
+ 
+ 	.macro	get_thread_info, rd
 -- 
 2.7.4
