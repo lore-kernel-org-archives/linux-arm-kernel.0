@@ -1,19 +1,19 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Wed, 28 Feb 2018 11:56:24 +0800
-Subject: [PATCH 02/29] arm64: mm: Move ASID from TTBR0 to TTBR1
+Date: Wed, 28 Feb 2018 11:56:25 +0800
+Subject: [PATCH 03/29] arm64: mm: Allocate ASIDs in pairs
 In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
 References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519790211-16582-3-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519790211-16582-4-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 7655abb95386 upstream.
+commit 0c8ea531b774 upstream.
 
-In preparation for mapping kernelspace and userspace with different
-ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
-TTBR0 via an invalid mapping (the zero page).
+In preparation for separate kernel/user ASIDs, allocate them in pairs
+for each mm_struct. The bottom bit distinguishes the two: if it is set,
+then the ASID will map only userspace.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
@@ -22,88 +22,86 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 
 Conflicts:
-	no pre_ttbr0_update_workaround in arch/arm64/mm/proc.S
+	no MMCF_AARCH32 in arch/arm64/include/asm/mmu.h
 ---
- arch/arm64/include/asm/mmu_context.h   | 7 +++++++
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/include/asm/proc-fns.h      | 6 ------
- arch/arm64/mm/proc.S                   | 9 ++++++---
- 4 files changed, 14 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/mmu.h |  2 ++
+ arch/arm64/mm/context.c      | 25 +++++++++++++++++--------
+ 2 files changed, 19 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index a501853..b96c4799 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -50,6 +50,13 @@ static inline void cpu_set_reserved_ttbr0(void)
- 	isb();
- }
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 8d9fce0..49924e5 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_MMU_H
+ #define __ASM_MMU_H
  
-+static inline void cpu_switch_mm(pgd_t *pgd, struct mm_struct *mm)
-+{
-+	BUG_ON(pgd == swapper_pg_dir);
-+	cpu_set_reserved_ttbr0();
-+	cpu_do_switch_mm(virt_to_phys(pgd),mm);
-+}
++#define USER_ASID_FLAG	(UL(1) << 48)
 +
- /*
-  * TCR.T0SZ value to use when the ID map is active. Usually equals
-  * TCR_T0SZ(VA_BITS), unless system RAM is positioned very high in
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index eb0c2bd..8df4cb6 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -272,6 +272,7 @@
- #define TCR_TG1_4K		(UL(2) << TCR_TG1_SHIFT)
- #define TCR_TG1_64K		(UL(3) << TCR_TG1_SHIFT)
+ typedef struct {
+ 	atomic64_t	id;
+ 	void		*vdso;
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index efcf1f7..f00f5ee 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -39,7 +39,16 @@ static cpumask_t tlb_flush_pending;
  
-+#define TCR_A1			(UL(1) << 22)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
- #define TCR_HA			(UL(1) << 39)
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 14ad6e4..16cef2e 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -35,12 +35,6 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
+ #define ASID_FIRST_VERSION	(1UL << asid_bits)
+-#define NUM_USER_ASIDS		ASID_FIRST_VERSION
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
++#define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
++#define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
++#else
++#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
++#define asid2idx(asid)		((asid) & ~ASID_MASK)
++#define idx2asid(idx)		asid2idx(idx)
++#endif
  
- #include <asm/memory.h>
+ /* Get the ASIDBits supported by the current CPU */
+ static u32 get_cpu_asid_bits(void)
+@@ -104,7 +113,7 @@ static void flush_context(unsigned int cpu)
+ 		 */
+ 		if (asid == 0)
+ 			asid = per_cpu(reserved_asids, i);
+-		__set_bit(asid & ~ASID_MASK, asid_map);
++		__set_bit(asid2idx(asid), asid_map);
+ 		per_cpu(reserved_asids, i) = asid;
+ 	}
  
--#define cpu_switch_mm(pgd,mm)				\
--do {							\
--	BUG_ON(pgd == swapper_pg_dir);			\
--	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
--} while (0)
--
- #endif /* __ASSEMBLY__ */
- #endif /* __KERNEL__ */
- #endif /* __ASM_PROCFNS_H */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 352c73b..3378f3e 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -132,9 +132,12 @@ ENDPROC(cpu_do_resume)
-  *	- pgd_phys - physical address of new TTB
-  */
- ENTRY(cpu_do_switch_mm)
-+	mrs	x2, ttbr1_el1
- 	mmid	x1, x1				// get mm->context.id
--	bfi	x0, x1, #48, #16		// set the ASID
--	msr	ttbr0_el1, x0			// set TTBR0
-+	bfi	x2, x1, #48, #16		// set the ASID
-+	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
-+	isb
-+	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
- alternative_if ARM64_WORKAROUND_CAVIUM_27456
- 	ic	iallu
-@@ -222,7 +225,7 @@ ENTRY(__cpu_setup)
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
--			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
- 	tcr_set_idmap_t0sz	x10, x9
+@@ -159,16 +168,16 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ 		 * We had a valid ASID in a previous life, so try to re-use
+ 		 * it if possible.
+ 		 */
+-		asid &= ~ASID_MASK;
+-		if (!__test_and_set_bit(asid, asid_map))
++		if (!__test_and_set_bit(asid2idx(asid), asid_map))
+ 			return newasid;
+ 	}
  
  	/*
+ 	 * Allocate a free ASID. If we can't find one, take a note of the
+-	 * currently active ASIDs and mark the TLBs as requiring flushes.
+-	 * We always count from ASID #1, as we use ASID #0 when setting a
+-	 * reserved TTBR0 for the init_mm.
++	 * currently active ASIDs and mark the TLBs as requiring flushes.  We
++	 * always count from ASID #2 (index 1), as we use ASID #0 when setting
++	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
++	 * pairs.
+ 	 */
+ 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
+ 	if (asid != NUM_USER_ASIDS)
+@@ -185,7 +194,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ set_asid:
+ 	__set_bit(asid, asid_map);
+ 	cur_idx = asid;
+-	return asid | generation;
++	return idx2asid(asid) | generation;
+ }
+ 
+ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
 -- 
 2.7.4
