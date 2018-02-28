@@ -1,85 +1,52 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 28 Feb 2018 15:35:53 +0100
-Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a register
- clock
-Message-ID: <20180228143553.12485-1-gregory.clement@bootlin.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 28 Feb 2018 15:40:13 +0100
+Subject: [PATCH 0/3] add CPUs OPPs to sun8i a83t
+In-Reply-To: <cover.f1ec43f8d2a0151c52434f0952e973b19626f285.1519823347.git-series.quentin.schulz@bootlin.com>
+References: <cover.f1ec43f8d2a0151c52434f0952e973b19626f285.1519823347.git-series.quentin.schulz@bootlin.com>
+Message-ID: <20180228144013.ayd65zbezdya7cbo@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 7K/8K we need to explicitly enable the register clock. This
-clock is optional because not all the SoCs using this IP need it but at
-least for Armada 7K/8K it is actually mandatory.
+On Wed, Feb 28, 2018 at 02:11:19PM +0100, Quentin Schulz wrote:
+> Hi all,
+> 
+> The Allwinner A83T is an octacore A7 divided in two clusters of 4 A7,
+> each cluster having its own regulator and clock.
+> 
+> Let's add the OPPs for each cluster so that we can use cpufreq on this SoC.
+> 
+> The operating points were found in Allwinner BSP and fex files and have
+> been tested on a TBS A711 with cpuburn and cpufreq-ljt-stress-test.
+> 
+> Note that there are a few OPPs that are missing:
+> 
+> 1608000000Hz with 920000mV
+> 1800000000Hz with 1000000mV
+> 2016000000Hz with 1080000mV
+> 
+> These OPPs are pretty unstable but it might be due to the SoC quickly
+> overheating (till the board completely shuts down).
+> It seems[1] impossible to reach those frequencies with none or passive
+> cooling, so better leave them out by default.
+> 
+> It's still possible to add those OPPs on a per-board basis though.
+> 
+> [1] http://linux-sunxi.org/User:Tkaiser#First_steps_with_Banana_Pi_M3
 
-The binding documentation is updated accordingly.
+Applied all three. The patch 3/3 wasn't ordered properly, so I fixed
+it, and I removed the newline pointed out by Thomas.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
- drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
- 2 files changed, 19 insertions(+), 1 deletion(-)
+Thanks!
+Maxime
 
-diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-index c08fb477b3c6..4ee9813bf88f 100644
---- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-@@ -14,7 +14,11 @@ Required properties:
- - #address-cells: shall be set to 1. Encode the NAND CS.
- - #size-cells: shall be set to 0.
- - interrupts: shall define the NAND controller interrupt.
--- clocks: shall reference the NAND controller clock.
-+- clocks: shall reference the NAND controller clocks, the second one is
-+  optional but needed for the Armada 7K/8K SoCs
-+- clock-names: mandatory if there is a second clock, in this case the
-+   name must be "core" for the first clock and "reg" for the second
-+   one
- - marvell,system-controller: Set to retrieve the syscon node that handles
-   NAND controller related registers (only required with the
-   "marvell,armada-8k-nand[-controller]" compatibles).
-diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
-index 2196f2a233d6..be874c636b5f 100644
---- a/drivers/mtd/nand/marvell_nand.c
-+++ b/drivers/mtd/nand/marvell_nand.c
-@@ -321,6 +321,7 @@ struct marvell_nfc {
- 	struct device *dev;
- 	void __iomem *regs;
- 	struct clk *ecc_clk;
-+	struct clk *reg_clk;
- 	struct completion complete;
- 	unsigned long assigned_cs;
- 	struct list_head chips;
-@@ -2747,6 +2748,17 @@ static int marvell_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
-+	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) == -EPROBE_DEFER) {
-+		clk_disable_unprepare(nfc->ecc_clk);
-+		return -EPROBE_DEFER;
-+	}
-+	if (!IS_ERR(nfc->reg_clk)) {
-+		ret = clk_prepare_enable(nfc->reg_clk);
-+		if (ret)
-+			goto unprepare_clk;
-+	}
-+
- 	marvell_nfc_disable_int(nfc, NDCR_ALL_INT);
- 	marvell_nfc_clear_int(nfc, NDCR_ALL_INT);
- 	ret = devm_request_irq(dev, irq, marvell_nfc_isr,
-@@ -2780,6 +2792,7 @@ static int marvell_nfc_probe(struct platform_device *pdev)
- 	return 0;
- 
- unprepare_clk:
-+	clk_disable_unprepare(nfc->reg_clk);
- 	clk_disable_unprepare(nfc->ecc_clk);
- 
- 	return ret;
-@@ -2797,6 +2810,7 @@ static int marvell_nfc_remove(struct platform_device *pdev)
- 	}
- 
- 	clk_disable_unprepare(nfc->ecc_clk);
-+	clk_disable_unprepare(nfc->reg_clk);
- 
- 	return 0;
- }
 -- 
-2.16.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180228/9f243e83/attachment.sig>
