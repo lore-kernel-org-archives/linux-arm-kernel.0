@@ -1,14 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 28 Feb 2018 06:41:04 -0800
-Subject: [PATCH v4 20/22] nvmem: rockchip-efuse: Do not use "&pdev->dev"
- explicitly
+Date: Wed, 28 Feb 2018 06:41:05 -0800
+Subject: [PATCH v4 21/22] nvmem: imx-iim: Do not use "&pdev->dev" explicitly
 In-Reply-To: <20180228144106.16363-1-andrew.smirnov@gmail.com>
 References: <20180228144106.16363-1-andrew.smirnov@gmail.com>
-Message-ID: <20180228144106.16363-21-andrew.smirnov@gmail.com>
+Message-ID: <20180228144106.16363-22-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's "dev" variable for this already. Use it.
+There's already "dev" variable for that. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,38 +23,21 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/imx-iim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index ca686f8f5166..593d9b0b5506 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -268,21 +268,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
+index 635561a441bd..3022bd96bd7e 100644
+--- a/drivers/nvmem/imx-iim.c
++++ b/drivers/nvmem/imx-iim.c
+@@ -125,7 +125,7 @@ static int imx_iim_probe(struct platform_device *pdev)
  
--	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
- 	if (!efuse)
- 		return -ENOMEM;
+ 	drvdata = of_id->data;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	efuse->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
+-	iim->clk = devm_clk_get(&pdev->dev, NULL);
++	iim->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(iim->clk))
+ 		return PTR_ERR(iim->clk);
  
--	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	efuse->clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(efuse->clk))
- 		return PTR_ERR(efuse->clk);
- 
--	efuse->dev = &pdev->dev;
-+	efuse->dev = dev;
- 	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
- 				 &econfig.size))
- 		econfig.size = resource_size(res);
 -- 
 2.14.3
