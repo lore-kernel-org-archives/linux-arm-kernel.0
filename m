@@ -1,61 +1,222 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 28 Feb 2018 17:34:19 +0100
-Subject: [PATCH] drm/sun4i: init dclk_min_div & dclk_max_div inside
- encoder init functions
-In-Reply-To: <20180228155559.lqm22dzeiptrwyxe@flea>
-References: <1519822318-3974-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180228155559.lqm22dzeiptrwyxe@flea>
-Message-ID: <ee7bff10-527a-5481-598b-47e1d7a9eeb6@micronovasrl.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 28 Feb 2018 08:34:49 -0800
+Subject: [RFC 0/4] Add support for the Gateworks System Controller
+In-Reply-To: <20180228144424.GC12303@lunn.ch>
+References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
+ <20180228144424.GC12303@lunn.ch>
+Message-ID: <CAJ+vNU3hG7z1mB0xKFZu-8o1r3hj-pOqkfVnWHvxxaxzrpGuzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Il 28/02/2018 16:55, Maxime Ripard ha scritto:
-> Hi,
-> 
-> On Wed, Feb 28, 2018 at 01:51:58PM +0100, Giulio Benetti wrote:
->> sun4i_dclk_round_rate is called before sun4i_tcon_mode_set,
->> so it finds dclk_min_div and dclk_max_div set to 0 and fails
->> adding crtc.
+On Wed, Feb 28, 2018 at 6:44 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Feb 27, 2018 at 05:21:10PM -0800, Tim Harvey wrote:
+>> This series adds support for the Gateworks System Controller used on Gateworks
+>> Laguna, Ventana, and Newport product families.
 >>
->> Move dclk_min_div and dclk_max_div to encoders init functions.
->>
->> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> 
-> I sent a similar patch there:
-> https://lists.freedesktop.org/archives/dri-devel/2018-February/166666.html
+>> The GSC is an MSP430 I2C slave controller whose firmware embeds the following
+>> features:
+>>  - I/O expander (16 GPIO's emulating a PCA955x)
+>>  - EEPROM (enumating AT24)
+>>  - RTC (enumating DS1672)
+>
+> Hi Tim
+>
+> Maybe it is in these patches, and i missed it....
+>
+> How do these emulated devices work? Does the controller respond to
+> different addresses for these different emulated devices? Or is it an
+> I2c bus mux?
+>
 
-I've missed that.
-And where you put it is better, since it's called every time set_mode is 
-called.
+Andrew,
 
-On lvds instead I don't see anything about this,
-it should have the same potential problem.
-Also I can't understand why it has been set min=7 and max=7 on lvds.
-With those values I would obtain 77Mhz only.
-And I can't find values on datasheet for minimum and maximum.
+You didn't miss it - I probably need to explain it better.
 
-> 
-> I guess eventually, we'll want to remove the usage of the clock
-> framework entirely, but it's not really the scope of a fix.
+The 'emulated devices' do respond on different slave addresses (which
+match one of or the only the slave addresses those parts support). For
+example the device-tree for the GW54xx has the following which are all
+from the GSC which is the only thing on i2c1:
 
-Where would you handle dclk instead of tcon?
+&i2c1 {
+        clock-frequency = <100000>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i2c1>;
+        status = "okay";
 
-Thanks
+        gsc: gsc at 20 {
+                compatible = "gw,gsc_v2";
+                reg = <0x20>;
+                interrupt-parent = <&gpio1>;
+                interrupts = <4 GPIO_ACTIVE_LOW>;
+                interrupt-controller;
+                #interrupt-cells = <1>;
 
--- 
-Giulio Benetti
-CTO
+                gsc_input {
+                        compatible = "gw,gsc-input";
+                };
 
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+                gsc_hwmon {
+                        compatible = "gw,gsc-hwmon";
+                        #address-cells = <1>;
+                        #size-cells = <0>;
 
-> 
-> Maxime
-> 
+                        hwmon at 0 { /* A0: Board Temperature */
+                                type = <0>;
+                                reg = <0x00>;
+                                label = "temp";
+                                /* lookup table */
+                        };
+
+                        hwmon at 1 { /* A1: Input Voltage */
+                                type = <1>;
+                                reg = <0x02>;
+                                label = "Vin";
+                                gw,voltage-divider = <22100 1000>;
+                                gw,offset = <800>;
+                        };
+
+                        hwmon at 2 { /* A2: 5P0 */
+                                type = <1>;
+                                reg = <0x0b>;
+                                label = "5P0";
+                                gw,voltage-divider = <22100 1000>;
+                        };
+
+                        hwmon at 4 { /* A4: 0-5V input */
+                                type = <1>;
+                                reg = <0x14>;
+                                label = "ANL0";
+                                gw,voltage-divider = <10000 10000>;
+                        };
+
+                        hwmon at 5 { /* A5: 2P5 PCIe/GigE */
+                                type = <1>;
+                                reg = <0x23>;
+                                label = "2P5";
+                                gw,voltage-divider = <10000 10000>;
+                        };
+
+                        hwmon at 6 { /* A6: 1P8 Aud/Vid */
+                                type = <1>;
+                                reg = <0x1d>;
+                                label = "1P8";
+                        };
+
+                        hwmon at 7 { /* A7: GPS */
+                                type = <1>;
+                                reg = <0x26>;
+                                label = "GPS";
+                                gw,voltage-divider = <4990 10000>;
+                        };
+
+                        hwmon at 12 { /* A12: VDD_CORE */
+                                type = <1>;
+                                reg = <0x3>;
+                                label = "VDD_CORE";
+                        };
+
+                        hwmon at 13 { /* A13: VDD_SOC */
+                                type = <1>;
+                                reg = <0x11>;
+                                label = "VDD_SOC";
+                        };
+
+                        hwmon at 14 { /* A14: 1P0 PCIe SW */
+                                type = <1>;
+                                reg = <0x20>;
+                                label = "1P0";
+                        };
+
+                        hwmon at 15 { /* fan0 */
+                                type = <2>;
+                                reg = <0x2c>;
+                                label = "fan_50p";
+                        };
+
+                        hwmon at 16 { /* fan1 */
+                                type = <2>;
+                                reg = <0x2e>;
+                                label = "fan_60p";
+                        };
+
+                        hwmon at 17 { /* fan2 */
+                                type = <2>;
+                                reg = <0x30>;
+                                label = "fan_70p";
+                        };
+
+                        hwmon at 18 { /* fan3 */
+                                type = <2>;
+                                reg = <0x32>;
+                                label = "fan_80p";
+                        };
+
+                        hwmon at 19 { /* fan4 */
+                                type = <2>;
+                                reg = <0x34>;
+                                label = "fan_90p";
+                        };
+
+                        hwmon at 20 { /* fan5 */
+                                type = <2>;
+                                reg = <0x36>;
+                                label = "fan_100p";
+                        };
+                };
+        };
+
+        gsc_gpio: pca9555 at 23 {
+                compatible = "nxp,pca9555";
+                reg = <0x23>;
+                gpio-controller;
+                #gpio-cells = <2>;
+                interrupt-parent = <&gsc>;
+                interrupts = <4>;
+        };
+
+        eeprom1: eeprom at 50 {
+                compatible = "atmel,24c02";
+                reg = <0x50>;
+                pagesize = <16>;
+        };
+
+        eeprom2: eeprom at 51 {
+                compatible = "atmel,24c02";
+                reg = <0x51>;
+                pagesize = <16>;
+        };
+
+        eeprom3: eeprom at 52 {
+                compatible = "atmel,24c02";
+                reg = <0x52>;
+                pagesize = <16>;
+        };
+
+        eeprom4: eeprom at 53 {
+                compatible = "atmel,24c02";
+                reg = <0x53>;
+                pagesize = <16>;
+        };
+
+        rtc: ds1672 at 68 {
+                compatible = "dallas,ds1672";
+                reg = <0x68>;
+        };
+};
+
+
+One issue I'm trying to figure out the best way to deal with is the
+fact that the GSC can 'NAK' transactions occasionally which is why I
+override the regmap read/write functions and provide retries. This
+resolves the issue for the mfd core driver and sub-module drivers but
+doesn't resolve the issue with these 'emulated devices' which have
+their own stand-alone drivers. I'm not sure how to best deal with that
+yet. I tried to add retires to the i2c adapter but that wasn't
+accepted upstream because it was too generic and I was told I need to
+work around it in device-drivers. I'm guessing I need to write my own
+sub-module drivers that will largely duplicate whats in the
+stand-alone drivers (ds1672, at24, pca9553x).
+
+Regards,
+
+Tim
