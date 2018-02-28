@@ -1,25 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Feb 2018 16:07:35 +0000
-Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
- patchset related
-In-Reply-To: <20180228154523.GA29931@akinoame>
-References: <20180228154523.GA29931@akinoame>
-Message-ID: <20180228160735.GA22612@arm.com>
+From: mgautam@codeaurora.org (Manu Gautam)
+Date: Wed, 28 Feb 2018 21:39:05 +0530
+Subject: [PATCH 2/2] usb: host: xhci-plat: Fix clock resource by adding a
+ register clock
+In-Reply-To: <20180214161620.4401-3-gregory.clement@bootlin.com>
+References: <20180214161620.4401-1-gregory.clement@bootlin.com>
+ <20180214161620.4401-3-gregory.clement@bootlin.com>
+Message-ID: <da059a0e-d6f3-73e4-b58d-b3db074c0601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 04:45:23PM +0100, Paolo Pisati wrote:
-> Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
-> intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
-> (it usually shows up in less than 10 iterations but i tested 32 boots before
-> marking it good).
+Hi,
 
-[...]
 
-> Anything else i can do to help debug this?
+On 2/14/2018 9:46 PM, Gregory CLEMENT wrote:
+> On Armada 7K/8K we need to explicitly enable the register clock. This
+> clock is optional because not all the SoCs using this IP need it but at
+> least for Armada 7K/8K it is actually mandatory.
+>
+> The change was done at xhci-plat level and not at a xhci-mvebu.c because,
+> it is expected that other SoC would have this kind of constraint.
+>
+> The binding documentation is updating accordingly.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/usb/usb-xhci.txt |  5 +++-
+>  drivers/usb/host/xhci-plat.c                       | 33 ++++++++++++++++++----
+>  drivers/usb/host/xhci.h                            |  3 +-
+>  3 files changed, 33 insertions(+), 8 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> index e2ea59bbca93..e4b14511f4f8 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> @@ -27,7 +27,10 @@ Required properties:
+>    - interrupts: one XHCI interrupt should be described here.
+>  
+>  Optional properties:
+> -  - clocks: reference to a clock
+> +  - clocks: reference to the clocks
+> +  - clock-names: mandatory if there is a second clock, in this case
+> +    the name must be "core" for the first clock and "reg" for the
+> +    second one
+>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 79afaac57ef6..fd0c399013a2 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -157,6 +157,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	struct resource         *res;
+>  	struct usb_hcd		*hcd;
+>  	struct clk              *clk;
+> +	struct clk              *reg_clk;
+>  	int			ret;
+>  	int			irq;
+>  
+> @@ -226,17 +227,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	hcd->rsrc_len = resource_size(res);
+>  
+>  	/*
+> -	 * Not all platforms have a clk so it is not an error if the
+> -	 * clock does not exists.
+> +	 * Not all platforms have clks so it is not an error if the
+> +	 * clock do not exist.
+>  	 */
+> +	reg_clk = devm_clk_get(&pdev->dev, "reg");
+> +	if (!IS_ERR(reg_clk)) {
+> +		ret = clk_prepare_enable(reg_clk);
+> +		if (ret)
+> +			goto put_hcd;
+> +	} else if (PTR_ERR(reg_clk) == -EPROBE_DEFER) {
+> +		ret = -EPROBE_DEFER;
+> +		goto put_hcd;
+> +	}
+> +
 
-If you could share the crash log, that would be helpful.
+How about using clk_bulk_ APIs?
 
-Cheers,
+>  	clk = devm_clk_get(&pdev->dev, NULL);
+>  	if (!IS_ERR(clk)) {
+>  		ret = clk_prepare_enable(clk);
+>
 
-Will
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
