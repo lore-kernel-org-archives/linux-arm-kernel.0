@@ -1,66 +1,39 @@
 From: samuel@sholland.org (Samuel Holland)
-Date: Tue, 27 Feb 2018 20:27:12 -0600
-Subject: [PATCH 1/3] dt-bindings: Add a binding for the sunxi message box
-In-Reply-To: <20180228022714.30068-1-samuel@sholland.org>
-References: <20180228022714.30068-1-samuel@sholland.org>
-Message-ID: <20180228022714.30068-2-samuel@sholland.org>
+Date: Tue, 27 Feb 2018 20:27:11 -0600
+Subject: [PATCH 0/3] Allwinner sunxi message box support
+Message-ID: <20180228022714.30068-1-samuel@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mailbox hardware is present in several Allwinner sun8i and sun50i
-SoCs. Add a device tree binding for it.
+This series adds support for the "hardware message box" in recent
+Allwinner sunxi SoCs, used for communication with the ARISC management
+processor (the platform's equivalent of the ARM SCP). The end goal is to
+use the arm_scpi driver as a client, communicating with firmware running
+on the ARISC CPU.
 
-Signed-off-by: Samuel Holland <samuel@sholland.org>
----
- .../devicetree/bindings/mailbox/sunxi-msgbox.txt   | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+This driver has been tested with the base arm_scpi driver (which sends
+the SCPI_CMD_SCPI_CAPABILITIES command at probe time) and an in-progress
+firmware application running on the ARISC CPU. Because no firmware for
+the other end of the mailbox is complete at the moment, I have not
+included changes to the SoC device trees.
+
+The second patch in the series fixes an issue in the mailbox framework
+discovered while writing this driver. It is a re-send of a patch I
+originally sent by itself in January.
+
+Samuel Holland (3):
+  dt-bindings: Add a binding for the sunxi message box
+  mailbox: Avoid NULL dereference in mbox_chan_received_data
+  mailbox: sunxi-msgbox: Add a new mailbox driver
+
+ .../devicetree/bindings/mailbox/sunxi-msgbox.txt   |  40 +++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox.c                          |   6 +-
+ drivers/mailbox/sunxi-msgbox.c                     | 323 +++++++++++++++++++++
+ 5 files changed, 376 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
+ create mode 100644 drivers/mailbox/sunxi-msgbox.c
 
-diff --git a/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
-new file mode 100644
-index 000000000000..3b3ed7f870a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
-@@ -0,0 +1,40 @@
-+Allwinner sunxi Message Box
-+===========================
-+
-+The hardware message box on sunxi SoCs is a two-user mailbox controller
-+containing 8 unidirectional FIFOs bonded into 4 bidirectional mailbox channels.
-+An interrupt is raised for received messages, but software must poll to know
-+when a transmitted message has been acknowledged by the remote user.
-+
-+Refer to ./mailbox.txt for generic information about mailbox device-tree
-+bindings.
-+
-+Mailbox Device Node:
-+====================
-+
-+Required properties:
-+--------------------
-+- compatible:		Must be "allwinner,sunxi-msgbox".
-+- reg:			Contains the mailbox register address range (base
-+			address and length).
-+- clocks:		phandle for the clock controller and specifier.
-+- clock-names:		Must be "bus".
-+- resets:		phandle for the reset controller and specifier.
-+- reset-names:		Must be "bus".
-+- interrupts:		Contains interrupt information for the mailbox.
-+- #mbox-cells		Must be 2 - the indexes of the transmit and receive
-+			channels, respectively.
-+
-+Example:
-+--------
-+
-+	msgbox: mailbox at 1c17000 {
-+		compatible = "allwinner,sunxi-msgbox";
-+		reg = <0x01c17000 0x1000>;
-+		clocks = <&ccu CLK_BUS_MSGBOX>;
-+		clock-names = "bus";
-+		resets = <&ccu RST_BUS_MSGBOX>;
-+		reset-names = "bus";
-+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+		#mbox-cells = <2>;
-+	};
 -- 
 2.13.6
