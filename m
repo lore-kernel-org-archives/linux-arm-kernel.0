@@ -1,28 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 28 Feb 2018 15:44:24 +0100
-Subject: [RFC 0/4] Add support for the Gateworks System Controller
-In-Reply-To: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
-References: <1519780874-8558-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20180228144424.GC12303@lunn.ch>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 28 Feb 2018 15:47:02 +0100
+Subject: [PATCH 0/2] PCI: armada8k: Fix clock resource for Armada 7K/8K
+Message-ID: <20180228144704.12947-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 05:21:10PM -0800, Tim Harvey wrote:
-> This series adds support for the Gateworks System Controller used on Gateworks
-> Laguna, Ventana, and Newport product families.
-> 
-> The GSC is an MSP430 I2C slave controller whose firmware embeds the following
-> features:
->  - I/O expander (16 GPIO's emulating a PCA955x)
->  - EEPROM (enumating AT24)
->  - RTC (enumating DS1672)
+Hi,
 
-Hi Tim
+This short series fixes the way the clocks are used for the PCIe host
+controller embedded in the Marvell Armada 7K/8K SoCs. On these SoCs a
+second one is needed in order to clock the registers. It was not
+noticed until now because we relied on the bootloader and also because
+the clock driver was wrong.
 
-Maybe it is in these patches, and i missed it....
+Thanks to this fix, it would be possible to fix the clock driver
+without introducing a regression.
 
-How do these emulated devices work? Does the controller respond to
-different addresses for these different emulated devices? Or is it an
-I2c bus mux?
+The first patch is just a small cleanup found when I wrote the main
+patch.
 
-    Andrew
+Gregory CLEMENT (2):
+  PCI: armada8k: Remove useless test before clk_disable_unprepare
+  PCI: armada8k: Fix clock resource by adding a register clock
+
+ Documentation/devicetree/bindings/pci/pci-armada8k.txt |  6 +++++-
+ drivers/pci/dwc/pcie-armada8k.c                        | 14 ++++++++++++--
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+-- 
+2.16.1
