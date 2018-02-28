@@ -1,86 +1,42 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 28 Feb 2018 13:57:43 +0900
-Subject: [PATCH v2 2/3] lkdtm: handle unresolved name for probing
-In-Reply-To: <20180228045744.12914-1-takahiro.akashi@linaro.org>
-References: <20180228045744.12914-1-takahiro.akashi@linaro.org>
-Message-ID: <20180228045744.12914-3-takahiro.akashi@linaro.org>
+Date: Wed, 28 Feb 2018 13:57:41 +0900
+Subject: [PATCH v2 0/3] lkdtm: fix irq handler entry for arm64
+Message-ID: <20180228045744.12914-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 doesn't have "do_IRQ" function, INT_HARDWARE_ENTRY just doesn't
-work.
+Lkdtm is a handy way for testing kdump in case of panic in interrupt
+context:
+   echo PANIC > /sys/kernel/debug/provoke-crash/INT_HARDWARE_ENTRY
 
-This patch provides a generalized approach for handling such an unresolved
-name for probing. Currently we handle only INT_HARDWARE_ENTRY, but may
-extend this workaround for others, if applicable, in the future.
+But this just doesn't work on arm64 since "do_IRQ" function doesn't
+exist on arm64. This patch series addresses this problem.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- drivers/misc/lkdtm_core.c | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+Patch#1 is a preliminary fix for the rest and allows for probing any
+exception entries, including irq handler, on arm64.
+Patch#2 provides a generalized approach for this issue on lkdtm side.
+Patch#3 is an arm64-specific fix.
 
-diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-index 2154d1bfd18b..737e7e0f50f4 100644
---- a/drivers/misc/lkdtm_core.c
-+++ b/drivers/misc/lkdtm_core.c
-@@ -39,6 +39,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/hrtimer.h>
-+#include <linux/kallsyms.h>
- #include <linux/slab.h>
- #include <scsi/scsi_cmnd.h>
- #include <linux/debugfs.h>
-@@ -235,6 +236,9 @@ static noinline void lkdtm_do_action(const struct crashtype *crashtype)
- 	crashtype->func();
- }
- 
-+/* Architecture may overwrite this. */
-+unsigned long __weak get_handle_irq(void) { return 0; }
-+
- static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
- 				 const struct crashtype *crashtype)
- {
-@@ -249,13 +253,38 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
- 	if (lkdtm_kprobe != NULL)
- 		unregister_kprobe(lkdtm_kprobe);
- 
-+	if (!kallsyms_lookup_name(crashpoint->kprobe.symbol_name)) {
-+		/* This symbol is not arhcitecture agnostic. */
-+		if (!strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
-+			unsigned long func;
-+
-+			func = get_handle_irq();
-+			if (func) {
-+				crashpoint->kprobe.addr =
-+						(kprobe_opcode_t *)func;
-+				/*
-+				 * Instantiating kprobe.symbol_name here, say
-+				 * with lookup_symbol_name(*handle_arch_irq),
-+				 * would cause register_kprobe() to fail.
-+				 */
-+				crashpoint->kprobe.symbol_name = NULL;
-+			} else {
-+				pr_info("Couldn't find a function for INT_HARDWARE_ENTRY\n");
-+				return -EINVAL;
-+			}
-+		}
-+	}
- 	lkdtm_crashpoint = crashpoint;
- 	lkdtm_crashtype = crashtype;
- 	lkdtm_kprobe = &crashpoint->kprobe;
- 	ret = register_kprobe(lkdtm_kprobe);
- 	if (ret < 0) {
--		pr_info("Couldn't register kprobe %s\n",
--			crashpoint->kprobe.symbol_name);
-+		if (crashpoint->kprobe.symbol_name)
-+			pr_info("Couldn't register kprobe %s\n",
-+				crashpoint->kprobe.symbol_name);
-+		else
-+			pr_info("Couldn't register kprobe 0x%lx\n",
-+				(unsigned long)crashpoint->kprobe.addr);
- 		lkdtm_kprobe = NULL;
- 		lkdtm_crashpoint = NULL;
- 		lkdtm_crashtype = NULL;
+As a hint for further improvement, another hook doesn't work neither:
+* hrtimer_start() was converted to an inline function in v4.2
+but I don't know how we should deal with them.
+(In my v1, I also mentioned handle_IRQ_event, but it was a wrong claim.)
+
+Changes in v2(Feb 27, 2018):
+* provide a generalized approach instead of adding "if (CONFIG_ARM64)"
+  stuff
+
+AKASHI Takahiro (2):
+  lkdtm: handle unresolved name for probing
+  arm64: irq: add get_handle_irq()
+
+Masami Hiramatsu (1):
+  arm64: kprobes: Remove unneeded address sanity check
+
+ arch/arm64/kernel/irq.c            |  7 +++++++
+ arch/arm64/kernel/probes/kprobes.c |  8 --------
+ drivers/misc/lkdtm_core.c          | 33 +++++++++++++++++++++++++++++++--
+ 3 files changed, 38 insertions(+), 10 deletions(-)
+
 -- 
 2.16.2
