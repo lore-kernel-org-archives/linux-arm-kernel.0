@@ -1,48 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 28 Feb 2018 16:24:24 +0000
-Subject: [PATCH] ACPI/IORT: Remove obsolete ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
- define
-Message-ID: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Wed, 28 Feb 2018 17:25:54 +0100
+Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti
+ patchset related
+In-Reply-To: <20180228161833.GB22612@arm.com>
+References: <20180228154523.GA29931@akinoame> <20180228160735.GA22612@arm.com>
+ <20180228161256.GA31013@akinoame> <20180228161833.GB22612@arm.com>
+Message-ID: <20180228162554.GD31013@akinoame>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To defeat ACPICA<->kernel merge order dependencies a preprocessor define
-value was introduced in the IORT compilation unit according to IORT
-revision C, IORT_SMMU_V3_CAVIUM_CN99XX, so that even if the value was
-not defined in ACPICA headers the IORT kernel layer would still be able
-to function and use it.
+On Wed, Feb 28, 2018 at 04:18:33PM +0000, Will Deacon wrote:
+> > 
+> > Oops log here:
+> > https://launchpadlibrarian.net/358687166/submission_2018-02-26T14.58.17.996524.html#9-1-log
+> 
+> The patch that Ard linked to should resolve that particular crash.
+> I see this is a 4.13-based kernel. Is the source tree available anywhere?
 
-Since commit 0c2021c047ba ("ACPICA: IORT: Update SMMU models for
-revision C") finally added the define in ACPICA headers, as required by
-ACPICA IORT support, the preprocessor definition in the IORT kernel
-compilation unit has become obsolete and can be removed.
+https://git.launchpad.net/~p-pisati/ubuntu/+source/linux/log/?h=artful-master-next-arm64-kpti-414-backport
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/arm64/iort.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 95255ecfae7c..c87b17ea03b7 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -31,11 +31,6 @@
- #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
- 				(1 << ACPI_IORT_NODE_SMMU_V3))
- 
--/* Until ACPICA headers cover IORT rev. C */
--#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
--#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
--#endif
--
- struct iort_its_msi_chip {
- 	struct list_head	list;
- 	struct fwnode_handle	*fw_node;
+I'll try that patch, thanks.
 -- 
-2.15.0
+bye,
+p.
