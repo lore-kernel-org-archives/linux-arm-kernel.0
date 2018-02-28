@@ -1,53 +1,56 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 28 Feb 2018 20:33:59 +0800
-Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
-In-Reply-To: <20180226102418.GD6019@linaro.org>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-3-takahiro.akashi@linaro.org>
- <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
- <20180226102418.GD6019@linaro.org>
-Message-ID: <20180228123359.GB2228@dhcp-128-65.nay.redhat.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Wed, 28 Feb 2018 20:36:30 +0800
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+ <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+Message-ID: <5A96A24E.80401@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/18 at 07:24pm, AKASHI Takahiro wrote:
-> On Fri, Feb 23, 2018 at 04:49:34PM +0800, Dave Young wrote:
-> > Hi AKASHI,
-> > 
-> > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
-> > > On arm64, no trampline code between old kernel and new kernel will be
-> > > required in kexec_file implementation. This patch introduces a new
-> > > configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
-> > > compiled in only if necessary.
-> > 
-> > Here also need the explanation about why no purgatory is needed, it would be
-> > required for kexec if no strong reason.
-> 
-> OK, I will add the reason:
-> On arm64, crash dump kernel's usable memory is protected by
-> *unmapping* it from kernel virtual space unlike other architectures
-> where the region is just made read-only.
-> So our key developers think that it is highly unlikely that the region
-> is accidentally corrupted and this rationalizes that digest check code
-> be also dropped from purgatory.
-> This greatly simplifies our purgatory without any need for a bit ugly
-> relocation stuff, i.e. arch_kexec_apply_relocations_add().
-> 
-> Please see:
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
-> to find out how simple our purgatory was. All that it does is
-> to shuffle arguments and jump into a new kernel.
-> 
-> Without this patch, we would have to have purgatory with a space for
-> a hash value (purgatory_sha256_digest) which is never checked against.
-> 
-> Do you think it makes sense?
+Hi Geert,
 
-Hmm, it looks reasonable, I remember there could be some performance
-issue for a purgatory because of cache disabled for arm64. I do not
-object this.
+Thanks for you reply.
 
-[snip]
+On 02/28/2018 08:17 PM, Geert Uytterhoeven wrote:
+> Hi Jeffy,
+>
+> On Wed, Feb 28, 2018 at 12:11 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+>> Currently we are adding all of the attached devices' clocks as pm clocks
+>> and enable them when powering on the power domain.
+>>
+>> This seems unnecessary, because those clocks are already controlled in
+>> the devices' drivers with better error handling.
+>>
+>> Tested on my chromebook minnie(rk3288) and chromebook kevin(rk3399).
+>>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>
+> Thanks for your patch!
+>
+> Just wondering: so you prefer to handle the clocks explicitly in all drivers,
+> instead of delegating this task to Runtime PM?
+hmmm, i think we should control PM clks here, but not all clocks...at 
+least some of the clocks are not required to be enabled while pd power 
+on(waste power?).
 
-Thanks
-Dave
+and seems the drivers might have better control for error 
+handling(decide to ignore or fail to probe or else).
+
+also Runtime PM seems optional(could be disabled in config), and some 
+devices(or even chips) don't have PM.
+
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
+>
+>
