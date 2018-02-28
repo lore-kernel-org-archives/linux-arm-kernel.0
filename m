@@ -1,204 +1,132 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Wed, 28 Feb 2018 09:03:48 +0200
-Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
- based tachometer
-In-Reply-To: <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
-References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
- <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
- <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
- <2510b525-ec36-b49d-5a62-81f335c0d10d@nvidia.com>
- <cfe0d0ce-3a89-bad0-85ba-6edf1135d2dc@roeck-us.net>
- <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
-Message-ID: <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 28 Feb 2018 15:14:08 +0800
+Subject: [PATCH v2 3/4] pinctrl: add mt2712 pinctrl driver
+In-Reply-To: <1519634042-12063-4-git-send-email-zhiyong.tao@mediatek.com>
+References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1519634042-12063-4-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1519802048.8089.17.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2018 08:12 AM, Rajkumar Rampelli wrote:
+
+Hi, Zhiyong
+
+all seems better than v1, but some nitpicking is addressed as below 
+
+	Sean
+
+On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
+> The commit includes mt2712 pinctrl driver.
 > 
-> On Wednesday 28 February 2018 11:28 AM, Guenter Roeck wrote:
->> On 02/27/2018 09:38 PM, Rajkumar Rampelli wrote:
->>>
->>> On Wednesday 21 February 2018 08:20 PM, Guenter Roeck wrote:
->>>> On 02/20/2018 10:58 PM, Rajkumar Rampelli wrote:
->>>>> Add generic PWM based tachometer driver via HWMON interface
->>>>> to report the RPM of motor. This drivers get the period/duty
->>>>> cycle from PWM IP which captures the motor PWM output.
->>>>>
->>>>> This driver implements a simple interface for monitoring the speed of
->>>>> a fan and exposes it in roatations per minute (RPM) to the user space
->>>>> by using the hwmon's sysfs interface
->>>>>
->>>>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
->>>>> ---
->>>>> ? Documentation/hwmon/generic-pwm-tachometer |? 17 +++++
->>>>> ? drivers/hwmon/Kconfig????????????????????? |? 10 +++
->>>>> ? drivers/hwmon/Makefile???????????????????? |?? 1 +
->>>>> ? drivers/hwmon/generic-pwm-tachometer.c???? | 112 
->>>>> +++++++++++++++++++++++++++++
->>>>> ? 4 files changed, 140 insertions(+)
->>>>> ? create mode 100644 Documentation/hwmon/generic-pwm-tachometer
->>>>> ? create mode 100644 drivers/hwmon/generic-pwm-tachometer.c
->>>>>
->>>>> diff --git a/Documentation/hwmon/generic-pwm-tachometer 
->>>>> b/Documentation/hwmon/generic-pwm-tachometer
->>>>> new file mode 100644
->>>>> index 0000000..e0713ee
->>>>> --- /dev/null
->>>>> +++ b/Documentation/hwmon/generic-pwm-tachometer
->>>>> @@ -0,0 +1,17 @@
->>>>> +Kernel driver generic-pwm-tachometer
->>>>> +====================================
->>>>> +
->>>>> +This driver enables the use of a PWM module to monitor a fan. It 
->>>>> uses the
->>>>> +generic PWM interface and can be used on SoCs as along as the SoC 
->>>>> supports
->>>>> +Tachometer controller that moniors the Fan speed in periods.
->>>>> +
->>>>> +Author: Rajkumar Rampelli <rrajk@nvidia.com>
->>>>> +
->>>>> +Description
->>>>> +-----------
->>>>> +
->>>>> +The driver implements a simple interface for monitoring the Fan 
->>>>> speed using
->>>>> +PWM module and Tachometer controller. It requests period value 
->>>>> through PWM
->>>>> +capture interface to Tachometer and measures the Rotations per 
->>>>> minute using
->>>>> +received period value. It exposes the Fan speed in RPM to the user 
->>>>> space by
->>>>> +using the hwmon's sysfs interface.
->>>>> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
->>>>> index ef23553..8912dcb 100644
->>>>> --- a/drivers/hwmon/Kconfig
->>>>> +++ b/drivers/hwmon/Kconfig
->>>>> @@ -1878,6 +1878,16 @@ config SENSORS_XGENE
->>>>> ??????? If you say yes here you get support for the temperature
->>>>> ??????? and power sensors for APM X-Gene SoC.
->>>>> ? +config GENERIC_PWM_TACHOMETER
->>>>> +??? tristate "Generic PWM based tachometer driver"
->>>>> +??? depends on PWM
->>>>> +??? help
->>>>> +????? Enables a driver to use PWM signal from motor to use
->>>>> +????? for measuring the motor speed. The RPM is captured by
->>>>> +????? PWM modules which has PWM capture capability and this
->>>>> +????? drivers reads the captured data from PWM IP to convert
->>>>> +????? it to speed in RPM.
->>>>> +
->>>>> ? if ACPI
->>>>> ??? comment "ACPI drivers"
->>>>> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
->>>>> index f814b4a..9dcc374 100644
->>>>> --- a/drivers/hwmon/Makefile
->>>>> +++ b/drivers/hwmon/Makefile
->>>>> @@ -175,6 +175,7 @@ obj-$(CONFIG_SENSORS_WM8350)??? += wm8350-hwmon.o
->>>>> ? obj-$(CONFIG_SENSORS_XGENE)??? += xgene-hwmon.o
->>>>> ??? obj-$(CONFIG_PMBUS)??????? += pmbus/
->>>>> +obj-$(CONFIG_GENERIC_PWM_TACHOMETER) += generic-pwm-tachometer.o
->>>>> ??? ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
->>>>> ? diff --git a/drivers/hwmon/generic-pwm-tachometer.c 
->>>>> b/drivers/hwmon/generic-pwm-tachometer.c
->>>>> new file mode 100644
->>>>> index 0000000..9354d43
->>>>> --- /dev/null
->>>>> +++ b/drivers/hwmon/generic-pwm-tachometer.c
->>>>> @@ -0,0 +1,112 @@
->>>>> +/*
->>>>> + * Copyright (c) 2017-2018, NVIDIA CORPORATION.? All rights reserved.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or 
->>>>> modify it
->>>>> + * under the terms and conditions of the GNU General Public License,
->>>>> + * version 2, as published by the Free Software Foundation.
->>>>> + *
->>>>> + * This program is distributed in the hope it will be useful, but 
->>>>> WITHOUT
->>>>> + * ANY WARRANTY; without even the implied warranty of 
->>>>> MERCHANTABILITY or
->>>>> + * FITNESS FOR A PARTICULAR PURPOSE.? See the GNU General Public 
->>>>> License for
->>>>> + * more details.
->>>>> + *
->>>>> + */
->>>>> +
->>>>> +#include <linux/module.h>
->>>>> +#include <linux/platform_device.h>
->>>>> +#include <linux/err.h>
->>>>> +#include <linux/pwm.h>
->>>>> +#include <linux/hwmon.h>
->>>>> +#include <linux/hwmon-sysfs.h>
->>>>> +
->>>>> +struct pwm_hwmon_tach {
->>>>> +??? struct device??????? *dev;
->>>>> +??? struct pwm_device??? *pwm;
->>>>> +??? struct device??????? *hwmon;
->>>>> +};
->>>>> +
->>>>> +static ssize_t show_rpm(struct device *dev, struct 
->>>>> device_attribute *attr,
->>>>> +??????????? char *buf)
->>>>> +{
->>>>> +??? struct pwm_hwmon_tach *ptt = dev_get_drvdata(dev);
->>>>> +??? struct pwm_device *pwm = ptt->pwm;
->>>>> +??? struct pwm_capture result;
->>>>> +??? int err;
->>>>> +??? unsigned int rpm = 0;
->>>>> +
->>>>> +??? err = pwm_capture(pwm, &result, 0);
->>>>> +??? if (err < 0) {
->>>>> +??????? dev_err(ptt->dev, "Failed to capture PWM: %d\n", err);
->>>>> +??????? return err;
->>>>> +??? }
->>>>> +
->>>>> +??? if (result.period)
->>>>> +??????? rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
->>>>> +??????????????????????? result.period);
->>>>> +
->>>>> +??? return sprintf(buf, "%u\n", rpm);
->>>>> +}
->>>>> +
->>>>> +static SENSOR_DEVICE_ATTR(rpm, 0444, show_rpm, NULL, 0);
->>>>> +
->>>>> +static struct attribute *pwm_tach_attrs[] = {
->>>>> +??? &sensor_dev_attr_rpm.dev_attr.attr,
->>>>> +??? NULL,
->>>>> +};
->>>>
->>>> "rpm" is not a standard hwmon sysfs attribute. If you don't provide
->>>> a single standard hwmon sysfs attribute, having a hwmon driver is 
->>>> pointless.
->>> Guenter Roeck,
->>> I will define a new hwmon sysfs attribute node called 
->>> "hwmon_tachometer_attributes" in hwmon.h like below and update the 
->>> same in tachometer hwmon driver. Is it fine ?
->>> enum hwmon_tachometer_attributes {
->>
->> Are you kidding me ?
->>
->> Guenter
-> Sorry, I just wanted to confirm whether my understanding is correct or 
-> not before implementing it actually.
-> Or, shall I add this attribute as a part of fan attributes with 
-> "hwmon_fan_rpm" ? or any other way to do it ? I need your inputs in 
-> fixing this.
-
-I think he wants the attribute to be named according to the properties 
-in this document: 
-https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface. I guess 
-the attribute would then map to fan1_input, though I'm not sure if 
-that's 100% correct either since this could technically be attached to 
-something other than a fan. But I would think in practice that's not a 
-big concern.
-
-Guenter,
-Please correct me as well if I'm wrong.
-
-Thank you,
-Mikko
-
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> ---
+>  drivers/pinctrl/mediatek/Kconfig              |    7 +
+>  drivers/pinctrl/mediatek/Makefile             |    1 +
+>  drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  639 ++++++++
+>  drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1973 +++++++++++++++++++++++++
+>  4 files changed, 2620 insertions(+)
+>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
+>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
 > 
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at? http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+> index 3e59874..b24bc76 100644
+> --- a/drivers/pinctrl/mediatek/Kconfig
+> +++ b/drivers/pinctrl/mediatek/Kconfig
+> @@ -32,6 +32,13 @@ config PINCTRL_MT8127
+>  	select PINCTRL_MTK
+>  
+>  # For ARMv8 SoCs
+> +config PINCTRL_MT2712
+> +	bool "Mediatek MT2712 pin control"
+
+
+should be MediaTek for normal
+
+> +	depends on OF
+> +	depends on ARM64 || COMPILE_TEST
+> +	default ARM64 && ARCH_MEDIATEK
+> +	select PINCTRL_MTK
+> +
+>  config PINCTRL_MT7622
+>  	bool "MediaTek MT7622 pin control"
+>  	depends on OF
+> diff --git a/drivers/pinctrl/mediatek/Makefile b/drivers/pinctrl/mediatek/Makefile
+> index ed7d2b2..7959e77 100644
+> --- a/drivers/pinctrl/mediatek/Makefile
+> +++ b/drivers/pinctrl/mediatek/Makefile
+> @@ -4,6 +4,7 @@ obj-$(CONFIG_PINCTRL_MTK)	+= pinctrl-mtk-common.o
+>  
+>  # SoC Drivers
+>  obj-$(CONFIG_PINCTRL_MT2701)	+= pinctrl-mt2701.o
+> +obj-$(CONFIG_PINCTRL_MT2712)	+= pinctrl-mt2712.o
+>  obj-$(CONFIG_PINCTRL_MT8135)	+= pinctrl-mt8135.o
+>  obj-$(CONFIG_PINCTRL_MT8127)	+= pinctrl-mt8127.o
+>  obj-$(CONFIG_PINCTRL_MT7622)	+= pinctrl-mt7622.o
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt2712.c b/drivers/pinctrl/mediatek/pinctrl-mt2712.c
+> new file mode 100644
+> index 0000000..b6ae71b
+> --- /dev/null
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mt2712.c
+> @@ -0,0 +1,639 @@
+> +/*
+> + * Copyright (c) 2014-2015 MediaTek Inc.
+> + * Author: Hongzhou.Yang <hongzhou.yang@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+
+suggest to consider more on using SPDX identifiers and
+using right data for both fields Copyright and Author
+
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/pinctrl/pinctrl.h>
+> +#include <linux/regmap.h>
+> +#include <linux/pinctrl/pinconf-generic.h>
+> +#include <dt-bindings/pinctrl/mt65xx.h>
+> +
+> +#include "pinctrl-mtk-common.h"
+> +#include "pinctrl-mtk-mt2712.h"
+> +
+
+<...>
+
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
+> new file mode 100644
+> index 0000000..71f4190
+> --- /dev/null
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
+> @@ -0,0 +1,1973 @@
+> +/*
+> + * Copyright (C) 2015 MediaTek Inc.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+
+Ditto 
+
+> +#ifndef PINCTRL_MTK_MT2712_H
+> +#define PINCTRL_MTK_MT2712_H
+> +
+
+<...>
+
+> +
+> +#endif /* __PINCTRL_MTK_MT2712_H */
