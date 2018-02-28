@@ -1,56 +1,91 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Feb 2018 16:35:17 +0000
-Subject: [PATCH] ACPI/IORT: Remove obsolete
- ACPI_IORT_SMMU_V3_CAVIUM_CN99XX define
-In-Reply-To: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
-References: <20180228162424.13636-1-lorenzo.pieralisi@arm.com>
-Message-ID: <e6cbbf2a-738c-a77e-efa1-a38a5602ae1c@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 28 Feb 2018 17:35:30 +0100
+Subject: [PATCH v2 2/2] PCI: armada8k: Fix clock resource by adding a register
+ clock
+In-Reply-To: <20180228163530.25389-1-gregory.clement@bootlin.com>
+References: <20180228163530.25389-1-gregory.clement@bootlin.com>
+Message-ID: <20180228163530.25389-3-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Armada 7K/8K we need to explicitly enable the register clock. This
+clock is optional because not all the SoCs using this IP need it but at
+least for Armada 7K/8K it is actually mandatory.
 
-On 28/02/18 16:24, Lorenzo Pieralisi wrote:
-> To defeat ACPICA<->kernel merge order dependencies a preprocessor define
-> value was introduced in the IORT compilation unit according to IORT
-> revision C, IORT_SMMU_V3_CAVIUM_CN99XX, so that even if the value was
-> not defined in ACPICA headers the IORT kernel layer would still be able
-> to function and use it.
-> 
-> Since commit 0c2021c047ba ("ACPICA: IORT: Update SMMU models for
-> revision C") finally added the define in ACPICA headers, as required by
-> ACPICA IORT support, the preprocessor definition in the IORT kernel
-> compilation unit has become obsolete and can be removed.
+The binding documentation is updated accordingly.
 
-Can the version check around iort_get_id_mapping_index() go as well?
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ Documentation/devicetree/bindings/pci/pci-armada8k.txt |  5 ++++-
+ drivers/pci/dwc/pcie-armada8k.c                        | 18 ++++++++++++++++--
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
-Robin.
-
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->   drivers/acpi/arm64/iort.c | 5 -----
->   1 file changed, 5 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 95255ecfae7c..c87b17ea03b7 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -31,11 +31,6 @@
->   #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
->   				(1 << ACPI_IORT_NODE_SMMU_V3))
->   
-> -/* Until ACPICA headers cover IORT rev. C */
-> -#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> -#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> -#endif
-> -
->   struct iort_its_msi_chip {
->   	struct list_head	list;
->   	struct fwnode_handle	*fw_node;
-> 
+diff --git a/Documentation/devicetree/bindings/pci/pci-armada8k.txt b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
+index c1e4c3d10a74..9e3fc15e1af8 100644
+--- a/Documentation/devicetree/bindings/pci/pci-armada8k.txt
++++ b/Documentation/devicetree/bindings/pci/pci-armada8k.txt
+@@ -12,7 +12,10 @@ Required properties:
+    - "ctrl" for the control register region
+    - "config" for the config space region
+ - interrupts: Interrupt specifier for the PCIe controler
+-- clocks: reference to the PCIe controller clock
++- clocks: reference to the PCIe controller clocks
++- clock-names: mandatory if there is a second clock, in this case the
++   name must be "core" for the first clock and "reg" for the second
++   one
+ 
+ Example:
+ 
+diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
+index f9b1aec25c5c..072fd7ecc29f 100644
+--- a/drivers/pci/dwc/pcie-armada8k.c
++++ b/drivers/pci/dwc/pcie-armada8k.c
+@@ -28,6 +28,7 @@
+ struct armada8k_pcie {
+ 	struct dw_pcie *pci;
+ 	struct clk *clk;
++	struct clk *clk_reg;
+ };
+ 
+ #define PCIE_VENDOR_REGS_OFFSET		0x8000
+@@ -229,23 +230,36 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	pcie->clk_reg = devm_clk_get(dev, "reg");
++	if (pcie->clk_reg == ERR_PTR(-EPROBE_DEFER)) {
++		ret = -EPROBE_DEFER;
++		goto fail;
++	}
++	if (!IS_ERR(pcie->clk_reg)) {
++		ret = clk_prepare_enable(pcie->clk_reg);
++		if (ret)
++			goto fail_clkreg;
++	}
++
+ 	/* Get the dw-pcie unit configuration/control registers base. */
+ 	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
+ 	pci->dbi_base = devm_pci_remap_cfg_resource(dev, base);
+ 	if (IS_ERR(pci->dbi_base)) {
+ 		dev_err(dev, "couldn't remap regs base %p\n", base);
+ 		ret = PTR_ERR(pci->dbi_base);
+-		goto fail;
++		goto fail_clkreg;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, pcie);
+ 
+ 	ret = armada8k_add_pcie_port(pcie, pdev);
+ 	if (ret)
+-		goto fail;
++		goto fail_clkreg;
+ 
+ 	return 0;
+ 
++fail_clkreg:
++	clk_disable_unprepare(pcie->clk_reg);
+ fail:
+ 	clk_disable_unprepare(pcie->clk);
+ 
+-- 
+2.16.1
