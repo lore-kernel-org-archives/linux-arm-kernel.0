@@ -1,98 +1,104 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 28 Feb 2018 18:32:47 +0900
-Subject: [PATCH] arm64: dts: uniphier: add fixed regulators for audio codec
-Message-ID: <20180228093247.29648-1-suzuki.katsuhiro@socionext.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 28 Feb 2018 10:40:38 +0100
+Subject: [RFC 3/3] perf pmu: Restore auto-merging of PMU events created
+ by prefix match
+In-Reply-To: <1519770848-26738-4-git-send-email-agustinv@codeaurora.org>
+References: <1519770848-26738-1-git-send-email-agustinv@codeaurora.org>
+ <1519770848-26738-4-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20180228094038.GA9474@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds regulators that have fixed voltage for audio codec
-on UniPhier LD11/20 Global boards. This patch fixes warnings about
-TAS57xx audio codec such as "tas571x 0-001b: 0-001b supply AVDD
-not found, using dummy regulator".
+On Tue, Feb 27, 2018 at 05:34:08PM -0500, Agustin Vega-Frias wrote:
+> This was disabled when auto-merging of non-alias events was disabled in
+> commit 63ce844 (perf stat: Only auto-merge events that are PMU aliases).
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- .../boot/dts/socionext/uniphier-ld11-global.dts     | 21 +++++++++++++++++++++
- .../boot/dts/socionext/uniphier-ld20-global.dts     | 21 +++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+this changes the output, right? please provide before/after output
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-index 6bfd1ccd1f71..71eb46a5bd48 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-@@ -39,6 +39,20 @@
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
- 
-+	dvdd_reg: reg-fixed {
-+		compatible = "regulator-fixed";
-+		regulator-name = "DVDD";
-+                regulator-min-microvolt = <3300000>;
-+                regulator-max-microvolt = <3300000>;
-+	};
-+
-+	amp_vcc_reg: reg-fixed {
-+		compatible = "regulator-fixed";
-+		regulator-name = "AMP_VCC";
-+                regulator-min-microvolt = <24000000>;
-+                regulator-max-microvolt = <24000000>;
-+	};
-+
- 	sound {
- 		compatible = "audio-graph-card";
- 		label = "UniPhier LD11";
-@@ -104,6 +118,13 @@
- 		pdn-gpios = <&gpio UNIPHIER_GPIO_PORT(23, 5) GPIO_ACTIVE_LOW>;
- 		#sound-dai-cells = <0>;
- 
-+		AVDD-supply = <&dvdd_reg>;
-+		DVDD-supply = <&dvdd_reg>;
-+		PVDD_A-supply = <&amp_vcc_reg>;
-+		PVDD_B-supply = <&amp_vcc_reg>;
-+		PVDD_C-supply = <&amp_vcc_reg>;
-+		PVDD_D-supply = <&amp_vcc_reg>;
-+
- 		port at 0 {
- 			tas_speaker: endpoint {
- 				remote-endpoint = <&i2s_hpcmout1>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-index 57b1e36b5eaf..eed6346497d2 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-@@ -39,6 +39,20 @@
- 		reg = <0 0x80000000 0 0xc0000000>;
- 	};
- 
-+	dvdd_reg: reg-fixed {
-+		compatible = "regulator-fixed";
-+		regulator-name = "DVDD";
-+                regulator-min-microvolt = <3300000>;
-+                regulator-max-microvolt = <3300000>;
-+	};
-+
-+	amp_vcc_reg: reg-fixed {
-+		compatible = "regulator-fixed";
-+		regulator-name = "AMP_VCC";
-+                regulator-min-microvolt = <12000000>;
-+                regulator-max-microvolt = <12000000>;
-+	};
-+
- 	sound {
- 		compatible = "audio-graph-card";
- 		label = "UniPhier LD20";
-@@ -104,6 +118,13 @@
- 		pdn-gpios = <&gpio UNIPHIER_GPIO_PORT(0, 1) GPIO_ACTIVE_LOW>;
- 		#sound-dai-cells = <0>;
- 
-+		AVDD-supply = <&dvdd_reg>;
-+		DVDD-supply = <&dvdd_reg>;
-+		PVDD_A-supply = <&amp_vcc_reg>;
-+		PVDD_B-supply = <&amp_vcc_reg>;
-+		PVDD_C-supply = <&amp_vcc_reg>;
-+		PVDD_D-supply = <&amp_vcc_reg>;
-+
- 		port at 0 {
- 			tas_speaker: endpoint {
- 				remote-endpoint = <&i2s_hpcmout1>;
--- 
-2.16.1
+thanks,
+jirka
+
+> 
+> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+> ---
+>  tools/perf/util/parse-events.c | 13 +++----------
+>  tools/perf/util/parse-events.h |  2 +-
+>  tools/perf/util/parse-events.y |  4 ++--
+>  3 files changed, 6 insertions(+), 13 deletions(-)
+> 
+> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
+> index bafc91e..4e80ca3 100644
+> --- a/tools/perf/util/parse-events.c
+> +++ b/tools/perf/util/parse-events.c
+> @@ -1217,7 +1217,7 @@ int parse_events_add_numeric(struct parse_events_state *parse_state,
+>  			 get_config_name(head_config), &config_terms);
+>  }
+> 
+> -static int __parse_events_add_pmu(struct parse_events_state *parse_state,
+> +int parse_events_add_pmu(struct parse_events_state *parse_state,
+>  			 struct list_head *list, char *name,
+>  			 struct list_head *head_config, bool auto_merge_stats)
+>  {
+> @@ -1287,13 +1287,6 @@ static int __parse_events_add_pmu(struct parse_events_state *parse_state,
+>  	return evsel ? 0 : -ENOMEM;
+>  }
+> 
+> -int parse_events_add_pmu(struct parse_events_state *parse_state,
+> -			 struct list_head *list, char *name,
+> -			 struct list_head *head_config)
+> -{
+> -	return __parse_events_add_pmu(parse_state, list, name, head_config, false);
+> -}
+> -
+>  int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
+>  			       char *str, struct list_head **listp)
+>  {
+> @@ -1323,8 +1316,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
+>  					return -1;
+>  				list_add_tail(&term->list, head);
+> 
+> -				if (!__parse_events_add_pmu(parse_state, list,
+> -							    pmu->name, head, true)) {
+> +				if (!parse_events_add_pmu(parse_state, list,
+> +							  pmu->name, head, true)) {
+>  					pr_debug("%s -> %s/%s/\n", str,
+>  						 pmu->name, alias->str);
+>  					ok++;
+> diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
+> index 88108cd..5015cfd 100644
+> --- a/tools/perf/util/parse-events.h
+> +++ b/tools/perf/util/parse-events.h
+> @@ -167,7 +167,7 @@ int parse_events_add_breakpoint(struct list_head *list, int *idx,
+>  				void *ptr, char *type, u64 len);
+>  int parse_events_add_pmu(struct parse_events_state *parse_state,
+>  			 struct list_head *list, char *name,
+> -			 struct list_head *head_config);
+> +			 struct list_head *head_config, bool auto_merge_stats);
+> 
+>  int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
+>  			       char *str,
+> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+> index c528469..b51278f 100644
+> --- a/tools/perf/util/parse-events.y
+> +++ b/tools/perf/util/parse-events.y
+> @@ -232,7 +232,7 @@ PE_NAME opt_event_config
+>  		YYABORT;
+> 
+>  	ALLOC_LIST(list);
+> -	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
+> +	if (parse_events_add_pmu(_parse_state, list, $1, $2, false)) {
+>  		struct perf_pmu *pmu = NULL;
+>  		int ok = 0;
+> 
+> @@ -245,7 +245,7 @@ PE_NAME opt_event_config
+>  			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
+>  				if (parse_events_copy_term_list(orig_terms, &terms))
+>  					YYABORT;
+> -				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms))
+> +				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms, true))
+>  					ok++;
+>  				parse_events_terms__delete(terms);
+>  			}
+> --
+> 2.7.4
+> 
