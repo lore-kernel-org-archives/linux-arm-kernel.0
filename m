@@ -1,154 +1,106 @@
-From: nobuhiro.iwamatsu@cybertrust.co.jp (Nobuhiro Iwamatsu)
-Date: Wed, 28 Feb 2018 10:52:53 +0900
-Subject: [PATCH 1/2] arm: dts: zynq: Add Digilent Zybo Z7 board
-In-Reply-To: <19b6dce3-4ff0-24a6-4777-71ac33a9e7f6@xilinx.com>
-References: <20180226005949.31259-1-nobuhiro.iwamatsu@cybertrust.co.jp>
- <19b6dce3-4ff0-24a6-4777-71ac33a9e7f6@xilinx.com>
-Message-ID: <20180228105253.13b8f8f7@debmouse>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 28 Feb 2018 09:53:24 +0800
+Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
+In-Reply-To: <HK2PR0601MB139380F295EF5CE849288F91F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
+ <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
+ <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+ <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
+ <HK2PR0601MB139380F295EF5CE849288F91F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+Message-ID: <52191012-300a-e13d-fa54-8717eb97c2e1@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Michal.
-
-Thanks for your review.
-
-On Tue, 27 Feb 2018 14:02:24 +0100
-Michal Simek <michal.simek@xilinx.com> wrote:
-
-> On 26.2.2018 01:59, Nobuhiro Iwamatsu wrote:
-> > This add a DTS for the Digilent Zybo Z7 board.
-> > This board is the successor board of Zybo, these are almost the
-> > same except for ps-clk-frequency specifications.
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu
-> > <nobuhiro.iwamatsu@cybertrust.co.jp> ---
-> >  arch/arm/boot/dts/Makefile         |  3 +-
-> >  arch/arm/boot/dts/zynq-zybo-z7.dts | 65
-> > ++++++++++++++++++++++++++++++++++++++ 2 files changed, 67
-> > insertions(+), 1 deletion(-) create mode 100644
-> > arch/arm/boot/dts/zynq-zybo-z7.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index ade7a38543dc..62605d600681 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -1067,7 +1067,8 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
-> >  	zynq-zc702.dtb \
-> >  	zynq-zc706.dtb \
-> >  	zynq-zed.dtb \
-> > -	zynq-zybo.dtb
-> > +	zynq-zybo.dtb \
-> > +	zynq-zybo-z7.dtb
-> >  dtb-$(CONFIG_MACH_ARMADA_370) += \
-> >  	armada-370-db.dtb \
-> >  	armada-370-dlink-dns327l.dtb \
-> > diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts
-> > b/arch/arm/boot/dts/zynq-zybo-z7.dts new file mode 100644
-> > index 000000000000..97e487913f8f
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/zynq-zybo-z7.dts
-> > @@ -0,0 +1,65 @@
-> > +/*
-> > + * Digilent Zybo Z7 board DTS
-> > + *
-> > + *  Copyright (C) 2017 Cybertrust Japan Co., Ltd.
-> > + *  Copyright (C) 2017 Nobuhiro Iwamatsu
-> > <nobuhiro.iwamatsu@cybertrust.co.jp>
-> > + *
-> > + *  SPDX-License-Identifier:	GPL-2.0+  
+On 2018/2/27 23:05, Phil Edworthy wrote:
+> Hi Shawn,
 > 
-> This should be the first line with starting //
+> On 27 February 2018 14:42, Shawn Lin wrote:
+>> On 2018/2/27 22:31, Phil Edworthy wrote:
+>>> Hi Shawn,
+>>>
+>>> On 27 February 2018 14:28, Shawn Lin wrote:
+>>>> ? 2018/2/27 21:55, Phil Edworthy ??:
+>>>>> Since the controller does not support the end-of-busy IRQ, don't use it.
+>>>>> Otherwise, on older SD cards you will get lots of these messages:
+>>>>> "mmc0: Got data interrupt 0x00000002 even though no data operation
+>>>>> was
+>>>> in progress"
+>>>>>
+>>>>
+>>>> I'm afraid you have to explain which version of arasan's IP suffer
+>>>> from this and what does the "older SD cards" mean?
+>>> Ok, I'll try to find out the IP version...
+>>> For "older SD cards", I can provide a list of a few cards that exhibit
+>>> this problem and others that don't, is that enough info?
+>>
+>> What I meant is could you elaborate more about what kind of cards, e.g, are
+>> them the  legacy SDSC cards or SDHC cards, or maybe they are only running
+>> with defaut speed? or whatever, but not just with a vague "older" cards. :)
+> Unfortunately, I have one SDHC card that works, one that doesn't. Both cards
+> are running with a 50MHz SD clock. All I know is this:
 
-OK, I'll fix this.
+Thanks for sharing these, though it looks wired as I never remember I
+saw this problem when extensively tested SD cards on one of arasan
+controllers in 2014.
 
 > 
-> > + */
-> > +/dts-v1/;
-> > +#include "zynq-7000.dtsi"
-> > +
-> > +/ {
-> > +	model = "Zynq ZYBO Z7 Development Board";
-> > +	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";  
+> SD cards that report unexpected interrupts:
+> 2GB Sandisk Extreme III                     (e624 SD02G 1.89 GiB)
+> 8GB Sandisk (SDHC class 4)              (aaaa SU08G 7.40 GiB)
+> 8GB Sandisk Extreme III (SDHC class 6)    (bb4e SD08G 7.61 GiB)
 > 
-> Please based it on this series:
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1618031.html
-> or https://github.com/Xilinx/linux-xlnx/tree/zynq/dt
+> SD cards that work ok:
+> 16GB Samsung (microSDHC U1 class 10)          (0001 00000 14.6 GiB)
+> 16GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL16G 14.8 GiB)
+> 32GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL32G 29.7 GiB)
 > 
-
-OK. I will rebase dt branch.
-
-> And you should record digilent,zynq-zybo-z7 compatible string.
+> Thanks
+> Phil
 > 
-> I have not a problem if you want to extend xilinx.txt file with it.
-> Documentation/devicetree/bindings/arm/xilinx.txt
+>>>>> This has been reported on Xilinx devices that also use the Arasan IP.
+>>>>> See https://patchwork.kernel.org/patch/8062871/
+>>>>>
+>>>>> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1
+>> SoC.
+>>>>>
+>>>>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+>>>>> ---
+>>>>>     drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
+>>>>>     1 file changed, 2 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+>>>>> b/drivers/mmc/host/sdhci-of-arasan.c
+>>>>> index c33a5f7..ab66e32 100644
+>>>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>>>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>>>>> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data
+>>>> sdhci_arasan_pdata = {
+>>>>>     	.ops = &sdhci_arasan_ops,
+>>>>>     	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+>>>>>     	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+>>>>> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>>>>> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+>>>>> +			SDHCI_QUIRK2_STOP_WITH_TC,
+>>>>>     };
+>>>>>
+>>>>>     static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32
+>>>>> intmask)
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Best Regards
+>>>> Shawn Lin
+>>>
+>>>
+>>>
+>>>
+>>
+>>
+>> --
+>> Best Regards
+>> Shawn Lin
 > 
-
-I see. I'll add this into next patch.
-
 > 
 > 
-> > +
-> > +	aliases {
-> > +		ethernet0 = &gem0;
-> > +		serial0 = &uart1;
-> > +	};
-> > +
-> > +	memory {  
 > 
-> this should be memory at 0
-
-My bad. I will fix it. Thanks!
-
-> 
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x20000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "";
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +
-> > +	usb_phy0: phy0 {
-> > +		#phy-cells = <0>;
-> > +		compatible = "usb-nop-xceiv";
-> > +		reset-gpios = <&gpio0 46 1>;
-> > +	};
-> > +};
-> > +
-> > +&clkc {
-> > +	ps-clk-frequency = <33333333>;
-> > +};
-> > +
-> > +&gem0 {
-> > +	status = "okay";
-> > +	phy-mode = "rgmii-id";
-> > +	phy-handle = <&ethernet_phy>;
-> > +
-> > +	ethernet_phy: ethernet-phy at 0 {
-> > +		reg = <0>;
-> > +		device_type = "ethernet-phy";
-> > +	};
-> > +};
-> > +
-> > +&sdhci0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&uart1 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usb0 {
-> > +	status = "okay";
-> > +	dr_mode = "host";
-> > +	usb-phy = <&usb_phy0>;
-> > +};
-> >   
-> 
-> Thanks,
-> Michal
-> 
-
-Best regards,
-  Nobuhiro
