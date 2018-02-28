@@ -1,29 +1,52 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Wed, 28 Feb 2018 16:45:23 +0100
-Subject: Internal error: Oops - BUG() / kvm boot race - arm64 kpti patchset
- related
-Message-ID: <20180228154523.GA29931@akinoame>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Wed, 28 Feb 2018 16:47:24 +0100
+Subject: [PATCH V2 5/5] ARM: configs: stm32: add mmc and ext2/3/4 support
+In-Reply-To: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1519832844-28068-6-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reproducible on 4.16-rc3 and 4.4.20 using defconfig - the failure it's
-intermittent, but i could reproduce it 100% if i boot loop the kvm instance 
-(it usually shows up in less than 10 iterations but i tested 32 boots before
-marking it good).
+From: Ludovic Barre <ludovic.barre@st.com>
 
-I bisected it down to this interval in linux-4.14.y:
+This patch adds support of
+-mmc framework and stm32 sdmmc controller
+-ext2/3/4 filesystem
+-LBDAF to support huge file (needed for ext4)
 
-2feb36e arm64: kpti: Add ->enable callback to remap swapper using nG mappings
-ee28fed arm64: mm: Permit transitioning from Global to Non-Global without BBM
-6928820 arm64: kpti: Make use of nG dependent on arm64_kernel_unmapped_at_el0()
-c98c8c2 arm64: Turn on KPTI only on CPUs that need it
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ arch/arm/configs/stm32_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-c98c8c2 is good, 2feb36e is bad - couldn't bisect in between, since it didn't
-boot there.
-And yes, when i tested 2feb36e i applied the "el1 trashing fix" mentioned here:
-https://www.spinics.net/lists/arm-kernel/msg636489.html
-
-Anything else i can do to help debug this?
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 91014ea..2573355 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -15,7 +15,6 @@ CONFIG_EMBEDDED=y
+ # CONFIG_VM_EVENT_COUNTERS is not set
+ # CONFIG_SLUB_DEBUG is not set
+ CONFIG_MODULES=y
+-# CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+@@ -57,6 +56,8 @@ CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_STM32_SDMMC=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+@@ -71,6 +72,7 @@ CONFIG_STM32_MDMA=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
++CONFIG_EXT3_FS=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
 -- 
-bye,
-p.
+2.7.4
