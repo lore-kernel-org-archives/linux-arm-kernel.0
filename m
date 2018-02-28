@@ -1,57 +1,56 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Wed, 28 Feb 2018 14:34:14 -0800 (PST)
-Subject: [PATCH v7 02/13] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <20180228220619.6992-3-jeremy.linton@arm.com>
-Message-ID: <mhng-a110cedb-912a-4701-b1b4-8546d12e861a@palmer-si-x1c4>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 Feb 2018 14:34:21 -0800
+Subject: [PATCH v2 15/15] ARM: dts: dra7: Add high speed modes capability
+ to MMC1/MMC2 dt node
+In-Reply-To: <4f18dab9-aee3-1023-d301-f142c6e2d358@ti.com>
+References: <20180206125806.19350-1-kishon@ti.com>
+ <20180206125806.19350-16-kishon@ti.com>
+ <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
+ <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
+ <4f18dab9-aee3-1023-d301-f142c6e2d358@ti.com>
+Message-ID: <20180228223421.GM5448@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Feb 2018 14:06:08 PST (-0800), jeremy.linton at arm.com wrote:
-> The original intent in cacheinfo was that an architecture
-> specific populate_cache_leaves() would probe the hardware
-> and then cache_shared_cpu_map_setup() and
-> cache_override_properties() would provide firmware help to
-> extend/expand upon what was probed. Arm64 was really
-> the only architecture that was working this way, and
-> with the removal of most of the hardware probing logic it
-> became clear that it was possible to simplify the logic a bit.
->
-> This patch combines the walk of the DT nodes with the
-> code updating the cache size/line_size and nr_sets.
-> cache_override_properties() (which was DT specific) is
-> then removed. The result is that cacheinfo.of_node is
-> no longer used as a temporary place to hold DT references
-> for future calls that update cache properties. That change
-> helps to clarify its one remaining use (matching
-> cacheinfo nodes that represent shared caches) which
-> will be used by the ACPI/PPTT code in the following patches.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/riscv/kernel/cacheinfo.c |  1 -
->  drivers/base/cacheinfo.c      | 65 +++++++++++++++++++------------------------
->  2 files changed, 29 insertions(+), 37 deletions(-)
->
-> diff --git a/arch/riscv/kernel/cacheinfo.c b/arch/riscv/kernel/cacheinfo.c
-> index 10ed2749e246..0bc86e5f8f3f 100644
-> --- a/arch/riscv/kernel/cacheinfo.c
-> +++ b/arch/riscv/kernel/cacheinfo.c
-> @@ -20,7 +20,6 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
->  			 struct device_node *node,
->  			 enum cache_type type, unsigned int level)
->  {
-> -	this_leaf->of_node = node;
->  	this_leaf->level = level;
->  	this_leaf->type = type;
->  	/* not a sector cache */
-> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-> index 09ccef7ddc99..a872523e8951 100644
-> --- a/drivers/base/cacheinfo.c
-> +++ b/drivers/base/cacheinfo.c
-> @@ -71,7 +71,7 @@ static inline int get_cacheinfo_idx(enum cache_type type)
->  	return type;
->  }
+* Sekhar Nori <nsekhar@ti.com> [180213 11:11]:
+> On Wednesday 07 February 2018 02:51 PM, Kishon Vijay Abraham I wrote:
+> > Hi,
+> > 
+> > On Wednesday 07 February 2018 02:41 PM, Sekhar Nori wrote:
+> >> Kishon,
+> >>
+> >> On Tuesday 06 February 2018 06:28 PM, Kishon Vijay Abraham I wrote:
+> >>> Add UHS/HS200/DDR speed mode capability to MMC1 and MMC2 dt nodes.
+> >>>
+> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>
+> >> Along with this, dont we need to have
+> >>
+> >> 	/delete-property/ mmc-hs200-1_8v;
+> >>
+> >> for eMMC on Beagle x15 which does not support HS200?
+> >>
+> >> Or are you planning to depend on lack of pinctrl entries for HS200 to
+> >> take care of that?
+> > 
+> > right now it relies on lack of pinctrl entries but I think adding delete
+> > property is appropriate. Actually I missed porting the patch that adds
+> > /delete-property/.
+> 
+> Actually, thinking more, this should be probably be handled using
+> "no-1-8-v" property. Reading the comment above SDHCI_QUIRK2_NO_1_8_V, it
+> is specifically meant for the case when system (board) does not support
+> 1.8V even when host (controller) does. Which is exactly the case with
+> Beagle x15.
 
-This looks good as far as RISC-V is concerned, though that's such a trivial 
-part of the changeset it's not worth that much :).  Thanks!
+OK so that seems to be related to the last patch. I've applied
+the first two defconfig patches into omap-for-v4.17/defconfig
+and patches up to patch 13/15 into omap-for-v4.17/dt-sdhci.
+
+Kishon, please repost the missing changes or ping me when
+the driver dependencies have cleared for further patches to
+be applied to enable sdhci.
+
+Regards,
+
+Tony
