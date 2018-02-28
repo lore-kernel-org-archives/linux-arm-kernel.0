@@ -1,36 +1,103 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 28 Feb 2018 13:39:45 -0800
-Subject: [GIT PULL 2/2] bcm2835-defconfig-next-2018-02-28
-In-Reply-To: <20180228213945.6781-1-eric@anholt.net>
-References: <20180228213945.6781-1-eric@anholt.net>
-Message-ID: <20180228213945.6781-2-eric@anholt.net>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 28 Feb 2018 22:55:03 +0100
+Subject: [PATCH v2 01/16] clk: sunxi-ng: Add check for minimal rate to NM
+ PLLs
+In-Reply-To: <20180228073440.6ejo3wjdqag6h4nl@flea>
+References: <20180227222701.9716-1-jernej.skrabec@siol.net>
+ <20180227222701.9716-2-jernej.skrabec@siol.net>
+ <20180228073440.6ejo3wjdqag6h4nl@flea>
+Message-ID: <3220888.aQMeRaSCkl@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi,
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Dne sreda, 28. februar 2018 ob 08:34:40 CET je Maxime Ripard napisal(a):
+> Hi,
+> 
+> On Tue, Feb 27, 2018 at 11:26:46PM +0100, Jernej Skrabec wrote:
+> > Some NM PLLs doesn't work well when their output clock rate is set below
+> > certain rate.
+> > 
+> > Add support for that constrain.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > ---
+> > 
+> >  drivers/clk/sunxi-ng/ccu_nm.c | 11 +++++++----
+> >  drivers/clk/sunxi-ng/ccu_nm.h | 27 +++++++++++++++++++++++++++
+> >  2 files changed, 34 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+> > index a16de092bf94..7fc743c78c1b 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_nm.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_nm.c
+> > @@ -20,7 +20,7 @@ struct _ccu_nm {
+> > 
+> >  };
+> >  
+> >  static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+> > 
+> > -			     struct _ccu_nm *nm)
+> > +			     unsigned long min_rate, struct _ccu_nm *nm)
+> > 
+> >  {
+> >  
+> >  	unsigned long best_rate = 0;
+> >  	unsigned long best_n = 0, best_m = 0;
+> > 
+> > @@ -30,7 +30,7 @@ static void ccu_nm_find_best(unsigned long parent,
+> > unsigned long rate,> 
+> >  		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
+> >  		
+> >  			unsigned long tmp_rate = parent * _n  / _m;
+> > 
+> > -			if (tmp_rate > rate)
+> > +			if (tmp_rate > rate || tmp_rate < min_rate)
+> > 
+> >  				continue;
+> >  			
+> >  			if ((rate - tmp_rate) < (rate - best_rate)) {
+> > 
+> > @@ -117,6 +117,9 @@ static long ccu_nm_round_rate(struct clk_hw *hw,
+> > unsigned long rate,> 
+> >  	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> >  	
+> >  		rate *= nm->fixed_post_div;
+> > 
+> > +	if (rate < nm->min_rate)
+> > +		rate = nm->min_rate;
+> > +
+> 
+> I guess you can just return there. There's no point in trying to find
+> the factors at this point, since the minimum should be a value that
+> can be reached.
+> 
 
-are available in the Git repository at:
+Right, I already tested it and it works.
 
-  git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-02-28
+Best regards,
+Jernej
 
-for you to fetch changes up to bb9d91a4e5c87cabfa2c9d35761374aa11150c2d:
-
-  ARM: multi_v7_defconfig: Enable thermal driver for RPi 2/3 (2018-02-26 15:30:43 -0800)
-
-----------------------------------------------------------------
-This pull request enables several recent drivers for the Raspberry Pi
-family in the defconfigs (thermal, BT, aux serial).
-
-----------------------------------------------------------------
-Stefan Wahren (2):
-      ARM: bcm2385_defconfig: Enable BT support for BCM43438
-      ARM: multi_v7_defconfig: Enable thermal driver for RPi 2/3
-
-Tuomas Tynkkynen (1):
-      ARM: multi_v7_defconfig: Enable serial console on RPi 3
-
- arch/arm/configs/bcm2835_defconfig  | 4 ++++
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 2 files changed, 8 insertions(+)
+> >  	if (ccu_frac_helper_has_rate(&nm->common, &nm->frac, rate)) {
+> >  	
+> >  		if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> >  		
+> >  			rate /= nm->fixed_post_div;
+> > 
+> > @@ -134,7 +137,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw,
+> > unsigned long rate,> 
+> >  	_nm.min_m = 1;
+> >  	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+> > 
+> > -	ccu_nm_find_best(*parent_rate, rate, &_nm);
+> > +	ccu_nm_find_best(*parent_rate, rate, nm->min_rate, &_nm);
+> 
+> Therefore, you don't need to change the prototype there either.
+> 
+> Maxime
+> 
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
