@@ -1,36 +1,29 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Feb 2018 08:16:40 +0800
-Subject: [GIT PULL] i.MX fixes for 4.16
-Message-ID: <20180228001638.GX3217@dragon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 27 Feb 2018 16:39:19 -0800
+Subject: [PATCH] ARM: dts: NSP: Fix amount of RAM on BCM958625HR
+In-Reply-To: <CAC3K-4rqYMUBtbwaojWBF-0biEV-WSPpe=0bDocL4TUrrL4gGQ@mail.gmail.com>
+References: <20180227010312.7495-1-f.fainelli@gmail.com>
+ <CAC3K-4rqYMUBtbwaojWBF-0biEV-WSPpe=0bDocL4TUrrL4gGQ@mail.gmail.com>
+Message-ID: <cf9e6bc5-094a-e658-cdd6-6495fbe99da6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On 02/27/2018 07:02 AM, Jon Mason wrote:
+> On Mon, Feb 26, 2018 at 8:03 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> Jon attempted to fix the amount of RAM on the BCM958625HR in commit
+>> c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
+>> but it seems like we tripped over some poorly documented schematics.
+>>
+>> The top-level page of the schematics says the board has 2GB, but when
+>> you end-up scrolling to page 6, you see two chips of 4GiB (512MB) but
+>> what the bootloader really initializes only 512MB, any attempt to use
+>> more than that results in data aborts. Fix this again back to 512MB.
+>>
+>> Fixes: c53beb47f621 ("ARM: dts: NSP: Correct RAM amount for BCM958625HR board")
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> 
+> Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.16
-
-for you to fetch changes up to c0c6bb2322964bd264b4ddedaa5776f40c709f0c:
-
-  ARM: dts: imx6dl: Include correct dtsi file for Engicam i.CoreM6 DualLite/Solo RQS (2018-02-24 16:53:09 +0800)
-
-----------------------------------------------------------------
-i.MX fixes for 4.16:
- - Fix i.MX GPC driver to remove power domains only when they are
-   initialized in imx_gpc_probe().
- - Fix the broken Engicam i.CoreM6 DualLite/Solo RQS board DT to include
-   imx6dl.dtsi instead of imx6q.dtsi.
-
-----------------------------------------------------------------
-Shyam Saini (1):
-      ARM: dts: imx6dl: Include correct dtsi file for Engicam i.CoreM6 DualLite/Solo RQS
-
-Stefan Agner (1):
-      soc: imx: gpc: de-register power domains only if initialized
-
- arch/arm/boot/dts/imx6dl-icore-rqs.dts |  2 +-
- drivers/soc/imx/gpc.c                  | 10 +++++++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Applied to devicetree/fixes
+-- 
+Florian
