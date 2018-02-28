@@ -1,54 +1,102 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Wed, 28 Feb 2018 16:02:16 +0530
-Subject: [PATCH] arm64/acpi: make ACPI boot preference configurable
-In-Reply-To: <1519812442.10722.248.camel@linux.intel.com>
-References: <85047448dc1d2d3c725b6b78d5ef2a89fc81b83b.1519659254.git.jtoppins@redhat.com>
- <CACi5LpM9hn17o7i7R3GUjQYy=6DFtCFKSbDUN7A7MGBTuf7=xw@mail.gmail.com>
- <1b5a55bd-5bc7-ecd0-99f0-71dd05119743@redhat.com>
- <CACi5LpMv_LB3wi7qn33b6mysdK_weki0YYsG0EkqPhR8FvFq5w@mail.gmail.com>
- <1519812442.10722.248.camel@linux.intel.com>
-Message-ID: <CACi5LpM31cVtw1QKMaQXoc-Dq7twX_z-rZFth0WTGPHp2WJJCQ@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Wed, 28 Feb 2018 11:36:30 +0100
+Subject: [PATCH] ARM: dts: stm32: add SPI support on STM32H743 SoC
+Message-ID: <1519814190-3208-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 3:37 PM, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> On Wed, 2018-02-28 at 00:29 +0530, Bhupesh Sharma wrote:
->> On Tue, Feb 27, 2018 at 8:14 PM, Jonathan Toppins <jtoppins@redhat.com
->> > wrote:
->> > On 02/27/2018 07:40 AM, Bhupesh Sharma wrote:
->> > >
->
->> > For arm64 DT is suppose to *not* be the preferred method, yet still
->> > DT
->> > is preferred if the firmware provides both tables to the kernel.
->
->> However several arm64 products in embedded applications are still not
->> SBSA/SBBR compliant (and I have worked on a couple of such
->> implementations earlier) and still use bootloaders like u-boot (and
->> also closed-source implementations) which have no support for ACPI
->> currently and still rely on a DT to pass the system hardware
->> information to the kernel.
->
->> So far only open source implementation of a ACPI compliant firmware is
->> EDK2/UEFI which supports ACPI as the preferred boot method
->
-> You mean for non-x86?
+This patch adds all SPI instances of the STM32H743 SoC.
 
-Yes the patch in discussion is for arm64. So my comments above are in
-context to arm64.
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32h743.dtsi | 61 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
->>  and I am
->> not sure if all u-boot/in-house firmware implementations are planned
->> to be ported over to EDK2/UEFI for embedded applications.
->
-> Why do you need that? ACPI (if you are talking about ACPI only, w/o EFI)
-> is supported in U-Boot for few x86 SoCs/platforms. Moreover, one of them
-> had never been shipped with ACPI/EFI complaint services in firmware and
-> ACPI layer is purely done in U-Boot.
-
-AFAIK upstream arm64 u-boot doesn't support ACPI boot method for
-armv8/arm64 yet.
-
-Regards,
-Bhupesh
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 3a28cd2..2bb103e 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -101,6 +101,27 @@
+ 			};
+ 		};
+ 
++		spi2: spi at 40003800 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x40003800 0x400>;
++			interrupts = <36>;
++			clocks = <&rcc SPI2_CK>;
++			status = "disabled";
++
++		};
++
++		spi3: spi at 40003c00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x40003c00 0x400>;
++			interrupts = <51>;
++			clocks = <&rcc SPI3_CK>;
++			status = "disabled";
++		};
++
+ 		usart2: serial at 40004400 {
+ 			compatible = "st,stm32f7-uart";
+ 			reg = <0x40004400 0x400>;
+@@ -141,6 +162,36 @@
+ 			clocks = <&rcc USART1_CK>;
+ 		};
+ 
++		spi1: spi at 40013000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x40013000 0x400>;
++			interrupts = <35>;
++			clocks = <&rcc SPI1_CK>;
++			status = "disabled";
++		};
++
++		spi4: spi at 40013400 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x40013400 0x400>;
++			interrupts = <84>;
++			clocks = <&rcc SPI4_CK>;
++			status = "disabled";
++		};
++
++		spi5: spi at 40015000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x40015000 0x400>;
++			interrupts = <85>;
++			clocks = <&rcc SPI5_CK>;
++			status = "disabled";
++		};
++
+ 		dma1: dma at 40020000 {
+ 			compatible = "st,stm32-dma";
+ 			reg = <0x40020000 0x400>;
+@@ -262,6 +313,16 @@
+ 			reg = <0x58000400 0x400>;
+ 		};
+ 
++		spi6: spi at 58001400 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32h7-spi";
++			reg = <0x58001400 0x400>;
++			interrupts = <86>;
++			clocks = <&rcc SPI6_CK>;
++			status = "disabled";
++		};
++
+ 		lptimer2: timer at 58002400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+2.7.4
