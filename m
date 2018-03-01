@@ -1,197 +1,51 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:08 +0800
-Subject: [PATCH 31/45] arm/arm64: KVM: Consolidate the PSCI include files
+Date: Thu,  1 Mar 2018 20:54:05 +0800
+Subject: [PATCH 28/45] arm64: cputype: Add missing MIDR values for Cortex-A72
+ and Cortex-A75
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-32-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-29-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 1a2fb94e6a77 upstream.
+commit a65d219fe5dc upstream.
 
-As we're about to update the PSCI support, and because I'm lazy,
-let's move the PSCI include file to include/kvm so that both
-ARM architectures can find it.
+Hook up MIDR values for the Cortex-A72 and Cortex-A75 CPUs, since they
+will soon need MIDR matches for hardening the branch predictor.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/include/asm/kvm_psci.h   | 27 ---------------------------
- arch/arm/kvm/arm.c                |  2 +-
- arch/arm/kvm/handle_exit.c        |  2 +-
- arch/arm/kvm/psci.c               |  2 +-
- arch/arm64/include/asm/kvm_psci.h | 27 ---------------------------
- arch/arm64/kvm/handle_exit.c      |  3 ++-
- include/kvm/arm_psci.h            | 27 +++++++++++++++++++++++++++
- 7 files changed, 32 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/include/asm/kvm_psci.h
- delete mode 100644 arch/arm64/include/asm/kvm_psci.h
- create mode 100644 include/kvm/arm_psci.h
+ arch/arm64/include/asm/cputype.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-deleted file mode 100644
-index 6bda945..0000000
---- a/arch/arm/include/asm/kvm_psci.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * Copyright (C) 2012 - ARM Ltd
-- * Author: Marc Zyngier <marc.zyngier@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM_KVM_PSCI_H__
--#define __ARM_KVM_PSCI_H__
--
--#define KVM_ARM_PSCI_0_1	1
--#define KVM_ARM_PSCI_0_2	2
--
--int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
--
--#endif /* __ARM_KVM_PSCI_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 4e4ae07..8588e67 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -44,8 +44,8 @@
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
--#include <asm/kvm_psci.h>
- #include <asm/sections.h>
-+#include <kvm/arm_psci.h>
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 26a68dd..0843b3f 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -75,7 +75,10 @@
+ #define ARM_CPU_PART_AEM_V8		0xD0F
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
++#define ARM_CPU_PART_CORTEX_A72		0xD08
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A73		0xD09
++#define ARM_CPU_PART_CORTEX_A75		0xD0A
  
- #ifdef REQUIRES_VIRT
- __asm__(".arch_extension	virt");
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 4e57ebc..0a2b758 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -21,7 +21,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
-+#include <kvm/arm_psci.h>
- #include <trace/events/kvm.h>
+ #define APM_CPU_PART_POTENZA		0x000
  
- #include "trace.h"
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index a08d7a9..18f9e9d 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -21,8 +21,8 @@
+@@ -86,6 +89,9 @@
  
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
--#include <asm/kvm_psci.h>
- #include <asm/kvm_host.h>
-+#include <kvm/arm_psci.h>
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
++#define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
++#define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
  
- #include <uapi/linux/psci.h>
- 
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
-deleted file mode 100644
-index bc39e55..0000000
---- a/arch/arm64/include/asm/kvm_psci.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * Copyright (C) 2012,2013 - ARM Ltd
-- * Author: Marc Zyngier <marc.zyngier@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM64_KVM_PSCI_H__
--#define __ARM64_KVM_PSCI_H__
--
--#define KVM_ARM_PSCI_0_1	1
--#define KVM_ARM_PSCI_0_2	2
--
--int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
--
--#endif /* __ARM64_KVM_PSCI_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 5b56b09..0231ebc 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -22,12 +22,13 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- 
-+#include <kvm/arm_psci.h>
-+
- #include <asm/esr.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-new file mode 100644
-index 0000000..2042bb9
---- /dev/null
-+++ b/include/kvm/arm_psci.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __KVM_ARM_PSCI_H__
-+#define __KVM_ARM_PSCI_H__
-+
-+#define KVM_ARM_PSCI_0_1	1
-+#define KVM_ARM_PSCI_0_2	2
-+
-+int kvm_psci_version(struct kvm_vcpu *vcpu);
-+int kvm_psci_call(struct kvm_vcpu *vcpu);
-+
-+#endif /* __KVM_ARM_PSCI_H__ */
 -- 
 2.7.4
