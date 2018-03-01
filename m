@@ -1,36 +1,167 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 Mar 2018 17:19:01 +0000
-Subject: [PATCH] scripts/kallsyms: filter arm64's __efistub_ symbols
-Message-ID: <20180301171901.1134-1-ard.biesheuvel@linaro.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 1 Mar 2018 22:59:44 +0530
+Subject: [PATCH v3 04/10] pinctrl: actions: Add Actions S900 pinctrl driver
+In-Reply-To: <CAHp75VchzV9SZb4g0fVP9aoKb7actsehXm8c4wsvVGASgkOc+w@mail.gmail.com>
+References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
+ <20180228181432.26847-5-manivannan.sadhasivam@linaro.org>
+ <CAHp75VchzV9SZb4g0fVP9aoKb7actsehXm8c4wsvVGASgkOc+w@mail.gmail.com>
+Message-ID: <20180301172943.cuypepvflte2cynr@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, the EFI stub and the kernel proper are essentially the same
-binary, although the EFI stub executes at a different virtual address
-as the kernel. For this reason, the EFI stub is restricted in the
-symbols it can link to, which is ensured by prefixing all EFI stub
-symbols with __efistub_ (and emitting __efistub_ prefixed aliases for
-routines that may be shared between the core kernel and the stub)
+Hi Andy,
 
-These symbols are leaking into kallsyms, polluting the namespace, so
-let's filter them explicitly.
+On Wed, Feb 28, 2018 at 08:36:53PM +0200, Andy Shevchenko wrote:
+> On Wed, Feb 28, 2018 at 8:14 PM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> > Add pinctrl driver for Actions Semi S900 SoC. The driver supports
+> > pinctrl, pinmux and pinconf functionalities through a range of registers
+> > common to both gpio driver and pinctrl driver.
+> >
+> > Pinmux functionality is available only for the pin groups while the
+> > pinconf functionality is available for both pin groups and individual
+> > pins.
+> 
+> > +static int owl_set_mux(struct pinctrl_dev *pctrldev,
+> > +                               unsigned int function,
+> > +                               unsigned int group)
+> > +{
+> 
+> > +       mfpval = readl(pctrl->base + g->mfpctl_reg);
+> > +       mfpval &= ~mask;
+> > +       mfpval |= val;
+> > +       writel(mfpval, pctrl->base + g->mfpctl_reg);
+> 
+> This is called owl_update_bits().
+>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- scripts/kallsyms.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-index 9ee9bf7fd1a2..1dd24c5b9b47 100644
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -221,6 +221,7 @@ static int symbol_valid(struct sym_entry *s)
+Okay. Will add a helper.
  
- 	static char *special_prefixes[] = {
- 		"__crc_",		/* modversions */
-+		"__efistub_",		/* arm64 EFI stub namespace */
- 		NULL };
+> > +static int owl_pin_config_set(struct pinctrl_dev *pctrldev,
+> > +                               unsigned int pin,
+> > +                               unsigned long *configs,
+> > +                               unsigned int num_configs)
+> > +{
+> 
+> > +       int ret = 0;
+> 
+> Redundant assignment?
+>
+
+Ack.
  
- 	static char *special_suffixes[] = {
--- 
-2.11.0
+> > +               mask = (1 << width) - 1;
+> > +               mask = mask << bit;
+> > +               tmp = readl(pctrl->base + reg);
+> > +               tmp &= ~mask;
+> > +               tmp |= arg << bit;
+> > +               writel(tmp, pctrl->base + reg);
+> 
+> This is called owl_update_bits().
+>
+
+Ack.
+
+> > +}
+> 
+> > +static int owl_group_pinconf_val2arg(const struct owl_pingroup *g,
+> > +                               unsigned int param,
+> > +                               u32 *arg)
+> > +{
+> 
+> > +       case PIN_CONFIG_SLEW_RATE:
+> > +               if (*arg)
+> > +                       *arg = 1;
+> > +               else
+> > +                       *arg = 0;
+> 
+> Doesn't slew rate allow a non-binary value?
+>
+
+As stated in the binding doc, valid values for the slew rate parameter are:
+
+0 - Slow
+1 - Fast
+ 
+> > +       return 0;
+> > +}
+> > +
+> > +static int owl_group_config_get(struct pinctrl_dev *pctrldev,
+> > +                               unsigned int group,
+> > +                               unsigned long *config)
+> > +{
+> > +       int ret = 0;
+> 
+> Redundant assignment.
+> 
+
+Ack.
+
+> > +}
+> 
+> > +static int owl_group_config_set(struct pinctrl_dev *pctrldev,
+> > +                               unsigned int group,
+> > +                               unsigned long *configs,
+> > +                               unsigned int num_configs)
+> > +{
+> > +       int ret = 0;
+> 
+> Redundant assignment, see below.
+>
+
+Ack. Will return 0 directly.
+ 
+> > +               mask = (1 << width) - 1;
+> > +               mask = mask << bit;
+> > +               tmp = readl(pctrl->base + reg);
+> > +               tmp &= ~mask;
+> > +               tmp |= arg << bit;
+> > +               writel(tmp, pctrl->base + reg);
+> 
+> This is called owl_update_bits().
+>
+
+Ack.
+ 
+> > +       return ret;
+> 
+> return 0; ?
+> 
+
+Okay.
+
+> > +}
+> 
+> > +int owl_pinctrl_probe(struct platform_device *pdev,
+> > +                               struct owl_pinctrl_soc_data *soc_data)
+> > +{
+> 
+> > +       clk_prepare_enable(pctrl->clk);
+> 
+> This can fail.
+>
+
+Okay. Will add a check.
+ 
+> > +}
+> 
+> > +static const struct of_device_id s900_pinctrl_of_match[] = {
+> > +       { .compatible = "actions,s900-pinctrl", },
+> 
+> > +       { },
+> 
+> No comma needed.
+>
+
+Okay.
+
+Thanks for the review.
+
+Regards,
+Mani
+ 
+> > +};
+> 
+> -- 
+> With Best Regards,
+> Andy Shevchenko
