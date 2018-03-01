@@ -1,157 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 1 Mar 2018 12:22:14 +0100
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAMuHMdWg1y3Ragb9nYY12whZhUn8w0a4aOOR31LSNXa37NbfXg@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
- <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
- <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
- <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
- <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
- <5A977638.8010506@rock-chips.com>
- <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
- <CAPDyKFq_hwao0hZCYmO-VrsW3vDJJboa1RG-TMLRQRgbt+YhpQ@mail.gmail.com>
- <CAMuHMdWg1y3Ragb9nYY12whZhUn8w0a4aOOR31LSNXa37NbfXg@mail.gmail.com>
-Message-ID: <CAPDyKFrN0t6Jr-gAuU4_OHEvYap2fRiaUbZC5E7sAGAQOUQjjw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 1 Mar 2018 11:32:32 +0000
+Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
+In-Reply-To: <20180301103259.nomjbwkw4xbvhbfv@flea>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-4-samuel@sholland.org>
+ <20180228083214.h4oi2kmjjqmoyfhn@flea>
+ <fdf86770-6f45-3b3c-50ea-7a8363894639@sholland.org>
+ <20180301103259.nomjbwkw4xbvhbfv@flea>
+Message-ID: <db1bc925-699e-14e7-f3fb-4dc83e2f6640@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2018 at 11:37, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf,
->
-> On Thu, Mar 1, 2018 at 11:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 1 March 2018 at 09:33, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->>> On Thu, Mar 1, 2018 at 4:40 AM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
->>>> 3/ make sure PM clk always be controlled(otherwise it might be unexpected
->>>> disabled by other clocks under the same clk parent?):
->>>>  a) make sure Runtime PM is always enabled. and as discussed, we can select
->>>> PM in ARCH_ROCKCHIP
+Hi,
+
+On 01/03/18 10:32, Maxime Ripard wrote:
+> On Wed, Feb 28, 2018 at 11:19:11AM -0600, Samuel Holland wrote:
+>> Hi,
 >>
->> I am fine enabling PM for ARCH_ROCKCHIP, if needed.
+>> On 02/28/18 02:32, Maxime Ripard wrote:
+>>> On Tue, Feb 27, 2018 at 08:27:14PM -0600, Samuel Holland wrote:
+>>>> +	/*
+>>>> +	 * The failure path should not disable the clock or assert the reset,
+>>>> +	 * because the PSCI implementation in firmware relies on this device
+>>>> +	 * being functional. Claiming the clock in this driver is required to
+>>>> +	 * prevent Linux from turning it off.
+>>>> +	 */
+>>>> +	ret = clk_prepare_enable(clk);
+>>>> +	if (ret) {
+>>>> +		dev_err(dev, "Failed to enable bus clock: %d\n", ret);
+>>>> +		return ret;
+>>>> +	}
+>>>
+>>> You don't need it to be always on though. You only need it to be
+>>> enabled when you access the registers (on both sides I guess?). So you
+>>> could very well enable the clock in your registers accessors in Linux,
+>>> and do the same in the ARISC firmware. That should work.
 >>
->> However, what I don't agree with in general, is to make a generic
->> driver to rely on having CONFIG_PM to be set to be functional. That's
->> to me, bad practice.
->>
->> I understand, this approach exists in drivers today. I assume it
->> works, because those drivers are being used on SoCs which always has
->> CONFIG_PM set.
->
-> I agree. This is mostly useful for drivers that are used on multiple SoCs,
-> where the driver doesn't care about the clock (doesn't care about its
-> properties), and where the clock is optional (i.e. either tied to an
-> always-running bus clock, or to a controllable module clock, depending on SoC).
-> The latter needs CONFIG_PM=y, but that's a platform property, controlled
-> by selecting support for that specific SoC.
->
->>> On Renesas SoCs, we only add the device's module clock with pm_clk_add().
->>> Drivers that don't care about properties of the module clock just call
->>> pm_runtime_*(). That way the same driver works on different SoCs using
->>> the same device, with and without power and/or clock domains.
->>
->> I understand your point and I accept your view.
->>
->> However, I think this is more a mindset of which way one want
->> implement things. This has been discussed several times in the mailing
->> list as well.
->>
->> Surely we can cope with SoC specific constraints in drivers as well,
->> we already do that.
->>
->> In principle I think this boils done to comparing a centralized
->> method, where the PM domain deals with clocks vs a decentralized
->> method, where the driver deals with clocks. Both works, both have
->> positive and negative consequences.
->
-> Is the clock (are the clocks) used purely for power management of the device,
-> or does it/do they serve another (independent) purpose?
+>> It does need to always be on because the *PSCI* implementation (ATF) also uses
+>> SCPI concurrently with Linux (on a separate channel). Turning off the clock
+>> anywhere in Linux could turn it off in the middle of a PSCI SCPI call on a
+>> different CPU, causing ATF to hang in EL3 (which would be very bad).
+> 
+> Then the above code doesn't fix anything. You should mark the clock
+> critical, otherwise that clock will be turned off if the driver is
+> compiled as a module and not loaded (or loaded later), or if the
+> driver is not even compiled in.
 
-Well, I am not talking about one specific case.
+... or if the module gets unloaded for some reason. So yes, I agree.
+Actually I was hitting this problem before on several occasions:
+- If firmware (either ATF or on the ARISC) wants to check temperatures,
+it needs to rely on Linux not turning off the THS clock - which it does
+at the moment when there is no Linux driver.
+- If an EFI framebuffer needs to keep running in Linux, we should not
+turn off the HDMI and DE clocks. simplefb solves this, but efifb has no
+simple way of copying this approach.
+- If a type 1 hypervisor like Xen uses the serial console (and exports a
+virtual console to the guest), Linux turns off the now apparently unused
+UART0 gate clock, killing Xen's console. So booting Xen on Allwinner
+requires clk_ignore_unused at the moment.
 
-I guess what you are saying is that, devices may need different kind
-of clocks. Some can be power managed, some can't. That seems
-reasonable.
+There are ways to mitigate or workaround each one of these, but I was
+wondering if we should look at a more general approach.
 
-In either way, the driver should be able to cope with both kinds of
-clocks. Right!?
+The most flexible seems to have some "clock victim" DT node, somewhat
+mimicking the simplefb solution: One DT node which just references
+clocks that are used by other (firmware) components in the system and
+which can't be protected otherwise.
+Normally this node would be empty, but firmware can add clock references
+the moment it needs one clock. So ATF could add the THS clock, and Xen
+could add the UART0 gate clock. This could be done at runtime by the
+firmware or hypervisor. Xen for instance already amends the DT before
+passing it on to Dom0, so copying all the clock references from the UART
+to this node would be easy to implement.
 
->
-> Note that unlike clocks, power areas cannot be controlled explicitly by the
-> driver. That always has to be done through the Runtime PM API.
+Does that sound worthwhile to pursue? I could sketch up something if
+that makes sense.
 
-Yes, agree!
-
-At least until/if we get multiple power areas (PM domain) support for
-devices. Then this may change. However, that's a different story. :-)
-
->
->> In my experience for ARM SoCs, I have found that centralized method
->> doesn't work well, when one need flexibility. For example, if there
->> are strict constraints on the order of how to put device's PM
->> resources (clocks, pinctrl, etc) in low power states. For example, to
->> avoid clock glitches.
->
-> With multiple clocks used by a device, there's sometimes also a lack of
-> understanding of the real clock hierarchy. If these multiple clocks need
-> to be enabled/disabled in a specific order, perhaps they are not
-> independent, and modelling the hierarchy correctly, and describing in DT
-> the device as being connected to the leaf clock may solve the ordering issue.
-
-Nope, this scenario I had in mind isn't about the clock hierarchy.
-Instead this is about other resources that the driver deals with
-during runtime PM. Pinctrl, regulators, device internals registers,
-etc.
-
-I have stumbled of cases, where the order dealing with these
-resources, simply need to be strict, thus it is better managed from
-the driver's runtime PM callbacks.
-
-What I am saying is that, if you have these kind of constraints, then
-having clocks being managed at the PM domain level via PM clk and
-other resources in the driver, simply isn't a good mix.
-
->
->> Another problem with the PM clk is, more exactly with
->> pm_clk_suspend|resume(), that those invokes only clk_enable|disable().
->> pm_clk_suspend|resume() can't call clk_prepare|unprepare(), because we
->> don't know if we running in atomic context when those are executed.
->> Potentially this means leaving the clocks ungated - all the time.
->>
->> I have though about how to fix the above, several times, but I always
->> ends up with thinking that's it more easy, to let the driver deal with
->> the clocks, as then the problem goes away.
->
-> There's a similar issue with powering on/off power areas.
-
-I don't follow. Can you elaborate?
-
-> How do device start/stop differ from power domain on/off?
-
-I guess what you refer to is that, genpd's ->start|stop() callbacks
-may be assigned to pm_clk_suspend|resume(), and those may be called
-from genps's runtime PM callbacks and genpd's system sleep callbacks.
-
-Yes, both cases suffers from the same problem as I describe above.
-Clocks may stay ungated - all the time.
-
->
->>> Drivers that care about properties of the module clock (mainly frequency)
->>> can still use the clk_*() API for that. Other (optional) clocks must be
->>> handled by the device driver itself.
->>
->> A comment on that;
->>
->> Before we the PM clk was introduced, we didn't have the clk_bulk_*()
->> interface. To me, using clk_bulk_*() in drivers could help to simplify
->> the code in regards to manage clocks (including SoC specific clocks)
->> during runtime PM.
->>
->> Perhaps this could be an option to using PM clk, as it provides both
->> flexibility and could manage SoC specific clocks.
->
-> See my comment about multiple clocks above...
->
-
-Kind regards
-Uffe
+Cheers,
+Andre.
