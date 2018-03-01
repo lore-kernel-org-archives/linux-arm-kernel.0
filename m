@@ -1,39 +1,42 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 1 Mar 2018 16:24:50 +0100
-Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
-In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <20180301152450.GA4061@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu,  1 Mar 2018 09:25:15 -0600
+Subject: [PATCH] ARM: boot: add strrchr function
+Message-ID: <20180301152515.27004-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
-> Hi All,
-> 
-> This backport patchset fixed the meltdown issue, it's original branch:
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-> A few dependency or fixingpatches are also picked up, if they are necessary
->  and no functional changes.
-> 
-> The patchset also on repository:
-> 	git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2 
-> 
-> No bug found yet from kernelci.org and lkft testing.
+libfdt gained a new dependency on strrchr, so copy the implementation
+from lib/string.c.
 
-No bugs is good, but does it actually fix the meltdown problem?  What
-did you test it on?
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+Please ack. This is a dependency for dtc/libfdt sync with upstream.
 
-And why are you making this patchset up?  What is wrong with the patches
-in the android-common tree for this?
+ arch/arm/boot/compressed/string.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> Any comments are appreciated!
-
-You need to start versioning this changeset, as I have no idea if this
-is the "latest" one or not, right?
-
-Or have you not sent out this patchset before?  How does this interact
-with the "spectre" patches?  Or am I totally confused here?
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+index 13c90abc68d6..ade5079bebbf 100644
+--- a/arch/arm/boot/compressed/string.c
++++ b/arch/arm/boot/compressed/string.c
+@@ -121,6 +121,16 @@ char *strchr(const char *s, int c)
+ 	return (char *)s;
+ }
+ 
++char *strrchr(const char *s, int c)
++{
++	const char *last = NULL;
++	do {
++		if (*s == (char)c)
++			last = s;
++	} while (*s++);
++	return (char *)last;
++}
++
+ #undef memset
+ 
+ void *memset(void *s, int c, size_t count)
+-- 
+2.14.1
