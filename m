@@ -1,25 +1,25 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:11 +0800
-Subject: [PATCH 34/45] arm/arm64: KVM: Implement PSCI 1.0 support
+Date: Thu,  1 Mar 2018 20:54:07 +0800
+Subject: [PATCH 30/45] arm64: KVM: Increment PC after handling an SMC trap
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-35-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-31-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 58e0b2239a4d upstream.
+commit f5115e8869e1 upstream.
 
-PSCI 1.0 can be trivially implemented by providing the FEATURES
-call on top of PSCI 0.2 and returning 1.0 as the PSCI version.
+When handling an SMC trap, the "preferred return address" is set
+to that of the SMC, and not the next PC (which is a departure from
+the behaviour of an SMC that isn't trapped).
 
-We happily ignore everything else, as they are either optional or
-are clarifications that do not require any additional change.
+Increment PC in the handler, as the guest is otherwise forever
+stuck...
 
-PSCI 1.0 is now the default until we decide to add a userspace
-selection API.
-
+Cc: stable at vger.kernel.org
+Fixes: acfb3b883f6d ("arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls")
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
@@ -27,93 +27,29 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/kvm/psci.c    | 45 ++++++++++++++++++++++++++++++++++++++++++++-
- include/kvm/arm_psci.h |  3 +++
- 2 files changed, 47 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/handle_exit.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index bc334d6..097632c 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -233,7 +233,7 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
- int kvm_psci_version(struct kvm_vcpu *vcpu)
- {
- 	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
--		return KVM_ARM_PSCI_0_2;
-+		return KVM_ARM_PSCI_LATEST;
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 2e6e9e9..5b56b09 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -53,7 +53,16 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
- 	return KVM_ARM_PSCI_0_1;
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
++	/*
++	 * "If an SMC instruction executed at Non-secure EL1 is
++	 * trapped to EL2 because HCR_EL2.TSC is 1, the exception is a
++	 * Trap exception, not a Secure Monitor Call exception [...]"
++	 *
++	 * We need to advance the PC after the trap, as it would
++	 * otherwise return to the same address...
++	 */
+ 	vcpu_set_reg(vcpu, 0, ~0UL);
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+ 	return 1;
  }
-@@ -312,6 +312,47 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	return ret;
- }
  
-+static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
-+{
-+	u32 psci_fn = smccc_get_function(vcpu);
-+	u32 feature;
-+	unsigned long val;
-+	int ret = 1;
-+
-+	switch(psci_fn) {
-+	case PSCI_0_2_FN_PSCI_VERSION:
-+		val = KVM_ARM_PSCI_1_0;
-+		break;
-+	case PSCI_1_0_FN_PSCI_FEATURES:
-+		feature = smccc_get_arg1(vcpu);
-+		switch(feature) {
-+		case PSCI_0_2_FN_PSCI_VERSION:
-+		case PSCI_0_2_FN_CPU_SUSPEND:
-+		case PSCI_0_2_FN64_CPU_SUSPEND:
-+		case PSCI_0_2_FN_CPU_OFF:
-+		case PSCI_0_2_FN_CPU_ON:
-+		case PSCI_0_2_FN64_CPU_ON:
-+		case PSCI_0_2_FN_AFFINITY_INFO:
-+		case PSCI_0_2_FN64_AFFINITY_INFO:
-+		case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
-+		case PSCI_0_2_FN_SYSTEM_OFF:
-+		case PSCI_0_2_FN_SYSTEM_RESET:
-+		case PSCI_1_0_FN_PSCI_FEATURES:
-+			val = 0;
-+			break;
-+		default:
-+			val = PSCI_RET_NOT_SUPPORTED;
-+			break;
-+		}
-+		break;
-+	default:
-+		return kvm_psci_0_2_call(vcpu);
-+	}
-+
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
-+	return ret;
-+}
-+
- static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
-@@ -354,6 +395,8 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- int kvm_psci_call(struct kvm_vcpu *vcpu)
- {
- 	switch (kvm_psci_version(vcpu)) {
-+	case KVM_ARM_PSCI_1_0:
-+		return kvm_psci_1_0_call(vcpu);
- 	case KVM_ARM_PSCI_0_2:
- 		return kvm_psci_0_2_call(vcpu);
- 	case KVM_ARM_PSCI_0_1:
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index 5659343..3236043 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -22,6 +22,9 @@
- 
- #define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
- #define KVM_ARM_PSCI_0_2	PSCI_VERSION(0, 2)
-+#define KVM_ARM_PSCI_1_0	PSCI_VERSION(1, 0)
-+
-+#define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
 -- 
 2.7.4
