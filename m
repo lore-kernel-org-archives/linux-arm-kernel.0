@@ -1,60 +1,64 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:40 +0800
-Subject: [PATCH 03/45] arm64: barrier: Add CSDB macros to control data-value
- prediction
+Date: Thu,  1 Mar 2018 20:53:41 +0800
+Subject: [PATCH 04/45] arm64: Implement array_index_mask_nospec()
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-4-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-5-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Robin Murphy <robin.murphy@arm.com>
 
-commit 669474e772b9 upstream.
+commit 022620eed3d0 upstream.
 
-For CPUs capable of data value prediction, CSDB waits for any outstanding
-predictions to architecturally resolve before allowing speculative execution
-to continue. Provide macros to expose it to the arch code.
+Provide an optimised, assembly implementation of array_index_mask_nospec()
+for arm64 so that the compiler is not in a position to transform the code
+in ways which affect its ability to inhibit speculation (e.g. by introducing
+conditional branches).
+
+This is similar to the sequence used by x86, modulo architectural differences
+in the carry/borrow flags.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/assembler.h | 7 +++++++
- arch/arm64/include/asm/barrier.h   | 2 ++
- 2 files changed, 9 insertions(+)
+ arch/arm64/include/asm/barrier.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 851290d..8760300 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -87,6 +87,13 @@
- 	.endm
- 
- /*
-+ * Value prediction barrier
-+ */
-+	.macro	csdb
-+	hint	#20
-+	.endm
-+
-+/*
-  * NOP sequence
-  */
- 	.macro	nops, num
 diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 0fe7e43..c68fdc5 100644
+index c68fdc5..0b0755c 100644
 --- a/arch/arm64/include/asm/barrier.h
 +++ b/arch/arm64/include/asm/barrier.h
-@@ -31,6 +31,8 @@
- #define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
- #define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
+@@ -40,6 +40,27 @@
+ #define dma_rmb()	dmb(oshld)
+ #define dma_wmb()	dmb(oshst)
  
-+#define csdb()		asm volatile("hint #20" : : : "memory")
++/*
++ * Generate a mask for array_index__nospec() that is ~0UL when 0 <= idx < sz
++ * and 0 otherwise.
++ */
++#define array_index_mask_nospec array_index_mask_nospec
++static inline unsigned long array_index_mask_nospec(unsigned long idx,
++						    unsigned long sz)
++{
++	unsigned long mask;
 +
- #define mb()		dsb(sy)
- #define rmb()		dsb(ld)
- #define wmb()		dsb(st)
++	asm volatile(
++	"	cmp	%1, %2\n"
++	"	sbc	%0, xzr, xzr\n"
++	: "=r" (mask)
++	: "r" (idx), "Ir" (sz)
++	: "cc");
++
++	csdb();
++	return mask;
++}
++
+ #define __smp_mb()	dmb(ish)
+ #define __smp_rmb()	dmb(ishld)
+ #define __smp_wmb()	dmb(ishst)
 -- 
 2.7.4
