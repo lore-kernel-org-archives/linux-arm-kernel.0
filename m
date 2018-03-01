@@ -1,26 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Mar 2018 15:52:09 -0600
-Subject: [PATCH v2 17/19] dt-bindings: net: ravb: Add support for
- r8a77965 SoC
-In-Reply-To: <1519139541-18783-18-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-18-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180301215209.724aqfekmo6tjczq@rob-hp-laptop>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 1 Mar 2018 13:59:22 -0800
+Subject: [PATCH] pata_bk3710: clarify license version and use SPDX header
+In-Reply-To: <1760511.OZqiSOBhjW@amdc3058>
+References: <CGME20180301111603epcas1p20d8448be4c055efdc39e23551bd7f68e@epcas1p2.samsung.com>
+ <1760511.OZqiSOBhjW@amdc3058>
+Message-ID: <20180301215922.GD2421174@devbig577.frc2.facebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 04:12:19PM +0100, Jacopo Mondi wrote:
-> Add documentation for r8a77965 compatible string to renesas ravb device
-> tree bindings documentation.
+On Thu, Mar 01, 2018 at 12:16:00PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> - clarify license version (it should be GPL 2.0)
+> - use SPDX header
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Cc: sergei.shtylyov at cogentembedded.com, netdev at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/net/renesas,ravb.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Applied to libata/for-4.17.
+
+Thanks.
+
+-- 
+tejun
