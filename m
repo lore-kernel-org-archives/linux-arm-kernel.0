@@ -1,45 +1,38 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  1 Mar 2018 16:25:15 +0100
-Subject: [PATCH v2 6/6] arm64: dts: rockchip: enable typec-phy0 for
- rk3399-puma-haikou.
-In-Reply-To: <20180301152515.20940-1-enric.balletbo@collabora.com>
-References: <20180301152515.20940-1-enric.balletbo@collabora.com>
-Message-ID: <20180301152515.20940-7-enric.balletbo@collabora.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 1 Mar 2018 18:28:29 +0300
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+In-Reply-To: <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+ <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
+ <20180228132707.mgunezg5o4lul7x5@verge.net.au>
+ <f9574ea2-d8ee-7c9f-b850-874074eddad2@cogentembedded.com>
+ <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
+Message-ID: <5f65b46d-be0f-a1ae-3d97-37f62ecf1657@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
-support for rk3399") caused a regression regarding the USB3. During
-boot, the following message appears a few times:
+On 03/01/2018 12:54 PM, Simon Horman wrote:
 
-    dwc3: failed to initialize core
+>>>>> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+>>>>> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+>>>>> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+>>>>> output (we're omitting the LVDS decoder for now). These patches depend on
+>>>>> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+>>>>
+>>>>    Need to mention that the DU driver silently fails to probe now. I do
+>>>>    hope that this is not due to my updates. :-)
+>>>
+>>> Please test that theory.
+>>
+>>    Yeah, after sucking in the recent versions of the DU/LVDS patches and uncommenting
+>> and fixing rejects in a couple patches here, the graphical console works again. :-)
+> 
+> Ok, but does this patchset cause a regression? If so it seems
 
-The driver is deferred waiting for the typec-phy, but this never
-happens beause is disabled. So, enable it.
+    Sorry, somehow missed that question. No regression is possible as the display just
+doesn't work before these patches are applied. It's just that it doesn't start to work
+until the recent DU/LVDS driver updates are applied.
 
-Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support for rk3399")
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
+> that we should wait for driver updates before applying it.
 
-Changes in v2: None
-
- arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-index 9a7486058455..2c9c696d1383 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-@@ -191,6 +191,10 @@
- 	status = "okay";
- };
- 
-+&tcphy0 {
-+	status = "okay";
-+};
-+
- &u2phy0 {
- 	status = "okay";
- };
--- 
-2.16.1
+MBR, Sergei
