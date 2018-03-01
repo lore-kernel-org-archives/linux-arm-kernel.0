@@ -1,52 +1,131 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:58 +0800
-Subject: [PATCH 21/45] arm64: cpufeature: Pass capability structure to
- ->enable callback
+Date: Thu,  1 Mar 2018 20:53:51 +0800
+Subject: [PATCH 14/45] arm64: uaccess: Don't bother eliding access_ok checks
+ in __{get, put}_user
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-22-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-15-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 0a0d111d40fd upstream.
+commit 84624087dd7e upstream.
 
-In order to invoke the CPU capability ->matches callback from the ->enable
-callback for applying local-CPU workarounds, we need a handle on the
-capability structure.
+access_ok isn't an expensive operation once the addr_limit for the current
+thread has been loaded into the cache. Given that the initial access_ok
+check preceding a sequence of __{get,put}_user operations will take
+the brunt of the miss, we can make the __* variants identical to the
+full-fat versions, which brings with it the benefits of address masking.
 
-This patch passes a pointer to the capability structure to the ->enable
-callback.
+The likely cost in these sequences will be from toggling PAN/UAO, which
+we can address later by implementing the *_unsafe versions.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/cpufeature.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/uaccess.h | 54 ++++++++++++++++++++++++----------------
+ 1 file changed, 32 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index fcb67e0..5c41ef6 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -949,7 +949,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 			 * uses an IPI, giving us a PSTATE that disappears when
- 			 * we return.
- 			 */
--			stop_machine(caps->enable, NULL, cpu_online_mask);
-+			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
- }
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 00025c5..ffa4e39 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -248,30 +248,35 @@ do {									\
+ 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+ } while (0)
  
- /*
-@@ -1005,7 +1005,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
- 			cpu_die_early();
- 		}
- 		if (caps->enable)
--			caps->enable(NULL);
-+			caps->enable((void *)caps);
- 	}
- }
+-#define __get_user(x, ptr)						\
++#define __get_user_check(x, ptr, err)					\
+ ({									\
+-	int __gu_err = 0;						\
+-	__get_user_err((x), (ptr), __gu_err);				\
+-	__gu_err;							\
++	__typeof__(*(ptr)) __user *__p = (ptr);				\
++	might_fault();							\
++	if (access_ok(VERIFY_READ, __p, sizeof(*__p))) {		\
++		__p = uaccess_mask_ptr(__p);				\
++		__get_user_err((x), __p, (err));			\
++	} else {							\
++		(x) = 0; (err) = -EFAULT;				\
++	}								\
+ })
  
+ #define __get_user_error(x, ptr, err)					\
+ ({									\
+-	__get_user_err((x), (ptr), (err));				\
++	__get_user_check((x), (ptr), (err));				\
+ 	(void)0;							\
+ })
+ 
+ #define __get_user_unaligned __get_user
+ 
+-#define get_user(x, ptr)						\
++#define __get_user(x, ptr)						\
+ ({									\
+-	__typeof__(*(ptr)) __user *__p = (ptr);				\
+-	might_fault();							\
+-	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
+-		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
+-		((x) = 0, -EFAULT);					\
++	int __gu_err = 0;						\
++	__get_user_check((x), (ptr), __gu_err);				\
++	__gu_err;							\
+ })
+ 
++#define get_user	__get_user
++
+ #define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
+ 	asm volatile(							\
+ 	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
+@@ -314,30 +319,35 @@ do {									\
+ 	uaccess_disable_not_uao();					\
+ } while (0)
+ 
+-#define __put_user(x, ptr)						\
++#define __put_user_check(x, ptr, err)					\
+ ({									\
+-	int __pu_err = 0;						\
+-	__put_user_err((x), (ptr), __pu_err);				\
+-	__pu_err;							\
++	__typeof__(*(ptr)) __user *__p = (ptr);				\
++	might_fault();							\
++	if (access_ok(VERIFY_WRITE, __p, sizeof(*__p))) {		\
++		__p = uaccess_mask_ptr(__p);				\
++		__put_user_err((x), __p, (err));			\
++	} else	{							\
++		(err) = -EFAULT;					\
++	}								\
+ })
+ 
+ #define __put_user_error(x, ptr, err)					\
+ ({									\
+-	__put_user_err((x), (ptr), (err));				\
++	__put_user_check((x), (ptr), (err));				\
+ 	(void)0;							\
+ })
+ 
+ #define __put_user_unaligned __put_user
+ 
+-#define put_user(x, ptr)						\
++#define __put_user(x, ptr)						\
+ ({									\
+-	__typeof__(*(ptr)) __user *__p = (ptr);				\
+-	might_fault();							\
+-	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
+-		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
+-		-EFAULT;						\
++	int __pu_err = 0;						\
++	__put_user_check((x), (ptr), __pu_err);				\
++	__pu_err;							\
+ })
+ 
++#define put_user	__put_user
++
+ extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+ extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
+ extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
 -- 
 2.7.4
