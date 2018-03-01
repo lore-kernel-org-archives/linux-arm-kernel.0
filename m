@@ -1,66 +1,77 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:04 +0800
-Subject: [PATCH 27/45] arm64: entry: Apply BP hardening for suspicious
- interrupts from EL0
+Date: Thu,  1 Mar 2018 20:54:16 +0800
+Subject: [PATCH 39/45] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-28-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-40-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 30d88c0e3ace upstream.
+commit f72af90c3783 upstream.
 
-It is possible to take an IRQ from EL0 following a branch to a kernel
-address in such a way that the IRQ is prioritised over the instruction
-abort. Whilst an attacker would need to get the stars to align here,
-it might be sufficient with enough calibration so perform BP hardening
-in the rare case that we see a kernel address in the ELR when handling
-an IRQ from EL0.
+We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+So let's intercept it as early as we can by testing for the
+function call number as soon as we've identified a HVC call
+coming from the guest.
 
-Reported-by: Dan Hettena <dhettena@nvidia.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/entry.S | 5 +++++
- arch/arm64/mm/fault.c     | 6 ++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/kvm/hyp/hyp-entry.S | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index d50c2fe..e26a114 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -646,6 +646,11 @@ el0_irq_naked:
- #endif
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 4e92399..4e9d50c 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -15,6 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- 	ct_user_exit
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	tbz	x22, #55, 1f
-+	bl	do_el0_irq_bp_hardening
-+1:
-+#endif
- 	irq_handler
++#include <linux/arm-smccc.h>
+ #include <linux/linkage.h>
  
- #ifdef CONFIG_TRACE_IRQFLAGS
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 6120a14..ad49ae8 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -590,6 +590,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	arm64_notify_die("", regs, &info, esr);
- }
+ #include <asm/alternative.h>
+@@ -79,10 +80,11 @@ alternative_endif
+ 	lsr	x0, x1, #ESR_ELx_EC_SHIFT
  
-+asmlinkage void __exception do_el0_irq_bp_hardening(void)
-+{
-+	/* PC has already been checked in entry.S */
-+	arm64_apply_bp_hardening();
-+}
+ 	cmp	x0, #ESR_ELx_EC_HVC64
++	ccmp	x0, #ESR_ELx_EC_HVC32, #4, ne
+ 	b.ne	el1_trap
+ 
+-	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+-	cbnz	x1, el1_trap		// called HVC
++	mrs	x1, vttbr_el2		// If vttbr is valid, the guest
++	cbnz	x1, el1_hvc_guest	// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
+ 	ldp	x0, x1, [sp], #16
+@@ -101,6 +103,20 @@ alternative_endif
+ 
+ 2:	eret
+ 
++el1_hvc_guest:
++	/*
++	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
++	 * The workaround has already been applied on the host,
++	 * so let's quickly get back to the guest. We don't bother
++	 * restoring x1, as it can be clobbered anyway.
++	 */
++	ldr	x1, [sp]				// Guest's x0
++	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
++	cbnz	w1, el1_trap
++	mov	x0, x1
++	add	sp, sp, #16
++	eret
 +
- asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
- 						   unsigned int esr,
- 						   struct pt_regs *regs)
+ el1_trap:
+ 	/*
+ 	 * x0: ESR_EC
 -- 
 2.7.4
