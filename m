@@ -1,216 +1,198 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:16 +0000
-Subject: [PATCH v5 01/23] arm64: alternatives: Add dynamic patching feature
+Date: Thu,  1 Mar 2018 15:55:18 +0000
+Subject: [PATCH v5 03/23] arm64: insn: Add encoder for bitwise operations
+ using literals
 In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
 References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-2-marc.zyngier@arm.com>
+Message-ID: <20180301155538.26860-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've so far relied on a patching infrastructure that only gave us
-a single alternative, without any way to provide a range of potential
-replacement instructions. For a single feature, this is an all or
-nothing thing.
+We lack a way to encode operations such as AND, ORR, EOR that take
+an immediate value. Doing so is quite involved, and is all about
+reverse engineering the decoding algorithm described in the
+pseudocode function DecodeBitMasks().
 
-It would be interesting to have a more flexible grained way of patching
-the kernel though, where we could dynamically tune the code that gets
-injected.
+This has been tested by feeding it all the possible literal values
+and comparing the output with that of GAS.
 
-In order to achive this, let's introduce a new form of dynamic patching,
-assiciating a callback to a patching site. This callback gets source and
-target locations of the patching request, as well as the number of
-instructions to be patched.
-
-Dynamic patching is declared with the new ALTERNATIVE_CB and alternative_cb
-directives:
-
-	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
-		     : "r" (v));
-or
-	alternative_cb callback
-		mov	x0, #0
-	alternative_cb_end
-
-where callback is the C function computing the alternative.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/alternative.h | 41 ++++++++++++++++++++++++++++++----
- arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++---------
- 2 files changed, 69 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/insn.h |   9 +++
+ arch/arm64/kernel/insn.c      | 136 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 145 insertions(+)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 669028172fd6..a91933b1e2e6 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -5,6 +5,8 @@
- #include <asm/cpucaps.h>
- #include <asm/insn.h>
- 
-+#define ARM64_CB_PATCH ARM64_NCAPS
-+
- #ifndef __ASSEMBLY__
- 
- #include <linux/init.h>
-@@ -22,12 +24,19 @@ struct alt_instr {
- 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 21fffdd290a3..815b35bc53ed 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -315,6 +315,10 @@ __AARCH64_INSN_FUNCS(eor,	0x7F200000, 0x4A000000)
+ __AARCH64_INSN_FUNCS(eon,	0x7F200000, 0x4A200000)
+ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+ __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
++__AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
++__AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
++__AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
++__AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+ __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+@@ -424,6 +428,11 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ 					 int shift,
+ 					 enum aarch64_insn_variant variant,
+ 					 enum aarch64_insn_logic_type type);
++u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
++				       enum aarch64_insn_variant variant,
++				       enum aarch64_insn_register Rn,
++				       enum aarch64_insn_register Rd,
++				       u64 imm);
+ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
+ 			      enum aarch64_insn_prfm_type type,
+ 			      enum aarch64_insn_prfm_target target,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 7e432662d454..72cb1721c63f 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1485,3 +1485,139 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
+ 	__check_hi, __check_ls, __check_ge, __check_lt,
+ 	__check_gt, __check_le, __check_al, __check_al
  };
- 
-+typedef void (*alternative_cb_t)(struct alt_instr *alt,
-+				 __le32 *origptr, __le32 *updptr, int nr_inst);
 +
- void __init apply_alternatives_all(void);
- void apply_alternatives(void *start, size_t length);
- 
--#define ALTINSTR_ENTRY(feature)						      \
-+#define ALTINSTR_ENTRY(feature,cb)					      \
- 	" .word 661b - .\n"				/* label           */ \
-+	" .if " __stringify(cb) " == 0\n"				      \
- 	" .word 663f - .\n"				/* new instruction */ \
-+	" .else\n"							      \
-+	" .word " __stringify(cb) "- .\n"		/* callback */	      \
-+	" .endif\n"							      \
- 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
- 	" .byte 662b-661b\n"				/* source len      */ \
- 	" .byte 664f-663f\n"				/* replacement len */
-@@ -45,15 +54,18 @@ void apply_alternatives(void *start, size_t length);
-  * but most assemblers die if insn1 or insn2 have a .inst. This should
-  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
-  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
-+ *
-+ * Alternatives with callbacks do not generate replacement instructions.
-  */
--#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
-+#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled, cb)	\
- 	".if "__stringify(cfg_enabled)" == 1\n"				\
- 	"661:\n\t"							\
- 	oldinstr "\n"							\
- 	"662:\n"							\
- 	".pushsection .altinstructions,\"a\"\n"				\
--	ALTINSTR_ENTRY(feature)						\
-+	ALTINSTR_ENTRY(feature,cb)					\
- 	".popsection\n"							\
-+	" .if " __stringify(cb) " == 0\n"				\
- 	".pushsection .altinstr_replacement, \"a\"\n"			\
- 	"663:\n\t"							\
- 	newinstr "\n"							\
-@@ -61,11 +73,17 @@ void apply_alternatives(void *start, size_t length);
- 	".popsection\n\t"						\
- 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
- 	".org	. - (662b-661b) + (664b-663b)\n"			\
-+	".else\n\t"							\
-+	"663:\n\t"							\
-+	"664:\n\t"							\
-+	".endif\n"							\
- 	".endif\n"
- 
- #define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
--	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
-+	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
- 
-+#define ALTERNATIVE_CB(oldinstr, cb) \
-+	__ALTERNATIVE_CFG(oldinstr, "NOT_AN_INSTRUCTION", ARM64_CB_PATCH, 1, cb)
- #else
- 
- #include <asm/assembler.h>
-@@ -132,6 +150,14 @@ void apply_alternatives(void *start, size_t length);
- 661:
- .endm
- 
-+.macro alternative_cb cb
-+	.set .Lasm_alt_mode, 0
-+	.pushsection .altinstructions, "a"
-+	altinstruction_entry 661f, \cb, ARM64_CB_PATCH, 662f-661f, 0
-+	.popsection
-+661:
-+.endm
-+
- /*
-  * Provide the other half of the alternative code sequence.
-  */
-@@ -157,6 +183,13 @@ void apply_alternatives(void *start, size_t length);
- 	.org	. - (662b-661b) + (664b-663b)
- .endm
- 
-+/*
-+ * Callback-based alternative epilogue
-+ */
-+.macro alternative_cb_end
-+662:
-+.endm
-+
- /*
-  * Provides a trivial alternative or default sequence consisting solely
-  * of NOPs. The number of NOPs is chosen automatically to match the
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 414288a558c8..5c4bce4ac381 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -107,32 +107,53 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
- 	return insn;
- }
- 
-+static void patch_alternative(struct alt_instr *alt,
-+			      __le32 *origptr, __le32 *updptr, int nr_inst)
++static bool range_of_ones(u64 val)
 +{
-+	__le32 *replptr;
-+	int i;
++	/* Doesn't handle full ones or full zeroes */
++	u64 sval = val >> __ffs64(val);
 +
-+	replptr = ALT_REPL_PTR(alt);
-+	for (i = 0; i < nr_inst; i++) {
-+		u32 insn;
-+
-+		insn = get_alt_insn(alt, origptr + i, replptr + i);
-+		updptr[i] = cpu_to_le32(insn);
-+	}
++	/* One of Sean Eron Anderson's bithack tricks */
++	return ((sval + 1) & (sval)) == 0;
 +}
 +
- static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
--	__le32 *origptr, *replptr, *updptr;
-+	__le32 *origptr, *updptr;
-+	alternative_cb_t alt_cb;
- 
- 	for (alt = region->begin; alt < region->end; alt++) {
--		u32 insn;
--		int i, nr_inst;
-+		int nr_inst;
- 
--		if (!cpus_have_cap(alt->cpufeature))
-+		/* Use ARM64_CB_PATCH as an unconditional patch */
-+		if (alt->cpufeature < ARM64_CB_PATCH &&
-+		    !cpus_have_cap(alt->cpufeature))
- 			continue;
- 
--		BUG_ON(alt->alt_len != alt->orig_len);
-+		if (alt->cpufeature == ARM64_CB_PATCH)
-+			BUG_ON(alt->alt_len != 0);
-+		else
-+			BUG_ON(alt->alt_len != alt->orig_len);
- 
- 		pr_info_once("patching kernel code\n");
- 
- 		origptr = ALT_ORIG_PTR(alt);
--		replptr = ALT_REPL_PTR(alt);
- 		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
--		nr_inst = alt->alt_len / sizeof(insn);
-+		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
- 
--		for (i = 0; i < nr_inst; i++) {
--			insn = get_alt_insn(alt, origptr + i, replptr + i);
--			updptr[i] = cpu_to_le32(insn);
--		}
-+		if (alt->cpufeature < ARM64_CB_PATCH)
-+			alt_cb = patch_alternative;
-+		else
-+			alt_cb  = ALT_REPL_PTR(alt);
++static u32 aarch64_encode_immediate(u64 imm,
++				    enum aarch64_insn_variant variant,
++				    u32 insn)
++{
++	unsigned int immr, imms, n, ones, ror, esz, tmp;
++	u64 mask = ~0UL;
 +
-+		alt_cb(alt, origptr, updptr, nr_inst);
- 
- 		flush_icache_range((uintptr_t)origptr,
- 				   (uintptr_t)(origptr + nr_inst));
++	/* Can't encode full zeroes or full ones */
++	if (!imm || !~imm)
++		return AARCH64_BREAK_FAULT;
++
++	switch (variant) {
++	case AARCH64_INSN_VARIANT_32BIT:
++		if (upper_32_bits(imm))
++			return AARCH64_BREAK_FAULT;
++		esz = 32;
++		break;
++	case AARCH64_INSN_VARIANT_64BIT:
++		insn |= AARCH64_INSN_SF_BIT;
++		esz = 64;
++		break;
++	default:
++		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
++		return AARCH64_BREAK_FAULT;
++	}
++
++	/*
++	 * Inverse of Replicate(). Try to spot a repeating pattern
++	 * with a pow2 stride.
++	 */
++	for (tmp = esz / 2; tmp >= 2; tmp /= 2) {
++		u64 emask = BIT(tmp) - 1;
++
++		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
++			break;
++
++		esz = tmp;
++		mask = emask;
++	}
++
++	/* N is only set if we're encoding a 64bit value */
++	n = esz == 64;
++
++	/* Trim imm to the element size */
++	imm &= mask;
++
++	/* That's how many ones we need to encode */
++	ones = hweight64(imm);
++
++	/*
++	 * imms is set to (ones - 1), prefixed with a string of ones
++	 * and a zero if they fit. Cap it to 6 bits.
++	 */
++	imms  = ones - 1;
++	imms |= 0xf << ffs(esz);
++	imms &= BIT(6) - 1;
++
++	/* Compute the rotation */
++	if (range_of_ones(imm)) {
++		/*
++		 * Pattern: 0..01..10..0
++		 *
++		 * Compute how many rotate we need to align it right
++		 */
++		ror = __ffs64(imm);
++	} else {
++		/*
++		 * Pattern: 0..01..10..01..1
++		 *
++		 * Fill the unused top bits with ones, and check if
++		 * the result is a valid immediate (all ones with a
++		 * contiguous ranges of zeroes).
++		 */
++		imm |= ~mask;
++		if (!range_of_ones(~imm))
++			return AARCH64_BREAK_FAULT;
++
++		/*
++		 * Compute the rotation to get a continuous set of
++		 * ones, with the first bit set@position 0
++		 */
++		ror = fls(~imm);
++	}
++
++	/*
++	 * immr is the number of bits we need to rotate back to the
++	 * original set of ones. Note that this is relative to the
++	 * element size...
++	 */
++	immr = (esz - ror) % esz;
++
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, n);
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_R, insn, immr);
++	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, imms);
++}
++
++u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
++				       enum aarch64_insn_variant variant,
++				       enum aarch64_insn_register Rn,
++				       enum aarch64_insn_register Rd,
++				       u64 imm)
++{
++	u32 insn;
++
++	switch (type) {
++	case AARCH64_INSN_LOGIC_AND:
++		insn = aarch64_insn_get_and_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_ORR:
++		insn = aarch64_insn_get_orr_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_EOR:
++		insn = aarch64_insn_get_eor_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_AND_SETFLAGS:
++		insn = aarch64_insn_get_ands_imm_value();
++		break;
++	default:
++		pr_err("%s: unknown logical encoding %d\n", __func__, type);
++		return AARCH64_BREAK_FAULT;
++	}
++
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
++	return aarch64_encode_immediate(imm, variant, insn);
++}
 -- 
 2.14.2
