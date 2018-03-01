@@ -1,59 +1,33 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 1 Mar 2018 10:43:38 +0100
-Subject: [PATCH 3/6] ARM: dts: stm32: Enable sdio1 for stm32f746-eval
+Date: Thu, 1 Mar 2018 10:43:40 +0100
+Subject: [PATCH 5/6] dt-bindings: mfd: Add STM32F7 SDMMC2 rcc entry
 In-Reply-To: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
 References: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1519897421-23803-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <1519897421-23803-6-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Adds SDIO related DT nodes for stm32f746-eval board.
-
-broken-cd property is needed as card detect signal is
-connected to a GPIO expander which is not yet supported
-in kernel linux.
+STM32F769 SoC provides 2 SDMMC instances, add missing
+RCC SDMMC2 entry for it.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/stm32746g-eval.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ include/dt-bindings/mfd/stm32f7-rcc.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index b2d4b8c46677..63160199e39a 100644
---- a/arch/arm/boot/dts/stm32746g-eval.dts
-+++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -91,6 +91,13 @@
- 		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
- 		clock-names = "main_clk";
- 	};
-+
-+	mmc_vcard: mmc_vcard {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc_vcard";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &clk_hse {
-@@ -113,6 +120,16 @@
- 	status = "okay";
- };
- 
-+&sdio1 {
-+	status = "okay";
-+	vmmc-supply = <&mmc_vcard>;
-+	broken-cd;
-+	pinctrl-names = "default", "opendrain";
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-1 = <&sdio_pins_od>;
-+	bus-width = <4>;
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_a>;
- 	pinctrl-names = "default";
+diff --git a/include/dt-bindings/mfd/stm32f7-rcc.h b/include/dt-bindings/mfd/stm32f7-rcc.h
+index 8b7b7197ffd7..a90f3613c584 100644
+--- a/include/dt-bindings/mfd/stm32f7-rcc.h
++++ b/include/dt-bindings/mfd/stm32f7-rcc.h
+@@ -91,6 +91,7 @@
+ #define STM32F7_RCC_APB2_TIM8		1
+ #define STM32F7_RCC_APB2_USART1		4
+ #define STM32F7_RCC_APB2_USART6		5
++#define STM32F7_RCC_APB2_SDMMC2		7
+ #define STM32F7_RCC_APB2_ADC1		8
+ #define STM32F7_RCC_APB2_ADC2		9
+ #define STM32F7_RCC_APB2_ADC3		10
 -- 
 1.9.1
