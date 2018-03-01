@@ -1,128 +1,72 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 11:03:28 +0100
-Subject: [PATCH 1/3] dt-bindings: Add a binding for the sunxi message box
-In-Reply-To: <d124c54f-7ac1-2305-0e69-94bc33c6eafe@arm.com>
-References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228022714.30068-2-samuel@sholland.org>
- <20180228082843.fga47gfrv2g5kmiz@flea>
- <d124c54f-7ac1-2305-0e69-94bc33c6eafe@arm.com>
-Message-ID: <20180301100328.3w36zdadeaqums44@flea>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  1 Mar 2018 18:08:10 +0800
+Subject: [PATCH v6 00/14] iommu/rockchip: Use OF_IOMMU
+Message-ID: <20180301100824.14887-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 05:17:03PM +0000, Andre Przywara wrote:
-> Hi Samuel,
-> 
-> thank you very much for writing and posting this!
-> 
-> On 28/02/18 08:28, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Tue, Feb 27, 2018 at 08:27:12PM -0600, Samuel Holland wrote:
-> >> This mailbox hardware is present in several Allwinner sun8i and sun50i
-> >> SoCs. Add a device tree binding for it.
-> >>
-> >> Signed-off-by: Samuel Holland <samuel@sholland.org>
-> >> ---
-> >>  .../devicetree/bindings/mailbox/sunxi-msgbox.txt   | 40 ++++++++++++++++++++++
-> >>  1 file changed, 40 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
-> >> new file mode 100644
-> >> index 000000000000..3b3ed7f870a0
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/mailbox/sunxi-msgbox.txt
-> >> @@ -0,0 +1,40 @@
-> >> +Allwinner sunxi Message Box
-> >> +===========================
-> >> +
-> >> +The hardware message box on sunxi SoCs is a two-user mailbox controller
-> >> +containing 8 unidirectional FIFOs bonded into 4 bidirectional mailbox channels.
-> >> +An interrupt is raised for received messages, but software must poll to know
-> >> +when a transmitted message has been acknowledged by the remote user.
-> >> +
-> >> +Refer to ./mailbox.txt for generic information about mailbox device-tree
-> >> +bindings.
-> >> +
-> >> +Mailbox Device Node:
-> >> +====================
-> >> +
-> >> +Required properties:
-> >> +--------------------
-> >> +- compatible:		Must be "allwinner,sunxi-msgbox".
-> > 
-> > The IP change quite often in the Allwinner SoCs, so it would be better
-> > to use a more specific compatible there. IIRC that IP was introduced
-> > with the A31, so what about sun6i-a31-msgbox?
-> 
-> As much as I like generic compatible strings ;-) I agree with Maxime
-> here. Can you change this to something like:
-> 
-> - compatible: Must contain at least "allwinner,sun6i-a31-msgbox".
->               Should also contain one of the more specific strings, when
-> 	      used on other SoCs which are compatible:
-> 
-> And then list the strings for the SoCs which we know of, ideally have
-> been tested also?
-> 
-> The rationale behind this is that by listing those strings here we
-> reserve them, to cover for future extensions or bugs found in those
-> SoCs. So even though the driver would only match on
-> "allwinner,sun6i-a31-msgbox" right now, we can extend it in the future.
-> The actual DTs would always use:
-> 	compatible = "allwinner,sun50i-a64-msgbox",
-> 		     "allwinner,sun6i-a31-msgbox";
-> Right now the first string would not match anything, but the second
-> would. The driver would use the generic driver functionality.
-> Should we find a bug or speciality in the A64, we can add the a64 string
-> to the driver and connect it to the workaround, and the actual DTs would
-> not need to be touched.
-> Does this make sense?
 
-It does to me :)
+This series fixes some issues in rockchip iommu driver, and add of_iommu
+support in it.
 
-> >> +- reg:			Contains the mailbox register address range (base
-> >> +			address and length).
-> >> +- clocks:		phandle for the clock controller and specifier.
-> >> +- clock-names:		Must be "bus".
-> 
-> Maxime:
-> Out of curiosity: There is only one clock, and just to gate the APB
-> clock to the MMIO registers. So do we need clock-names?
+Changes in v6:
+Add clk names, and modify all iommu nodes in all existing rockchip dts
+Fix dt-binding as Robin suggested.
+Use aclk and iface clk as Rob and Robin suggested, and split binding
+patch.
 
-We don't.
+Changes in v5:
+Use out labels to save the duplication between the error and success paths.
+Use RK_MMU_POLL_PERIOD_US instead of 100.
+Remove clk names.
+Use clk_bulk APIs.
+Avoid race about pm_runtime_get_if_in_use() and pm_runtime_enabled().
 
-> Or is this good practise these days to allow extending the clocks
-> later in a compatible manner? (Thinking of the sunxi pinctrl here.)
+Changes in v4:
+Rewrite commit message.
 
-This is always doable, since if you ever have multiple clocks, you
-will have clock-names, so any newer clock will have a name, and the
-first one will usually be the first in the index. This is not as nice
-as having it from the start, but it's definitely something we can have
-in the binding as well.
+Changes in v3:
+Also remove remove() and module_exit() as Tomasz suggested.
+Loop platform_get_irq() as Robin suggested.
+Add struct rk_iommudata.
+Squash iommu/rockchip: Use iommu_group_get_for_dev() for add_device
+Only call startup() and shutdown() when iommu attached.
+Remove pm_mutex.
+Check runtime PM disabled.
+Check pm_runtime in rk_iommu_irq().
+Remove rk_iommudata->domain.
 
-> And is "bus" the correct naming? I see "apb" being used as well, is this
-> legacy?
+Changes in v2:
+Move irq request to probe(in patch[0])
+Move bus_set_iommu() to rk_iommu_probe().
 
-So we were using apb/ahb at the beginning, but we've had some IPs
-moving from one generation to the other from the APB to AHB bus iirc
-(or the other way around, this was quite some time ago).
+Jeffy Chen (10):
+  iommu/rockchip: Prohibit unbind and remove
+  iommu/rockchip: Fix error handling in probe
+  iommu/rockchip: Request irqs in rk_iommu_probe()
+  ARM: dts: rockchip: add clocks in iommu nodes
+  dt-bindings: iommu/rockchip: Add clock property
+  iommu/rockchip: Use IOMMU device for dma mapping operations
+  iommu/rockchip: Use OF_IOMMU to attach devices automatically
+  iommu/rockchip: Fix error handling in init
+  iommu/rockchip: Add runtime PM support
+  iommu/rockchip: Support sharing IOMMU between masters
 
-Having some more generic name will also help to have genpd handle the
-clocks and resets lines, which is something I've wanted to have for
-quite some time, but is very low on my TODO-list...
+Tomasz Figa (4):
+  iommu/rockchip: Fix error handling in attach
+  iommu/rockchip: Use iopoll helpers to wait for hardware
+  iommu/rockchip: Fix TLB flush of secondary IOMMUs
+  iommu/rockchip: Control clocks needed to access the IOMMU
 
-Maxime
+ .../devicetree/bindings/iommu/rockchip,iommu.txt   |   7 +
+ arch/arm/boot/dts/rk3036.dtsi                      |   2 +
+ arch/arm/boot/dts/rk322x.dtsi                      |   8 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  12 +
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  10 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  10 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  14 +-
+ drivers/iommu/rockchip-iommu.c                     | 600 +++++++++++----------
+ 8 files changed, 374 insertions(+), 289 deletions(-)
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/19aad8d7/attachment-0001.sig>
+2.11.0
