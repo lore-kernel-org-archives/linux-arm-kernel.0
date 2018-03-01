@@ -1,54 +1,62 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu,  1 Mar 2018 11:38:03 -0800
-Subject: [PATCH] arm64/debug: Fix registers on sleeping tasks
-Message-ID: <20180301193803.129195-1-dianders@chromium.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 2 Mar 2018 03:57:49 +0800
+Subject: [arm-platforms:kvm-arm64/haslr 30/31] arch/arm64/mm/fault.c:719:2:
+ error: implicit declaration of function 'arm64_apply_bp_hardening'; did you
+ mean 'do_el0_irq_bp_hardening'?
+Message-ID: <201803020345.qBthC71N%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
-registers on sleeping tasks") but for arm64.  Nuff said.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/haslr
+head:   59f018b25acbeec7d46fdf5fbced13e12665a16b
+commit: 286d63fc464fa92e4bc6e48e0a52b007d7c4c2a5 [30/31] arm64: KVM: Allow mapping of vectors outside of the RAM region
+config: arm64-allnoconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 286d63fc464fa92e4bc6e48e0a52b007d7c4c2a5
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+All errors (new ones prefixed by >>):
+
+   arch/arm64/mm/fault.c: In function 'do_el0_irq_bp_hardening':
+>> arch/arm64/mm/fault.c:719:2: error: implicit declaration of function 'arm64_apply_bp_hardening'; did you mean 'do_el0_irq_bp_hardening'? [-Werror=implicit-function-declaration]
+     arm64_apply_bp_hardening();
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+     do_el0_irq_bp_hardening
+   cc1: some warnings being treated as errors
+--
+   arch/arm64/mm/context.c: In function 'check_and_switch_context':
+>> arch/arm64/mm/context.c:238:2: error: implicit declaration of function 'arm64_apply_bp_hardening' [-Werror=implicit-function-declaration]
+     arm64_apply_bp_hardening();
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +719 arch/arm64/mm/fault.c
+
+1d18c47c Catalin Marinas 2012-03-05  715  
+30d88c0e Will Deacon     2018-02-02  716  asmlinkage void __exception do_el0_irq_bp_hardening(void)
+30d88c0e Will Deacon     2018-02-02  717  {
+30d88c0e Will Deacon     2018-02-02  718  	/* PC has already been checked in entry.S */
+30d88c0e Will Deacon     2018-02-02 @719  	arm64_apply_bp_hardening();
+30d88c0e Will Deacon     2018-02-02  720  }
+30d88c0e Will Deacon     2018-02-02  721  
+
+:::::: The code at line 719 was first introduced by commit
+:::::: 30d88c0e3ace625a92eead9ca0ad94093a8f59fe arm64: entry: Apply BP hardening for suspicious interrupts from EL0
+
+:::::: TO: Will Deacon <will.deacon@arm.com>
+:::::: CC: Catalin Marinas <catalin.marinas@arm.com>
+
 ---
-
- arch/arm64/kernel/kgdb.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 2122cd187f19..01285d4dcdc3 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -138,14 +138,26 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
- void
- sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
- {
--	struct pt_regs *thread_regs;
-+	struct thread_struct *thread = &task->thread;
-+	struct cpu_context *cpu_context = &thread->cpu_context;
- 
- 	/* Initialize to zero */
- 	memset((char *)gdb_regs, 0, NUMREGBYTES);
--	thread_regs = task_pt_regs(task);
--	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
--	/* Special case for PSTATE (check comments in asm/kgdb.h for details) */
--	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
-+
-+	gdb_regs[19] = cpu_context->x19;
-+	gdb_regs[20] = cpu_context->x20;
-+	gdb_regs[21] = cpu_context->x21;
-+	gdb_regs[22] = cpu_context->x22;
-+	gdb_regs[23] = cpu_context->x23;
-+	gdb_regs[24] = cpu_context->x24;
-+	gdb_regs[25] = cpu_context->x25;
-+	gdb_regs[26] = cpu_context->x26;
-+	gdb_regs[27] = cpu_context->x27;
-+	gdb_regs[28] = cpu_context->x28;
-+	gdb_regs[29] = cpu_context->fp;
-+
-+	gdb_regs[31] = cpu_context->sp;
-+	gdb_regs[32] = cpu_context->pc;
- }
- 
- void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
--- 
-2.16.2.395.g2e18187dfd-goog
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 7006 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/0d210f56/attachment.gz>
