@@ -1,53 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Mar 2018 12:54:46 +0100
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAPDyKFrN0t6Jr-gAuU4_OHEvYap2fRiaUbZC5E7sAGAQOUQjjw@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
- <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
- <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
- <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
- <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
- <5A977638.8010506@rock-chips.com>
- <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
- <CAPDyKFq_hwao0hZCYmO-VrsW3vDJJboa1RG-TMLRQRgbt+YhpQ@mail.gmail.com>
- <CAMuHMdWg1y3Ragb9nYY12whZhUn8w0a4aOOR31LSNXa37NbfXg@mail.gmail.com>
- <CAPDyKFrN0t6Jr-gAuU4_OHEvYap2fRiaUbZC5E7sAGAQOUQjjw@mail.gmail.com>
-Message-ID: <CAMuHMdVXWj8GCAFy66usSj-z_zeWgY3SyxvpenUKf9cc-ZWK5w@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 1 Mar 2018 12:06:15 +0000
+Subject: [PATCH v7 00/13] Support PPTT for ARM64
+In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+Message-ID: <8b5bfd7e-57ea-bb34-85f8-69007a3847e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Jeremy,
 
-On Thu, Mar 1, 2018 at 12:22 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 1 March 2018 at 11:37, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Thu, Mar 1, 2018 at 11:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> Another problem with the PM clk is, more exactly with
->>> pm_clk_suspend|resume(), that those invokes only clk_enable|disable().
->>> pm_clk_suspend|resume() can't call clk_prepare|unprepare(), because we
->>> don't know if we running in atomic context when those are executed.
->>> Potentially this means leaving the clocks ungated - all the time.
->>>
->>> I have though about how to fix the above, several times, but I always
->>> ends up with thinking that's it more easy, to let the driver deal with
->>> the clocks, as then the problem goes away.
->>
->> There's a similar issue with powering on/off power areas.
->
-> I don't follow. Can you elaborate?
+On 28/02/18 22:06, Jeremy Linton wrote:
+> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+> used to describe the processor and cache topology. Ideally it is
+> used to extend/override information provided by the hardware, but
+> right now ARM64 is entirely dependent on firmware provided tables.
+> 
+> This patch parses the table for the cache topology and CPU topology.
+> When we enable ACPI/PPTT for arm64 we map the physical_id to the
+> PPTT node flagged as the physical package by the firmware.
+> This results in topologies that match what the remainder of the
+> system expects. To avoid inverted scheduler domains we then
+> set the MC domain equal to the largest cache within the socket
+> below the NUMA domain.
+> 
+I remember reviewing and acknowledging most of the cacheinfo stuff with
+couple of minor suggestions for v6. I don't see any Acked-by tags in
+this series and don't know if I need to review/ack any more cacheinfo
+related patches.
 
-I intended to comment on the atomic context (or not).
-But I think I was wrong, and PM domain drivers do busy loops instead
-of sleeps.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Regards,
+Sudeep
