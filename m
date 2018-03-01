@@ -1,151 +1,167 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu,  1 Mar 2018 20:18:45 +0100
-Subject: [PATCH 1/2] drm/sun4i: backend: Check that we only have a single YUV
- plane
+Date: Thu,  1 Mar 2018 20:18:46 +0100
+Subject: [PATCH 2/2] drm/sun4i: backend: Support YUV planes
 In-Reply-To: <cover.f0cb3210f2d878853ef16506da152f38ba2e3286.1519931807.git-series.maxime.ripard@bootlin.com>
 References: <cover.f0cb3210f2d878853ef16506da152f38ba2e3286.1519931807.git-series.maxime.ripard@bootlin.com>
-Message-ID: <2f8586493d9139b12efe7e94f65e9a149f818e0e.1519931807.git-series.maxime.ripard@bootlin.com>
+Message-ID: <66088c1398bd3189123f28a89a7ccc669fe9f296.1519931807.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like for the frontend, a single plane can use a YUV format. Make sure
-we have that constraint covered in our atomic_check.
+Now that we have the guarantee that we will have only a single YUV plane,
+actually support them. The way it works is not really straightforward,
+since we first need to enable the YUV mode in the plane that we want to
+setup, and then we have a few registers to setup the YUV buffer and
+parameters.
+
+We also need to setup the color correction to actually have something
+displayed.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 49 ++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_backend.h | 18 ++++++++++-
- 2 files changed, 65 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 79 ++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.c   |  4 +-
+ 2 files changed, 83 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 092ade4ff6a5..486dfd357920 100644
+index 486dfd357920..7e647044cbed 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -42,6 +42,38 @@ static const u32 sunxi_rgb2yuv_coef[12] = {
+@@ -42,6 +42,12 @@ static const u32 sunxi_rgb2yuv_coef[12] = {
  	0x000001c1, 0x00003e88, 0x00003fb8, 0x00000808
  };
  
-+static inline bool sun4i_backend_format_is_planar_yuv(uint32_t format)
-+{
-+	switch (format) {
-+	case DRM_FORMAT_YUV411:
-+	case DRM_FORMAT_YUV422:
-+	case DRM_FORMAT_YUV444:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
++static const u32 sunxi_bt601_yuv2rgb_coef[12] = {
++	0x000004a7, 0x00001e6f, 0x00001cbf, 0x00000877,
++	0x000004a7, 0x00000000, 0x00000662, 0x00003211,
++	0x000004a7, 0x00000812, 0x00000000, 0x00002eb1,
++};
 +
-+static inline bool sun4i_backend_format_is_packed_yuv422(uint32_t format)
-+{
-+	switch (format) {
-+	case DRM_FORMAT_YUYV:
-+	case DRM_FORMAT_YVYU:
-+	case DRM_FORMAT_UYVY:
-+	case DRM_FORMAT_VYUY:
-+		return true;
-+
-+	default:
-+		return false;
-+	}
-+}
-+
-+static inline bool sun4i_backend_format_is_yuv(uint32_t format)
-+{
-+	return sun4i_backend_format_is_planar_yuv(format) ||
-+		sun4i_backend_format_is_packed_yuv422(format);
-+}
-+
- static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
+ static inline bool sun4i_backend_format_is_planar_yuv(uint32_t format)
  {
- 	int i;
-@@ -330,6 +362,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 	unsigned int num_planes = 0;
- 	unsigned int num_alpha_planes = 0;
- 	unsigned int num_frontend_planes = 0;
-+	unsigned int num_yuv_planes = 0;
- 	unsigned int current_pipe = 0;
- 	unsigned int i;
- 
-@@ -362,6 +395,11 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		if (fb->format->has_alpha)
- 			num_alpha_planes++;
- 
-+		if (sun4i_backend_format_is_yuv(fb->format->format)) {
-+			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
-+			num_yuv_planes++;
-+		}
-+
- 		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
- 				 plane_state->normalized_zpos);
- 
-@@ -430,13 +468,20 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		s_state->pipe = current_pipe;
- 	}
- 
-+	/* We can only have a single YUV plane at a time */
-+	if (num_yuv_planes > SUN4I_BACKEND_NUM_YUV_PLANES) {
-+		DRM_DEBUG_DRIVER("Too many planes with YUV, rejecting...\n");
-+		return -EINVAL;
-+	}
-+
- 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
- 		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
- 		return -EINVAL;
- 	}
- 
--	DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video\n",
--			 num_planes, num_alpha_planes, num_frontend_planes);
-+	DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video, %u YUV\n",
-+			 num_planes, num_alpha_planes, num_frontend_planes,
-+			 num_yuv_planes);
- 
+ 	switch (format) {
+@@ -198,6 +204,55 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
  	return 0;
  }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 52e77591186a..316f2179e9e1 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -72,6 +72,7 @@
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x) << 15)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11, 10)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			((x) << 10)
-+#define SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN		BIT(2)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
  
- #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 * (l)))
-@@ -110,7 +111,23 @@
- #define SUN4I_BACKEND_SPREN_REG			0x900
- #define SUN4I_BACKEND_SPRFMTCTL_REG		0x908
- #define SUN4I_BACKEND_SPRALPHACTL_REG		0x90c
++static int sun4i_backend_update_yuv_format(struct sun4i_backend *backend,
++					   int layer, struct drm_plane *plane)
++{
++	struct drm_plane_state *state = plane->state;
++	struct drm_framebuffer *fb = state->fb;
++	uint32_t format = fb->format->format;
++	u32 val = SUN4I_BACKEND_IYUVCTL_EN;
++	int i;
 +
- #define SUN4I_BACKEND_IYUVCTL_REG		0x920
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_MASK		GENMASK(14, 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV444		(4 << 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV422		(3 << 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_PLANAR_YUV444		(2 << 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_PLANAR_YUV222		(1 << 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBFMT_PLANAR_YUV111		(0 << 12)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_MASK			GENMASK(9, 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_YVYU				(3 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_VYUY				(2 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_YUYV				(1 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_UYVY				(0 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_VUYA				(1 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_FBPS_AYUV				(0 << 8)
-+#define SUN4I_BACKEND_IYUVCTL_EN			BIT(0)
++	for (i = 0; i < ARRAY_SIZE(sunxi_bt601_yuv2rgb_coef); i++)
++		regmap_write(backend->engine.regs,
++			     SUN4I_BACKEND_YGCOEF_REG(i),
++			     sunxi_bt601_yuv2rgb_coef[i]);
 +
- #define SUN4I_BACKEND_IYUVADD_REG(c)		(0x930 + (0x4 * (c)))
++	/*
++	 * We should do that only for a single plane, but the
++	 * framebuffer's atomic_check has our back on this.
++	 */
++	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN,
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN);
++
++	if (sun4i_backend_format_is_packed_yuv422(format))
++		val |= SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV422;
++	else
++		DRM_DEBUG_DRIVER("Unknown YUV format\n");
++
++	switch (format) {
++	case DRM_FORMAT_YUYV:
++		val |= SUN4I_BACKEND_IYUVCTL_FBPS_VYUY;
++		break;
++	case DRM_FORMAT_YVYU:
++		val |= SUN4I_BACKEND_IYUVCTL_FBPS_UYVY;
++		break;
++	case DRM_FORMAT_UYVY:
++		val |= SUN4I_BACKEND_IYUVCTL_FBPS_YVYU;
++		break;
++	case DRM_FORMAT_VYUY:
++		val |= SUN4I_BACKEND_IYUVCTL_FBPS_YUYV;
++		break;
++	default:
++		DRM_DEBUG_DRIVER("Unknown YUV pixel sequence\n");
++	}
++
++	regmap_write(backend->engine.regs, SUN4I_BACKEND_IYUVCTL_REG, val);
++
++	return 0;
++}
++
+ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 				       int layer, struct drm_plane *plane)
+ {
+@@ -207,6 +262,10 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 	u32 val;
+ 	int ret;
  
- #define SUN4I_BACKEND_IYUVLINEWIDTH_REG(c)	(0x940 + (0x4 * (c)))
-@@ -149,6 +166,7 @@
- #define SUN4I_BACKEND_NUM_LAYERS		4
- #define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
- #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
-+#define SUN4I_BACKEND_NUM_YUV_PLANES		1
++	/* Clear the YUV mode */
++	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN, 0);
++
+ 	if (plane->state->crtc)
+ 		interlaced = plane->state->crtc->state->adjusted_mode.flags
+ 			& DRM_MODE_FLAG_INTERLACE;
+@@ -218,6 +277,9 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 	DRM_DEBUG_DRIVER("Switching display backend interlaced mode %s\n",
+ 			 interlaced ? "on" : "off");
  
- struct sun4i_backend {
- 	struct sunxi_engine	engine;
++	if (sun4i_backend_format_is_yuv(fb->format->format))
++		return sun4i_backend_update_yuv_format(backend, layer, plane);
++
+ 	ret = sun4i_backend_drm_format_to_layer(fb->format->format, &val);
+ 	if (ret) {
+ 		DRM_DEBUG_DRIVER("Invalid format\n");
+@@ -255,6 +317,20 @@ int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+ 	return 0;
+ }
+ 
++static int sun4i_backend_update_yuv_buffer(struct sun4i_backend *backend,
++					   struct drm_framebuffer *fb,
++					   dma_addr_t paddr)
++{
++	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
++	regmap_write(backend->engine.regs, SUN4I_BACKEND_IYUVADD_REG(0), paddr);
++
++	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
++	regmap_write(backend->engine.regs, SUN4I_BACKEND_IYUVLINEWIDTH_REG(0),
++		     fb->pitches[0] * 8);
++
++	return 0;
++}
++
+ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 				      int layer, struct drm_plane *plane)
+ {
+@@ -280,6 +356,9 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	 */
+ 	paddr -= PHYS_OFFSET;
+ 
++	if (sun4i_backend_format_is_yuv(fb->format->format))
++		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
++
+ 	/* Write the 32 lower bits of the address (in bits) */
+ 	lo_paddr = paddr << 3;
+ 	DRM_DEBUG_DRIVER("Setting address lower bits to 0x%x\n", lo_paddr);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 33ad377569ec..2949a3c912c1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -134,7 +134,11 @@ static const uint32_t sun4i_backend_layer_formats[] = {
+ 	DRM_FORMAT_RGBA4444,
+ 	DRM_FORMAT_RGB888,
+ 	DRM_FORMAT_RGB565,
++	DRM_FORMAT_UYVY,
++	DRM_FORMAT_VYUY,
+ 	DRM_FORMAT_XRGB8888,
++	DRM_FORMAT_YUYV,
++	DRM_FORMAT_YVYU,
+ };
+ 
+ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 -- 
 git-series 0.9.1
