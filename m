@@ -1,31 +1,71 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Mar 2018 10:53:00 +0100
-Subject: [PATCH v2 00/10] R-Car M3-N: Enable EtherAVB device node
-In-Reply-To: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1519726974-23160-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180301095300.egvxwzpiuhwabwzg@verge.net.au>
+Date: Thu, 1 Mar 2018 10:54:13 +0100
+Subject: [PATCH v2 1/2] arm64: dts: renesas: r8a77970: add I2C support
+In-Reply-To: <CAMuHMdWcwx8=KKf0RajtSXnJY9duaupFmUUKEka=uAmJjTdvoQ@mail.gmail.com>
+References: <3aaa4464-fc85-3fb4-2026-5d9df357bdff@cogentembedded.com>
+ <e309d9cd-69c6-7db2-96a4-73bc788b7cfc@cogentembedded.com>
+ <CAMuHMdWcwx8=KKf0RajtSXnJY9duaupFmUUKEka=uAmJjTdvoQ@mail.gmail.com>
+Message-ID: <20180301095412.obgrryduesbjinbv@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 11:22:44AM +0100, Jacopo Mondi wrote:
-> Hi Simon, Geert,
->    in this second iteration I have dropped iommu dependencies for EtherAVB
-> and have changed "phy-mode" for all mainlines Gen-3 boards, this time including
-> ULCB, Draak, Eagle and V3MSK.
+On Wed, Feb 28, 2018 at 11:56:27AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Feb 26, 2018 at 9:54 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Define the generic R8A77970 parts of the I2C[0-4] device node.
+> >
+> > Based on the original (and large) patch by Daisuke Matsushita
+> > <daisuke.matsushita.ns@hitachi.com>.
+> >
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >
+> > ---
+> > Changes in version 2:
+> > - made  use of  the SYSC power domain #define's;
+> > - moved the I2C nodes before HSCIF nodes.
 > 
-> The series add phy-mode as a board property to the following board files:
-> - salvator-common.dtsi
-> - ulcb.dtsi
-> - r8a77995-draak.dts
-> - r8a77970-eagle.dts
-> - r8a77970-v3msk.dts
+> auto-repeat below...
 > 
-> And reset the EtherAVB phy-mode to "rgmii" in the following SoC DTSI:
-> - r8a7795.dtsi
-> - r8a7796.dtsi
-> - r8a77995.dtsi
-> - r8a77970.dtsi
+> >  arch/arm64/boot/dts/renesas/r8a77970.dtsi |   88 ++++++++++++++++++++++++++++++
+> >  1 file changed, 88 insertions(+)
+> >
+> > Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+> > ===================================================================
+> > --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+> > +++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+> > @@ -19,6 +19,14 @@
+> >         #address-cells = <2>;
+> >         #size-cells = <2>;
+> >
+> > +       aliases {
+> > +               i2c0 = &i2c0;
+> > +               i2c1 = &i2c1;
+> > +               i2c2 = &i2c2;
+> > +               i2c3 = &i2c3;
+> > +               i2c4 = &i2c4;
+> > +       };
+> > +
+> >         psci {
+> >                 compatible = "arm,psci-1.0", "arm,psci-0.2";
+> >                 method = "smc";
+> > @@ -338,6 +346,86 @@
+> >                                <&ipmmu_ds1 22>, <&ipmmu_ds1 23>;
+> >                 };
+> >
+> > +               i2c0: i2c at e6500000 {
+> > +                       compatible = "renesas,i2c-r8a77970",
+> > +                                    "renesas,rcar-gen3-i2c";
+> > +                       reg = <0 0xe6500000 0 0x40>;
+> > +                       interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       clocks = <&cpg CPG_MOD 931>;
+> > +                       power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
+> > +                       resets = <&cpg 931>;
+> > +                       dmas = <&dmac1 0x91>, <&dmac1 0x90>;
 > 
-> And finally, I added EtherAVB device node for M3-N on top.
+> Can't all five i2c interfaces be used with both dmac1 and dmac2?
+> 
+> With that fixed:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks for the test report, applied.
+Sergei, please address this review and repost as appropriate.
