@@ -1,30 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Mar 2018 14:28:30 +0100
-Subject: [PATCH v8 00/15] Krait clocks + Krait CPUfreq
-In-Reply-To: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <CACRpkdbu9Kxvuwr-nLHxyEYiTeGK38o7MKCFf-MMjYxwgcJPPA@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Thu,  1 Mar 2018 20:53:50 +0800
+Subject: [PATCH 13/45] arm64: uaccess: Prevent speculative use of the current
+ addr_limit
+In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-14-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+From: Will Deacon <will.deacon@arm.com>
 
-thanks for picking up Stephen's patch set and working on this
-clocking business!
+commit c2f0ad4fc089 upstream.
 
-Would you happen to know if the MSM8660/APQ8060 that
-I'm using a bit has the same Krait clocking so I need to augment
-that SoC to use this too (on top of this, naturally, this is a good first
-step)?
+A mispredicted conditional call to set_fs could result in the wrong
+addr_limit being forwarded under speculation to a subsequent access_ok
+check, potentially forming part of a spectre-v1 attack using uaccess
+routines.
 
-On Tue, Feb 27, 2018 at 3:06 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+This patch prevents this forwarding from taking place, but putting heavy
+barriers in set_fs after writing the addr_limit.
 
->   * Dropped the DT update from the series. Will send separately
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/uaccess.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Are these available somewhere so I can test the sum total on
-the Nexus 7 and see if I get some graphics? I've been sticking a
-patch from Stephen's series in for some time and it makes the
-MDP graphics works on the 2013 Nexus 7.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 3531fec..00025c5 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -71,6 +71,13 @@ static inline void set_fs(mm_segment_t fs)
+ 	current_thread_info()->addr_limit = fs;
+ 
+ 	/*
++	 * Prevent a mispredicted conditional call to set_fs from forwarding
++	 * the wrong address limit to access_ok under speculation.
++	 */
++	dsb(nsh);
++	isb();
++
++	/*
+ 	 * Enable/disable UAO so that copy_to_user() etc can access
+ 	 * kernel memory with the unprivileged instructions.
+ 	 */
+-- 
+2.7.4
