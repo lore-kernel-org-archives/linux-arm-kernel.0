@@ -1,33 +1,88 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 1 Mar 2018 12:06:15 +0000
-Subject: [PATCH v7 00/13] Support PPTT for ARM64
-In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
-Message-ID: <8b5bfd7e-57ea-bb34-85f8-69007a3847e6@arm.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu, 1 Mar 2018 13:15:44 +0100
+Subject: [PATCH 1/6] phy: rockchip-typec: fall back to working in
+ host-mode if extcon is missing.
+In-Reply-To: <5052573.JZoBBeufta@diego>
+References: <20180301092420.1191-1-enric.balletbo@collabora.com>
+ <20180301092420.1191-2-enric.balletbo@collabora.com>
+ <5052573.JZoBBeufta@diego>
+Message-ID: <38900733-42c3-4b53-74c9-30356f01d46d@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Hi Heiko,
 
-On 28/02/18 22:06, Jeremy Linton wrote:
-> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-> used to describe the processor and cache topology. Ideally it is
-> used to extend/override information provided by the hardware, but
-> right now ARM64 is entirely dependent on firmware provided tables.
+On 01/03/18 10:45, Heiko St?bner wrote:
+> Am Donnerstag, 1. M?rz 2018, 10:24:15 CET schrieb Enric Balletbo i Serra:
+>> Right now the rockchip typec-phy does fail probing when no extcon is
+>> detected. Some boards get the cable-state via the extcon interface and
+>> have this supported, other boards seem to use the fusb302 chip or
+>> another but the driver currently does not seem to utilize the extcon
+>> interface to report the cable-state. That's required to detect
+>> cable-state changes but a missing extcon shouldn't fail to probe,
+>> instead, should just fall back to working in host-mode if it cannot get
+>> the extcon.
 > 
-> This patch parses the table for the cache topology and CPU topology.
-> When we enable ACPI/PPTT for arm64 we map the physical_id to the
-> PPTT node flagged as the physical package by the firmware.
-> This results in topologies that match what the remainder of the
-> system expects. To avoid inverted scheduler domains we then
-> set the MC domain equal to the largest cache within the socket
-> below the NUMA domain.
+> And of course:
+> Some boards use no controller at all and just connect the type-c to a
+> standard USB-A port.
 > 
-I remember reviewing and acknowledging most of the cacheinfo stuff with
-couple of minor suggestions for v6. I don't see any Acked-by tags in
-this series and don't know if I need to review/ack any more cacheinfo
-related patches.
+>> Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
+>> support for rk3399") Reported-by: Vicente Bergas <vicencb@gmail.com>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>
+>>  drivers/phy/rockchip/phy-rockchip-typec.c | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
+>> b/drivers/phy/rockchip/phy-rockchip-typec.c index
+>> 7492c8978217..3741afab5cd2 100644
+>> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+>> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+>> @@ -782,6 +782,9 @@ static int tcphy_get_mode(struct rockchip_typec_phy
+>> *tcphy) u8 mode;
+>>  	int ret;
+>>
+>> +	if (!edev)
+>> +		return MODE_DFP_USB;
+>> +
+>>  	ufp = extcon_get_state(edev, EXTCON_USB);
+>>  	dp = extcon_get_state(edev, EXTCON_DISP_DP);
+>>
+>> @@ -1115,9 +1118,9 @@ static int rockchip_typec_phy_probe(struct
+>> platform_device *pdev)
+>>
+>>  	tcphy->extcon = extcon_get_edev_by_phandle(dev, 0);
+>>  	if (IS_ERR(tcphy->extcon)) {
+>> -		if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
+>> -			dev_err(dev, "Invalid or missing extcon\n");
+>> -		return PTR_ERR(tcphy->extcon);
+>> +		if (PTR_ERR(tcphy->extcon) == -EPROBE_DEFER)
+>> +			return PTR_ERR(tcphy->extcon);
+>> +		tcphy->extcon = NULL;
+> 
+> Do we want to keep a bit of the error handling of extcon, a la
+> 
+> +		if (PTR_ERR(tcphy->extcon) == -ENODEV) {
+> +			tcphy->extcon = NULL;
+> +		} else {
+> +			if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
+> +				dev_err(dev, "Invalid or extcon\n");
+> +			return PTR_ERR(tcphy->extcon);
+> +		}
+> 
+> So only make it NULL, if extcon really reports ENODEV?
+> 
 
--- 
+Sounds good to me, I'll send a second version ASAP, so people can test it with
+that change applied.
+
+Thanks for the feedback.
+
 Regards,
-Sudeep
+ Enric
+
+> 
+> Heiko
+> 
