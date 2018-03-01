@@ -1,43 +1,41 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  1 Mar 2018 10:24:20 +0100
-Subject: [PATCH 6/6] arm64: dts: rockchip: enable typec-phy0 for
- rk3399-puma-haikou.
-In-Reply-To: <20180301092420.1191-1-enric.balletbo@collabora.com>
-References: <20180301092420.1191-1-enric.balletbo@collabora.com>
-Message-ID: <20180301092420.1191-7-enric.balletbo@collabora.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 1 Mar 2018 14:55:56 +0530
+Subject: [PATCH v3 01/10] dt-bindings: pinctrl: Add bindings for Actions
+ S900 SoC
+In-Reply-To: <CACRpkdYG_aBJ0WME7NSOdv0pV5Vh_z8GVqQ+tUFnXGA7NGVMUg@mail.gmail.com>
+References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
+ <20180228181432.26847-2-manivannan.sadhasivam@linaro.org>
+ <CACRpkdYG_aBJ0WME7NSOdv0pV5Vh_z8GVqQ+tUFnXGA7NGVMUg@mail.gmail.com>
+Message-ID: <20180301092556.x4a5ohx3iccwsugw@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
-support for rk3399") caused a regression regarding the USB3. During
-boot, the following message appears a few times:
+Hi Linus,
+On Thu, Mar 01, 2018 at 10:20:29AM +0100, Linus Walleij wrote:
+> On Wed, Feb 28, 2018 at 7:14 PM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> 
+> > Add pinctrl bindings for Actions Semi S900 SoC
+> >
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> 
+> The previous (v2) version had Rob's Review tag, did you just forget
+> to add it or has something changed?
+> 
 
-    dwc3: failed to initialize core
+My bad. Slipped through the cracks.
 
-The driver is deferred waiting for the typec-phy, but this never
-happens beause is disabled. So, enable it.
+> If nothing is changed I can add his tag when applying.
+>
 
-Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support for rk3399")
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
+I will send out a new version of the whole series, incorporating Andy's
+pinctrl driver review.
 
- arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Also, FYI this pacthseries depends on Clock driver patchset I have submitted
+earlier. So far no reply from Stephen yet. He said that he is working on setting
+up his new environment and will begin reviewing shortly.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-index 9a7486058455..2c9c696d1383 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-@@ -191,6 +191,10 @@
- 	status = "okay";
- };
- 
-+&tcphy0 {
-+	status = "okay";
-+};
-+
- &u2phy0 {
- 	status = "okay";
- };
--- 
-2.16.1
+Thanks,
+Mani 
+> Yours,
+> Linus Walleij
