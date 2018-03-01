@@ -1,41 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Mar 2018 23:33:01 +0100
-Subject: [PATCH] pinctrl: samsung: Validate alias coming from DT
-In-Reply-To: <20180220181751.20826-1-krzk@kernel.org>
-References: <20180220181751.20826-1-krzk@kernel.org>
-Message-ID: <CACRpkdbAhPdpRTx0P3yvazGgRvtUMmJ-qese1LFoCqNSPuR+sw@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 1 Mar 2018 23:35:29 +0100
+Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
+ add/remove and notify code
+In-Reply-To: <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
+References: <20180215185606.26736-1-james.morse@arm.com>
+ <20180215185606.26736-3-james.morse@arm.com>
+ <20180301150144.GA4215@pd.tnic>
+ <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180301223529.GA28811@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 7:17 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Thu, Mar 01, 2018 at 06:06:59PM +0000, Punit Agrawal wrote:
+> You're looking at support for the 32-bit ARM systems.
 
-> Driver uses alias from Device Tree as an index of pin controller data
-> array.  In case of a wrong DTB or an out-of-tree DTB, the alias could be
-> outside of this data array leading to out-of-bounds access.
->
-> Depending on binary and memory layout, this could be handled properly
-> (showing error like "samsung-pinctrl 3860000.pinctrl: driver data not
-> available") or could lead to exceptions.
->
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: <stable@vger.kernel.org>
-> Fixes: 30574f0db1b1 ("pinctrl: add samsung pinctrl and gpiolib driver")
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> ---
->
-> Issue is present since first version of this driver so this should be
-> backported as far as possible.
->
-> Tested on Odroid HC1 (Exynos5422). Tests on S3C24xx, S3C64xx, Exynos
-> ARM64 and any other chips are highly appreciated.
->
-> Linus,
-> I can take it through samsung/pinctrl tree and later send you again as
-> pull request... or you can apply it directly as I do not have any other
-> pinctrl patches queued so far.
+I know. That's why I'm asking.
 
-Patch applied for fixes with all the tags.
+> The 64-bit support lives in arch/arm64 and the die() there doesn't
+> contain an oops_begin()/oops_end(). But the lack of oops_begin() on
+> arm64 doesn't really matter here.
 
-Yours,
-Linus Walleij
+Yap.
+
+> One issue I see with calling die() is that it is defined in different
+> includes across various architectures, (e.g., include/asm/kdebug.h for
+> x86, include/asm/system_misc.h in arm64, etc.)
+
+I don't think that's insurmountable.
+
+The more important question is, can we do the same set of calls when
+panic severity on all architectures which support APEI or should we have
+arch-specific ghes_panic() callbacks or so.
+
+As it is now, it would turn into a mess if we start with the ifdeffery
+and the different requirements architectures might have...
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
