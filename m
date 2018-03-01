@@ -1,86 +1,54 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 2 Mar 2018 03:25:13 +0800
-Subject: [xlnx:master 1383/1438] drivers//dma/xgene-dma.c:459:3: error:
- implicit declaration of function 'xgene_dma_invalidate_buffer'; did you mean
- 'xgene_dma_set_src_buffer'?
-Message-ID: <201803020311.BWm73SAG%fengguang.wu@intel.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu,  1 Mar 2018 11:38:03 -0800
+Subject: [PATCH] arm64/debug: Fix registers on sleeping tasks
+Message-ID: <20180301193803.129195-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   807fdad49dd7b39688d91c60925994956cfafef4
-commit: d1797ba7285165859c754c6ff22fd77b7c74c0e6 [1383/1438] Revert "dmaengine: remove DMA_SG as it is dead code in kernel"
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d1797ba7285165859c754c6ff22fd77b7c74c0e6
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
+registers on sleeping tasks") but for arm64.  Nuff said.
 
-All errors (new ones prefixed by >>):
-
-   drivers//dma/xgene-dma.c: In function 'xgene_dma_prep_cpy_desc':
->> drivers//dma/xgene-dma.c:459:3: error: implicit declaration of function 'xgene_dma_invalidate_buffer'; did you mean 'xgene_dma_set_src_buffer'? [-Werror=implicit-function-declaration]
-      xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
-      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-      xgene_dma_set_src_buffer
-   cc1: some warnings being treated as errors
-
-vim +459 drivers//dma/xgene-dma.c
-
-   422	
-   423	static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
-   424					    struct xgene_dma_desc_sw *desc_sw,
-   425					    dma_addr_t dst, dma_addr_t src,
-   426					    size_t len)
-   427	{
-   428		struct xgene_dma_desc_hw *desc1, *desc2;
-   429		int i;
-   430	
-   431		/* Get 1st descriptor */
-   432		desc1 = &desc_sw->desc1;
-   433		xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
-   434	
-   435		/* Set destination address */
-   436		desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
-   437		desc1->m3 |= cpu_to_le64(dst);
-   438	
-   439		/* Set 1st source address */
-   440		xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
-   441	
-   442		if (!len)
-   443			return;
-   444	
-   445		/*
-   446		 * We need to split this source buffer,
-   447		 * and need to use 2nd descriptor
-   448		 */
-   449		desc2 = &desc_sw->desc2;
-   450		desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
-   451	
-   452		/* Set 2nd to 5th source address */
-   453		for (i = 0; i < 4 && len; i++)
-   454			xgene_dma_set_src_buffer(xgene_dma_lookup_ext8(desc2, i),
-   455						 &len, &src);
-   456	
-   457		/* Invalidate unused source address field */
-   458		for (; i < 4; i++)
- > 459			xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
-   460	
-   461		/* Updated flag that we have prepared 64B descriptor */
-   462		desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
-   463	}
-   464	
-
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46837 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/9d5f891e/attachment-0001.gz>
+
+ arch/arm64/kernel/kgdb.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+index 2122cd187f19..01285d4dcdc3 100644
+--- a/arch/arm64/kernel/kgdb.c
++++ b/arch/arm64/kernel/kgdb.c
+@@ -138,14 +138,26 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
+ void
+ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
+ {
+-	struct pt_regs *thread_regs;
++	struct thread_struct *thread = &task->thread;
++	struct cpu_context *cpu_context = &thread->cpu_context;
+ 
+ 	/* Initialize to zero */
+ 	memset((char *)gdb_regs, 0, NUMREGBYTES);
+-	thread_regs = task_pt_regs(task);
+-	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
+-	/* Special case for PSTATE (check comments in asm/kgdb.h for details) */
+-	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
++
++	gdb_regs[19] = cpu_context->x19;
++	gdb_regs[20] = cpu_context->x20;
++	gdb_regs[21] = cpu_context->x21;
++	gdb_regs[22] = cpu_context->x22;
++	gdb_regs[23] = cpu_context->x23;
++	gdb_regs[24] = cpu_context->x24;
++	gdb_regs[25] = cpu_context->x25;
++	gdb_regs[26] = cpu_context->x26;
++	gdb_regs[27] = cpu_context->x27;
++	gdb_regs[28] = cpu_context->x28;
++	gdb_regs[29] = cpu_context->fp;
++
++	gdb_regs[31] = cpu_context->sp;
++	gdb_regs[32] = cpu_context->pc;
+ }
+ 
+ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
+-- 
+2.16.2.395.g2e18187dfd-goog
