@@ -1,114 +1,79 @@
-From: chenhc@lemote.com (Huacai Chen)
-Date: Thu, 1 Mar 2018 10:59:43 +0800
-Subject: [PATCH 01/99] ZBOOT: fix stack protector in compressed boot phase
-In-Reply-To: <1519872791-19076-1-git-send-email-chenhc@lemote.com>
-References: <1519872791-19076-1-git-send-email-chenhc@lemote.com>
-Message-ID: <CAAhV-H6f4szrbEKyuEgp-Zs6jFTRi_ekUpsrQwtSBcp7gbAUuA@mail.gmail.com>
+From: yi.l.liu@intel.com (Liu, Yi L)
+Date: Thu, 1 Mar 2018 03:03:25 +0000
+Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+In-Reply-To: <ca4d4992-0c8b-dae6-e443-7c7f7164be60@arm.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-3-jean-philippe.brucker@arm.com>
+ <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
+ <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
+ <AADFC41AFE54684AB9EE6CBC0274A5D191003AD6@SHSMSX101.ccr.corp.intel.com>
+ <ca4d4992-0c8b-dae6-e443-7c7f7164be60@arm.com>
+Message-ID: <A2975661238FB949B60364EF0F2C257439B829DA@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a single patch, please ignore 1/99 in the title...
+Hi Jean,
 
-Huacai
+> From: Jean-Philippe Brucker [mailto:jean-philippe.brucker at arm.com]
+> Sent: Thursday, February 15, 2018 8:41 PM
+> Subject: Re: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+> 
+> On 13/02/18 23:34, Tian, Kevin wrote:
+> >> From: Jean-Philippe Brucker
+> >> Sent: Tuesday, February 13, 2018 8:57 PM
+> >>
+> >> On 13/02/18 07:54, Tian, Kevin wrote:
+> >>>> From: Jean-Philippe Brucker
+> >>>> Sent: Tuesday, February 13, 2018 2:33 AM
+> >>>>
+> >>>> Add bind() and unbind() operations to the IOMMU API. Device drivers
+> >> can
+> >>>> use them to share process page tables with their devices.
+> >>>> bind_group() is provided for VFIO's convenience, as it needs to
+> >>>> provide a coherent interface on containers. Other device drivers
+> >>>> will most likely want to use bind_device(), which binds a single device in the
+> group.
+> >>>
+> >>> I saw your bind_group implementation tries to bind the address space
+> >>> for all devices within a group, which IMO has some problem. Based on
+> >> PCIe
+> >>> spec, packet routing on the bus doesn't take PASID into consideration.
+> >>> since devices within same group cannot be isolated based on
+> >>> requestor-
+> >> ID
+> >>> i.e. traffic not guaranteed going to IOMMU, enabling SVA on multiple
+> >> devices
+> >>> could cause undesired p2p.
+> >> But so does enabling "classic" DMA... If two devices are not
+> >> protected by ACS for example, they are put in the same IOMMU group,
+> >> and one device might be able to snoop the other's DMA. VFIO allows
+> >> userspace to create a container for them and use MAP/UNMAP, but makes
+> >> it explicit to the user that for DMA, these devices are not isolated
+> >> and must be considered as a single device (you can't pass them to
+> >> different VMs or put them in different containers). So I tried to
+> >> keep the same idea as MAP/UNMAP for SVA, performing BIND/UNBIND
+> >> operations on the VFIO container instead of the device.
+> >
+> > there is a small difference. for classic DMA we can reserve PCI BARs
+> > when allocating IOVA, thus multiple devices in the same group can
+> > still work correctly applied with same translation, if isolation is
+> > not cared in between. However for SVA it's CPU virtual addresses
+> > managed by kernel mm thus difficult to introduce similar address
+> > reservation. Then it's possible for a VA falling into other device's
+> > BAR in the same group and cause undesired p2p traffic. In such regard,
+> > SVA is actually functionally-broken.
+> 
+> I think the problem exists even if there is a single device in the group.
+> If for example, malloc() returns a VA that corresponds to a PCI host bridge in IOVA
+> space, performing DMA on that buffer won't reach the IOMMU and will cause
+> undesirable side-effects.
 
-On Thu, Mar 1, 2018 at 10:53 AM, Huacai Chen <chenhc@lemote.com> wrote:
-> Call __stack_chk_guard_setup() in decompress_kernel() is too late that
-> stack checking always fails for decompress_kernel() itself. So remove
-> __stack_chk_guard_setup() and initialize __stack_chk_guard at where we
-> define it.
->
-> Original code comes from ARM but also used for MIPS and SH, so fix them
-> together.
->
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Huacai Chen <chenhc@lemote.com>
-> ---
->  arch/arm/boot/compressed/misc.c        | 9 +--------
->  arch/mips/boot/compressed/decompress.c | 9 +--------
->  arch/sh/boot/compressed/misc.c         | 9 +--------
->  3 files changed, 3 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-> index 16a8a80..43aca75 100644
-> --- a/arch/arm/boot/compressed/misc.c
-> +++ b/arch/arm/boot/compressed/misc.c
-> @@ -128,12 +128,7 @@ asmlinkage void __div0(void)
->         error("Attempting division by 0!");
->  }
->
-> -unsigned long __stack_chk_guard;
-> -
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> +unsigned long __stack_chk_guard = 0x000a0dff;
->
->  void __stack_chk_fail(void)
->  {
-> @@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
->  {
->         int ret;
->
-> -       __stack_chk_guard_setup();
-> -
->         output_data             = (unsigned char *)output_start;
->         free_mem_ptr            = free_mem_ptr_p;
->         free_mem_end_ptr        = free_mem_ptr_end_p;
-> diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
-> index fdf99e9..0694b3f 100644
-> --- a/arch/mips/boot/compressed/decompress.c
-> +++ b/arch/mips/boot/compressed/decompress.c
-> @@ -76,12 +76,7 @@ void error(char *x)
->  #include "../../../../lib/decompress_unxz.c"
->  #endif
->
-> -unsigned long __stack_chk_guard;
-> -
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> +unsigned long __stack_chk_guard = 0x000a0dff;
->
->  void __stack_chk_fail(void)
->  {
-> @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
->  {
->         unsigned long zimage_start, zimage_size;
->
-> -       __stack_chk_guard_setup();
-> -
->         zimage_start = (unsigned long)(&__image_begin);
->         zimage_size = (unsigned long)(&__image_end) -
->             (unsigned long)(&__image_begin);
-> diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
-> index 627ce8e..2c564c2 100644
-> --- a/arch/sh/boot/compressed/misc.c
-> +++ b/arch/sh/boot/compressed/misc.c
-> @@ -104,12 +104,7 @@ static void error(char *x)
->         while(1);       /* Halt */
->  }
->
-> -unsigned long __stack_chk_guard;
-> -
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> +unsigned long __stack_chk_guard = 0x000a0dff;
->
->  void __stack_chk_fail(void)
->  {
-> @@ -130,8 +125,6 @@ void decompress_kernel(void)
->  {
->         unsigned long output_addr;
->
-> -       __stack_chk_guard_setup();
-> -
->  #ifdef CONFIG_SUPERH64
->         output_addr = (CONFIG_MEMORY_START + 0x2000);
->  #else
-> --
-> 2.7.0
->
+If only a single device in a group, should it mean there is ACS support in
+the path from this device to root complex? It means any memory request
+from this device would be upstreamed to root complex, thus it should be
+able to avoid undesired p2p traffics. So I intend to believe, even we do
+bind in group level, we actually expect to make it work only for the case
+where a single device within a group.
+
+Thanks,
+Yi Liu
