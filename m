@@ -1,58 +1,66 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:01 +0800
-Subject: [PATCH 24/45] arm64: Move BP hardening to check_and_switch_context
+Date: Thu,  1 Mar 2018 20:54:04 +0800
+Subject: [PATCH 27/45] arm64: entry: Apply BP hardening for suspicious
+ interrupts from EL0
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-25-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-28-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit a8e4c0a919ae upstream.
+commit 30d88c0e3ace upstream.
 
-We call arm64_apply_bp_hardening() from post_ttbr_update_workaround,
-which has the unexpected consequence of being triggered on every
-exception return to userspace when ARM64_SW_TTBR0_PAN is selected,
-even if no context switch actually occured.
+It is possible to take an IRQ from EL0 following a branch to a kernel
+address in such a way that the IRQ is prioritised over the instruction
+abort. Whilst an attacker would need to get the stars to align here,
+it might be sufficient with enough calibration so perform BP hardening
+in the rare case that we see a kernel address in the ELR when handling
+an IRQ from EL0.
 
-This is a bit suboptimal, and it would be more logical to only
-invalidate the branch predictor when we actually switch to
-a different mm.
-
-In order to solve this, move the call to arm64_apply_bp_hardening()
-into check_and_switch_context(), where we're guaranteed to pick
-a different mm context.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Dan Hettena <dhettena@nvidia.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/mm/context.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm64/kernel/entry.S | 5 +++++
+ arch/arm64/mm/fault.c     | 6 ++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index afc9266..36416e4 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -221,6 +221,7 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
- 	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index d50c2fe..e26a114 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -646,6 +646,11 @@ el0_irq_naked:
+ #endif
  
- switch_mm_fastpath:
+ 	ct_user_exit
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	tbz	x22, #55, 1f
++	bl	do_el0_irq_bp_hardening
++1:
++#endif
+ 	irq_handler
+ 
+ #ifdef CONFIG_TRACE_IRQFLAGS
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 6120a14..ad49ae8 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -590,6 +590,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 	arm64_notify_die("", regs, &info, esr);
+ }
+ 
++asmlinkage void __exception do_el0_irq_bp_hardening(void)
++{
++	/* PC has already been checked in entry.S */
 +	arm64_apply_bp_hardening();
- 	cpu_switch_mm(mm->pgd, mm);
- }
- 
-@@ -231,8 +232,6 @@ asmlinkage void post_ttbr_update_workaround(void)
- 			"ic iallu; dsb nsh; isb",
- 			ARM64_WORKAROUND_CAVIUM_27456,
- 			CONFIG_CAVIUM_ERRATUM_27456));
--
--	arm64_apply_bp_hardening();
- }
- 
- static int asids_init(void)
++}
++
+ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+ 						   unsigned int esr,
+ 						   struct pt_regs *regs)
 -- 
 2.7.4
