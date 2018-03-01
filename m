@@ -1,38 +1,39 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Thu, 1 Mar 2018 09:04:58 +0100
-Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
-In-Reply-To: <5A97A324.9050605@linux.intel.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-4-jean-philippe.brucker@arm.com>
- <5A97A324.9050605@linux.intel.com>
-Message-ID: <cd4d7a98-e45e-7066-345f-52d8eef926a2@amd.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Thu,  1 Mar 2018 16:09:15 +0800
+Subject: [PATCH] MAINTAINERS: Add Spreadtrum SoC entry
+Message-ID: <1519891755-17135-1-git-send-email-zhang.lyra@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.03.2018 um 07:52 schrieb Lu Baolu:
-> Hi Jean,
->
-> On 02/13/2018 02:33 AM, Jean-Philippe Brucker wrote:
->> [SNIP]
->> +	pasid = idr_alloc_cyclic(&iommu_pasid_idr, io_mm, dev_param->min_pasid,
->> +				 dev_param->max_pasid + 1, GFP_ATOMIC);
-> Can the pasid management code be moved into a common library?
-> PASID is not stick to SVA. An IOMMU model device could be designed
-> to use PASID for second level translation (classical DMA translation)
-> as well.
+Add Spreadtrum's maintainer entry and Orson, Baolin and me
+as maintainers.
 
-Yeah, we have the same problem on amdgpu.
+Cc: Orson Zhai <orsonzhai@gmail.com>
+Cc: Baolin Wang <baolin.wang@linaro.org>
 
-We assign PASIDs to clients even when IOMMU isn't present in the system 
-just because we need it for debugging.
+Signed-off-by: Chunyan Zhang <zhang.lyra@gmail.com>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-E.g. when the hardware detects that some shader program is doing 
-something nasty we get the PASID in the interrupt and could for example 
-use it to inform the client about the fault.
-
-Regards,
-Christian.
-
->
-> Best regards,
-> Lu Baolu
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4c104db..d232df9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1972,6 +1972,14 @@ M:	Thor Thayer <thor.thayer@linux.intel.com>
+ S:	Maintained
+ F:	drivers/edac/altera_edac.
+ 
++ARM/SPREADTRUM SoC SUPPORT
++M:	Orson Zhai <orsonzhai@gmail.com>
++M:	Baolin Wang <baolin.wang@linaro.org>
++M:	Chunyan Zhang <zhang.lyra@gmail.com>
++S:	Maintained
++F:	arch/arm64/boot/dts/sprd
++N:	sprd
++
+ ARM/STI ARCHITECTURE
+ M:	Patrice Chotard <patrice.chotard@st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+2.7.4
