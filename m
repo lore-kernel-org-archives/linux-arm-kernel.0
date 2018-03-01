@@ -1,17 +1,21 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Mar 2018 11:57:53 +0100
-Subject: [PATCH] dt-bindings: rockchip-dw-mshc: use consistent clock names
-In-Reply-To: <20180301103447.7059-1-john@metanate.com>
-References: <20180301103447.7059-1-john@metanate.com>
-Message-ID: <3149874.hkvgG7d5Rc@diego>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Mar 2018 17:12:01 +0530
+Subject: [PATCH] pata_bk3710: clarify license version and use SPDX header
+In-Reply-To: <1760511.OZqiSOBhjW@amdc3058>
+References: <CGME20180301111603epcas1p20d8448be4c055efdc39e23551bd7f68e@epcas1p2.samsung.com>
+ <1760511.OZqiSOBhjW@amdc3058>
+Message-ID: <51dc69a3-660c-1de9-f6ac-e7a68270ae47@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. M?rz 2018, 11:34:47 CET schrieb John Keeping:
-> The names of these clocks are "ciu-drive" and "ciu-sample" as described
-> for the clock-names property.  Avoid confusion by spelling these
-> correctly everywhere they are referenced.
+On Thursday 01 March 2018 04:46 PM, Bartlomiej Zolnierkiewicz wrote:
+> - clarify license version (it should be GPL 2.0)
+> - use SPDX header
 > 
-> Signed-off-by: John Keeping <john@metanate.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
