@@ -1,62 +1,96 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Mar 2018 11:27:51 +0800
-Subject: [PATCH 2/2] clk: mediatek: fix PWM clock source by adding a
- fixed-factor clock
-In-Reply-To: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
-References: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
-Message-ID: <b6eafb38f8d697bd8d00c8d86a0b22be809f8062.1519874655.git.sean.wang@mediatek.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Thu, 01 Mar 2018 11:40:40 +0800
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+ <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+ <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
+ <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
+ <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
+ <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
+ <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
+Message-ID: <5A977638.8010506@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi guys,
 
-The clock for which all PWM devices on MT7623 or MT2701 actually depending
-on has to be divided by four from its parent clock axi_sel in the clock
-path prior to PWM devices.
+if i'm reading the code right, the PM clk means:
+1/ the clocks which would be enabled while power on
+2/ these clocks are optional, it's ok if anything wrong with them
+3/ controlled by pm_domain(or USE_PM_CLK_RUNTIME_OPS & pm_clk_add_notifier)
 
-Consequently, adding a fixed-factor clock axisel_d4 as one-fourth of
-clock axi_sel allows that PWM devices can have the correct resolution
-calculation.
+and currently we're adding all clocks of the attached device as PM clk 
+in rockchip PM domain driver, which seems wrong. because we might have 
+these kinds of clocks:
+1/ critical, should block power on if anything wrong with it(failed to 
+get/ prepare/ enable)
+2/ optional, could ignore it if anything wrong
+3/ only required in some special cases, for example register r/w, and 
+doesn't need to stay enabled while power on
 
-Cc: stable at vger.kernel.org
-Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/clk/mediatek/clk-mt2701.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+so maybe we can:
+1/ let the device(dts) or driver decide which clock is PM clk, and add 
+it using *pm_clk_add* APIs (even of_pm_clk_add_clks() if all clocks are 
+pm clk)
 
-diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
-index 8e7f16f..deca752 100644
---- a/drivers/clk/mediatek/clk-mt2701.c
-+++ b/drivers/clk/mediatek/clk-mt2701.c
-@@ -148,6 +148,7 @@ static const struct mtk_fixed_factor top_fixed_divs[] = {
- 	FACTOR(CLK_TOP_CLK26M_D8, "clk26m_d8", "clk26m", 1, 8),
- 	FACTOR(CLK_TOP_32K_INTERNAL, "32k_internal", "clk26m", 1, 793),
- 	FACTOR(CLK_TOP_32K_EXTERNAL, "32k_external", "rtc32k", 1, 1),
-+	FACTOR(CLK_TOP_AXISEL_D4, "axisel_d4", "axi_sel", 1, 4),
- };
- 
- static const char * const axi_parents[] = {
-@@ -857,13 +858,13 @@ static const struct mtk_gate peri_clks[] = {
- 	GATE_PERI0(CLK_PERI_USB1, "usb1_ck", "usb20_sel", 11),
- 	GATE_PERI0(CLK_PERI_USB0, "usb0_ck", "usb20_sel", 10),
- 	GATE_PERI0(CLK_PERI_PWM, "pwm_ck", "axi_sel", 9),
--	GATE_PERI0(CLK_PERI_PWM7, "pwm7_ck", "axi_sel", 8),
--	GATE_PERI0(CLK_PERI_PWM6, "pwm6_ck", "axi_sel", 7),
--	GATE_PERI0(CLK_PERI_PWM5, "pwm5_ck", "axi_sel", 6),
--	GATE_PERI0(CLK_PERI_PWM4, "pwm4_ck", "axi_sel", 5),
--	GATE_PERI0(CLK_PERI_PWM3, "pwm3_ck", "axi_sel", 4),
--	GATE_PERI0(CLK_PERI_PWM2, "pwm2_ck", "axi_sel", 3),
--	GATE_PERI0(CLK_PERI_PWM1, "pwm1_ck", "axi_sel", 2),
-+	GATE_PERI0(CLK_PERI_PWM7, "pwm7_ck", "axisel_d4", 8),
-+	GATE_PERI0(CLK_PERI_PWM6, "pwm6_ck", "axisel_d4", 7),
-+	GATE_PERI0(CLK_PERI_PWM5, "pwm5_ck", "axisel_d4", 6),
-+	GATE_PERI0(CLK_PERI_PWM4, "pwm4_ck", "axisel_d4", 5),
-+	GATE_PERI0(CLK_PERI_PWM3, "pwm3_ck", "axisel_d4", 4),
-+	GATE_PERI0(CLK_PERI_PWM2, "pwm2_ck", "axisel_d4", 3),
-+	GATE_PERI0(CLK_PERI_PWM1, "pwm1_ck", "axisel_d4", 2),
- 	GATE_PERI0(CLK_PERI_THERM, "therm_ck", "axi_sel", 1),
- 	GATE_PERI0(CLK_PERI_NFI, "nfi_ck", "nfi2x_sel", 0),
- 
--- 
-2.7.4
+2/ add support for critical PM clk, which would return error to the 
+driver if anything wrong
+
+3/ make sure PM clk always be controlled(otherwise it might be 
+unexpected disabled by other clocks under the same clk parent?):
+  a) make sure Runtime PM is always enabled. and as discussed, we can 
+select PM in ARCH_ROCKCHIP
+
+  b) make sure the device has a PM domain to control PM clk:
+select ROCKCHIP_PM_DOMAINS for ARCH_ROCKCHIP(that would also select 
+PM_GENERIC_DOMAINS)
+
+check dev->pm_domain before hand over PM clk, since we only care about 
+EPROBE_DEFER when attach PM domain:
+         ret = dev_pm_domain_attach(_dev, true);
+         if (ret != -EPROBE_DEFER) {
+                 if (drv->probe) {
+                         ret = drv->probe(dev);
+
+or
+
+  c) make pm_clk_suspend/pm_clk_resume part of the generic PM Runtime 
+flow(even without a PM domain)
+
+
+On 02/28/2018 10:07 PM, Tomasz Figa wrote:
+> On Wed, Feb 28, 2018 at 10:11 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> Hi Tomasz,
+>>
+>> On Wed, Feb 28, 2018 at 1:49 PM, Tomasz Figa <tfiga@chromium.org> wrote:
+>>> On Wed, Feb 28, 2018 at 9:32 PM, Geert Uytterhoeven
+>>> <geert@linux-m68k.org> wrote:
+>>>> On Wed, Feb 28, 2018 at 1:29 PM, Tomasz Figa <tfiga@chromium.org> wrote:
+>>>>> Also, how about systems where runtime PM is disabled? I think that's
+>>>>> one of the reasons we control the clocks explicitly in the drivers
+>>>>> anyway.
+>>>>
+>>>> On many platforms, Runtime PM is always enabled.
+>>>
+>>> Can we make such assumption? If so, could we just make an explicit
+>>> "select PM_RUNTIME" in Kconfig of the SoC?
+>>
+>> Note that the PM_RUNTIME symbol was removed in commit 464ed18ebdb6236f
+>> ("PM: Eliminate CONFIG_PM_RUNTIME"), in favor of plain PM.
+>>
+>> The following already select PM unconditionally:
+>>    - ARCH_OMAP2PLUS_TYPICAL
+>>    - ARCH_RENESAS (except EMEV2)
+>>    - ARCH_TEGRA
+>>    - ARCH_VEXPRESS
+>
+> Thanks! Sounds like we might be able to simplify a lot of things with
+> doing the same for Rockchip.
+>
+> Best regards,
+> Tomasz
+>
+>
+>
