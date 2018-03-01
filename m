@@ -1,25 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Mar 2018 10:20:29 +0100
-Subject: [PATCH v3 01/10] dt-bindings: pinctrl: Add bindings for Actions
- S900 SoC
-In-Reply-To: <20180228181432.26847-2-manivannan.sadhasivam@linaro.org>
-References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
- <20180228181432.26847-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdYG_aBJ0WME7NSOdv0pV5Vh_z8GVqQ+tUFnXGA7NGVMUg@mail.gmail.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu,  1 Mar 2018 10:24:17 +0100
+Subject: [PATCH 3/6] arm64: dts: rockchip: enable typec-phy for
+ rk3399-sapphire.
+In-Reply-To: <20180301092420.1191-1-enric.balletbo@collabora.com>
+References: <20180301092420.1191-1-enric.balletbo@collabora.com>
+Message-ID: <20180301092420.1191-4-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 7:14 PM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
+support for rk3399") caused a regression regarding the USB3 type-A port.
+During boot, the following message appears a few times:
 
-> Add pinctrl bindings for Actions Semi S900 SoC
->
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+  dwc3: failed to initialize core
 
-The previous (v2) version had Rob's Review tag, did you just forget
-to add it or has something changed?
+The driver is deferred waiting for the typec-phy, but this never happens
+bceause is disabled. So, enable it.
 
-If nothing is changed I can add his tag when applying.
+Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support for rk3399")
+Reported-by: Vicente Bergas <vicencb@gmail.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
-Yours,
-Linus Walleij
+ arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
+index ce592a4c0c4c..9c685eab4748 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
+@@ -557,6 +557,14 @@
+ 	status = "okay";
+ };
+ 
++&tcphy0 {
++	status = "okay";
++};
++
++&tcphy1 {
++	status = "okay";
++};
++
+ &u2phy0 {
+ 	status = "okay";
+ 
+-- 
+2.16.1
