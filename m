@@ -1,44 +1,44 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 01 Mar 2018 12:16 +0100
-Subject: [PATCH] pata_bk3710: clarify license version and use SPDX header
-References: <CGME20180301111603epcas1p20d8448be4c055efdc39e23551bd7f68e@epcas1p2.samsung.com>
-Message-ID: <1760511.OZqiSOBhjW@amdc3058>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Mar 2018 11:21:49 +0000
+Subject: [PATCH] mmc: dw_mmc-rockchip: correct property names in debug
+In-Reply-To: <20180301103625.7285-1-john@metanate.com>
+References: <20180301103625.7285-1-john@metanate.com>
+Message-ID: <e665dcdb-edd8-8802-e7f2-445b71cd6acd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- clarify license version (it should be GPL 2.0)
-- use SPDX header
+On 01/03/18 10:36, John Keeping wrote:
+> Following up the device tree fixed in commits e78c637127ee ("ARM: dts:
+> rockchip: Fix DWMMC clocks") and ca9eee95a2de ("arm64: dts: rockchip:
+> Fix DWMMC clocks", 2018-02-15), avoid confusion by using the correct
+> property name in the debug output if clocks are not found.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- drivers/ata/pata_bk3710.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+Yeah, I was lazy since this inconsistency was already present and I just 
+wanted to make my thing work :)
 
-Index: b/drivers/ata/pata_bk3710.c
-===================================================================
---- a/drivers/ata/pata_bk3710.c	2017-11-22 14:11:06.120729358 +0100
-+++ b/drivers/ata/pata_bk3710.c	2018-03-01 12:10:36.293559718 +0100
-@@ -1,3 +1,5 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
- /*
-  * Palmchip BK3710 PATA controller driver
-  *
-@@ -8,10 +10,6 @@
-  *
-  * Copyright (C) 2006 Texas Instruments.
-  * Copyright (C) 2007 MontaVista Software, Inc., <source@mvista.com>
-- *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file "COPYING" in the main directory of this archive
-- * for more details.
-  */
- 
- #include <linux/ata.h>
-@@ -379,4 +377,4 @@ static int __init pata_bk3710_init(void)
- }
- 
- module_init(pata_bk3710_init);
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+>   drivers/mmc/host/dw_mmc-rockchip.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index 339295212935..40d7de2eea12 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -282,11 +282,11 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
+>   
+>   	priv->drv_clk = devm_clk_get(host->dev, "ciu-drive");
+>   	if (IS_ERR(priv->drv_clk))
+> -		dev_dbg(host->dev, "ciu_drv not available\n");
+> +		dev_dbg(host->dev, "ciu-drive not available\n");
+>   
+>   	priv->sample_clk = devm_clk_get(host->dev, "ciu-sample");
+>   	if (IS_ERR(priv->sample_clk))
+> -		dev_dbg(host->dev, "ciu_sample not available\n");
+> +		dev_dbg(host->dev, "ciu-sample not available\n");
+>   
+>   	host->priv = priv;
+>   
+> 
