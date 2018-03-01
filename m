@@ -1,94 +1,56 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 11:28:36 +0100
-Subject: [PATCH 0/3] Allwinner sunxi message box support
-In-Reply-To: <398d54c4-8bfc-c459-f7d4-fba4665d1250@sholland.org>
-References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228082459.o3juhfiml3logxwl@flea>
- <398d54c4-8bfc-c459-f7d4-fba4665d1250@sholland.org>
-Message-ID: <20180301102836.odxjy4lak2spujii@flea>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 1 Mar 2018 10:31:02 +0000
+Subject: Clang build of arm64 kernel fails
+In-Reply-To: <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
+References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+ <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
+Message-ID: <20180301103100.GE32331@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Feb 28, 2018 at 11:18:50AM -0600, Samuel Holland wrote:
-> On 02/28/18 02:24, Maxime Ripard wrote:
-> > On Tue, Feb 27, 2018 at 08:27:11PM -0600, Samuel Holland wrote:
-> >> This series adds support for the "hardware message box" in recent
-> >> Allwinner sunxi SoCs, used for communication with the ARISC management
-> >> processor (the platform's equivalent of the ARM SCP). The end goal is to
-> >> use the arm_scpi driver as a client, communicating with firmware running
-> >> on the ARISC CPU.
-> >>
-> >> This driver has been tested with the base arm_scpi driver (which sends
-> >> the SCPI_CMD_SCPI_CAPABILITIES command at probe time) and an in-progress
-> >> firmware application running on the ARISC CPU. Because no firmware for
-> >> the other end of the mailbox is complete at the moment, I have not
-> >> included changes to the SoC device trees.
-> > 
-> > This is not directly related to this series, but what is your end goal
-> > with regard to SCPI? What features do you expect to have there?
+On Thu, Mar 01, 2018 at 09:45:24AM +0000, Robin Murphy wrote:
+> Hi Andrey,
 > 
-> Current plans are to support in SCPI:
-> - SMP bringup and CPU hotplug (via PSCI in ATF)
-> - System reset and poweroff (via PSCI in ATF)
-> - System standby and suspend (via PSCI in ATF)
-> - DVFS for ARM CPUs
-> - Clock control for clocks in R_PRCM (e.g. R_CIR_RX)
-> - Thermal sensor reading
+> On 28/02/18 19:32, Andrey Konovalov wrote:
+> >Hi Marc!
+> >
+> >I've tried to pull in new upstream commits and the kernel build
+> >started failing for me with the following errors (see below).
+> >
+> >It seems that the reason is your commit "arm64: Add
+> >ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
+> >doesn't like 32 bits registers being used in 64 bits build.
 > 
-> Other planned features of the firmware:
-> - System wakeup from poweroff (via GPIO or interrupt to firmware)
-> - System power/suspend LED control (connected to GPIO or PMIC GPIO)
-> - Polling of thermal sensor in firmware for thermal throttling
-
-Nice.
-
-> > I'm asking because last time we discussed this, SCPI wasn't able to abstract
-> > all the features the PMIC provides, and thus Linux needed to still be able to
-> > access it.
+> I'd say this is really a bug in Clang. Architecturally, the register in
+> AArch64 state is still named "r0"; "x0"/"w0" are assembler operands which
+> additionally encode the size of the corresponding *access* to r0.
 > 
-> This should only be an issue for devices with AXP PMICs.
+> I note that GCC's documentation on register variables[1] does just say "the
+> name of the register", which implies this code is not incorrect. Given that
+> Clang already likes to infer the operand size from the argument type in
+> actual inline asms, it seems funny that its register allocator should care
+> in this non-instruction context.
 
-So this should only be an issue for most devices out there :)
++1
 
-> Other devices with GPIO or simple I?C regulator control, such as H3
-> and H5 boards, can have all necessary features described with
-> standard SCPI commands. SCPI provides for 127 vendor-defined
-> "extended" commands, which could be used to build a full AXP PMIC
-> driver, or simply provide commands to read/write PMIC registers.
+rN is perfectly reasonable here and has always been supported by GCC for
+AArch64 AFAIK.
 
-So I'm not sure whether it was your plan, but the last plan that was
-discussed was that the whole RSB bus would be put outside of Linux
-control, hence why I was asking.
+(IMHO rN is preferable, because this separates the register allocation
+specification from how that register is used to encode the data type --
+GCC has no choice about the latter, but using "w"/"x" gives the
+misleading impression of control over this.)
 
-And in this case the RSB bus is used to access the PMIC, but also its
-secondary devices such as the audio codec on the AC100/AC200, so we
-really need to have access to the RSB bus in Linux. If you can
-implement that through custom SCPI commands, that works for me though.
+> >Would you mind sending a fix?
+> 
+> That said, I guess it's a bug we might have to work around anyway. Oh well.
 
-Another thing that I'm not quire sure about is how would interrupts be
-reported throuh that mecanism? We want to use the PMIC as an interrupt
-controller for things like VBUS detection, GPIOs or the Jack detect in
-the codec. Is that doable?
+It would be preferable to see evidence of the llvm community committing
+to fix this before we consider merging a bodge into Linux for it.
 
-> For the moment I'm not concerned with battery powered devices. So
-> right now the relevant boards either a) don't have a PMIC, or b) can
-> have everything but DVFS voltage hard-coded in the firmware.
+Although this one issue is easy-ish to work around, we're on a slippery
+slope towards allowing the LLVM and GCC inline assemblers to diverge if
+we don't push back on worthless incompatibilities.
 
-I wasn't asking you to implement everything from the start, just that
-you consider the rest in your design.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/25b77551/attachment.sig>
+Cheers
+---Dave
