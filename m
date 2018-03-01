@@ -1,132 +1,413 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:42 +0800
-Subject: [PATCH 05/45] arm64: move TASK_* definitions to <asm/processor.h>
+Date: Thu,  1 Mar 2018 20:53:43 +0800
+Subject: [PATCH 06/45] arm64: Factor out PAN enabling/disabling into separate
+ uaccess_* macros
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-6-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-7-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yury Norov <ynorov@caviumnetworks.com>
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-commit eef94a3d09aab upstream.
+commit bd38967d406 upstream.
 
-ILP32 series [1] introduces the dependency on <asm/is_compat.h> for
-TASK_SIZE macro. Which in turn requires <asm/thread_info.h>, and
-<asm/thread_info.h> include <asm/memory.h>, giving a circular dependency,
-because TASK_SIZE is currently located in <asm/memory.h>.
+This patch moves the directly coded alternatives for turning PAN on/off
+into separate uaccess_{enable,disable} macros or functions. The asm
+macros take a few arguments which will be used in subsequent patches.
 
-In other architectures, TASK_SIZE is defined in <asm/processor.h>, and
-moving TASK_SIZE there fixes the problem.
+Note that any (unlikely) access that the compiler might generate between
+uaccess_enable() and uaccess_disable(), other than those explicitly
+specified by the user access code, will not be protected by PAN.
 
-Discussion: https://patchwork.kernel.org/patch/9929107/
-
-[1] https://github.com/norov/linux/tree/ilp32-next
-
-CC: Will Deacon <will.deacon@arm.com>
-CC: Laura Abbott <labbott@redhat.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: James Morse <james.morse@arm.com>
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: Kees Cook <keescook@chromium.org>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/memory.h    | 15 ---------------
- arch/arm64/include/asm/processor.h | 21 +++++++++++++++++++++
- arch/arm64/kernel/entry.S          |  2 +-
- 3 files changed, 22 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/futex.h       | 17 ++++----
+ arch/arm64/include/asm/uaccess.h     | 79 +++++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/armv8_deprecated.c | 11 +++--
+ arch/arm64/lib/clear_user.S          | 11 ++---
+ arch/arm64/lib/copy_from_user.S      | 11 ++---
+ arch/arm64/lib/copy_in_user.S        | 11 ++---
+ arch/arm64/lib/copy_to_user.S        | 11 ++---
+ 7 files changed, 93 insertions(+), 58 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 53211a0..269b979 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -60,8 +60,6 @@
-  * KIMAGE_VADDR - the virtual address of the start of the kernel image
-  * VA_BITS - the maximum number of bits for virtual addresses.
-  * VA_START - the first kernel virtual address.
-- * TASK_SIZE - the maximum size of a user space task.
-- * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
-@@ -74,19 +72,6 @@
- #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
--#define TASK_SIZE_64		(UL(1) << VA_BITS)
--
--#ifdef CONFIG_COMPAT
--#define TASK_SIZE_32		UL(0x100000000)
--#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
--				TASK_SIZE_32 : TASK_SIZE_64)
--#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
--				TASK_SIZE_32 : TASK_SIZE_64)
--#else
--#define TASK_SIZE		TASK_SIZE_64
--#endif /* CONFIG_COMPAT */
--
--#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index f2585cd..85c4a89 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -21,15 +21,12 @@
+ #include <linux/futex.h>
+ #include <linux/uaccess.h>
  
- #define KERNEL_START      _text
- #define KERNEL_END        _end
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 60e3482..4258f4d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -19,6 +19,10 @@
- #ifndef __ASM_PROCESSOR_H
- #define __ASM_PROCESSOR_H
+-#include <asm/alternative.h>
+-#include <asm/cpufeature.h>
+ #include <asm/errno.h>
+-#include <asm/sysreg.h>
  
-+#define TASK_SIZE_64		(UL(1) << VA_BITS)
+ #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
++do {									\
++	uaccess_enable();						\
+ 	asm volatile(							\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,		\
+-		    CONFIG_ARM64_PAN)					\
+ "	prfm	pstl1strm, %2\n"					\
+ "1:	ldxr	%w1, %2\n"						\
+ 	insn "\n"							\
+@@ -44,11 +41,11 @@
+ "	.popsection\n"							\
+ 	_ASM_EXTABLE(1b, 4b)						\
+ 	_ASM_EXTABLE(2b, 4b)						\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
+-		    CONFIG_ARM64_PAN)					\
+ 	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
+ 	: "r" (oparg), "Ir" (-EFAULT)					\
+-	: "memory")
++	: "memory");							\
++	uaccess_disable();						\
++} while (0)
+ 
+ static inline int
+ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
+@@ -118,8 +115,8 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
+ 	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+ 		return -EFAULT;
+ 
++	uaccess_enable();
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+-ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ "	prfm	pstl1strm, %2\n"
+ "1:	ldxr	%w1, %2\n"
+ "	sub	%w3, %w1, %w4\n"
+@@ -134,10 +131,10 @@ ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ "	.popsection\n"
+ 	_ASM_EXTABLE(1b, 4b)
+ 	_ASM_EXTABLE(2b, 4b)
+-ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
+ 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
+ 	: "memory");
++	uaccess_disable();
+ 
+ 	*uval = val;
+ 	return ret;
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 811cf16..94e1457 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -18,6 +18,11 @@
+ #ifndef __ASM_UACCESS_H
+ #define __ASM_UACCESS_H
+ 
++#include <asm/alternative.h>
++#include <asm/sysreg.h>
 +
 +#ifndef __ASSEMBLY__
 +
  /*
-  * Default implementation of macro that returns current
-  * instruction pointer ("program counter").
-@@ -37,6 +41,22 @@
+  * User space memory access functions
+  */
+@@ -26,10 +31,8 @@
+ #include <linux/string.h>
+ #include <linux/thread_info.h>
+ 
+-#include <asm/alternative.h>
+ #include <asm/cpufeature.h>
  #include <asm/ptrace.h>
- #include <asm/types.h>
- 
-+/*
-+ * TASK_SIZE - the maximum size of a user space task.
-+ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-+ */
-+#ifdef CONFIG_COMPAT
-+#define TASK_SIZE_32		UL(0x100000000)
-+#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-+				TASK_SIZE_32 : TASK_SIZE_64)
-+#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-+				TASK_SIZE_32 : TASK_SIZE_64)
-+#else
-+#define TASK_SIZE		TASK_SIZE_64
-+#endif /* CONFIG_COMPAT */
-+
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
-+
- #define STACK_TOP_MAX		TASK_SIZE_64
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
-@@ -192,4 +212,5 @@ int cpu_enable_pan(void *__unused);
- int cpu_enable_uao(void *__unused);
- int cpu_enable_cache_maint_trap(void *__unused);
- 
-+#endif /* __ASSEMBLY__ */
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b4c7db4..478f0fe 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -28,7 +28,7 @@
+-#include <asm/sysreg.h>
  #include <asm/errno.h>
- #include <asm/esr.h>
- #include <asm/irq.h>
--#include <asm/memory.h>
-+#include <asm/processor.h>
- #include <asm/thread_info.h>
- #include <asm/asm-uaccess.h>
- #include <asm/unistd.h>
+ #include <asm/memory.h>
+ #include <asm/compiler.h>
+@@ -121,6 +124,44 @@ static inline void set_fs(mm_segment_t fs)
+ 	"	.popsection\n"
+ 
+ /*
++ * User access enabling/disabling.
++ */
++#define __uaccess_disable(alt)						\
++do {									\
++	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
++			CONFIG_ARM64_PAN));				\
++} while (0)
++
++#define __uaccess_enable(alt)						\
++do {									\
++	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
++			CONFIG_ARM64_PAN));				\
++} while (0)
++
++static inline void uaccess_disable(void)
++{
++	__uaccess_disable(ARM64_HAS_PAN);
++}
++
++static inline void uaccess_enable(void)
++{
++	__uaccess_enable(ARM64_HAS_PAN);
++}
++
++/*
++ * These functions are no-ops when UAO is present.
++ */
++static inline void uaccess_disable_not_uao(void)
++{
++	__uaccess_disable(ARM64_ALT_PAN_NOT_UAO);
++}
++
++static inline void uaccess_enable_not_uao(void)
++{
++	__uaccess_enable(ARM64_ALT_PAN_NOT_UAO);
++}
++
++/*
+  * The "__xxx" versions of the user access functions do not verify the address
+  * space - it must have been done previously with a separate "access_ok()"
+  * call.
+@@ -147,8 +188,7 @@ static inline void set_fs(mm_segment_t fs)
+ do {									\
+ 	unsigned long __gu_val;						\
+ 	__chk_user_ptr(ptr);						\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_enable_not_uao();					\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+ 		__get_user_asm("ldrb", "ldtrb", "%w", __gu_val, (ptr),  \
+@@ -169,9 +209,8 @@ do {									\
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
++	uaccess_disable_not_uao();					\
+ 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
+ } while (0)
+ 
+ #define __get_user(x, ptr)						\
+@@ -216,8 +255,7 @@ do {									\
+ do {									\
+ 	__typeof__(*(ptr)) __pu_val = (x);				\
+ 	__chk_user_ptr(ptr);						\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_enable_not_uao();					\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+ 		__put_user_asm("strb", "sttrb", "%w", __pu_val, (ptr),	\
+@@ -238,8 +276,7 @@ do {									\
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_disable_not_uao();					\
+ } while (0)
+ 
+ #define __put_user(x, ptr)						\
+@@ -332,4 +369,26 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
+ extern __must_check long strlen_user(const char __user *str);
+ extern __must_check long strnlen_user(const char __user *str, long n);
+ 
++#else	/* __ASSEMBLY__ */
++
++#include <asm/assembler.h>
++
++/*
++ * User access enabling/disabling macros. These are no-ops when UAO is
++ * present.
++ */
++	.macro	uaccess_disable_not_uao, tmp1
++alternative_if ARM64_ALT_PAN_NOT_UAO
++	SET_PSTATE_PAN(1)
++alternative_else_nop_endif
++	.endm
++
++	.macro	uaccess_enable_not_uao, tmp1, tmp2
++alternative_if ARM64_ALT_PAN_NOT_UAO
++	SET_PSTATE_PAN(0)
++alternative_else_nop_endif
++	.endm
++
++#endif	/* __ASSEMBLY__ */
++
+ #endif /* __ASM_UACCESS_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index c0ede23..29d2ad8 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -14,7 +14,6 @@
+ #include <linux/slab.h>
+ #include <linux/sysctl.h>
+ 
+-#include <asm/alternative.h>
+ #include <asm/cpufeature.h>
+ #include <asm/insn.h>
+ #include <asm/opcodes.h>
+@@ -285,10 +284,10 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ #define __SWP_LL_SC_LOOPS	4
+ 
+ #define __user_swpX_asm(data, addr, res, temp, temp2, B)	\
++do {								\
++	uaccess_enable();					\
+ 	__asm__ __volatile__(					\
+ 	"	mov		%w3, %w7\n"			\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+-		    CONFIG_ARM64_PAN)				\
+ 	"0:	ldxr"B"		%w2, [%4]\n"			\
+ 	"1:	stxr"B"		%w0, %w1, [%4]\n"		\
+ 	"	cbz		%w0, 2f\n"			\
+@@ -306,13 +305,13 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ 	"	.popsection"					\
+ 	_ASM_EXTABLE(0b, 4b)					\
+ 	_ASM_EXTABLE(1b, 4b)					\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
+-		CONFIG_ARM64_PAN)				\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp), "=&r" (temp2)	\
+ 	: "r" ((unsigned long)addr), "i" (-EAGAIN),		\
+ 	  "i" (-EFAULT),					\
+ 	  "i" (__SWP_LL_SC_LOOPS)				\
+-	: "memory")
++	: "memory");						\
++	uaccess_disable();					\
++} while (0)
+ 
+ #define __user_swp_asm(data, addr, res, temp, temp2) \
+ 	__user_swpX_asm(data, addr, res, temp, temp2, "")
+diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+index 5d1cad3..d7150e3 100644
+--- a/arch/arm64/lib/clear_user.S
++++ b/arch/arm64/lib/clear_user.S
+@@ -17,10 +17,7 @@
+  */
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
+-#include <asm/assembler.h>
+-#include <asm/cpufeature.h>
+-#include <asm/sysreg.h>
++#include <asm/uaccess.h>
+ 
+ 	.text
+ 
+@@ -33,8 +30,7 @@
+  * Alignment fixed up by hardware.
+  */
+ ENTRY(__clear_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable_not_uao x2, x3
+ 	mov	x2, x1			// save the size for fixup return
+ 	subs	x1, x1, #8
+ 	b.mi	2f
+@@ -54,8 +50,7 @@ uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
+ 	b.mi	5f
+ uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
+ 5:	mov	x0, #0
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable_not_uao x2
+ 	ret
+ ENDPROC(__clear_user)
+ 
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 4fd67ea..cfe1339 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -16,11 +16,8 @@
+ 
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
+-#include <asm/assembler.h>
+ #include <asm/cache.h>
+-#include <asm/cpufeature.h>
+-#include <asm/sysreg.h>
++#include <asm/uaccess.h>
+ 
+ /*
+  * Copy from user space to a kernel buffer (alignment handled by the hardware)
+@@ -67,12 +64,10 @@
+ 
+ end	.req	x5
+ ENTRY(__arch_copy_from_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable_not_uao x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable_not_uao x3
+ 	mov	x0, #0				// Nothing to copy
+ 	ret
+ ENDPROC(__arch_copy_from_user)
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+index f7292dd0..718b1c4 100644
+--- a/arch/arm64/lib/copy_in_user.S
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -18,11 +18,8 @@
+ 
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
+-#include <asm/assembler.h>
+ #include <asm/cache.h>
+-#include <asm/cpufeature.h>
+-#include <asm/sysreg.h>
++#include <asm/uaccess.h>
+ 
+ /*
+  * Copy from user space to user space (alignment handled by the hardware)
+@@ -68,12 +65,10 @@
+ 
+ end	.req	x5
+ ENTRY(__copy_in_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable_not_uao x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable_not_uao x3
+ 	mov	x0, #0
+ 	ret
+ ENDPROC(__copy_in_user)
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index 7a7efe2..e99e31c 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -16,11 +16,8 @@
+ 
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
+-#include <asm/assembler.h>
+ #include <asm/cache.h>
+-#include <asm/cpufeature.h>
+-#include <asm/sysreg.h>
++#include <asm/uaccess.h>
+ 
+ /*
+  * Copy to user space from a kernel buffer (alignment handled by the hardware)
+@@ -66,12 +63,10 @@
+ 
+ end	.req	x5
+ ENTRY(__arch_copy_to_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable_not_uao x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable_not_uao x3
+ 	mov	x0, #0
+ 	ret
+ ENDPROC(__arch_copy_to_user)
 -- 
 2.7.4
