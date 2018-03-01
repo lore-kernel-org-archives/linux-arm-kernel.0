@@ -1,77 +1,107 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:16 +0800
-Subject: [PATCH 39/45] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+Date: Thu,  1 Mar 2018 20:54:18 +0800
+Subject: [PATCH 41/45] firmware/psci: Expose SMCCC version through psci_ops
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-40-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-42-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit f72af90c3783 upstream.
+commit e78eef554a91 upstream.
 
-We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
-So let's intercept it as early as we can by testing for the
-function call number as soon as we've identified a HVC call
-coming from the guest.
+Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
+let's do that at boot time, and expose the version of the calling
+convention as part of the psci_ops structure.
 
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ drivers/firmware/psci.c | 27 +++++++++++++++++++++++++++
+ include/linux/psci.h    |  6 ++++++
+ 2 files changed, 33 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 4e92399..4e9d50c 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index a49196a..79a48c3 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
  
-+#include <linux/arm-smccc.h>
- #include <linux/linkage.h>
+ struct psci_operations psci_ops = {
+ 	.conduit = PSCI_CONDUIT_NONE,
++	.smccc_version = SMCCC_VERSION_1_0,
+ };
  
- #include <asm/alternative.h>
-@@ -79,10 +80,11 @@ alternative_endif
- 	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+@@ -511,6 +512,31 @@ static void __init psci_init_migrate(void)
+ 	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+ }
  
- 	cmp	x0, #ESR_ELx_EC_HVC64
-+	ccmp	x0, #ESR_ELx_EC_HVC32, #4, ne
- 	b.ne	el1_trap
- 
--	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
--	cbnz	x1, el1_trap		// called HVC
-+	mrs	x1, vttbr_el2		// If vttbr is valid, the guest
-+	cbnz	x1, el1_hvc_guest	// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
-@@ -101,6 +103,20 @@ alternative_endif
- 
- 2:	eret
- 
-+el1_hvc_guest:
-+	/*
-+	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
-+	 * The workaround has already been applied on the host,
-+	 * so let's quickly get back to the guest. We don't bother
-+	 * restoring x1, as it can be clobbered anyway.
-+	 */
-+	ldr	x1, [sp]				// Guest's x0
-+	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	cbnz	w1, el1_trap
-+	mov	x0, x1
-+	add	sp, sp, #16
-+	eret
++static void __init psci_init_smccc(void)
++{
++	u32 ver = ARM_SMCCC_VERSION_1_0;
++	int feature;
 +
- el1_trap:
- 	/*
- 	 * x0: ESR_EC
++	feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
++
++	if (feature != PSCI_RET_NOT_SUPPORTED) {
++		u32 ret;
++		ret = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
++		if (ret == ARM_SMCCC_VERSION_1_1) {
++			psci_ops.smccc_version = SMCCC_VERSION_1_1;
++			ver = ret;
++		}
++	}
++
++	/*
++	 * Conveniently, the SMCCC and PSCI versions are encoded the
++	 * same way. No, this isn't accidental.
++	 */
++	pr_info("SMC Calling Convention v%d.%d\n",
++		PSCI_VERSION_MAJOR(ver), PSCI_VERSION_MINOR(ver));
++
++}
++
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+@@ -559,6 +585,7 @@ static int __init psci_probe(void)
+ 	psci_init_migrate();
+ 
+ 	if (PSCI_VERSION_MAJOR(ver) >= 1) {
++		psci_init_smccc();
+ 		psci_init_cpu_suspend();
+ 		psci_init_system_suspend();
+ 	}
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 66ff547..347077c 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -31,6 +31,11 @@ enum psci_conduit {
+ 	PSCI_CONDUIT_HVC,
+ };
+ 
++enum smccc_version {
++	SMCCC_VERSION_1_0,
++	SMCCC_VERSION_1_1,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -41,6 +46,7 @@ struct psci_operations {
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
+ 	enum psci_conduit conduit;
++	enum smccc_version smccc_version;
+ };
+ 
+ extern struct psci_operations psci_ops;
 -- 
 2.7.4
