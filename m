@@ -1,142 +1,71 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 01 Mar 2018 09:37:03 +0100
-Subject: [PATCH] dmaengine: mv_xor_v2: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180301082554.GE15443@localhost> (Vinod Koul's message of "Thu,
- 1 Mar 2018 13:55:54 +0530")
-References: <20180214162733.4591-1-gregory.clement@bootlin.com>
- <20180227151511.GC15443@localhost> <87vaeijw83.fsf@bootlin.com>
- <20180301082554.GE15443@localhost>
-Message-ID: <87lgfcdweo.fsf@bootlin.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Mar 2018 09:43:55 +0100
+Subject: [PATCH] arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs,
+ wifi reset)
+In-Reply-To: <20180227204711.29357-1-dianders@chromium.org>
+References: <20180227204711.29357-1-dianders@chromium.org>
+Message-ID: <3831527.HjPPvuL6zK@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
- 
- On jeu., mars 01 2018, Vinod Koul <vinod.koul@intel.com> wrote:
+Am Dienstag, 27. Februar 2018, 21:47:11 CET schrieb Douglas Anderson:
+> Back in the early days when gru devices were still under development
+> we found an issue where the WiFi reset line needed to be configured as
+> early as possible during the boot process to avoid the WiFi module
+> being in a bad state.
+> 
+> We found that the way to get the kernel to do this in the earliest
+> possible place was to configure this line in the pinctrl hogs, so
+> that's what we did.  For some history here you can see
+> <http://crosreview.com/368770>.  After the time that change landed in
+> the kernel, we landed a firmware change to configure this line even
+> earlier.  See <http://crosreview.com/399919>.  However, even after the
+> firmware change landed we kept the kernel change to deal with the fact
+> that some people working on devices might take a little while to
+> update their firmware.
+> 
+> At this there are definitely zero devices out in the wild that have
+> firmware without the fix in it.  Specifically looking in the firmware
+> branch several critically important fixes for memory stability landed
+> after the patch in coreboot and I know we didn't ship without those.
+> Thus, by now, everyone should have the new firmware and it's safe to
+> not have the kernel set this up in a pinctrl hog.
+> 
+> Historically, even though it wasn't needed to have this in a pinctrl
+> hog, we still kept it since it didn't hurt.  Pinctrl would apply the
+> default hog at bootup and then would never touch things again.  That
+> all changed with commit 981ed1bfbc6c ("pinctrl: Really force states
+> during suspend/resume").  After that commit then we'll re-apply the
+> default hog at resume time and that can screw up the reset state of
+> WiFi.  ...and on rk3399 if you touch a device on PCIe in the wrong way
+> then the whole system can go haywire.  That's what was happening.
+> Specifically you'd resume a rk3399-gru-* device and it would mostly
+> resume, then would crash with some crazy weird crash.
+> 
+> One could say, perhaps, that the recent pinctrl change was at fault
+> (and should be fixed) since it changed behavior.  ...but that's not
+> really true.  The device tree for rk3399-gru is really to blame.
+> Specifically since the pinctrl is defined in the hog and not in the
+> "wlan-pd-n" node then the actual user of this pin doesn't have a
+> pinctrl entry for it.  That's bad.
+> 
+> Let's fix our problems by just moving the control of
+> "wlan_module_reset_l pinctrl" out of the hog and put them in the
+> proper place.
+> 
+> NOTE: in theory, I think it should actually be possible to have a pin
+> controlled _both_ by the hog and by an actual device.  Once the device
+> claims the pin I think the hog is supposed to let go.  I'm not 100%
+> sure that this works and in any case this solution would be more
+> complex than is necessary.
+> 
+> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> Fixes: 48f4d9796d99 ("arm64: dts: rockchip: add Gru/Kevin DTS")
+> Fixes: 981ed1bfbc6c ("pinctrl: Really force states during suspend/resume")
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+
+applied as fix for 4.16 with the 2 Tested-tags
 
 
->> >>  Optional properties:
->> >> -- clocks: Optional reference to the clock used by the XOR engine.
->> >> +- clocks: Optional reference to the clocks used by the XOR engine.
->> >> +- clock-names: mandatory if there is a second clock, in this case the
->> >> +   name must be "core" for the first clock and "reg" for the second
->> >> +   one
->> >> +
->> >>  
->> >>  Example:
->> >>  
->> >> diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
->> >> index f652a0e0f5a2..93b3d80ce701 100644
->> >> --- a/drivers/dma/mv_xor_v2.c
->> >> +++ b/drivers/dma/mv_xor_v2.c
->> >> @@ -163,6 +163,7 @@ struct mv_xor_v2_device {
->> >>  	void __iomem *dma_base;
->> >>  	void __iomem *glob_base;
->> >>  	struct clk *clk;
->> >> +	struct clk *reg_clk;
->> >>  	struct tasklet_struct irq_tasklet;
->> >>  	struct list_head free_sw_desc;
->> >>  	struct dma_device dmadev;
->> >> @@ -749,13 +750,24 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
->> >>  	if (ret)
->> >>  		return ret;
->> >>  
->> >> -	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
->> >> -	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
->> >> +	xor_dev->reg_clk = devm_clk_get(&pdev->dev, "reg");
->> >
->> > is this an exiting property?
->> 
->> It is the name of the new optional clock described in the first part of
->> this patch.
->
-> okay I am missing something then, you are reading "reg" but property added is
-> "clock-names", where are you reading this?
-
-"reg" is actually the _name_ of the clock given by the clock-names
-property.
-
-With devm_clk_get the second parameter is a pointer to the name of the
-clock name. When it is NULL then, the first clock is used, else in the
-common clock framework looks for the clock associated with the name
-given.
-
-With this patch both clock have now a name, but in order to be backward
-compatible, I don't use the name for the first clock. It allows to still
-use this clock with a device tree using the old binding.
-
-Gregory
-
-
->
->> 
->> About the typo, do you need a new version or do you plan to fix them
->> while applying the patch?
->> 
->> Thanks,
->> 
->> Gregory
->> 
->> 
->> >
->> >> +	if (!IS_ERR(xor_dev->reg_clk)) {
->> >> +		ret = clk_prepare_enable(xor_dev->reg_clk);
->> >> +		if (ret)
->> >> +			return ret;
->> >> +	} else if (PTR_ERR(xor_dev->reg_clk) == -EPROBE_DEFER) {
->> >>  		return -EPROBE_DEFER;
->> >> +	}
->> >> +
->> >> +	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
->> >> +	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
->> >> +		ret = EPROBE_DEFER;
->> >> +		goto disable_reg_clk;
->> >> +	}
->> >>  	if (!IS_ERR(xor_dev->clk)) {
->> >>  		ret = clk_prepare_enable(xor_dev->clk);
->> >>  		if (ret)
->> >> -			return ret;
->> >> +			goto disable_reg_clk;
->> >>  	}
->> >>  
->> >>  	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
->> >> @@ -866,8 +878,9 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
->> >>  free_msi_irqs:
->> >>  	platform_msi_domain_free_irqs(&pdev->dev);
->> >>  disable_clk:
->> >> -	if (!IS_ERR(xor_dev->clk))
->> >> -		clk_disable_unprepare(xor_dev->clk);
->> >> +	clk_disable_unprepare(xor_dev->clk);
->> >> +disable_reg_clk:
->> >> +	clk_disable_unprepare(xor_dev->reg_clk);
->> >>  	return ret;
->> >>  }
->> >>  
->> >> -- 
->> >> 2.15.1
->> >> 
->> >
->> > -- 
->> > ~Vinod
->> > --
->> > To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> > the body of a message to majordomo at vger.kernel.org
->> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
->> -- 
->> Gregory Clement, Bootlin (formerly Free Electrons)
->> Embedded Linux and Kernel engineering
->> http://bootlin.com
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> -- 
-> ~Vinod
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Thanks
+Heiko
