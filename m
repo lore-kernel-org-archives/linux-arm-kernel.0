@@ -1,33 +1,56 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 10:29:33 +0100
-Subject: [PATCH v3 5/7] clk: sunxi-ng: add support for the Allwinner H6 CCU
-In-Reply-To: <20180223123555.64009-6-icenowy@aosc.io>
-References: <20180223123555.64009-6-icenowy@aosc.io>
-Message-ID: <20180301092933.eqibjnepoj3ecvo6@flea>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Mar 2018 10:49:52 +0100
+Subject: [PATCH 2/6] dt-bindings: phy-rockchip-typec: move extcon property
+ to be optional.
+In-Reply-To: <20180301092420.1191-3-enric.balletbo@collabora.com>
+References: <20180301092420.1191-1-enric.balletbo@collabora.com>
+ <20180301092420.1191-3-enric.balletbo@collabora.com>
+Message-ID: <379977528.QSC4nRyzFz@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 08:35:53PM +0800, Icenowy Zheng wrote:
-> The Allwinner H6 SoC has a CCU which has been largely rearranged.
+Hi Enric,
+
+Am Donnerstag, 1. M?rz 2018, 10:24:16 CET schrieb Enric Balletbo i Serra:
+> The extcon property is used to detect the cable-state but some boards,
+> like Sapphire, currently does not seem to support, others might just not
+> need, as are supposed to work in host-mode only. So, extcon property is
+> not really a required property, move to be optional instead.
+
+The change itself is justified, the "justification" in the message might
+need some rework, as this sounds more like a kernel-side issue,
+while the extcon should always be optional.
+
+Something like:
+
+The extcon property is used to detect the cable-state but some boards
+just connect the type-c phy to a regular USB-A connector without any
+power-delivery and thus no controller reporting the cable-state.
+So the extcon property is not really a required property, move it to be 
+optional instead.
+
+
+For the change itself:
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
 > 
-> Add support for it in the sunxi-ng CCU framework.
+>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Rob Herring <robh@kernel.org>
-
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/06437b74/attachment.sig>
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt index
+> 6ea867e3176f..a66f23a01129 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -14,6 +14,8 @@ Required properties:
+>   - resets : a list of phandle + reset specifier pairs
+>   - reset-names : string reset name, must be:
+>  		 "uphy", "uphy-pipe", "uphy-tcphy"
+> +
+> +Optional properties:
+>   - extcon : extcon specifier for the Power Delivery
+> 
+>  Note, there are 2 type-c phys for RK3399, and they are almost identical,
+> except
