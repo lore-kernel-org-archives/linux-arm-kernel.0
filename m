@@ -1,62 +1,50 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  1 Mar 2018 22:34:35 +0100
-Subject: [PATCH v3 09/16] drm/sun4i: Fix polarity configuration for DW HDMI PHY
+Date: Thu,  1 Mar 2018 22:34:30 +0100
+Subject: [PATCH v3 04/16] clk: sunxi-ng: h3: h5: export CLK_PLL_VIDEO
 In-Reply-To: <20180301213442.16677-1-jernej.skrabec@siol.net>
 References: <20180301213442.16677-1-jernej.skrabec@siol.net>
-Message-ID: <20180301213442.16677-10-jernej.skrabec@siol.net>
+Message-ID: <20180301213442.16677-5-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current polarity configuration code is cleary wrong since it compares
-same flag two times. However, even if flag name is fixed, it won't work
-well for resolutions which have one polarity positive and another
-negative.
+CLK_PLL_VIDEO needs to be referenced in HDMI DT entry as a possible
+PHY clock parent.
 
-Fix that by properly set each bit according to each polarity. Since
-those two bits are not described in any documentation, relationships
-were obtained by experimentation.
-
-Fixes: b7c7436a5ff0 ("drm/sun4i: Implement A83T HDMI driver")
+Export it so it can be used later in DT.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 4 +++-
+ include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index e5bfcdd43ec9..9d2f11ca3538 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -10,7 +10,8 @@
- #define SUN8I_HDMI_PHY_DBG_CTRL_REG	0x0000
- #define SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK		BIT(0)
- #define SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK	GENMASK(15, 8)
--#define SUN8I_HDMI_PHY_DBG_CTRL_POL(val)	(val << 8)
-+#define SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC	BIT(8)
-+#define SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC	BIT(9)
- #define SUN8I_HDMI_PHY_DBG_CTRL_ADDR_MASK	GENMASK(23, 16)
- #define SUN8I_HDMI_PHY_DBG_CTRL_ADDR(addr)	(addr << 16)
- 
-@@ -35,14 +36,14 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
- 	struct sun8i_hdmi_phy *phy = (struct sun8i_hdmi_phy *)data;
- 	u32 val = 0;
- 
--	if ((mode->flags & DRM_MODE_FLAG_NHSYNC) &&
--	    (mode->flags & DRM_MODE_FLAG_NHSYNC)) {
--		val = 0x03;
--	}
-+	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-+		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NHSYNC;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+index 1b4baea37d81..73d7392c968c 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+@@ -26,7 +26,9 @@
+ #define CLK_PLL_AUDIO_2X	3
+ #define CLK_PLL_AUDIO_4X	4
+ #define CLK_PLL_AUDIO_8X	5
+-#define CLK_PLL_VIDEO		6
 +
-+	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-+		val |= SUN8I_HDMI_PHY_DBG_CTRL_POL_NVSYNC;
++/* PLL_VIDEO is exported */
++
+ #define CLK_PLL_VE		7
+ #define CLK_PLL_DDR		8
  
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
--			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK,
--			   SUN8I_HDMI_PHY_DBG_CTRL_POL(val));
-+			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK, val);
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+index e139fe5c62ec..c5f7e9a70968 100644
+--- a/include/dt-bindings/clock/sun8i-h3-ccu.h
++++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
+@@ -43,6 +43,8 @@
+ #ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
+ #define _DT_BINDINGS_CLK_SUN8I_H3_H_
  
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
- 			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
++#define CLK_PLL_VIDEO		6
++
+ #define CLK_PLL_PERIPH0		9
+ 
+ #define CLK_CPUX		14
 -- 
 2.16.2
