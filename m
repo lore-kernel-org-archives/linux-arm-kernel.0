@@ -1,52 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Mar 2018 21:10:56 +0000
-Subject: [PATCH] KVM: arm/arm64: drop pr_info() of IDMAP page
-In-Reply-To: <20180301191406.18083-1-ard.biesheuvel@linaro.org>
-References: <20180301191406.18083-1-ard.biesheuvel@linaro.org>
-Message-ID: <86sh9j33j3.wl-marc.zyngier@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Mar 2018 15:13:13 -0600
+Subject: [PATCH v7 09/42] dt-bindings: clock: New bindings for TI Davinci
+ PSC
+In-Reply-To: <1519071723-31790-10-git-send-email-david@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-10-git-send-email-david@lechnology.com>
+Message-ID: <20180301211313.tahm4kjpma6jsywz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 01 Mar 2018 19:14:06 +0000,
-Ard Biesheuvel wrote:
+On Mon, Feb 19, 2018 at 02:21:30PM -0600, David Lechner wrote:
+> This adds a new binding for the Power Sleep Controller (PSC) for the
+> mach-davinci family of processors.
 > 
-> The KVM IDMAP is a mapping of a statically allocated kernel structure,
-> and so printing its physical address leaks the physical placement of
-> the kernel when physical KASLR is in effect. Just remove it, nobody
-> except Marc needs this anyway.
-
-Bah, even I don't really need it anymore...
-
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Note: Although TI Keystone has a very similar PSC, we are not using the
+> existing bindings. Keystone is using a legacy one-node-per-clock binding
+> (actually two nodes if you count the separate reset binding for the same
+> IP block). Also, some davinci LPSCs have quirks that aren't handled by
+> the keystone bindings, so we would be adding one compatible string per
+> clock with quirks instead of just a new compatible string for each
+> controller.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 > ---
-> CC -stable?
-
-In this day and age, probably.
-
 > 
->  virt/kvm/arm/mmu.c | 1 -
->  1 file changed, 1 deletion(-)
+> v7 changes:
+> - Fixed clock-names property typo
+> - Added #power-domain-cells property
 > 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index ec62d1cccab7..c07f88cb6dcf 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1810,7 +1810,6 @@ int kvm_mmu_init(void)
->  	 */
->  	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
->  
-> -	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
->  	kvm_info("HYP VA range: %lx:%lx\n",
->  		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
+> v6 changes:
+> - added clocks and clock-names properties
+> - expanded examples
+> 
+> 
+>  .../devicetree/bindings/clock/ti/davinci/psc.txt   | 71 ++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/psc.txt
 
-Instead of removing this particular line, how about turning all these
-kvm_info into kvm_debug (see [1])?
-
-Thanks,
-
-	M.
-
-[1] https://www.spinics.net/lists/arm-kernel/msg637920.html
-
--- 
-Jazz is not dead, it just smell funny.
+Reviewed-by: Rob Herring <robh@kernel.org>
