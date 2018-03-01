@@ -1,41 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Mar 2018 17:24:19 -0600
-Subject: [PATCH v2] ARM: tegra: fix ulpi regression on tegra20
-In-Reply-To: <20180222143825.1517-1-marcel@ziswiler.com>
-References: <20180222143825.1517-1-marcel@ziswiler.com>
-Message-ID: <20180301232419.ypehol54rhqrqjds@rob-hp-laptop>
+Date: Thu, 1 Mar 2018 17:28:10 -0600
+Subject: [PATCH] arm: dts: omap3: Add missing #sound-dai-cells
+In-Reply-To: <20180301223243.GI62820@atomide.com>
+References: <20180301202537.30571-2-robh@kernel.org>
+ <20180301223243.GI62820@atomide.com>
+Message-ID: <CAL_Jsq+=dBEH_MFHDgZbNBb75hVzoXsyH-_qE7mKFuGtOixQsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 03:38:25PM +0100, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
-> during registration") ULPI has been broken on Tegra20 leading to the
-> following error message during boot:
-> 
-> [    1.974698] ulpi_phy_power_on: ulpi write failed
-> [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
-> [    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
-> 
-> Debugging through the changes and finally also consulting the TRM
-> revealed that rather than the CDEV2 clock off OSC requiring such pin
-> muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
-> just worked by chance of that one having been enabled which Stephen's
-> commit now changed when reparenting sclk away from pll_p_out4 leaving
-> that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
-> as the ULPI PHY clock.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - Updated device tree binding documentation as well.
-> - CCing Dmitry as well.
-> 
->  Documentation/devicetree/bindings/phy/nvidia,tegra20-usb-phy.txt | 4 +++-
->  arch/arm/boot/dts/tegra20.dtsi                                   | 2 +-
->  2 files changed, 4 insertions(+), 2 deletions(-)
+On Thu, Mar 1, 2018 at 4:32 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Rob Herring <robh@kernel.org> [180301 12:26]:
+>> dtc now gives the following warnings:
+>>
+>> arch/arm/boot/dts/omap3-gta04a3.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+>> arch/arm/boot/dts/omap3-gta04a4.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+>> arch/arm/boot/dts/omap3-gta04a5.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+>>
+>> Add the missing #sound-dai-cells property.
+>
+> Is this needed for the current -rc or is v4.17 OK?
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+4.17 is fine.
+
+> Somehow I'm not seeing these with current -rc or next, is
+> there some special option (not W=2 :) that you're using?
+
+Upstream dtc which I'm working on syncing to for 4.17.
+
+Rob
