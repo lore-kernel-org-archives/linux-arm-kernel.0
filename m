@@ -1,38 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Mar 2018 10:44:34 +0100
-Subject: [PATCH v6 01/26] ARM: shmobile: Add watchdog support
-In-Reply-To: <1519839622-6109-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <CAMuHMdUx3A_8MeZmrwiBRqUS0oGjwrg13fy1QMsA2SUw+dR0Hg@mail.gmail.com>
- <1519839622-6109-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180301094434.tnk5uxlbkhv6pcb7@verge.net.au>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Thu, 1 Mar 2018 10:43:41 +0100
+Subject: [PATCH 6/6] ARM: dts: stm32: Fix sdio2 rcc hard coded value
+In-Reply-To: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
+References: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1519897421-23803-7-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 05:40:22PM +0000, Fabrizio Castro wrote:
-> On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
-> boot CPUs run a routine designed to bring up SMP and deal with hot plug.
-> The value contained in the SBAR registers is not initialized by a WDT
-> triggered reset, which means that after a WDT triggered reset we jump
-> to the SMP bring up routine, preventing the system from executing the
-> bootrom code.
-> 
-> The purpose of this patch is to jump to the bootrom code in case of a
-> WDT triggered reset, and keep the SMP functionality untouched.
-> In order to tell if the code had been called due to the WDT overflowing
-> we are testing WOVF from register RWTCSRA.
-> 
-> The new function shmobile_boot_vector_gen2 isn't replacing
-> shmobile_boot_vector for backward compatibility reasons. The kernel
-> will install the best option (either shmobile_boot_vector or
-> shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree,
-> according to the amount of memory available.
-> 
-> Since shmobile_boot_vector has become bigger, "reg" property of nodes
-> compatible with "renesas,smp-sram" now need to be set to a value
-> greater or equal to "<0 0x60>".
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Thanks, I have marked this as deferred as I would like dependencies to
-be merged first.
+Replace sdio2 rcc hard coded clock value by its macro.
+
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/boot/dts/stm32f746.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 07c29658696c..2c5704f96801 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -432,7 +432,7 @@
+ 			compatible = "arm,pl180", "arm,primecell";
+ 			arm,primecell-periphid = <0x00880180>;
+ 			reg = <0x40011c00 0x400>;
+-			clocks = <&rcc 0 167>;
++			clocks = <&rcc 0 STM32F7_APB2_CLOCK(SDMMC2)>;
+ 			clock-names = "apb_pclk";
+ 			interrupts = <103>;
+ 			max-frequency = <48000000>;
+-- 
+1.9.1
