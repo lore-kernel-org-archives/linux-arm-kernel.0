@@ -1,53 +1,62 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 1 Mar 2018 11:34:05 +0100
-Subject: [PATCH] ARM: davinci: fix the GPIO lookup for omapl138-hawk
-In-Reply-To: <2396d1a7-e4ef-95d7-3d38-309adcc3507e@ti.com>
-References: <20180227121443.3191-1-brgl@bgdev.pl>
- <2396d1a7-e4ef-95d7-3d38-309adcc3507e@ti.com>
-Message-ID: <CAMRc=MeFib2=vCj0-4zAXXJ9Cq8hDZFTxUQ3-FxHECd8xtzaYg@mail.gmail.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  1 Mar 2018 18:18:35 +0800
+Subject: [RESEND PATCH v6 12/14] iommu/rockchip: Fix error handling in init
+In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180301101837.27969-13-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-28 7:38 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Tuesday 27 February 2018 05:44 PM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
->> mmc can correctly lookup the wp and cp gpios.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> index a3e78074be70..62eb7d668890 100644
->> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> @@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
->>       .dev_id = "da830-mmc.0",
->>       .table = {
->>               /* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
->> -             GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
->> -             GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
->> +             GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
->> +             GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
->
-> Hmm, shouldn't this just be "davinci_gpio" since we use .id = -1 in
-> da8xx_gpio_device?
->
+It's hard to undo bus_set_iommu() in the error path, so move it to the
+end of rk_iommu_probe().
 
-The gpio-davinci driver sets the gpiochip label to davinci_gpio.0 and
-gpiolib sets the device name to chip's label.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> Also:
->
-> Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc pins")
->
-> Thanks,
-> Sekhar
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2:
+Move bus_set_iommu() to rk_iommu_probe().
 
-Sending v2.
+ drivers/iommu/rockchip-iommu.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-Thanks,
-Bartosz
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 1346bbb8a3e7..2448a0528e39 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1133,6 +1133,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	if (!dma_dev)
+ 		dma_dev = &pdev->dev;
+ 
++	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
++
+ 	return 0;
+ err_remove_sysfs:
+ 	iommu_device_sysfs_remove(&iommu->iommu);
+@@ -1158,19 +1160,6 @@ static struct platform_driver rk_iommu_driver = {
+ 
+ static int __init rk_iommu_init(void)
+ {
+-	struct device_node *np;
+-	int ret;
+-
+-	np = of_find_matching_node(NULL, rk_iommu_dt_ids);
+-	if (!np)
+-		return 0;
+-
+-	of_node_put(np);
+-
+-	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
+-	if (ret)
+-		return ret;
+-
+ 	return platform_driver_register(&rk_iommu_driver);
+ }
+ subsys_initcall(rk_iommu_init);
+-- 
+2.11.0
