@@ -1,48 +1,44 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Thu, 01 Mar 2018 19:14:10 +0800
-Subject: [RESEND PATCH v6 14/14] iommu/rockchip: Support sharing IOMMU
- between masters
-In-Reply-To: <44efebd3-ab48-4e12-cf92-66b6563f7644@arm.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
- <20180301101837.27969-15-jeffy.chen@rock-chips.com>
- <44efebd3-ab48-4e12-cf92-66b6563f7644@arm.com>
-Message-ID: <5A97E082.3020109@rock-chips.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 01 Mar 2018 12:16 +0100
+Subject: [PATCH] pata_bk3710: clarify license version and use SPDX header
+References: <CGME20180301111603epcas1p20d8448be4c055efdc39e23551bd7f68e@epcas1p2.samsung.com>
+Message-ID: <1760511.OZqiSOBhjW@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+- clarify license version (it should be GPL 2.0)
+- use SPDX header
 
-On 03/01/2018 07:03 PM, Robin Murphy wrote:
->>
->> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
->> +{
->> +    struct rk_iommu *iommu;
->> +
->> +    iommu = rk_iommu_from_dev(dev);
->> +
->> +    return iommu->group;
->
-> Oops, seems I overlooked this in my previous review - it should really be:
->
->      return iommu_group_get(iommu->group);
->
-> or the refcounting will be unbalanced on those future systems where it
-> really will be called more than once.
->
-hmmm, right, it should be return iommu_group_ref_get(iommu->group);
+Cc: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/ata/pata_bk3710.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-i was following omap iommu:
-static struct iommu_group *omap_iommu_device_group(struct device *dev)
-{
-         struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
-         struct iommu_group *group = ERR_PTR(-EINVAL);
-
-         if (arch_data->iommu_dev)
-                 group = arch_data->iommu_dev->group;
-
-         return group;
-}
-
-will fix it too in the version.
-
-> Robin.
+Index: b/drivers/ata/pata_bk3710.c
+===================================================================
+--- a/drivers/ata/pata_bk3710.c	2017-11-22 14:11:06.120729358 +0100
++++ b/drivers/ata/pata_bk3710.c	2018-03-01 12:10:36.293559718 +0100
+@@ -1,3 +1,5 @@
++// SPDX-License-Identifier: GPL-2.0
++
+ /*
+  * Palmchip BK3710 PATA controller driver
+  *
+@@ -8,10 +10,6 @@
+  *
+  * Copyright (C) 2006 Texas Instruments.
+  * Copyright (C) 2007 MontaVista Software, Inc., <source@mvista.com>
+- *
+- * This file is subject to the terms and conditions of the GNU General Public
+- * License.  See the file "COPYING" in the main directory of this archive
+- * for more details.
+  */
+ 
+ #include <linux/ata.h>
+@@ -379,4 +377,4 @@ static int __init pata_bk3710_init(void)
+ }
+ 
+ module_init(pata_bk3710_init);
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
