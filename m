@@ -1,124 +1,97 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 1 Mar 2018 11:51:10 +0000
-Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <52a4e58b-b5dd-cf68-1207-b43e60efee4b@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-12-jeremy.linton@arm.com>
- <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
- <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
- <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
- <52a4e58b-b5dd-cf68-1207-b43e60efee4b@arm.com>
-Message-ID: <20180301115110.GG4589@e105550-lin.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 1 Mar 2018 12:51:31 +0100
+Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
+In-Reply-To: <db1bc925-699e-14e7-f3fb-4dc83e2f6640@arm.com>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-4-samuel@sholland.org>
+ <20180228083214.h4oi2kmjjqmoyfhn@flea>
+ <fdf86770-6f45-3b3c-50ea-7a8363894639@sholland.org>
+ <20180301103259.nomjbwkw4xbvhbfv@flea>
+ <db1bc925-699e-14e7-f3fb-4dc83e2f6640@arm.com>
+Message-ID: <20180301115131.dmgptn4fbm3jkhlj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 10:37:33PM -0600, Jeremy Linton wrote:
-> On 02/23/2018 05:02 AM, Lorenzo Pieralisi wrote:
-> >On Thu, Jan 25, 2018 at 09:56:30AM -0600, Jeremy Linton wrote:
-> >>Hi,
-> >>
-> >>On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
-> >>>Hi Jeremy,
-> >>>
-> >>>I have tested the patch with the newest UEFI. It prints the below error:
-> >>>
-> >>>[    4.017371] BUG: arch topology borken
-> >>>[    4.021069] BUG: arch topology borken
-> >>>[    4.024764] BUG: arch topology borken
-> >>>[    4.028460] BUG: arch topology borken
-> >>>[    4.032153] BUG: arch topology borken
-> >>>[    4.035849] BUG: arch topology borken
-> >>>[    4.039543] BUG: arch topology borken
-> >>>[    4.043239] BUG: arch topology borken
-> >>>[    4.046932] BUG: arch topology borken
-> >>>[    4.050629] BUG: arch topology borken
-> >>>[    4.054322] BUG: arch topology borken
-> >>>
-> >>>I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
-> >>>the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
-> >>
-> >>I commented about that on the EDK2 mailing list. While the current spec
-> >>doesn't explicitly ban having the flag set multiple times between the leaf
-> >>and the root I consider it a "bug" and there is an effort to clarify the
-> >>spec and the use of that flag.
-> >>>
-> >>>When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
-> >>>and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
-> >>>sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
-> >>
-> >>Right. I've mentioned this problem a couple of times.
-> >>
-> >>At at the moment, the spec isn't clear about how the proximity domain is
-> >>detected/located within the PPTT topology (a node with a 1:1 correspondence
-> >>isn't even required). As you can see from this patch set, we are making the
-> >>general assumption that the proximity domains are at the same level as the
-> >>physical socket. This isn't ideal for NUMA topologies, like the D05, that
-> >>don't align with the physical socket.
-> >>
-> >>There are efforts underway to clarify and expand upon the specification to
-> >>deal with this general problem. The simple solution is another flag (say
-> >>PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to
-> >>find nodes with 1:1 correspondence. At that point we could add a fairly
-> >>trivial patch to correct just the scheduler topology without affecting the
-> >>rest of the system topology code.
-> >
-> >I think Morten asked already but isn't this the same end result we end
-> >up having if we remove the DIE level if NUMA-within-package is detected
-> >(instead of using the default_topology[]) and we create our own ARM64
-> >domain hierarchy (with DIE level removed) through set_sched_topology()
-> >accordingly ?
+On Thu, Mar 01, 2018 at 11:32:32AM +0000, Andre Przywara wrote:
+> Hi,
 > 
-> I'm not sure what removing the die level does for you, but its not really
-> the problem AFAIK, the problem is because MC layer is larger than the NUMA
-> domains.
-
-Do you mean MC domains are larger than NUMA domains because that
-reflects the hardware topology, i.e. you have caches shared across NUMA
-nodes, or do you mean the problem is that the current code generates too
-large MC domains?
-
-If is it the first, then you have to make a choice whether you want
-multi-core scheduling or NUMA-scheduling at that level in the topology.
-You can't have both. If you don't want NUMA scheduling at that level you
-should define your NUMA nodes to be larger than (or equal to?) the MC
-domains, or not define NUMA nodes at all. If you do want NUMA
-scheduling at that level, we have to ignore any cache sharing between
-NUMA nodes and reduce the size of the MC domains accordingly.
-
-We should be able to reduce the size of the MC domains based on in the
-information already in the ACPI spec. SRAT defines the NUMA domains, if
-the PPTT package level is larger than the NUMA nodes we should claim it
-is NUMA in package, drop the DIE level and reduce the size of the MC
-domain to equal to the NUMA node size ignoring any PPTT topology
-information above the NUMA node level.
-
-AFAICT, x86 doesn't have this problem as they don't use PPTT, and the
-last-level cache is always inside the NUMA node, even for
-numa-in-package. For numa-in-package they seem to let SRAT define the
-NUMA nodes, have a special topology table for the non-NUMA levels only
-containing SMT and MC, and guarantee the MC isn't larger than the NUMA
-node.
-
-Can't we just follow the same approach with the addition that we have to
-resize the MC domains if necessary?
-
-> >Put it differently: do we really need to rely on another PPTT flag to
-> >collect this information ?
+> On 01/03/18 10:32, Maxime Ripard wrote:
+> > On Wed, Feb 28, 2018 at 11:19:11AM -0600, Samuel Holland wrote:
+> >> Hi,
+> >>
+> >> On 02/28/18 02:32, Maxime Ripard wrote:
+> >>> On Tue, Feb 27, 2018 at 08:27:14PM -0600, Samuel Holland wrote:
+> >>>> +	/*
+> >>>> +	 * The failure path should not disable the clock or assert the reset,
+> >>>> +	 * because the PSCI implementation in firmware relies on this device
+> >>>> +	 * being functional. Claiming the clock in this driver is required to
+> >>>> +	 * prevent Linux from turning it off.
+> >>>> +	 */
+> >>>> +	ret = clk_prepare_enable(clk);
+> >>>> +	if (ret) {
+> >>>> +		dev_err(dev, "Failed to enable bus clock: %d\n", ret);
+> >>>> +		return ret;
+> >>>> +	}
+> >>>
+> >>> You don't need it to be always on though. You only need it to be
+> >>> enabled when you access the registers (on both sides I guess?). So you
+> >>> could very well enable the clock in your registers accessors in Linux,
+> >>> and do the same in the ARISC firmware. That should work.
+> >>
+> >> It does need to always be on because the *PSCI* implementation (ATF) also uses
+> >> SCPI concurrently with Linux (on a separate channel). Turning off the clock
+> >> anywhere in Linux could turn it off in the middle of a PSCI SCPI call on a
+> >> different CPU, causing ATF to hang in EL3 (which would be very bad).
+> > 
+> > Then the above code doesn't fix anything. You should mark the clock
+> > critical, otherwise that clock will be turned off if the driver is
+> > compiled as a module and not loaded (or loaded later), or if the
+> > driver is not even compiled in.
 > 
-> Strictly no, and I have a partial patch around here i've been meaning to
-> flush out which uses the early node information to detect if there are nodes
-> smaller than the package. Initially I've been claiming i was going to stay
-> away from making scheduler topology changes in this patch set, but it seems
-> that at least providing a patch which does the minimal bits is in the cards.
-> The PXN flag was is more of a shortcut to finding the cache levels at or
-> below the numa domains, rather than any hard requirement. Similarly, to the
-> request someone else was making for a leaf node flag (or node ordering) to
-> avoid multiple passes in the table. That request would simplify the posted
-> code a bit but it works without it.
+> ... or if the module gets unloaded for some reason. So yes, I agree.
+> Actually I was hitting this problem before on several occasions:
+> - If firmware (either ATF or on the ARISC) wants to check temperatures,
+> it needs to rely on Linux not turning off the THS clock - which it does
+> at the moment when there is no Linux driver.
+> - If an EFI framebuffer needs to keep running in Linux, we should not
+> turn off the HDMI and DE clocks. simplefb solves this, but efifb has no
+> simple way of copying this approach.
+> - If a type 1 hypervisor like Xen uses the serial console (and exports a
+> virtual console to the guest), Linux turns off the now apparently unused
+> UART0 gate clock, killing Xen's console. So booting Xen on Allwinner
+> requires clk_ignore_unused at the moment.
+> 
+> There are ways to mitigate or workaround each one of these, but I was
+> wondering if we should look at a more general approach.
+> 
+> The most flexible seems to have some "clock victim" DT node, somewhat
+> mimicking the simplefb solution: One DT node which just references
+> clocks that are used by other (firmware) components in the system and
+> which can't be protected otherwise.
+> Normally this node would be empty, but firmware can add clock references
+> the moment it needs one clock. So ATF could add the THS clock, and Xen
+> could add the UART0 gate clock. This could be done at runtime by the
+> firmware or hypervisor. Xen for instance already amends the DT before
+> passing it on to Dom0, so copying all the clock references from the UART
+> to this node would be easy to implement.
+> 
+> Does that sound worthwhile to pursue? I could sketch up something if
+> that makes sense.
 
-I don't see how a flag defining the proximity domains in PPTT makes this
-a lot easier. PPTT and setting this flag would have to be mandatory for
-NUMA in package systems for the flag to make any difference.
+This makes sense, but I remember how heated the simplefb discussion
+has been to introduce the clocks and regulator properties, so I'm not
+sure this would be nice to encourage you to do that :)
 
-Morten
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/3862db33/attachment.sig>
