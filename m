@@ -1,56 +1,57 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 1 Mar 2018 10:31:02 +0000
-Subject: Clang build of arm64 kernel fails
-In-Reply-To: <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
-References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
- <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
-Message-ID: <20180301103100.GE32331@e103592.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 1 Mar 2018 11:32:59 +0100
+Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
+In-Reply-To: <fdf86770-6f45-3b3c-50ea-7a8363894639@sholland.org>
+References: <20180228022714.30068-1-samuel@sholland.org>
+ <20180228022714.30068-4-samuel@sholland.org>
+ <20180228083214.h4oi2kmjjqmoyfhn@flea>
+ <fdf86770-6f45-3b3c-50ea-7a8363894639@sholland.org>
+Message-ID: <20180301103259.nomjbwkw4xbvhbfv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 09:45:24AM +0000, Robin Murphy wrote:
-> Hi Andrey,
+On Wed, Feb 28, 2018 at 11:19:11AM -0600, Samuel Holland wrote:
+> Hi,
 > 
-> On 28/02/18 19:32, Andrey Konovalov wrote:
-> >Hi Marc!
-> >
-> >I've tried to pull in new upstream commits and the kernel build
-> >started failing for me with the following errors (see below).
-> >
-> >It seems that the reason is your commit "arm64: Add
-> >ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
-> >doesn't like 32 bits registers being used in 64 bits build.
+> On 02/28/18 02:32, Maxime Ripard wrote:
+> > On Tue, Feb 27, 2018 at 08:27:14PM -0600, Samuel Holland wrote:
+> >> +	/*
+> >> +	 * The failure path should not disable the clock or assert the reset,
+> >> +	 * because the PSCI implementation in firmware relies on this device
+> >> +	 * being functional. Claiming the clock in this driver is required to
+> >> +	 * prevent Linux from turning it off.
+> >> +	 */
+> >> +	ret = clk_prepare_enable(clk);
+> >> +	if (ret) {
+> >> +		dev_err(dev, "Failed to enable bus clock: %d\n", ret);
+> >> +		return ret;
+> >> +	}
+> > 
+> > You don't need it to be always on though. You only need it to be
+> > enabled when you access the registers (on both sides I guess?). So you
+> > could very well enable the clock in your registers accessors in Linux,
+> > and do the same in the ARISC firmware. That should work.
 > 
-> I'd say this is really a bug in Clang. Architecturally, the register in
-> AArch64 state is still named "r0"; "x0"/"w0" are assembler operands which
-> additionally encode the size of the corresponding *access* to r0.
-> 
-> I note that GCC's documentation on register variables[1] does just say "the
-> name of the register", which implies this code is not incorrect. Given that
-> Clang already likes to infer the operand size from the argument type in
-> actual inline asms, it seems funny that its register allocator should care
-> in this non-instruction context.
+> It does need to always be on because the *PSCI* implementation (ATF) also uses
+> SCPI concurrently with Linux (on a separate channel). Turning off the clock
+> anywhere in Linux could turn it off in the middle of a PSCI SCPI call on a
+> different CPU, causing ATF to hang in EL3 (which would be very bad).
 
-+1
+Then the above code doesn't fix anything. You should mark the clock
+critical, otherwise that clock will be turned off if the driver is
+compiled as a module and not loaded (or loaded later), or if the
+driver is not even compiled in.
 
-rN is perfectly reasonable here and has always been supported by GCC for
-AArch64 AFAIK.
+Maxime
 
-(IMHO rN is preferable, because this separates the register allocation
-specification from how that register is used to encode the data type --
-GCC has no choice about the latter, but using "w"/"x" gives the
-misleading impression of control over this.)
-
-> >Would you mind sending a fix?
-> 
-> That said, I guess it's a bug we might have to work around anyway. Oh well.
-
-It would be preferable to see evidence of the llvm community committing
-to fix this before we consider merging a bodge into Linux for it.
-
-Although this one issue is easy-ish to work around, we're on a slippery
-slope towards allowing the LLVM and GCC inline assemblers to diverge if
-we don't push back on worthless incompatibilities.
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/a6441894/attachment.sig>
