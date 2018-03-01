@@ -1,99 +1,77 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Thu, 01 Mar 2018 09:37:43 +0800
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <34a60ab2-a3af-3302-6612-740cba5460db@arm.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
- <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
- <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
- <5A72F7D2.1050201@rock-chips.com> <5A8FEBC6.4000408@rock-chips.com>
- <33d1d6bd-3455-5cad-6990-a9ca94063f3a@arm.com>
- <5A96A809.2020509@rock-chips.com>
- <34a60ab2-a3af-3302-6612-740cba5460db@arm.com>
-Message-ID: <5A975967.6020301@rock-chips.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 1 Mar 2018 01:49:51 +0000
+Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
+In-Reply-To: <2424862.oPtAVTfrB9@jernej-laptop>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+Message-ID: <87fu5kk1mm.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
-Thanks for your reply.
+Hi Jernej
 
-On 02/28/2018 11:06 PM, Robin Murphy wrote:
-> On 28/02/18 13:00, JeffyChen wrote:
->> Hi Robin,
->>
->> Thanks for your reply.
->>
->> On 02/28/2018 12:59 AM, Robin Murphy wrote:
->>>>> the rockchip IOMMU is part of the master block in hardware, so it
->>>>> needs
->>>>> to control the master's power domain and some of the master's clocks
->>>>> when access it's registers.
->>>>>
->>>>> and the number of clocks needed here, might be different between each
->>>>> IOMMUs(according to which master block it belongs), it's a little like
->>>>> our power domain:
->>>>> https://elixir.free-electrons.com/linux/latest/source/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L935
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> i'm not sure how to describe this correctly, is it ok use something
->>>>> like
->>>>> "the same as it's master block"?
->>>>
->>>> would it make sense to add a property to specify the master who owns
->>>> the iommu, and we can get all clocks(only some of those clocks are
->>>> actually needed) from it in the of_xlate()? and we can also reuse the
->>>> clock-names of that master to build clk_bulk_data and log errors in
->>>> clk_bulk_get.
->>>
->>> I'm inclined to agree with Rob here - if we're to add anything to the
->>> binding, it should only be whatever clock inputs are defined for the
->>> IOMMU IP block itself. If Linux doesn't properly handle the interconnect
->>> clock hierarchy external to a particular integration, that's a separate
->>> issue and it's not the binding's problem.
->>>
->>> I actually quite like the hack of "borrowing" the clocks from
->>> dev->of_node in of_xlate() - you shouldn't need any DT changes for that,
->>> because you already know that each IOMMU instance only has the one
->>> master device anyway.
->>
->> Thanks:) but actually we are going to support sharing IOMMU between
->> multiple masters(one of them is the main master i think) in the newer
->> chips(not yet supported on upstream kernel)...
->
-> Ha! OK, fair enough, back to the first point then...
->
->> So we might have to get all clocks from all masters, or find a way to
->> specify the main master...and for the multiple masters case, do it in
->> of_xlate() turns out to be a little racy...maybe we can add a property
->> to specify main master, and get it's clocks in probe()?
->
-> I notice that the 4.4 BSP kernel consistently specifies "aclk" and
-> "hclk" for the IOMMU instances - it feels unusual to say "why don't we
-> follow the downstream binding?", but it does look a lot like what I
-> would expect (I'd guess at one for the register slave interface and one
-> for the master interface/general operation?)
-huh, right.
-i did noticed that, but there's a hevc_mmu with ("aclk", "hclk", 
-"clk_core", "clk_cabac") confused me.
+Thank you for your report
 
-so confirmed with Simon, that hevc_mmu is wrong. currently all IOMMUs 
-should only have 2 clks, either aclk+hclk or aclk+pclk (depends on the 
-clk tree)
+> with todays linux-next (next-20180228), kernel on Allwinner H3 SoC crashes 
+> with dmesg like that: https://pastebin.com/raw/0D5JeaJ8
+> 
+> I bisected the kernel and first offending commit is:
+> be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: replace platform to 
+> component")
+> 
+> I know that crash message is completely unrelated to sound subsystem, but it 
+> turns out that if I disable CONFIG_SND_SUN4I_CODEC kernel works ok, but this 
+> way I lose analog audio output.
+> 
+> Any suggestions what can be the issue?
 
-so it seems to be a good idea to do so, will send patches soon, thanks :)
->
-> If we can implement conceptually-correct clock handling based on an
-> accurate binding, which should cover most cases, and *then* look at
-> hacking around those where it doesn't quite work in practice due to
-> shortcomings elsewhere, that would be ideal, and of course a lot nicer
-> than just jumping straight into piles of hacks.
->
-> Robin.
->
->
->
+Hmm... I'm sorry but I have no idea...
+
+One thing I noticed is that...
+
+=>	[    1.662605] Unable to handle kernel NULL pointer dereference at virtual address 00000004
+	...
+	[    1.703312] PC is at strlen+0x0/0x2c
+	[    1.706976] LR is at kobject_get_path+0x1c/0xb4
+
+my guess this "strlen" is from get_kobj_path_length() (?)
+and it is below.
+
+static int get_kobj_path_length(struct kobject *kobj)
+{
+	...
+=>	if (kobject_name(parent) == NULL)
+		return 0;
+=>	length += strlen(kobject_name(parent)) + 1;
+	...
+}
+
+Your "parent name" is 0x00000004 instead of NULL somehow...
+
+	[    2.170203] [<c063efbc>] (strlen) from [<c0633f08>] (kobject_get_path+0x1c/0xb4)
+	[    2.183581] [<c0633f08>] (kobject_get_path) from [<c0635178>] (kobject_uevent_env+0xd4/0x5d0)
+	[    2.198143] [<c0635178>] (kobject_uevent_env) from [<c0428c54>] (device_add+0x3b4/0x5b4)
+	[    2.212252] [<c0428c54>] (device_add) from [<c05205d0>] (extcon_dev_register+0x348/0x6c0)
+	[    2.226443] [<c05205d0>] (extcon_dev_register) from [<c05210a4>] (devm_extcon_dev_register+0x38/0x70)
+	[    2.241717] [<c05210a4>] (devm_extcon_dev_register) from [<c037505c>] (sun4i_usb_phy_probe+0x180/0x614)
+	[    2.257279] [<c037505c>] (sun4i_usb_phy_probe) from [<c042d0c0>] (platform_drv_probe+0x50/0xac)
+
+According to log, this crash came from edev of extcon_dev_register()
+which is *alocated* by devm_extcon_dev_allocate().
+I guess "parent" is set by it ?
+Hmm... does "snd_dmaengine_xxx" and "devm_extcon_dev_allocate" has relation ?
+
+static int sun4i_usb_phy_probe(struct platform_device *pdev)
+{
+	...
+=>	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
+	...
+
+	ret = devm_extcon_dev_register(dev, data->extcon);
+	...                                 ~~~~~~~~~~~~
+}
+
+
+Best regards
+---
+Kuninori Morimoto
