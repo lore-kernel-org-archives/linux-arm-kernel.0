@@ -1,35 +1,39 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 1 Mar 2018 16:01:44 +0100
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <20180215185606.26736-3-james.morse@arm.com>
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com>
-Message-ID: <20180301150144.GA4215@pd.tnic>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 1 Mar 2018 16:24:50 +0100
+Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
+In-Reply-To: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <20180301152450.GA4061@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 06:55:57PM +0000, James Morse wrote:
-> Keep the oops_begin() call for x86,
+On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
+> Hi All,
+> 
+> This backport patchset fixed the meltdown issue, it's original branch:
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+> A few dependency or fixingpatches are also picked up, if they are necessary
+>  and no functional changes.
+> 
+> The patchset also on repository:
+> 	git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2 
+> 
+> No bug found yet from kernelci.org and lkft testing.
 
-That oops_begin() in generic code is such a layering violation, grrr.
+No bugs is good, but does it actually fix the meltdown problem?  What
+did you test it on?
 
-> arm64 doesn't have one of these,
-> and APEI is the only thing outside arch code calling this..
+And why are you making this patchset up?  What is wrong with the patches
+in the android-common tree for this?
 
-So looking at:
+> Any comments are appreciated!
 
-arch/arm/kernel/traps.c:die()
+You need to start versioning this changeset, as I have no idea if this
+is the "latest" one or not, right?
 
-it does call oops_begin() ... oops_end() just like the x86 version of
-die().
+Or have you not sent out this patchset before?  How does this interact
+with the "spectre" patches?  Or am I totally confused here?
 
-I'm wondering if we could move the code to do die() in a prepatch? My
-assumption is that all the arches should have die()... A quick grep does
-show a bunch of other arches having die()...
+thanks,
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+greg k-h
