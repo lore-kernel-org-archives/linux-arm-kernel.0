@@ -1,96 +1,90 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Thu, 01 Mar 2018 11:40:40 +0800
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
- <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
- <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
- <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
- <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
-Message-ID: <5A977638.8010506@rock-chips.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Thu, 1 Mar 2018 11:47:52 +0800
+Subject: [PATCH v2 4/4] pintcrl: support bias-disable of generic and
+ special pins simultaneously
+In-Reply-To: <1519804157.23198.9.camel@mhfsdcap03>
+References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1519634042-12063-5-git-send-email-zhiyong.tao@mediatek.com>
+ <1519803217.8089.31.camel@mtkswgap22> <1519804157.23198.9.camel@mhfsdcap03>
+Message-ID: <1519876072.23198.17.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Wed, 2018-02-28 at 15:49 +0800, Zhiyong Tao wrote:
+> On Wed, 2018-02-28 at 15:33 +0800, Sean Wang wrote:
+> > On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
+> > > For generic pins, parameter "arg" is 0 or 1.
+> > > For special pins, bias-disable is set by R0R1,
+> > > so we need transmited "00" to set bias-disable
+> > > When we set "bias-disable" as high-z property,
+> > > the parameter should be "MTK_PUPD_SET_R1R0_00".
+> > > 
+> > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > > ---
+> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 13 +++++++++++--
+> > >  1 file changed, 11 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > index 3cf384f..e88ba04 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > @@ -301,8 +301,17 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+> > >  	 * resistor bit, so we need this special handle.
+> > >  	 */
+> > >  	if (pctl->devdata->spec_pull_set) {
+> > > -		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+> > > -			pin, pctl->devdata->port_align, isup, arg);
+> > > +		if (enable) {
+> > > +			ret = pctl->devdata->spec_pull_set(
+> > > +				mtk_get_regmap(pctl, pin), pin,
+> > > +				pctl->devdata->port_align, isup,
+> > > +				arg);
+> > > +		} else {
+> > > +			ret = pctl->devdata->spec_pull_set(
+> > > +				mtk_get_regmap(pctl, pin), pin,
+> > > +				pctl->devdata->port_align, isup,
+> > > +				MTK_PUPD_SET_R1R0_00);
+> > > +		}
+> > 
+> > 
+> > it looks like you can use as following snippet with reusing original
+> > logic and less effort on maintaining these common code (?)
+> ==> Thanks for your suggestion very much. It seems better.
+> I will change it in v3.
 
-if i'm reading the code right, the PM clk means:
-1/ the clocks which would be enabled while power on
-2/ these clocks are optional, it's ok if anything wrong with them
-3/ controlled by pm_domain(or USE_PM_CLK_RUNTIME_OPS & pm_clk_add_notifier)
+==>
+ Hi sean,
 
-and currently we're adding all clocks of the attached device as PM clk 
-in rockchip PM domain driver, which seems wrong. because we might have 
-these kinds of clocks:
-1/ critical, should block power on if anything wrong with it(failed to 
-get/ prepare/ enable)
-2/ optional, could ignore it if anything wrong
-3/ only required in some special cases, for example register r/w, and 
-doesn't need to stay enabled while power on
+we try it in our site. we can't change like this.
+Because we will check "arg" after setting "arg = MTK_PUPD_SET_R1R0_00;".
+following snippet which check "arg" value is o or 1. If it not, which
+will print error. so we can't change like this.
+/* For generic pull config, default arg value should be 0 or 1. */
+if (arg != 0 && arg != 1) {
+	dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n", arg,
+pin);
+	return -EINVAL;
+}
 
-so maybe we can:
-1/ let the device(dts) or driver decide which clock is PM clk, and add 
-it using *pm_clk_add* APIs (even of_pm_clk_add_clks() if all clocks are 
-pm clk)
-
-2/ add support for critical PM clk, which would return error to the 
-driver if anything wrong
-
-3/ make sure PM clk always be controlled(otherwise it might be 
-unexpected disabled by other clocks under the same clk parent?):
-  a) make sure Runtime PM is always enabled. and as discussed, we can 
-select PM in ARCH_ROCKCHIP
-
-  b) make sure the device has a PM domain to control PM clk:
-select ROCKCHIP_PM_DOMAINS for ARCH_ROCKCHIP(that would also select 
-PM_GENERIC_DOMAINS)
-
-check dev->pm_domain before hand over PM clk, since we only care about 
-EPROBE_DEFER when attach PM domain:
-         ret = dev_pm_domain_attach(_dev, true);
-         if (ret != -EPROBE_DEFER) {
-                 if (drv->probe) {
-                         ret = drv->probe(dev);
-
-or
-
-  c) make pm_clk_suspend/pm_clk_resume part of the generic PM Runtime 
-flow(even without a PM domain)
-
-
-On 02/28/2018 10:07 PM, Tomasz Figa wrote:
-> On Wed, Feb 28, 2018 at 10:11 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> Hi Tomasz,
->>
->> On Wed, Feb 28, 2018 at 1:49 PM, Tomasz Figa <tfiga@chromium.org> wrote:
->>> On Wed, Feb 28, 2018 at 9:32 PM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> On Wed, Feb 28, 2018 at 1:29 PM, Tomasz Figa <tfiga@chromium.org> wrote:
->>>>> Also, how about systems where runtime PM is disabled? I think that's
->>>>> one of the reasons we control the clocks explicitly in the drivers
->>>>> anyway.
->>>>
->>>> On many platforms, Runtime PM is always enabled.
->>>
->>> Can we make such assumption? If so, could we just make an explicit
->>> "select PM_RUNTIME" in Kconfig of the SoC?
->>
->> Note that the PM_RUNTIME symbol was removed in commit 464ed18ebdb6236f
->> ("PM: Eliminate CONFIG_PM_RUNTIME"), in favor of plain PM.
->>
->> The following already select PM unconditionally:
->>    - ARCH_OMAP2PLUS_TYPICAL
->>    - ARCH_RENESAS (except EMEV2)
->>    - ARCH_TEGRA
->>    - ARCH_VEXPRESS
->
-> Thanks! Sounds like we might be able to simplify a lot of things with
-> doing the same for Rockchip.
->
-> Best regards,
-> Tomasz
->
->
->
+Thanks.
+> > 
+> > 
+> > if (pctl->devdata->spec_pull_set) {
+> > 	+ if (!enable)
+> > 	+ 	arg = MTK_PUPD_SET_R1R0_00;
+> > 
+> > 	ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+> > 		pin, pctl->devdata->port_align, isup, arg);
+> > 
+> > 
+> > Also, it's better to add more comments to such kind of special path for
+> > allowing future SoCs to follow and extend more easily.
+> 
+> ==> Thanks for your suggestion very much. I will add more comments here.
+> > 
+> > >  		if (!ret)
+> > >  			return 0;
+> > >  	}
+> > 
+> > 
+> 
