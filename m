@@ -1,73 +1,88 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:49 +0800
-Subject: [PATCH 12/45] arm64: entry: Ensure branch through syscall table is
- bounded under speculation
+Date: Thu,  1 Mar 2018 20:53:47 +0800
+Subject: [PATCH 10/45] arm64: Use pointer masking to limit uaccess speculation
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-13-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-11-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Robin Murphy <robin.murphy@arm.com>
 
-commit 6314d90e6493 upstream.
+commit 4d8efc2d5ee4 upstream.
 
-In a similar manner to array_index_mask_nospec, this patch introduces an
-assembly macro (mask_nospec64) which can be used to bound a value under
-speculation. This macro is then used to ensure that the indirect branch
-through the syscall table is bounded under speculation, with out-of-range
-addresses speculating as calls to sys_io_setup (0).
+Similarly to x86, mitigate speculation past an access_ok() check by
+masking the pointer against the address limit before use.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Even if we don't expect speculative writes per se, it is plausible that
+a CPU may still speculate at least as far as fetching a cache line for
+writing, hence we also harden put_user() and clear_user() for peace of
+mind.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/assembler.h | 11 +++++++++++
- arch/arm64/kernel/entry.S          |  2 ++
- 2 files changed, 13 insertions(+)
+ arch/arm64/include/asm/uaccess.h | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index ab3a179..a109d30 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -94,6 +94,17 @@
- 	.endm
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 7b1eb49..3531fec 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -170,6 +170,26 @@ static inline void uaccess_enable_not_uao(void)
+ }
  
  /*
-+ * Sanitise a 64-bit bounded index wrt speculation, returning zero if out
-+ * of bounds.
++ * Sanitise a uaccess pointer such that it becomes NULL if above the
++ * current addr_limit.
 + */
-+	.macro	mask_nospec64, idx, limit, tmp
-+	sub	\tmp, \idx, \limit
-+	bic	\tmp, \tmp, \idx
-+	and	\idx, \idx, \tmp, asr #63
-+	csdb
-+	.endm
++#define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
++static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
++{
++	void __user *safe_ptr;
++
++	asm volatile(
++	"	bics	xzr, %1, %2\n"
++	"	csel	%0, %1, xzr, eq\n"
++	: "=&r" (safe_ptr)
++	: "r" (ptr), "r" (current_thread_info()->addr_limit)
++	: "cc");
++
++	csdb();
++	return safe_ptr;
++}
 +
 +/*
-  * NOP sequence
-  */
- 	.macro	nops, num
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 48c41ff..0a27e12 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -233,6 +233,7 @@ alternative_else_nop_endif
-  * x7 is reserved for the system call number in 32-bit mode.
-  */
- wsc_nr	.req	w25		// number of system calls
-+xsc_nr	.req	x25		// number of system calls (zero-extended)
- wscno	.req	w26		// syscall number
- xscno	.req	x26		// syscall number (zero-extended)
- stbl	.req	x27		// syscall table pointer
-@@ -754,6 +755,7 @@ el0_svc_naked:					// compat entry point
- 	b.ne	__sys_trace
- 	cmp     wscno, wsc_nr			// check upper syscall limit
- 	b.hs	ni_sys
-+	mask_nospec64 xscno, xsc_nr, x19	// enforce bounds for syscall number
- 	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
- 	blr	x16				// call sys_* routine
- 	b	ret_fast_syscall
+  * The "__xxx" versions of the user access functions do not verify the address
+  * space - it must have been done previously with a separate "access_ok()"
+  * call.
+@@ -241,7 +261,7 @@ do {									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
+-		__get_user((x), __p) :					\
++		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
+ 		((x) = 0, -EFAULT);					\
+ })
+ 
+@@ -307,7 +327,7 @@ do {									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
+-		__put_user((x), __p) :					\
++		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
+ 		-EFAULT;						\
+ })
+ 
+@@ -368,7 +388,7 @@ static inline unsigned long __must_check copy_in_user(void __user *to, const voi
+ static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
+ {
+ 	if (access_ok(VERIFY_WRITE, to, n))
+-		n = __clear_user(to, n);
++		n = __clear_user(__uaccess_mask_ptr(to), n);
+ 	return n;
+ }
+ 
 -- 
 2.7.4
