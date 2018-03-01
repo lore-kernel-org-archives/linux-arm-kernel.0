@@ -1,88 +1,67 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:47 +0800
-Subject: [PATCH 10/45] arm64: Use pointer masking to limit uaccess speculation
+Date: Thu,  1 Mar 2018 20:53:53 +0800
+Subject: [PATCH 16/45] arm64: futex: Mask __user pointers prior to dereference
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-11-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-17-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 4d8efc2d5ee4 upstream.
+commit 91b2d3442f6a upstream.
 
-Similarly to x86, mitigate speculation past an access_ok() check by
-masking the pointer against the address limit before use.
+The arm64 futex code has some explicit dereferencing of user pointers
+where performing atomic operations in response to a futex command. This
+patch uses masking to limit any speculative futex operations to within
+the user address space.
 
-Even if we don't expect speculative writes per se, it is plausible that
-a CPU may still speculate at least as far as fetching a cache line for
-writing, hence we also harden put_user() and clear_user() for peace of
-mind.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/uaccess.h | 26 +++++++++++++++++++++++---
- 1 file changed, 23 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/futex.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 7b1eb49..3531fec 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -170,6 +170,26 @@ static inline void uaccess_enable_not_uao(void)
- }
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index 85c4a89..1943cf6 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -48,13 +48,14 @@ do {									\
+ } while (0)
  
- /*
-+ * Sanitise a uaccess pointer such that it becomes NULL if above the
-+ * current addr_limit.
-+ */
-+#define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
-+static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
-+{
-+	void __user *safe_ptr;
-+
-+	asm volatile(
-+	"	bics	xzr, %1, %2\n"
-+	"	csel	%0, %1, xzr, eq\n"
-+	: "=&r" (safe_ptr)
-+	: "r" (ptr), "r" (current_thread_info()->addr_limit)
-+	: "cc");
-+
-+	csdb();
-+	return safe_ptr;
-+}
-+
-+/*
-  * The "__xxx" versions of the user access functions do not verify the address
-  * space - it must have been done previously with a separate "access_ok()"
-  * call.
-@@ -241,7 +261,7 @@ do {									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
--		__get_user((x), __p) :					\
-+		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
- 		((x) = 0, -EFAULT);					\
- })
- 
-@@ -307,7 +327,7 @@ do {									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
--		__put_user((x), __p) :					\
-+		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
- 		-EFAULT;						\
- })
- 
-@@ -368,7 +388,7 @@ static inline unsigned long __must_check copy_in_user(void __user *to, const voi
- static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
+ static inline int
+-futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
++futex_atomic_op_inuser (int encoded_op, u32 __user *_uaddr)
  {
- 	if (access_ok(VERIFY_WRITE, to, n))
--		n = __clear_user(to, n);
-+		n = __clear_user(__uaccess_mask_ptr(to), n);
- 	return n;
+ 	int op = (encoded_op >> 28) & 7;
+ 	int cmp = (encoded_op >> 24) & 15;
+ 	int oparg = (encoded_op << 8) >> 20;
+ 	int cmparg = (encoded_op << 20) >> 20;
+ 	int oldval = 0, ret, tmp;
++	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
+ 
+ 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
+ 		oparg = 1 << oparg;
+@@ -106,15 +107,17 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
  }
  
+ static inline int
+-futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
+ 			      u32 oldval, u32 newval)
+ {
+ 	int ret = 0;
+ 	u32 val, tmp;
++	u32 __user *uaddr;
+ 
+-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
+ 		return -EFAULT;
+ 
++	uaddr = __uaccess_mask_ptr(_uaddr);
+ 	uaccess_enable();
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+ "	prfm	pstl1strm, %2\n"
 -- 
 2.7.4
