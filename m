@@ -1,37 +1,40 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu,  1 Mar 2018 20:18:47 +0800
-Subject: [PATCH RESEND] arm64: dts: hi6220: enable watchdog
-Message-ID: <1519906727-11135-1-git-send-email-leo.yan@linaro.org>
+From: bich.hemon@st.com (Bich HEMON)
+Date: Thu, 1 Mar 2018 12:29:50 +0000
+Subject: [PATCH] can: m_can: select pinctrl state in each suspend/resume
+ function
+Message-ID: <1519907380-15135-1-git-send-email-bich.hemon@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Shmidt <dimitrysh@google.com>
+Make sure to apply the correct pin state in suspend/resume callbacks.
+Putting pins in sleep state saves power.
 
-This patch is to add watchdog binding for Hi6220 on Hikey board.
-
-Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+Signed-off-by: Bich Hemon <bich.hemon@st.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/net/can/m_can/m_can.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 6a180d1..e9d5bb6 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -817,6 +817,14 @@
- 			pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle>;
- 		};
+diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+index 2594f77..a86ef69 100644
+--- a/drivers/net/can/m_can/m_can.c
++++ b/drivers/net/can/m_can/m_can.c
+@@ -1700,6 +1700,8 @@ static __maybe_unused int m_can_suspend(struct device *dev)
+ 		m_can_clk_stop(priv);
+ 	}
  
-+		watchdog0: watchdog at f8005000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xf8005000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ao_ctrl HI6220_WDT0_PCLK>;
-+			clock-names = "apb_pclk";
-+		};
++	pinctrl_pm_select_sleep_state(dev);
 +
- 		tsensor: tsensor at 0,f7030700 {
- 			compatible = "hisilicon,tsensor";
- 			reg = <0x0 0xf7030700 0x0 0x1000>;
+ 	priv->can.state = CAN_STATE_SLEEPING;
+ 
+ 	return 0;
+@@ -1710,6 +1712,8 @@ static __maybe_unused int m_can_resume(struct device *dev)
+ 	struct net_device *ndev = dev_get_drvdata(dev);
+ 	struct m_can_priv *priv = netdev_priv(ndev);
+ 
++	pinctrl_pm_select_default_state(dev);
++
+ 	m_can_init_ram(priv);
+ 
+ 	priv->can.state = CAN_STATE_ERROR_ACTIVE;
 -- 
-2.7.4
+1.9.1
