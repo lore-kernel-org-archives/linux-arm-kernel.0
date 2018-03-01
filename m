@@ -1,45 +1,51 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 01 Mar 2018 18:06:59 +0000
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <20180301150144.GA4215@pd.tnic> (Borislav Petkov's message of
- "Thu, 1 Mar 2018 16:01:44 +0100")
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com>
- <20180301150144.GA4215@pd.tnic>
-Message-ID: <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 2 Mar 2018 02:10:35 +0800
+Subject: [xlnx:master 1405/1438] drivers/crypto/zynqmp-sha.c:31:10: fatal
+ error: linux/soc/xilinx/zynqmp/firmware.h: No such file or directory
+Message-ID: <201803020232.TMXbcMDA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   807fdad49dd7b39688d91c60925994956cfafef4
+commit: 55ddcf001d16a1490c8d3ba54a685229eba606b7 [1405/1438] soc: zynqmp: Deprecate legacy PM driver
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        git checkout 55ddcf001d16a1490c8d3ba54a685229eba606b7
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Borislav Petkov <bp@alien8.de> writes:
+All errors (new ones prefixed by >>):
 
-> On Thu, Feb 15, 2018 at 06:55:57PM +0000, James Morse wrote:
->> Keep the oops_begin() call for x86,
->
-> That oops_begin() in generic code is such a layering violation, grrr.
->
->> arm64 doesn't have one of these,
->> and APEI is the only thing outside arch code calling this..
->
-> So looking at:
->
-> arch/arm/kernel/traps.c:die()
->
-> it does call oops_begin() ... oops_end() just like the x86 version of
-> die().
+>> drivers/crypto/zynqmp-sha.c:31:10: fatal error: linux/soc/xilinx/zynqmp/firmware.h: No such file or directory
+    #include <linux/soc/xilinx/zynqmp/firmware.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+--
+>> drivers/crypto/zynqmp-rsa.c:27:10: fatal error: linux/soc/xilinx/zynqmp/firmware.h: No such file or directory
+    #include <linux/soc/xilinx/zynqmp/firmware.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
 
-You're looking at support for the 32-bit ARM systems. The 64-bit support
-lives in arch/arm64 and the die() there doesn't contain an
-oops_begin()/oops_end(). But the lack of oops_begin() on arm64 doesn't
-really matter here.
+vim +31 drivers/crypto/zynqmp-sha.c
 
->
-> I'm wondering if we could move the code to do die() in a prepatch? My
-> assumption is that all the arches should have die()... A quick grep does
-> show a bunch of other arches having die()...
+6aa92efb Nava kishore Manne 2017-09-19 @31  #include <linux/soc/xilinx/zynqmp/firmware.h>
+6aa92efb Nava kishore Manne 2017-09-19  32  
 
-One issue I see with calling die() is that it is defined in different
-includes across various architectures, (e.g., include/asm/kdebug.h for
-x86, include/asm/system_misc.h in arm64, etc.)
+:::::: The code at line 31 was first introduced by commit
+:::::: 6aa92efb058fe13225b5ee06e2d6ca5f221e505f crypto: zynqmp-sha: Adopted SHA3 support for ZynqMP Soc
+
+:::::: TO: Nava kishore Manne <nava.manne@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62067 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/a350fca6/attachment-0001.gz>
