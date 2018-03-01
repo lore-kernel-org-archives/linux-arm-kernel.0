@@ -1,30 +1,33 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 10:41:47 +0100
-Subject: [PATCH] drm/sun4i: Fix dclk_set_phase
-In-Reply-To: <1519836413-35023-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1519836413-35023-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20180301094147.2mjgpfq4q64gtptv@flea>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 1 Mar 2018 09:42:20 +0000
+Subject: [PATCH v2 14/15] clk: stm32: Add clk entry for SDMMC2 on stm32F769
+In-Reply-To: <CACRpkdbd-Zz-JRC-_OfKtx28OvDcf0af93pqraP=XPpAN-geVg@mail.gmail.com>
+References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
+ <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
+ <fb3b26e8-0102-122b-1386-68a661139706@st.com>
+ <CACRpkdbd-Zz-JRC-_OfKtx28OvDcf0af93pqraP=XPpAN-geVg@mail.gmail.com>
+Message-ID: <f1cb9925-6f93-bf1f-1362-3d427bc3b909@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 05:46:53PM +0100, Giulio Benetti wrote:
-> Phase value is not shifted before writing.
-> 
-> Shift left of 28 bits to fit right bits
-> 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Hi Linus
 
-Applied, thanks!
-Maxime
+On 03/01/2018 10:12 AM, Linus Walleij wrote:
+> On Mon, Feb 26, 2018 at 9:41 AM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
+> 
+>> Hi Stephen, Michael
+>>
+>> It's a gentle reminder as this patch is present on mailing list and
+>> acked-by since 01/12/2018
+> 
+> You need Stephen's new kernel.org mail address to reach him.
+> (Added on TO:)
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/a0834cff/attachment.sig>
+Thanks !
+
+Patrice
+
+> 
+> Yours,
+> Linus Walleij
+> 
