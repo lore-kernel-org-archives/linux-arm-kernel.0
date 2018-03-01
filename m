@@ -1,77 +1,93 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 1 Mar 2018 01:49:51 +0000
-Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
-In-Reply-To: <2424862.oPtAVTfrB9@jernej-laptop>
-References: <2424862.oPtAVTfrB9@jernej-laptop>
-Message-ID: <87fu5kk1mm.wl%kuninori.morimoto.gx@renesas.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Thu, 1 Mar 2018 09:53:51 +0800
+Subject: [PATCH] irqchip/gic-v3-its: handle rd_idx wrapping in
+ its_wait_for_range_completion()
+In-Reply-To: <866073z7pr.wl-marc.zyngier@arm.com>
+References: <1518320521-12536-1-git-send-email-yangyingliang@huawei.com>
+ <866073z7pr.wl-marc.zyngier@arm.com>
+Message-ID: <5A975D2F.1010302@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Jernej
 
-Thank you for your report
+On 2018/2/12 2:45, Marc Zyngier wrote:
+Hi, Marc
 
-> with todays linux-next (next-20180228), kernel on Allwinner H3 SoC crashes 
-> with dmesg like that: https://pastebin.com/raw/0D5JeaJ8
-> 
-> I bisected the kernel and first offending commit is:
-> be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: replace platform to 
-> component")
-> 
-> I know that crash message is completely unrelated to sound subsystem, but it 
-> turns out that if I disable CONFIG_SND_SUN4I_CODEC kernel works ok, but this 
-> way I lose analog audio output.
-> 
-> Any suggestions what can be the issue?
+Sorry for replying so late.
+> On Sun, 11 Feb 2018 03:42:01 +0000,
+> Yang Yingliang wrote:
+>
+> Hi Yang,
+>
+>> In direct case, rd_idx will wrap if other cpus post commands
+>> that make rd_idx increase. When rd_idx wrapped, the driver prints
+>> timeout messages but in fact the command is finished. To handle
+>> this case by adding last_rd_id to check rd_idx whether wrapped.
+>>
+>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> Please always Cc LKML on irqchip related patches.
+>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its.c | 84 ++++++++++++++++++++++------------------
+>>   1 file changed, 46 insertions(+), 38 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 06f025f..d7176d1 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -713,7 +713,8 @@ static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
+>>   
+>>   static int its_wait_for_range_completion(struct its_node *its,
+>>   					 struct its_cmd_block *from,
+>> -					 struct its_cmd_block *to)
+>> +					 struct its_cmd_block *to,
+>> +					 u64 last_rd_idx)
+>>   {
+>>   	u64 rd_idx, from_idx, to_idx;
+>>   	u32 count = 1000000;	/* 1s! */
+>> @@ -724,9 +725,14 @@ static int its_wait_for_range_completion(struct its_node *its,
+>>   	while (1) {
+>>   		rd_idx = readl_relaxed(its->base + GITS_CREADR);
+>>   
+>> -		/* Direct case */
+>> -		if (from_idx < to_idx && rd_idx >= to_idx)
+>> -			break;
+>> +
+>> +		/*
+>> +		 * Direct case. In this case, rd_idx may wrapped,
+>> +		 * because other cpus may post commands that make
+>> +		 * rd_idx increase.
+>> +		 */
+>> +		if (from_idx < to_idx && (rd_idx >= to_idx || rd_idx < last_rd_idx))
+>> +				break;
+>>   
+>>   		/* Wrapped case */
+>>   		if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
+>> @@ -746,40 +752,42 @@ static int its_wait_for_range_completion(struct its_node *its,
+> [...]
+>
+>> +	last_rd_idx = readl_relaxed(its->base + GITS_CREADR);			\
+> What is this last_rd_idx exactly? It is just some random sampling of
+> the read pointer after we've posted our commands. It can still be in
+> any position. And if the reader as wrapped because other CPUs are
+> feeding more commands to the queue, it could just as well overtake
+> last_rd_idx, making your new condition just as false. Yes, this is
+> unlikely, but still.
+>
+> If you're going to harden the command queue wrapping, I'd suggest you
+> implement a generation mechanism so that we can easily work out if
+> we've seen the queue wrapping or not. THis would lift any kind of
+> ambiguity once and for all.
+I get a lot of timeout messages, when I am doing set affinity stress 
+testing which
+will post many its commands. I will try another way to handle the 
+wrapped case.
 
-Hmm... I'm sorry but I have no idea...
-
-One thing I noticed is that...
-
-=>	[    1.662605] Unable to handle kernel NULL pointer dereference at virtual address 00000004
-	...
-	[    1.703312] PC is at strlen+0x0/0x2c
-	[    1.706976] LR is at kobject_get_path+0x1c/0xb4
-
-my guess this "strlen" is from get_kobj_path_length() (?)
-and it is below.
-
-static int get_kobj_path_length(struct kobject *kobj)
-{
-	...
-=>	if (kobject_name(parent) == NULL)
-		return 0;
-=>	length += strlen(kobject_name(parent)) + 1;
-	...
-}
-
-Your "parent name" is 0x00000004 instead of NULL somehow...
-
-	[    2.170203] [<c063efbc>] (strlen) from [<c0633f08>] (kobject_get_path+0x1c/0xb4)
-	[    2.183581] [<c0633f08>] (kobject_get_path) from [<c0635178>] (kobject_uevent_env+0xd4/0x5d0)
-	[    2.198143] [<c0635178>] (kobject_uevent_env) from [<c0428c54>] (device_add+0x3b4/0x5b4)
-	[    2.212252] [<c0428c54>] (device_add) from [<c05205d0>] (extcon_dev_register+0x348/0x6c0)
-	[    2.226443] [<c05205d0>] (extcon_dev_register) from [<c05210a4>] (devm_extcon_dev_register+0x38/0x70)
-	[    2.241717] [<c05210a4>] (devm_extcon_dev_register) from [<c037505c>] (sun4i_usb_phy_probe+0x180/0x614)
-	[    2.257279] [<c037505c>] (sun4i_usb_phy_probe) from [<c042d0c0>] (platform_drv_probe+0x50/0xac)
-
-According to log, this crash came from edev of extcon_dev_register()
-which is *alocated* by devm_extcon_dev_allocate().
-I guess "parent" is set by it ?
-Hmm... does "snd_dmaengine_xxx" and "devm_extcon_dev_allocate" has relation ?
-
-static int sun4i_usb_phy_probe(struct platform_device *pdev)
-{
-	...
-=>	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
-	...
-
-	ret = devm_extcon_dev_register(dev, data->extcon);
-	...                                 ~~~~~~~~~~~~
-}
-
-
-Best regards
----
-Kuninori Morimoto
+Regards,
+Yang
+>
+> Thanks,
+>
+> 	M.
+>
