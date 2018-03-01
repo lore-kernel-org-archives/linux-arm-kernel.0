@@ -1,34 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Feb 2018 08:57:20 +0100
-Subject: [PATCH v3 2/2] ARM: dts: imx25-pinfunc: Always set SION for
- eSDHC CMD
-In-Reply-To: <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
-References: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
- <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180201075720.3fj7ozvclpp6yovz@pengutronix.de>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Thu, 1 Mar 2018 09:04:58 +0100
+Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
+In-Reply-To: <5A97A324.9050605@linux.intel.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+ <5A97A324.9050605@linux.intel.com>
+Message-ID: <cd4d7a98-e45e-7066-345f-52d8eef926a2@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 10:35:44PM +0100, Beno?t Th?baudeau wrote:
-> The eSDHC does not work properly if the SION bit is not set for the
-> bidirectional CMD signal, whatever the eSDHC instance and the selected
-> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
-> this for MX25_PAD_*__ESDHCn_CMD in imx25-pinfunc.h in order to enforce
-> this behavior for all boards.
-> 
-> This had already been done for eSDHC1, but not for eSDHC2. Also, define
-> MX25_PAD_FEC_MDC__ESDHC2_CMD so that all the possible cases are covered
-> from now on.
-> 
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Am 01.03.2018 um 07:52 schrieb Lu Baolu:
+> Hi Jean,
+>
+> On 02/13/2018 02:33 AM, Jean-Philippe Brucker wrote:
+>> [SNIP]
+>> +	pasid = idr_alloc_cyclic(&iommu_pasid_idr, io_mm, dev_param->min_pasid,
+>> +				 dev_param->max_pasid + 1, GFP_ATOMIC);
+> Can the pasid management code be moved into a common library?
+> PASID is not stick to SVA. An IOMMU model device could be designed
+> to use PASID for second level translation (classical DMA translation)
+> as well.
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Yeah, we have the same problem on amdgpu.
 
-Thanks
-Uwe
+We assign PASIDs to clients even when IOMMU isn't present in the system 
+just because we need it for debugging.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+E.g. when the hardware detects that some shader program is doing 
+something nasty we get the PASID in the interrupt and could for example 
+use it to inform the client about the fault.
+
+Regards,
+Christian.
+
+>
+> Best regards,
+> Lu Baolu
