@@ -1,96 +1,123 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu,  1 Mar 2018 14:15:14 -0800
-Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume order
-Message-ID: <1519942514-3350-1-git-send-email-fkan@apm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Mar 2018 16:15:43 -0600
+Subject: [PATCH v2 04/10] dt-bindings: display: Add Allwinner MIPI-DSI
+ bindings
+In-Reply-To: <eb9c3f0c0270334154b48605e2ded542236ced79.1519204731.git-series.maxime.ripard@bootlin.com>
+References: <cover.68c39205c8726547449e3df67b549d89380e51a2.1519204731.git-series.maxime.ripard@bootlin.com>
+ <eb9c3f0c0270334154b48605e2ded542236ced79.1519204731.git-series.maxime.ripard@bootlin.com>
+Message-ID: <20180301221543.szhh75wplyq4rvhd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bridge and its endpoint is enumerated the devices are added to the
-dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-This causes the bridge to be moved to the end of the dpm list when
-deferred probe kicks in. The order of the dpm list for bridge and
-endpoint is reversed.
+On Wed, Feb 21, 2018 at 10:20:28AM +0100, Maxime Ripard wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> The Allwinner SoCs usually come with a DSI encoder. Add a binding for it.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 84 +++++++-
+>  1 file changed, 84 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> new file mode 100644
+> index 000000000000..cbcc673b9bcc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> @@ -0,0 +1,84 @@
+> +Allwinner A31 DSI Encoder
+> +=========================
+> +
+> +The DSI pipeline consists of two separate blocks: the DSI controller
+> +itself, and its associated D-PHY.
+> +
+> +DSI Encoder
+> +-----------
+> +
+> +The DSI Encoder generates the DSI signal from the TCON's.
+> +
+> +Required properties:
+> +  - compatible: value must be one of:
+> +    * allwinner,sun6i-a31-mipi-dsi
+> +  - reg: base address and size of memory-mapped region
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the DSI encoder
+> +    * bus: the DSI interface clock
+> +    * mod: the DSI module clock
+> +  - clock-names: the clock names mentioned above
+> +  - phys: phandle to the D-PHY
+> +  - phy-names: must be "dphy"
+> +  - resets: phandle to the reset controller driving the encoder
+> +
+> +  - ports: A ports node with endpoint definitions as defined in
+> +    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> +    port should be the input endpoint, usually coming from the
+> +    associated TCON.
+> +
+> +Any MIPI-DSI device attached to this should be described according to
+> +the bindings defined in ../mipi-dsi-bus.txt
+> +
+> +D-PHY
+> +-----
+> +
+> +Required properties:
+> +  - compatible: value must be one of:
+> +    * allwinner,sun6i-a31-mipi-dphy
+> +  - reg: base address and size of memory-mapped region
+> +  - clocks: phandles to the clocks feeding the DSI encoder
+> +    * bus: the DSI interface clock
+> +    * mod: the DSI module clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandle to the reset controller driving the encoder
+> +
+> +Example:
+> +
+> +dsi0: dsi at 1ca0000 {
+> +	compatible = "allwinner,sun6i-a31-mipi-dsi";
+> +	reg = <0x01ca0000 0x1000>;
+> +	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&ccu CLK_BUS_MIPI_DSI>,
+> +		 <&ccu CLK_DSI_SCLK>;
+> +	clock-names = "bus", "mod";
+> +	resets = <&ccu RST_BUS_MIPI_DSI>;
+> +	phys = <&dphy0>;
+> +	phy-names = "dphy";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	panel at 0 {
+> +		compatible = "huarui,lhr050h41";
+> +		reg = <0>;
+> +		power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
+> +		reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
+> +		backlight = <&pwm_bl>;
+> +	};
+> +
+> +	port {
+> +		dsi0_in_tcon0: endpoint {
+> +			remote-endpoint = <&tcon0_out_dsi0>;
+> +		};
+> +	};
 
-Add reordering code to move the bridge and its children and consumers to
-the end of the pm list so the order for suspend and resume is not altered.
-The code also move device and its children and consumers to the tail of
-device_kset list if it is registered.
+Kind of odd to have a mixture of panel and port. I guess that's valid 
+though. I'd recommend you put port under ports node so if you ever have 
+another port you are not mixing unit-address spaces.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Toan Le <toanle@apm.com>
----
- V2:
-	1. change patch title from "move device and its children..."
-	2. move define based on Bjorn's comment
-	3. rename function name and comment content
- drivers/base/base.h |  3 +++
- drivers/base/core.c | 22 ++++++++++++++++++++++
- drivers/base/dd.c   |  8 ++++----
- 3 files changed, 29 insertions(+), 4 deletions(-)
+With that,
 
-diff --git a/drivers/base/base.h b/drivers/base/base.h
-index d800de6..a75c302 100644
---- a/drivers/base/base.h
-+++ b/drivers/base/base.h
-@@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
- extern void device_links_no_driver(struct device *dev);
- extern bool device_links_busy(struct device *dev);
- extern void device_links_unbind_consumers(struct device *dev);
-+
-+/* device pm support */
-+void device_pm_move_to_tail(struct device *dev);
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 110230d..0a0756b 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
- }
- 
- /**
-+ * device_pm_move_to_tail - move device and its children and consumers to end of
-+ *                          pm and device kset list
-+ * @dev: current device pointer
-+ *
-+ * This is a lock held version of the device_reorder_to_tail. Function checks
-+ * if the device is registered and moves it to the end of device_kset list. Also
-+ * if the device is pm initialized, move the device to the end of the pm list.
-+ * Then the function iterate through the children and device link consumers to
-+ * do the same for each found.
-+ */
-+void device_pm_move_to_tail(struct device *dev)
-+{
-+	int idx;
-+
-+	idx = device_links_read_lock();
-+	device_pm_lock();
-+	device_reorder_to_tail(dev, NULL);
-+	device_pm_unlock();
-+	device_links_read_unlock(idx);
-+}
-+
-+/**
-  * device_link_add - Create a link between two devices.
-  * @consumer: Consumer end of the link.
-  * @supplier: Supplier end of the link.
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 2c964f5..7e9d1ef 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
- 		 * Force the device to the end of the dpm_list since
- 		 * the PM code assumes that the order we add things to
- 		 * the list is a good order for suspend but deferred
--		 * probe makes that very unsafe.
-+		 * probe makes that very unsafe. Move any children and
-+		 * consumers belong to the device to the end of the list.
-+		 * This way the suspend resume order won't be corrupted.
- 		 */
--		device_pm_lock();
--		device_pm_move_last(dev);
--		device_pm_unlock();
-+		device_pm_move_to_tail(dev);
- 
- 		dev_dbg(dev, "Retrying from deferred list\n");
- 		if (initcall_debug && !initcalls_done)
--- 
-1.8.3.1
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+> +};
+> +
+> +dphy0: d-phy at 1ca1000 {
+> +	compatible = "allwinner,sun6i-a31-mipi-dphy";
+> +	reg = <0x01ca1000 0x1000>;
+> +	clocks = <&ccu CLK_BUS_MIPI_DSI>,
+> +		 <&ccu CLK_DSI_DPHY>;
+> +	clock-names = "bus", "mod";
+> +	resets = <&ccu RST_BUS_MIPI_DSI>;
+> +	#phy-cells = <0>;
+> +};
+> -- 
+> git-series 0.9.1
