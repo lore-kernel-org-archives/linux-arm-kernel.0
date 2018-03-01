@@ -1,39 +1,62 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Mar 2018 11:27:50 +0800
-Subject: [PATCH 1/2] dt-bindings: clock: mediatek: add binding for
- fixed-factor clock axisel_d4
-Message-ID: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
+Date: Thu, 1 Mar 2018 11:27:51 +0800
+Subject: [PATCH 2/2] clk: mediatek: fix PWM clock source by adding a
+ fixed-factor clock
+In-Reply-To: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
+References: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
+Message-ID: <b6eafb38f8d697bd8d00c8d86a0b22be809f8062.1519874655.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Just add binding for a fixed-factor clock axisel_d4, which would be
-referenced by PWM devices on MT7623 or MT2701 SoC.
+The clock for which all PWM devices on MT7623 or MT2701 actually depending
+on has to be divided by four from its parent clock axi_sel in the clock
+path prior to PWM devices.
+
+Consequently, adding a fixed-factor clock axisel_d4 as one-fourth of
+clock axi_sel allows that PWM devices can have the correct resolution
+calculation.
 
 Cc: stable at vger.kernel.org
-Fixes: 1de9b21633d6 ("clk: mediatek: Add dt-bindings for MT2701 clocks")
+Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
 ---
- include/dt-bindings/clock/mt2701-clk.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clk/mediatek/clk-mt2701.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/include/dt-bindings/clock/mt2701-clk.h b/include/dt-bindings/clock/mt2701-clk.h
-index 551f760..24e93df 100644
---- a/include/dt-bindings/clock/mt2701-clk.h
-+++ b/include/dt-bindings/clock/mt2701-clk.h
-@@ -176,7 +176,8 @@
- #define CLK_TOP_AUD_EXT1			156
- #define CLK_TOP_AUD_EXT2			157
- #define CLK_TOP_NFI1X_PAD			158
--#define CLK_TOP_NR				159
-+#define CLK_TOP_AXISEL_D4			159
-+#define CLK_TOP_NR				160
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index 8e7f16f..deca752 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -148,6 +148,7 @@ static const struct mtk_fixed_factor top_fixed_divs[] = {
+ 	FACTOR(CLK_TOP_CLK26M_D8, "clk26m_d8", "clk26m", 1, 8),
+ 	FACTOR(CLK_TOP_32K_INTERNAL, "32k_internal", "clk26m", 1, 793),
+ 	FACTOR(CLK_TOP_32K_EXTERNAL, "32k_external", "rtc32k", 1, 1),
++	FACTOR(CLK_TOP_AXISEL_D4, "axisel_d4", "axi_sel", 1, 4),
+ };
  
- /* APMIXEDSYS */
+ static const char * const axi_parents[] = {
+@@ -857,13 +858,13 @@ static const struct mtk_gate peri_clks[] = {
+ 	GATE_PERI0(CLK_PERI_USB1, "usb1_ck", "usb20_sel", 11),
+ 	GATE_PERI0(CLK_PERI_USB0, "usb0_ck", "usb20_sel", 10),
+ 	GATE_PERI0(CLK_PERI_PWM, "pwm_ck", "axi_sel", 9),
+-	GATE_PERI0(CLK_PERI_PWM7, "pwm7_ck", "axi_sel", 8),
+-	GATE_PERI0(CLK_PERI_PWM6, "pwm6_ck", "axi_sel", 7),
+-	GATE_PERI0(CLK_PERI_PWM5, "pwm5_ck", "axi_sel", 6),
+-	GATE_PERI0(CLK_PERI_PWM4, "pwm4_ck", "axi_sel", 5),
+-	GATE_PERI0(CLK_PERI_PWM3, "pwm3_ck", "axi_sel", 4),
+-	GATE_PERI0(CLK_PERI_PWM2, "pwm2_ck", "axi_sel", 3),
+-	GATE_PERI0(CLK_PERI_PWM1, "pwm1_ck", "axi_sel", 2),
++	GATE_PERI0(CLK_PERI_PWM7, "pwm7_ck", "axisel_d4", 8),
++	GATE_PERI0(CLK_PERI_PWM6, "pwm6_ck", "axisel_d4", 7),
++	GATE_PERI0(CLK_PERI_PWM5, "pwm5_ck", "axisel_d4", 6),
++	GATE_PERI0(CLK_PERI_PWM4, "pwm4_ck", "axisel_d4", 5),
++	GATE_PERI0(CLK_PERI_PWM3, "pwm3_ck", "axisel_d4", 4),
++	GATE_PERI0(CLK_PERI_PWM2, "pwm2_ck", "axisel_d4", 3),
++	GATE_PERI0(CLK_PERI_PWM1, "pwm1_ck", "axisel_d4", 2),
+ 	GATE_PERI0(CLK_PERI_THERM, "therm_ck", "axi_sel", 1),
+ 	GATE_PERI0(CLK_PERI_NFI, "nfi_ck", "nfi2x_sel", 0),
  
 -- 
 2.7.4
