@@ -1,82 +1,38 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  1 Mar 2018 18:18:24 +0800
-Subject: [RESEND PATCH v6 01/14] iommu/rockchip: Prohibit unbind and remove
-In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180301101837.27969-2-jeffy.chen@rock-chips.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu,  1 Mar 2018 11:34:48 +0100
+Subject: [PATCH v2] ARM: davinci: fix the GPIO lookup for omapl138-hawk
+Message-ID: <20180301103448.27233-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removal of IOMMUs cannot be done reliably.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This is similar to exynos iommu driver.
+The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+mmc can correctly lookup the wp and cp gpios.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc pins")
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
+v1 -> v2:
+- added the Fixes: tag
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-Rewrite commit message.
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes in v3:
-Also remove remove() and module_exit() as Tomasz suggested.
-
-Changes in v2: None
-
- drivers/iommu/rockchip-iommu.c | 21 +--------------------
- 1 file changed, 1 insertion(+), 20 deletions(-)
-
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 9d991c2d8767..16cd8780c289 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -1197,18 +1197,6 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	return err;
- }
- 
--static int rk_iommu_remove(struct platform_device *pdev)
--{
--	struct rk_iommu *iommu = platform_get_drvdata(pdev);
--
--	if (iommu) {
--		iommu_device_sysfs_remove(&iommu->iommu);
--		iommu_device_unregister(&iommu->iommu);
--	}
--
--	return 0;
--}
--
- static const struct of_device_id rk_iommu_dt_ids[] = {
- 	{ .compatible = "rockchip,iommu" },
- 	{ /* sentinel */ }
-@@ -1217,10 +1205,10 @@ MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
- 
- static struct platform_driver rk_iommu_driver = {
- 	.probe = rk_iommu_probe,
--	.remove = rk_iommu_remove,
- 	.driver = {
- 		   .name = "rk_iommu",
- 		   .of_match_table = rk_iommu_dt_ids,
-+		   .suppress_bind_attrs = true,
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index a3e78074be70..62eb7d668890 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
+ 	.dev_id = "da830-mmc.0",
+ 	.table = {
+ 		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
+-		GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
+-		GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
  	},
  };
  
-@@ -1248,14 +1236,7 @@ static int __init rk_iommu_init(void)
- 		platform_driver_unregister(&rk_iommu_domain_driver);
- 	return ret;
- }
--static void __exit rk_iommu_exit(void)
--{
--	platform_driver_unregister(&rk_iommu_driver);
--	platform_driver_unregister(&rk_iommu_domain_driver);
--}
--
- subsys_initcall(rk_iommu_init);
--module_exit(rk_iommu_exit);
- 
- MODULE_DESCRIPTION("IOMMU API for Rockchip");
- MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
 -- 
-2.11.0
+2.16.1
