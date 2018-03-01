@@ -1,97 +1,46 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 12:51:31 +0100
-Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
-In-Reply-To: <db1bc925-699e-14e7-f3fb-4dc83e2f6640@arm.com>
-References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228022714.30068-4-samuel@sholland.org>
- <20180228083214.h4oi2kmjjqmoyfhn@flea>
- <fdf86770-6f45-3b3c-50ea-7a8363894639@sholland.org>
- <20180301103259.nomjbwkw4xbvhbfv@flea>
- <db1bc925-699e-14e7-f3fb-4dc83e2f6640@arm.com>
-Message-ID: <20180301115131.dmgptn4fbm3jkhlj@flea>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Thu, 1 Mar 2018 19:53:55 +0800
+Subject: [PATCH 01/29] arm64: mm: Use non-global mappings for kernel space
+In-Reply-To: <20180228120828.GB8453@kroah.com>
+References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+ <1519790211-16582-2-git-send-email-alex.shi@linaro.org>
+ <20180228120828.GB8453@kroah.com>
+Message-ID: <92d7d0b8-7483-74d7-efe5-29249093d1ad@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 11:32:32AM +0000, Andre Przywara wrote:
-> Hi,
-> 
-> On 01/03/18 10:32, Maxime Ripard wrote:
-> > On Wed, Feb 28, 2018 at 11:19:11AM -0600, Samuel Holland wrote:
-> >> Hi,
-> >>
-> >> On 02/28/18 02:32, Maxime Ripard wrote:
-> >>> On Tue, Feb 27, 2018 at 08:27:14PM -0600, Samuel Holland wrote:
-> >>>> +	/*
-> >>>> +	 * The failure path should not disable the clock or assert the reset,
-> >>>> +	 * because the PSCI implementation in firmware relies on this device
-> >>>> +	 * being functional. Claiming the clock in this driver is required to
-> >>>> +	 * prevent Linux from turning it off.
-> >>>> +	 */
-> >>>> +	ret = clk_prepare_enable(clk);
-> >>>> +	if (ret) {
-> >>>> +		dev_err(dev, "Failed to enable bus clock: %d\n", ret);
-> >>>> +		return ret;
-> >>>> +	}
-> >>>
-> >>> You don't need it to be always on though. You only need it to be
-> >>> enabled when you access the registers (on both sides I guess?). So you
-> >>> could very well enable the clock in your registers accessors in Linux,
-> >>> and do the same in the ARISC firmware. That should work.
-> >>
-> >> It does need to always be on because the *PSCI* implementation (ATF) also uses
-> >> SCPI concurrently with Linux (on a separate channel). Turning off the clock
-> >> anywhere in Linux could turn it off in the middle of a PSCI SCPI call on a
-> >> different CPU, causing ATF to hang in EL3 (which would be very bad).
-> > 
-> > Then the above code doesn't fix anything. You should mark the clock
-> > critical, otherwise that clock will be turned off if the driver is
-> > compiled as a module and not loaded (or loaded later), or if the
-> > driver is not even compiled in.
-> 
-> ... or if the module gets unloaded for some reason. So yes, I agree.
-> Actually I was hitting this problem before on several occasions:
-> - If firmware (either ATF or on the ARISC) wants to check temperatures,
-> it needs to rely on Linux not turning off the THS clock - which it does
-> at the moment when there is no Linux driver.
-> - If an EFI framebuffer needs to keep running in Linux, we should not
-> turn off the HDMI and DE clocks. simplefb solves this, but efifb has no
-> simple way of copying this approach.
-> - If a type 1 hypervisor like Xen uses the serial console (and exports a
-> virtual console to the guest), Linux turns off the now apparently unused
-> UART0 gate clock, killing Xen's console. So booting Xen on Allwinner
-> requires clk_ignore_unused at the moment.
-> 
-> There are ways to mitigate or workaround each one of these, but I was
-> wondering if we should look at a more general approach.
-> 
-> The most flexible seems to have some "clock victim" DT node, somewhat
-> mimicking the simplefb solution: One DT node which just references
-> clocks that are used by other (firmware) components in the system and
-> which can't be protected otherwise.
-> Normally this node would be empty, but firmware can add clock references
-> the moment it needs one clock. So ATF could add the THS clock, and Xen
-> could add the UART0 gate clock. This could be done at runtime by the
-> firmware or hypervisor. Xen for instance already amends the DT before
-> passing it on to Dom0, so copying all the clock references from the UART
-> to this node would be easy to implement.
-> 
-> Does that sound worthwhile to pursue? I could sketch up something if
-> that makes sense.
 
-This makes sense, but I remember how heated the simplefb discussion
-has been to introduce the clocks and regulator properties, so I'm not
-sure this would be nice to encourage you to do that :)
 
-Maxime
+On 02/28/2018 08:08 PM, Greg KH wrote:
+> On Wed, Feb 28, 2018 at 11:56:23AM +0800, Alex Shi wrote:
+>> From: Will Deacon <will.deacon@arm.com>
+>>
+>> commit e046eb0c9bf2 upstream.
+>>
+>> In preparation for unmapping the kernel whilst running in userspace,
+>> make the kernel mappings non-global so we can avoid expensive TLB
+>> invalidation on kernel exit to userspace.
+>>
+>> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>> Tested-by: Laura Abbott <labbott@redhat.com>
+>> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Alex Shi <alex.shi@linaro.org>
+>>
+>> Conflicts:
+>> 	skip PTE_RDONLY of PAGE_NONE in arch/arm64/include/asm/pgtable-prot.h
+> 
+> These "Conflicts:" lines need to be removed, or put below the --- line
+> please.
+> 
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/3862db33/attachment.sig>
+Thanks response! Greg,
+
+There are still a boot hang on one of renesas board on
+CONFIG_RANDOMIZE_BASE. I am trying to get help from Renesas guys help on
+this. I will back after fix it.
+
+https://kernelci.org/boot/id/5a96f3dd59b5146590b3a4d5/
+
+Thanks
+Alex
