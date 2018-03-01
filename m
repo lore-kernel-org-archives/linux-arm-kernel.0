@@ -1,80 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 1 Mar 2018 11:44:18 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-In-Reply-To: <8f328063-610f-a2e8-5f29-d3f0019384f2@st.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
- <8f328063-610f-a2e8-5f29-d3f0019384f2@st.com>
-Message-ID: <CAPDyKFqFWcZnWoUdnfRtj9WA1+ooNCXKfZ94Ddq4j849CH2QOQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Mar 2018 10:47:37 +0000
+Subject: Clang build of arm64 kernel fails
+In-Reply-To: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+Message-ID: <be30b204-5752-9667-b599-b394cbfbc663@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2018 at 10:57, Ludovic BARRE <ludovic.barre@st.com> wrote:
-> Hi Ulf
->
-> On 03/01/2018 10:06 AM, Ulf Hansson wrote:
->>
->> Hi Ludovic,
->>
->> On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> This patch serie adds support of stm32 SDMMC controller.
->>> stm32h7 is the first SoC to use stm32 SDMMC controller
->>> (previous SoC had pl180 controller).
->>
->>
->> I am a not convinced this isn't a new improved variant of the pl180.
->> According to register layout and the code you submitted in patch2,
->> there are great similarities to pl180 and the mmci driver.
->
->
-> In fact, ST designers which created stm32-sdmmc hardware block from scratch
-> are the same which have done the modifications on pl180 variant (stm32
-> legacy f4, f7).
-> So some registers or bits name seem identical (or strongly inspirited) but
-> the engine and features are different.
+Hi Andrey,
 
-Well, in that case, I assume the driver would also need work
-differently, but when looking at the code in patch2 this doesn't seem
-to be the case.
+On 28/02/18 19:32, Andrey Konovalov wrote:
+> Hi Marc!
+> 
+> I've tried to pull in new upstream commits and the kernel build
+> started failing for me with the following errors (see below).
+> 
+> It seems that the reason is your commit "arm64: Add
+> ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
+> doesn't like 32 bits registers being used in 64 bits build.
 
->
-> You could find the datasheet of STM32H7x3 on:
-> http://www.st.com/content/ccc/resource/technical/document/reference_manual/group0/c9/a3/76/fa/55/46/45/fa/DM00314099/files/DM00314099.pdf/jcr:content/translations/en.DM00314099.pdf
->
-> Chapters: 55 Secure digital input/output MultiMediaCard interface
-> (SDMMC)
+These are not AArch32 registers. They are AArch64 registers that the
+compiler specialises to an x (64bit wide) or w (32bit wide) register
+depending on the type that is used to define the corresponding variable.
+The fact that they are named just as AArch32 is an added compatibility
+bonus.
 
-Thanks for sharing this. However this confirms my view, it looks
-exactly as a new improved mmci variant. :-)
+For example:
 
->
-> This hardware block has own roadmap and some features are already in the
-> pipe for next SoC.
+void foo(void)
+{
+	register unsigned long reg0 asm("r0") = 0;
+	register unsigned int  reg1 asm("r1") = 1;
 
-That's fine. I don't have a problem extending the mmci driver, even
-several times, as to cope with new revisions.
+	asm volatile("hvc #0" : : "r" (reg0), "r" (reg1));
+}
 
->
-> For code design: like I also worked on pl180 in the past :-)
-> my code is inspirited of this driver.
+results in:
 
-Right, that may explain things a bit.
+Disassembly of section .text:
 
-However, besides a re-name of the registers, I really think that the
-code execution, dealing with IRQs etc, is very similar to the mmci
-driver. Isn't it?
+0000000000000000 <foo>:
+   0:	d2800000 	mov	x0, #0x0                   	// #0
+   4:	52800021 	mov	w1, #0x1                   	// #1
+   8:	d4000002 	hvc	#0x0
+   c:	d65f03c0 	ret
 
-So, I think it's at least worth to give it a go with the mmci driver
-first, to see if we can get it to work.
+> Would you mind sending a fix?
 
-I guess you understand why I am pushing!? This is about maintenance -
-and I really want to avoid having a yet another driver to maintain,
-unless we can extend an existing one.
+I can look into it. Is there an equivalent Clang construct that wouldn't
+result in a sea of #ifdefs?
 
-[...]
+Thanks,
 
-Kind regards
-Uffe
+	M.
+-- 
+Jazz is not dead. It just smells funny...
