@@ -1,251 +1,177 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 28 Feb 2018 22:14:00 -0600
-Subject: [PATCH v6] arm64: Add support for new control bits CTR_EL0.DIC and
- CTR_EL0.IDC
-Message-ID: <1519877640-11944-1-git-send-email-shankerd@codeaurora.org>
+From: lmark@codeaurora.org (Liam Mark)
+Date: Wed, 28 Feb 2018 21:18:27 -0800 (PST)
+Subject: [RFC] android: ion: How to properly clean caches for uncached
+ allocations
+Message-ID: <alpine.DEB.2.02.1802282111320.22860@lmark-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCache clean & ICache invalidation requirements for instructions
-to be data coherence are discoverable through new fields in CTR_EL0.
-The following two control bits DIC and IDC were defined for this
-purpose. No need to perform point of unification cache maintenance
-operations from software on systems where CPU caches are transparent.
+The issue:
 
-This patch optimize the three functions __flush_cache_user_range(),
-clean_dcache_area_pou() and invalidate_icache_range() if the hardware
-reports CTR_EL0.IDC and/or CTR_EL0.IDC. Basically it skips the two
-instructions 'DC CVAU' and 'IC IVAU', and the associated loop logic
-in order to avoid the unnecessary overhead.
+Currently in ION if you allocate uncached memory it is possible that there
+are still dirty lines in the cache.  And often these dirty lines in the
+cache are the zeros which were meant to clear out any sensitive kernel
+data.
 
-CTR_EL0.DIC: Instruction cache invalidation requirements for
- instruction to data coherence. The meaning of this bit[29].
-  0: Instruction cache invalidation to the point of unification
-     is required for instruction to data coherence.
-  1: Instruction cache cleaning to the point of unification is
-      not required for instruction to data coherence.
+What this means is that if you allocate uncached memory from ION, and then
+subsequently write to that buffer (using the uncached mapping you are
+provided by ION) then the data you have written could be corrupted at some
+point in the future if a dirty line is evicted from the cache.
 
-CTR_EL0.IDC: Data cache clean requirements for instruction to data
- coherence. The meaning of this bit[28].
-  0: Data cache clean to the point of unification is required for
-     instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
-     or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
-  1: Data cache clean to the point of unification is not required
-     for instruction to data coherence.
+Also this means there is a potential security issue.  If an un-privileged
+userspace user allocated uncached memory (for example from the system heap)
+and then if they were to read from that buffer (through the un-cached
+mapping they are provided by ION), and if some of the zeros which were
+written to that memory are still in the cache then this un-privileged
+userspace user could read potentially sensitive kernel data.
 
-Co-authored-by: Philip Elcan <pelcan@codeaurora.org>
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+
+An unacceptable fix:
+
+I have included some sample code which should resolve this issue for the
+system heap and the cma heap on some architectures, however this code
+would not be acceptable for upstreaming since it uses hacks to clean
+the cache.
+Similar changes would need to be made to carveout heap and chunk heap.
+
+I would appreciate some feedback on the proper way for ION to clean the
+caches for memory it has allocated that is intended for uncached access.
+
+I realize that it may be tempting, as a solution to this problem, to
+simply strip uncached support from ION. I hope that we can try to find a
+solution which preserves uncached memory support as ION uncached memory
+is often used (though perhaps not in upstreamed code) in cases such as
+multimedia use cases where there is no CPU access required, in secure
+heap allocations, and in some cases where there is minimal CPU access
+and therefore uncached memory performs better.
+
+Signed-off-by: Liam Mark <lmark@codeaurora.org>
 ---
-Changes since v5:
-  -Addressed Mark's review comments.
+ drivers/staging/android/ion/ion.c             | 16 ++++++++++++++++
+ drivers/staging/android/ion/ion.h             |  5 ++++-
+ drivers/staging/android/ion/ion_cma_heap.c    |  3 +++
+ drivers/staging/android/ion/ion_page_pool.c   |  8 ++++++--
+ drivers/staging/android/ion/ion_system_heap.c |  7 ++++++-
+ 5 files changed, 35 insertions(+), 4 deletions(-)
 
-Changes since v4:
-  -Moved patching ARM64_HAS_CACHE_DIC inside invalidate_icache_by_line
-  -Removed 'dsb	ishst' for ARM64_HAS_CACHE_DIC as Mark suggested.
-
-Changes since v3:
-  -Added preprocessor guard CONFIG_xxx to code snippets in cache.S
-  -Changed barrier attributes from ISH to ISHST.
-
-Changes since v2:
-  -Included barriers, DSB/ISB with DIC set, and DSB with IDC set.
-  -Single Kconfig option.
-
-Changes since v1:
-  -Reworded commit text.
-  -Used the alternatives framework as Catalin suggested.
-  -Rebased on top of https://patchwork.kernel.org/patch/10227927/
-
- arch/arm64/Kconfig                 | 12 ++++++++++++
- arch/arm64/include/asm/assembler.h |  6 ++++++
- arch/arm64/include/asm/cache.h     |  4 ++++
- arch/arm64/include/asm/cpucaps.h   |  4 +++-
- arch/arm64/kernel/cpufeature.c     | 40 ++++++++++++++++++++++++++++++++------
- arch/arm64/mm/cache.S              | 13 +++++++++++++
- 6 files changed, 72 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb..41af850 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1091,6 +1091,18 @@ config ARM64_RAS_EXTN
- 	  and access the new registers if the system supports the extension.
- 	  Platform RAS features may additionally depend on firmware support.
- 
-+config ARM64_SKIP_CACHE_POU
-+	bool "Enable support to skip cache PoU operations"
-+	default y
-+	help
-+	  Explicit point of unification cache operations can be eliminated
-+	  in software if the hardware handles transparently. The new bits in
-+	  CTR_EL0, CTR_EL0.DIC and CTR_EL0.IDC indicates the hardware
-+	  capabilities of ICache and DCache PoU requirements.
-+
-+	  Selecting this feature will allow the kernel to optimize cache
-+	  maintenance to the PoU.
-+
- endmenu
- 
- config ARM64_SVE
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 3c78835..39f2274 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -444,6 +444,11 @@
-  * 	Corrupts:	tmp1, tmp2
-  */
- 	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label
-+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
-+alternative_if ARM64_HAS_CACHE_DIC
-+	b	9996f
-+alternative_else_nop_endif
-+#endif
- 	icache_line_size \tmp1, \tmp2
- 	sub	\tmp2, \tmp1, #1
- 	bic	\tmp2, \start, \tmp2
-@@ -453,6 +458,7 @@
- 	cmp	\tmp2, \end
- 	b.lo	9997b
- 	dsb	ish
-+9996:
- 	isb
- 	.endm
- 
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index ea9bb4e..d460e9f 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -20,8 +20,12 @@
- 
- #define CTR_L1IP_SHIFT		14
- #define CTR_L1IP_MASK		3
-+#define CTR_DMLINE_SHIFT	16
-+#define CTR_ERG_SHIFT		20
- #define CTR_CWG_SHIFT		24
- #define CTR_CWG_MASK		15
-+#define CTR_IDC_SHIFT		28
-+#define CTR_DIC_SHIFT		29
- 
- #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
- 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index bb26382..8dd42ae 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -45,7 +45,9 @@
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
- #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
- #define ARM64_HAS_RAS_EXTN			26
-+#define ARM64_HAS_CACHE_IDC			27
-+#define ARM64_HAS_CACHE_DIC			28
- 
--#define ARM64_NCAPS				27
-+#define ARM64_NCAPS				29
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 2985a06..0b64b55 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -199,12 +199,12 @@ static int __init register_cpu_hwcaps_dumper(void)
- };
- 
- static const struct arm64_ftr_bits ftr_ctr[] = {
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RES1 */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 29, 1, 1),	/* DIC */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 28, 1, 1),	/* IDC */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 20, 4, 0),	/* ERG */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),                    /* RES1 */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),    /* DIC */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 1),    /* IDC */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_CWG_SHIFT, 4, 0),   /* CWG */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_ERG_SHIFT, 4, 0),   /* ERG */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DMLINE_SHIFT, 4, 1), /* DminLine */
- 	/*
- 	 * Linux can handle differing I-cache policies. Userspace JITs will
- 	 * make use of *minLine.
-@@ -852,6 +852,20 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 					ID_AA64PFR0_FP_SHIFT) < 0;
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index 57e0d8035b2e..10e967b0a0f4 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -38,6 +38,22 @@ bool ion_buffer_cached(struct ion_buffer *buffer)
+ 	return !!(buffer->flags & ION_FLAG_CACHED);
  }
  
-+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
-+static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
-+			  int __unused)
++void ion_pages_sync_for_device(struct page *page, size_t size,
++			       enum dma_data_direction dir)
 +{
-+	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_IDC_SHIFT);
++	struct scatterlist sg;
++	struct device dev = {0};
++
++	/* hack, use dummy device */
++	arch_setup_dma_ops(&dev, 0, 0, NULL, false);
++
++	sg_init_table(&sg, 1);
++	sg_set_page(&sg, page, size, 0);
++	/* hack, use phys address for dma address */
++	sg_dma_address(&sg) = page_to_phys(page);
++	dma_sync_sg_for_device(&dev, &sg, 1, dir);
 +}
 +
-+static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
-+			  int __unused)
-+{
-+	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
-+}
-+#endif
+ /* this function should only be called while dev->lock is held */
+ static void ion_buffer_add(struct ion_device *dev,
+ 			   struct ion_buffer *buffer)
+diff --git a/drivers/staging/android/ion/ion.h b/drivers/staging/android/ion/ion.h
+index a238f23c9116..227b9928d185 100644
+--- a/drivers/staging/android/ion/ion.h
++++ b/drivers/staging/android/ion/ion.h
+@@ -192,6 +192,9 @@ struct ion_heap {
+  */
+ bool ion_buffer_cached(struct ion_buffer *buffer);
+ 
++void ion_pages_sync_for_device(struct page *page, size_t size,
++			       enum dma_data_direction dir);
 +
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ /**
+  * ion_buffer_fault_user_mappings - fault in user mappings of this buffer
+  * @buffer:		buffer
+@@ -333,7 +336,7 @@ struct ion_page_pool {
+ struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order,
+ 					   bool cached);
+ void ion_page_pool_destroy(struct ion_page_pool *pool);
+-struct page *ion_page_pool_alloc(struct ion_page_pool *pool);
++struct page *ion_page_pool_alloc(struct ion_page_pool *pool, bool *from_pool);
+ void ion_page_pool_free(struct ion_page_pool *pool, struct page *page);
  
-@@ -1088,6 +1102,20 @@ static int cpu_copy_el2regs(void *__unused)
- 		.enable = cpu_clear_disr,
- 	},
- #endif /* CONFIG_ARM64_RAS_EXTN */
-+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
-+	{
-+		.desc = "Skip D-Cache maintenance 'DC CVAU' (CTR_EL0.IDC=1)",
-+		.capability = ARM64_HAS_CACHE_IDC,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cache_idc,
-+	},
-+	{
-+		.desc = "Skip I-Cache maintenance 'IC IVAU' (CTR_EL0.DIC=1)",
-+		.capability = ARM64_HAS_CACHE_DIC,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cache_dic,
-+	},
-+#endif /* CONFIG_ARM64_SKIP_CACHE_POU */
- 	{},
- };
+ /** ion_page_pool_shrink - shrinks the size of the memory cached in the pool
+diff --git a/drivers/staging/android/ion/ion_cma_heap.c b/drivers/staging/android/ion/ion_cma_heap.c
+index 49718c96bf9e..82e80621d114 100644
+--- a/drivers/staging/android/ion/ion_cma_heap.c
++++ b/drivers/staging/android/ion/ion_cma_heap.c
+@@ -59,6 +59,9 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
+ 		memset(page_address(pages), 0, size);
+ 	}
  
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 758bde7..d8d7a32 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -50,6 +50,12 @@ ENTRY(flush_icache_range)
-  */
- ENTRY(__flush_cache_user_range)
- 	uaccess_ttbr0_enable x2, x3, x4
-+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
-+alternative_if ARM64_HAS_CACHE_IDC
-+	dsb	ishst
-+	b	8f
-+alternative_else_nop_endif
-+#endif
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x4, x0, x3
-@@ -60,6 +66,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
- 	b.lo	1b
- 	dsb	ish
++	if (!ion_buffer_cached(buffer))
++		ion_pages_sync_for_device(pages, size, DMA_BIDIRECTIONAL);
++
+ 	table = kmalloc(sizeof(*table), GFP_KERNEL);
+ 	if (!table)
+ 		goto err;
+diff --git a/drivers/staging/android/ion/ion_page_pool.c b/drivers/staging/android/ion/ion_page_pool.c
+index b3017f12835f..169a321778ed 100644
+--- a/drivers/staging/android/ion/ion_page_pool.c
++++ b/drivers/staging/android/ion/ion_page_pool.c
+@@ -63,7 +63,7 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high)
+ 	return page;
+ }
  
-+8:
- 	invalidate_icache_by_line x0, x1, x2, x3, 9f
- 	mov	x0, #0
- 1:
-@@ -116,6 +123,12 @@ ENDPIPROC(__flush_dcache_area)
-  *	- size    - size in question
-  */
- ENTRY(__clean_dcache_area_pou)
-+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
-+alternative_if ARM64_HAS_CACHE_IDC
-+	dsb	ishst
-+	ret
-+alternative_else_nop_endif
-+#endif
- 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
- 	ret
- ENDPROC(__clean_dcache_area_pou)
+-struct page *ion_page_pool_alloc(struct ion_page_pool *pool)
++struct page *ion_page_pool_alloc(struct ion_page_pool *pool, bool *from_pool)
+ {
+ 	struct page *page = NULL;
+ 
+@@ -76,8 +76,12 @@ struct page *ion_page_pool_alloc(struct ion_page_pool *pool)
+ 		page = ion_page_pool_remove(pool, false);
+ 	mutex_unlock(&pool->mutex);
+ 
+-	if (!page)
++	if (!page) {
+ 		page = ion_page_pool_alloc_pages(pool);
++		*from_pool = false;
++	} else {
++		*from_pool = true;
++	}
+ 
+ 	return page;
+ }
+diff --git a/drivers/staging/android/ion/ion_system_heap.c b/drivers/staging/android/ion/ion_system_heap.c
+index bc19cdd30637..3bb4604e032b 100644
+--- a/drivers/staging/android/ion/ion_system_heap.c
++++ b/drivers/staging/android/ion/ion_system_heap.c
+@@ -57,13 +57,18 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
+ 	bool cached = ion_buffer_cached(buffer);
+ 	struct ion_page_pool *pool;
+ 	struct page *page;
++	bool from_pool;
+ 
+ 	if (!cached)
+ 		pool = heap->uncached_pools[order_to_index(order)];
+ 	else
+ 		pool = heap->cached_pools[order_to_index(order)];
+ 
+-	page = ion_page_pool_alloc(pool);
++	page = ion_page_pool_alloc(pool, &from_pool);
++
++	if (!from_pool && !ion_buffer_cached(buffer))
++		ion_pages_sync_for_device(page, PAGE_SIZE << order,
++					  DMA_BIDIRECTIONAL);
+ 
+ 	return page;
+ }
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.8.5.2
+
+
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
