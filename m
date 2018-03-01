@@ -1,114 +1,71 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 1 Mar 2018 18:26:49 +0530
-Subject: [PATCH v5 2/3] dmaengine: mediatek: Add MediaTek High-Speed DMA
- controller for MT7622 and MT7623 SoC
-In-Reply-To: <1519900021.8089.136.camel@mtkswgap22>
-References: <cover.1518857746.git.sean.wang@mediatek.com>
- <de4177cb2269c99f8d7c5738ac8a64f512122dfd.1518857747.git.sean.wang@mediatek.com>
- <20180301082329.GD15443@localhost>
- <1519900021.8089.136.camel@mtkswgap22>
-Message-ID: <20180301125649.GH15443@localhost>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Thu,  1 Mar 2018 20:53:37 +0800
+Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
+Message-ID: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 06:27:01PM +0800, Sean Wang wrote:
-> On Thu, 2018-03-01 at 13:53 +0530, Vinod Koul wrote:
-> > On Sun, Feb 18, 2018 at 03:08:30AM +0800, sean.wang at mediatek.com wrote:
-> > 
-> > > @@ -0,0 +1,1054 @@
-> > > +// SPDX-License-Identifier: GPL-2.0
-> > // Copyright ...
-> > 
-> > The copyright line needs to follow SPDX tag line
-> > 
-> 
-> okay, I will make it reorder and be something like that
-> 
-> // SPDX-License-Identifier: GPL-2.0
-> /*
->  * Copyright (c) 2017-2018 MediaTek Inc.
->  * Author: Sean Wang <sean.wang@mediatek.com>
->  *
->  * Driver for MediaTek High-Speed DMA Controller
->  *
->  */
+Hi All,
 
-It needs to be:
+Resent without non-upstream patches.
 
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2017-2018 MediaTek Inc.
+This backport patchset fixed the spectre issue, it's original branch:
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+A few dependency or fixingpatches are also picked up, if they are necessary
+ and no functional changes.
 
-/*
- * whatever else you want
- */
+No bug found from kernelci.org and lkft testing. It also could be gotten from:
 
-The first two lines are in C99 style comment and need to have SPDX tag and
-Copyright info
+git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
 
-> the point is I learned from other subsystem makes the driver name be
-> same with the module name with KBUILD_MODNAME.
-> 
-> If you really don't like it, I can just change it into 
-> 
-> #define MTK_DMA_DEV "mtk-hsdma"
+Comments are appreciated!
 
-It is used only once, why not use KBUILD_MODNAME directly?
+Regards
+Alex
 
-> 
-> > > +
-> > > +#define MTK_HSDMA_USEC_POLL		20
-> > > +#define MTK_HSDMA_TIMEOUT_POLL		200000
-> > > +#define MTK_HSDMA_DMA_BUSWIDTHS		BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED)
-> > 
-> > Undefined buswidth??
 
-??
-
-> > > +/**
-> > > + * struct mtk_hsdma_pdesc - This is the struct holding info describing physical
-> > > + *			    descriptor (PD) and its placement must be kept at
-> > > + *			    4-bytes alignment in little endian order.
-> > > + * @desc[1-4]:		    The control pad used to indicate hardware how to
-> > 
-> > pls align to 80char or lesser
-> > 
-> 
-> weird, it seems the line is already with 80 char and pass the
-> checkpatch.pl. or do I misunderstand something ?
-
-Okay please check. With text it helps to wrap before that
-
-> > > +	/*
-> > > +	 * Updating into hardware the pointer of TX ring lets HSDMA to take
-> > > +	 * action for those pending PDs.
-> > > +	 */
-> > > +	mtk_dma_write(hsdma, MTK_HSDMA_TX_CPU, ring->cur_tptr);
-> > > +
-> > > +	spin_unlock_irqrestore(&hsdma->lock, flags);
-> > > +
-> > > +	return !hvd->len ? 0 : -ENOSPC;
-> > 
-> > you already wrote and started txn, so why this?
-> > 
-> 
-> it's possible just partial virtual descriptor fits into hardware and
-> then return -ENOSPC. And it will start it to complete the remaining part
-> as soon as possible when some rooms is being freed.
-
-Either ways you have issued the descriptor, so you succeed right?
-
-> > shouldn't we check if next is in range, we can crash if we get bad value
-> > from hardware..
-> 
-> okay, there are checks for next with ddone bit check and null check in
-> the corresponding descriptor as the following.
-
-what if you get bad next value
-
-> 
-> > > +		rxd = &pc->ring.rxd[next];
-
-resulting in bad ref here
-
--- 
-~Vinod
+[PATCH 01/45] mm: Introduce lm_alias
+[PATCH 02/45] arm64: alternatives: apply boot time fixups via the
+[PATCH 03/45] arm64: barrier: Add CSDB macros to control data-value
+[PATCH 04/45] arm64: Implement array_index_mask_nospec()
+[PATCH 05/45] arm64: move TASK_* definitions to <asm/processor.h>
+[PATCH 06/45] arm64: Factor out PAN enabling/disabling into separate
+[PATCH 07/45] arm64: Factor out TTBR0_EL1 post-update workaround into
+[PATCH 08/45] arm64: uaccess: consistently check object sizes
+[PATCH 09/45] arm64: Make USER_DS an inclusive limit
+[PATCH 10/45] arm64: Use pointer masking to limit uaccess speculation
+[PATCH 11/45] arm64: syscallno is secretly an int, make it official
+[PATCH 12/45] arm64: entry: Ensure branch through syscall table is
+[PATCH 13/45] arm64: uaccess: Prevent speculative use of the current
+[PATCH 14/45] arm64: uaccess: Don't bother eliding access_ok checks
+[PATCH 15/45] arm64: uaccess: Mask __user pointers for __arch_{clear,
+[PATCH 16/45] arm64: futex: Mask __user pointers prior to dereference
+[PATCH 17/45] drivers/firmware: Expose psci_get_version through
+[PATCH 18/45] arm64: cpufeature: __this_cpu_has_cap() shouldn't stop
+[PATCH 19/45] arm64: cpu_errata: Allow an erratum to be match for all
+[PATCH 20/45] arm64: Run enable method for errata work arounds on
+[PATCH 21/45] arm64: cpufeature: Pass capability structure to
+[PATCH 22/45] arm64: Move post_ttbr_update_workaround to C code
+[PATCH 23/45] arm64: Add skeleton to harden the branch predictor
+[PATCH 24/45] arm64: Move BP hardening to check_and_switch_context
+[PATCH 25/45] arm64: KVM: Use per-CPU vector when BP hardening is
+[PATCH 26/45] arm64: entry: Apply BP hardening for high-priority
+[PATCH 27/45] arm64: entry: Apply BP hardening for suspicious
+[PATCH 28/45] arm64: cputype: Add missing MIDR values for Cortex-A72
+[PATCH 29/45] arm64: Implement branch predictor hardening for
+[PATCH 30/45] arm64: KVM: Increment PC after handling an SMC trap
+[PATCH 31/45] arm/arm64: KVM: Consolidate the PSCI include files
+[PATCH 32/45] arm/arm64: KVM: Add PSCI_VERSION helper
+[PATCH 33/45] arm/arm64: KVM: Add smccc accessors to PSCI code
+[PATCH 34/45] arm/arm64: KVM: Implement PSCI 1.0 support
+[PATCH 35/45] arm/arm64: KVM: Advertise SMCCC v1.1
+[PATCH 36/45] arm64: KVM: Make PSCI_VERSION a fast path
+[PATCH 37/45] arm/arm64: KVM: Turn kvm_psci_version into a static
+[PATCH 38/45] arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP hardening
+[PATCH 39/45] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+[PATCH 40/45] firmware/psci: Expose PSCI conduit
+[PATCH 41/45] firmware/psci: Expose SMCCC version through psci_ops
+[PATCH 42/45] arm/arm64: smccc: Make function identifiers an unsigned
+[PATCH 43/45] arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
+[PATCH 44/45] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+[PATCH 45/45] arm64: Kill PSCI_GET_VERSION as a variant-2 workaround
