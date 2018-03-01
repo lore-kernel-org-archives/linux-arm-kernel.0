@@ -1,108 +1,122 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 1 Mar 2018 16:16:25 +0900
-Subject: [RFC PATCH v2 00/12] Rewrite asm-generic/bitops/{atomic,lock}.h
- and use on arm64
-In-Reply-To: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
-References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAK7LNATktPPTHDDhS0i=3o8p=XoVXBJ1KB+3VmDp_iqn239Z8g@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 1 Mar 2018 15:43:03 +0800
+Subject: [PATCH v2 4/4] pintcrl: support bias-disable of generic and
+ special pins simultaneously
+In-Reply-To: <1519876072.23198.17.camel@mhfsdcap03>
+References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1519634042-12063-5-git-send-email-zhiyong.tao@mediatek.com>
+ <1519803217.8089.31.camel@mtkswgap22> <1519804157.23198.9.camel@mhfsdcap03>
+ <1519876072.23198.17.camel@mhfsdcap03>
+Message-ID: <1519890183.8089.114.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-27 0:04 GMT+09:00 Will Deacon <will.deacon@arm.com>:
-> Hi everyone,
->
-> This is version two of the RFC I previously posted here:
->
->   https://www.spinics.net/lists/arm-kernel/msg634719.html
->
-> Changes since v1 include:
->
->   * Fixed __clear_bit_unlock to work on archs with lock-based atomics
->   * Moved lock ops into bitops/lock.h
->   * Fixed build breakage on lesser-spotted architectures
->
-> Trying to fix the circular #includes introduced by pulling atomic.h
-> into btops/lock.h has been driving me insane. I've ended up moving some
-> basic BIT definitions into bits.h, but this might all be better in
-> const.h which is being proposed by Masahiro. Feedback is especially
-> welcome on this part.
+On Thu, 2018-03-01 at 11:47 +0800, Zhiyong Tao wrote:
+> On Wed, 2018-02-28 at 15:49 +0800, Zhiyong Tao wrote:
+> > On Wed, 2018-02-28 at 15:33 +0800, Sean Wang wrote:
+> > > On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
+> > > > For generic pins, parameter "arg" is 0 or 1.
+> > > > For special pins, bias-disable is set by R0R1,
+> > > > so we need transmited "00" to set bias-disable
+> > > > When we set "bias-disable" as high-z property,
+> > > > the parameter should be "MTK_PUPD_SET_R1R0_00".
+> > > > 
+> > > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > > > ---
+> > > >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 13 +++++++++++--
+> > > >  1 file changed, 11 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > > index 3cf384f..e88ba04 100644
+> > > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > > > @@ -301,8 +301,17 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+> > > >  	 * resistor bit, so we need this special handle.
+> > > >  	 */
+> > > >  	if (pctl->devdata->spec_pull_set) {
+> > > > -		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+> > > > -			pin, pctl->devdata->port_align, isup, arg);
+> > > > +		if (enable) {
+> > > > +			ret = pctl->devdata->spec_pull_set(
+> > > > +				mtk_get_regmap(pctl, pin), pin,
+> > > > +				pctl->devdata->port_align, isup,
+> > > > +				arg);
+> > > > +		} else {
+> > > > +			ret = pctl->devdata->spec_pull_set(
+> > > > +				mtk_get_regmap(pctl, pin), pin,
+> > > > +				pctl->devdata->port_align, isup,
+> > > > +				MTK_PUPD_SET_R1R0_00);
+> > > > +		}
+> > > 
+> > > 
+> > > it looks like you can use as following snippet with reusing original
+> > > logic and less effort on maintaining these common code (?)
+> > ==> Thanks for your suggestion very much. It seems better.
+> > I will change it in v3.
+> 
+> ==>
+>  Hi sean,
+> 
+> we try it in our site. we can't change like this.
+> Because we will check "arg" after setting "arg = MTK_PUPD_SET_R1R0_00;".
+> following snippet which check "arg" value is o or 1. If it not, which
+> will print error. so we can't change like this.
+> /* For generic pull config, default arg value should be 0 or 1. */
+> if (arg != 0 && arg != 1) {
+> 	dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n", arg,
+> pin);
+> 	return -EINVAL;
+> }
+> 
+> Thanks.
 
+why not rewrite it with
 
-Info for reviewers:
+@@ -301,8 +301,10 @@ static int mtk_pconf_set_pull_select(struct
+mtk_pinctrl *pctl,
+         * resistor bit, so we need this special handle.
+         */
+        if (pctl->devdata->spec_pull_set) {
++               unsigned int r1r0 = enable ? arg : MTK_PUPD_SET_R1R0_00;
++
+                ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl,
+pin),
+-                       pin, pctl->devdata->port_align, isup, arg);
++                       pin, pctl->devdata->port_align, isup, r1r0);
+                if (!ret)
+                        return 0;
+        }
 
-You can see my patches at the following:
+and also I appeared to find another bug in the original code when I had
+a close look at the code path, but it's not related to the patch: 
 
-1/5: https://patchwork.kernel.org/patch/10235457/
-2/5: https://patchwork.kernel.org/patch/10235461/
-3/5: https://patchwork.kernel.org/patch/10235463/
-4/5: https://patchwork.kernel.org/patch/10235469/
-5/5: https://patchwork.kernel.org/patch/10235471/
+a special pin would still go through the code path to handle
+generic pin when the special pin uses an invalid argument.
 
+It looks like err-code from pctl->devdata->spec_pull_set cannot be
+used directly to judge its pin type. It's also possible to use it as an
+indication of the real failure during special pin is being set up.
 
-5/5 has conflict with Will's 2/12.
-
-Fortunately, it is at the tail of the series.
-It is easy to pick/drop/change
-when we decide how to organize it.
-
-
-
-
-
-
-
-
-> I've not bothered optimising for the case of a 64-bit, big-endian
-> architecture that uses the generic implementation of atomic64_t because
-> it's both messy and hypothetical. The code here should still work
-> correctly for that case, it just sucks (as does the implementation
-> currently in mainline).
->
-> Cheers,
->
-> Will
->
-> --->8
->
-> Will Deacon (12):
->   h8300: Don't include linux/kernel.h in asm/atomic.h
->   m68k: Don't use asm-generic/bitops/lock.h
->   asm-generic: Move some macros from linux/bitops.h to a new bits.h file
->   openrisc: Don't pull in all of linux/bitops.h in asm/cmpxchg.h
->   sh: Don't pull in all of linux/bitops.h in asm/cmpxchg-xchg.h
->   arm64: fpsimd: include <linux/init.h> in fpsimd.h
->   arm64: lse: Include compiler_types.h and export.h for out-of-line
->     LL/SC
->   arm64: cmpxchg: Include build_bug.h instead of bug.h for BUILD_BUG
->   asm-generic/bitops/atomic.h: Rewrite using atomic_fetch_*
->   asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*
->   arm64: Replace our atomic/lock bitop implementations with asm-generic
->   arm64: bitops: Include <asm-generic/bitops/ext2-atomic-setbit.h>
->
->  arch/arm64/include/asm/bitops.h     |  21 +---
->  arch/arm64/include/asm/cmpxchg.h    |   2 +-
->  arch/arm64/include/asm/fpsimd.h     |   1 +
->  arch/arm64/include/asm/lse.h        |   2 +
->  arch/arm64/lib/Makefile             |   2 +-
->  arch/arm64/lib/bitops.S             |  76 ---------------
->  arch/h8300/include/asm/atomic.h     |   4 +-
->  arch/m68k/include/asm/bitops.h      |   6 +-
->  arch/openrisc/include/asm/cmpxchg.h |   3 +-
->  arch/sh/include/asm/cmpxchg-xchg.h  |   3 +-
->  include/asm-generic/bitops/atomic.h | 188 +++++++-----------------------------
->  include/asm-generic/bitops/lock.h   |  68 ++++++++++---
->  include/asm-generic/bits.h          |  26 +++++
->  include/linux/bitops.h              |  22 +----
->  14 files changed, 135 insertions(+), 289 deletions(-)
->  delete mode 100644 arch/arm64/lib/bitops.S
->  create mode 100644 include/asm-generic/bits.h
->
-> --
-> 2.1.4
->
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> > > 
+> > > 
+> > > if (pctl->devdata->spec_pull_set) {
+> > > 	+ if (!enable)
+> > > 	+ 	arg = MTK_PUPD_SET_R1R0_00;
+> > > 
+> > > 	ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+> > > 		pin, pctl->devdata->port_align, isup, arg);
+> > > 
+> > > 
+> > > Also, it's better to add more comments to such kind of special path for
+> > > allowing future SoCs to follow and extend more easily.
+> > 
+> > ==> Thanks for your suggestion very much. I will add more comments here.
+> > > 
+> > > >  		if (!ret)
+> > > >  			return 0;
+> > > >  	}
+> > > 
+> > > 
+> > 
+> 
+> 
