@@ -1,167 +1,133 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 1 Mar 2018 22:59:44 +0530
-Subject: [PATCH v3 04/10] pinctrl: actions: Add Actions S900 pinctrl driver
-In-Reply-To: <CAHp75VchzV9SZb4g0fVP9aoKb7actsehXm8c4wsvVGASgkOc+w@mail.gmail.com>
-References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
- <20180228181432.26847-5-manivannan.sadhasivam@linaro.org>
- <CAHp75VchzV9SZb4g0fVP9aoKb7actsehXm8c4wsvVGASgkOc+w@mail.gmail.com>
-Message-ID: <20180301172943.cuypepvflte2cynr@linaro.org>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 1 Mar 2018 18:35:20 +0100
+Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
+ register clock
+In-Reply-To: <20180228143553.12485-1-gregory.clement@bootlin.com>
+References: <20180228143553.12485-1-gregory.clement@bootlin.com>
+Message-ID: <20180301183520.4251439a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi Greg,
 
-On Wed, Feb 28, 2018 at 08:36:53PM +0200, Andy Shevchenko wrote:
-> On Wed, Feb 28, 2018 at 8:14 PM, Manivannan Sadhasivam
-> <manivannan.sadhasivam@linaro.org> wrote:
-> > Add pinctrl driver for Actions Semi S900 SoC. The driver supports
-> > pinctrl, pinmux and pinconf functionalities through a range of registers
-> > common to both gpio driver and pinctrl driver.
-> >
-> > Pinmux functionality is available only for the pin groups while the
-> > pinconf functionality is available for both pin groups and individual
-> > pins.
-> 
-> > +static int owl_set_mux(struct pinctrl_dev *pctrldev,
-> > +                               unsigned int function,
-> > +                               unsigned int group)
-> > +{
-> 
-> > +       mfpval = readl(pctrl->base + g->mfpctl_reg);
-> > +       mfpval &= ~mask;
-> > +       mfpval |= val;
-> > +       writel(mfpval, pctrl->base + g->mfpctl_reg);
-> 
-> This is called owl_update_bits().
->
+On Wed, 28 Feb 2018 15:35:53 +0100
+Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-Okay. Will add a helper.
- 
-> > +static int owl_pin_config_set(struct pinctrl_dev *pctrldev,
-> > +                               unsigned int pin,
-> > +                               unsigned long *configs,
-> > +                               unsigned int num_configs)
-> > +{
+> On Armada 7K/8K we need to explicitly enable the register clock. This
+> clock is optional because not all the SoCs using this IP need it but at
+> least for Armada 7K/8K it is actually mandatory.
 > 
-> > +       int ret = 0;
+> The binding documentation is updated accordingly.
 > 
-> Redundant assignment?
->
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
+>  drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
+>  2 files changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> index c08fb477b3c6..4ee9813bf88f 100644
+> --- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> @@ -14,7 +14,11 @@ Required properties:
+>  - #address-cells: shall be set to 1. Encode the NAND CS.
+>  - #size-cells: shall be set to 0.
+>  - interrupts: shall define the NAND controller interrupt.
+> -- clocks: shall reference the NAND controller clock.
+> +- clocks: shall reference the NAND controller clocks, the second one is
+> +  optional but needed for the Armada 7K/8K SoCs
+> +- clock-names: mandatory if there is a second clock, in this case the
+> +   name must be "core" for the first clock and "reg" for the second
+> +   one
 
-Ack.
- 
-> > +               mask = (1 << width) - 1;
-> > +               mask = mask << bit;
-> > +               tmp = readl(pctrl->base + reg);
-> > +               tmp &= ~mask;
-> > +               tmp |= arg << bit;
-> > +               writel(tmp, pctrl->base + reg);
-> 
-> This is called owl_update_bits().
->
+Hm, not sure this is a good idea to impose a specific order. I know you
+do that to avoid changing the code requesting the core clk, but I'd
+prefer to have a solution where we first search for a clock named
+"core" (devm_clk_get(&pdev->dev, "core")), and if it's missing,
+fall back to devm_clk_get(&pdev->dev, NULL).
 
-Ack.
+>  - marvell,system-controller: Set to retrieve the syscon node that handles
+>    NAND controller related registers (only required with the
+>    "marvell,armada-8k-nand[-controller]" compatibles).
+> diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
+> index 2196f2a233d6..be874c636b5f 100644
+> --- a/drivers/mtd/nand/marvell_nand.c
+> +++ b/drivers/mtd/nand/marvell_nand.c
+> @@ -321,6 +321,7 @@ struct marvell_nfc {
+>  	struct device *dev;
+>  	void __iomem *regs;
+>  	struct clk *ecc_clk;
+> +	struct clk *reg_clk;
+>  	struct completion complete;
+>  	unsigned long assigned_cs;
+>  	struct list_head chips;
+> @@ -2747,6 +2748,17 @@ static int marvell_nfc_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> +	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
 
-> > +}
-> 
-> > +static int owl_group_pinconf_val2arg(const struct owl_pingroup *g,
-> > +                               unsigned int param,
-> > +                               u32 *arg)
-> > +{
-> 
-> > +       case PIN_CONFIG_SLEW_RATE:
-> > +               if (*arg)
-> > +                       *arg = 1;
-> > +               else
-> > +                       *arg = 0;
-> 
-> Doesn't slew rate allow a non-binary value?
->
+Can we move that before the "core" clock (which for some unknown reason
+is called ecc_clk in the driver) is prepared, so that you don't have to
+call clk_disable_unprepare() here.
 
-As stated in the binding doc, valid values for the slew rate parameter are:
+> +	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) == -EPROBE_DEFER) {
+> +		clk_disable_unprepare(nfc->ecc_clk);
+> +		return -EPROBE_DEFER;
+> +	}
 
-0 - Slow
-1 - Fast
- 
-> > +       return 0;
-> > +}
-> > +
-> > +static int owl_group_config_get(struct pinctrl_dev *pctrldev,
-> > +                               unsigned int group,
-> > +                               unsigned long *config)
-> > +{
-> > +       int ret = 0;
-> 
-> Redundant assignment.
-> 
+Why not:
 
-Ack.
+	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) != -ENOENT)
+		return PTR_ERR(nfc->reg_clk);
 
-> > +}
-> 
-> > +static int owl_group_config_set(struct pinctrl_dev *pctrldev,
-> > +                               unsigned int group,
-> > +                               unsigned long *configs,
-> > +                               unsigned int num_configs)
-> > +{
-> > +       int ret = 0;
-> 
-> Redundant assignment, see below.
->
+?
 
-Ack. Will return 0 directly.
- 
-> > +               mask = (1 << width) - 1;
-> > +               mask = mask << bit;
-> > +               tmp = readl(pctrl->base + reg);
-> > +               tmp &= ~mask;
-> > +               tmp |= arg << bit;
-> > +               writel(tmp, pctrl->base + reg);
-> 
-> This is called owl_update_bits().
->
+AFAIR, if the clk is not defined, ENOENT is returned, and you want to
+propagate all error codes, not only EPROBE_DEFER otherwise.
 
-Ack.
- 
-> > +       return ret;
-> 
-> return 0; ?
-> 
+Another solution would be to retrieve the reg clk only on platforms
+that need it (based on the compatible). This way you won't have to test
+for -ENOENT and could simply propagate the error to the upper layer.
 
-Okay.
+> +	if (!IS_ERR(nfc->reg_clk)) {
+> +		ret = clk_prepare_enable(nfc->reg_clk);
+> +		if (ret)
+> +			goto unprepare_clk;
 
-> > +}
-> 
-> > +int owl_pinctrl_probe(struct platform_device *pdev,
-> > +                               struct owl_pinctrl_soc_data *soc_data)
-> > +{
-> 
-> > +       clk_prepare_enable(pctrl->clk);
-> 
-> This can fail.
->
+This is wrong: you've put a clk_disable_unprepare(nfc->reg_clk) call in
+the unprepare_clk path, which means you'll disable/unprepare a clk that
+has not been successfully prepared/enabled => unbalanced refcounting.
 
-Okay. Will add a check.
- 
-> > +}
-> 
-> > +static const struct of_device_id s900_pinctrl_of_match[] = {
-> > +       { .compatible = "actions,s900-pinctrl", },
-> 
-> > +       { },
-> 
-> No comma needed.
->
+Please define a new label and rename the old one.
 
-Okay.
-
-Thanks for the review.
+> +	}
+> +
+>  	marvell_nfc_disable_int(nfc, NDCR_ALL_INT);
+>  	marvell_nfc_clear_int(nfc, NDCR_ALL_INT);
+>  	ret = devm_request_irq(dev, irq, marvell_nfc_isr,
+> @@ -2780,6 +2792,7 @@ static int marvell_nfc_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  unprepare_clk:
+> +	clk_disable_unprepare(nfc->reg_clk);
+>  	clk_disable_unprepare(nfc->ecc_clk);
+>  
+>  	return ret;
+> @@ -2797,6 +2810,7 @@ static int marvell_nfc_remove(struct platform_device *pdev)
+>  	}
+>  
+>  	clk_disable_unprepare(nfc->ecc_clk);
+> +	clk_disable_unprepare(nfc->reg_clk);
+>  
+>  	return 0;
+>  }
 
 Regards,
-Mani
- 
-> > +};
-> 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
+
+Boris
+
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
