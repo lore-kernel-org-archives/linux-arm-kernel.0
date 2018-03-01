@@ -1,62 +1,37 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  1 Mar 2018 18:18:35 +0800
-Subject: [RESEND PATCH v6 12/14] iommu/rockchip: Fix error handling in init
-In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180301101837.27969-13-jeffy.chen@rock-chips.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 1 Mar 2018 13:20:31 +0300
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+In-Reply-To: <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+ <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
+ <20180228132707.mgunezg5o4lul7x5@verge.net.au>
+ <f9574ea2-d8ee-7c9f-b850-874074eddad2@cogentembedded.com>
+ <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
+Message-ID: <f1d4c67d-ba1e-9db2-2a60-400d89292dc0@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's hard to undo bus_set_iommu() in the error path, so move it to the
-end of rk_iommu_probe().
+Hello!
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
+On 03/01/2018 12:54 PM, Simon Horman wrote:
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2:
-Move bus_set_iommu() to rk_iommu_probe().
+>>>>> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+>>>>> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+>>>>> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+>>>>> output (we're omitting the LVDS decoder for now). These patches depend on
+>>>>> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+>>>>
+>>>>    Need to mention that the DU driver silently fails to probe now. I do
+>>>>    hope that this is not due to my updates. :-)
+>>>
+>>> Please test that theory.
+>>
+>>    Yeah, after sucking in the recent versions of the DU/LVDS patches and uncommenting
+>> and fixing rejects in a couple patches here, the graphical console works again. :-)
+> 
+> Ok, but does this patchset cause a regression? If so it seems
+> that we should wait for driver updates before applying it.
 
- drivers/iommu/rockchip-iommu.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+   Yes, we'll have to wait at this point...
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 1346bbb8a3e7..2448a0528e39 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -1133,6 +1133,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (!dma_dev)
- 		dma_dev = &pdev->dev;
- 
-+	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
-+
- 	return 0;
- err_remove_sysfs:
- 	iommu_device_sysfs_remove(&iommu->iommu);
-@@ -1158,19 +1160,6 @@ static struct platform_driver rk_iommu_driver = {
- 
- static int __init rk_iommu_init(void)
- {
--	struct device_node *np;
--	int ret;
--
--	np = of_find_matching_node(NULL, rk_iommu_dt_ids);
--	if (!np)
--		return 0;
--
--	of_node_put(np);
--
--	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
--	if (ret)
--		return ret;
--
- 	return platform_driver_register(&rk_iommu_driver);
- }
- subsys_initcall(rk_iommu_init);
--- 
-2.11.0
+MBR, Sergei
