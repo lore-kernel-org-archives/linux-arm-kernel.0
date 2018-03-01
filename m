@@ -1,234 +1,96 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:37 +0000
-Subject: [PATCH v5 22/23] arm64: KVM: Allow mapping of vectors outside of the
- RAM region
+Date: Thu,  1 Mar 2018 15:55:34 +0000
+Subject: [PATCH v5 19/23] arm64: KVM: Allow far branches from vector slots to
+ the main vectors
 In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
 References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-23-marc.zyngier@arm.com>
+Message-ID: <20180301155538.26860-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're now ready to map our vectors in weird and wonderful locations.
-On enabling ARM64_HARDEN_EL2_VECTORS, a vector slots gets allocated
-if this hasn't been already done via ARM64_HARDEN_BRANCH_PREDICTOR
-and gets mapped outside of the normal RAM region, next to the
-idmap.
+So far, the branch from the vector slots to the main vectors can at
+most be 4GB from the main vectors (the reach of ADRP), and this
+distance is known at compile time. If we were to remap the slots
+to an unrelated VA, things would break badly.
 
-That way, being able to obtain VBAR_EL2 doesn't reveal the mapping
-of the rest of the hypervisor code.
+A way to achieve VA independence would be to load the absolute
+address of the vectors (__kvm_hyp_vector), either using a constant
+pool or a series of movs, followed by an indirect branch.
+
+This patches implements the latter solution, using another instance
+of a patching callback.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/arm64/memory.txt   |  3 +-
- arch/arm64/Kconfig               | 16 ++++++++
- arch/arm64/include/asm/kvm_mmu.h | 81 ++++++++++++++++++++++++++++++++++------
- arch/arm64/include/asm/mmu.h     |  5 ++-
- arch/arm64/kernel/Makefile       |  4 +-
- arch/arm64/kvm/va_layout.c       |  3 ++
- 6 files changed, 96 insertions(+), 16 deletions(-)
+ arch/arm64/kernel/bpi.S    | 11 ++++++++++-
+ arch/arm64/kvm/va_layout.c | 27 +++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index c58cc5dbe667..c5dab30d3389 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -90,7 +90,8 @@ When using KVM without the Virtualization Host Extensions, the
- hypervisor maps kernel pages in EL2 at a fixed (and potentially
- random) offset from the linear mapping. See the kern_hyp_va macro and
- kvm_update_va_mask function for more details. MMIO devices such as
--GICv2 gets mapped next to the HYP idmap page.
-+GICv2 gets mapped next to the HYP idmap page, as do vectors when
-+ARM64_HARDEN_EL2_VECTORS is selected for particular CPUs.
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index e000cb390618..e8d997788ad0 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -19,6 +19,9 @@
+ #include <linux/linkage.h>
+ #include <linux/arm-smccc.h>
  
- When using KVM with the Virtualization Host Extensions, no additional
- mappings are created, since the host kernel runs directly in EL2.
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb7ef8e..e6be4393aaad 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -904,6 +904,22 @@ config HARDEN_BRANCH_PREDICTOR
- 
- 	  If unsure, say Y.
- 
-+config HARDEN_EL2_VECTORS
-+	bool "Harden EL2 vector mapping against system register leak" if EXPERT
-+	default y
-+	help
-+	  Speculation attacks against some high-performance processors can
-+	  be used to leak privileged information such as the vector base
-+	  register, resulting in a potential defeat of the EL2 layout
-+	  randomization.
++#include <asm/alternative.h>
++#include <asm/kvm_mmu.h>
 +
-+	  This config option will map the vectors to a fixed location,
-+	  independent of the EL2 code mapping, so that revealing VBAR_EL2
-+	  to an attacker does no give away any extra information. This
-+	  only gets enabled on affected CPUs.
-+
-+	  If unsure, say Y.
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 3da9e5aea936..433d13d0c271 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -360,33 +360,90 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
- }
+ .macro hyp_ventry offset
+ 	.align 7
+ 	.rept 29
+@@ -64,9 +67,15 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.endr
  
--#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
-+     defined(CONFIG_HARDEN_EL2_VECTORS))
-+/*
-+ * EL2 vectors can be mapped and rerouted in a number of ways,
-+ * depending on the kernel configuration and CPU present:
-+ *
-+ * - If the CPU has the ARM64_HARDEN_BRANCH_PREDICTOR cap, the
-+ *   hardening sequence is placed in one of the vector slots, which is
-+ *   executed before jumping to the real vectors.
-+ *
-+ * - If the CPU has both the ARM64_HARDEN_EL2_VECTORS and BP
-+ *   hardening, the slot containing the hardening sequence is mapped
-+ *   next to the idmap page, and executed before jumping to the real
-+ *   vectors.
-+ *
-+ * - If the CPU only has ARM64_HARDEN_EL2_VECTORS, then an empty slot
-+ *   is selected, mapped next to the idmap page, and executed before
-+ *   jumping to the real vectors.
-+ *
-+ * Note that ARM64_HARDEN_EL2_VECTORS is somewhat incompatible with
-+ * VHE, as we don't have hypervisor-specific mappings. If the system
-+ * is VHE and yet selects this capability, it will be ignored.
-+ */
- #include <asm/mmu.h>
+ __kvm_enter_vectors:
++alternative_cb	kvm_patch_vector_branch
++	movz	x1, #0
++	movk	x1, #0, lsl #16
++	movk	x1, #0, lsl #32
++	movk	x1, #0, lsl #48
++alternative_cb_end
  
-+extern void *__kvm_bp_vect_base;
-+extern int __kvm_harden_el2_vector_slot;
-+
- static inline void *kvm_get_hyp_vector(void)
- {
- 	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
--	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
-+	int slot = -1;
-+
-+	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn)
-+		slot = data->hyp_vectors_slot;
-+
-+	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS) &&
-+	    !has_vhe() && slot == -1)
-+		slot = __kvm_harden_el2_vector_slot;
+-	adr_l	x1, __kvm_hyp_vector
+ 	add	x0, x1, x0
++	kern_hyp_va x0
+ 	br	x0
+ ENTRY(__bp_harden_hyp_vecs_end)
  
--	if (data->fn) {
--		vect = __bp_harden_hyp_vecs_start +
--		       data->hyp_vectors_slot * SZ_2K;
-+	if (slot != -1) {
-+		void *vect;
- 
- 		if (!has_vhe())
--			vect = lm_alias(vect);
-+			vect = __kvm_bp_vect_base;
-+		else
-+			vect = __bp_harden_hyp_vecs_start;
-+		vect += slot * SZ_2K;
-+
-+		return vect;
- 	}
- 
--	vect = kern_hyp_va(vect);
--	return vect;
-+	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
- }
- 
-+/*  This is only called on a !VHE system */
- static inline int kvm_map_vectors(void)
- {
--	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
--				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
--				   PAGE_HYP_EXEC);
--}
-+	phys_addr_t vect_pa = virt_to_phys(__bp_harden_hyp_vecs_start);
-+	unsigned long size = __bp_harden_hyp_vecs_end - __bp_harden_hyp_vecs_start;
-+
-+	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR)) {
-+		int ret;
-+
-+		ret = create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
-+					  kvm_ksym_ref(__bp_harden_hyp_vecs_end),
-+					  PAGE_HYP_EXEC);
-+
-+		if (ret)
-+			return ret;
-+
-+		__kvm_bp_vect_base = kvm_ksym_ref(__bp_harden_hyp_vecs_start);
-+		__kvm_bp_vect_base = kern_hyp_va(__kvm_bp_vect_base);
-+	}
-+
-+	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
-+		__kvm_harden_el2_vector_slot = atomic_inc_return(&arm64_el2_vector_last_slot);
-+		BUG_ON(__kvm_harden_el2_vector_slot >= BP_HARDEN_EL2_SLOTS);
-+		return create_hyp_exec_mappings(vect_pa, size,
-+						&__kvm_bp_vect_base);
-+	}
- 
-+	return 0;
-+}
- #else
- static inline void *kvm_get_hyp_vector(void)
- {
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 3baf010fe883..0b0cc69031c1 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -51,10 +51,12 @@ struct bp_hardening_data {
- 	bp_hardening_cb_t	fn;
- };
- 
--#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
-+     defined(CONFIG_HARDEN_EL2_VECTORS))
- extern char __bp_harden_hyp_vecs_start[], __bp_harden_hyp_vecs_end[];
- extern atomic_t arm64_el2_vector_last_slot;
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- DECLARE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
-@@ -81,6 +83,7 @@ static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
- 
- static inline void arm64_apply_bp_hardening(void)	{ }
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
-+#endif  /* CONFIG_HARDEN_BRANCH_PREDICTOR || CONFIG_HARDEN_EL2_VECTORS */
- 
- extern void paging_init(void);
- extern void bootmem_init(void);
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index b87541360f43..e7fc471c91a6 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -54,8 +54,8 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
- 
--ifeq ($(CONFIG_KVM),y)
--arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
-+ifneq ($(filter y,$(CONFIG_HARDEN_BRANCH_PREDICTOR) $(CONFIG_HARDEN_EL2_VECTORS)),)
-+arm64-obj-$(CONFIG_KVM)			+= bpi.o
- endif
- 
- obj-y					+= $(arm64-obj-y) vdso/ probes/
 diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-index 7ef3d920c8d4..5d17bb50287c 100644
+index a73e47804972..7ef3d920c8d4 100644
 --- a/arch/arm64/kvm/va_layout.c
 +++ b/arch/arm64/kvm/va_layout.c
-@@ -153,6 +153,9 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
+@@ -152,3 +152,30 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
+ 		updptr[i] = cpu_to_le32(insn);
  	}
  }
- 
-+void *__kvm_bp_vect_base;
-+int __kvm_harden_el2_vector_slot;
 +
- void kvm_patch_vector_branch(struct alt_instr *alt,
- 			     __le32 *origptr, __le32 *updptr, int nr_inst)
- {
++void kvm_patch_vector_branch(struct alt_instr *alt,
++			     __le32 *origptr, __le32 *updptr, int nr_inst)
++{
++	enum aarch64_insn_movewide_type type;
++	u64 addr;
++	u32 oinsn, rd;
++	int s;
++
++	BUG_ON(nr_inst != 4);
++
++	addr = (uintptr_t)kvm_ksym_ref(__kvm_hyp_vector);
++	oinsn = le32_to_cpu(origptr[0]);
++	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
++
++	type = AARCH64_INSN_MOVEWIDE_ZERO;
++	for (s = 0; nr_inst--; s += 16) {
++		u32 insn = aarch64_insn_gen_movewide(rd,
++						     (u16)(addr >> s),
++						     s,
++						     AARCH64_INSN_VARIANT_64BIT,
++						     type);
++		*updptr++ = cpu_to_le32(insn);
++		type = AARCH64_INSN_MOVEWIDE_KEEP;
++	}
++
++}
 -- 
 2.14.2
