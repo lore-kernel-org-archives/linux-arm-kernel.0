@@ -1,22 +1,21 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:20 +0800
-Subject: [PATCH 43/45] arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
+Date: Thu,  1 Mar 2018 20:54:17 +0800
+Subject: [PATCH 40/45] firmware/psci: Expose PSCI conduit
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-44-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-41-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit f2d3b2e8759a upstream.
+commit 09a8d6d48499 upstream.
 
-One of the major improvement of SMCCC v1.1 is that it only clobbers
-the first 4 registers, both on 32 and 64bit. This means that it
-becomes very easy to provide an inline version of the SMC call
-primitive, and avoid performing a function call to stash the
-registers that would otherwise be clobbered by SMCCC v1.0.
+In order to call into the firmware to apply workarounds, it is
+useful to find out whether we're using HVC or SMC. Let's expose
+this through the psci_ops.
 
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
@@ -24,159 +23,96 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- include/linux/arm-smccc.h | 141 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 141 insertions(+)
+ drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+ include/linux/psci.h    |  7 +++++++
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index dd44d84..a031897 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -150,5 +150,146 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 9a3ce76..a49196a 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+ 	return cpu == resident_cpu;
+ }
  
- #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
+-struct psci_operations psci_ops;
++struct psci_operations psci_ops = {
++	.conduit = PSCI_CONDUIT_NONE,
++};
  
-+/* SMCCC v1.1 implementation madness follows */
-+#ifdef CONFIG_ARM64
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+@@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+ 			      0, 0, 0);
+ }
+ 
++static void set_conduit(enum psci_conduit conduit)
++{
++	switch (conduit) {
++	case PSCI_CONDUIT_HVC:
++		invoke_psci_fn = __invoke_psci_fn_hvc;
++		break;
++	case PSCI_CONDUIT_SMC:
++		invoke_psci_fn = __invoke_psci_fn_smc;
++		break;
++	default:
++		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
++	}
 +
-+#define SMCCC_SMC_INST	"smc	#0"
-+#define SMCCC_HVC_INST	"hvc	#0"
++	psci_ops.conduit = conduit;
++}
 +
-+#elif defined(CONFIG_ARM)
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+ 	}
+ 
+ 	if (!strcmp("hvc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	} else if (!strcmp("smc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 	} else {
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 		return -EINVAL;
+@@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+ 	pr_info("probing for conduit method from ACPI.\n");
+ 
+ 	if (acpi_psci_use_hvc())
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	else
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 
+ 	return psci_probe();
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 6306ab1..66ff547 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+ int psci_cpu_init_idle(unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
+ 
++enum psci_conduit {
++	PSCI_CONDUIT_NONE,
++	PSCI_CONDUIT_SMC,
++	PSCI_CONDUIT_HVC,
++};
 +
-+#define SMCCC_SMC_INST	__SMC(0)
-+#define SMCCC_HVC_INST	__HVC(0)
-+
-+#endif
-+
-+#define ___count_args(_0, _1, _2, _3, _4, _5, _6, _7, _8, x, ...) x
-+
-+#define __count_args(...)						\
-+	___count_args(__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
-+
-+#define __constraint_write_0						\
-+	"+r" (r0), "=&r" (r1), "=&r" (r2), "=&r" (r3)
-+#define __constraint_write_1						\
-+	"+r" (r0), "+r" (r1), "=&r" (r2), "=&r" (r3)
-+#define __constraint_write_2						\
-+	"+r" (r0), "+r" (r1), "+r" (r2), "=&r" (r3)
-+#define __constraint_write_3						\
-+	"+r" (r0), "+r" (r1), "+r" (r2), "+r" (r3)
-+#define __constraint_write_4	__constraint_write_3
-+#define __constraint_write_5	__constraint_write_4
-+#define __constraint_write_6	__constraint_write_5
-+#define __constraint_write_7	__constraint_write_6
-+
-+#define __constraint_read_0
-+#define __constraint_read_1
-+#define __constraint_read_2
-+#define __constraint_read_3
-+#define __constraint_read_4	"r" (r4)
-+#define __constraint_read_5	__constraint_read_4, "r" (r5)
-+#define __constraint_read_6	__constraint_read_5, "r" (r6)
-+#define __constraint_read_7	__constraint_read_6, "r" (r7)
-+
-+#define __declare_arg_0(a0, res)					\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register unsigned long r1 asm("r1");				\
-+	register unsigned long r2 asm("r2");				\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_1(a0, a1, res)					\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register unsigned long r2 asm("r2");				\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_2(a0, a1, a2, res)				\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register typeof(a2)    r2 asm("r2") = a2;			\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_3(a0, a1, a2, a3, res)				\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register typeof(a2)    r2 asm("r2") = a2;			\
-+	register typeof(a3)    r3 asm("r3") = a3
-+
-+#define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
-+	__declare_arg_3(a0, a1, a2, a3, res);				\
-+	register typeof(a4) r4 asm("r4") = a4
-+
-+#define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
-+	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
-+	register typeof(a5) r5 asm("r5") = a5
-+
-+#define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
-+	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
-+	register typeof(a6) r6 asm("r6") = a6
-+
-+#define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
-+	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
-+	register typeof(a7) r7 asm("r7") = a7
-+
-+#define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
-+#define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
-+
-+#define ___constraints(count)						\
-+	: __constraint_write_ ## count					\
-+	: __constraint_read_ ## count					\
-+	: "memory"
-+#define __constraints(count)	___constraints(count)
-+
-+/*
-+ * We have an output list that is not necessarily used, and GCC feels
-+ * entitled to optimise the whole sequence away. "volatile" is what
-+ * makes it stick.
-+ */
-+#define __arm_smccc_1_1(inst, ...)					\
-+	do {								\
-+		__declare_args(__count_args(__VA_ARGS__), __VA_ARGS__);	\
-+		asm volatile(inst "\n"					\
-+			     __constraints(__count_args(__VA_ARGS__)));	\
-+		if (___res)						\
-+			*___res = (typeof(*___res)){r0, r1, r2, r3};	\
-+	} while (0)
-+
-+/*
-+ * arm_smccc_1_1_smc() - make an SMCCC v1.1 compliant SMC call
-+ *
-+ * This is a variadic macro taking one to eight source arguments, and
-+ * an optional return structure.
-+ *
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This macro is used to make SMC calls following SMC Calling Convention v1.1.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the SMC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the SMC instruction if not NULL.
-+ */
-+#define arm_smccc_1_1_smc(...)	__arm_smccc_1_1(SMCCC_SMC_INST, __VA_ARGS__)
-+
-+/*
-+ * arm_smccc_1_1_hvc() - make an SMCCC v1.1 compliant HVC call
-+ *
-+ * This is a variadic macro taking one to eight source arguments, and
-+ * an optional return structure.
-+ *
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This macro is used to make HVC calls following SMC Calling Convention v1.1.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the HVC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the HVC instruction if not NULL.
-+ */
-+#define arm_smccc_1_1_hvc(...)	__arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
-+
- #endif /*__ASSEMBLY__*/
- #endif /*__LINUX_ARM_SMCCC_H*/
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -34,6 +40,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	enum psci_conduit conduit;
+ };
+ 
+ extern struct psci_operations psci_ops;
 -- 
 2.7.4
