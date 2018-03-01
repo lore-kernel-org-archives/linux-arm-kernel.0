@@ -1,75 +1,74 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Thu, 1 Mar 2018 09:00:22 +0000
-Subject: [PATCH] drm/bridge/synopsys: dsi: readl_poll_timeout return value
- clean up
-In-Reply-To: <20180204213624.18288-1-philippe.cornu@st.com>
-References: <20180204213624.18288-1-philippe.cornu@st.com>
-Message-ID: <172e7f68-8f4b-7e5f-3e9f-7aaf10a51dc9@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 1 Mar 2018 10:06:28 +0100
+Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
+In-Reply-To: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit, Andrzej & Laurent,
+Hi Ludovic,
 
-May I ask you please your feedback on this small patch?
-Many thanks,
+On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> This patch serie adds support of stm32 SDMMC controller.
+> stm32h7 is the first SoC to use stm32 SDMMC controller
+> (previous SoC had pl180 controller).
 
-Philippe :-)
+I am a not convinced this isn't a new improved variant of the pl180.
+According to register layout and the code you submitted in patch2,
+there are great similarities to pl180 and the mmci driver.
 
-On 02/04/2018 10:36 PM, Philippe Cornu wrote:
-> The readl_poll_timeout() return value is 0 in case of success
-> so it is better to detect errors without taking care of the
-> return value sign.
-> 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
->   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index 65aeb3f78b48..4d0e8471a15c 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -342,7 +342,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->   	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   				 val, !(val & GEN_CMD_FULL), 1000,
->   				 CMD_PKT_STATUS_TIMEOUT_US);
-> -	if (ret < 0) {
-> +	if (ret) {
->   		dev_err(dsi->dev, "failed to get available command FIFO\n");
->   		return ret;
->   	}
-> @@ -353,7 +353,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->   	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   				 val, (val & mask) == mask,
->   				 1000, CMD_PKT_STATUS_TIMEOUT_US);
-> -	if (ret < 0) {
-> +	if (ret) {
->   		dev_err(dsi->dev, "failed to write command FIFO\n");
->   		return ret;
->   	}
-> @@ -385,7 +385,7 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
->   		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   					 val, !(val & GEN_PLD_W_FULL), 1000,
->   					 CMD_PKT_STATUS_TIMEOUT_US);
-> -		if (ret < 0) {
-> +		if (ret) {
->   			dev_err(dsi->dev,
->   				"failed to get available write payload FIFO\n");
->   			return ret;
-> @@ -716,13 +716,13 @@ static void dw_mipi_dsi_dphy_enable(struct dw_mipi_dsi *dsi)
->   
->   	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS, val,
->   				 val & PHY_LOCK, 1000, PHY_STATUS_TIMEOUT_US);
-> -	if (ret < 0)
-> +	if (ret)
->   		DRM_DEBUG_DRIVER("failed to wait phy lock state\n");
->   
->   	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
->   				 val, val & PHY_STOP_STATE_CLK_LANE, 1000,
->   				 PHY_STATUS_TIMEOUT_US);
-> -	if (ret < 0)
-> +	if (ret)
->   		DRM_DEBUG_DRIVER("failed to wait phy clk lane stop state\n");
->   }
->   
-> 
+In other words, it more sounds like an improved variant of pl180,
+hence I am thinking that you should try to extend the mmci driver
+instead. Could you please have a look at that, unless you can specify
+more exactly why that isn't suitable?
+
+>
+> The SDMMC features include the following:
+> -Full compliance with MultiMediaCard System Specification Version 4.51.
+>  Card support for three different databus modes:
+>  1-bit (default), 4-bit and 8-bit.
+> -Full compliance with SD memory card specifications version 4.1.
+>  SDR104 speed limited to maximum allowed I/O speed, SPI mode and
+>  UHS-II mode not supported.
+> -Full compliance with SDIO card specification version 4.0.
+>
+> change V2:
+> -dt-bindings: properties name
+> st,dir-output-high; st,neg-edge; st,use-ckin
+> -dt-bindings: node example s/sdmmc@/mmc@/g
+> -removes return of enable/disable_imask functions
+> -adds dev_warn if clk divisor is too short.
+> -replaces overprotection of n_elem by fail of dma_map_sg
+> -removes shortcut host->base
+> -Use device_property_present
+>
+> Ludovic Barre (5):
+>   dt-bindings: mmc: document the stm32 sdmmc bindings
+>   mmc: add stm32 sdmmc controller driver
+>   ARM: dts: stm32: add sdmmc support for stm32h743
+>   ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
+>   ARM: configs: stm32: add mmc and ext2/3/4 support
+>
+>  .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     |  35 +
+>  arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  26 +
+>  arch/arm/boot/dts/stm32h743.dtsi                   |  26 +
+>  arch/arm/boot/dts/stm32h743i-eval.dts              |  11 +
+>  arch/arm/configs/stm32_defconfig                   |   4 +-
+>  drivers/mmc/host/Kconfig                           |   8 +
+>  drivers/mmc/host/Makefile                          |   1 +
+>  drivers/mmc/host/stm32-sdmmc.c                     | 708 +++++++++++++++++++++
+>  drivers/mmc/host/stm32-sdmmc.h                     | 220 +++++++
+>  9 files changed, 1038 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+>  create mode 100644 drivers/mmc/host/stm32-sdmmc.c
+>  create mode 100644 drivers/mmc/host/stm32-sdmmc.h
+>
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
