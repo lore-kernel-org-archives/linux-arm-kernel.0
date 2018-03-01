@@ -1,71 +1,61 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 10:26:46 +0100
-Subject: [linux-sunxi] [PATCH v2 1/4] dt-bindings: pwm: binding allwinner
- sun8i.
-In-Reply-To: <56645bca-9f4a-3191-72d8-32b60ebbc26e@arm.com>
-References: <20180225135045.GA14508@arx-s1>
- <56645bca-9f4a-3191-72d8-32b60ebbc26e@arm.com>
-Message-ID: <20180301092646.44rxuwui2ssiar4u@flea>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 1 Mar 2018 10:35:10 +0100
+Subject: [PATCH 0/2] arm: Support for Renesas RZ/N1D (R9A06G032)
+In-Reply-To: <HK2PR0601MB1393B2D7E0C96590482C3726F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+References: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
+ <HK2PR0601MB1393B2D7E0C96590482C3726F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+Message-ID: <20180301093505.2wib5uzsxrhut3tm@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Feb 28, 2018 at 01:51:59AM +0000, Andr? Przywara wrote:
-> On 25/02/18 13:50, hao_zhang wrote:
-> > This patch adds allwinner sun8i pwm binding documents.
-> > 
-> > Signed-off-by: hao_zhang <hao5781286@gmail.com>
-> > ---
-> >  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> > new file mode 100644
-> > index 0000000..e8c48be
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> > @@ -0,0 +1,18 @@
-> > +Allwinner sun8i R40/V40/T3 SoC PWM controller
-> > +
-> > +Required properties:
-> > +  - compatible: should be one of:
-> > +    - "allwinner,sun8i-r40-pwm"
-> > +  - reg: physical base address and length of the controller's registers
-> > +  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-> > +    the cells format.
-> > +  - clocks: From common clock binding, handle to the parent clock.
+On Tue, Feb 27, 2018 at 01:10:36PM +0000, Phil Edworthy wrote:
+> Hi Simon,
 > 
-> The manual tells me that there are two possible clock sources (24 MHz
-> OSC and APB1), with actually two bits for encoding the mux source,
-> allowing for two more potential clock sources.
-> So can we extend this description to provide up to four clocks, with a
-> clock-names property telling the driver how this maps to the mux value?
-> Either we use clock names matching the clocks mentioned in the manual:
-> 	clocks = <&osc24M>, <&ccu CLK_APB1>;
-> 	clock-names = "osc", "apb1";
-> or we encode the mux values in the clock-names:
-> 	clock-names = "mux-0", "mux-1";
+> On 26 February 2018, Michel Pollet wrote:
+> > 
+> > This series adds the plain basic support for booting a bare
+> > kernel on the RZ/N1D-DB Board. It's been trimmed to the strict
+> > minimum as a 'base', further patches that will add the
+> > rest of the support, pinctrl, clock architecture and quite
+> > a few others.
 
-I'd prefer the former.
+Thanks Michel,
 
-> Don't know what's more widely used in those cases, the latter seems to
-> be more future-proof.
+I am of course very happy to see support for new SoCs and boards added
+to upstream and I support such efforts as best I can. However, the pattern
+followed by this patchset adds a new board file. This was the common
+practice some time ago but it is now upstream policy not to accept new
+board files. Rather, drivers should be developed and hardware should be
+described in DT. So I believe support for RZ/N1D needs to be reworked
+to that end in order to be accepted upstream.
 
-Not really, nothing prevents the next generation to have three bits,
-or even 32 bits to do the muxing :)
+I also believe that the patches in this series are rather large.  Its much
+better to submit small incremental patches for review. This allows much
+smoother iteration over patch review cycles. Patches also need to be split
+up so that C-code changes,  DT and ideally documentation changes are not
+mixed in the same patch unless necessary. You can find examples of this on
+the linux-renesas-soc mailing list.
 
-Maxime
+And lastly, the use of RZN1_IRQ_* macros in the DT file does not
+follow the current best practice of using numeric constants for
+values derived from documentation.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/a9bccc06/attachment.sig>
+Please consider reworking this patchset, I look forward
+so seeing RZ/N1D support upstream some time soon.
+
+> I spoke to Magnus about helping to get the RZ/N1 patches upstream.
+> We're trying to sort out making the device manual and board schematics
+> available, hopefully it won't take too long. We're also trying to sort out
+> access to a board... that might take a bit longer.
+> 
+> btw, what do you want to do about shmobile_defconfig? Should we add
+> any changes needed for RZ/N1 to it? Note that only one IP block is the
+> same as R-Car.
+
+Hi Phil,
+
+In general I believe that the upstream policy is not to accept new
+defconfigs. So my suggestion would be to expand shmobile_defconfig
+if the result it produces a working kernel for both already supported
+boards and the RZ/N1D-DB Board. Otherwise we need to consider what
+other options we have.
