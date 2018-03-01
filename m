@@ -1,25 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Mar 2018 14:34:49 +0100
-Subject: [PATCH v5] drm/rockchip: Add device links for master and
- components
-In-Reply-To: <20180207175309.21095-1-enric.balletbo@collabora.com>
-References: <20180207175309.21095-1-enric.balletbo@collabora.com>
-Message-ID: <1621728.R05mi6GW7F@diego>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 1 Mar 2018 14:46:20 +0100
+Subject: [PATCH v2] rtc: brcmstb-waketimer: Set wktmr prescaler
+In-Reply-To: <1519675798-26720-1-git-send-email-justin.chen@broadcom.com>
+References: <1519675798-26720-1-git-send-email-justin.chen@broadcom.com>
+Message-ID: <20180301134620.GX1479@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 7. Februar 2018, 18:53:09 CET schrieb Enric Balletbo i Serra:
-> From: Jeffy Chen <jeffy.chen@rock-chips.com>
+On 26/02/2018 at 12:09:58 -0800, Justin Chen wrote:
+> The HW default is one tick per second, however instead of assuming this,
+> lets make sure the waketimer is actually one tick per second before
+> arming the alarm.
 > 
-> Since we are trying to access components' resources in the master's
-> suspend/resume PM callbacks(e.g. panel), add device links to correct
-> the suspend/resume and shutdown ordering.
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+> ---
+>  drivers/rtc/rtc-brcmstb-waketimer.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Applied, thanks.
 
-applied to drm-misc-next
-[after confering on #dri-devel on fixes vs. next]
-
-Thanks
-Heiko
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
