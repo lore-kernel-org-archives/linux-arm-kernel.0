@@ -1,95 +1,104 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 1 Mar 2018 11:53:38 +0100
-Subject: [PATCH v2 1/6] ARM: dts: stm32: Add sdio pins definition for stm32f7
-In-Reply-To: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
-References: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1519901623-23216-2-git-send-email-patrice.chotard@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Mar 2018 11:03:38 +0000
+Subject: [RESEND PATCH v6 14/14] iommu/rockchip: Support sharing IOMMU
+ between masters
+In-Reply-To: <20180301101837.27969-15-jeffy.chen@rock-chips.com>
+References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+ <20180301101837.27969-15-jeffy.chen@rock-chips.com>
+Message-ID: <44efebd3-ab48-4e12-cf92-66b6563f7644@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 01/03/18 10:18, Jeffy Chen wrote:
+> There would be some masters sharing the same IOMMU device. Put them in
+> the same iommu group and share the same iommu domain.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+> Remove rk_iommudata->domain.
+> 
+> Changes in v2: None
+> 
+>   drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
+>   1 file changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 0e0a42f41818..f4ce7706fc34 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -104,6 +104,7 @@ struct rk_iommu {
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+>   	struct iommu_domain *domain; /* domain to which iommu is attached */
+> +	struct iommu_group *group;
+>   };
+>   
+>   struct rk_iommudata {
+> @@ -1083,6 +1084,15 @@ static void rk_iommu_remove_device(struct device *dev)
+>   	iommu_group_remove_device(dev);
+>   }
+>   
+> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
+> +{
+> +	struct rk_iommu *iommu;
+> +
+> +	iommu = rk_iommu_from_dev(dev);
+> +
+> +	return iommu->group;
 
-Add sdio pins definition for the 2 sdio instances embeds in stm32f746.
+Oops, seems I overlooked this in my previous review - it should really be:
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
-v2: _ rename sdio_pins / sdio_od_pins to sdio_pins_a / sdio_od_pins_a 
+	return iommu_group_get(iommu->group);
 
- arch/arm/boot/dts/stm32f7-pinctrl.dtsi | 62 ++++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+or the refcounting will be unbalanced on those future systems where it 
+really will be called more than once.
 
-diff --git a/arch/arm/boot/dts/stm32f7-pinctrl.dtsi b/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
-index f518de184e52..9314128df185 100644
---- a/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
-@@ -222,6 +222,68 @@
- 					slew-rate = <2>;
- 				};
- 			};
-+
-+			sdio_pins_a: sdio_pins_a at 0 {
-+				pins {
-+					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDMMC1 D0 */
-+						 <STM32_PINMUX('C', 9, AF12)>, /* SDMMC1 D1 */
-+						 <STM32_PINMUX('C', 10, AF12)>, /* SDMMC1 D2 */
-+						 <STM32_PINMUX('C', 11, AF12)>, /* SDMMC1 D3 */
-+						 <STM32_PINMUX('C', 12, AF12)>, /* SDMMC1 CLK */
-+						 <STM32_PINMUX('D', 2, AF12)>; /* SDMMC1 CMD */
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+			};
-+
-+			sdio_pins_od_a: sdio_pins_od_a at 0 {
-+				pins1 {
-+					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDMMC1 D0 */
-+						 <STM32_PINMUX('C', 9, AF12)>, /* SDMMC1 D1 */
-+						 <STM32_PINMUX('C', 10, AF12)>, /* SDMMC1 D2 */
-+						 <STM32_PINMUX('C', 11, AF12)>, /* SDMMC1 D3 */
-+						 <STM32_PINMUX('C', 12, AF12)>; /* SDMMC1 CLK */
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+
-+				pins2 {
-+					pinmux = <STM32_PINMUX('D', 2, AF12)>; /* SDMMC1 CMD */
-+					drive-open-drain;
-+					slew-rate = <2>;
-+				};
-+			};
-+
-+			sdio_pins_b: sdio_pins_b at 0 {
-+				pins {
-+					pinmux = <STM32_PINMUX('G', 9, AF11)>, /* SDMMC2 D0 */
-+						 <STM32_PINMUX('G', 10, AF11)>, /* SDMMC2 D1 */
-+						 <STM32_PINMUX('B', 3, AF10)>, /* SDMMC2 D2 */
-+						 <STM32_PINMUX('B', 4, AF10)>, /* SDMMC2 D3 */
-+						 <STM32_PINMUX('D', 6, AF11)>, /* SDMMC2 CLK */
-+						 <STM32_PINMUX('D', 7, AF11)>; /* SDMMC2 CMD */
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+			};
-+
-+			sdio_pins_od_b: sdio_pins_od_b at 0 {
-+				pins1 {
-+					pinmux = <STM32_PINMUX('G', 9, AF11)>, /* SDMMC2 D0 */
-+						 <STM32_PINMUX('G', 10, AF11)>, /* SDMMC2 D1 */
-+						 <STM32_PINMUX('B', 3, AF10)>, /* SDMMC2 D2 */
-+						 <STM32_PINMUX('B', 4, AF10)>, /* SDMMC2 D3 */
-+						 <STM32_PINMUX('D', 6, AF11)>; /* SDMMC2 CLK */
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+
-+				pins2 {
-+					pinmux = <STM32_PINMUX('D', 7, AF11)>; /* SDMMC2 CMD */
-+					drive-open-drain;
-+					slew-rate = <2>;
-+				};
-+			};
- 		};
- 	};
- };
--- 
-1.9.1
+Robin.
+
+> +}
+> +
+>   static int rk_iommu_of_xlate(struct device *dev,
+>   			     struct of_phandle_args *args)
+>   {
+> @@ -1114,7 +1124,7 @@ static const struct iommu_ops rk_iommu_ops = {
+>   	.add_device = rk_iommu_add_device,
+>   	.remove_device = rk_iommu_remove_device,
+>   	.iova_to_phys = rk_iommu_iova_to_phys,
+> -	.device_group = generic_device_group,
+> +	.device_group = rk_iommu_device_group,
+>   	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+>   	.of_xlate = rk_iommu_of_xlate,
+>   };
+> @@ -1183,9 +1193,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	if (err)
+>   		return err;
+>   
+> +	iommu->group = iommu_group_alloc();
+> +	if (IS_ERR(iommu->group)) {
+> +		err = PTR_ERR(iommu->group);
+> +		goto err_unprepare_clocks;
+> +	}
+> +
+>   	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+>   	if (err)
+> -		goto err_unprepare_clocks;
+> +		goto err_put_group;
+>   
+>   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+>   	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
+> @@ -1209,6 +1225,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	return 0;
+>   err_remove_sysfs:
+>   	iommu_device_sysfs_remove(&iommu->iommu);
+> +err_put_group:
+> +	iommu_group_put(iommu->group);
+>   err_unprepare_clocks:
+>   	clk_bulk_unprepare(iommu->num_clocks, iommu->clocks);
+>   	return err;
+> 
