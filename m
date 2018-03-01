@@ -1,74 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Mar 2018 14:30:23 +0000
-Subject: [PATCH v3 1/2] dt-bindings: i2c: add binding for Socionext
- SynQuacer I2C
-In-Reply-To: <CAL_JsqJL9idphGUyZ8M4MuF2oTUC0hNYaVsbLu4ec+=s90qJ1w@mail.gmail.com>
-References: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
- <20180227110107.30259-2-ard.biesheuvel@linaro.org>
- <CAL_JsqJL9idphGUyZ8M4MuF2oTUC0hNYaVsbLu4ec+=s90qJ1w@mail.gmail.com>
-Message-ID: <CAKv+Gu-W=GuRphju6EZvgC9PK_Gv5Hsxe5Dzp8vFhW-xROokrQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 1 Mar 2018 14:44:11 +0000
+Subject: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
+In-Reply-To: <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+Message-ID: <573acd04-85c4-829d-a0d6-36b3958ac1ec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2018 at 14:28, Rob Herring <robh+dt@kernel.org> wrote:
-> On Tue, Feb 27, 2018 at 5:01 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> Add a binding for the I2C controller that can be found in the Socionext
->> SynQuacer SoC. Note that this is the exact same IP as the Fujitsu F_I2C.
->
-> Is there a binding for that? Should be the same doc if so.
->
 
-No, there isn't. That support never made it upstream, but I thought
-it'd be useful to mention it given the Fujitsu -> Socionext name
-change.
 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/i2c/i2c-synquacer.txt | 29 ++++++++++++++++++++
->>  1 file changed, 29 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
->> new file mode 100644
->> index 000000000000..4d0bb6a71211
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
->> @@ -0,0 +1,29 @@
->> +Socionext SynQuacer I2C
->> +
->> +Required properties:
->> +- compatible      : Must be "socionext,synquacer-i2c"
->> +- reg             : Offset and length of the register set for the device
->> +- interrupts      : the interrupt specifier
->
-> How many?
->
+On 20/02/18 19:21, Jolly Shah wrote:
+> Add Firmware-ggs sysfs interface which provides read/write
+> interface to global storage registers.
+> 
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> ---
+>  .../ABI/stable/sysfs-driver-zynqmp-firmware        |  50 ++++
+>  drivers/firmware/xilinx/zynqmp/Makefile            |   2 +-
+>  drivers/firmware/xilinx/zynqmp/firmware-ggs.c      | 297 +++++++++++++++++++++
+>  drivers/firmware/xilinx/zynqmp/firmware.c          |  13 +
+>  include/linux/firmware/xilinx/zynqmp/firmware.h    |   2 +
+>  5 files changed, 363 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+>  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
+> 
+> diff --git a/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware b/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> new file mode 100644
+> index 0000000..b04727a
+> --- /dev/null
+> +++ b/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> @@ -0,0 +1,50 @@
+> +What:		/sys/devices/platform/zynqmp-firmware/ggs> +Date:		January 2018
+> +KernelVersion:	4.15.0
+> +Contact:	"Jolly Shah" <jollys@xilinx.com>
+> +Description:
+> +		Read/Write PMU global general storage register value,
+> +		GLOBAL_GEN_STORAGE{0:3}.
+> +		Global general storage register that can be used
+> +		by system to pass information between masters.
+> +
 
-A single one, will change
+What kind of information ? Is there any semantics for that ?
+Why does EEMI lack APIs for that if it's critical, giving access to
+such information to userspace may not be good idea.
 
->> +- #address-cells  : Must be <1>;
->> +- #size-cells     : Must be <0>;
->> +- clock-names     : Must contain "pclk".
->> +- clocks          : Must contain an entry for each name in clock-names.
->> +                    (See the common clock bindings.)
->> +
->> +Optional properties:
->> +- clock-frequency : Desired I2C bus clock frequency in Hz. As only Normal and
->> +                    Fast modes are supported, possible values are 100000 and
->> +                    400000.
->> +
->> +Example :
->> +
->> +    i2c at 51210000 {
->> +        compatible = "socionext,synquacer-i2c";
->> +        reg = <0x51210000 0x1000>;
->> +        interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
->> +        #address-cells = <1>;
->> +        #size-cells = <0>;
->> +        clock-names = "pclk";
->> +        clocks = <&clk_i2c>;
->> +        clock-frequency = <400000>;
->> +    };
->> --
->> 2.11.0
->>
+> +		The register is reset during system or power-on
+> +		resets. Three registers are used by the FSBL and
+> +		other Xilinx software products: GLOBAL_GEN_STORAGE{4:6}.
+> +
+
+FSBL ?
+
+For what is it used ?
+
+> +		Usage:
+> +		# cat /sys/.../zynqmp-firmware/ggs0
+> +		# echo <mask> <value> > /sys/.../zynqmp-firmware/ggs0
+> +
+> +		Example:
+> +		# cat /sys/.../zynqmp-firmware/ggs0
+> +		# echo 0xFFFFFFFF 0x1234ABCD > /sys/.../zynqmp-firmware/ggs0
+> +
+> +Users:		Xilinx
+> +
+> +What:		/sys/devices/platform/zynqmp-firmware/pggs*
+> +Date:		January 2018
+> +KernelVersion:	4.15.0
+> +Contact:	"Jolly Shah" <jollys@xilinx.com>
+> +Description:
+> +		Read/Write PMU persistent global general storage register
+> +		value, PERS_GLOB_GEN_STORAGE{0:3}.
+> +		Persistent global general storage register that
+> +		can be used by system to pass information between
+> +		masters.
+> +
+
+Ditto
+
+> +		This register is only reset by the power-on reset
+> +		and maintains its value through a system reset.
+> +		Four registers are used by the FSBL and other Xilinx
+> +		software products: PERS_GLOB_GEN_STORAGE{4:7}.
+> +		Register is reset only by a POR reset.
+> +
+
+Ditto
+
+-- 
+Regards,
+Sudeep
