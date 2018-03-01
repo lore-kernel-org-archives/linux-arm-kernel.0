@@ -1,173 +1,140 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:35 +0000
-Subject: [PATCH v5 20/23] arm/arm64: KVM: Introduce EL2-specific executable
- mappings
+Date: Thu,  1 Mar 2018 15:55:33 +0000
+Subject: [PATCH v5 18/23] arm64: KVM: Add epilogue branching to the vector code
 In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
 References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-21-marc.zyngier@arm.com>
+Message-ID: <20180301155538.26860-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, all EL2 executable mappings were derived from their
-EL1 VA. Since we want to decouple the vectors mapping from
-the rest of the hypervisor, we need to be able to map some
-text somewhere else.
+We are soon going to have to do some extra work in the BP hardening
+vector slots. Instead of doing that work in the vectors themselves
+(which would massively reduce the space available to deal with
+Spectre v2), let's branch to an epilogue where we can do "stuff".
 
-The "idmap" region (for lack of a better name) is ideally suited
-for this, as we have a huge range that hardly has anything in it.
+This has a number of consequences:
+- We need some free registers, so we're spilling x0 and x1 on the
+  stack
+- In order to counterbalance this, we branch to the *second* instruction
+  in the vectors, avoiding the initial store that is already there
+  (or loading the registers back if we've branched to a panic vector)
 
-Let's extend the IO allocator to also deal with executable mappings,
-thus providing the required feature.
+This is all controlled by a new capability (ARM64_HARDEN_EL2_VECTORS)
+which doesn't get enabled yet.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  2 +
- arch/arm64/include/asm/kvm_mmu.h |  2 +
- virt/kvm/arm/mmu.c               | 80 +++++++++++++++++++++++++++++-----------
- 3 files changed, 63 insertions(+), 21 deletions(-)
+ arch/arm64/include/asm/cpucaps.h |  2 +-
+ arch/arm64/kernel/bpi.S          | 57 +++++++++++++++++++++++++---------------
+ arch/arm64/kvm/hyp/hyp-entry.S   |  2 ++
+ 3 files changed, 39 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 26eb6b1cec9b..1b7f592eae57 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -56,6 +56,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
- 			   void __iomem **haddr);
-+int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
-+			     void **haddr);
- void free_hyp_pgds(void);
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 76a43a17449a..d4cc54ed0656 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -32,7 +32,7 @@
+ #define ARM64_HAS_VIRT_HOST_EXTN		11
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
+ #define ARM64_HAS_32BIT_EL0			13
+-/* #define ARM64_UNALLOCATED_ENTRY			14 */
++#define ARM64_HARDEN_EL2_VECTORS		14
+ #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+ #define ARM64_HAS_NO_FPSIMD			16
+ #define ARM64_WORKAROUND_REPEAT_TLBI		17
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index e5de33513b5d..e000cb390618 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -19,40 +19,55 @@
+ #include <linux/linkage.h>
+ #include <linux/arm-smccc.h>
  
- void stage2_unmap_vm(struct kvm *kvm);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index bfb81e73da06..3da9e5aea936 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -151,6 +151,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
- 			   void __iomem **haddr);
-+int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
-+			     void **haddr);
- void free_hyp_pgds(void);
+-.macro ventry target
+-	.rept 31
++.macro hyp_ventry offset
++	.align 7
++	.rept 29
+ 	nop
+ 	.endr
+-	b	\target
++alternative_if ARM64_HARDEN_EL2_VECTORS
++	stp	x0, x1, [sp, #-16]!
++	mov	x0, #(\offset + 4)
++	b	__kvm_enter_vectors
++alternative_else
++	b	__kvm_hyp_vector + \offset
++	nop
++	nop
++alternative_endif
+ .endm
  
- void stage2_unmap_vm(struct kvm *kvm);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index e2de45db0af2..7059c4f34c37 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -715,30 +715,13 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
- 	return 0;
- }
+-.macro vectors target
+-	ventry \target + 0x000
+-	ventry \target + 0x080
+-	ventry \target + 0x100
+-	ventry \target + 0x180
++.macro generate_vectors
++	hyp_ventry 0x000
++	hyp_ventry 0x080
++	hyp_ventry 0x100
++	hyp_ventry 0x180
  
--/**
-- * create_hyp_io_mappings - Map IO into both kernel and HYP
-- * @phys_addr:	The physical start address which gets mapped
-- * @size:	Size of the region being mapped
-- * @kaddr:	Kernel VA for this mapping
-- * @haddr:	HYP VA for this mapping
-- */
--int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
--			   void __iomem **kaddr,
--			   void __iomem **haddr)
-+static int __create_hyp_private_mapping(phys_addr_t phys_addr, size_t size,
-+					unsigned long *haddr, pgprot_t prot)
- {
- 	pgd_t *pgd = hyp_pgd;
- 	unsigned long base;
- 	int ret;
+-	ventry \target + 0x200
+-	ventry \target + 0x280
+-	ventry \target + 0x300
+-	ventry \target + 0x380
++	hyp_ventry 0x200
++	hyp_ventry 0x280
++	hyp_ventry 0x300
++	hyp_ventry 0x380
  
--	*kaddr = ioremap(phys_addr, size);
--	if (!*kaddr)
--		return -ENOMEM;
--
--	if (is_kernel_in_hyp_mode()) {
--		*haddr = *kaddr;
--		return 0;
--	}
--
- 	mutex_lock(&io_map_lock);
+-	ventry \target + 0x400
+-	ventry \target + 0x480
+-	ventry \target + 0x500
+-	ventry \target + 0x580
++	hyp_ventry 0x400
++	hyp_ventry 0x480
++	hyp_ventry 0x500
++	hyp_ventry 0x580
  
- 	/*
-@@ -766,22 +749,77 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-	ventry \target + 0x600
+-	ventry \target + 0x680
+-	ventry \target + 0x700
+-	ventry \target + 0x780
++	hyp_ventry 0x600
++	hyp_ventry 0x680
++	hyp_ventry 0x700
++	hyp_ventry 0x780
+ .endm
  
- 	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
- 				    base, base + size,
--				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+				    __phys_to_pfn(phys_addr), prot);
- 	if (ret)
- 		goto out;
- 
--	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
-+	*haddr = base + offset_in_page(phys_addr);
- 	io_map_base = base;
- 
- out:
- 	mutex_unlock(&io_map_lock);
- 
-+	return ret;
-+}
+ 	.align	11
+ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.rept 4
+-	vectors __kvm_hyp_vector
++	generate_vectors
+ 	.endr
 +
-+/**
-+ * create_hyp_io_mappings - Map IO into both kernel and HYP
-+ * @phys_addr:	The physical start address which gets mapped
-+ * @size:	Size of the region being mapped
-+ * @kaddr:	Kernel VA for this mapping
-+ * @haddr:	HYP VA for this mapping
-+ */
-+int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-+			   void __iomem **kaddr,
-+			   void __iomem **haddr)
-+{
-+	unsigned long addr;
-+	int ret;
++__kvm_enter_vectors:
 +
-+	*kaddr = ioremap(phys_addr, size);
-+	if (!*kaddr)
-+		return -ENOMEM;
-+
-+	if (is_kernel_in_hyp_mode()) {
-+		*haddr = *kaddr;
-+		return 0;
-+	}
-+
-+	ret = __create_hyp_private_mapping(phys_addr, size,
-+					   &addr, PAGE_HYP_DEVICE);
- 	if (ret) {
- 		iounmap(*kaddr);
- 		*kaddr = NULL;
-+		*haddr = NULL;
-+		return ret;
-+	}
-+
-+	*haddr = (void __iomem *)addr;
-+	return 0;
-+}
-+
-+/**
-+ * create_hyp_exec_mappings - Map an executable range into into HYP
-+ * @phys_addr:	The physical start address which gets mapped
-+ * @size:	Size of the region being mapped
-+ * @haddr:	HYP VA for this mapping
-+ */
-+int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
-+			     void **haddr)
-+{
-+	unsigned long addr;
-+	int ret;
-+
-+	BUG_ON(is_kernel_in_hyp_mode());
-+
-+	ret = __create_hyp_private_mapping(phys_addr, size,
-+					   &addr, PAGE_HYP_EXEC);
-+	if (ret) {
-+		*haddr = NULL;
- 		return ret;
- 	}
++	adr_l	x1, __kvm_hyp_vector
++	add	x0, x1, x0
++	br	x0
+ ENTRY(__bp_harden_hyp_vecs_end)
  
-+	*haddr = (void *)addr;
- 	return 0;
- }
+ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 0f62b5f76aa5..fc6a1006cc08 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -220,6 +220,8 @@ ENDPROC(\label)
+ .macro invalid_vect target
+ 	.align 7
+ 	b	\target
++	ldp	x0, x1, [sp], #16
++	b	\target
+ .endm
  
+ ENTRY(__kvm_hyp_vector)
 -- 
 2.14.2
