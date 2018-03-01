@@ -1,67 +1,41 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:53 +0800
-Subject: [PATCH 16/45] arm64: futex: Mask __user pointers prior to dereference
-In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-17-git-send-email-alex.shi@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 1 Mar 2018 14:32:24 +0100
+Subject: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
+In-Reply-To: <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+Message-ID: <3e14f7b3-52e7-660a-a2f7-cc23b3262f0a@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+On 20.2.2018 20:21, Jolly Shah wrote:
+> Add Firmware-ggs sysfs interface which provides read/write
+> interface to global storage registers.
+> 
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> ---
+>  .../ABI/stable/sysfs-driver-zynqmp-firmware        |  50 ++++
 
-commit 91b2d3442f6a upstream.
+This file name has changed between v4 and v5. File from v4 was correct.
+That's why I am waiting for v6 to be send before this is applied.
 
-The arm64 futex code has some explicit dereferencing of user pointers
-where performing atomic operations in response to a futex command. This
-patch uses masking to limit any speculative futex operations to within
-the user address space.
+Thanks,
+Michal
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/include/asm/futex.h | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 85c4a89..1943cf6 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -48,13 +48,14 @@ do {									\
- } while (0)
- 
- static inline int
--futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
-+futex_atomic_op_inuser (int encoded_op, u32 __user *_uaddr)
- {
- 	int op = (encoded_op >> 28) & 7;
- 	int cmp = (encoded_op >> 24) & 15;
- 	int oparg = (encoded_op << 8) >> 20;
- 	int cmparg = (encoded_op << 20) >> 20;
- 	int oldval = 0, ret, tmp;
-+	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
- 
- 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
- 		oparg = 1 << oparg;
-@@ -106,15 +107,17 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
- }
- 
- static inline int
--futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-+futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
- 			      u32 oldval, u32 newval)
- {
- 	int ret = 0;
- 	u32 val, tmp;
-+	u32 __user *uaddr;
- 
--	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-+	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
- 		return -EFAULT;
- 
-+	uaddr = __uaccess_mask_ptr(_uaddr);
- 	uaccess_enable();
- 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
- "	prfm	pstl1strm, %2\n"
 -- 
-2.7.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/4be53ddb/attachment.sig>
