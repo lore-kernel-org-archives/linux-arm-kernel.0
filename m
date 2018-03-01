@@ -1,172 +1,100 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:25 +0000
-Subject: [PATCH v5 10/23] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+Date: Thu,  1 Mar 2018 15:55:21 +0000
+Subject: [PATCH v5 06/23] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
 In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
 References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-11-marc.zyngier@arm.com>
+Message-ID: <20180301155538.26860-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We so far mapped our HYP IO (which is essencially the GICv2 control
-registers) using the same method as for memory. It recently appeared
-that is a bit unsafe:
+kvm_vgic_global_state is part of the read-only section, and is
+usually accessed using a PC-relative address generation (adrp + add).
 
-We compute the HYP VA using the kern_hyp_va helper, but that helper
-is only designed to deal with kernel VAs coming from the linear map,
-and not from the vmalloc region... This could in turn cause some bad
-aliasing between the two, amplified by the upcoming VA randomisation.
+It is thus useless to use kern_hyp_va() on it, and actively problematic
+if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+no way that the compiler is going to guarantee that such access is
+always PC relative.
 
-A solution is to come up with our very own basic VA allocator for
-MMIO. Since half of the HYP address space only contains a single
-page (the idmap), we have plenty to borrow from. Let's use the idmap
-as a base, and allocate downwards from it. GICv2 now lives on the
-other side of the great VA barrier.
+So let's bite the bullet and provide our own accessor.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h |  3 ++
- virt/kvm/arm/mmu.c             | 65 +++++++++++++++++++++++++++++++++---------
- 2 files changed, 55 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  7 +++++++
+ arch/arm64/include/asm/kvm_mmu.h | 20 ++++++++++++++++++++
+ virt/kvm/arm/hyp/vgic-v2-sr.c    |  4 ++--
+ 3 files changed, 29 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5b12a3d2755e..26eb6b1cec9b 100644
+index de1b919404e4..a6808d2869f5 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -49,6 +49,9 @@
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
- 
-+/* Ensure compatibility with arm64 */
-+#define VA_BITS			32
-+
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 0e5cfffb4c21..3074544940dc 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
- static unsigned long hyp_idmap_end;
- static phys_addr_t hyp_idmap_vector;
- 
-+static DEFINE_MUTEX(io_map_lock);
-+static unsigned long io_map_base;
-+
- #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
- #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
- 
-@@ -502,27 +505,31 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
-  *
-  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
-  * therefore contains either mappings in the kernel memory area (above
-- * PAGE_OFFSET), or device mappings in the vmalloc range (from
-- * VMALLOC_START to VMALLOC_END).
-+ * PAGE_OFFSET), or device mappings in the idmap range.
-  *
-- * boot_hyp_pgd should only map two pages for the init code.
-+ * boot_hyp_pgd should only map the idmap range, and is only used in
-+ * the extended idmap case.
+@@ -28,6 +28,13 @@
   */
- void free_hyp_pgds(void)
+ #define kern_hyp_va(kva)	(kva)
+ 
++/* Resolving symbol addresses in a PC-relative way is easy... */
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr = &(s);					\
++		addr;							\
++	})
++
+ /*
+  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
+  */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index e3bc1d0a5e93..7120bf3f22c7 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -110,6 +110,26 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ 
+ #define kern_hyp_va(v) 	((typeof(v))(__kern_hyp_va((unsigned long)(v))))
+ 
++/*
++ * Obtain the PC-relative address of a kernel symbol
++ * s: symbol
++ *
++ * The goal of this macro is to return a symbol's address based on a
++ * PC-relative computation, as opposed to a loading the VA from a
++ * constant pool or something similar. This works well for HYP, as an
++ * absolute VA is guaranteed to be wrong. Only use this if trying to
++ * obtain the address of a symbol (i.e. not something you obtained by
++ * following a pointer).
++ */
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr;					\
++		asm volatile("adrp	%0, %1\n"			\
++			     "add	%0, %0, :lo12:%1\n"		\
++			     : "=r" (addr) : "S" (&s));			\
++		addr;							\
++	})
++
+ /*
+  * We currently only support a 40bit IPA.
+  */
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 4fe6e797e8b3..a6ca049d9651 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -26,7 +26,7 @@
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
  {
-+	pgd_t *id_pgd;
-+
- 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
++	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
+ 	u32 elrsr0, elrsr1;
  
-+	id_pgd = boot_hyp_pgd ? boot_hyp_pgd : hyp_pgd;
-+
-+	if (id_pgd)
-+		unmap_hyp_range(id_pgd, io_map_base,
-+				hyp_idmap_start + PAGE_SIZE - io_map_base);
-+
- 	if (boot_hyp_pgd) {
--		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
- 		boot_hyp_pgd = NULL;
- 	}
+ 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+@@ -140,7 +140,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		return -1;
  
- 	if (hyp_pgd) {
--		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
- 				(uintptr_t)high_memory - PAGE_OFFSET);
--		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
--				VMALLOC_END - VMALLOC_START);
+ 	rd = kvm_vcpu_dabt_get_rd(vcpu);
+-	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
++	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
  
- 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
- 		hyp_pgd = NULL;
-@@ -719,7 +726,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
- 			   void __iomem **haddr)
- {
--	unsigned long start, end;
-+	pgd_t *pgd = hyp_pgd;
-+	unsigned long base;
- 	int ret;
- 
- 	*kaddr = ioremap(phys_addr, size);
-@@ -731,11 +739,42 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 		return 0;
- 	}
- 
-+	mutex_lock(&io_map_lock);
-+
-+	/*
-+	 * This assumes that we we have enough space below the idmap
-+	 * page to allocate our VAs. If not, the check below will
-+	 * kick. A potential alternative would be to detect that
-+	 * overflow and switch to an allocation above the idmap.
-+	 */
-+	size = max(PAGE_SIZE, roundup_pow_of_two(size));
-+	base = io_map_base - size;
-+	base &= ~(size - 1);
- 
--	start = kern_hyp_va((unsigned long)*kaddr);
--	end = kern_hyp_va((unsigned long)*kaddr + size);
--	ret = __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD, start, end,
--				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+	/*
-+	 * Verify that BIT(VA_BITS - 1) hasn't been flipped by
-+	 * allocating the new area, as it would indicate we've
-+	 * overflowed the idmap/IO address range.
-+	 */
-+	if ((base ^ io_map_base) & BIT(VA_BITS - 1)) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	if (__kvm_cpu_uses_extended_idmap())
-+		pgd = boot_hyp_pgd;
-+
-+	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
-+				    base, base + size,
-+				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+	if (ret)
-+		goto out;
-+
-+	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
-+	io_map_base = base;
-+
-+out:
-+	mutex_unlock(&io_map_lock);
- 
- 	if (ret) {
- 		iounmap(*kaddr);
-@@ -743,7 +782,6 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 		return ret;
- 	}
- 
--	*haddr = (void __iomem *)start;
- 	return 0;
- }
- 
-@@ -1874,6 +1912,7 @@ int kvm_mmu_init(void)
- 			goto out;
- 	}
- 
-+	io_map_base = hyp_idmap_start;
- 	return 0;
- out:
- 	free_hyp_pgds();
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
 -- 
 2.14.2
