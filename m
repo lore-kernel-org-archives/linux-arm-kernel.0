@@ -1,45 +1,61 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu,  1 Mar 2018 18:07:12 +0100
-Subject: [PATCH] kasan, arm64: clean up KASAN_SHADOW_SCALE_SHIFT usage
-Message-ID: <44281e784702443f06edb837ec672984783a9621.1519923749.git.andreyknvl@google.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Mar 2018 17:08:26 +0000
+Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
+In-Reply-To: <20180301162803.5490-1-robh@kernel.org>
+References: <20180301162803.5490-1-robh@kernel.org>
+Message-ID: <20180301170826.GA2678@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow up patch to the series I sent recently that cleans up
-KASAN_SHADOW_SCALE_SHIFT usage (which value was hardcoded and scattered
-all over the code). This fixes the one place that I forgot to fix.
+On Thu, Mar 01, 2018 at 10:28:03AM -0600, Rob Herring wrote:
+> libfdt gained a new dependency on strrchr, so make it available to the
+> EFI namespace before we update libfdt.
+> 
+> Thanks to Ard for providing this fix.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please ack. This is a dependency on a dtc upstream sync.
 
-The change is purely aesthetical, instead of hardcoding the value for
-KASAN_SHADOW_SCALE_SHIFT in arch/arm64/Makefile, an appropriate variable
-is declared and used.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- arch/arm64/Makefile | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+As an aside, I noticed that this __efistub prefixing is also being
+applied to mapping symbols, so we get crazy stuff like __efistub_$x. I
+didn't get round to working out whether that's going to be problematic,
+but maybe it's all fine...
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b481b4a7c011..4bb18aee4846 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -97,12 +97,14 @@ else
- TEXT_OFFSET := 0x00080000
- endif
- 
--# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
-+# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
-+#				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
- # in 32-bit arithmetic
-+KASAN_SHADOW_SCALE_SHIFT := 3
- KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
--			(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
--			+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - 3)) \
--			- (1 << (64 - 32 - 3)) )) )
-+	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
-+	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
-+	- (1 << (64 - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) )) )
- 
- export	TEXT_OFFSET GZFLAGS
- 
--- 
-2.16.2.395.g2e18187dfd-goog
+Will
+
+> 
+>  arch/arm64/kernel/image.h | 1 +
+>  arch/arm64/lib/strrchr.S  | 2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> index c7fcb232fe47..a820ed07fb80 100644
+> --- a/arch/arm64/kernel/image.h
+> +++ b/arch/arm64/kernel/image.h
+> @@ -103,6 +103,7 @@ __efistub_strlen		= KALLSYMS_HIDE(__pi_strlen);
+>  __efistub_strnlen		= KALLSYMS_HIDE(__pi_strnlen);
+>  __efistub_strcmp		= KALLSYMS_HIDE(__pi_strcmp);
+>  __efistub_strncmp		= KALLSYMS_HIDE(__pi_strncmp);
+> +__efistub_strrchr		= KALLSYMS_HIDE(__pi_strrchr);
+>  __efistub___flush_dcache_area	= KALLSYMS_HIDE(__pi___flush_dcache_area);
+>  
+>  #ifdef CONFIG_KASAN
+> diff --git a/arch/arm64/lib/strrchr.S b/arch/arm64/lib/strrchr.S
+> index 61eabd9a289a..f8e2784d5752 100644
+> --- a/arch/arm64/lib/strrchr.S
+> +++ b/arch/arm64/lib/strrchr.S
+> @@ -40,4 +40,4 @@ ENTRY(strrchr)
+>  	b	1b
+>  2:	mov	x0, x3
+>  	ret
+> -ENDPROC(strrchr)
+> +ENDPIPROC(strrchr)
+> -- 
+> 2.14.1
+> 
