@@ -1,96 +1,45 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 1 Mar 2018 14:19:03 +0000
-Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <2d248f08-79b6-d5e2-7e34-31a21efcdc07@huawei.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-12-jeremy.linton@arm.com>
- <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
- <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
- <20180223110238.GB20461@e107981-ln.cambridge.arm.com>
- <2d248f08-79b6-d5e2-7e34-31a21efcdc07@huawei.com>
-Message-ID: <20180301141903.GH4589@e105550-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Mar 2018 14:19:16 +0000
+Subject: [PATCH v2 0/2] STM32 Extended TrustZone Protection driver
+In-Reply-To: <CA+M3ks6YPY6Lx-qBA+-Zrrtzr3Nqyzay=1wBHRGjd7PqJgAb0Q@mail.gmail.com>
+References: <20180301135806.19982-1-benjamin.gaignard@st.com>
+ <20180301140243.3uamdvdcvmsxv6im@lakrids.cambridge.arm.com>
+ <CA+M3ks6YPY6Lx-qBA+-Zrrtzr3Nqyzay=1wBHRGjd7PqJgAb0Q@mail.gmail.com>
+Message-ID: <ad7a8214-875e-3c1a-87e1-0403d4328737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 24, 2018 at 11:05:53AM +0800, Xiongfeng Wang wrote:
+On 01/03/18 14:15, Benjamin Gaignard wrote:
+> 2018-03-01 15:02 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+>> On Thu, Mar 01, 2018 at 02:58:04PM +0100, Benjamin Gaignard wrote:
+>>> On early boot stages STM32MP1 platform is able to dedicate some hardware blocks
+>>> to a secure OS running in TrustZone.
+>>> We need to avoid using those hardware blocks on non-secure context (i.e. kernel)
+>>> because read/write accesses could generate illegale access exceptions.
+>>>
+>>> Extended TrustZone Protection driver make sure that device is disabled if
+>>> non-secure world can't acces to it.
+>>>
+>>> version 2:
+>>> - do not use notifier anymore
+>>> - change status property value in device-tree if needed
+>>> - use a list of phandle instead of hard coded array
+>>
+>> As mentioned on v1, I don't think this should be done in Linux at all.
+>>
+>> If you wish to handle this dynamically, please fixup the DT *before*
+>> entering Linux.
+>>
+>> If you want a sane default in the dts file, put status = "disabled" on
+>> all nodes which the secure world might take ownership of.
 > 
-> Hi,
-> On 2018/2/23 19:02, Lorenzo Pieralisi wrote:
-> > On Thu, Jan 25, 2018 at 09:56:30AM -0600, Jeremy Linton wrote:
-> >> Hi,
-> >>
-> >> On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
-> >>> Hi Jeremy,
-> >>>
-> >>> I have tested the patch with the newest UEFI. It prints the below error:
-> >>>
-> >>> [    4.017371] BUG: arch topology borken
-> >>> [    4.021069] BUG: arch topology borken
-> >>> [    4.024764] BUG: arch topology borken
-> >>> [    4.028460] BUG: arch topology borken
-> >>> [    4.032153] BUG: arch topology borken
-> >>> [    4.035849] BUG: arch topology borken
-> >>> [    4.039543] BUG: arch topology borken
-> >>> [    4.043239] BUG: arch topology borken
-> >>> [    4.046932] BUG: arch topology borken
-> >>> [    4.050629] BUG: arch topology borken
-> >>> [    4.054322] BUG: arch topology borken
-> >>>
-> >>> I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
-> >>> the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
-> >>
-> >> I commented about that on the EDK2 mailing list. While the current spec
-> >> doesn't explicitly ban having the flag set multiple times between the leaf
-> >> and the root I consider it a "bug" and there is an effort to clarify the
-> >> spec and the use of that flag.
-> >>>
-> >>> When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
-> >>> and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
-> >>> sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
-> >>
-> >> Right. I've mentioned this problem a couple of times.
-> >>
-> >> At at the moment, the spec isn't clear about how the proximity domain is
-> >> detected/located within the PPTT topology (a node with a 1:1 correspondence
-> >> isn't even required). As you can see from this patch set, we are making the
-> >> general assumption that the proximity domains are at the same level as the
-> >> physical socket. This isn't ideal for NUMA topologies, like the D05, that
-> >> don't align with the physical socket.
-> >>
-> >> There are efforts underway to clarify and expand upon the specification to
-> >> deal with this general problem. The simple solution is another flag (say
-> >> PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to
-> >> find nodes with 1:1 correspondence. At that point we could add a fairly
-> >> trivial patch to correct just the scheduler topology without affecting the
-> >> rest of the system topology code.
-> > 
-> > I think Morten asked already but isn't this the same end result we end
-> > up having if we remove the DIE level if NUMA-within-package is detected
-> > (instead of using the default_topology[]) and we create our own ARM64
-> > domain hierarchy (with DIE level removed) through set_sched_topology()
-> > accordingly ?
-> > 
-> > Put it differently: do we really need to rely on another PPTT flag to
-> > collect this information ?
-> > 
-> > I can't merge code that breaks a platform with legitimate firmware
-> > bindings.
-> 
-> I think we really need another PPTT flag, from which we can get information
-> about how to build a multi-core sched_domain. I think only cache-sharing information
-> is not enough to get information about how to build a multi-core shced_domain.
-> 
-> How about this? We assume the upper layer of the lowest layer to be multi-core layer.
-> After that flag is added into ACPI specs, we add another patch to adapt to the change.
+> That is the case, nodes are disabled by ealier boot stages before entering
+> in Linux but, since mistakes and/or errors are always possible, fixup the DT
+> to avoid illegal access exceptions make sense for me.
 
-I'm not sure what you mean by upper layers of the lowest layer.
+So why not also run a test on the memory controller in case the 
+bootloader made a mistake in the memory node too? As I mentioned before, 
+if you can't trust the DT to describe your hardware correctly you've 
+already lost.
 
-As I see it for non-numa-in-package system, the PPTT physical package
-flag should define the MC domains, any levels above should be
-represented in the DIE level, any level below should be ignored, except
-the lowest level if we have SMT. If have SMT the lowest level in PPTT
-should define the SMT domains.
-
-For numa-in-package, the MC domains should be shrunk to match the NUMA
-nodes and DIE is ignored.
+Robin.
