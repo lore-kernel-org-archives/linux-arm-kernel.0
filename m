@@ -1,67 +1,73 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:55 +0800
-Subject: [PATCH 18/45] arm64: cpufeature: __this_cpu_has_cap() shouldn't stop
- early
+Date: Thu,  1 Mar 2018 20:53:49 +0800
+Subject: [PATCH 12/45] arm64: entry: Ensure branch through syscall table is
+ bounded under speculation
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-19-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-13-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-commit edf298cfce47 upstream.
-Alex Shi rewrite this commit on func this_cpu_has_cap(). The following commit
-log is still meaningful.
+commit 6314d90e6493 upstream.
 
-    this_cpu_has_cap() tests caps->desc not caps->matches, so it stops
-    walking the list when it finds a 'silent' feature, instead of
-    walking to the end of the list.
+In a similar manner to array_index_mask_nospec, this patch introduces an
+assembly macro (mask_nospec64) which can be used to bound a value under
+speculation. This macro is then used to ensure that the indirect branch
+through the syscall table is bounded under speculation, with out-of-range
+addresses speculating as calls to sys_io_setup (0).
 
-    Prior to v4.6's 644c2ae198412 ("arm64: cpufeature: Test 'matches' pointer
-    to find the end of the list") we always tested desc to find the end of
-    a capability list. This was changed for dubious things like PAN_NOT_UAO.
-    v4.7's e3661b128e53e ("arm64: Allow a capability to be checked on
-    single CPU") added this_cpu_has_cap() using the old desc style test.
-
-CC: Suzuki K Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/futex.h | 1 +
- arch/arm64/kernel/cpufeature.c | 4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/assembler.h | 11 +++++++++++
+ arch/arm64/kernel/entry.S          |  2 ++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 1943cf6..718140a 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index ab3a179..a109d30 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -94,6 +94,17 @@
+ 	.endm
  
- #include <linux/futex.h>
- #include <linux/uaccess.h>
-+#include <linux/compiler.h>
- 
- #include <asm/errno.h>
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 3a129d4..fcb67e0 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1063,8 +1063,8 @@ bool this_cpu_has_cap(unsigned int cap)
- 	if (WARN_ON(preemptible()))
- 		return false;
- 
--	for (caps = arm64_features; caps->desc; caps++)
--		if (caps->capability == cap && caps->matches)
-+	for (caps = arm64_features; caps->matches; caps++)
-+		if (caps->capability == cap)
- 			return caps->matches(caps, SCOPE_LOCAL_CPU);
- 
- 	return false;
+ /*
++ * Sanitise a 64-bit bounded index wrt speculation, returning zero if out
++ * of bounds.
++ */
++	.macro	mask_nospec64, idx, limit, tmp
++	sub	\tmp, \idx, \limit
++	bic	\tmp, \tmp, \idx
++	and	\idx, \idx, \tmp, asr #63
++	csdb
++	.endm
++
++/*
+  * NOP sequence
+  */
+ 	.macro	nops, num
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 48c41ff..0a27e12 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -233,6 +233,7 @@ alternative_else_nop_endif
+  * x7 is reserved for the system call number in 32-bit mode.
+  */
+ wsc_nr	.req	w25		// number of system calls
++xsc_nr	.req	x25		// number of system calls (zero-extended)
+ wscno	.req	w26		// syscall number
+ xscno	.req	x26		// syscall number (zero-extended)
+ stbl	.req	x27		// syscall table pointer
+@@ -754,6 +755,7 @@ el0_svc_naked:					// compat entry point
+ 	b.ne	__sys_trace
+ 	cmp     wscno, wsc_nr			// check upper syscall limit
+ 	b.hs	ni_sys
++	mask_nospec64 xscno, xsc_nr, x19	// enforce bounds for syscall number
+ 	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
+ 	blr	x16				// call sys_* routine
+ 	b	ret_fast_syscall
 -- 
 2.7.4
