@@ -1,66 +1,46 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 1 Mar 2018 18:12:48 +0100
-Subject: [PATCH 1/2][v5] dt-bindings: mtd-physmap: Add endianness supports
-In-Reply-To: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
-References: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180301181248.7212a5c5@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Mar 2018 17:13:43 +0000
+Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
+In-Reply-To: <CAKv+Gu8E=wg-=KCtsR=GFEwT1SsEaGFujBx8PNq0JkCAmJYktw@mail.gmail.com>
+References: <20180301162803.5490-1-robh@kernel.org>
+ <20180301170826.GA2678@arm.com>
+ <CAKv+Gu8E=wg-=KCtsR=GFEwT1SsEaGFujBx8PNq0JkCAmJYktw@mail.gmail.com>
+Message-ID: <20180301171343.GB2678@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Feb 2018 13:03:34 +0530
-Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
-
-> Connection between flash and controller is not necessary to be always
-> of same type. It may varies from platform to platform.
+On Thu, Mar 01, 2018 at 05:10:38PM +0000, Ard Biesheuvel wrote:
+> On 1 March 2018 at 17:08, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Mar 01, 2018 at 10:28:03AM -0600, Rob Herring wrote:
+> >> libfdt gained a new dependency on strrchr, so make it available to the
+> >> EFI namespace before we update libfdt.
+> >>
+> >> Thanks to Ard for providing this fix.
+> >>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> ---
+> >> Please ack. This is a dependency on a dtc upstream sync.
+> >
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > As an aside, I noticed that this __efistub prefixing is also being
+> > applied to mapping symbols, so we get crazy stuff like __efistub_$x. I
+> > didn't get round to working out whether that's going to be problematic,
+> > but maybe it's all fine...
+> >
 > 
-> Adding endianness (optional) property to provide connection type
-> information.
+> Ugh. Those mapping symbols.
 > 
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes for v2: updated subject
-> Changes for v3: fixed typo for "big-endian"
-> Changes for v4: Moved binding definition in mtd-physmap.txt
-> as discussed at https://patchwork.ozlabs.org/patch/842543/
-> Changes for v5: Sending as it is
-> 
->  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> index 4a0a48bf4ecb..961a8eed9d0d 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> @@ -41,6 +41,11 @@ additional (optional) property is defined:
->  
->   - erase-size : The chip's physical erase block size in bytes.
->  
-> + The device tree may optionally contain endianness property.
-> + little-endian or big-endian : It represents connection between controller and
-> +			flash.
+> We can filter them explicitly in scripts/kallsyms, I guess, or even
+> better, get rid of all __efistub_ symbols entirely (since they are
+> either aliases or part of __init code)
 
-Hm, I'm not even sure it has to do with the HW connection of the data
-lines (D0:X), probably more something related to how the flash was
-programmed (some people program the flash using a dedicated programmer
-before soldering it on the board) and the current platform endianness
-(which for some platforms, can be changed with a Kconfig option).
+Yeah, I started hooking into frob_arch_sections, but I didn't have my ELF
+hat on so I set it aside for the time being. There were some other weird
+symbols that ended up in modules, some of them with unprintable characters
+due to gas generating weird local labels too (I think in BUG()).
 
-> If this property is absent, flash is considered
-> +			to be host-endian.
-
-The second sentence is no longer valid. Now, if the property is missing
-the behavior is platform/configuration dependent, not necessarily
-host-endian.
-
-> +
->  The device tree may optionally contain sub-nodes describing partitions of the
->  address space. See partition.txt for more detail.
->  
-
-
-
--- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Will
