@@ -1,50 +1,58 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  1 Mar 2018 22:34:30 +0100
-Subject: [PATCH v3 04/16] clk: sunxi-ng: h3: h5: export CLK_PLL_VIDEO
+Date: Thu,  1 Mar 2018 22:34:31 +0100
+Subject: [PATCH v3 05/16] dt-bindings: display: sun4i-drm: Add compatibles for
+ H3 HDMI pipeline
 In-Reply-To: <20180301213442.16677-1-jernej.skrabec@siol.net>
 References: <20180301213442.16677-1-jernej.skrabec@siol.net>
-Message-ID: <20180301213442.16677-5-jernej.skrabec@siol.net>
+Message-ID: <20180301213442.16677-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_PLL_VIDEO needs to be referenced in HDMI DT entry as a possible
-PHY clock parent.
-
-Export it so it can be used later in DT.
+Add missing compatibles for H3 HDMI pipeline. These compatibles can also
+be used with H5 SoC.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 4 +++-
- include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-index 1b4baea37d81..73d7392c968c 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-@@ -26,7 +26,9 @@
- #define CLK_PLL_AUDIO_2X	3
- #define CLK_PLL_AUDIO_4X	4
- #define CLK_PLL_AUDIO_8X	5
--#define CLK_PLL_VIDEO		6
-+
-+/* PLL_VIDEO is exported */
-+
- #define CLK_PLL_VE		7
- #define CLK_PLL_DDR		8
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index b995bfee734a..8bdef4920edc 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -102,6 +102,7 @@ DWC HDMI PHY
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-hdmi-phy
++    * allwinner,sun8i-h3-hdmi-phy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the HDMI PHY
+     * bus: the HDMI PHY interface clock
+@@ -110,6 +111,9 @@ Required properties:
+   - resets: phandle to the reset controller driving the PHY
+   - reset-names: must be "phy"
  
-diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
-index e139fe5c62ec..c5f7e9a70968 100644
---- a/include/dt-bindings/clock/sun8i-h3-ccu.h
-+++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
-@@ -43,6 +43,8 @@
- #ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
- #define _DT_BINDINGS_CLK_SUN8I_H3_H_
- 
-+#define CLK_PLL_VIDEO		6
++H3 HDMI PHY requires additional clock:
++  - pll-0: parent of phy clock
 +
- #define CLK_PLL_PERIPH0		9
+ TV Encoder
+ ----------
  
- #define CLK_CPUX		14
+@@ -275,6 +279,7 @@ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-de2-mixer-0
+     * allwinner,sun8i-a83t-de2-mixer-1
++    * allwinner,sun8i-h3-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -305,6 +310,7 @@ Required properties:
+     * allwinner,sun7i-a20-display-engine
+     * allwinner,sun8i-a33-display-engine
+     * allwinner,sun8i-a83t-display-engine
++    * allwinner,sun8i-h3-display-engine
+     * allwinner,sun8i-v3s-display-engine
+ 
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 2.16.2
