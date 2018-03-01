@@ -1,67 +1,93 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 1 Mar 2018 10:43:39 +0100
-Subject: [PATCH 4/6] ARM: dts: stm32: Enable sdio1 for stm32f769-disco
+Date: Thu, 1 Mar 2018 10:43:36 +0100
+Subject: [PATCH 1/6] ARM: dts: stm32: Add sdio pins definition for stm32f7
 In-Reply-To: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
 References: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1519897421-23803-5-git-send-email-patrice.chotard@st.com>
+Message-ID: <1519897421-23803-2-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Adds SDIO related DT nodes for stm32f769-disco board.
-
-broken-cd property is needed as it misses a pullup on board
-(resistor R76 is missing).
+Add sdio pins definition for the 2 sdio instances embeds in stm32f746.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/stm32f769-disco.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/stm32f7-pinctrl.dtsi | 62 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-index 9dba286c6d2f..2d922b5d4766 100644
---- a/arch/arm/boot/dts/stm32f769-disco.dts
-+++ b/arch/arm/boot/dts/stm32f769-disco.dts
-@@ -44,6 +44,7 @@
- #include "stm32f746.dtsi"
- #include "stm32f769-pinctrl.dtsi"
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "STMicroelectronics STM32F769-DISCO board";
-@@ -62,6 +63,12 @@
- 		serial0 = &usart1;
- 	};
- 
-+	mmc_vcard: mmc_vcard {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc_vcard";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &cec {
-@@ -74,6 +81,18 @@
- 	clock-frequency = <25000000>;
- };
- 
-+&sdio2 {
-+	status = "okay";
-+	vmmc-supply = <&mmc_vcard>;
-+	cd-gpios = <&gpioi 15 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	broken-cd;
-+	pinctrl-names = "default", "opendrain";
-+	pinctrl-0 = <&sdio_pins_b>;
-+	pinctrl-1 = <&sdio_pins_od_b>;
-+	bus-width = <4>;
-+};
+diff --git a/arch/arm/boot/dts/stm32f7-pinctrl.dtsi b/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
+index f518de184e52..fb40f0835dd4 100644
+--- a/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32f7-pinctrl.dtsi
+@@ -222,6 +222,68 @@
+ 					slew-rate = <2>;
+ 				};
+ 			};
 +
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_a>;
- 	pinctrl-names = "default";
++			sdio_pins: sdio_pins at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDMMC1 D0 */
++						 <STM32_PINMUX('C', 9, AF12)>, /* SDMMC1 D1 */
++						 <STM32_PINMUX('C', 10, AF12)>, /* SDMMC1 D2 */
++						 <STM32_PINMUX('C', 11, AF12)>, /* SDMMC1 D3 */
++						 <STM32_PINMUX('C', 12, AF12)>, /* SDMMC1 CLK */
++						 <STM32_PINMUX('D', 2, AF12)>; /* SDMMC1 CMD */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++			};
++
++			sdio_pins_od: sdio_pins_od at 0 {
++				pins1 {
++					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDMMC1 D0 */
++						 <STM32_PINMUX('C', 9, AF12)>, /* SDMMC1 D1 */
++						 <STM32_PINMUX('C', 10, AF12)>, /* SDMMC1 D2 */
++						 <STM32_PINMUX('C', 11, AF12)>, /* SDMMC1 D3 */
++						 <STM32_PINMUX('C', 12, AF12)>; /* SDMMC1 CLK */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++
++				pins2 {
++					pinmux = <STM32_PINMUX('D', 2, AF12)>; /* SDMMC1 CMD */
++					drive-open-drain;
++					slew-rate = <2>;
++				};
++			};
++
++			sdio_pins_b: sdio_pins_b at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('G', 9, AF11)>, /* SDMMC2 D0 */
++						 <STM32_PINMUX('G', 10, AF11)>, /* SDMMC2 D1 */
++						 <STM32_PINMUX('B', 3, AF10)>, /* SDMMC2 D2 */
++						 <STM32_PINMUX('B', 4, AF10)>, /* SDMMC2 D3 */
++						 <STM32_PINMUX('D', 6, AF11)>, /* SDMMC2 CLK */
++						 <STM32_PINMUX('D', 7, AF11)>; /* SDMMC2 CMD */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++			};
++
++			sdio_pins_od_b: sdio_pins_od_b at 0 {
++				pins1 {
++					pinmux = <STM32_PINMUX('G', 9, AF11)>, /* SDMMC2 D0 */
++						 <STM32_PINMUX('G', 10, AF11)>, /* SDMMC2 D1 */
++						 <STM32_PINMUX('B', 3, AF10)>, /* SDMMC2 D2 */
++						 <STM32_PINMUX('B', 4, AF10)>, /* SDMMC2 D3 */
++						 <STM32_PINMUX('D', 6, AF11)>; /* SDMMC2 CLK */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++
++				pins2 {
++					pinmux = <STM32_PINMUX('D', 7, AF11)>; /* SDMMC2 CMD */
++					drive-open-drain;
++					slew-rate = <2>;
++				};
++			};
+ 		};
+ 	};
+ };
 -- 
 1.9.1
