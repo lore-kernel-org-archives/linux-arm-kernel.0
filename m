@@ -1,43 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 1 Mar 2018 18:46:01 +0100
-Subject: [PATCH] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM and
- PDK2
-In-Reply-To: <20180228053432.GG3217@dragon>
-References: <20180224210429.18606-1-marex@denx.de>
- <20180228053432.GG3217@dragon>
-Message-ID: <f8263399-c9b9-4c76-b468-8eb49b172139@denx.de>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Thu,  1 Mar 2018 11:47:09 -0600
+Subject: [PATCH 0/3] staging: fsl-mc: Move DPBP and DPCON out of staging
+Message-ID: <20180301174712.2660-1-bogdan.purcareata@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2018 06:34 AM, Shawn Guo wrote:
-> On Sat, Feb 24, 2018 at 10:04:29PM +0100, Marek Vasut wrote:
->> Add support for the DH i.MX6 Quad based SoM and a PDK2 evaluation board.
->> The evaluation board features three serial ports, USB OTG, USB host with
->> an USB hub, Fast or Gigabit ethernet, eMMC, uSD, SD, mSATA, analog audio,
->> PCIe and HDMI video output.
->>
->> All of the aforementioned features are supported by this patch.
->>
->> Signed-off-by: Marek Vasut <marex@denx.de>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
+Commit 6bd067c48ef ("staging: fsl-mc: Move core bus out of staging")
+moves the fsl-mc bus driver infrastructure out of staging to
+drivers/bus/fsl-mc. The next step is moving a couple of tightly
+connected DPAA2 objects - DPBP (Data Path Buffer Pool) and DPCON
+(Data Path Concentrator).
 
-[...]
+Patch 1 removes dead code from the involved source files.
 
->> +	rtc at 56 {
-> 
-> The node name says it's a RTC ...
-> 
->> +		compatible = "rv3029c2";
-> 
-> ... the compatible is defined in bindings/i2c/i2c-gpio.txt and should be
-> a I2C GPIO expander.  Confused.
+Patches 2-3 handle moving out the mentioned objects, one at a time.
 
-Very quick git grep reveals
-drivers/rtc/rtc-rv3029c2.c
+Bogdan Purcareata (3):
+  staging: fsl-mc: Cleanup dpbp and dpcon API
+  staging: fsl-mc: Move DPBP out of staging
+  staging: fsl-mc: Move DPCON out of staging
 
-[...]
+ drivers/bus/fsl-mc/Makefile                        |   2 +
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c  |  71 +-------------
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpcon.c |   4 +-
+ drivers/bus/fsl-mc/fsl-mc-private.h                |  87 +++++++++++++++++
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   3 +-
+ drivers/staging/fsl-mc/bus/Makefile                |   2 -
+ drivers/staging/fsl-mc/bus/dpbp-cmd.h              |  54 -----------
+ drivers/staging/fsl-mc/bus/dpcon-cmd.h             |  53 ----------
+ drivers/staging/fsl-mc/include/dpbp.h              |  63 ------------
+ drivers/staging/fsl-mc/include/dpcon.h             |  79 ---------------
+ include/linux/fsl/mc.h                             | 108 +++++++++++++++++++++
+ 11 files changed, 202 insertions(+), 324 deletions(-)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c (73%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpcon.c (99%)
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpbp-cmd.h
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpcon-cmd.h
+ delete mode 100644 drivers/staging/fsl-mc/include/dpbp.h
+ delete mode 100644 drivers/staging/fsl-mc/include/dpcon.h
 
 -- 
-Best regards,
-Marek Vasut
+2.7.4
