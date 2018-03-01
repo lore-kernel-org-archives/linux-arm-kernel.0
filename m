@@ -1,50 +1,106 @@
-From: acourbot@chromium.org (Alexandre Courbot)
-Date: Thu, 1 Mar 2018 11:19:21 +0900
-Subject: [PATCH] arm64: defconfig: Enable typec-phy and
- extcon-usbc-cros-ec for rk3399
-In-Reply-To: <20180228140251.22232-1-enric.balletbo@collabora.com>
-References: <20180228140251.22232-1-enric.balletbo@collabora.com>
-Message-ID: <CAPBb6MV4Wx4j4vuv+m2PK20QCuF_BcGXx9A2SCjNmi7i-eo85Q@mail.gmail.com>
+From: chenhc@lemote.com (Huacai Chen)
+Date: Thu,  1 Mar 2018 10:53:11 +0800
+Subject: [PATCH 01/99] ZBOOT: fix stack protector in compressed boot phase
+Message-ID: <1519872791-19076-1-git-send-email-chenhc@lemote.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 11:02 PM, Enric Balletbo i Serra
-<enric.balletbo@collabora.com> wrote:
-> Enables typec phyter and extcon driver for cable detection that is used by
-> USB 3.0 controller for Rockchip rk3399 SoCs.
->
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+stack checking always fails for decompress_kernel() itself. So remove
+__stack_chk_guard_setup() and initialize __stack_chk_guard at where we
+define it.
 
-Tested-by: Alexandre Courbot <acourbot@chromium.org>
+Original code comes from ARM but also used for MIPS and SH, so fix them
+together.
 
-Thanks! This fixes a USB regression in 4.16-rc1 and -rc2 for
-gru-kevin. Neither USB3 nor USB2 were usable whereas at least USB2 was
-usable in 4.15.
+Cc: stable at vger.kernel.org
+Signed-off-by: Huacai Chen <chenhc@lemote.com>
+---
+ arch/arm/boot/compressed/misc.c        | 9 +--------
+ arch/mips/boot/compressed/decompress.c | 9 +--------
+ arch/sh/boot/compressed/misc.c         | 9 +--------
+ 3 files changed, 3 insertions(+), 24 deletions(-)
 
-> ---
->  arch/arm64/configs/defconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 78b47bc7dc54..d4c25aa55785 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -544,6 +544,7 @@ CONFIG_ARCH_TEGRA_132_SOC=y
->  CONFIG_ARCH_TEGRA_210_SOC=y
->  CONFIG_ARCH_TEGRA_186_SOC=y
->  CONFIG_EXTCON_USB_GPIO=y
-> +CONFIG_EXTCON_USBC_CROS_EC=y
->  CONFIG_IIO=y
->  CONFIG_EXYNOS_ADC=y
->  CONFIG_ROCKCHIP_SARADC=m
-> @@ -564,6 +565,7 @@ CONFIG_PHY_MVEBU_CP110_COMPHY=y
->  CONFIG_PHY_ROCKCHIP_INNO_USB2=y
->  CONFIG_PHY_ROCKCHIP_EMMC=y
->  CONFIG_PHY_ROCKCHIP_PCIE=m
-> +CONFIG_PHY_ROCKCHIP_TYPEC=y
->  CONFIG_PHY_XGENE=y
->  CONFIG_PHY_TEGRA_XUSB=y
->  CONFIG_QCOM_L2_PMU=y
-> --
-> 2.16.1
->
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 16a8a80..43aca75 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -128,12 +128,7 @@ asmlinkage void __div0(void)
+ 	error("Attempting division by 0!");
+ }
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ {
+ 	int ret;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	output_data		= (unsigned char *)output_start;
+ 	free_mem_ptr		= free_mem_ptr_p;
+ 	free_mem_end_ptr	= free_mem_ptr_end_p;
+diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+index fdf99e9..0694b3f 100644
+--- a/arch/mips/boot/compressed/decompress.c
++++ b/arch/mips/boot/compressed/decompress.c
+@@ -76,12 +76,7 @@ void error(char *x)
+ #include "../../../../lib/decompress_unxz.c"
+ #endif
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+ {
+ 	unsigned long zimage_start, zimage_size;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	zimage_start = (unsigned long)(&__image_begin);
+ 	zimage_size = (unsigned long)(&__image_end) -
+ 	    (unsigned long)(&__image_begin);
+diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+index 627ce8e..2c564c2 100644
+--- a/arch/sh/boot/compressed/misc.c
++++ b/arch/sh/boot/compressed/misc.c
+@@ -104,12 +104,7 @@ static void error(char *x)
+ 	while(1);	/* Halt */
+ }
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -130,8 +125,6 @@ void decompress_kernel(void)
+ {
+ 	unsigned long output_addr;
+ 
+-	__stack_chk_guard_setup();
+-
+ #ifdef CONFIG_SUPERH64
+ 	output_addr = (CONFIG_MEMORY_START + 0x2000);
+ #else
+-- 
+2.7.0
