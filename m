@@ -1,44 +1,349 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 1 Mar 2018 10:23:00 +0000
-Subject: [PATCH v3 01/10] dt-bindings: pinctrl: Add bindings for Actions
- S900 SoC
-In-Reply-To: <20180301092556.x4a5ohx3iccwsugw@linaro.org>
-References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
- <20180228181432.26847-2-manivannan.sadhasivam@linaro.org>
- <CACRpkdYG_aBJ0WME7NSOdv0pV5Vh_z8GVqQ+tUFnXGA7NGVMUg@mail.gmail.com>
- <20180301092556.x4a5ohx3iccwsugw@linaro.org>
-Message-ID: <20180301102300.z2abpg4ao62dibgm@oak.lan>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  1 Mar 2018 18:18:36 +0800
+Subject: [RESEND PATCH v6 13/14] iommu/rockchip: Add runtime PM support
+In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180301101837.27969-14-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 02:55:56PM +0530, Manivannan Sadhasivam wrote:
-> Hi Linus,
-> On Thu, Mar 01, 2018 at 10:20:29AM +0100, Linus Walleij wrote:
-> > On Wed, Feb 28, 2018 at 7:14 PM, Manivannan Sadhasivam
-> > <manivannan.sadhasivam@linaro.org> wrote:
-> > 
-> > > Add pinctrl bindings for Actions Semi S900 SoC
-> > >
-> > > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > 
-> > The previous (v2) version had Rob's Review tag, did you just forget
-> > to add it or has something changed?
-> > 
-> 
-> My bad. Slipped through the cracks.
-> 
-> > If nothing is changed I can add his tag when applying.
-> >
-> 
-> I will send out a new version of the whole series, incorporating Andy's
-> pinctrl driver review.
-> 
-> Also, FYI this pacthseries depends on Clock driver patchset I have submitted
-> earlier. So far no reply from Stephen yet. He said that he is working on setting
-> up his new environment and will begin reviewing shortly.
+When the power domain is powered off, the IOMMU cannot be accessed and
+register programming must be deferred until the power domain becomes
+enabled.
 
-Is the dependancy at runtime (driver is not functional without clocks) or compile
-time (driver cannot build without other patchset landing)?
+Add runtime PM support, and use runtime PM device link from IOMMU to
+master to startup and shutdown IOMMU.
 
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Daniel.
+Changes in v6: None
+Changes in v5:
+Avoid race about pm_runtime_get_if_in_use() and pm_runtime_enabled().
+
+Changes in v4: None
+Changes in v3:
+Only call startup() and shutdown() when iommu attached.
+Remove pm_mutex.
+Check runtime PM disabled.
+Check pm_runtime in rk_iommu_irq().
+
+Changes in v2: None
+
+ drivers/iommu/rockchip-iommu.c | 181 +++++++++++++++++++++++++++++++----------
+ 1 file changed, 140 insertions(+), 41 deletions(-)
+
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 2448a0528e39..0e0a42f41818 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+@@ -106,6 +107,7 @@ struct rk_iommu {
+ };
+ 
+ struct rk_iommudata {
++	struct device_link *link; /* runtime PM link from IOMMU to master */
+ 	struct rk_iommu *iommu;
+ };
+ 
+@@ -518,7 +520,12 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+ 	u32 int_status;
+ 	dma_addr_t iova;
+ 	irqreturn_t ret = IRQ_NONE;
+-	int i;
++	int i, err, need_runtime_put;
++
++	err = pm_runtime_get_if_in_use(iommu->dev);
++	if (err <= 0 && err != -EINVAL)
++		return ret;
++	need_runtime_put = err > 0;
+ 
+ 	WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+ 
+@@ -570,6 +577,9 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+ 
+ 	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 
++	if (need_runtime_put)
++		pm_runtime_put(iommu->dev);
++
+ 	return ret;
+ }
+ 
+@@ -611,10 +621,20 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+ 	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+ 	list_for_each(pos, &rk_domain->iommus) {
+ 		struct rk_iommu *iommu;
++		int ret;
++
+ 		iommu = list_entry(pos, struct rk_iommu, node);
+-		WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+-		rk_iommu_zap_lines(iommu, iova, size);
+-		clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++
++		/* Only zap TLBs of IOMMUs that are powered on. */
++		ret = pm_runtime_get_if_in_use(iommu->dev);
++		if (ret > 0 || ret == -EINVAL) {
++			WARN_ON(clk_bulk_enable(iommu->num_clocks,
++						iommu->clocks));
++			rk_iommu_zap_lines(iommu, iova, size);
++			clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++		}
++		if (ret > 0)
++			pm_runtime_put(iommu->dev);
+ 	}
+ 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+ }
+@@ -817,22 +837,30 @@ static struct rk_iommu *rk_iommu_from_dev(struct device *dev)
+ 	return data ? data->iommu : NULL;
+ }
+ 
+-static int rk_iommu_attach_device(struct iommu_domain *domain,
+-				  struct device *dev)
++/* Must be called with iommu powered on and attached */
++static void rk_iommu_shutdown(struct rk_iommu *iommu)
+ {
+-	struct rk_iommu *iommu;
++	int i;
++
++	/* Ignore error while disabling, just keep going */
++	WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
++	rk_iommu_enable_stall(iommu);
++	rk_iommu_disable_paging(iommu);
++	for (i = 0; i < iommu->num_mmu; i++) {
++		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, 0);
++		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
++	}
++	rk_iommu_disable_stall(iommu);
++	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++}
++
++/* Must be called with iommu powered on and attached */
++static int rk_iommu_startup(struct rk_iommu *iommu)
++{
++	struct iommu_domain *domain = iommu->domain;
+ 	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+-	unsigned long flags;
+ 	int ret, i;
+ 
+-	/*
+-	 * Allow 'virtual devices' (e.g., drm) to attach to domain.
+-	 * Such a device does not belong to an iommu group.
+-	 */
+-	iommu = rk_iommu_from_dev(dev);
+-	if (!iommu)
+-		return 0;
+-
+ 	ret = clk_bulk_enable(iommu->num_clocks, iommu->clocks);
+ 	if (ret)
+ 		return ret;
+@@ -845,8 +873,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	if (ret)
+ 		goto out_disable_stall;
+ 
+-	iommu->domain = domain;
+-
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+ 			       rk_domain->dt_dma);
+@@ -855,14 +881,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	}
+ 
+ 	ret = rk_iommu_enable_paging(iommu);
+-	if (ret)
+-		goto out_disable_stall;
+-
+-	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+-	list_add_tail(&iommu->node, &rk_domain->iommus);
+-	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+-
+-	dev_dbg(dev, "Attached to iommu domain\n");
+ 
+ out_disable_stall:
+ 	rk_iommu_disable_stall(iommu);
+@@ -877,31 +895,76 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	struct rk_iommu *iommu;
+ 	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+ 	unsigned long flags;
+-	int i;
++	int ret;
+ 
+ 	/* Allow 'virtual devices' (eg drm) to detach from domain */
+ 	iommu = rk_iommu_from_dev(dev);
+ 	if (!iommu)
+ 		return;
+ 
++	dev_dbg(dev, "Detaching from iommu domain\n");
++
++	/* iommu already detached */
++	if (iommu->domain != domain)
++		return;
++
++	iommu->domain = NULL;
++
+ 	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+ 	list_del_init(&iommu->node);
+ 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+ 
+-	/* Ignore error while disabling, just keep going */
+-	WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+-	rk_iommu_enable_stall(iommu);
+-	rk_iommu_disable_paging(iommu);
+-	for (i = 0; i < iommu->num_mmu; i++) {
+-		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, 0);
+-		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
+-	}
+-	rk_iommu_disable_stall(iommu);
+-	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++	ret = pm_runtime_get_if_in_use(iommu->dev);
++	if (ret > 0 || ret == -EINVAL)
++		rk_iommu_shutdown(iommu);
++	if (ret > 0)
++		pm_runtime_put(iommu->dev);
++}
+ 
+-	iommu->domain = NULL;
++static int rk_iommu_attach_device(struct iommu_domain *domain,
++		struct device *dev)
++{
++	struct rk_iommu *iommu;
++	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
++	unsigned long flags;
++	int ret, need_runtime_put;
++
++	/*
++	 * Allow 'virtual devices' (e.g., drm) to attach to domain.
++	 * Such a device does not belong to an iommu group.
++	 */
++	iommu = rk_iommu_from_dev(dev);
++	if (!iommu)
++		return 0;
++
++	dev_dbg(dev, "Attaching to iommu domain\n");
++
++	/* iommu already attached */
++	if (iommu->domain == domain)
++		return 0;
++
++	if (iommu->domain)
++		rk_iommu_detach_device(iommu->domain, dev);
++
++	iommu->domain = domain;
++
++	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
++	list_add_tail(&iommu->node, &rk_domain->iommus);
++	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
++
++	ret = pm_runtime_get_if_in_use(iommu->dev);
++	if (ret <= 0 && ret != -EINVAL)
++		return 0;
++	need_runtime_put = ret > 0;
++
++	ret = rk_iommu_startup(iommu);
++	if (ret)
++		rk_iommu_detach_device(iommu->domain, dev);
++
++	if (need_runtime_put)
++		pm_runtime_put(iommu->dev);
+ 
+-	dev_dbg(dev, "Detached from iommu domain\n");
++	return ret;
+ }
+ 
+ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
+@@ -989,17 +1052,21 @@ static int rk_iommu_add_device(struct device *dev)
+ {
+ 	struct iommu_group *group;
+ 	struct rk_iommu *iommu;
++	struct rk_iommudata *data;
+ 
+-	iommu = rk_iommu_from_dev(dev);
+-	if (!iommu)
++	data = dev->archdata.iommu;
++	if (!data)
+ 		return -ENODEV;
+ 
++	iommu = rk_iommu_from_dev(dev);
++
+ 	group = iommu_group_get_for_dev(dev);
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+ 	iommu_group_put(group);
+ 
+ 	iommu_device_link(&iommu->iommu, dev);
++	data->link = device_link_add(dev, iommu->dev, DL_FLAG_PM_RUNTIME);
+ 
+ 	return 0;
+ }
+@@ -1007,9 +1074,11 @@ static int rk_iommu_add_device(struct device *dev)
+ static void rk_iommu_remove_device(struct device *dev)
+ {
+ 	struct rk_iommu *iommu;
++	struct rk_iommudata *data = dev->archdata.iommu;
+ 
+ 	iommu = rk_iommu_from_dev(dev);
+ 
++	device_link_del(data->link);
+ 	iommu_device_unlink(&iommu->iommu, dev);
+ 	iommu_group_remove_device(dev);
+ }
+@@ -1135,6 +1204,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 
+ 	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
+ 
++	pm_runtime_enable(dev);
++
+ 	return 0;
+ err_remove_sysfs:
+ 	iommu_device_sysfs_remove(&iommu->iommu);
+@@ -1143,6 +1214,33 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
++static int __maybe_unused rk_iommu_suspend(struct device *dev)
++{
++	struct rk_iommu *iommu = dev_get_drvdata(dev);
++
++	if (!iommu->domain)
++		return 0;
++
++	rk_iommu_shutdown(iommu);
++	return 0;
++}
++
++static int __maybe_unused rk_iommu_resume(struct device *dev)
++{
++	struct rk_iommu *iommu = dev_get_drvdata(dev);
++
++	if (!iommu->domain)
++		return 0;
++
++	return rk_iommu_startup(iommu);
++}
++
++static const struct dev_pm_ops rk_iommu_pm_ops = {
++	SET_RUNTIME_PM_OPS(rk_iommu_suspend, rk_iommu_resume, NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
++};
++
+ static const struct of_device_id rk_iommu_dt_ids[] = {
+ 	{ .compatible = "rockchip,iommu" },
+ 	{ /* sentinel */ }
+@@ -1154,6 +1252,7 @@ static struct platform_driver rk_iommu_driver = {
+ 	.driver = {
+ 		   .name = "rk_iommu",
+ 		   .of_match_table = rk_iommu_dt_ids,
++		   .pm = &rk_iommu_pm_ops,
+ 		   .suppress_bind_attrs = true,
+ 	},
+ };
+-- 
+2.11.0
