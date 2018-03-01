@@ -1,33 +1,59 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 1 Mar 2018 10:43:41 +0100
-Subject: [PATCH 6/6] ARM: dts: stm32: Fix sdio2 rcc hard coded value
+Date: Thu, 1 Mar 2018 10:43:38 +0100
+Subject: [PATCH 3/6] ARM: dts: stm32: Enable sdio1 for stm32f746-eval
 In-Reply-To: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
 References: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1519897421-23803-7-git-send-email-patrice.chotard@st.com>
+Message-ID: <1519897421-23803-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Replace sdio2 rcc hard coded clock value by its macro.
+Adds SDIO related DT nodes for stm32f746-eval board.
+
+broken-cd property is needed as card detect signal is
+connected to a GPIO expander which is not yet supported
+in kernel linux.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/stm32f746.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/stm32746g-eval.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 07c29658696c..2c5704f96801 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -432,7 +432,7 @@
- 			compatible = "arm,pl180", "arm,primecell";
- 			arm,primecell-periphid = <0x00880180>;
- 			reg = <0x40011c00 0x400>;
--			clocks = <&rcc 0 167>;
-+			clocks = <&rcc 0 STM32F7_APB2_CLOCK(SDMMC2)>;
- 			clock-names = "apb_pclk";
- 			interrupts = <103>;
- 			max-frequency = <48000000>;
+diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
+index b2d4b8c46677..63160199e39a 100644
+--- a/arch/arm/boot/dts/stm32746g-eval.dts
++++ b/arch/arm/boot/dts/stm32746g-eval.dts
+@@ -91,6 +91,13 @@
+ 		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
+ 		clock-names = "main_clk";
+ 	};
++
++	mmc_vcard: mmc_vcard {
++		compatible = "regulator-fixed";
++		regulator-name = "mmc_vcard";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &clk_hse {
+@@ -113,6 +120,16 @@
+ 	status = "okay";
+ };
+ 
++&sdio1 {
++	status = "okay";
++	vmmc-supply = <&mmc_vcard>;
++	broken-cd;
++	pinctrl-names = "default", "opendrain";
++	pinctrl-0 = <&sdio_pins>;
++	pinctrl-1 = <&sdio_pins_od>;
++	bus-width = <4>;
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
