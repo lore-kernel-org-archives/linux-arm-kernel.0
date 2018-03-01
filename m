@@ -1,79 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  1 Mar 2018 14:17:00 -0800
-Subject: [PATCH 06/10] ARM: omap2plus_defconfig: Drop unneeded options
-In-Reply-To: <20180301221704.104530-1-tony@atomide.com>
-References: <20180301221704.104530-1-tony@atomide.com>
-Message-ID: <20180301221704.104530-7-tony@atomide.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 01 Mar 2018 23:23:57 +0100
+Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
+In-Reply-To: <2424862.oPtAVTfrB9@jernej-laptop>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+Message-ID: <63331816.68OamKINx1@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are no longer needed because:
+Hi Kuninori,
 
-- PCI_DRA7XX_HOST selects PCI_DRA7XX
+I'm responding to my own mail, since I didn't received yours for some reason 
+but I still saw your response in mailing list archive.
 
-- USB_NET_QMI_WWAN selects USB_WDM
+Dne sreda, 28. februar 2018 ob 22:02:09 CET je Jernej ?krabec napisal(a):
+> Hi all,
+> 
+> with todays linux-next (next-20180228), kernel on Allwinner H3 SoC crashes
+> with dmesg like that: https://pastebin.com/raw/0D5JeaJ8
+> 
+> I bisected the kernel and first offending commit is:
+> be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: replace platform to
+> component")
+> 
+> I know that crash message is completely unrelated to sound subsystem, but it
+> turns out that if I disable CONFIG_SND_SUN4I_CODEC kernel works ok, but
+> this way I lose analog audio output.
+> 
+> Any suggestions what can be the issue?
 
-- USB_PHY selects EXTCON
+I did a bit of research and I can tell you that different kernel options (some 
+drivers added or removed) change how or where kernel crashes. That would 
+suggest some kind of memory corruption.
 
-- IIO_CONFIGFS selects CONFIGFS_FS
+I removed parts of the code from the sun4i codec driver and interestingly it 
+doesn't crash if I remove following lines:
 
-- TIMER_STATS option no longer exists
+ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+if (ret) {
+	dev_err(&pdev->dev, "Failed to register against DMAEngine\n");
+	goto err_assert_reset;
+}
 
-- CRYPTO_SHA1_ARM_NEON selects CRYPTO_SHA1_ARM
+Is it possible that NULL pointer causes troubles somewhere down the line?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 6 ------
- 1 file changed, 6 deletions(-)
+I tested this on linux-next, next-20180228 tag.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -50,7 +50,6 @@ CONFIG_ARM_THUMBEE=y
- CONFIG_ARM_ERRATA_411920=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
--CONFIG_PCI_DRA7XX=y
- CONFIG_PCI_DRA7XX_EP=y
- CONFIG_PCI_ENDPOINT=y
- CONFIG_PCI_ENDPOINT_CONFIGFS=y
-@@ -394,7 +393,6 @@ CONFIG_USB_MON=m
- CONFIG_USB_XHCI_HCD=m
- CONFIG_USB_EHCI_HCD=m
- CONFIG_USB_OHCI_HCD=m
--CONFIG_USB_WDM=m
- CONFIG_USB_ACM=m
- CONFIG_USB_STORAGE=m
- CONFIG_USB_MUSB_HDRC=m
-@@ -471,7 +469,6 @@ CONFIG_DMADEVICES=y
- CONFIG_DMA_OMAP=y
- CONFIG_TI_EDMA=y
- CONFIG_OMAP_IOMMU=y
--CONFIG_EXTCON=m
- CONFIG_EXTCON_PALMAS=m
- CONFIG_EXTCON_USB_GPIO=m
- CONFIG_TI_EMIF=m
-@@ -503,7 +500,6 @@ CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
--CONFIG_CONFIGFS_FS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
- CONFIG_JFFS2_FS_XATTR=y
-@@ -524,13 +520,11 @@ CONFIG_DEBUG_INFO_SPLIT=y
- CONFIG_DEBUG_INFO_DWARF4=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_SCHEDSTATS=y
--CONFIG_TIMER_STATS=y
- CONFIG_PROVE_LOCKING=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_SECURITY=y
- CONFIG_CRYPTO_MICHAEL_MIC=y
- CONFIG_ARM_CRYPTO=y
--CONFIG_CRYPTO_SHA1_ARM=m
- CONFIG_CRYPTO_SHA1_ARM_NEON=m
- CONFIG_CRYPTO_SHA256_ARM=m
- CONFIG_CRYPTO_SHA512_ARM=m
--- 
-2.16.2
+Best regards,
+Jernej
