@@ -1,57 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Mar 2018 10:47:37 +0000
-Subject: Clang build of arm64 kernel fails
-In-Reply-To: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
-References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
-Message-ID: <be30b204-5752-9667-b599-b394cbfbc663@arm.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Thu, 1 Mar 2018 11:53:43 +0100
+Subject: [PATCH v2 6/6] ARM: dts: stm32: Fix sdio2 rcc hard coded value
+In-Reply-To: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
+References: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1519901623-23216-7-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On 28/02/18 19:32, Andrey Konovalov wrote:
-> Hi Marc!
-> 
-> I've tried to pull in new upstream commits and the kernel build
-> started failing for me with the following errors (see below).
-> 
-> It seems that the reason is your commit "arm64: Add
-> ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
-> doesn't like 32 bits registers being used in 64 bits build.
+Replace sdio2 rcc hard coded clock value by its macro.
 
-These are not AArch32 registers. They are AArch64 registers that the
-compiler specialises to an x (64bit wide) or w (32bit wide) register
-depending on the type that is used to define the corresponding variable.
-The fact that they are named just as AArch32 is an added compatibility
-bonus.
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/boot/dts/stm32f746.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-For example:
-
-void foo(void)
-{
-	register unsigned long reg0 asm("r0") = 0;
-	register unsigned int  reg1 asm("r1") = 1;
-
-	asm volatile("hvc #0" : : "r" (reg0), "r" (reg1));
-}
-
-results in:
-
-Disassembly of section .text:
-
-0000000000000000 <foo>:
-   0:	d2800000 	mov	x0, #0x0                   	// #0
-   4:	52800021 	mov	w1, #0x1                   	// #1
-   8:	d4000002 	hvc	#0x0
-   c:	d65f03c0 	ret
-
-> Would you mind sending a fix?
-
-I can look into it. Is there an equivalent Clang construct that wouldn't
-result in a sea of #ifdefs?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 07c29658696c..2c5704f96801 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -432,7 +432,7 @@
+ 			compatible = "arm,pl180", "arm,primecell";
+ 			arm,primecell-periphid = <0x00880180>;
+ 			reg = <0x40011c00 0x400>;
+-			clocks = <&rcc 0 167>;
++			clocks = <&rcc 0 STM32F7_APB2_CLOCK(SDMMC2)>;
+ 			clock-names = "apb_pclk";
+ 			interrupts = <103>;
+ 			max-frequency = <48000000>;
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
