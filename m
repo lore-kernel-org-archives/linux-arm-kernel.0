@@ -1,38 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Mar 2018 15:22:53 -0600
-Subject: [PATCH V5 2/2] thermal: imx: add i.MX7 thermal sensor support
-In-Reply-To: <1519859380-15878-2-git-send-email-Anson.Huang@nxp.com>
-References: <1519859380-15878-1-git-send-email-Anson.Huang@nxp.com>
- <1519859380-15878-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180301212253.fp4gxes57t2m2tg2@rob-hp-laptop>
+From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
+Date: Thu, 1 Mar 2018 22:24:21 +0100
+Subject: [PATCH 2/2] ARM: pinctrl: stm32: Optimizes and enhances stm32gpio
+ irqchip
+In-Reply-To: <CACRpkdbmmx7y3xJOOy0Dx62tMonkCgZeVzKYzr1B362QZe0fsA@mail.gmail.com>
+References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <1519221027-4028-3-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <CACRpkdbmmx7y3xJOOy0Dx62tMonkCgZeVzKYzr1B362QZe0fsA@mail.gmail.com>
+Message-ID: <CAFvLkMRRWZKqChFu+7yEDURtM_ZmmB1RMjj8yUwTZndiwySckA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 07:09:40AM +0800, Anson Huang wrote:
-> This patch adds i.MX7 thermal sensor support, most
-> of the i.MX7 thermal sensor functions are same with
-> i.MX6 except the registers offset/layout, so we move
-> those registers offset/layout definitions to soc data
-> structure.
-> 
-> i.MX7 uses single calibration data @25C, the calibration
-> data is located at OCOTP offset 0x4F0, bit[17:9], the
-> formula is as below:
-> 
-> Tmeas = (Nmeas - n1) + 25; n1 is the fuse value for 25C.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> ---
-> changes since V4:
-> 	drop direct OCOTP register access for i.mx7d since it is a new added platform,
-> 	only support reading ocotp values through the ocotp nvmem driver which handles clock.
->  .../devicetree/bindings/thermal/imx-thermal.txt    |   9 +-
->  drivers/thermal/imx_thermal.c                      | 295 ++++++++++++++++-----
->  2 files changed, 239 insertions(+), 65 deletions(-)
+I don't know if Alexandre agrees but It might be better to take v2
+where irq_ack is added.
 
-Please add ack/reviewed-by's when posting new versions.
-
-Rob
+2018-03-01 22:04 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Feb 21, 2018 at 2:50 PM, Radoslaw Pietrzyk
+> <radoslaw.pietrzyk@gmail.com> wrote:
+>
+>>         - removes unneeded irq_chip.irq_eoi callback
+>>         - adds irq_chip.irq_set_wake callback for possible
+>>         in the future GPIO wakeup
+>>
+>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>
+> Patch applied with Alexandre's ACK, stripping ARM from the
+> commit message, thanks!
+>
+> Yours,
+> Linus Walleij
