@@ -1,66 +1,74 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Thu,  1 Mar 2018 17:43:42 +0100
-Subject: [PATCH v2 1/2] ARM: PLT: Move struct plt_entries definition to header
-In-Reply-To: <20180301164343.5794-1-alexander.sverdlin@nokia.com>
-References: <20180301164343.5794-1-alexander.sverdlin@nokia.com>
-Message-ID: <20180301164343.5794-2-alexander.sverdlin@nokia.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 1 Mar 2018 10:44:29 -0600
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+ <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+ <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
+Message-ID: <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change, later it will be re-used in several files.
+On 03/01/2018 02:36 AM, Bartosz Golaszewski wrote:
+> 2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
+>> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
+>>>
+>>>
+>>> I think I found the reason for the strange crashes we were
+>>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
+>>> me in the right direction.
+>>>
+>>> The mdio driver fails to probe with v7 due to the supplied clock rate
+>>> being wrong. Before failing we register the emac clock with
+>>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
+>>> reference count of the clock, but we never actually increased it in
+>>> the first place in the line above. The core clock code then destroys
+>>> the associated clk_core structure. When the next user comes around (in
+>>> our case the clk debug functions) the system crashes.
+>>>
+>>> I believe there to be two issues: one is with v7 - we need to increase
+>>> the clock reference count in davinci_psc_genpd_attach_dev().
+>>>
+>>> Second is the error path in the clock framework - we should remove the
+>>> destroyed clk_core from the debug list, which is not being done now.
+>>>
+>>> Why we even need to track the refcount of clk_core is a mistery for me
+>>> though. Stephen, Mike?
+>>>
+>>> Best regards,
+>>> Bartosz Golaszewski
+>>
+>>
+>> Great find. I figured it had to be something like this, but I wasn't
+>> able to reproduce the problem yet.
+>>
+>> I suppose it is time to spin up a v8 with some fixes.
+> 
+> I still don't know why the mdio clock rate is much lower than in
+> mainline though. Any ideas?
+> 
+> Thanks,
+> Bart
+> 
 
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
----
- arch/arm/include/asm/module.h | 9 +++++++++
- arch/arm/kernel/module-plts.c | 9 ---------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+Now that you have fixed the crash, can you answer the questions I have
+asked earlier?
 
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index 89ad059..6996405 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -19,6 +19,15 @@ enum {
- };
- #endif
- 
-+#define PLT_ENT_STRIDE		L1_CACHE_BYTES
-+#define PLT_ENT_COUNT		(PLT_ENT_STRIDE / sizeof(u32))
-+#define PLT_ENT_SIZE		(sizeof(struct plt_entries) / PLT_ENT_COUNT)
-+
-+struct plt_entries {
-+	u32	ldr[PLT_ENT_COUNT];
-+	u32	lit[PLT_ENT_COUNT];
-+};
-+
- struct mod_plt_sec {
- 	struct elf32_shdr	*plt;
- 	int			plt_count;
-diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index 3d0c2e4..f272711 100644
---- a/arch/arm/kernel/module-plts.c
-+++ b/arch/arm/kernel/module-plts.c
-@@ -14,10 +14,6 @@
- #include <asm/cache.h>
- #include <asm/opcodes.h>
- 
--#define PLT_ENT_STRIDE		L1_CACHE_BYTES
--#define PLT_ENT_COUNT		(PLT_ENT_STRIDE / sizeof(u32))
--#define PLT_ENT_SIZE		(sizeof(struct plt_entries) / PLT_ENT_COUNT)
--
- #ifdef CONFIG_THUMB2_KERNEL
- #define PLT_ENT_LDR		__opcode_to_mem_thumb32(0xf8dff000 | \
- 							(PLT_ENT_STRIDE - 4))
-@@ -26,11 +22,6 @@
- 						    (PLT_ENT_STRIDE - 8))
- #endif
- 
--struct plt_entries {
--	u32	ldr[PLT_ENT_COUNT];
--	u32	lit[PLT_ENT_COUNT];
--};
--
- static bool in_init(const struct module *mod, unsigned long loc)
- {
- 	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
--- 
-2.4.6
+> Can you post the output of this command so that I can see how your
+clocks are setup:
+
+cat /sys/kernel/debug/clk/clk_summary
+
+> Using your workaround, can you run:
+
+cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+
+If you see:
+   1e27000.clock-controller: emac  off-0
+
+then genpd is not working like it is supposed to. You should see something
+like this for device that are working:
+           1e27000.clock-controller: uart2  on
+     /devices/platform/soc at 1c00000/1d0d000.serial        active
