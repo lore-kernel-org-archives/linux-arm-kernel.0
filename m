@@ -1,74 +1,70 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Mar 2018 10:45:20 +0100
-Subject: [PATCH 1/6] phy: rockchip-typec: fall back to working in
- host-mode if extcon is missing.
-In-Reply-To: <20180301092420.1191-2-enric.balletbo@collabora.com>
-References: <20180301092420.1191-1-enric.balletbo@collabora.com>
- <20180301092420.1191-2-enric.balletbo@collabora.com>
-Message-ID: <5052573.JZoBBeufta@diego>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Mar 2018 09:45:24 +0000
+Subject: Clang build of arm64 kernel fails
+In-Reply-To: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+Message-ID: <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. M?rz 2018, 10:24:15 CET schrieb Enric Balletbo i Serra:
-> Right now the rockchip typec-phy does fail probing when no extcon is
-> detected. Some boards get the cable-state via the extcon interface and
-> have this supported, other boards seem to use the fusb302 chip or
-> another but the driver currently does not seem to utilize the extcon
-> interface to report the cable-state. That's required to detect
-> cable-state changes but a missing extcon shouldn't fail to probe,
-> instead, should just fall back to working in host-mode if it cannot get
-> the extcon.
+Hi Andrey,
 
-And of course:
-Some boards use no controller at all and just connect the type-c to a
-standard USB-A port.
-
-> Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
-> support for rk3399") Reported-by: Vicente Bergas <vicencb@gmail.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
+On 28/02/18 19:32, Andrey Konovalov wrote:
+> Hi Marc!
 > 
->  drivers/phy/rockchip/phy-rockchip-typec.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+> I've tried to pull in new upstream commits and the kernel build
+> started failing for me with the following errors (see below).
 > 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
-> b/drivers/phy/rockchip/phy-rockchip-typec.c index
-> 7492c8978217..3741afab5cd2 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-> @@ -782,6 +782,9 @@ static int tcphy_get_mode(struct rockchip_typec_phy
-> *tcphy) u8 mode;
->  	int ret;
+> It seems that the reason is your commit "arm64: Add
+> ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
+> doesn't like 32 bits registers being used in 64 bits build.
+
+I'd say this is really a bug in Clang. Architecturally, the register in 
+AArch64 state is still named "r0"; "x0"/"w0" are assembler operands 
+which additionally encode the size of the corresponding *access* to r0.
+
+I note that GCC's documentation on register variables[1] does just say 
+"the name of the register", which implies this code is not incorrect. 
+Given that Clang already likes to infer the operand size from the 
+argument type in actual inline asms, it seems funny that its register 
+allocator should care in this non-instruction context.
+
+> Would you mind sending a fix?
+
+That said, I guess it's a bug we might have to work around anyway. Oh well.
+
+Robin.
+
+[1] 
+https://gcc.gnu.org/onlinedocs/gcc/Global-Register-Variables.html#Global-Register-Variables
+
 > 
-> +	if (!edev)
-> +		return MODE_DFP_USB;
-> +
->  	ufp = extcon_get_state(edev, EXTCON_USB);
->  	dp = extcon_get_state(edev, EXTCON_DISP_DP);
+> Thanks!
 > 
-> @@ -1115,9 +1118,9 @@ static int rockchip_typec_phy_probe(struct
-> platform_device *pdev)
+> arch/arm64/kernel/cpu_errata.c:156:2: error: unknown register name 'r0' in asm
+>          arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
+>          ^
+> ./include/linux/arm-smccc.h:276:32: note: expanded from macro
+> 'arm_smccc_1_1_smc'
+> #define arm_smccc_1_1_smc(...)  __arm_smccc_1_1(SMCCC_SMC_INST, __VA_ARGS__)
+>                                  ^
+> ./include/linux/arm-smccc.h:255:3: note: expanded from macro '__arm_smccc_1_1'
+>                  __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
+>                  ^
+> ./include/linux/arm-smccc.h:240:37: note: expanded from macro '__declare_args'
+> #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
+>                                      ^
+> ./include/linux/arm-smccc.h:239:37: note: expanded from macro '___declare_args'
+> #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
+>                                      ^
+> <scratch space>:136:1: note: expanded from here
+> __declare_arg_0
+> ^
+> ./include/linux/arm-smccc.h:197:32: note: expanded from macro '__declare_arg_0'
+>          register u32           r0 asm("r0") = a0;
 > 
->  	tcphy->extcon = extcon_get_edev_by_phandle(dev, 0);
->  	if (IS_ERR(tcphy->extcon)) {
-> -		if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
-> -			dev_err(dev, "Invalid or missing extcon\n");
-> -		return PTR_ERR(tcphy->extcon);
-> +		if (PTR_ERR(tcphy->extcon) == -EPROBE_DEFER)
-> +			return PTR_ERR(tcphy->extcon);
-> +		tcphy->extcon = NULL;
-
-Do we want to keep a bit of the error handling of extcon, a la
-
-+		if (PTR_ERR(tcphy->extcon) == -ENODEV) {
-+			tcphy->extcon = NULL;
-+		} else {
-+			if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
-+				dev_err(dev, "Invalid or extcon\n");
-+			return PTR_ERR(tcphy->extcon);
-+		}
-
-So only make it NULL, if extcon really reports ENODEV?
-
-
-Heiko
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
