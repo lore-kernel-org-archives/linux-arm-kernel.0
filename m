@@ -1,30 +1,45 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 1 Mar 2018 17:46:30 +0100
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <20180301164630.GB23321@kroah.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu,  1 Mar 2018 18:07:12 +0100
+Subject: [PATCH] kasan, arm64: clean up KASAN_SHADOW_SCALE_SHIFT usage
+Message-ID: <44281e784702443f06edb837ec672984783a9621.1519923749.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
-> Hi All,
-> 
-> Resent without non-upstream patches.
-> 
-> This backport patchset fixed the spectre issue, it's original branch:
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-> A few dependency or fixingpatches are also picked up, if they are necessary
->  and no functional changes.
-> 
-> No bug found from kernelci.org and lkft testing. It also could be gotten from:
-> 
-> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
+This is a follow up patch to the series I sent recently that cleans up
+KASAN_SHADOW_SCALE_SHIFT usage (which value was hardcoded and scattered
+all over the code). This fixes the one place that I forgot to fix.
 
-Also, how did you test, what platforms did you test, and did you test
-that this actually did fix the spectre issue on your platforms?  If so,
-what test did you use?
+The change is purely aesthetical, instead of hardcoding the value for
+KASAN_SHADOW_SCALE_SHIFT in arch/arm64/Makefile, an appropriate variable
+is declared and used.
 
-thanks,
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ arch/arm64/Makefile | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-greg k-h
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b481b4a7c011..4bb18aee4846 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -97,12 +97,14 @@ else
+ TEXT_OFFSET := 0x00080000
+ endif
+ 
+-# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
++# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
++#				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
+ # in 32-bit arithmetic
++KASAN_SHADOW_SCALE_SHIFT := 3
+ KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
+-			(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
+-			+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - 3)) \
+-			- (1 << (64 - 32 - 3)) )) )
++	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
++	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
++	- (1 << (64 - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) )) )
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
+-- 
+2.16.2.395.g2e18187dfd-goog
