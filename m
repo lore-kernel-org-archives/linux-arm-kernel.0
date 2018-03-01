@@ -1,74 +1,106 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 1 Mar 2018 10:06:28 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-In-Reply-To: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Thu, 01 Mar 2018 17:09:25 +0800
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+ <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+ <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
+ <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
+ <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
+ <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
+ <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
+ <5A977638.8010506@rock-chips.com>
+ <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
+Message-ID: <5A97C345.3060205@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+Hi Geert,
 
-On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch serie adds support of stm32 SDMMC controller.
-> stm32h7 is the first SoC to use stm32 SDMMC controller
-> (previous SoC had pl180 controller).
+Thanks for your reply.
 
-I am a not convinced this isn't a new improved variant of the pl180.
-According to register layout and the code you submitted in patch2,
-there are great similarities to pl180 and the mmci driver.
+On 03/01/2018 04:33 PM, Geert Uytterhoeven wrote:
+>> >so maybe we can:
+>> >1/ let the device(dts) or driver decide which clock is PM clk, and add it
+>> >using*pm_clk_add*  APIs (even of_pm_clk_add_clks() if all clocks are pm clk)
+>> >
+>> >2/ add support for critical PM clk, which would return error to the driver
+>> >if anything wrong
+>> >
+>> >3/ make sure PM clk always be controlled(otherwise it might be unexpected
+>> >disabled by other clocks under the same clk parent?):
+>> >  a) make sure Runtime PM is always enabled. and as discussed, we can select
+>> >PM in ARCH_ROCKCHIP
+> On Renesas SoCs, we only add the device's module clock with pm_clk_add().
+> Drivers that don't care about properties of the module clock just call
+> pm_runtime_*(). That way the same driver works on different SoCs using
+> the same device, with and without power and/or clock domains.
 
-In other words, it more sounds like an improved variant of pl180,
-hence I am thinking that you should try to extend the mmci driver
-instead. Could you please have a look at that, unless you can specify
-more exactly why that isn't suitable?
+well, i think we may need to check:
+1/ so the driver might not know is the clock really enabled(currently):
+
+static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+{
+     if (!ce->clk)
+         ce->clk = clk_get(dev, ce->con_id);
+     if (IS_ERR(ce->clk)) {
+         ce->status = PCE_STATUS_ERROR;
+
+static inline void __pm_clk_enable(struct device *dev, struct 
+pm_clock_entry *ce)
+{
+     int ret;
+
+     if (ce->status < PCE_STATUS_ERROR) {
+         ret = clk_enable(ce->clk);
+         if (!ret)
+             ce->status = PCE_STATUS_ENABLED;
+
+it seems the status is private.
+
+2/ the pm_clk_resume/suspend seems only be called in the domain's 
+suspend/resume ops(or USE_PM_CLK_RUNTIME_OPS, or called directly in the 
+drivers for example tegra-aconnect):
+
+# cgrep pm_clk_resume -w
+./include/linux/pm_clock.h:50:extern int pm_clk_resume(struct device *dev);
+./include/linux/pm_clock.h:83:#define pm_clk_resume     NULL
+./drivers/bus/tegra-aconnect.c:62:      return pm_clk_resume(dev);
+./drivers/dma/tegra210-adma.c:649:      ret = pm_clk_resume(dev);
+./drivers/base/power/clock_ops.c:421: * pm_clk_resume - Enable clocks in 
+a device's PM clock list.
+./drivers/base/power/clock_ops.c:424:int pm_clk_resume(struct device *dev)
+./drivers/base/power/clock_ops.c:444:EXPORT_SYMBOL_GPL(pm_clk_resume);
+./drivers/base/power/clock_ops.c:533:   ret = pm_clk_resume(dev);
+./drivers/base/power/domain.c:1685:             genpd->dev_ops.start = 
+pm_clk_resume;
+./drivers/irqchip/irq-gic-pm.c:36:      ret = pm_clk_resume(dev);
+
+so if the device doesn't have a power domain, the PM clks could be 
+unmanaged right?
+
+by the way, the tegra drivers(tegra-aconnect/tegra210-adma) seems like 
+good examples of using current PM clks...
+
+
+but anyway, force adding all clocks as PM clks in the rockchip power 
+domain driver seems wrong...
 
 >
-> The SDMMC features include the following:
-> -Full compliance with MultiMediaCard System Specification Version 4.51.
->  Card support for three different databus modes:
->  1-bit (default), 4-bit and 8-bit.
-> -Full compliance with SD memory card specifications version 4.1.
->  SDR104 speed limited to maximum allowed I/O speed, SPI mode and
->  UHS-II mode not supported.
-> -Full compliance with SDIO card specification version 4.0.
+> Drivers that care about properties of the module clock (mainly frequency)
+> can still use the clk_*() API for that. Other (optional) clocks must be
+> handled by the device driver itself.
 >
-> change V2:
-> -dt-bindings: properties name
-> st,dir-output-high; st,neg-edge; st,use-ckin
-> -dt-bindings: node example s/sdmmc@/mmc@/g
-> -removes return of enable/disable_imask functions
-> -adds dev_warn if clk divisor is too short.
-> -replaces overprotection of n_elem by fail of dma_map_sg
-> -removes shortcut host->base
-> -Use device_property_present
+> Gr{oetje,eeting}s,
 >
-> Ludovic Barre (5):
->   dt-bindings: mmc: document the stm32 sdmmc bindings
->   mmc: add stm32 sdmmc controller driver
->   ARM: dts: stm32: add sdmmc support for stm32h743
->   ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
->   ARM: configs: stm32: add mmc and ext2/3/4 support
->
->  .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     |  35 +
->  arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  26 +
->  arch/arm/boot/dts/stm32h743.dtsi                   |  26 +
->  arch/arm/boot/dts/stm32h743i-eval.dts              |  11 +
->  arch/arm/configs/stm32_defconfig                   |   4 +-
->  drivers/mmc/host/Kconfig                           |   8 +
->  drivers/mmc/host/Makefile                          |   1 +
->  drivers/mmc/host/stm32-sdmmc.c                     | 708 +++++++++++++++++++++
->  drivers/mmc/host/stm32-sdmmc.h                     | 220 +++++++
->  9 files changed, 1038 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
->  create mode 100644 drivers/mmc/host/stm32-sdmmc.c
->  create mode 100644 drivers/mmc/host/stm32-sdmmc.h
+>                          Geert
 >
 > --
-> 2.7.4
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 --geert at linux-m68k.org
 >
-
-Kind regards
-Uffe
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
+>
+>
