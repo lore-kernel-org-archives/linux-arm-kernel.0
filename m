@@ -1,52 +1,64 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 09:23:47 +0100
-Subject: [PATCH v2 00/16] Implement H3/H5 HDMI driver
-In-Reply-To: <2235934.0TF68fluGz@jernej-laptop>
-References: <20180227222701.9716-1-jernej.skrabec@siol.net>
- <2235934.0TF68fluGz@jernej-laptop>
-Message-ID: <20180301082347.go4l7332kjoq5dmm@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 Mar 2018 09:33:22 +0100
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <5A977638.8010506@rock-chips.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+ <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+ <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
+ <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
+ <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
+ <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
+ <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
+ <5A977638.8010506@rock-chips.com>
+Message-ID: <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jeffy,
 
-On Wed, Feb 28, 2018 at 10:23:35PM +0100, Jernej ?krabec wrote:
-> Dne torek, 27. februar 2018 ob 23:26:45 CET je Jernej Skrabec napisal(a):
-> > This series implements H3/H5 HDMI driver. It was tested on OrangePi 2 (H3),
-> > OrangePi Plus2e (H3) and OrangePi PC2 (H5) with many resolutions and it
-> > works well. Bug, which prevented correct operation for some resolutions,
-> > is also fixed.
-> > 
-> > Code is based on linux-next, next-20180226 tag.
-> 
-> Today I tried on this series on  next-20180228, but resolution switching 
-> doesn't really work. The reason for this is use of clk_set_rate_exclusive() in 
-> sun4i_tcon1_mode_set(). If I revert it to ordinary clk_set_rate() it works ok. 
-> I investigated a bit and it seems that clocks stays at first set even if tcon 
-> (the owner of exclusive lock) request the new one. Example:
-> 
-> [   69.325732] TCON clk wanted: 148500000
-> [   69.325740] TCON real clk: 69272728
-> [   69.325770] HDMI clk wanted: 148500000
-> [   69.325773] HDMI real clk: 138545455
-> [   69.325815] HDMI PHY clk wanted: 148500000
-> [   69.325819] HDMI PHY real clk: 138545454
-> 
-> Is there anything I can do to help debug this?
+On Thu, Mar 1, 2018 at 4:40 AM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
+> if i'm reading the code right, the PM clk means:
+> 1/ the clocks which would be enabled while power on
+> 2/ these clocks are optional, it's ok if anything wrong with them
+> 3/ controlled by pm_domain(or USE_PM_CLK_RUNTIME_OPS & pm_clk_add_notifier)
+>
+> and currently we're adding all clocks of the attached device as PM clk in
+> rockchip PM domain driver, which seems wrong. because we might have these
+> kinds of clocks:
+> 1/ critical, should block power on if anything wrong with it(failed to get/
+> prepare/ enable)
+> 2/ optional, could ignore it if anything wrong
+> 3/ only required in some special cases, for example register r/w, and
+> doesn't need to stay enabled while power on
+>
+> so maybe we can:
+> 1/ let the device(dts) or driver decide which clock is PM clk, and add it
+> using *pm_clk_add* APIs (even of_pm_clk_add_clks() if all clocks are pm clk)
+>
+> 2/ add support for critical PM clk, which would return error to the driver
+> if anything wrong
+>
+> 3/ make sure PM clk always be controlled(otherwise it might be unexpected
+> disabled by other clocks under the same clk parent?):
+>  a) make sure Runtime PM is always enabled. and as discussed, we can select
+> PM in ARCH_ROCKCHIP
 
-I don't recall if disable hook is called during a mode set, but if it
-is, you can add a call to clk_rate_exclusive_put.
+On Renesas SoCs, we only add the device's module clock with pm_clk_add().
+Drivers that don't care about properties of the module clock just call
+pm_runtime_*(). That way the same driver works on different SoCs using
+the same device, with and without power and/or clock domains.
 
-Maxime
+Drivers that care about properties of the module clock (mainly frequency)
+can still use the clk_*() API for that. Other (optional) clocks must be
+handled by the device driver itself.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/30cb71ba/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
