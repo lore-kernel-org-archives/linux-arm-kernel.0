@@ -1,74 +1,53 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 1 Mar 2018 10:52:42 +0530
-Subject: [PATCH 3/3] mailbox: sunxi-msgbox: Add a new mailbox driver
-In-Reply-To: <e52b48cb-ce06-f4c4-ce20-9b893139e54d@sholland.org>
-References: <20180228022714.30068-1-samuel@sholland.org>
- <20180228022714.30068-4-samuel@sholland.org>
- <CABb+yY2uueAK9kzXzU9DT2a4NtV3kK2dc_wtyFWTBn8=Z6Vi7Q@mail.gmail.com>
- <d9e14058-6ffb-e54a-1565-f228342ee1f0@sholland.org>
- <CABb+yY3nfVxoA9wy1ym4mtCTKCZtJjepUTr7OP1uUPmzOEzniA@mail.gmail.com>
- <e52b48cb-ce06-f4c4-ce20-9b893139e54d@sholland.org>
-Message-ID: <CABb+yY0PZCFtud0qYFNV4LO5A38f=JE=ZwoN2N89c0LiX9zV-Q@mail.gmail.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Thu, 1 Mar 2018 07:04:17 +0100
+Subject: [PATCH] arm: Initialize hrtimer-based broadcast clockevent
+In-Reply-To: <86a7e675-11bd-3b8b-22a0-8f440db96293@siemens.com>
+References: <86a7e675-11bd-3b8b-22a0-8f440db96293@siemens.com>
+Message-ID: <8f2fd3b9-416a-992e-5ca6-fc83aad5700d@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 12:26 AM, Samuel Holland <samuel@sholland.org> wrote:
-> On 02/28/18 12:14, Jassi Brar wrote:
->> On Wed, Feb 28, 2018 at 11:21 PM, Samuel Holland <samuel@sholland.org> wrote:
->>> Hi,
->>>
->>> On 02/28/18 03:16, Jassi Brar wrote:
->>>> On Wed, Feb 28, 2018 at 7:57 AM, Samuel Holland <samuel@sholland.org> wrote:
->>>> ....
->>>>
->>>>> +/*
->>>>> + * The message box hardware provides 8 unidirectional channels. As the mailbox
->>>>> + * framework expects them to be bidirectional
->>>>>
->>>> That is incorrect. Mailbox framework does not require a channel to be
->>>> TX and RX capable.
->>>
->>> Sorry, it would be more accurate to say that the intended mailbox _client_
->>> expects the channels to be bidirectional.
->>>
->> Mailbox clients are very mailbox provider specific. Your client driver
->> is unlikely to be reuseable over another controller+remote combo.
->> Your client has to know already what a physical channel can do (RX, TX
->> or RXTX). There is no api to provide that info.
->
-> There's a public specification for SCPI available[1]. I'm writing the remote
-> endpoint to follow that protocol specification. (There's even an explicitly
-> platform-agnostic update to the protocol called SCMI[2]). Ideally, I should be
-> able to reuse the existing Linux client drivers for that protocol.
->
-Thanks, I have already read those specs. Please note there are two
-parts of the spec - Chapter-4-Protocol and Chapter-5-Transport.
+On 2018-01-22 07:06, Jan Kiszka wrote:
+> Analogously to 9358d755bd5c, this registers a broadcast clockevent in
+> case no hardware broadcast timer is available and the per-CPU timers can
+> be stopped in deep power states.
+> 
+> Partitions of the Jailhouse hypervisor fall in this category.
+> Registering the workaround timer allows to enter high-resolution mode in
+> that case.
+> 
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  arch/arm/kernel/time.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+> index 629f8e9981f1..0a45d861ef8e 100644
+> --- a/arch/arm/kernel/time.c
+> +++ b/arch/arm/kernel/time.c
+> @@ -12,6 +12,7 @@
+>   *  reading the RTC at bootup, etc...
+>   */
+>  #include <linux/clk-provider.h>
+> +#include <linux/clockchips.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/errno.h>
+>  #include <linux/export.h>
+> @@ -121,5 +122,7 @@ void __init time_init(void)
+>  		of_clk_init(NULL);
+>  #endif
+>  		timer_probe();
+> +
+> +		tick_setup_hrtimer_broadcast();
+>  	}
+>  }
+> 
 
-You should definitely be able to reuse the Protocol implementation.
+Gentle ping, just to avoid that this falls through the cracks because
+it's so small.
 
-However, transport can vary with platform - that is why it is
-separated out from Protocol. And mailbox is but one instance of
-transport.
-  Consider a platform with "power manager" chip connected via, say,
-I2C - one could still make use of SCMI protocol. Or consider another
-platform that does have mailbox link to the "power manager" but there
-is no shared memory between them - you could then pass packets via the
-mailbox FIFOs.
-  So no, we can't have common transport implementation for every platform.
+Jan
 
-> Are you
-> suggesting that I need to write a copy of the arm_scpi driver, completely
-> identical except that it requests two mailbox channels per client (sending on
-> one and receiving on the other) instead of one? In the >1000 line file, this is
-> all that I would need to change:
->
-I did unsuccessfully try to convince Sudeep to break the
-implementation into platform-agnostic protocol and platform-specific
-transport drivers. That way there would be no duplication of code.
-
-Also please realise that you should not be writing controller driver,
-keeping just one client driver (SCMI/SCPI) in mind. What if another
-platform with same mailbox controller needs 8 TX "broadcast" links?
-The h/w supports the usecase, but your driver wouldn't.
-
-Thanks
+-- 
+Siemens AG, Corporate Technology, CT RDA IOT SES-DE
+Corporate Competence Center Embedded Linux
