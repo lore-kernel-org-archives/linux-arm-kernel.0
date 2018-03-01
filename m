@@ -1,22 +1,25 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Mar 2018 14:33:37 +0100
-Subject: [PATCH] drm/rockchip: vop: Init vskiplines in scl_vop_cal_scale()
-In-Reply-To: <20180223062250.10470-1-jeffy.chen@rock-chips.com>
-References: <20180223062250.10470-1-jeffy.chen@rock-chips.com>
-Message-ID: <126662348.ZcAOZAFD3X@diego>
+Date: Thu, 01 Mar 2018 14:34:49 +0100
+Subject: [PATCH v5] drm/rockchip: Add device links for master and
+ components
+In-Reply-To: <20180207175309.21095-1-enric.balletbo@collabora.com>
+References: <20180207175309.21095-1-enric.balletbo@collabora.com>
+Message-ID: <1621728.R05mi6GW7F@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 23. Februar 2018, 07:22:50 CET schrieb Jeffy Chen:
-> Currently we are calling scl_vop_cal_scale() to get vskiplines for yrgb
-> and cbcr. So the cbcr's vskiplines might be an unexpected value if the
-> second scl_vop_cal_scale() didn't update it.
+Am Mittwoch, 7. Februar 2018, 18:53:09 CET schrieb Enric Balletbo i Serra:
+> From: Jeffy Chen <jeffy.chen@rock-chips.com>
 > 
-> Init vskiplines in scl_vop_cal_scale() to avoid that.
+> Since we are trying to access components' resources in the master's
+> suspend/resume PM callbacks(e.g. panel), add device links to correct
+> the suspend/resume and shutdown ordering.
 > 
 > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-applied to drm-misc-next with Sean Paul's Ack
+applied to drm-misc-next
+[after confering on #dri-devel on fixes vs. next]
 
-
+Thanks
 Heiko
