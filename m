@@ -1,29 +1,24 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 1 Mar 2018 08:43:56 +0800
-Subject: [PATCH] ARM: dts: mx5: Pass the memory unit-address
-In-Reply-To: <1519784015-16507-1-git-send-email-festevam@gmail.com>
-References: <1519784015-16507-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180301004354.GO3217@dragon>
+Date: Thu, 1 Mar 2018 08:45:59 +0800
+Subject: [PATCH 1/5] ARM: dts: vf500: Remove skeleton.dtsi inclusion
+In-Reply-To: <1519755447-9666-1-git-send-email-festevam@gmail.com>
+References: <1519755447-9666-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180301004552.GP3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 11:13:35PM -0300, Fabio Estevam wrote:
+On Tue, Feb 27, 2018 at 03:17:23PM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Pass the memory unit-address to fix the following build warnings with W=1:
+> Since commit 9c0da3cc61f1 ("ARM: dts: explicitly mark skeleton.dtsi as
+> deprecated") the inclusion of skeleton.dtsi is deprecated, so
+> remove it as this file will eventually go away someday.
 > 
-> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/imx53-tx53-x03x.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/imx53-tx53-x13x.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> 
-> In theses cases an empty memory node is passed, which will be filled
-> by the bootloader. Passing the memory base address still allows the
-> bootloader to fill the memory size.
+> Move its content to the SoC dtsi file, so that the resultant dtb
+> is the same.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-s/mx5/imx5 in subject.
-
-I fixed it up and applied the patch.
+Stefan, please take a look at the series.
 
 Shawn
