@@ -1,69 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Mar 2018 17:10:38 +0000
-Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
-In-Reply-To: <20180301170826.GA2678@arm.com>
-References: <20180301162803.5490-1-robh@kernel.org>
- <20180301170826.GA2678@arm.com>
-Message-ID: <CAKv+Gu8E=wg-=KCtsR=GFEwT1SsEaGFujBx8PNq0JkCAmJYktw@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 1 Mar 2018 18:12:48 +0100
+Subject: [PATCH 1/2][v5] dt-bindings: mtd-physmap: Add endianness supports
+In-Reply-To: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
+References: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180301181248.7212a5c5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2018 at 17:08, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Mar 01, 2018 at 10:28:03AM -0600, Rob Herring wrote:
->> libfdt gained a new dependency on strrchr, so make it available to the
->> EFI namespace before we update libfdt.
->>
->> Thanks to Ard for providing this fix.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> ---
->> Please ack. This is a dependency on a dtc upstream sync.
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> As an aside, I noticed that this __efistub prefixing is also being
-> applied to mapping symbols, so we get crazy stuff like __efistub_$x. I
-> didn't get round to working out whether that's going to be problematic,
-> but maybe it's all fine...
->
+On Wed, 28 Feb 2018 13:03:34 +0530
+Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
 
-Ugh. Those mapping symbols.
+> Connection between flash and controller is not necessary to be always
+> of same type. It may varies from platform to platform.
+> 
+> Adding endianness (optional) property to provide connection type
+> information.
+> 
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes for v2: updated subject
+> Changes for v3: fixed typo for "big-endian"
+> Changes for v4: Moved binding definition in mtd-physmap.txt
+> as discussed at https://patchwork.ozlabs.org/patch/842543/
+> Changes for v5: Sending as it is
+> 
+>  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> index 4a0a48bf4ecb..961a8eed9d0d 100644
+> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> @@ -41,6 +41,11 @@ additional (optional) property is defined:
+>  
+>   - erase-size : The chip's physical erase block size in bytes.
+>  
+> + The device tree may optionally contain endianness property.
+> + little-endian or big-endian : It represents connection between controller and
+> +			flash.
 
-We can filter them explicitly in scripts/kallsyms, I guess, or even
-better, get rid of all __efistub_ symbols entirely (since they are
-either aliases or part of __init code)
+Hm, I'm not even sure it has to do with the HW connection of the data
+lines (D0:X), probably more something related to how the flash was
+programmed (some people program the flash using a dedicated programmer
+before soldering it on the board) and the current platform endianness
+(which for some platforms, can be changed with a Kconfig option).
+
+> If this property is absent, flash is considered
+> +			to be host-endian.
+
+The second sentence is no longer valid. Now, if the property is missing
+the behavior is platform/configuration dependent, not necessarily
+host-endian.
+
+> +
+>  The device tree may optionally contain sub-nodes describing partitions of the
+>  address space. See partition.txt for more detail.
+>  
 
 
->>
->>  arch/arm64/kernel/image.h | 1 +
->>  arch/arm64/lib/strrchr.S  | 2 +-
->>  2 files changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
->> index c7fcb232fe47..a820ed07fb80 100644
->> --- a/arch/arm64/kernel/image.h
->> +++ b/arch/arm64/kernel/image.h
->> @@ -103,6 +103,7 @@ __efistub_strlen          = KALLSYMS_HIDE(__pi_strlen);
->>  __efistub_strnlen            = KALLSYMS_HIDE(__pi_strnlen);
->>  __efistub_strcmp             = KALLSYMS_HIDE(__pi_strcmp);
->>  __efistub_strncmp            = KALLSYMS_HIDE(__pi_strncmp);
->> +__efistub_strrchr            = KALLSYMS_HIDE(__pi_strrchr);
->>  __efistub___flush_dcache_area        = KALLSYMS_HIDE(__pi___flush_dcache_area);
->>
->>  #ifdef CONFIG_KASAN
->> diff --git a/arch/arm64/lib/strrchr.S b/arch/arm64/lib/strrchr.S
->> index 61eabd9a289a..f8e2784d5752 100644
->> --- a/arch/arm64/lib/strrchr.S
->> +++ b/arch/arm64/lib/strrchr.S
->> @@ -40,4 +40,4 @@ ENTRY(strrchr)
->>       b       1b
->>  2:   mov     x0, x3
->>       ret
->> -ENDPROC(strrchr)
->> +ENDPIPROC(strrchr)
->> --
->> 2.14.1
->>
+
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
