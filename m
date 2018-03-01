@@ -1,86 +1,38 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Thu, 1 Mar 2018 23:18:40 +0200
-Subject: [PATCH] drm/bridge: sii902x: Fall back to standard modes
-In-Reply-To: <CACRpkdYuZE+ohhLf6mmPHEsGmNw6r7UOBCyQEFOcYOYxdVj2oA@mail.gmail.com>
-References: <20180214130059.19052-1-linus.walleij@linaro.org>
- <CACRpkdYuZE+ohhLf6mmPHEsGmNw6r7UOBCyQEFOcYOYxdVj2oA@mail.gmail.com>
-Message-ID: <20180301211840.GD5453@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Mar 2018 15:22:53 -0600
+Subject: [PATCH V5 2/2] thermal: imx: add i.MX7 thermal sensor support
+In-Reply-To: <1519859380-15878-2-git-send-email-Anson.Huang@nxp.com>
+References: <1519859380-15878-1-git-send-email-Anson.Huang@nxp.com>
+ <1519859380-15878-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180301212253.fp4gxes57t2m2tg2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 10:02:55PM +0100, Linus Walleij wrote:
-> Hm, hard to get review feedback on this one.
+On Thu, Mar 01, 2018 at 07:09:40AM +0800, Anson Huang wrote:
+> This patch adds i.MX7 thermal sensor support, most
+> of the i.MX7 thermal sensor functions are same with
+> i.MX6 except the registers offset/layout, so we move
+> those registers offset/layout definitions to soc data
+> structure.
 > 
-> It gives me proper video on an ARM Versatile Express utilizing the
-> bridge driver with a plugged in DVI-to-VGA dongle with the new
-> PL111 DRI driver.
+> i.MX7 uses single calibration data @25C, the calibration
+> data is located at OCOTP offset 0x4F0, bit[17:9], the
+> formula is as below:
 > 
-> Liviu? Pawel?
+> Tmeas = (Nmeas - n1) + 25; n1 is the fuse value for 25C.
 > 
-> Some ACK is fine to know I am doing the right thing :)
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+> changes since V4:
+> 	drop direct OCOTP register access for i.mx7d since it is a new added platform,
+> 	only support reading ocotp values through the ocotp nvmem driver which handles clock.
+>  .../devicetree/bindings/thermal/imx-thermal.txt    |   9 +-
+>  drivers/thermal/imx_thermal.c                      | 295 ++++++++++++++++-----
+>  2 files changed, 239 insertions(+), 65 deletions(-)
 
-Why isn't the probe helper's noedid fallback working?
+Please add ack/reviewed-by's when posting new versions.
 
-> 
-> Yours,
-> Linus Walleij
-> 
-> On Wed, Feb 14, 2018 at 2:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > The following happens when connection a DVI output driven
-> > from the SiI9022 using a DVI-to-VGA adapter plug:
-> >
-> > i2c i2c-0: sendbytes: NAK bailout.
-> > i2c i2c-0: sendbytes: NAK bailout.
-> >
-> > Then no picture. Apparently the I2C engine inside the SiI9022
-> > is not smart enough to try to fall back to DDC I2C. Or the
-> > vendor have not integrated the electronics properly. I don't
-> > know which one it is.
-> >
-> > By using standard modes as fallback, the bridge probes nicely
-> > with a minor warning and we get picture.
-> >
-> > This code is inspired by similar code in the dumb VGA bridge.
-> >
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> >  drivers/gpu/drm/bridge/sii902x.c | 15 +++++++++++++--
-> >  1 file changed, 13 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
-> > index b1ab4ab09532..4483095c4013 100644
-> > --- a/drivers/gpu/drm/bridge/sii902x.c
-> > +++ b/drivers/gpu/drm/bridge/sii902x.c
-> > @@ -168,8 +168,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
-> >                 return ret;
-> >
-> >         edid = drm_get_edid(connector, sii902x->i2c->adapter);
-> > -       drm_mode_connector_update_edid_property(connector, edid);
-> > -       if (edid) {
-> > +       if (!edid) {
-> > +               /*
-> > +                * This happens when using a simple DVI-to-VGA converter
-> > +                * dongle for example: the I2C lines are not bridged over
-> > +                * to VGA DDC.
-> > +                */
-> > +               DRM_INFO("EDID readout failed, falling back to standard modes\n");
-> > +               ret = drm_add_modes_noedid(connector, 1920, 1080);
-> > +               /* Set some standard resolution most monitors can handle */
-> > +               drm_set_preferred_mode(connector, 1024, 768);
-> > +       } else {
-> > +               /* Data from EDID readout */
-> > +               drm_mode_connector_update_edid_property(connector, edid);
-> >                 num = drm_add_edid_modes(connector, edid);
-> >                 kfree(edid);
-> >         }
-> > --
-> > 2.14.3
-> >
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Ville Syrj?l?
-Intel OTC
+Rob
