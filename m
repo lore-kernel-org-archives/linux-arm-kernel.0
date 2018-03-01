@@ -1,46 +1,53 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu, 1 Mar 2018 19:53:55 +0800
-Subject: [PATCH 01/29] arm64: mm: Use non-global mappings for kernel space
-In-Reply-To: <20180228120828.GB8453@kroah.com>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
- <1519790211-16582-2-git-send-email-alex.shi@linaro.org>
- <20180228120828.GB8453@kroah.com>
-Message-ID: <92d7d0b8-7483-74d7-efe5-29249093d1ad@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 Mar 2018 12:54:46 +0100
+Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
+In-Reply-To: <CAPDyKFrN0t6Jr-gAuU4_OHEvYap2fRiaUbZC5E7sAGAQOUQjjw@mail.gmail.com>
+References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
+ <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
+ <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
+ <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
+ <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
+ <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
+ <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
+ <5A977638.8010506@rock-chips.com>
+ <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
+ <CAPDyKFq_hwao0hZCYmO-VrsW3vDJJboa1RG-TMLRQRgbt+YhpQ@mail.gmail.com>
+ <CAMuHMdWg1y3Ragb9nYY12whZhUn8w0a4aOOR31LSNXa37NbfXg@mail.gmail.com>
+ <CAPDyKFrN0t6Jr-gAuU4_OHEvYap2fRiaUbZC5E7sAGAQOUQjjw@mail.gmail.com>
+Message-ID: <CAMuHMdVXWj8GCAFy66usSj-z_zeWgY3SyxvpenUKf9cc-ZWK5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-
-On 02/28/2018 08:08 PM, Greg KH wrote:
-> On Wed, Feb 28, 2018 at 11:56:23AM +0800, Alex Shi wrote:
->> From: Will Deacon <will.deacon@arm.com>
+On Thu, Mar 1, 2018 at 12:22 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 1 March 2018 at 11:37, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Thu, Mar 1, 2018 at 11:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> Another problem with the PM clk is, more exactly with
+>>> pm_clk_suspend|resume(), that those invokes only clk_enable|disable().
+>>> pm_clk_suspend|resume() can't call clk_prepare|unprepare(), because we
+>>> don't know if we running in atomic context when those are executed.
+>>> Potentially this means leaving the clocks ungated - all the time.
+>>>
+>>> I have though about how to fix the above, several times, but I always
+>>> ends up with thinking that's it more easy, to let the driver deal with
+>>> the clocks, as then the problem goes away.
 >>
->> commit e046eb0c9bf2 upstream.
->>
->> In preparation for unmapping the kernel whilst running in userspace,
->> make the kernel mappings non-global so we can avoid expensive TLB
->> invalidation on kernel exit to userspace.
->>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> Tested-by: Laura Abbott <labbott@redhat.com>
->> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Alex Shi <alex.shi@linaro.org>
->>
->> Conflicts:
->> 	skip PTE_RDONLY of PAGE_NONE in arch/arm64/include/asm/pgtable-prot.h
-> 
-> These "Conflicts:" lines need to be removed, or put below the --- line
-> please.
-> 
+>> There's a similar issue with powering on/off power areas.
+>
+> I don't follow. Can you elaborate?
 
-Thanks response! Greg,
+I intended to comment on the atomic context (or not).
+But I think I was wrong, and PM domain drivers do busy loops instead
+of sleeps.
 
-There are still a boot hang on one of renesas board on
-CONFIG_RANDOMIZE_BASE. I am trying to get help from Renesas guys help on
-this. I will back after fix it.
+Gr{oetje,eeting}s,
 
-https://kernelci.org/boot/id/5a96f3dd59b5146590b3a4d5/
+                        Geert
 
-Thanks
-Alex
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
