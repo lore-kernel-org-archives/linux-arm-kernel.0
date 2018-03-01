@@ -1,47 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu,  1 Mar 2018 10:28:03 -0600
-Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
-Message-ID: <20180301162803.5490-1-robh@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  1 Mar 2018 16:38:13 +0000
+Subject: [PATCH v4 0/2] add support for Socionext SynQuacer I2C controller
+Message-ID: <20180301163815.30595-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-libfdt gained a new dependency on strrchr, so make it available to the
-EFI namespace before we update libfdt.
+Add a binding and a driver for the I2C IP found in the Socionext SynQuacer
+SoC, which is essentially a rebranded version of the Fujitsu F_I2C controller.
 
-Thanks to Ard for providing this fix.
+v4:
+- clarify binding that only a single interrupt specifier is expected (#1)
+- check return value of clk_prepare_enable() on probe path (#2)
+- add Andy's R-b to patch #2
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-Please ack. This is a dependency on a dtc upstream sync.
+v3:
+- incorporate more of Andy's review comments (#2), especially regarding the
+  bus speed and clock source handling for ACPI
+- patch #1 unchanged.
 
- arch/arm64/kernel/image.h | 1 +
- arch/arm64/lib/strrchr.S  | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+v2:
+- incorporate Andy's review comments (#2)
+- patch #1 unchanged.
 
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index c7fcb232fe47..a820ed07fb80 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -103,6 +103,7 @@ __efistub_strlen		= KALLSYMS_HIDE(__pi_strlen);
- __efistub_strnlen		= KALLSYMS_HIDE(__pi_strnlen);
- __efistub_strcmp		= KALLSYMS_HIDE(__pi_strcmp);
- __efistub_strncmp		= KALLSYMS_HIDE(__pi_strncmp);
-+__efistub_strrchr		= KALLSYMS_HIDE(__pi_strrchr);
- __efistub___flush_dcache_area	= KALLSYMS_HIDE(__pi___flush_dcache_area);
- 
- #ifdef CONFIG_KASAN
-diff --git a/arch/arm64/lib/strrchr.S b/arch/arm64/lib/strrchr.S
-index 61eabd9a289a..f8e2784d5752 100644
---- a/arch/arm64/lib/strrchr.S
-+++ b/arch/arm64/lib/strrchr.S
-@@ -40,4 +40,4 @@ ENTRY(strrchr)
- 	b	1b
- 2:	mov	x0, x3
- 	ret
--ENDPROC(strrchr)
-+ENDPIPROC(strrchr)
+Ard Biesheuvel (2):
+  dt-bindings: i2c: add binding for Socionext SynQuacer I2C
+  i2c: add support for Socionext SynQuacer I2C controller
+
+ Documentation/devicetree/bindings/i2c/i2c-synquacer.txt |  29 +
+ drivers/i2c/busses/Kconfig                              |  10 +
+ drivers/i2c/busses/Makefile                             |   1 +
+ drivers/i2c/busses/i2c-synquacer.c                      | 792 ++++++++++++++++++++
+ 4 files changed, 832 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+ create mode 100644 drivers/i2c/busses/i2c-synquacer.c
+
 -- 
-2.14.1
+2.11.0
