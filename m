@@ -1,133 +1,81 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 1 Mar 2018 18:35:20 +0100
-Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180228143553.12485-1-gregory.clement@bootlin.com>
-References: <20180228143553.12485-1-gregory.clement@bootlin.com>
-Message-ID: <20180301183520.4251439a@bbrezillon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu,  1 Mar 2018 17:44:05 +0000
+Subject: [PATCH v2 0/3] arm64: Fix invalid si_codes for fault signals
+Message-ID: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Changes since v1:
 
-On Wed, 28 Feb 2018 15:35:53 +0100
-Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+ * Fixed failing BUILD_BUG_ON() sanity check on NSIGFPE done by x86.
+   (Thanks to James Morse for spotting.)
 
-> On Armada 7K/8K we need to explicitly enable the register clock. This
-> clock is optional because not all the SoCs using this IP need it but at
-> least for Armada 7K/8K it is actually mandatory.
-> 
-> The binding documentation is updated accordingly.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
->  drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
->  2 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> index c08fb477b3c6..4ee9813bf88f 100644
-> --- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> @@ -14,7 +14,11 @@ Required properties:
->  - #address-cells: shall be set to 1. Encode the NAND CS.
->  - #size-cells: shall be set to 0.
->  - interrupts: shall define the NAND controller interrupt.
-> -- clocks: shall reference the NAND controller clock.
-> +- clocks: shall reference the NAND controller clocks, the second one is
-> +  optional but needed for the Armada 7K/8K SoCs
-> +- clock-names: mandatory if there is a second clock, in this case the
-> +   name must be "core" for the first clock and "reg" for the second
-> +   one
+   The addition of FPE_FLTUNK is harmless to x86, since only arm64
+   uses this code right now.
 
-Hm, not sure this is a good idea to impose a specific order. I know you
-do that to avoid changing the code requesting the core clk, but I'd
-prefer to have a solution where we first search for a clock named
-"core" (devm_clk_get(&pdev->dev, "core")), and if it's missing,
-fall back to devm_clk_get(&pdev->dev, NULL).
+Changes since RFC v2:
 
->  - marvell,system-controller: Set to retrieve the syscon node that handles
->    NAND controller related registers (only required with the
->    "marvell,armada-8k-nand[-controller]" compatibles).
-> diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
-> index 2196f2a233d6..be874c636b5f 100644
-> --- a/drivers/mtd/nand/marvell_nand.c
-> +++ b/drivers/mtd/nand/marvell_nand.c
-> @@ -321,6 +321,7 @@ struct marvell_nfc {
->  	struct device *dev;
->  	void __iomem *regs;
->  	struct clk *ecc_clk;
-> +	struct clk *reg_clk;
->  	struct completion complete;
->  	unsigned long assigned_cs;
->  	struct list_head chips;
-> @@ -2747,6 +2748,17 @@ static int marvell_nfc_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
+ * Fold in reverts of the relevant parts of Eric's *_FIXME changes,
+   since this series removes all cases of those dummy si_code values
+   from arm64.
 
-Can we move that before the "core" clock (which for some unknown reason
-is called ecc_clk in the driver) is prepared, so that you don't have to
-call clk_disable_unprepare() here.
+ * Propagated the new signal/si_code assignments for synchronous
+   external aborts correctly to signals thrown from do_sea().
 
-> +	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) == -EPROBE_DEFER) {
-> +		clk_disable_unprepare(nfc->ecc_clk);
-> +		return -EPROBE_DEFER;
-> +	}
+Original blurb:
 
-Why not:
+As reported by Eric Biederman, [1], [2], [3] etc., several architectures
+are inappropriately setting si_code to 0 when signaling faults to
+userspace, which will interpret this value as SI_USER leading to garbage
+being read out of siginfo fields that the kernel doesn't initialise.
 
-	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) != -ENOENT)
-		return PTR_ERR(nfc->reg_clk);
+This seems not to be a huge problem in practice, since many affected
+faults should only happen if the kernel or hardware is buggy or broken.
+However, there are some cases that don't fall under this.
 
-?
+This RFC series proposes fixes to eliminate these si_code == 0 cases
+from arm64.  Some of the changes may be controversial.
 
-AFAIR, if the clk is not defined, ENOENT is returned, and you want to
-propagate all error codes, not only EPROBE_DEFER otherwise.
+There are two main headlines here, which may be applicable to other
+architectures:
 
-Another solution would be to retrieve the reg clk only on platforms
-that need it (based on the compatible). This way you won't have to test
-for -ENOENT and could simply propagate the error to the upper layer.
+ * addition of a new code FPE_UNKNOWN for undiagnosable floating-point
+   exception traps;
 
-> +	if (!IS_ERR(nfc->reg_clk)) {
-> +		ret = clk_prepare_enable(nfc->reg_clk);
-> +		if (ret)
-> +			goto unprepare_clk;
+ * delivering SIGKILL instead of SIGSEGV/BUS/TRAP etc. for "impossible"
+   exceptions that are not feasible to recover from and likely indicate
+   a kernel or system bug or failure.
 
-This is wrong: you've put a clk_disable_unprepare(nfc->reg_clk) call in
-the unprepare_clk path, which means you'll disable/unprepare a clk that
-has not been successfully prepared/enabled => unbalanced refcounting.
+In particular there is likely to be a fair amount of overlap between arm
+and arm64 here, but due to the longer history and evolution of the arm
+tree and 32-bit architecture I'm less confident in making correct
+judgements for that case.  This series doesn't touch arm, for now.
 
-Please define a new label and rename the old one.
+Boot-tested on Arm Juno r0.
+Floating-point exception traps tested on the Arm Fast Model.
 
-> +	}
-> +
->  	marvell_nfc_disable_int(nfc, NDCR_ALL_INT);
->  	marvell_nfc_clear_int(nfc, NDCR_ALL_INT);
->  	ret = devm_request_irq(dev, irq, marvell_nfc_isr,
-> @@ -2780,6 +2792,7 @@ static int marvell_nfc_probe(struct platform_device *pdev)
->  	return 0;
->  
->  unprepare_clk:
-> +	clk_disable_unprepare(nfc->reg_clk);
->  	clk_disable_unprepare(nfc->ecc_clk);
->  
->  	return ret;
-> @@ -2797,6 +2810,7 @@ static int marvell_nfc_remove(struct platform_device *pdev)
->  	}
->  
->  	clk_disable_unprepare(nfc->ecc_clk);
-> +	clk_disable_unprepare(nfc->reg_clk);
->  
->  	return 0;
->  }
+[1] [PATCH 00/11] siginfo fixes/cleanups esp SI_USER
+https://marc.info/?l=linux-kernel&m=151571871109016&w=2
 
-Regards,
+[2] [PATCH 08/11] signal/arm: Document conflicts with SI_USER and SIGFPE
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553574.html
 
-Boris
+[3] [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and SIGFPE, SIGTRAP, SIGBUS
+lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553573.html
+
+Dave Martin (3):
+  signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions
+  arm64: fpsimd: Fix bad si_code for undiagnosed SIGFPE
+  arm64: signal: Ensure si_code is valid for all fault signals
+
+ arch/arm64/include/asm/esr.h          |   9 +++
+ arch/arm64/include/uapi/asm/siginfo.h |  21 ------
+ arch/arm64/kernel/fpsimd.c            |  31 +++++----
+ arch/arm64/mm/fault.c                 | 116 +++++++++++++++++-----------------
+ arch/x86/kernel/signal_compat.c       |   2 +-
+ include/uapi/asm-generic/siginfo.h    |   3 +-
+ kernel/signal.c                       |   4 --
+ 7 files changed, 87 insertions(+), 99 deletions(-)
 
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.1.4
