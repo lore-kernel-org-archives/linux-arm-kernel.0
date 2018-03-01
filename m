@@ -1,69 +1,73 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 1 Mar 2018 12:48:55 +0100
-Subject: [PATCH] pinctrl: sunxi: always look for apb block
-In-Reply-To: <20180301113701.8888-1-andre.przywara@arm.com>
-References: <20180301113701.8888-1-andre.przywara@arm.com>
-Message-ID: <20180301114855.s7rbk7wiealepqrf@flea>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 1 Mar 2018 11:49:12 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5A972A7D.9020301@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org>
+ <20180225143653.peb4quk3ha5h3t5x@salmiak>
+ <5A972A7D.9020301@codeaurora.org>
+Message-ID: <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 01, 2018 at 11:37:01AM +0000, Andre Przywara wrote:
-> The Allwinner pinctrl device tree binding suggests that a clock named
-> "apb" would drive the pin controller IP. However (for legacy reasons) we
-> rely on this clock actually being the first clock defined.
-> Since named clocks can be in any order, let's explicitly check for a
-> clock called "apb" first, then revert to using the first (and only!)
-> clock to keep compatibility with older DTs.
+On Wed, Feb 28, 2018 at 02:17:33PM -0800, Saravana Kannan wrote:
+> On 02/25/2018 06:36 AM, Mark Rutland wrote:
+> > On Fri, Feb 23, 2018 at 04:53:18PM -0800, Saravana Kannan wrote:
+> > > On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
+> > > > +static void dsu_pmu_event_update(struct perf_event *event)
+> > > > +{
+> > > > +	struct hw_perf_event *hwc = &event->hw;
+> > > > +	u64 delta, prev_count, new_count;
+> > > > +
+> > > > +	do {
+> > > > +		/* We may also be called from the irq handler */
+> > > > +		prev_count = local64_read(&hwc->prev_count);
+> > > > +		new_count = dsu_pmu_read_counter(event);
+> > > > +	} while (local64_cmpxchg(&hwc->prev_count, prev_count, new_count) !=
+> > > > +			prev_count);
+> > > > +	delta = (new_count - prev_count) & DSU_PMU_COUNTER_MASK(hwc->idx);
+> > > > +	local64_add(delta, &event->count);
+> > > > +}
+> > > > +
+> > > > +static void dsu_pmu_read(struct perf_event *event)
+> > > > +{
+> > > > +	dsu_pmu_event_update(event);
+> > > > +}
+> > 
+> > > I sent out a patch that'll allow PMUs to set an event flag to avoid
+> > > unnecessary smp calls when the event can be read from any CPU. You could
+> > > just always set that if you can't have multiple DSU's running the kernel (I
+> > > don't know if the current ARM designs support having multiple DSUs in a
+> > > SoC/system) or set it if associated_cpus == cpu_present_mask.
+> > 
+> > As-is, that won't be safe, given the read function calls the event_update()
+> > function, which has side-effects on hwc->prec_count and event->count. Those
+> > need to be serialized somehow.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 4b6cb25bc796..897ba13e6a03 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -1360,10 +1360,21 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
->  			goto gpiochip_error;
->  	}
->  
-> -	clk = devm_clk_get(&pdev->dev, NULL);
-> +	clk = devm_clk_get(&pdev->dev, "apb");
->  	if (IS_ERR(clk)) {
-> -		ret = PTR_ERR(clk);
-> -		goto gpiochip_error;
-> +		/*
-> +		 * If no "apb" clock can be found, try the first one, which
-> +		 * must be the only one defined.
-> +		 */
-> +		if (PTR_ERR(clk) == -ENOENT &&
-> +		    of_count_phandle_with_args(node, "clocks",
-> +					       "#clock-cells") == 1)
-> +			clk = devm_clk_get(&pdev->dev, NULL);
-> +
-> +		if (IS_ERR(clk)) {
-> +			ret = PTR_ERR(clk);
-> +			goto gpiochip_error;
-> +		}
+> You have to grab the dsu_pmu->pmu_lock spin lock anyway because the system
+> registers are shared across all CPUs.
 
-I guess this can be made slightly less convoluted using something like
+I believe that lock is currently superfluous, because the perf core
+ensures operations are cpu-affine, and have interrupts disabled in most
+cases (thanks to the context lock).
 
-ret = of_count_phandle_with_args(node, "clocks", "#clock-cells");
-clk = devm_clk_get(&pdev->dev, ret == 1 ? NULL : "apb");
+> So, just expanding it a bit to lock the hwc->prev_count and
+> event->count updated doesn't seem to be any worse.  In fact, it's
+> better than sending pointless IPIs.
 
-Maxime
+That's a fair point.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/bd3a1390/attachment.sig>
+I'll leave it to Suzuki to decide.
+
+> The local64_read/cmpxchg/add etc makes sense when you have per-cpu system
+> registers like in the case of the ARM CPU PMU registers. It doesn't really
+> buy us much for registers shared across the CPUs.
+
+Theoretically, because operations are currnetly cpu-affine, they
+potentially reduce the overhead of sertialization and synchronization.
+In practice for arm64 they're just LL/SC loops, so I agree we don't lose
+much.
+
+Thanks,
+Mark.
