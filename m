@@ -1,93 +1,50 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 1 Mar 2018 09:53:51 +0800
-Subject: [PATCH] irqchip/gic-v3-its: handle rd_idx wrapping in
- its_wait_for_range_completion()
-In-Reply-To: <866073z7pr.wl-marc.zyngier@arm.com>
-References: <1518320521-12536-1-git-send-email-yangyingliang@huawei.com>
- <866073z7pr.wl-marc.zyngier@arm.com>
-Message-ID: <5A975D2F.1010302@huawei.com>
+From: acourbot@chromium.org (Alexandre Courbot)
+Date: Thu, 1 Mar 2018 11:19:21 +0900
+Subject: [PATCH] arm64: defconfig: Enable typec-phy and
+ extcon-usbc-cros-ec for rk3399
+In-Reply-To: <20180228140251.22232-1-enric.balletbo@collabora.com>
+References: <20180228140251.22232-1-enric.balletbo@collabora.com>
+Message-ID: <CAPBb6MV4Wx4j4vuv+m2PK20QCuF_BcGXx9A2SCjNmi7i-eo85Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 28, 2018 at 11:02 PM, Enric Balletbo i Serra
+<enric.balletbo@collabora.com> wrote:
+> Enables typec phyter and extcon driver for cable detection that is used by
+> USB 3.0 controller for Rockchip rk3399 SoCs.
+>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
+Tested-by: Alexandre Courbot <acourbot@chromium.org>
 
-On 2018/2/12 2:45, Marc Zyngier wrote:
-Hi, Marc
+Thanks! This fixes a USB regression in 4.16-rc1 and -rc2 for
+gru-kevin. Neither USB3 nor USB2 were usable whereas at least USB2 was
+usable in 4.15.
 
-Sorry for replying so late.
-> On Sun, 11 Feb 2018 03:42:01 +0000,
-> Yang Yingliang wrote:
+> ---
+>  arch/arm64/configs/defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> Hi Yang,
->
->> In direct case, rd_idx will wrap if other cpus post commands
->> that make rd_idx increase. When rd_idx wrapped, the driver prints
->> timeout messages but in fact the command is finished. To handle
->> this case by adding last_rd_id to check rd_idx whether wrapped.
->>
->> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> Please always Cc LKML on irqchip related patches.
->
->> ---
->>   drivers/irqchip/irq-gic-v3-its.c | 84 ++++++++++++++++++++++------------------
->>   1 file changed, 46 insertions(+), 38 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 06f025f..d7176d1 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -713,7 +713,8 @@ static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
->>   
->>   static int its_wait_for_range_completion(struct its_node *its,
->>   					 struct its_cmd_block *from,
->> -					 struct its_cmd_block *to)
->> +					 struct its_cmd_block *to,
->> +					 u64 last_rd_idx)
->>   {
->>   	u64 rd_idx, from_idx, to_idx;
->>   	u32 count = 1000000;	/* 1s! */
->> @@ -724,9 +725,14 @@ static int its_wait_for_range_completion(struct its_node *its,
->>   	while (1) {
->>   		rd_idx = readl_relaxed(its->base + GITS_CREADR);
->>   
->> -		/* Direct case */
->> -		if (from_idx < to_idx && rd_idx >= to_idx)
->> -			break;
->> +
->> +		/*
->> +		 * Direct case. In this case, rd_idx may wrapped,
->> +		 * because other cpus may post commands that make
->> +		 * rd_idx increase.
->> +		 */
->> +		if (from_idx < to_idx && (rd_idx >= to_idx || rd_idx < last_rd_idx))
->> +				break;
->>   
->>   		/* Wrapped case */
->>   		if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
->> @@ -746,40 +752,42 @@ static int its_wait_for_range_completion(struct its_node *its,
-> [...]
->
->> +	last_rd_idx = readl_relaxed(its->base + GITS_CREADR);			\
-> What is this last_rd_idx exactly? It is just some random sampling of
-> the read pointer after we've posted our commands. It can still be in
-> any position. And if the reader as wrapped because other CPUs are
-> feeding more commands to the queue, it could just as well overtake
-> last_rd_idx, making your new condition just as false. Yes, this is
-> unlikely, but still.
->
-> If you're going to harden the command queue wrapping, I'd suggest you
-> implement a generation mechanism so that we can easily work out if
-> we've seen the queue wrapping or not. THis would lift any kind of
-> ambiguity once and for all.
-I get a lot of timeout messages, when I am doing set affinity stress 
-testing which
-will post many its commands. I will try another way to handle the 
-wrapped case.
-
-Regards,
-Yang
->
-> Thanks,
->
-> 	M.
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 78b47bc7dc54..d4c25aa55785 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -544,6 +544,7 @@ CONFIG_ARCH_TEGRA_132_SOC=y
+>  CONFIG_ARCH_TEGRA_210_SOC=y
+>  CONFIG_ARCH_TEGRA_186_SOC=y
+>  CONFIG_EXTCON_USB_GPIO=y
+> +CONFIG_EXTCON_USBC_CROS_EC=y
+>  CONFIG_IIO=y
+>  CONFIG_EXYNOS_ADC=y
+>  CONFIG_ROCKCHIP_SARADC=m
+> @@ -564,6 +565,7 @@ CONFIG_PHY_MVEBU_CP110_COMPHY=y
+>  CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+>  CONFIG_PHY_ROCKCHIP_EMMC=y
+>  CONFIG_PHY_ROCKCHIP_PCIE=m
+> +CONFIG_PHY_ROCKCHIP_TYPEC=y
+>  CONFIG_PHY_XGENE=y
+>  CONFIG_PHY_TEGRA_XUSB=y
+>  CONFIG_QCOM_L2_PMU=y
+> --
+> 2.16.1
 >
