@@ -1,242 +1,177 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  1 Mar 2018 18:18:34 +0800
-Subject: [RESEND PATCH v6 11/14] iommu/rockchip: Use OF_IOMMU to attach
- devices automatically
-In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180301101837.27969-12-jeffy.chen@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 Mar 2018 11:20:11 +0100
+Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <20180223081443.ak6kl3z72kamcxob@verge.net.au>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
+ <20180221161326.ktvf3mlzzxith5kw@verge.net.au>
+ <CAMuHMdUTSmrWggMK4ehSL3Ux-JUzVpamTuToveuXogjuvGKkaw@mail.gmail.com>
+ <20180221183223.qacrmmuzoqlzzbpo@verge.net.au>
+ <CAMuHMdXCt1-coXGgtgFBm4rZLGBRMvSjbgeBSweiyKrOfCF0Xg@mail.gmail.com>
+ <20180223081443.ak6kl3z72kamcxob@verge.net.au>
+Message-ID: <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Converts the rockchip-iommu driver to use the OF_IOMMU infrastructure,
-which allows attaching master devices to their IOMMUs automatically
-according to DT properties.
+Hi Simon,
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
+On Fri, Feb 23, 2018 at 9:14 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Feb 22, 2018 at 09:38:39AM +0100, Geert Uytterhoeven wrote:
+>> On Wed, Feb 21, 2018 at 7:32 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Wed, Feb 21, 2018 at 05:30:12PM +0100, Geert Uytterhoeven wrote:
+>> >> On Wed, Feb 21, 2018 at 5:13 PM, Simon Horman <horms@verge.net.au> wrote:
+>> >> > On Tue, Feb 20, 2018 at 01:51:28PM +0100, Geert Uytterhoeven wrote:
+>> >> >> On Mon, Feb 12, 2018 at 6:44 PM, Fabrizio Castro
+>> >> >> <fabrizio.castro@bp.renesas.com> wrote:
+>> >> >> > this series has been around for some time as RFC, and it has collected
+>> >> >> > useful comments from the community along the way.
+>> >> >> > The solution proposed by this patch set works for most R-Car Gen2 and
+>> >> >> > RZ/G1 devices, but not all of them. We now know that for some R-Car
+>> >> >> > Gen2 early revisions there is no proper software fix. Anyway, no
+>> >> >> > product has been built around early revisions, but development boards
+>> >> >> > mounting early revisions (basically prototypes) are still out there.
+>> >> >> > As a result, this series isn't enabling the internal watchdog on R-Car
+>> >> >> > Gen2 boards, developers may enable it in board specific device trees
+>> >> >> > if needed.
+>> >> >> > This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
+>> >> >> > and Koelsch boards.
+>> >> >> >
+>> >> >> > The problem
+>> >> >> > ===========
+>> >> >> > To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
+>> >> >> > to ICRAM1 and we program the [S]BAR registers so that when we turn ON
+>> >> >> > the non-boot CPUs they are redirected to the reset vector installed by
+>> >> >> > Linux in ICRAM1, and eventually they continue the execution to RAM,
+>> >> >> > where the SMP bring-up code will take care of the rest.
+>> >> >> > The content of the [S]BAR registers survives a watchdog triggered reset,
+>> >> >> > and as such after the watchdog fires the boot core will try and execute
+>> >> >> > the SMP bring-up code instead of jumping to the bootrom code.
+>> >> >> >
+>> >> >> > The fix
+>> >> >> > =======
+>> >> >> > The main strategy for the solution is to let the reset vector decide
+>> >> >> > if it needs to jump to shmobile_boot_fn or to the bootrom code.
+>> >> >> > In a watchdog triggered reset scenario, since the [S]BAR registers keep
+>> >> >> > their values, the boot CPU will jump into the newly designed reset
+>> >> >> > vector, the assembly routine will eventually test WOVF (a bit in register
+>> >> >> > RWTCSRA that indicates if the watchdog counter has overflown, the value
+>> >> >> > of this bit gets retained in this scenario), and jump to the bootrom code
+>> >> >> > which will in turn load up the bootloader, etc.
+>> >> >> > When bringing up SMP or using CPU hotplug, the reset vector will jump
+>> >> >> > to shmobile_boot_fn instead.
+>> >> >> >
+>> >> >> > Thank you All for your help.
+>> >> >> >
+>> >> >> > Best regards,
+>> >> >> >
+>> >> >> > Fabrizio Castro (26):
+>> >> >> >   ARM: shmobile: Add watchdog support
+>> >> >> >   ARM: dts: r8a7743: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7745: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7790: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7791: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7792: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7793: Adjust SMP routine size
+>> >> >> >   ARM: dts: r8a7794: Adjust SMP routine size
+>> >> >> >   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
+>> >> >> >   ARM: shmobile: rcar-gen2: Add watchdog support
+>> >> >> >   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
+>> >> >> >   watchdog: renesas_wdt: Add R-Car Gen2 support
+>> >> >> >   watchdog: renesas_wdt: Add restart handler
+>> >> >> >   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+>> >> >> >   clk: renesas: r8a7743: Add rwdt clock
+>> >> >> >   clk: renesas: r8a7745: Add rwdt clock
+>> >> >> >   clk: renesas: r8a7790: Add rwdt clock
+>> >> >> >   clk: renesas: r8a7791/r8a7793: Add rwdt clock
+>> >> >> >   clk: renesas: r8a7794: Add rwdt clock
+>> >> >> >   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
+>> >> >> >   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+>> >> >> >   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+>> >> >> >   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+>> >> >> >   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
+>> >> >> >   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+>> >> >> >   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+>> >> >> >
+>> >> >> >  .../devicetree/bindings/watchdog/renesas-wdt.txt   | 19 ++++++--
+>> >> >> >  arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  5 ++
+>> >> >> >  arch/arm/boot/dts/r8a7743.dtsi                     | 12 ++++-
+>> >> >> >  arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |  5 ++
+>> >> >> >  arch/arm/boot/dts/r8a7745.dtsi                     | 12 ++++-
+>> >> >> >  arch/arm/boot/dts/r8a7790.dtsi                     | 12 ++++-
+>> >> >> >  arch/arm/boot/dts/r8a7791.dtsi                     | 12 ++++-
+>> >> >> >  arch/arm/boot/dts/r8a7792.dtsi                     |  2 +-
+>> >> >> >  arch/arm/boot/dts/r8a7793.dtsi                     |  2 +-
+>> >> >> >  arch/arm/boot/dts/r8a7794.dtsi                     | 12 ++++-
+>> >> >> >  arch/arm/configs/shmobile_defconfig                |  1 +
+>> >> >> >  arch/arm/mach-shmobile/common.h                    |  6 +++
+>> >> >> >  arch/arm/mach-shmobile/headsmp.S                   | 55 ++++++++++++++++++++++
+>> >> >> >  arch/arm/mach-shmobile/platsmp-apmu.c              |  1 +
+>> >> >> >  arch/arm/mach-shmobile/pm-rcar-gen2.c              | 15 ++++--
+>> >> >> >  drivers/clk/renesas/r8a7743-cpg-mssr.c             |  2 +
+>> >> >> >  drivers/clk/renesas/r8a7745-cpg-mssr.c             |  2 +
+>> >> >> >  drivers/clk/renesas/r8a7790-cpg-mssr.c             |  2 +
+>> >> >> >  drivers/clk/renesas/r8a7791-cpg-mssr.c             |  2 +
+>> >> >> >  drivers/clk/renesas/r8a7794-cpg-mssr.c             |  2 +
+>> >> >> >  drivers/soc/renesas/rcar-rst.c                     | 35 +++++++++++---
+>> >> >> >  drivers/watchdog/renesas_wdt.c                     | 39 +++++++++++++--
+>> >> >>
+>> >> >> Thanks, I've queued the clock patches in clk-renesas-for-v4.17, as they are
+>> >> >> a hard dependency for:
+>> >> >>   (1) The new reset vector in arch/arm/mach-shmobile/
+>> >> >>   (2) The watchdog driver.
+>> >> >>
+>> >> >> Note that the watchdog driver itself (2) has a hard dependency on the
+>> >> >> new reset vector (1).
+>> >> >
+>> >> > Thanks, I have marked the watchdog driver patch as Deferred.
+>> >> > Please resubmit or otherwise ping me once they dependencies
+>> >> > are in an rc release.
+>> >>
+>> >> I gave the dependencies a bit more thought.
+>> >>
+>> >> I think we can gain once release cycle if you would postpone the DTS patches
+>> >> (both SMP routine size adjustments and RWDT device node additions) to v4.18.
+>> >> Then all other parts can be upstreamed in parallel in v4.17, as nothing
+>> >> will be activated before the DTS parts are in.
+>> >>
+>> >> Does this look sane?
+>> >
+>> > What about new DTS on old kernels of a specific vintage?
+>>
+>> New DTS would work fine on v4.16 and older, which don't have any of the
+>> other patches from this series.
+>> New DTS would work fine on v4.17, assumed all other patches from this
+>> series get into v4.17.
+>>
+>> The only issue would be a new DTS on a kernel that has some but not all
+>> other patches from this series.
+>
+> Thanks for the analysis. I think this is the key point. What is the risk of
+> that happening?
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-Add struct rk_iommudata.
-Squash iommu/rockchip: Use iommu_group_get_for_dev() for add_device
+I think the risk is fairly low.
+You control when the DTS changes go in, and also when they are backported
+to LTSI.
 
-Changes in v2: None
+>> If we want to fast-track everything into v4.17, we need a stable branch, to be
+>> pulled by all 5 actors (clk-renesas, mach-shmobile, soc-renesas, watchdog,
+>> renesas-dts).
+>
+> It seems that watchdog is the only item on that list that neither you nor I
+> sign off on. So I conclude that if the watchdog patch goes in early enough
+> in the cycle then we ought to be in good shape.
+>
+> None the less, is it worth the risk?
 
- drivers/iommu/rockchip-iommu.c | 135 ++++++++++++-----------------------------
- 1 file changed, 40 insertions(+), 95 deletions(-)
+Do we want the functionality early, or can we wait until v4.19?
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 6789e11b7087..1346bbb8a3e7 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -19,6 +19,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -104,6 +105,10 @@ struct rk_iommu {
- 	struct iommu_domain *domain; /* domain to which iommu is attached */
- };
- 
-+struct rk_iommudata {
-+	struct rk_iommu *iommu;
-+};
-+
- static struct device *dma_dev;
- 
- static inline void rk_table_flush(struct rk_iommu_domain *dom, dma_addr_t dma,
-@@ -807,18 +812,9 @@ static size_t rk_iommu_unmap(struct iommu_domain *domain, unsigned long _iova,
- 
- static struct rk_iommu *rk_iommu_from_dev(struct device *dev)
- {
--	struct iommu_group *group;
--	struct device *iommu_dev;
--	struct rk_iommu *rk_iommu;
-+	struct rk_iommudata *data = dev->archdata.iommu;
- 
--	group = iommu_group_get(dev);
--	if (!group)
--		return NULL;
--	iommu_dev = iommu_group_get_iommudata(group);
--	rk_iommu = dev_get_drvdata(iommu_dev);
--	iommu_group_put(group);
--
--	return rk_iommu;
-+	return data ? data->iommu : NULL;
- }
- 
- static int rk_iommu_attach_device(struct iommu_domain *domain,
-@@ -989,110 +985,53 @@ static void rk_iommu_domain_free(struct iommu_domain *domain)
- 		iommu_put_dma_cookie(&rk_domain->domain);
- }
- 
--static bool rk_iommu_is_dev_iommu_master(struct device *dev)
--{
--	struct device_node *np = dev->of_node;
--	int ret;
--
--	/*
--	 * An iommu master has an iommus property containing a list of phandles
--	 * to iommu nodes, each with an #iommu-cells property with value 0.
--	 */
--	ret = of_count_phandle_with_args(np, "iommus", "#iommu-cells");
--	return (ret > 0);
--}
--
--static int rk_iommu_group_set_iommudata(struct iommu_group *group,
--					struct device *dev)
-+static int rk_iommu_add_device(struct device *dev)
- {
--	struct device_node *np = dev->of_node;
--	struct platform_device *pd;
--	int ret;
--	struct of_phandle_args args;
-+	struct iommu_group *group;
-+	struct rk_iommu *iommu;
- 
--	/*
--	 * An iommu master has an iommus property containing a list of phandles
--	 * to iommu nodes, each with an #iommu-cells property with value 0.
--	 */
--	ret = of_parse_phandle_with_args(np, "iommus", "#iommu-cells", 0,
--					 &args);
--	if (ret) {
--		dev_err(dev, "of_parse_phandle_with_args(%pOF) => %d\n",
--			np, ret);
--		return ret;
--	}
--	if (args.args_count != 0) {
--		dev_err(dev, "incorrect number of iommu params found for %pOF (found %d, expected 0)\n",
--			args.np, args.args_count);
--		return -EINVAL;
--	}
-+	iommu = rk_iommu_from_dev(dev);
-+	if (!iommu)
-+		return -ENODEV;
- 
--	pd = of_find_device_by_node(args.np);
--	of_node_put(args.np);
--	if (!pd) {
--		dev_err(dev, "iommu %pOF not found\n", args.np);
--		return -EPROBE_DEFER;
--	}
-+	group = iommu_group_get_for_dev(dev);
-+	if (IS_ERR(group))
-+		return PTR_ERR(group);
-+	iommu_group_put(group);
- 
--	/* TODO(djkurtz): handle multiple slave iommus for a single master */
--	iommu_group_set_iommudata(group, &pd->dev, NULL);
-+	iommu_device_link(&iommu->iommu, dev);
- 
- 	return 0;
- }
- 
--static int rk_iommu_add_device(struct device *dev)
-+static void rk_iommu_remove_device(struct device *dev)
- {
--	struct iommu_group *group;
- 	struct rk_iommu *iommu;
--	int ret;
--
--	if (!rk_iommu_is_dev_iommu_master(dev))
--		return -ENODEV;
--
--	group = iommu_group_get(dev);
--	if (!group) {
--		group = iommu_group_alloc();
--		if (IS_ERR(group)) {
--			dev_err(dev, "Failed to allocate IOMMU group\n");
--			return PTR_ERR(group);
--		}
--	}
--
--	ret = iommu_group_add_device(group, dev);
--	if (ret)
--		goto err_put_group;
--
--	ret = rk_iommu_group_set_iommudata(group, dev);
--	if (ret)
--		goto err_remove_device;
- 
- 	iommu = rk_iommu_from_dev(dev);
--	if (iommu)
--		iommu_device_link(&iommu->iommu, dev);
- 
--	iommu_group_put(group);
--
--	return 0;
--
--err_remove_device:
-+	iommu_device_unlink(&iommu->iommu, dev);
- 	iommu_group_remove_device(dev);
--err_put_group:
--	iommu_group_put(group);
--	return ret;
- }
- 
--static void rk_iommu_remove_device(struct device *dev)
-+static int rk_iommu_of_xlate(struct device *dev,
-+			     struct of_phandle_args *args)
- {
--	struct rk_iommu *iommu;
-+	struct platform_device *iommu_dev;
-+	struct rk_iommudata *data;
- 
--	if (!rk_iommu_is_dev_iommu_master(dev))
--		return;
-+	data = devm_kzalloc(dma_dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
- 
--	iommu = rk_iommu_from_dev(dev);
--	if (iommu)
--		iommu_device_unlink(&iommu->iommu, dev);
-+	iommu_dev = of_find_device_by_node(args->np);
- 
--	iommu_group_remove_device(dev);
-+	data->iommu = platform_get_drvdata(iommu_dev);
-+	dev->archdata.iommu = data;
-+
-+	of_dev_put(iommu_dev);
-+
-+	return 0;
- }
- 
- static const struct iommu_ops rk_iommu_ops = {
-@@ -1106,7 +1045,9 @@ static const struct iommu_ops rk_iommu_ops = {
- 	.add_device = rk_iommu_add_device,
- 	.remove_device = rk_iommu_remove_device,
- 	.iova_to_phys = rk_iommu_iova_to_phys,
-+	.device_group = generic_device_group,
- 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
-+	.of_xlate = rk_iommu_of_xlate,
- };
- 
- static int rk_iommu_probe(struct platform_device *pdev)
-@@ -1178,6 +1119,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 		goto err_unprepare_clocks;
- 
- 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
-+	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
-+
- 	err = iommu_device_register(&iommu->iommu);
- 	if (err)
- 		goto err_remove_sysfs;
-@@ -1232,6 +1175,8 @@ static int __init rk_iommu_init(void)
- }
- subsys_initcall(rk_iommu_init);
- 
-+IOMMU_OF_DECLARE(rk_iommu_of, "rockchip,iommu");
-+
- MODULE_DESCRIPTION("IOMMU API for Rockchip");
- MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
- MODULE_ALIAS("platform:rockchip-iommu");
--- 
-2.11.0
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
