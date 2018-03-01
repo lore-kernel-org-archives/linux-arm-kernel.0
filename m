@@ -1,61 +1,114 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 1 Mar 2018 11:59:22 +0900
-Subject: [PATCH v8 02/13] kexec_file: make an use of purgatory optional
-In-Reply-To: <20180228123359.GB2228@dhcp-128-65.nay.redhat.com>
-References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
- <20180222111732.23051-3-takahiro.akashi@linaro.org>
- <20180223084934.GB4433@dhcp-128-65.nay.redhat.com>
- <20180226102418.GD6019@linaro.org>
- <20180228123359.GB2228@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180301025921.GL6019@linaro.org>
+From: chenhc@lemote.com (Huacai Chen)
+Date: Thu, 1 Mar 2018 10:59:43 +0800
+Subject: [PATCH 01/99] ZBOOT: fix stack protector in compressed boot phase
+In-Reply-To: <1519872791-19076-1-git-send-email-chenhc@lemote.com>
+References: <1519872791-19076-1-git-send-email-chenhc@lemote.com>
+Message-ID: <CAAhV-H6f4szrbEKyuEgp-Zs6jFTRi_ekUpsrQwtSBcp7gbAUuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 08:33:59PM +0800, Dave Young wrote:
-> On 02/26/18 at 07:24pm, AKASHI Takahiro wrote:
-> > On Fri, Feb 23, 2018 at 04:49:34PM +0800, Dave Young wrote:
-> > > Hi AKASHI,
-> > > 
-> > > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
-> > > > On arm64, no trampline code between old kernel and new kernel will be
-> > > > required in kexec_file implementation. This patch introduces a new
-> > > > configuration, ARCH_HAS_KEXEC_PURGATORY, and allows related code to be
-> > > > compiled in only if necessary.
-> > > 
-> > > Here also need the explanation about why no purgatory is needed, it would be
-> > > required for kexec if no strong reason.
-> > 
-> > OK, I will add the reason:
-> > On arm64, crash dump kernel's usable memory is protected by
-> > *unmapping* it from kernel virtual space unlike other architectures
-> > where the region is just made read-only.
-> > So our key developers think that it is highly unlikely that the region
-> > is accidentally corrupted and this rationalizes that digest check code
-> > be also dropped from purgatory.
-> > This greatly simplifies our purgatory without any need for a bit ugly
-> > relocation stuff, i.e. arch_kexec_apply_relocations_add().
-> > 
-> > Please see:
-> >    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
-> > to find out how simple our purgatory was. All that it does is
-> > to shuffle arguments and jump into a new kernel.
-> > 
-> > Without this patch, we would have to have purgatory with a space for
-> > a hash value (purgatory_sha256_digest) which is never checked against.
-> > 
-> > Do you think it makes sense?
-> 
-> Hmm, it looks reasonable, I remember there could be some performance
-> issue for a purgatory because of cache disabled for arm64. I do not
-> object this.
+This is a single patch, please ignore 1/99 in the title...
 
-Yeah, Pratyush(redhat) had expressed his concerns on slow boot-up of
-the 2nd kernel which is due to hash value calculation.
+Huacai
 
--Takahiro AKASHI
-
-> 
-> [snip]
-> 
-> Thanks
-> Dave
+On Thu, Mar 1, 2018 at 10:53 AM, Huacai Chen <chenhc@lemote.com> wrote:
+> Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+> stack checking always fails for decompress_kernel() itself. So remove
+> __stack_chk_guard_setup() and initialize __stack_chk_guard at where we
+> define it.
+>
+> Original code comes from ARM but also used for MIPS and SH, so fix them
+> together.
+>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Huacai Chen <chenhc@lemote.com>
+> ---
+>  arch/arm/boot/compressed/misc.c        | 9 +--------
+>  arch/mips/boot/compressed/decompress.c | 9 +--------
+>  arch/sh/boot/compressed/misc.c         | 9 +--------
+>  3 files changed, 3 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index 16a8a80..43aca75 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -128,12 +128,7 @@ asmlinkage void __div0(void)
+>         error("Attempting division by 0!");
+>  }
+>
+> -unsigned long __stack_chk_guard;
+> -
+> -void __stack_chk_guard_setup(void)
+> -{
+> -       __stack_chk_guard = 0x000a0dff;
+> -}
+> +unsigned long __stack_chk_guard = 0x000a0dff;
+>
+>  void __stack_chk_fail(void)
+>  {
+> @@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+>  {
+>         int ret;
+>
+> -       __stack_chk_guard_setup();
+> -
+>         output_data             = (unsigned char *)output_start;
+>         free_mem_ptr            = free_mem_ptr_p;
+>         free_mem_end_ptr        = free_mem_ptr_end_p;
+> diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+> index fdf99e9..0694b3f 100644
+> --- a/arch/mips/boot/compressed/decompress.c
+> +++ b/arch/mips/boot/compressed/decompress.c
+> @@ -76,12 +76,7 @@ void error(char *x)
+>  #include "../../../../lib/decompress_unxz.c"
+>  #endif
+>
+> -unsigned long __stack_chk_guard;
+> -
+> -void __stack_chk_guard_setup(void)
+> -{
+> -       __stack_chk_guard = 0x000a0dff;
+> -}
+> +unsigned long __stack_chk_guard = 0x000a0dff;
+>
+>  void __stack_chk_fail(void)
+>  {
+> @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+>  {
+>         unsigned long zimage_start, zimage_size;
+>
+> -       __stack_chk_guard_setup();
+> -
+>         zimage_start = (unsigned long)(&__image_begin);
+>         zimage_size = (unsigned long)(&__image_end) -
+>             (unsigned long)(&__image_begin);
+> diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+> index 627ce8e..2c564c2 100644
+> --- a/arch/sh/boot/compressed/misc.c
+> +++ b/arch/sh/boot/compressed/misc.c
+> @@ -104,12 +104,7 @@ static void error(char *x)
+>         while(1);       /* Halt */
+>  }
+>
+> -unsigned long __stack_chk_guard;
+> -
+> -void __stack_chk_guard_setup(void)
+> -{
+> -       __stack_chk_guard = 0x000a0dff;
+> -}
+> +unsigned long __stack_chk_guard = 0x000a0dff;
+>
+>  void __stack_chk_fail(void)
+>  {
+> @@ -130,8 +125,6 @@ void decompress_kernel(void)
+>  {
+>         unsigned long output_addr;
+>
+> -       __stack_chk_guard_setup();
+> -
+>  #ifdef CONFIG_SUPERH64
+>         output_addr = (CONFIG_MEMORY_START + 0x2000);
+>  #else
+> --
+> 2.7.0
+>
