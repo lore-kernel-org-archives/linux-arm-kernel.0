@@ -1,37 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Mar 2018 23:28:46 +0100
-Subject: [PATCH 0/6] Introduce STMicroelectronics MultiFunction eXpander
-In-Reply-To: <276d5f97-55c2-406e-92c7-0d03c7f7a49d@st.com>
-References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
- <CACRpkdZYnQC5BusLyK5aAcA2q0NmvHu=TaLhFCfu2M0bgBcjrQ@mail.gmail.com>
- <276d5f97-55c2-406e-92c7-0d03c7f7a49d@st.com>
-Message-ID: <CACRpkdbd=n=6g+20_sn+_Q_xNpQowa_40o1uzCnRm8vnEnantQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Mar 2018 14:32:43 -0800
+Subject: [PATCH] arm: dts: omap3: Add missing #sound-dai-cells
+In-Reply-To: <20180301202537.30571-2-robh@kernel.org>
+References: <20180301202537.30571-2-robh@kernel.org>
+Message-ID: <20180301223243.GI62820@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 4:13 PM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+* Rob Herring <robh@kernel.org> [180301 12:26]:
+> dtc now gives the following warnings:
+> 
+> arch/arm/boot/dts/omap3-gta04a3.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+> arch/arm/boot/dts/omap3-gta04a4.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+> arch/arm/boot/dts/omap3-gta04a5.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
+> 
+> Add the missing #sound-dai-cells property.
 
-> ST MFX is different from STMPE as far as the HW is completely different.
-> IDD is a new feature.
-> TS management is completely different.
-> GPIO management looks like but is also rather different.
-> ST MFX counts a first level of 8 interrupts (acked by writing in the ACK
-> register), then a second level of 24 interrupts for GPIOs. GPIO IRQ can
-> be triggered on low level, falling edge, high level, rising edge. GPIO
-> IRQ have to be acked by writing in the GPI_ACK register, GPIO can be
-> output open-drain with/without internal pull-up, output push-pull, input
-> with pull-up/down, input floating or analog.
+Is this needed for the current -rc or is v4.17 OK?
 
-Okay I am convinced that we need to model this as its own
-driver if it is as different as you say.
+Somehow I'm not seeing these with current -rc or next, is
+there some special option (not W=2 :) that you're using?
 
-But let's keep an eye on STMPE's approaches and what it does
-right and wrong.
+Regards,
 
-If I rewrote the STMPE driver today, the major changes would be
-to use regmap to pass around to subdrivers, and implement a
-combined pin control and GPIO driver, so I think those things should
-be nice to have for the next iteration.
+Tony
 
-Yours,
-Linus Walleij
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  arch/arm/boot/dts/omap3.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index a005802cd52b..4043ecb38016 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -557,6 +557,7 @@
+>  			dma-names = "tx", "rx";
+>  			clocks = <&mcbsp4_fck>;
+>  			clock-names = "fck";
+> +			#sound-dai-cells = <0>;
+>  			status = "disabled";
+>  		};
+>  
+> -- 
+> 2.14.1
+> 
