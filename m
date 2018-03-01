@@ -1,48 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu,  1 Mar 2018 14:25:36 -0600
-Subject: [PATCH] arm: dts: stih4xx: Add missing #sound-dai-cells
-Message-ID: <20180301202537.30571-4-robh@kernel.org>
+From: amonakov@ispras.ru (Alexander Monakov)
+Date: Thu,  1 Mar 2018 23:25:36 +0300
+Subject: [PATCH] drivers/perf: arm_pmu_platform: do not warn about affinity on
+ uniprocessor
+Message-ID: <20180301202536.11776-1-amonakov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc now gives the following warnings:
+If there is exactly one CPU present, there is no ambiguity: do not warn
+that PMU setup would need to guess IRQ affinity.
 
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
-
-Add the missing #sound-dai-cells property.
-
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alexander Monakov <amonakov@ispras.ru>
 ---
- arch/arm/boot/dts/stih407.dtsi | 1 +
- arch/arm/boot/dts/stih410.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+This helps to avoid a useless warning on single-CPU systems with a PMU.
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 11fdecd9312e..b592ecbe6420 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -107,6 +107,7 @@
- 				compatible = "st,stih407-hdmi";
- 				reg = <0x8d04000 0x1000>;
- 				reg-names = "hdmi-reg";
-+				#sound-dai-cells = <0>;
- 				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
- 				interrupt-names	= "irq";
- 				clock-names = "pix",
-diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index 68b5ff91d6a7..4bcdbbb70a31 100644
---- a/arch/arm/boot/dts/stih410.dtsi
-+++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -198,6 +198,7 @@
- 				compatible = "st,stih407-hdmi";
- 				reg = <0x8d04000 0x1000>;
- 				reg-names = "hdmi-reg";
-+				#sound-dai-cells = <0>;
- 				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
- 				interrupt-names	= "irq";
- 				clock-names = "pix",
+ drivers/perf/arm_pmu_platform.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 91b224eced18..e5740b6dee74 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -131,7 +131,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+ 			return pmu_parse_percpu_irq(pmu, irq);
+ 	}
+ 
+-	if (!pmu_has_irq_affinity(pdev->dev.of_node)) {
++	if (nr_cpu_ids != 1 && !pmu_has_irq_affinity(pdev->dev.of_node)) {
+ 		pr_warn("no interrupt-affinity property for %pOF, guessing.\n",
+ 			pdev->dev.of_node);
+ 	}
 -- 
-2.14.1
+2.11.0
