@@ -1,41 +1,22 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 1 Mar 2018 14:32:24 +0100
-Subject: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
-In-Reply-To: <1519154467-2896-4-git-send-email-jollys@xilinx.com>
-References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-4-git-send-email-jollys@xilinx.com>
-Message-ID: <3e14f7b3-52e7-660a-a2f7-cc23b3262f0a@monstr.eu>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Mar 2018 14:33:37 +0100
+Subject: [PATCH] drm/rockchip: vop: Init vskiplines in scl_vop_cal_scale()
+In-Reply-To: <20180223062250.10470-1-jeffy.chen@rock-chips.com>
+References: <20180223062250.10470-1-jeffy.chen@rock-chips.com>
+Message-ID: <126662348.ZcAOZAFD3X@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.2.2018 20:21, Jolly Shah wrote:
-> Add Firmware-ggs sysfs interface which provides read/write
-> interface to global storage registers.
+Am Freitag, 23. Februar 2018, 07:22:50 CET schrieb Jeffy Chen:
+> Currently we are calling scl_vop_cal_scale() to get vskiplines for yrgb
+> and cbcr. So the cbcr's vskiplines might be an unexpected value if the
+> second scl_vop_cal_scale() didn't update it.
 > 
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> ---
->  .../ABI/stable/sysfs-driver-zynqmp-firmware        |  50 ++++
+> Init vskiplines in scl_vop_cal_scale() to avoid that.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-This file name has changed between v4 and v5. File from v4 was correct.
-That's why I am waiting for v6 to be send before this is applied.
-
-Thanks,
-Michal
+applied to drm-misc-next with Sean Paul's Ack
 
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/4be53ddb/attachment.sig>
+Heiko
