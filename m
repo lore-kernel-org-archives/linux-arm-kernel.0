@@ -1,78 +1,51 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:53:52 +0800
-Subject: [PATCH 15/45] arm64: uaccess: Mask __user pointers for __arch_{clear,
- copy_*}_user
+Date: Thu,  1 Mar 2018 20:53:56 +0800
+Subject: [PATCH 19/45] arm64: cpu_errata: Allow an erratum to be match for all
+ revisions of a core
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-16-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-20-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Rewritting from commit f71c2ffcb20d upstream. On LTS 4.9, there has no
-raw_copy_from/to_user, neither __copy_user_flushcache, and it isn't good
-idead to pick up them. The following is origin commit log, that's also
-applicable for the new patch.
+commit 06f1494f837 upstream.
 
-    Like we've done for get_user and put_user, ensure that user pointers
-    are masked before invoking the underlying __arch_{clear,copy_*}_user
-    operations.
+Some minor erratum may not be fixed in further revisions of a core,
+leading to a situation where the workaround needs to be updated each
+time an updated core is released.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Introduce a MIDR_ALL_VERSIONS match helper that will work for all
+versions of that MIDR, once and for all.
+
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/uaccess.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/cpu_errata.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index ffa4e39..fbf4ce4 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -357,14 +357,14 @@ static inline unsigned long __must_check __copy_from_user(void *to, const void _
- {
- 	kasan_check_write(to, n);
- 	check_object_size(to, n, false);
--	return __arch_copy_from_user(to, from, n);
-+	return __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
- }
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index b75e917..c66a673c 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ 	.midr_range_min = min, \
+ 	.midr_range_max = max
  
- static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
- {
- 	kasan_check_read(from, n);
- 	check_object_size(from, n, true);
--	return __arch_copy_to_user(to, from, n);
-+	return __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
- }
- 
- static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
-@@ -374,7 +374,7 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
- 	check_object_size(to, n, false);
- 
- 	if (access_ok(VERIFY_READ, from, n)) {
--		res = __arch_copy_from_user(to, from, n);
-+		res = __arch_copy_from_user(to, __uaccess_mask_ptr(from), n);
- 	}
- 	if (unlikely(res))
- 		memset(to + (n - res), 0, res);
-@@ -387,7 +387,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
- 	check_object_size(from, n, true);
- 
- 	if (access_ok(VERIFY_WRITE, to, n)) {
--		n = __arch_copy_to_user(to, from, n);
-+		n = __arch_copy_to_user(__uaccess_mask_ptr(to), from, n);
- 	}
- 	return n;
- }
-@@ -395,7 +395,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
- static inline unsigned long __must_check copy_in_user(void __user *to, const void __user *from, unsigned long n)
- {
- 	if (access_ok(VERIFY_READ, from, n) && access_ok(VERIFY_WRITE, to, n))
--		n = __copy_in_user(to, from, n);
-+		n = __copy_in_user(__uaccess_mask_ptr(to), __uaccess_mask_ptr(from), n);
- 	return n;
- }
- 
++#define MIDR_ALL_VERSIONS(model) \
++	.def_scope = SCOPE_LOCAL_CPU, \
++	.matches = is_affected_midr_range, \
++	.midr_model = model, \
++	.midr_range_min = 0, \
++	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
 -- 
 2.7.4
