@@ -1,9 +1,9 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  1 Mar 2018 10:24:18 +0100
-Subject: [PATCH 4/6] arm64: dts: rockchip: enable typec-phy for rk3399-firefly.
+Date: Thu,  1 Mar 2018 10:24:19 +0100
+Subject: [PATCH 5/6] arm64: dts: rockchip: enable typec-phy1 for rk3399-puma.
 In-Reply-To: <20180301092420.1191-1-enric.balletbo@collabora.com>
 References: <20180301092420.1191-1-enric.balletbo@collabora.com>
-Message-ID: <20180301092420.1191-5-enric.balletbo@collabora.com>
+Message-ID: <20180301092420.1191-6-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,26 +20,22 @@ Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support fo
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index 4f28628aa091..0e3a9ab4a297 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -670,6 +670,14 @@
- 	status = "okay";
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
+index 1fc5060d7027..3a3b24383482 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
+@@ -505,6 +505,10 @@
+ 	};
  };
  
-+&tcphy0 {
-+	status = "okay";
-+};
-+
 +&tcphy1 {
 +	status = "okay";
 +};
 +
- &u2phy0 {
+ &u2phy1 {
  	status = "okay";
  
 -- 
