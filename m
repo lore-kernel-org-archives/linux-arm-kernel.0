@@ -1,125 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 1 Mar 2018 14:27:34 +0000
-Subject: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <1519154467-2896-3-git-send-email-jollys@xilinx.com>
-References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-3-git-send-email-jollys@xilinx.com>
-Message-ID: <dab419e8-3afe-5bfe-240e-e9ee4f2300f2@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 1 Mar 2018 08:28:23 -0600
+Subject: [PATCH v3 1/2] dt-bindings: i2c: add binding for Socionext
+ SynQuacer I2C
+In-Reply-To: <20180227110107.30259-2-ard.biesheuvel@linaro.org>
+References: <20180227110107.30259-1-ard.biesheuvel@linaro.org>
+ <20180227110107.30259-2-ard.biesheuvel@linaro.org>
+Message-ID: <CAL_JsqJL9idphGUyZ8M4MuF2oTUC0hNYaVsbLu4ec+=s90qJ1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 27, 2018 at 5:01 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Add a binding for the I2C controller that can be found in the Socionext
+> SynQuacer SoC. Note that this is the exact same IP as the Fujitsu F_I2C.
 
+Is there a binding for that? Should be the same doc if so.
 
-On 20/02/18 19:21, Jolly Shah wrote:
-> This patch is adding communication layer with firmware.
-> Firmware driver provides an interface to firmware APIs.
-> Interface APIs can be used by any driver to communicate to
-> PMUFW(Platform Management Unit). All requests go through ATF.
-> 
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm64/Kconfig.platforms                    |    1 +
->  drivers/firmware/Kconfig                        |    1 +
->  drivers/firmware/Makefile                       |    1 +
->  drivers/firmware/xilinx/Kconfig                 |    4 +
->  drivers/firmware/xilinx/Makefile                |    4 +
->  drivers/firmware/xilinx/zynqmp/Kconfig          |   16 +
->  drivers/firmware/xilinx/zynqmp/Makefile         |    4 +
->  drivers/firmware/xilinx/zynqmp/firmware.c       | 1051 +++++++++++++++++++++++
->  include/linux/firmware/xilinx/zynqmp/firmware.h |  590 +++++++++++++
->  9 files changed, 1672 insertions(+)
->  create mode 100644 drivers/firmware/xilinx/Kconfig
->  create mode 100644 drivers/firmware/xilinx/Makefile
->  create mode 100644 drivers/firmware/xilinx/zynqmp/Kconfig
->  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
->  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
->  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
-> 
+>  Documentation/devicetree/bindings/i2c/i2c-synquacer.txt | 29 ++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+> new file mode 100644
+> index 000000000000..4d0bb6a71211
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+> @@ -0,0 +1,29 @@
+> +Socionext SynQuacer I2C
 > +
-> +/**
-> + * zynqmp_pm_force_powerdown - PM call to request for another PU or subsystem to
-> + *				be powered down forcefully
-> + * @target:	Node ID of the targeted PU or subsystem
-> + * @ack:	Flag to specify whether acknowledge is requested
-> + *
-> + * Return:	Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_force_powerdown(const u32 target,
-> +				     const enum zynqmp_pm_request_ack ack)
-> +{
-> +	return zynqmp_pm_invoke_fn(PM_FORCE_POWERDOWN, target, ack, 0, 0, NULL);
-> +}
+> +Required properties:
+> +- compatible      : Must be "socionext,synquacer-i2c"
+> +- reg             : Offset and length of the register set for the device
+> +- interrupts      : the interrupt specifier
+
+How many?
+
+> +- #address-cells  : Must be <1>;
+> +- #size-cells     : Must be <0>;
+> +- clock-names     : Must contain "pclk".
+> +- clocks          : Must contain an entry for each name in clock-names.
+> +                    (See the common clock bindings.)
 > +
-
-[...]
-
-> +/**
-> + * zynqmp_pm_system_shutdown - PM call to request a system shutdown or restart
-> + * @type:	Shutdown or restart? 0 for shutdown, 1 for restart
-> + * @subtype:	Specifies which system should be restarted or shut down
-> + *
-> + * Return:	Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_system_shutdown(const u32 type, const u32 subtype)
-> +{
-> +	return zynqmp_pm_invoke_fn(PM_SYSTEM_SHUTDOWN, type, subtype,
-> +				   0, 0, NULL);
-> +}
+> +Optional properties:
+> +- clock-frequency : Desired I2C bus clock frequency in Hz. As only Normal and
+> +                    Fast modes are supported, possible values are 100000 and
+> +                    400000.
 > +
-
-I can't understand why you need above 2 APIs: PM_FORCE_POWERDOWN and
-PM_SYSTEM_SHUTDOWN. You should use PSCI_SYSTEM_OFF and PSCI_SYSTEM_RESET
-and drop these two.
-
-
-> +static const struct zynqmp_eemi_ops eemi_ops = {
-> +	.get_api_version = zynqmp_pm_get_api_version,
-> +	.get_chipid = zynqmp_pm_get_chipid,
-> +	.reset_assert = zynqmp_pm_reset_assert,
-> +	.reset_get_status = zynqmp_pm_reset_get_status,
-> +	.fpga_load = zynqmp_pm_fpga_load,
-> +	.fpga_get_status = zynqmp_pm_fpga_get_status,
-> +	.sha_hash = zynqmp_pm_sha_hash,
-> +	.rsa = zynqmp_pm_rsa,
-> +	.request_suspend = zynqmp_pm_request_suspend,
-> +	.force_powerdown = zynqmp_pm_force_powerdown,
-> +	.request_wakeup = zynqmp_pm_request_wakeup,
-> +	.set_wakeup_source = zynqmp_pm_set_wakeup_source,
-> +	.system_shutdown = zynqmp_pm_system_shutdown,
-> +	.request_node = zynqmp_pm_request_node,
-> +	.release_node = zynqmp_pm_release_node,
-> +	.set_requirement = zynqmp_pm_set_requirement,
-> +	.set_max_latency = zynqmp_pm_set_max_latency,
-> +	.set_configuration = zynqmp_pm_set_configuration,
-> +	.get_node_status = zynqmp_pm_get_node_status,
-> +	.get_operating_characteristic = zynqmp_pm_get_operating_characteristic,
-> +	.init_finalize = zynqmp_pm_init_finalize,
-> +	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
-> +	.ioctl = zynqmp_pm_ioctl,
-> +	.query_data = zynqmp_pm_query_data,
-> +	.pinctrl_request = zynqmp_pm_pinctrl_request,
-> +	.pinctrl_release = zynqmp_pm_pinctrl_release,
-> +	.pinctrl_get_function = zynqmp_pm_pinctrl_get_function,
-> +	.pinctrl_set_function = zynqmp_pm_pinctrl_set_function,
-> +	.pinctrl_get_config = zynqmp_pm_pinctrl_get_config,
-> +	.pinctrl_set_config = zynqmp_pm_pinctrl_set_config,
-> +	.clock_enable = zynqmp_pm_clock_enable,
-> +	.clock_disable = zynqmp_pm_clock_disable,
-> +	.clock_getstate = zynqmp_pm_clock_getstate,
-> +	.clock_setdivider = zynqmp_pm_clock_setdivider,
-> +	.clock_getdivider = zynqmp_pm_clock_getdivider,
-> +	.clock_setrate = zynqmp_pm_clock_setrate,
-> +	.clock_getrate = zynqmp_pm_clock_getrate,
-> +	.clock_setparent = zynqmp_pm_clock_setparent,
-> +	.clock_getparent = zynqmp_pm_clock_getparent,
-> +};
+> +Example :
 > +
-Instead of introducing all these in oneshot, add them as you have users
-of it. IOW, show the users of these functions in the series. Also I
-asked to split this into functional changes like clock, pinctrl, power, etc.
-
--- 
-Regards,
-Sudeep
+> +    i2c at 51210000 {
+> +        compatible = "socionext,synquacer-i2c";
+> +        reg = <0x51210000 0x1000>;
+> +        interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+> +        #address-cells = <1>;
+> +        #size-cells = <0>;
+> +        clock-names = "pclk";
+> +        clocks = <&clk_i2c>;
+> +        clock-frequency = <400000>;
+> +    };
+> --
+> 2.11.0
+>
