@@ -1,158 +1,42 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  1 Mar 2018 22:34:40 +0100
-Subject: [PATCH v3 14/16] ARM: dts: sunxi: h3/h5: Add HDMI pipeline
+Date: Thu,  1 Mar 2018 22:34:32 +0100
+Subject: [PATCH v3 06/16] drm/sun4i: Release exclusive clock lock when
+ disabling TCON
 In-Reply-To: <20180301213442.16677-1-jernej.skrabec@siol.net>
 References: <20180301213442.16677-1-jernej.skrabec@siol.net>
-Message-ID: <20180301213442.16677-15-jernej.skrabec@siol.net>
+Message-ID: <20180301213442.16677-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all entries needed for HDMI to function properly.
+Currently exclusive TCON clock lock is never released, which, for
+example, prevents changing resolution on HDMI.
+
+In order to fix that, release clock when disabling TCON. TCON is always
+disabled first before new mode is set.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 108 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 7741166d34d8..1be1a02d6df2 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -105,6 +105,12 @@
- 		};
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 1d714c06ec9d..7f6c4125c89f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -102,10 +102,12 @@ static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
+ 		return;
+ 	}
  
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-h3-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -123,6 +129,29 @@
- 			#reset-cells = <1>;
- 		};
+-	if (enabled)
++	if (enabled) {
+ 		clk_prepare_enable(clk);
+-	else
++	} else {
++		clk_rate_exclusive_put(clk);
+ 		clk_disable_unprepare(clk);
++	}
+ }
  
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-h3-de2-mixer-0";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER0>,
-+				 <&display_clocks CLK_MIXER0>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_MIXER0>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint {
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-h3-system-controller",
- 				"syscon";
-@@ -138,6 +167,41 @@
- 			#dma-cells = <1>;
- 		};
- 
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-h3-tcon-tv",
-+				     "allwinner,sun8i-a83t-tcon-tv";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+			clock-names = "ahb", "tcon-ch1";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			reset-names = "lcd";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint {
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon0_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			/* compatible and clocks are in per SoC .dtsi file */
- 			reg = <0x01c0f000 0x1000>;
-@@ -682,6 +746,50 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		hdmi: hdmi at 1ee0000 {
-+			compatible = "allwinner,sun8i-h3-dw-hdmi",
-+				     "allwinner,sun8i-a83t-dw-hdmi";
-+			reg = <0x01ee0000 0x10000>;
-+			reg-io-width = <1>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
-+				 <&ccu CLK_HDMI>;
-+			clock-names = "iahb", "isfr", "tmds";
-+			resets = <&ccu RST_BUS_HDMI1>;
-+			reset-names = "ctrl";
-+			phys = <&hdmi_phy>;
-+			phy-names = "hdmi-phy";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					reg = <0>;
-+
-+					hdmi_in_tcon0: endpoint {
-+						remote-endpoint = <&tcon0_out_hdmi>;
-+					};
-+				};
-+
-+				hdmi_out: port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		hdmi_phy: hdmi-phy at 1ef0000 {
-+			compatible = "allwinner,sun8i-h3-hdmi-phy";
-+			reg = <0x01ef0000 0x10000>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
-+				 <&ccu 6>;
-+			clock-names = "bus", "mod", "pll-0";
-+			resets = <&ccu RST_BUS_HDMI0>;
-+			reset-names = "phy";
-+			#phy-cells = <0>;
-+		};
-+
- 		rtc: rtc at 1f00000 {
- 			compatible = "allwinner,sun6i-a31-rtc";
- 			reg = <0x01f00000 0x54>;
+ static void sun4i_tcon_lvds_set_status(struct sun4i_tcon *tcon,
 -- 
 2.16.2
