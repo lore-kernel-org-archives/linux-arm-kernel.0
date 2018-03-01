@@ -1,43 +1,36 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  1 Mar 2018 10:24:14 +0100
-Subject: [PATCH 0/6] phy: rockchip-typec: fix boards that does not report
- cable-state.
-Message-ID: <20180301092420.1191-1-enric.balletbo@collabora.com>
+Date: Thu,  1 Mar 2018 10:24:16 +0100
+Subject: [PATCH 2/6] dt-bindings: phy-rockchip-typec: move extcon property to
+ be optional.
+In-Reply-To: <20180301092420.1191-1-enric.balletbo@collabora.com>
+References: <20180301092420.1191-1-enric.balletbo@collabora.com>
+Message-ID: <20180301092420.1191-3-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The extcon property is used to detect the cable-state but some boards,
+like Sapphire, currently does not seem to support, others might just not
+need, as are supposed to work in host-mode only. So, extcon property is
+not really a required property, move to be optional instead.
 
-Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
-support for rk3399") introduced a regression on some rk3399 boards,
-and break USB. While some boards have support to report cable-state via
-extcon interface, other boards does not support. This patch series
-tries to fix this.
-
-First and second patch makes extcon optional, the following patches
-enables the typec phyter for others rk3399 boards. It has been tested on
-Samsung Chromebook Plus and Sapphire but not on the other boards, so I'll
-appreciate if someone can test it.
-
-Best regards,
- Enric
-
-Enric Balletbo i Serra (6):
-  phy: rockchip-typec: fall back to working in host-mode if extcon is
-    missing.
-  dt-bindings: phy-rockchip-typec: move extcon property to be optional.
-  arm64: dts: rockchip: enable typec-phy for rk3399-sapphire.
-  arm64: dts: rockchip: enable typec-phy for rk3399-firefly.
-  arm64: dts: rockchip: enable typec-phy1 for rk3399-puma.
-  arm64: dts: rockchip: enable typec-phy0 for rk3399-puma-haikou.
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 2 ++
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts              | 8 ++++++++
- arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts          | 4 ++++
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi                | 4 ++++
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi            | 8 ++++++++
- drivers/phy/rockchip/phy-rockchip-typec.c                    | 9 ++++++---
- 6 files changed, 32 insertions(+), 3 deletions(-)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+index 6ea867e3176f..a66f23a01129 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -14,6 +14,8 @@ Required properties:
+  - resets : a list of phandle + reset specifier pairs
+  - reset-names : string reset name, must be:
+ 		 "uphy", "uphy-pipe", "uphy-tcphy"
++
++Optional properties:
+  - extcon : extcon specifier for the Power Delivery
+ 
+ Note, there are 2 type-c phys for RK3399, and they are almost identical, except
 -- 
 2.16.1
