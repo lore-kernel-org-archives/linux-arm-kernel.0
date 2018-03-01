@@ -1,41 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  1 Mar 2018 14:16:54 -0800
-Subject: [PATCH 00/10] updates for omap2plus_defconfig
-Message-ID: <20180301221704.104530-1-tony@atomide.com>
+Date: Thu,  1 Mar 2018 14:16:56 -0800
+Subject: [PATCH 02/10] ARM: omap2plus_defconfig: Add SERIAL_DEV for bluetooth
+In-Reply-To: <20180301221704.104530-1-tony@atomide.com>
+References: <20180301221704.104530-1-tony@atomide.com>
+Message-ID: <20180301221704.104530-3-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We now have SERIAL_DEV that at least TI WLAN devices can use.
 
-Here are some omap2plus_defconfig updates to fix up the options that
-have changed and would get removed with make defconfig, then to drop
-the unneeded options with make defconfig, and finally add some new
-options.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-The biggest changes naturally are the switch from omap_serial to
-8250_omap, and from omapfb to omapdrm. But both have been tested for
-several years now, so I think we can flip over to use them now.
-
-And then we now enable the options needed for am335x and am437x PM.
-
-Regards,
-
-Tony
-
-Tony Lindgren (10):
-  ARM: omap2plus_defconfig: Update for moved options
-  ARM: omap2plus_defconfig: Add SERIAL_DEV for bluetooth
-  ARM: omap2plus_defconfig: Select MFD_TI_LMU
-  ARM: omap2plus_defconfig: Update LIRC options
-  ARM: omap2plus_defconfig: Add SND_OSSEMUL
-  ARM: omap2plus_defconfig: Drop unneeded options
-  ARM: omap2plus_defconfig: Enable am335x and am437x PM options
-  ARM: omap2plus_defconfig: Enable CEC
-  ARM: omap2plus_defconfig: Switch to use omapdrm by default
-  ARM: omap2plus_defconfig: Enable 8250_OMAP
-
- arch/arm/configs/omap2plus_defconfig | 91 ++++++++++++++++++++----------------
- 1 file changed, 52 insertions(+), 39 deletions(-)
-
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -104,9 +104,11 @@ CONFIG_BT_HIDP=m
+ CONFIG_BT_HCIBTUSB=m
+ CONFIG_BT_HCIBTSDIO=m
+ CONFIG_BT_HCIUART=m
++CONFIG_BT_HCIUART_NOKIA=m
+ CONFIG_BT_HCIUART_BCSP=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_BT_HCIUART_3WIRE=y
++CONFIG_BT_HCIUART_BCM=y
+ CONFIG_BT_HCIBCM203X=m
+ CONFIG_BT_HCIBPA10X=m
+ CONFIG_BT_HCIBFUSB=m
+@@ -248,6 +250,7 @@ CONFIG_SERIAL_8250_RSA=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_SERIAL_OMAP=y
+ CONFIG_SERIAL_OMAP_CONSOLE=y
++CONFIG_SERIAL_DEV_BUS=m
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_SPI=y
+ CONFIG_SPI_OMAP24XX=y
 -- 
 2.16.2
