@@ -1,18 +1,19 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:10 +0800
-Subject: [PATCH 33/45] arm/arm64: KVM: Add smccc accessors to PSCI code
+Date: Thu,  1 Mar 2018 20:54:09 +0800
+Subject: [PATCH 32/45] arm/arm64: KVM: Add PSCI_VERSION helper
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-34-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-33-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 84684fecd7ea upstream.
+commit d0a144f12a7c upstream.
 
-Instead of open coding the accesses to the various registers,
-let's add explicit SMCCC accessors.
+As we're about to trigger a PSCI version explosion, it doesn't
+hurt to introduce a PSCI_VERSION helper that is going to be
+used everywhere.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -21,126 +22,54 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/kvm/psci.c | 52 ++++++++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 42 insertions(+), 10 deletions(-)
+ arch/arm/kvm/psci.c       | 2 +-
+ include/kvm/arm_psci.h    | 6 ++++--
+ include/uapi/linux/psci.h | 3 +++
+ 3 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 4adfa28..bc334d6 100644
+index 18f9e9d..4adfa28 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -33,6 +33,38 @@
- 
- #define AFFINITY_MASK(level)	~((0x1UL << ((level) * MPIDR_LEVEL_BITS)) - 1)
- 
-+static u32 smccc_get_function(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_get_reg(vcpu, 0);
-+}
-+
-+static unsigned long smccc_get_arg1(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_get_reg(vcpu, 1);
-+}
-+
-+static unsigned long smccc_get_arg2(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_get_reg(vcpu, 2);
-+}
-+
-+static unsigned long smccc_get_arg3(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_get_reg(vcpu, 3);
-+}
-+
-+static void smccc_set_retval(struct kvm_vcpu *vcpu,
-+			     unsigned long a0,
-+			     unsigned long a1,
-+			     unsigned long a2,
-+			     unsigned long a3)
-+{
-+	vcpu_set_reg(vcpu, 0, a0);
-+	vcpu_set_reg(vcpu, 1, a1);
-+	vcpu_set_reg(vcpu, 2, a2);
-+	vcpu_set_reg(vcpu, 3, a3);
-+}
-+
- static unsigned long psci_affinity_mask(unsigned long affinity_level)
- {
- 	if (affinity_level <= 3)
-@@ -75,7 +107,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	unsigned long context_id;
- 	phys_addr_t target_pc;
- 
--	cpu_id = vcpu_get_reg(source_vcpu, 1) & MPIDR_HWID_BITMASK;
-+	cpu_id = smccc_get_arg1(source_vcpu) & MPIDR_HWID_BITMASK;
- 	if (vcpu_mode_is_32bit(source_vcpu))
- 		cpu_id &= ~((u32) 0);
- 
-@@ -94,8 +126,8 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 			return PSCI_RET_INVALID_PARAMS;
- 	}
- 
--	target_pc = vcpu_get_reg(source_vcpu, 2);
--	context_id = vcpu_get_reg(source_vcpu, 3);
-+	target_pc = smccc_get_arg2(source_vcpu);
-+	context_id = smccc_get_arg3(source_vcpu);
- 
- 	kvm_reset_vcpu(vcpu);
- 
-@@ -114,7 +146,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
- 	 * the general puspose registers are undefined upon CPU_ON.
- 	 */
--	vcpu_set_reg(vcpu, 0, context_id);
-+	smccc_set_retval(vcpu, context_id, 0, 0, 0);
- 	vcpu->arch.power_off = false;
- 	smp_mb();		/* Make sure the above is visible */
- 
-@@ -134,8 +166,8 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 	struct kvm *kvm = vcpu->kvm;
- 	struct kvm_vcpu *tmp;
- 
--	target_affinity = vcpu_get_reg(vcpu, 1);
--	lowest_affinity_level = vcpu_get_reg(vcpu, 2);
-+	target_affinity = smccc_get_arg1(vcpu);
-+	lowest_affinity_level = smccc_get_arg2(vcpu);
- 
- 	/* Determine target affinity mask */
- 	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
-@@ -209,7 +241,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
- static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
--	unsigned long psci_fn = vcpu_get_reg(vcpu, 0) & ~((u32) 0);
-+	u32 psci_fn = smccc_get_function(vcpu);
- 	unsigned long val;
- 	int ret = 1;
- 
-@@ -276,14 +308,14 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+@@ -219,7 +219,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		 * Bits[31:16] = Major Version = 0
+ 		 * Bits[15:0] = Minor Version = 2
+ 		 */
+-		val = 2;
++		val = KVM_ARM_PSCI_0_2;
  		break;
- 	}
+ 	case PSCI_0_2_FN_CPU_SUSPEND:
+ 	case PSCI_0_2_FN64_CPU_SUSPEND:
+diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+index 2042bb9..5659343 100644
+--- a/include/kvm/arm_psci.h
++++ b/include/kvm/arm_psci.h
+@@ -18,8 +18,10 @@
+ #ifndef __KVM_ARM_PSCI_H__
+ #define __KVM_ARM_PSCI_H__
  
--	vcpu_set_reg(vcpu, 0, val);
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
- 	return ret;
- }
+-#define KVM_ARM_PSCI_0_1	1
+-#define KVM_ARM_PSCI_0_2	2
++#include <uapi/linux/psci.h>
++
++#define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
++#define KVM_ARM_PSCI_0_2	PSCI_VERSION(0, 2)
  
- static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
--	unsigned long psci_fn = vcpu_get_reg(vcpu, 0) & ~((u32) 0);
-+	u32 psci_fn = smccc_get_function(vcpu);
- 	unsigned long val;
+ int kvm_psci_version(struct kvm_vcpu *vcpu);
+ int kvm_psci_call(struct kvm_vcpu *vcpu);
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 3d7a0fc..39930ca 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -87,6 +87,9 @@
+ 		(((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
+ #define PSCI_VERSION_MINOR(ver)			\
+ 		((ver) & PSCI_VERSION_MINOR_MASK)
++#define PSCI_VERSION(maj, min)						\
++	((((maj) << PSCI_VERSION_MAJOR_SHIFT) & PSCI_VERSION_MAJOR_MASK) | \
++	 ((min) & PSCI_VERSION_MINOR_MASK))
  
- 	switch (psci_fn) {
-@@ -301,7 +333,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- 		break;
- 	}
- 
--	vcpu_set_reg(vcpu, 0, val);
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
- 	return 1;
- }
- 
+ /* PSCI features decoding (>=1.0) */
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
 -- 
 2.7.4
