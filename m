@@ -1,51 +1,74 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:05 +0800
-Subject: [PATCH 28/45] arm64: cputype: Add missing MIDR values for Cortex-A72
- and Cortex-A75
+Date: Thu,  1 Mar 2018 20:54:03 +0800
+Subject: [PATCH 26/45] arm64: entry: Apply BP hardening for high-priority
+ synchronous exceptions
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-29-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-27-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit a65d219fe5dc upstream.
+commit 5dfc6ed27710 upstream.
 
-Hook up MIDR values for the Cortex-A72 and Cortex-A75 CPUs, since they
-will soon need MIDR matches for hardening the branch predictor.
+Software-step and PC alignment fault exceptions have higher priority than
+instruction abort exceptions, so apply the BP hardening hooks there too
+if the user PC appears to reside in kernel space.
 
+Reported-by: Dan Hettena <dhettena@nvidia.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/cputype.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/kernel/entry.S | 6 ++++--
+ arch/arm64/mm/fault.c     | 9 +++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 26a68dd..0843b3f 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -75,7 +75,10 @@
- #define ARM_CPU_PART_AEM_V8		0xD0F
- #define ARM_CPU_PART_FOUNDATION		0xD00
- #define ARM_CPU_PART_CORTEX_A57		0xD07
-+#define ARM_CPU_PART_CORTEX_A72		0xD08
- #define ARM_CPU_PART_CORTEX_A53		0xD03
-+#define ARM_CPU_PART_CORTEX_A73		0xD09
-+#define ARM_CPU_PART_CORTEX_A75		0xD0A
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index bdb0139..d50c2fe 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -584,8 +584,10 @@ el0_sp_pc:
+ 	 * Stack or PC alignment exception handling
+ 	 */
+ 	mrs	x26, far_el1
+-	// enable interrupts before calling the main handler
+-	enable_dbg_and_irq
++	msr	daifclr, #(8 | 4 | 1)
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl	trace_hardirqs_off
++#endif
+ 	ct_user_exit
+ 	mov	x0, x26
+ 	mov	x1, x25
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c95b194..6120a14 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -617,6 +617,12 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+ 	struct siginfo info;
+ 	struct task_struct *tsk = current;
  
- #define APM_CPU_PART_POTENZA		0x000
++	if (user_mode(regs)) {
++		if (instruction_pointer(regs) > TASK_SIZE)
++			arm64_apply_bp_hardening();
++		local_irq_enable();
++	}
++
+ 	if (show_unhandled_signals && unhandled_signal(tsk, SIGBUS))
+ 		pr_info_ratelimited("%s[%d]: %s exception: pc=%p sp=%p\n",
+ 				    tsk->comm, task_pid_nr(tsk),
+@@ -676,6 +682,9 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	if (interrupts_enabled(regs))
+ 		trace_hardirqs_off();
  
-@@ -86,6 +89,9 @@
- 
- #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
- #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
-+#define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
-+#define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
-+#define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
- #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
- #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
- 
++	if (user_mode(regs) && instruction_pointer(regs) > TASK_SIZE)
++		arm64_apply_bp_hardening();
++
+ 	if (!inf->fn(addr, esr, regs)) {
+ 		rv = 1;
+ 	} else {
 -- 
 2.7.4
