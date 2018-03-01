@@ -1,112 +1,67 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 1 Mar 2018 10:59:48 +0100
-Subject: [PATCH] PM / core: move device and its children to end of dpm list
-In-Reply-To: <1519843555-982-1-git-send-email-fkan@apm.com>
-References: <1519843555-982-1-git-send-email-fkan@apm.com>
-Message-ID: <CAJZ5v0jMOLSEzC9F67TJpgP6Z0JN1dr2uwjfrNfwDkTR8OVGyg@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 1 Mar 2018 10:59:44 +0100
+Subject: [PATCH v4] rtc: ac100: Fix ac100 determine rate bug
+In-Reply-To: <20180226211901.9805-1-embed3d@gmail.com>
+References: <20180226211901.9805-1-embed3d@gmail.com>
+Message-ID: <20180301095944.GT1479@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 7:45 PM, Feng Kan <fkan@apm.com> wrote:
-> When bridge and its endpoint is enumated the devices are added to the
-> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> This causes the bridge to be moved to the end of the dpm list when deferred
-> probe kicks in. The order of the dpm list for bridge and endpoint is
-> reversed.
->
-> Add reordering code to re-position the bridge and its children so the order
-> for suspend and resume is not altered.
->
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Toan Le <toanle@apm.com>
+On 26/02/2018 at 22:19:01 +0100, Philipp Rossak wrote:
+> This patch fixes a bug, that prevents the Allwinner A83T and the A80
+> from a successful boot.
+> 
+> The bug is there since v4.16-rc1 and appeared after the clk branch was
+> merged.
+> 
+> You can find the shortend trace below:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address
+> 00000000
+> pgd = (ptrval)
+> [00000000] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 49 Comm: kworker/0:1 Not tainted 4.15.0-10190-gb89e32ccd1be #2
+> Hardware name: Allwinner sun8i Family
+> Workqueue: events deferred_probe_work_func
+> PC is at clk_hw_get_rate+0x0/0x34
+> LR is at ac100_clkout_determine_rate+0x48/0x19c
+> 
+> [ ... ]
+> 
+> (clk_hw_get_rate) from (ac100_clkout_determine_rate+0x48/0x19c)
+> (ac100_clkout_determine_rate) from  (clk_core_set_rate_nolock+0x3c/0x1a0)
+> (clk_core_set_rate_nolock) from (clk_set_rate+0x30/0x88)
+> (clk_set_rate) from (of_clk_set_defaults+0x200/0x364)
+> (of_clk_set_defaults) from (platform_drv_probe+0x18/0xb0)
+> 
+> To fix that bug, we first check if the return of the
+> clk_hw_get_parent_by_index is non zero. If it is zero we skip that
+> clock parent.
+> 
+> The BUG report could be found here: https://lkml.org/lkml/2018/2/10/198
+> 
+> Fixes: 04940631b8d2 ("rtc: ac100: Add clk output support")
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  drivers/base/core.c    | 20 ++++++++++++++++++++
->  drivers/base/dd.c      |  8 ++++----
->  include/linux/device.h |  3 +++
->  3 files changed, 27 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 110230d..0b4ad99 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
->  }
->
->  /**
-> + * device_pm_reorder - reorder device and its children to end of dpm list
+> 
+> Changes in v4:
+> 	* add more information to the comment
+> Changes in v3:
+> 	* add information when the bug appeared 
+> 	* make the comment more clear
+> Changes in v2:
+> 	* add tag Fixes: ... to commit message
+> 	* add comment to if statement why we are doing this check
+> 
+>  drivers/rtc/rtc-ac100.c | 24 +++++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
+> 
+Applied, thanks.
 
-Not just the children and not just dpm_list.
-
-> + * @dev: current device pointer
-> + *
-> + * This is a lock held version of reordering the device to dpm list tail.
-> + * This will move the device to the end of the dpm list if it not registered.
-> + * Afterward, it will iterate through its children and do the same for them.
-
-This isn't entirely accurate as device_reorder_to_tail() does more than that.
-
-> + */
-> +void device_pm_reorder(struct device *dev)
-
-I'd call it device_pm_move_to_tail() as that's what it does.
-
-"Reorder" is sort of overly generic IMO.
-
-> +{
-> +       int idx;
-> +
-> +       idx = device_links_read_lock();
-> +       device_pm_lock();
-> +       device_reorder_to_tail(dev, NULL);
-> +       device_pm_unlock();
-> +       device_links_read_unlock(idx);
-> +}
-> +EXPORT_SYMBOL_GPL(device_pm_reorder);
-
-It is not necessary to export this symbol.
-
-> +
-> +/**
->   * device_link_add - Create a link between two devices.
->   * @consumer: Consumer end of the link.
->   * @supplier: Supplier end of the link.
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 2c964f5..3223a30 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
->                  * Force the device to the end of the dpm_list since
->                  * the PM code assumes that the order we add things to
->                  * the list is a good order for suspend but deferred
-> -                * probe makes that very unsafe.
-> +                * probe makes that very unsafe. Also move any children
-> +                * belong to the device to the end of the list as well.
-> +                * This way the suspend resume order won't be corrupted.
->                  */
-> -               device_pm_lock();
-> -               device_pm_move_last(dev);
-> -               device_pm_unlock();
-> +               device_pm_reorder(dev);
->
->                 dev_dbg(dev, "Retrying from deferred list\n");
->                 if (initcall_debug && !initcalls_done)
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index 9d32000..1ec12d5 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -1272,6 +1272,9 @@ extern void devm_device_remove_group(struct device *dev,
->  /* debugging and troubleshooting/diagnostic helpers. */
->  extern const char *dev_driver_string(const struct device *dev);
->
-> +/* reorder device and its children to end of dpm list */
-> +void device_pm_reorder(struct device *dev);
-
-And this header can go into drivers/base/base.h as Bjorn said.
-
-> +
->  /* Device links interface. */
->  struct device_link *device_link_add(struct device *consumer,
->                                     struct device *supplier, u32 flags);
-> --
-> 1.8.3.1
->
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
