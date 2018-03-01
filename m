@@ -1,58 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:31 +0000
-Subject: [PATCH v5 16/23] arm64: KVM: Move vector offsetting from hyp-init.S
- to kvm_get_hyp_vector
-In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
-References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-17-marc.zyngier@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 1 Mar 2018 16:20:52 +0000
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.17
+Message-ID: <20180301162052.GA1752@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently provide the hyp-init code with a kernel VA, and expect
-it to turn it into a HYP va by itself. As we're about to provide
-the hypervisor with mappings that are not necessarily in the memory
-range, let's move the kern_hyp_va macro to kvm_get_hyp_vector.
+Hi ARM SoC Team,
 
-No functionnal change.
+Please pull !
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_mmu.h | 3 ++-
- arch/arm64/kvm/hyp-init.S        | 1 -
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Regards,
+Sudeep
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index a5e0fc900de8..bfb81e73da06 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -374,6 +374,7 @@ static inline void *kvm_get_hyp_vector(void)
- 			vect = lm_alias(vect);
- 	}
- 
-+	vect = kern_hyp_va(vect);
- 	return vect;
- }
- 
-@@ -387,7 +388,7 @@ static inline int kvm_map_vectors(void)
- #else
- static inline void *kvm_get_hyp_vector(void)
- {
--	return kvm_ksym_ref(__kvm_hyp_vector);
-+	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
- }
- 
- static inline int kvm_map_vectors(void)
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5aa9ccf6db99..6fd91b31a131 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -117,7 +117,6 @@ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
- 	/* Set the stack and new vectors */
- 	kern_hyp_va	x1
- 	mov	sp, x1
--	kern_hyp_va	x2
- 	msr	vbar_el2, x2
- 
- 	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
--- 
-2.14.2
+--
+
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.17
+
+for you to fetch changes up to 3f5098135b2cd23941e5573a3f0abaf75b0e1d0a:
+
+  arm64: dts: juno: fix size of GICv2m MSI frames (2018-02-28 16:58:13 +0000)
+
+----------------------------------------------------------------
+ARMv8 Vexpress/Juno DT updates for v4.17
+
+1. Extends support for missing 3 GICv2m MSI frames
+2. Fixes the incorrect GICv2m frame size(64kB instead of 4kB)
+
+----------------------------------------------------------------
+Robin Murphy (1):
+      arm64: dts: juno: Describe the full GICv2m region
+
+Sudeep Holla (1):
+      arm64: dts: juno: fix size of GICv2m MSI frames
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
