@@ -1,33 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 Mar 2018 19:14:06 +0000
-Subject: [PATCH] KVM: arm/arm64: drop pr_info() of IDMAP page
-Message-ID: <20180301191406.18083-1-ard.biesheuvel@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu,  1 Mar 2018 20:18:44 +0100
+Subject: [PATCH 0/2] drm/sun4i: backend: Support interleaved YUV planes
+Message-ID: <cover.f0cb3210f2d878853ef16506da152f38ba2e3286.1519931807.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The KVM IDMAP is a mapping of a statically allocated kernel structure,
-and so printing its physical address leaks the physical placement of
-the kernel when physical KASLR is in effect. Just remove it, nobody
-except Marc needs this anyway.
+Hi,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-CC -stable?
+This is an attempt at supporting the interleaved YUV planes in the sun4i
+DRM driver for SoCs that use the DE1.
 
- virt/kvm/arm/mmu.c | 1 -
- 1 file changed, 1 deletion(-)
+There's nothing out of the extraordinary there, we just have one more
+constraint in our DRM driver, since we can only have a single YUV plane.
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ec62d1cccab7..c07f88cb6dcf 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1810,7 +1810,6 @@ int kvm_mmu_init(void)
- 	 */
- 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
- 
--	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
- 	kvm_info("HYP VA range: %lx:%lx\n",
- 		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
- 
+Let me know what you think,
+Maxime
+
+Maxime Ripard (2):
+  drm/sun4i: backend: Check that we only have a single YUV plane
+  drm/sun4i: backend: Support YUV planes
+
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 128 ++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  18 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.c   |   4 +-
+ 3 files changed, 148 insertions(+), 2 deletions(-)
+
+base-commit: 35152d1159dbb0277b18ae664dfb5b11c27fdefa
 -- 
-2.11.0
+git-series 0.9.1
