@@ -1,61 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 1 Mar 2018 10:35:10 +0100
-Subject: [PATCH 0/2] arm: Support for Renesas RZ/N1D (R9A06G032)
-In-Reply-To: <HK2PR0601MB1393B2D7E0C96590482C3726F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
-References: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
- <HK2PR0601MB1393B2D7E0C96590482C3726F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
-Message-ID: <20180301093505.2wib5uzsxrhut3tm@verge.net.au>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 1 Mar 2018 10:39:09 +0100
+Subject: [PATCH] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE
+In-Reply-To: <1519834492-30559-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1519834492-30559-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180301093909.ph6nuvxuqtwyfssd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 01:10:36PM +0000, Phil Edworthy wrote:
-> Hi Simon,
+On Wed, Feb 28, 2018 at 05:14:52PM +0100, Giulio Benetti wrote:
+> Handle both positive and negative dclk polarity,
+> according to bus_flags.
 > 
-> On 26 February 2018, Michel Pollet wrote:
-> > 
-> > This series adds the plain basic support for booting a bare
-> > kernel on the RZ/N1D-DB Board. It's been trimmed to the strict
-> > minimum as a 'base', further patches that will add the
-> > rest of the support, pinctrl, clock architecture and quite
-> > a few others.
-
-Thanks Michel,
-
-I am of course very happy to see support for new SoCs and boards added
-to upstream and I support such efforts as best I can. However, the pattern
-followed by this patchset adds a new board file. This was the common
-practice some time ago but it is now upstream policy not to accept new
-board files. Rather, drivers should be developed and hardware should be
-described in DT. So I believe support for RZ/N1D needs to be reworked
-to that end in order to be accepted upstream.
-
-I also believe that the patches in this series are rather large.  Its much
-better to submit small incremental patches for review. This allows much
-smoother iteration over patch review cycles. Patches also need to be split
-up so that C-code changes,  DT and ideally documentation changes are not
-mixed in the same patch unless necessary. You can find examples of this on
-the linux-renesas-soc mailing list.
-
-And lastly, the use of RZN1_IRQ_* macros in the DT file does not
-follow the current best practice of using numeric constants for
-values derived from documentation.
-
-Please consider reworking this patchset, I look forward
-so seeing RZ/N1D support upstream some time soon.
-
-> I spoke to Magnus about helping to get the RZ/N1 patches upstream.
-> We're trying to sort out making the device manual and board schematics
-> available, hopefully it won't take too long. We're also trying to sort out
-> access to a board... that might take a bit longer.
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
-> btw, what do you want to do about shmobile_defconfig? Should we add
-> any changes needed for RZ/N1 to it? Note that only one IP block is the
-> same as R-Car.
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index aaf911a..534e5ee 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -17,6 +17,7 @@
+>  #include <drm/drm_encoder.h>
+>  #include <drm/drm_modes.h>
+>  #include <drm/drm_of.h>
+> +#include <drm/drm_panel.h>
+>  
+>  #include <uapi/drm/drm_mode.h>
+>  
+> @@ -340,6 +341,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+>  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>  				     const struct drm_display_mode *mode)
+>  {
+> +	struct drm_panel *panel = tcon->panel;
+> +	struct drm_connector *connector = panel->connector;
+> +	struct drm_display_info display_info = connector->display_info;
+>  	unsigned int bp, hsync, vsync;
+>  	u8 clk_delay;
+>  	u32 val = 0;
+> @@ -395,8 +399,15 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>  
+> +	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
+> +		clk_set_phase(tcon->dclk, 240);
+> +
+> +	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+> +		clk_set_phase(tcon->dclk, 0);
+> +
 
-Hi Phil,
+This needs to have a whole bunch of comments here. We want to have
+basically the whole discussion we had by mail previously about this in
+there.
 
-In general I believe that the upstream policy is not to accept new
-defconfigs. So my suggestion would be to expand shmobile_defconfig
-if the result it produces a working kernel for both already supported
-boards and the RZ/N1D-DB Board. Otherwise we need to consider what
-other options we have.
+And the same goes for your commit log.
+
+>  	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
+> -			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
+> +			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE |
+> +			   SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
+>  			   val);
+
+This has nothing to do with your patch.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/47f5eaaf/attachment.sig>
