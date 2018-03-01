@@ -1,63 +1,74 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 1 Mar 2018 10:43:37 +0100
-Subject: [PATCH 2/6] ARM: dts: stm32: Enable sdio1 for stm32f746-disco
-In-Reply-To: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
-References: <1519897421-23803-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1519897421-23803-3-git-send-email-patrice.chotard@st.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Mar 2018 10:45:20 +0100
+Subject: [PATCH 1/6] phy: rockchip-typec: fall back to working in
+ host-mode if extcon is missing.
+In-Reply-To: <20180301092420.1191-2-enric.balletbo@collabora.com>
+References: <20180301092420.1191-1-enric.balletbo@collabora.com>
+ <20180301092420.1191-2-enric.balletbo@collabora.com>
+Message-ID: <5052573.JZoBBeufta@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+Am Donnerstag, 1. M?rz 2018, 10:24:15 CET schrieb Enric Balletbo i Serra:
+> Right now the rockchip typec-phy does fail probing when no extcon is
+> detected. Some boards get the cable-state via the extcon interface and
+> have this supported, other boards seem to use the fusb302 chip or
+> another but the driver currently does not seem to utilize the extcon
+> interface to report the cable-state. That's required to detect
+> cable-state changes but a missing extcon shouldn't fail to probe,
+> instead, should just fall back to working in host-mode if it cannot get
+> the extcon.
 
-Adds SDIO related DT nodes for stm32f746-disco board.
+And of course:
+Some boards use no controller at all and just connect the type-c to a
+standard USB-A port.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/boot/dts/stm32f746-disco.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+> Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
+> support for rk3399") Reported-by: Vicente Bergas <vicencb@gmail.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+> 
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
+> b/drivers/phy/rockchip/phy-rockchip-typec.c index
+> 7492c8978217..3741afab5cd2 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+> @@ -782,6 +782,9 @@ static int tcphy_get_mode(struct rockchip_typec_phy
+> *tcphy) u8 mode;
+>  	int ret;
+> 
+> +	if (!edev)
+> +		return MODE_DFP_USB;
+> +
+>  	ufp = extcon_get_state(edev, EXTCON_USB);
+>  	dp = extcon_get_state(edev, EXTCON_DISP_DP);
+> 
+> @@ -1115,9 +1118,9 @@ static int rockchip_typec_phy_probe(struct
+> platform_device *pdev)
+> 
+>  	tcphy->extcon = extcon_get_edev_by_phandle(dev, 0);
+>  	if (IS_ERR(tcphy->extcon)) {
+> -		if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
+> -			dev_err(dev, "Invalid or missing extcon\n");
+> -		return PTR_ERR(tcphy->extcon);
+> +		if (PTR_ERR(tcphy->extcon) == -EPROBE_DEFER)
+> +			return PTR_ERR(tcphy->extcon);
+> +		tcphy->extcon = NULL;
 
-diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
-index 623b6f2bc361..ab65f812e8ae 100644
---- a/arch/arm/boot/dts/stm32f746-disco.dts
-+++ b/arch/arm/boot/dts/stm32f746-disco.dts
-@@ -44,6 +44,7 @@
- #include "stm32f746.dtsi"
- #include "stm32f746-pinctrl.dtsi"
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "STMicroelectronics STM32F746-DISCO board";
-@@ -76,12 +77,30 @@
- 		regulator-name = "vcc5_host1";
- 		regulator-always-on;
- 	};
-+
-+	mmc_vcard: mmc_vcard {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc_vcard";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &clk_hse {
- 	clock-frequency = <25000000>;
- };
- 
-+&sdio1 {
-+	status = "okay";
-+	vmmc-supply = <&mmc_vcard>;
-+	cd-gpios = <&gpioc 13 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	pinctrl-names = "default", "opendrain";
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-1 = <&sdio_pins_od>;
-+	bus-width = <4>;
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_b>;
- 	pinctrl-names = "default";
--- 
-1.9.1
+Do we want to keep a bit of the error handling of extcon, a la
+
++		if (PTR_ERR(tcphy->extcon) == -ENODEV) {
++			tcphy->extcon = NULL;
++		} else {
++			if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
++				dev_err(dev, "Invalid or extcon\n");
++			return PTR_ERR(tcphy->extcon);
++		}
+
+So only make it NULL, if extcon really reports ENODEV?
+
+
+Heiko
