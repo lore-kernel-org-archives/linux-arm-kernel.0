@@ -1,74 +1,30 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:03 +0800
-Subject: [PATCH 26/45] arm64: entry: Apply BP hardening for high-priority
- synchronous exceptions
-In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-27-git-send-email-alex.shi@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Mar 2018 14:28:30 +0100
+Subject: [PATCH v8 00/15] Krait clocks + Krait CPUfreq
+In-Reply-To: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CACRpkdbu9Kxvuwr-nLHxyEYiTeGK38o7MKCFf-MMjYxwgcJPPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi Sricharan,
 
-commit 5dfc6ed27710 upstream.
+thanks for picking up Stephen's patch set and working on this
+clocking business!
 
-Software-step and PC alignment fault exceptions have higher priority than
-instruction abort exceptions, so apply the BP hardening hooks there too
-if the user PC appears to reside in kernel space.
+Would you happen to know if the MSM8660/APQ8060 that
+I'm using a bit has the same Krait clocking so I need to augment
+that SoC to use this too (on top of this, naturally, this is a good first
+step)?
 
-Reported-by: Dan Hettena <dhettena@nvidia.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kernel/entry.S | 6 ++++--
- arch/arm64/mm/fault.c     | 9 +++++++++
- 2 files changed, 13 insertions(+), 2 deletions(-)
+On Tue, Feb 27, 2018 at 3:06 PM, Sricharan R <sricharan@codeaurora.org> wrote:
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index bdb0139..d50c2fe 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -584,8 +584,10 @@ el0_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	msr	daifclr, #(8 | 4 | 1)
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_off
-+#endif
- 	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index c95b194..6120a14 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -617,6 +617,12 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
- 	struct siginfo info;
- 	struct task_struct *tsk = current;
- 
-+	if (user_mode(regs)) {
-+		if (instruction_pointer(regs) > TASK_SIZE)
-+			arm64_apply_bp_hardening();
-+		local_irq_enable();
-+	}
-+
- 	if (show_unhandled_signals && unhandled_signal(tsk, SIGBUS))
- 		pr_info_ratelimited("%s[%d]: %s exception: pc=%p sp=%p\n",
- 				    tsk->comm, task_pid_nr(tsk),
-@@ -676,6 +682,9 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	if (interrupts_enabled(regs))
- 		trace_hardirqs_off();
- 
-+	if (user_mode(regs) && instruction_pointer(regs) > TASK_SIZE)
-+		arm64_apply_bp_hardening();
-+
- 	if (!inf->fn(addr, esr, regs)) {
- 		rv = 1;
- 	} else {
--- 
-2.7.4
+>   * Dropped the DT update from the series. Will send separately
+
+Are these available somewhere so I can test the sum total on
+the Nexus 7 and see if I get some graphics? I've been sticking a
+patch from Stephen's series in for some time and it makes the
+MDP graphics works on the 2013 Nexus 7.
+
+Yours,
+Linus Walleij
