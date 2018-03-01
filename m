@@ -1,90 +1,61 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Thu, 1 Mar 2018 11:47:52 +0800
-Subject: [PATCH v2 4/4] pintcrl: support bias-disable of generic and
- special pins simultaneously
-In-Reply-To: <1519804157.23198.9.camel@mhfsdcap03>
-References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
- <1519634042-12063-5-git-send-email-zhiyong.tao@mediatek.com>
- <1519803217.8089.31.camel@mtkswgap22> <1519804157.23198.9.camel@mhfsdcap03>
-Message-ID: <1519876072.23198.17.camel@mhfsdcap03>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 1 Mar 2018 10:48:04 +0530
+Subject: [PATCH v2 15/15] ARM: dts: dra7: Add high speed modes capability
+ to MMC1/MMC2 dt node
+In-Reply-To: <20180228223421.GM5448@atomide.com>
+References: <20180206125806.19350-1-kishon@ti.com>
+ <20180206125806.19350-16-kishon@ti.com>
+ <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
+ <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
+ <4f18dab9-aee3-1023-d301-f142c6e2d358@ti.com>
+ <20180228223421.GM5448@atomide.com>
+Message-ID: <f657b33e-8d02-4529-fe1f-20693a329fd3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-28 at 15:49 +0800, Zhiyong Tao wrote:
-> On Wed, 2018-02-28 at 15:33 +0800, Sean Wang wrote:
-> > On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
-> > > For generic pins, parameter "arg" is 0 or 1.
-> > > For special pins, bias-disable is set by R0R1,
-> > > so we need transmited "00" to set bias-disable
-> > > When we set "bias-disable" as high-z property,
-> > > the parameter should be "MTK_PUPD_SET_R1R0_00".
-> > > 
-> > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > > ---
-> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 13 +++++++++++--
-> > >  1 file changed, 11 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > index 3cf384f..e88ba04 100644
-> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > @@ -301,8 +301,17 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
-> > >  	 * resistor bit, so we need this special handle.
-> > >  	 */
-> > >  	if (pctl->devdata->spec_pull_set) {
-> > > -		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> > > -			pin, pctl->devdata->port_align, isup, arg);
-> > > +		if (enable) {
-> > > +			ret = pctl->devdata->spec_pull_set(
-> > > +				mtk_get_regmap(pctl, pin), pin,
-> > > +				pctl->devdata->port_align, isup,
-> > > +				arg);
-> > > +		} else {
-> > > +			ret = pctl->devdata->spec_pull_set(
-> > > +				mtk_get_regmap(pctl, pin), pin,
-> > > +				pctl->devdata->port_align, isup,
-> > > +				MTK_PUPD_SET_R1R0_00);
-> > > +		}
-> > 
-> > 
-> > it looks like you can use as following snippet with reusing original
-> > logic and less effort on maintaining these common code (?)
-> ==> Thanks for your suggestion very much. It seems better.
-> I will change it in v3.
+Hi Tony,
 
-==>
- Hi sean,
-
-we try it in our site. we can't change like this.
-Because we will check "arg" after setting "arg = MTK_PUPD_SET_R1R0_00;".
-following snippet which check "arg" value is o or 1. If it not, which
-will print error. so we can't change like this.
-/* For generic pull config, default arg value should be 0 or 1. */
-if (arg != 0 && arg != 1) {
-	dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n", arg,
-pin);
-	return -EINVAL;
-}
-
-Thanks.
-> > 
-> > 
-> > if (pctl->devdata->spec_pull_set) {
-> > 	+ if (!enable)
-> > 	+ 	arg = MTK_PUPD_SET_R1R0_00;
-> > 
-> > 	ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> > 		pin, pctl->devdata->port_align, isup, arg);
-> > 
-> > 
-> > Also, it's better to add more comments to such kind of special path for
-> > allowing future SoCs to follow and extend more easily.
+On Thursday 01 March 2018 04:04 AM, Tony Lindgren wrote:
+> * Sekhar Nori <nsekhar@ti.com> [180213 11:11]:
+>> On Wednesday 07 February 2018 02:51 PM, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Wednesday 07 February 2018 02:41 PM, Sekhar Nori wrote:
+>>>> Kishon,
+>>>>
+>>>> On Tuesday 06 February 2018 06:28 PM, Kishon Vijay Abraham I wrote:
+>>>>> Add UHS/HS200/DDR speed mode capability to MMC1 and MMC2 dt nodes.
+>>>>>
+>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>
+>>>> Along with this, dont we need to have
+>>>>
+>>>> 	/delete-property/ mmc-hs200-1_8v;
+>>>>
+>>>> for eMMC on Beagle x15 which does not support HS200?
+>>>>
+>>>> Or are you planning to depend on lack of pinctrl entries for HS200 to
+>>>> take care of that?
+>>>
+>>> right now it relies on lack of pinctrl entries but I think adding delete
+>>> property is appropriate. Actually I missed porting the patch that adds
+>>> /delete-property/.
+>>
+>> Actually, thinking more, this should be probably be handled using
+>> "no-1-8-v" property. Reading the comment above SDHCI_QUIRK2_NO_1_8_V, it
+>> is specifically meant for the case when system (board) does not support
+>> 1.8V even when host (controller) does. Which is exactly the case with
+>> Beagle x15.
 > 
-> ==> Thanks for your suggestion very much. I will add more comments here.
-> > 
-> > >  		if (!ret)
-> > >  			return 0;
-> > >  	}
-> > 
-> > 
+> OK so that seems to be related to the last patch. I've applied
+> the first two defconfig patches into omap-for-v4.17/defconfig
+> and patches up to patch 13/15 into omap-for-v4.17/dt-sdhci.
 > 
+> Kishon, please repost the missing changes or ping me when
+> the driver dependencies have cleared for further patches to
+> be applied to enable sdhci.
+
+sure, I'll repost when sdhci driver changes gets merged.
+
+Thanks
+Kishon
