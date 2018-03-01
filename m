@@ -1,66 +1,207 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu,  1 Mar 2018 14:18:19 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for the
- uart nodes
-Message-ID: <20180301131819.10790-1-gregory.clement@bootlin.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Thu,  1 Mar 2018 20:54:22 +0800
+Subject: [PATCH 45/45] arm64: Kill PSCI_GET_VERSION as a variant-2 workaround
+In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-46-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extra clock is needed to access the registers of the UARTs used on
-CP110 component of the Armada 7K/8K SoCs.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+commit 3a0a397ff5ff upstream.
+
+Now that we've standardised on SMCCC v1.1 to perform the branch
+prediction invalidation, let's drop the previous band-aid.
+If vendors haven't updated their firmware to do SMCCC 1.1, they
+haven't updated PSCI either, so we don't loose anything.
+
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/bpi.S        | 24 ------------------------
+ arch/arm64/kernel/cpu_errata.c | 41 +++++++++++------------------------------
+ arch/arm64/kvm/hyp/switch.c    | 14 --------------
+ 3 files changed, 11 insertions(+), 68 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index d3f422f8f086..355bb295e4d9 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -303,7 +303,9 @@
- 			reg-shift = <2>;
- 			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-io-width = <1>;
--			clocks = <&CP110_LABEL(clk) 1 21>;
-+			clock-names = "baudclk", "apb_pclk";
-+			clocks = <&CP110_LABEL(clk) 1 21>,
-+				 <&CP110_LABEL(clk) 1 17>;
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index c72f261..dc4eb15 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -54,30 +54,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	vectors __kvm_hyp_vector
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+-ENTRY(__psci_hyp_bp_inval_start)
+-	sub	sp, sp, #(8 * 18)
+-	stp	x16, x17, [sp, #(16 * 0)]
+-	stp	x14, x15, [sp, #(16 * 1)]
+-	stp	x12, x13, [sp, #(16 * 2)]
+-	stp	x10, x11, [sp, #(16 * 3)]
+-	stp	x8, x9, [sp, #(16 * 4)]
+-	stp	x6, x7, [sp, #(16 * 5)]
+-	stp	x4, x5, [sp, #(16 * 6)]
+-	stp	x2, x3, [sp, #(16 * 7)]
+-	stp	x0, x1, [sp, #(16 * 8)]
+-	mov	x0, #0x84000000
+-	smc	#0
+-	ldp	x16, x17, [sp, #(16 * 0)]
+-	ldp	x14, x15, [sp, #(16 * 1)]
+-	ldp	x12, x13, [sp, #(16 * 2)]
+-	ldp	x10, x11, [sp, #(16 * 3)]
+-	ldp	x8, x9, [sp, #(16 * 4)]
+-	ldp	x6, x7, [sp, #(16 * 5)]
+-	ldp	x4, x5, [sp, #(16 * 6)]
+-	ldp	x2, x3, [sp, #(16 * 7)]
+-	ldp	x0, x1, [sp, #(16 * 8)]
+-	add	sp, sp, #(8 * 18)
+-ENTRY(__psci_hyp_bp_inval_end)
  
-@@ -313,7 +315,9 @@
- 			reg-shift = <2>;
- 			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-io-width = <1>;
--			clocks = <&CP110_LABEL(clk) 1 21>;
-+			clock-names = "baudclk", "apb_pclk";
-+			clocks = <&CP110_LABEL(clk) 1 21>,
-+				 <&CP110_LABEL(clk) 1 17>;
- 			status = "disabled";
- 		};
+ .macro smccc_workaround_1 inst
+ 	sub	sp, sp, #(8 * 4)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 9632319..8b74f80 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -53,7 +53,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
  
-@@ -323,7 +327,9 @@
- 			reg-shift = <2>;
- 			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-io-width = <1>;
--			clocks = <&CP110_LABEL(clk) 1 21>;
-+			clock-names = "baudclk", "apb_pclk";
-+			clocks = <&CP110_LABEL(clk) 1 21>,
-+				 <&CP110_LABEL(clk) 1 17>;
- 			status = "disabled";
- 		};
+ #ifdef CONFIG_KVM
+-extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+ extern char __smccc_workaround_1_smc_start[];
+ extern char __smccc_workaround_1_smc_end[];
+ extern char __smccc_workaround_1_hvc_start[];
+@@ -100,8 +99,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	spin_unlock(&bp_lock);
+ }
+ #else
+-#define __psci_hyp_bp_inval_start		NULL
+-#define __psci_hyp_bp_inval_end			NULL
+ #define __smccc_workaround_1_smc_start		NULL
+ #define __smccc_workaround_1_smc_end		NULL
+ #define __smccc_workaround_1_hvc_start		NULL
+@@ -146,24 +143,25 @@ static void call_hvc_arch_workaround_1(void)
+ 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
+ }
  
-@@ -333,7 +339,9 @@
- 			reg-shift = <2>;
- 			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-io-width = <1>;
--			clocks = <&CP110_LABEL(clk) 1 21>;
-+			clock-names = "baudclk", "apb_pclk";
-+			clocks = <&CP110_LABEL(clk) 1 21>,
-+				 <&CP110_LABEL(clk) 1 17>;
- 			status = "disabled";
- 		};
+-static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
++static int enable_smccc_arch_workaround_1(void *data)
+ {
++	const struct arm64_cpu_capabilities *entry = data;
+ 	bp_hardening_cb_t cb;
+ 	void *smccc_start, *smccc_end;
+ 	struct arm_smccc_res res;
  
+ 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+-		return false;
++		return 0;
+ 
+ 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+-		return false;
++		return 0;
+ 
+ 	switch (psci_ops.conduit) {
+ 	case PSCI_CONDUIT_HVC:
+ 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+ 		if (res.a0)
+-			return false;
++			return 0;
+ 		cb = call_hvc_arch_workaround_1;
+ 		smccc_start = __smccc_workaround_1_hvc_start;
+ 		smccc_end = __smccc_workaround_1_hvc_end;
+@@ -173,35 +171,18 @@ static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *e
+ 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+ 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+ 		if (res.a0)
+-			return false;
++			return 0;
+ 		cb = call_smc_arch_workaround_1;
+ 		smccc_start = __smccc_workaround_1_smc_start;
+ 		smccc_end = __smccc_workaround_1_smc_end;
+ 		break;
+ 
+ 	default:
+-		return false;
++		return 0;
+ 	}
+ 
+ 	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
+ 
+-	return true;
+-}
+-
+-static int enable_psci_bp_hardening(void *data)
+-{
+-	const struct arm64_cpu_capabilities *entry = data;
+-
+-	if (psci_ops.get_version) {
+-		if (check_smccc_arch_workaround_1(entry))
+-			return 0;
+-
+-		install_bp_hardening_cb(entry,
+-				       (bp_hardening_cb_t)psci_ops.get_version,
+-				       __psci_hyp_bp_inval_start,
+-				       __psci_hyp_bp_inval_end);
+-	}
+-
+ 	return 0;
+ }
+ #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+@@ -301,22 +282,22 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ #endif
+ 	{
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 996328e..154b471 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -311,20 +311,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+ 		goto again;
+ 
+-	if (exit_code == ARM_EXCEPTION_TRAP &&
+-	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
+-	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32)) {
+-		u32 val = vcpu_get_reg(vcpu, 0);
+-
+-		if (val == PSCI_0_2_FN_PSCI_VERSION) {
+-			val = kvm_psci_version(vcpu, kern_hyp_va(vcpu->kvm));
+-			if (unlikely(val == KVM_ARM_PSCI_0_1))
+-				val = PSCI_RET_NOT_SUPPORTED;
+-			vcpu_set_reg(vcpu, 0, val);
+-			goto again;
+-		}
+-	}
+-
+ 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+ 	    exit_code == ARM_EXCEPTION_TRAP) {
+ 		bool valid;
 -- 
-2.16.1
+2.7.4
