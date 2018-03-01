@@ -1,45 +1,125 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 1 Mar 2018 14:19:16 +0000
-Subject: [PATCH v2 0/2] STM32 Extended TrustZone Protection driver
-In-Reply-To: <CA+M3ks6YPY6Lx-qBA+-Zrrtzr3Nqyzay=1wBHRGjd7PqJgAb0Q@mail.gmail.com>
-References: <20180301135806.19982-1-benjamin.gaignard@st.com>
- <20180301140243.3uamdvdcvmsxv6im@lakrids.cambridge.arm.com>
- <CA+M3ks6YPY6Lx-qBA+-Zrrtzr3Nqyzay=1wBHRGjd7PqJgAb0Q@mail.gmail.com>
-Message-ID: <ad7a8214-875e-3c1a-87e1-0403d4328737@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 1 Mar 2018 14:27:34 +0000
+Subject: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
+ driver
+In-Reply-To: <1519154467-2896-3-git-send-email-jollys@xilinx.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-3-git-send-email-jollys@xilinx.com>
+Message-ID: <dab419e8-3afe-5bfe-240e-e9ee4f2300f2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/18 14:15, Benjamin Gaignard wrote:
-> 2018-03-01 15:02 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
->> On Thu, Mar 01, 2018 at 02:58:04PM +0100, Benjamin Gaignard wrote:
->>> On early boot stages STM32MP1 platform is able to dedicate some hardware blocks
->>> to a secure OS running in TrustZone.
->>> We need to avoid using those hardware blocks on non-secure context (i.e. kernel)
->>> because read/write accesses could generate illegale access exceptions.
->>>
->>> Extended TrustZone Protection driver make sure that device is disabled if
->>> non-secure world can't acces to it.
->>>
->>> version 2:
->>> - do not use notifier anymore
->>> - change status property value in device-tree if needed
->>> - use a list of phandle instead of hard coded array
->>
->> As mentioned on v1, I don't think this should be done in Linux at all.
->>
->> If you wish to handle this dynamically, please fixup the DT *before*
->> entering Linux.
->>
->> If you want a sane default in the dts file, put status = "disabled" on
->> all nodes which the secure world might take ownership of.
+
+
+On 20/02/18 19:21, Jolly Shah wrote:
+> This patch is adding communication layer with firmware.
+> Firmware driver provides an interface to firmware APIs.
+> Interface APIs can be used by any driver to communicate to
+> PMUFW(Platform Management Unit). All requests go through ATF.
 > 
-> That is the case, nodes are disabled by ealier boot stages before entering
-> in Linux but, since mistakes and/or errors are always possible, fixup the DT
-> to avoid illegal access exceptions make sense for me.
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> ---
+>  arch/arm64/Kconfig.platforms                    |    1 +
+>  drivers/firmware/Kconfig                        |    1 +
+>  drivers/firmware/Makefile                       |    1 +
+>  drivers/firmware/xilinx/Kconfig                 |    4 +
+>  drivers/firmware/xilinx/Makefile                |    4 +
+>  drivers/firmware/xilinx/zynqmp/Kconfig          |   16 +
+>  drivers/firmware/xilinx/zynqmp/Makefile         |    4 +
+>  drivers/firmware/xilinx/zynqmp/firmware.c       | 1051 +++++++++++++++++++++++
+>  include/linux/firmware/xilinx/zynqmp/firmware.h |  590 +++++++++++++
+>  9 files changed, 1672 insertions(+)
+>  create mode 100644 drivers/firmware/xilinx/Kconfig
+>  create mode 100644 drivers/firmware/xilinx/Makefile
+>  create mode 100644 drivers/firmware/xilinx/zynqmp/Kconfig
+>  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
+>  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
+>  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
+> 
+> +
+> +/**
+> + * zynqmp_pm_force_powerdown - PM call to request for another PU or subsystem to
+> + *				be powered down forcefully
+> + * @target:	Node ID of the targeted PU or subsystem
+> + * @ack:	Flag to specify whether acknowledge is requested
+> + *
+> + * Return:	Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_force_powerdown(const u32 target,
+> +				     const enum zynqmp_pm_request_ack ack)
+> +{
+> +	return zynqmp_pm_invoke_fn(PM_FORCE_POWERDOWN, target, ack, 0, 0, NULL);
+> +}
+> +
 
-So why not also run a test on the memory controller in case the 
-bootloader made a mistake in the memory node too? As I mentioned before, 
-if you can't trust the DT to describe your hardware correctly you've 
-already lost.
+[...]
 
-Robin.
+> +/**
+> + * zynqmp_pm_system_shutdown - PM call to request a system shutdown or restart
+> + * @type:	Shutdown or restart? 0 for shutdown, 1 for restart
+> + * @subtype:	Specifies which system should be restarted or shut down
+> + *
+> + * Return:	Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_system_shutdown(const u32 type, const u32 subtype)
+> +{
+> +	return zynqmp_pm_invoke_fn(PM_SYSTEM_SHUTDOWN, type, subtype,
+> +				   0, 0, NULL);
+> +}
+> +
+
+I can't understand why you need above 2 APIs: PM_FORCE_POWERDOWN and
+PM_SYSTEM_SHUTDOWN. You should use PSCI_SYSTEM_OFF and PSCI_SYSTEM_RESET
+and drop these two.
+
+
+> +static const struct zynqmp_eemi_ops eemi_ops = {
+> +	.get_api_version = zynqmp_pm_get_api_version,
+> +	.get_chipid = zynqmp_pm_get_chipid,
+> +	.reset_assert = zynqmp_pm_reset_assert,
+> +	.reset_get_status = zynqmp_pm_reset_get_status,
+> +	.fpga_load = zynqmp_pm_fpga_load,
+> +	.fpga_get_status = zynqmp_pm_fpga_get_status,
+> +	.sha_hash = zynqmp_pm_sha_hash,
+> +	.rsa = zynqmp_pm_rsa,
+> +	.request_suspend = zynqmp_pm_request_suspend,
+> +	.force_powerdown = zynqmp_pm_force_powerdown,
+> +	.request_wakeup = zynqmp_pm_request_wakeup,
+> +	.set_wakeup_source = zynqmp_pm_set_wakeup_source,
+> +	.system_shutdown = zynqmp_pm_system_shutdown,
+> +	.request_node = zynqmp_pm_request_node,
+> +	.release_node = zynqmp_pm_release_node,
+> +	.set_requirement = zynqmp_pm_set_requirement,
+> +	.set_max_latency = zynqmp_pm_set_max_latency,
+> +	.set_configuration = zynqmp_pm_set_configuration,
+> +	.get_node_status = zynqmp_pm_get_node_status,
+> +	.get_operating_characteristic = zynqmp_pm_get_operating_characteristic,
+> +	.init_finalize = zynqmp_pm_init_finalize,
+> +	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
+> +	.ioctl = zynqmp_pm_ioctl,
+> +	.query_data = zynqmp_pm_query_data,
+> +	.pinctrl_request = zynqmp_pm_pinctrl_request,
+> +	.pinctrl_release = zynqmp_pm_pinctrl_release,
+> +	.pinctrl_get_function = zynqmp_pm_pinctrl_get_function,
+> +	.pinctrl_set_function = zynqmp_pm_pinctrl_set_function,
+> +	.pinctrl_get_config = zynqmp_pm_pinctrl_get_config,
+> +	.pinctrl_set_config = zynqmp_pm_pinctrl_set_config,
+> +	.clock_enable = zynqmp_pm_clock_enable,
+> +	.clock_disable = zynqmp_pm_clock_disable,
+> +	.clock_getstate = zynqmp_pm_clock_getstate,
+> +	.clock_setdivider = zynqmp_pm_clock_setdivider,
+> +	.clock_getdivider = zynqmp_pm_clock_getdivider,
+> +	.clock_setrate = zynqmp_pm_clock_setrate,
+> +	.clock_getrate = zynqmp_pm_clock_getrate,
+> +	.clock_setparent = zynqmp_pm_clock_setparent,
+> +	.clock_getparent = zynqmp_pm_clock_getparent,
+> +};
+> +
+Instead of introducing all these in oneshot, add them as you have users
+of it. IOW, show the users of these functions in the series. Also I
+asked to split this into functional changes like clock, pinctrl, power, etc.
+
+-- 
+Regards,
+Sudeep
