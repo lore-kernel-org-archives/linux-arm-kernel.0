@@ -1,39 +1,27 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 1 Mar 2018 20:32:21 +0200
-Subject: [PATCH v4 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <20180301163815.30595-3-ard.biesheuvel@linaro.org>
-References: <20180301163815.30595-1-ard.biesheuvel@linaro.org>
- <20180301163815.30595-3-ard.biesheuvel@linaro.org>
-Message-ID: <CAHp75VcJ4+4-yCm6sKf+Q80FwRMjkjSGMZd5X3hecHQZ9nV7Rw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 1 Mar 2018 18:37:32 +0000
+Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
+In-Reply-To: <20180301162803.5490-1-robh@kernel.org>
+References: <20180301162803.5490-1-robh@kernel.org>
+Message-ID: <20180301183732.52ntz5trt26vpuhh@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 6:38 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> This is a cleaned up version of the I2C controller driver for
-> the Fujitsu F_I2C IP, which was never supported upstream, and
-> has now been incorporated into the Socionext SynQuacer SoC.
+On Thu, Mar 01, 2018 at 10:28:03AM -0600, Rob Herring wrote:
+> libfdt gained a new dependency on strrchr, so make it available to the
+> EFI namespace before we update libfdt.
+> 
+> Thanks to Ard for providing this fix.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please ack. This is a dependency on a dtc upstream sync.
 
-> +static int synquacer_i2c_remove(struct platform_device *pdev)
-> +{
-> +       struct synquacer_i2c *i2c = platform_get_drvdata(pdev);
-> +
-
-> +       platform_set_drvdata(pdev, NULL);
-
-Just noticed, this is redundant for many years since driver core does
-it for every device on removal.
-
-It can be fixed by followup though.
-
-> +       i2c_del_adapter(&i2c->adapter);
-> +       if (!IS_ERR(i2c->pclk))
-> +               clk_disable_unprepare(i2c->pclk);
-> +
-> +       return 0;
-> +};
+So I assume you'll merge this patch via the DT tree and we don't need to
+pick it up through the arm64 tree.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Catalin
