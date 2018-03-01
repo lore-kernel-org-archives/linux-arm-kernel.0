@@ -1,20 +1,16 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  1 Mar 2018 18:18:29 +0800
-Subject: [RESEND PATCH v6 06/14] iommu/rockchip: Fix TLB flush of secondary
- IOMMUs
+Date: Thu,  1 Mar 2018 18:18:32 +0800
+Subject: [RESEND PATCH v6 09/14] dt-bindings: iommu/rockchip: Add clock
+ property
 In-Reply-To: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
 References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180301101837.27969-7-jeffy.chen@rock-chips.com>
+Message-ID: <20180301101837.27969-10-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+Add clock property, since we are going to control clocks in rockchip
+iommu driver.
 
-Due to the bug in current code, only first IOMMU has the TLB lines
-flushed in rk_iommu_zap_lines. This patch fixes the inner loop to
-execute for all IOMMUs and properly flush the TLB.
-
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
@@ -24,39 +20,32 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/iommu/rockchip-iommu.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/iommu/rockchip,iommu.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index baba283ccdf9..c4131ca792e0 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -274,19 +274,21 @@ static void rk_iommu_base_command(void __iomem *base, u32 command)
- {
- 	writel(command, base + RK_MMU_COMMAND);
- }
--static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova,
-+static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova_start,
- 			       size_t size)
- {
- 	int i;
--
--	dma_addr_t iova_end = iova + size;
-+	dma_addr_t iova_end = iova_start + size;
- 	/*
- 	 * TODO(djkurtz): Figure out when it is more efficient to shootdown the
- 	 * entire iotlb rather than iterate over individual iovas.
- 	 */
--	for (i = 0; i < iommu->num_mmu; i++)
--		for (; iova < iova_end; iova += SPAGE_SIZE)
-+	for (i = 0; i < iommu->num_mmu; i++) {
-+		dma_addr_t iova;
-+
-+		for (iova = iova_start; iova < iova_end; iova += SPAGE_SIZE)
- 			rk_iommu_write(iommu->bases[i], RK_MMU_ZAP_ONE_LINE, iova);
-+	}
- }
+diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+index 2098f7732264..6ecefea1c6f9 100644
+--- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
++++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+@@ -14,6 +14,11 @@ Required properties:
+                     "single-master" device, and needs no additional information
+                     to associate with its master device.  See:
+                     Documentation/devicetree/bindings/iommu/iommu.txt
++- clocks          : A list of clocks required for the IOMMU to be accessible by
++                    the host CPU.
++- clock-names     : Should contain the following:
++	"iface" - Main peripheral bus clock (PCLK/HCL) (required)
++	"aclk"  - AXI bus clock (required)
  
- static bool rk_iommu_is_stall_active(struct rk_iommu *iommu)
+ Optional properties:
+ - rockchip,disable-mmu-reset : Don't use the mmu reset operation.
+@@ -27,5 +32,7 @@ Example:
+ 		reg = <0xff940300 0x100>;
+ 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "vopl_mmu";
++		clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
++		clock-names = "aclk", "iface";
+ 		#iommu-cells = <0>;
+ 	};
 -- 
 2.11.0
