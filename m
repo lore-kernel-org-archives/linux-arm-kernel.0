@@ -1,190 +1,145 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Thu, 1 Mar 2018 09:21:02 +0100
-Subject: [PATCH v4 08/10] ARM: sunxi: smp: Move assembly code into a file
-In-Reply-To: <20180223150949.ky4blpbc64tf44tt@flea.lan>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-9-mylene.josserand@bootlin.com>
- <20180223150949.ky4blpbc64tf44tt@flea.lan>
-Message-ID: <20180301092102.50d80937@dell-desktop.home>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 1 Mar 2018 13:55:54 +0530
+Subject: [PATCH] dmaengine: mv_xor_v2: Fix clock resource by adding a
+ register clock
+In-Reply-To: <87vaeijw83.fsf@bootlin.com>
+References: <20180214162733.4591-1-gregory.clement@bootlin.com>
+ <20180227151511.GC15443@localhost> <87vaeijw83.fsf@bootlin.com>
+Message-ID: <20180301082554.GE15443@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 23 Feb 2018 16:09:49 +0100
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-
-> On Fri, Feb 23, 2018 at 02:37:40PM +0100, Myl?ne Josserand wrote:
-> > Move the assembly code for cluster cache enabling
-> > into an assembly file instead of having it directly in C code.
-> > 
-> > Create a sunxi_boot entry that will perform a cluster cached
-> > enabling and called secondary_startup.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > ---
-> >  arch/arm/mach-sunxi/Makefile  |  1 +
-> >  arch/arm/mach-sunxi/headsmp.S | 73 +++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-sunxi/mc_smp.c  | 76 ++++---------------------------------------
-> >  3 files changed, 80 insertions(+), 70 deletions(-)
-> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S
-> > 
-> > diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> > index 7de9cc286d53..d1a072b879ed 100644
-> > --- a/arch/arm/mach-sunxi/Makefile
-> > +++ b/arch/arm/mach-sunxi/Makefile
-> > @@ -1,5 +1,6 @@
-> >  CFLAGS_mc_smp.o	+= -march=armv7-a
-> >  
-> >  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-> > +obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
-> >  obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o
-> >  obj-$(CONFIG_SMP) += platsmp.o
-> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> > new file mode 100644
-> > index 000000000000..4f5957a6e188
-> > --- /dev/null
-> > +++ b/arch/arm/mach-sunxi/headsmp.S
-> > @@ -0,0 +1,73 @@
-> > +/*
-> > + * SMP support for sunxi based systems with Cortex A7/A15
-> > + *
-> > + * Copyright (C) 2018 Bootlin  
+On Tue, Feb 27, 2018 at 04:19:56PM +0100, Gregory CLEMENT wrote:
+> Hi Vinod,
+>  
+>  On mar., f?vr. 27 2018, Vinod Koul <vinod.koul@intel.com> wrote:
 > 
-> This is just a copy, and while you can claim that you are one of the
-> copyrights holder, you are not the sole one and the original author
-> should be there.
-
-yep, sorry about that.
-
+> > Pls do CC DT folks and Rob for bindings update
+> >
+> > On Wed, Feb 14, 2018 at 05:27:33PM +0100, Gregory CLEMENT wrote:
+> >> On the CP110 components whic are present on the Armada 7K/8K SoC we need
+> >
+> > /s/whic/which
+> >
+> >> to explicitly enable the registers clock. However it is not needed for
+> >
+> > /s/registers/register
+> >
+> >> the AP8xx componenet, that's why this clock is optional.
+> >> 
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> >> ---
+> >>  .../devicetree/bindings/dma/mv-xor-v2.txt          |  6 +++++-
+> >>  drivers/dma/mv_xor_v2.c                            | 23 +++++++++++++++++-----
+> >>  2 files changed, 23 insertions(+), 6 deletions(-)
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
+> >> index 217a90eaabe7..9c38bbe7e6d7 100644
+> >> --- a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
+> >> +++ b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
+> >> @@ -11,7 +11,11 @@ Required properties:
+> >>    interrupts.
+> >>  
+> >>  Optional properties:
+> >> -- clocks: Optional reference to the clock used by the XOR engine.
+> >> +- clocks: Optional reference to the clocks used by the XOR engine.
+> >> +- clock-names: mandatory if there is a second clock, in this case the
+> >> +   name must be "core" for the first clock and "reg" for the second
+> >> +   one
+> >> +
+> >>  
+> >>  Example:
+> >>  
+> >> diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
+> >> index f652a0e0f5a2..93b3d80ce701 100644
+> >> --- a/drivers/dma/mv_xor_v2.c
+> >> +++ b/drivers/dma/mv_xor_v2.c
+> >> @@ -163,6 +163,7 @@ struct mv_xor_v2_device {
+> >>  	void __iomem *dma_base;
+> >>  	void __iomem *glob_base;
+> >>  	struct clk *clk;
+> >> +	struct clk *reg_clk;
+> >>  	struct tasklet_struct irq_tasklet;
+> >>  	struct list_head free_sw_desc;
+> >>  	struct dma_device dmadev;
+> >> @@ -749,13 +750,24 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
+> >>  	if (ret)
+> >>  		return ret;
+> >>  
+> >> -	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
+> >> -	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
+> >> +	xor_dev->reg_clk = devm_clk_get(&pdev->dev, "reg");
+> >
+> > is this an exiting property?
 > 
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.  
-> 
-> You want to use SPDX there instead.
+> It is the name of the new optional clock described in the first part of
+> this patch.
 
-Sure, I will update it.
-
-> 
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +#include <asm/assembler.h>
-> > +
-> > +ENTRY(sunxi_mc_smp_cluster_cache_enable)
-> > +	/*
-> > +	* Enable cluster-level coherency, in preparation for turning on the MMU.
-> > +	*
-> > +	* Also enable regional clock gating and L2 data latency settings for
-> > +	* Cortex-A15. These settings are from the vendor kernel.
-> > +	*/  
-> 
-> The indentation is not correct there, the * should be aligned
-
-Okay
+okay I am missing something then, you are reading "reg" but property added is
+"clock-names", where are you reading this?
 
 > 
-> > +	mrc	p15, 0, r1, c0, c0, 0
-> > +	movw	r2, #(0xff00fff0&0xffff)
-> > +	movt	r2, #(0xff00fff0>>16)  
+> About the typo, do you need a new version or do you plan to fix them
+> while applying the patch?
 > 
-> This used to be defines, we should keep them, and we should have
-> spaces around the operators as well.
-
-Okay 
-
+> Thanks,
 > 
-> > +	and	r1, r1, r2
-> > +	movw	r2, #(0x4100c0f0&0xffff)
-> > +	movt	r2, #(0x4100c0f0>>16)
-> > +	cmp	r1, r2
-> > +	bne	not_a15
-> > +
-> > +	/* The following is Cortex-A15 specific */
-> > +
-> > +	/* ACTLR2: Enable CPU regional clock gates */
-> > +	mrc p15, 1, r1, c15, c0, 4
-> > +	orr r1, r1, #(0x1<<31)
-> > +	mcr p15, 1, r1, c15, c0, 4
-> > +
-> > +	/* L2ACTLR */
-> > +	mrc p15, 1, r1, c15, c0, 0
-> > +	/* Enable L2, GIC, and Timer regional clock gates */
-> > +	orr r1, r1, #(0x1<<26)
-> > +	/* Disable clean/evict from being pushed to external */
-> > +	orr r1, r1, #(0x1<<3)
-> > +	mcr p15, 1, r1, c15, c0, 0
-> > +
-> > +	/* L2CTRL: L2 data RAM latency */
-> > +	mrc p15, 1, r1, c9, c0, 2
-> > +	bic r1, r1, #(0x7<<0)
-> > +	orr r1, r1, #(0x3<<0)
-> > +	mcr p15, 1, r1, c9, c0, 2
-> > +
-> > +	/* End of Cortex-A15 specific setup */
-> > +	not_a15:
-> > +
-> > +	/* Get value of sunxi_mc_smp_first_comer */
-> > +	adr	r1, first
-> > +	ldr	r0, [r1]
-> > +	ldr	r0, [r1, r0]
-> > +
-> > +	/* Skip cci_enable_port_for_self if not first comer */
-> > +	cmp	r0, #0
-> > +	bxeq	lr
-> > +	b	cci_enable_port_for_self
-> > +
-> > +	.align 2
-> > +	first: .word sunxi_mc_smp_first_comer - .
-> > +ENDPROC(sunxi_mc_smp_cluster_cache_enable)
-> > +
-> > +#ifdef CONFIG_SMP  
+> Gregory
 > 
-> I guess that whole file should be compiled only if we have SMP
-> enabled.
-
-True, thanks
-
 > 
-> > +ENTRY(sunxi_boot)
-> > +	bl	sunxi_mc_smp_cluster_cache_enable
-> > +	b	secondary_startup
-> > +ENDPROC(sunxi_boot)
-> > +#endif
-> > diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> > index f2c2cfca28cd..4e807cc11a0f 100644
-> > --- a/arch/arm/mach-sunxi/mc_smp.c
-> > +++ b/arch/arm/mach-sunxi/mc_smp.c
-> > @@ -82,6 +82,9 @@ static void __iomem *prcm_base;
-> >  static void __iomem *sram_b_smp_base;
-> >  static bool is_sun9i;
-> >  
-> > +extern void sunxi_boot(void);  
+> >
+> >> +	if (!IS_ERR(xor_dev->reg_clk)) {
+> >> +		ret = clk_prepare_enable(xor_dev->reg_clk);
+> >> +		if (ret)
+> >> +			return ret;
+> >> +	} else if (PTR_ERR(xor_dev->reg_clk) == -EPROBE_DEFER) {
+> >>  		return -EPROBE_DEFER;
+> >> +	}
+> >> +
+> >> +	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
+> >> +	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
+> >> +		ret = EPROBE_DEFER;
+> >> +		goto disable_reg_clk;
+> >> +	}
+> >>  	if (!IS_ERR(xor_dev->clk)) {
+> >>  		ret = clk_prepare_enable(xor_dev->clk);
+> >>  		if (ret)
+> >> -			return ret;
+> >> +			goto disable_reg_clk;
+> >>  	}
+> >>  
+> >>  	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
+> >> @@ -866,8 +878,9 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
+> >>  free_msi_irqs:
+> >>  	platform_msi_domain_free_irqs(&pdev->dev);
+> >>  disable_clk:
+> >> -	if (!IS_ERR(xor_dev->clk))
+> >> -		clk_disable_unprepare(xor_dev->clk);
+> >> +	clk_disable_unprepare(xor_dev->clk);
+> >> +disable_reg_clk:
+> >> +	clk_disable_unprepare(xor_dev->reg_clk);
+> >>  	return ret;
+> >>  }
+> >>  
+> >> -- 
+> >> 2.15.1
+> >> 
+> >
+> > -- 
+> > ~Vinod
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Why did you change the name of that function? The older one made it
-> more obvious to tell what is going on.
-
-Okay, I will use the old name.
-
-> 
-> > +extern void sunxi_cluster_cache_enable(void);  
-> 
-> Is that used somewhere?
-
-No, I will remove it.
-
-> 
-> Thanks!
-> Maxime
-> 
-
-Thanks,
-
-Myl?ne
+> -- 
+> Gregory Clement, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+~Vinod
