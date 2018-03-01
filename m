@@ -1,64 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Mar 2018 09:33:22 +0100
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <5A977638.8010506@rock-chips.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
- <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
- <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
- <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
- <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
- <5A977638.8010506@rock-chips.com>
-Message-ID: <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 1 Mar 2018 09:36:14 +0100
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+ <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+Message-ID: <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
-
-On Thu, Mar 1, 2018 at 4:40 AM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> if i'm reading the code right, the PM clk means:
-> 1/ the clocks which would be enabled while power on
-> 2/ these clocks are optional, it's ok if anything wrong with them
-> 3/ controlled by pm_domain(or USE_PM_CLK_RUNTIME_OPS & pm_clk_add_notifier)
+2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
+>>
+>>
+>> I think I found the reason for the strange crashes we were
+>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
+>> me in the right direction.
+>>
+>> The mdio driver fails to probe with v7 due to the supplied clock rate
+>> being wrong. Before failing we register the emac clock with
+>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
+>> reference count of the clock, but we never actually increased it in
+>> the first place in the line above. The core clock code then destroys
+>> the associated clk_core structure. When the next user comes around (in
+>> our case the clk debug functions) the system crashes.
+>>
+>> I believe there to be two issues: one is with v7 - we need to increase
+>> the clock reference count in davinci_psc_genpd_attach_dev().
+>>
+>> Second is the error path in the clock framework - we should remove the
+>> destroyed clk_core from the debug list, which is not being done now.
+>>
+>> Why we even need to track the refcount of clk_core is a mistery for me
+>> though. Stephen, Mike?
+>>
+>> Best regards,
+>> Bartosz Golaszewski
 >
-> and currently we're adding all clocks of the attached device as PM clk in
-> rockchip PM domain driver, which seems wrong. because we might have these
-> kinds of clocks:
-> 1/ critical, should block power on if anything wrong with it(failed to get/
-> prepare/ enable)
-> 2/ optional, could ignore it if anything wrong
-> 3/ only required in some special cases, for example register r/w, and
-> doesn't need to stay enabled while power on
 >
-> so maybe we can:
-> 1/ let the device(dts) or driver decide which clock is PM clk, and add it
-> using *pm_clk_add* APIs (even of_pm_clk_add_clks() if all clocks are pm clk)
+> Great find. I figured it had to be something like this, but I wasn't
+> able to reproduce the problem yet.
 >
-> 2/ add support for critical PM clk, which would return error to the driver
-> if anything wrong
->
-> 3/ make sure PM clk always be controlled(otherwise it might be unexpected
-> disabled by other clocks under the same clk parent?):
->  a) make sure Runtime PM is always enabled. and as discussed, we can select
-> PM in ARCH_ROCKCHIP
+> I suppose it is time to spin up a v8 with some fixes.
 
-On Renesas SoCs, we only add the device's module clock with pm_clk_add().
-Drivers that don't care about properties of the module clock just call
-pm_runtime_*(). That way the same driver works on different SoCs using
-the same device, with and without power and/or clock domains.
+I still don't know why the mdio clock rate is much lower than in
+mainline though. Any ideas?
 
-Drivers that care about properties of the module clock (mainly frequency)
-can still use the clk_*() API for that. Other (optional) clocks must be
-handled by the device driver itself.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Bart
