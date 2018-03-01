@@ -1,37 +1,23 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 01 Mar 2018 13:49:56 -0800
-Subject: [PATCH v2 2/3] gpiolib-of: Support 'reserved-gpio-ranges' property
-In-Reply-To: <CACRpkda2_nt24pweyQTtB_9gypDJTK1NHRm1LjsinEaK-G8F_Q@mail.gmail.com>
-References: <20180126011400.2191-1-sboyd@codeaurora.org>
- <20180126011400.2191-3-sboyd@codeaurora.org>
- <CACRpkda2_nt24pweyQTtB_9gypDJTK1NHRm1LjsinEaK-G8F_Q@mail.gmail.com>
-Message-ID: <151994099669.240031.102662015980326125@swboyd.mtv.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Mar 2018 15:50:23 -0600
+Subject: [PATCH v2 10/19] dt-bindings: dmaengine: rcar-dmac: document
+ R8A77965 support
+In-Reply-To: <1519139541-18783-11-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519139541-18783-11-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180301215023.ojsnkavkrxnkcxli@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2018-02-07 05:34:19)
-> Hi Stephen,
+On Tue, Feb 20, 2018 at 04:12:12PM +0100, Jacopo Mondi wrote:
+> Add documentation for r8a77965 compatible string to rcar-dmac device
+> tree bindings documentation.
 > 
-> nice work!
-> 
-> On Fri, Jan 26, 2018 at 2:13 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > For now, we plumb this into the gpiochip irq APIs so that
-> > GPIO/pinctrl drivers can use the gpiochip_irqchip_irq_valid() to
-> > test validity of GPIOs.
-> 
-> But is that the right thing to do, given that we just took the
-> trouble to define a DT binding that is explicitly about
-> any GPIO, not just IRQ capable ones?
-> 
-> I am worries that the *irq* infix etc on these functions
-> will be a bit confusing.
-> 
-> Is it a lot of work to make it just generic and maybe bake it
-> into the gpio_chip so as to refuse already in
-> gpiod_request_commit() in gpiolib already?
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  Documentation/devicetree/bindings/dma/renesas,rcar-dmac.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-I don't think that it will be too much work to tweak the code to treat
-these as gpios instead of irq lines. It may end up duplicating a bit of code
-that the irq line stuff is already doing, but I'll take a stab at it and
-see how bad it comes out.
+Reviewed-by: Rob Herring <robh@kernel.org>
