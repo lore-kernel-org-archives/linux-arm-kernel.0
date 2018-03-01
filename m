@@ -1,20 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Mar 2018 16:41:51 -0600
-Subject: [PATCH v1 1/5] dt-bindings: soc: update MT2712 power dt-bindings
-In-Reply-To: <20180222054851.26096-3-weiyi.lu@mediatek.com>
-References: <20180222054851.26096-1-weiyi.lu@mediatek.com>
- <20180222054851.26096-3-weiyi.lu@mediatek.com>
-Message-ID: <20180301224151.bl3syre32pqfcsls@rob-hp-laptop>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Mar 2018 23:41:54 +0100
+Subject: [PATCH v2 2/2] pinctrl: stm32: Optimizes and enhances stm32gpio
+ irqchip
+In-Reply-To: <c648235f538b030e7f349e286661fd00894d5316.1519374248.git.radoslaw.pietrzyk@gmail.com>
+References: <1519221027-4028-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <c648235f538b030e7f349e286661fd00894d5316.1519374248.git.radoslaw.pietrzyk@gmail.com>
+Message-ID: <CACRpkdYfbgdr9QsTudYdr8EnXgMzwqm_iP2m1ya3hQkyTBjgqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 01:48:47PM +0800, Weiyi Lu wrote:
-> Add new power domains(MFG_SC1/MFG_SC2/MFG_SC3)
-> for MT2712 according to ECO design change.
-> 
-> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
-> ---
->  include/dt-bindings/power/mt2712-power.h | 3 +++
->  1 file changed, 3 insertions(+)
+On Fri, Feb 23, 2018 at 9:31 AM, Radoslaw Pietrzyk
+<radoslaw.pietrzyk@gmail.com> wrote:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+> - removes unneeded irq_chip.irq_eoi callback
+> - adds irq_chip.irq_set_wake callback for possible
+> in the future GPIO wakeup
+> - adds irq_chip.irq_ack callback
+>
+> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+
+This v2 patch applied with Ludovic's tags.
+
+Yours,
+Linus Walleij
