@@ -1,42 +1,69 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu, 1 Mar 2018 19:46:57 +0800
-Subject: boot hang on meltdown backporting -- urgent
-Message-ID: <30b47155-2dcd-45db-b47a-95bf6b8d4dbb@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 1 Mar 2018 12:48:55 +0100
+Subject: [PATCH] pinctrl: sunxi: always look for apb block
+In-Reply-To: <20180301113701.8888-1-andre.przywara@arm.com>
+References: <20180301113701.8888-1-andre.przywara@arm.com>
+Message-ID: <20180301114855.s7rbk7wiealepqrf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magus & Geert,
+Hi,
 
-When I do backport meltdown fix to LTS 4.9, a boot hang happens(RCU
-stall) with defconfig+CONFIG_RANDOMIZE_BASE=y on your board:
-r8a7795-salvator-x
-The bug at https://kernelci.org/boot/id/5a96f3dd59b5146590b3a4d5/
+On Thu, Mar 01, 2018 at 11:37:01AM +0000, Andre Przywara wrote:
+> The Allwinner pinctrl device tree binding suggests that a clock named
+> "apb" would drive the pin controller IP. However (for legacy reasons) we
+> rely on this clock actually being the first clock defined.
+> Since named clocks can be in any order, let's explicitly check for a
+> clock called "apb" first, then revert to using the first (and only!)
+> clock to keep compatibility with older DTs.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> index 4b6cb25bc796..897ba13e6a03 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> @@ -1360,10 +1360,21 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+>  			goto gpiochip_error;
+>  	}
+>  
+> -	clk = devm_clk_get(&pdev->dev, NULL);
+> +	clk = devm_clk_get(&pdev->dev, "apb");
+>  	if (IS_ERR(clk)) {
+> -		ret = PTR_ERR(clk);
+> -		goto gpiochip_error;
+> +		/*
+> +		 * If no "apb" clock can be found, try the first one, which
+> +		 * must be the only one defined.
+> +		 */
+> +		if (PTR_ERR(clk) == -ENOENT &&
+> +		    of_count_phandle_with_args(node, "clocks",
+> +					       "#clock-cells") == 1)
+> +			clk = devm_clk_get(&pdev->dev, NULL);
+> +
+> +		if (IS_ERR(clk)) {
+> +			ret = PTR_ERR(clk);
+> +			goto gpiochip_error;
+> +		}
 
-The backporting git tree is
-https://git.linaro.org/kernel/linux-linaro-stable.git/commit/?id=791778ab06292219a9ed09d3bf025badb8f02b48
+I guess this can be made slightly less convoluted using something like
 
-Due to recent kernelci issue, a possible fix can not be tested now:
+ret = of_count_phandle_with_args(node, "clocks", "#clock-cells");
+clk = devm_clk_get(&pdev->dev, ret == 1 ? NULL : "apb");
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 8d50b28..198f231 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -906,6 +906,7 @@ __ni_sys_trace:
-        tramp_map_kernel        x30
- #ifdef CONFIG_RANDOMIZE_BASE
-        adr     x30, tramp_vectors + PAGE_SIZE
-+       isb
-        ldr     x30, [x30]
- #else
-        ldr     x30, =vectors
+Maxime
 
-Would you like to help me test above patch? which is included
-in the latest branch
-https://git.linaro.org/kernel/linux-linaro-stable.git  v4.9-metldown
-
-If it still causes boot hang, could you like to do a bisect to the buggy
-commit? This is the only issue on the way to merge this patchset to LTS.
-
-
-Thanks a lot!
-Alex
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/bd3a1390/attachment.sig>
