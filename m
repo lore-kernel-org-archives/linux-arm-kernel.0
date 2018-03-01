@@ -1,121 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Mar 2018 11:37:00 +0100
-Subject: [PATCH] soc: rockchip: power-domain: remove PM clocks
-In-Reply-To: <CAPDyKFq_hwao0hZCYmO-VrsW3vDJJboa1RG-TMLRQRgbt+YhpQ@mail.gmail.com>
-References: <20180228111113.13639-1-jeffy.chen@rock-chips.com>
- <CAMuHMdWLL9CxmxSLsqs1QX0dDHVhp4NrW4Me2EZaZE_bJ330bA@mail.gmail.com>
- <CAAFQd5CLXUwH6jTq9ZOpbYt9-Xx-+Kgj-Nk+KujS=Y=qLByc9Q@mail.gmail.com>
- <CAMuHMdWdVdregCRh17Jfa92csBruZvLzAK+M8uajif0BSJTcaw@mail.gmail.com>
- <CAAFQd5CpA_M821cMDtiEiWxw_rL--hQy6T6imz_c+fSi3gH9zw@mail.gmail.com>
- <CAMuHMdVVDiuv7bpdC0X95Xy9dSK_TfjW5RvSekVym9Q02798Fg@mail.gmail.com>
- <CAAFQd5C0GZ9C-pAqAdpuyxaF2xthLPY62a921nmABTbbmYtBmQ@mail.gmail.com>
- <5A977638.8010506@rock-chips.com>
- <CAMuHMdU9PFAXwo+1Z7Baw1fanst9yFKZ3ohoSTiQiMKTaYMVVw@mail.gmail.com>
- <CAPDyKFq_hwao0hZCYmO-VrsW3vDJJboa1RG-TMLRQRgbt+YhpQ@mail.gmail.com>
-Message-ID: <CAMuHMdWg1y3Ragb9nYY12whZhUn8w0a4aOOR31LSNXa37NbfXg@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 1 Mar 2018 16:03:34 +0530
+Subject: [PATCH v3 01/10] dt-bindings: pinctrl: Add bindings for Actions
+ S900 SoC
+In-Reply-To: <20180301102300.z2abpg4ao62dibgm@oak.lan>
+References: <20180228181432.26847-1-manivannan.sadhasivam@linaro.org>
+ <20180228181432.26847-2-manivannan.sadhasivam@linaro.org>
+ <CACRpkdYG_aBJ0WME7NSOdv0pV5Vh_z8GVqQ+tUFnXGA7NGVMUg@mail.gmail.com>
+ <20180301092556.x4a5ohx3iccwsugw@linaro.org>
+ <20180301102300.z2abpg4ao62dibgm@oak.lan>
+Message-ID: <20180301103334.jjyxiimsjs4d33nv@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Daniel,
 
-On Thu, Mar 1, 2018 at 11:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 1 March 2018 at 09:33, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Thu, Mar 1, 2018 at 4:40 AM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
->>> 3/ make sure PM clk always be controlled(otherwise it might be unexpected
->>> disabled by other clocks under the same clk parent?):
->>>  a) make sure Runtime PM is always enabled. and as discussed, we can select
->>> PM in ARCH_ROCKCHIP
+On Thu, Mar 01, 2018 at 10:23:00AM +0000, Daniel Thompson wrote:
+> On Thu, Mar 01, 2018 at 02:55:56PM +0530, Manivannan Sadhasivam wrote:
+> > Hi Linus,
+> > On Thu, Mar 01, 2018 at 10:20:29AM +0100, Linus Walleij wrote:
+> > > On Wed, Feb 28, 2018 at 7:14 PM, Manivannan Sadhasivam
+> > > <manivannan.sadhasivam@linaro.org> wrote:
+> > > 
+> > > > Add pinctrl bindings for Actions Semi S900 SoC
+> > > >
+> > > > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > > 
+> > > The previous (v2) version had Rob's Review tag, did you just forget
+> > > to add it or has something changed?
+> > > 
+> > 
+> > My bad. Slipped through the cracks.
+> > 
+> > > If nothing is changed I can add his tag when applying.
+> > >
+> > 
+> > I will send out a new version of the whole series, incorporating Andy's
+> > pinctrl driver review.
+> > 
+> > Also, FYI this pacthseries depends on Clock driver patchset I have submitted
+> > earlier. So far no reply from Stephen yet. He said that he is working on setting
+> > up his new environment and will begin reviewing shortly.
+> 
+> Is the dependancy at runtime (driver is not functional without clocks) or compile
+> time (driver cannot build without other patchset landing)?
 >
-> I am fine enabling PM for ARCH_ROCKCHIP, if needed.
->
-> However, what I don't agree with in general, is to make a generic
-> driver to rely on having CONFIG_PM to be set to be functional. That's
-> to me, bad practice.
->
-> I understand, this approach exists in drivers today. I assume it
-> works, because those drivers are being used on SoCs which always has
-> CONFIG_PM set.
 
-I agree. This is mostly useful for drivers that are used on multiple SoCs,
-where the driver doesn't care about the clock (doesn't care about its
-properties), and where the clock is optional (i.e. either tied to an
-always-running bus clock, or to a controllable module clock, depending on SoC).
-The latter needs CONFIG_PM=y, but that's a platform property, controlled
-by selecting support for that specific SoC.
+There is no build time dependency only runtime dependency. Driver is pretty
+much useless without clock driver.
 
->> On Renesas SoCs, we only add the device's module clock with pm_clk_add().
->> Drivers that don't care about properties of the module clock just call
->> pm_runtime_*(). That way the same driver works on different SoCs using
->> the same device, with and without power and/or clock domains.
->
-> I understand your point and I accept your view.
->
-> However, I think this is more a mindset of which way one want
-> implement things. This has been discussed several times in the mailing
-> list as well.
->
-> Surely we can cope with SoC specific constraints in drivers as well,
-> we already do that.
->
-> In principle I think this boils done to comparing a centralized
-> method, where the PM domain deals with clocks vs a decentralized
-> method, where the driver deals with clocks. Both works, both have
-> positive and negative consequences.
+Also, there will be merge conflicts when this series gets applied independently.
+Since there is no build time dependency, if Linus decides to apply it now, I
+can generate a new independent patchset.
 
-Is the clock (are the clocks) used purely for power management of the device,
-or does it/do they serve another (independent) purpose?
-
-Note that unlike clocks, power areas cannot be controlled explicitly by the
-driver. That always has to be done through the Runtime PM API.
-
-> In my experience for ARM SoCs, I have found that centralized method
-> doesn't work well, when one need flexibility. For example, if there
-> are strict constraints on the order of how to put device's PM
-> resources (clocks, pinctrl, etc) in low power states. For example, to
-> avoid clock glitches.
-
-With multiple clocks used by a device, there's sometimes also a lack of
-understanding of the real clock hierarchy. If these multiple clocks need
-to be enabled/disabled in a specific order, perhaps they are not
-independent, and modelling the hierarchy correctly, and describing in DT
-the device as being connected to the leaf clock may solve the ordering issue.
-
-> Another problem with the PM clk is, more exactly with
-> pm_clk_suspend|resume(), that those invokes only clk_enable|disable().
-> pm_clk_suspend|resume() can't call clk_prepare|unprepare(), because we
-> don't know if we running in atomic context when those are executed.
-> Potentially this means leaving the clocks ungated - all the time.
->
-> I have though about how to fix the above, several times, but I always
-> ends up with thinking that's it more easy, to let the driver deal with
-> the clocks, as then the problem goes away.
-
-There's a similar issue with powering on/off power areas.
-How do device start/stop differ from power domain on/off?
-
->> Drivers that care about properties of the module clock (mainly frequency)
->> can still use the clk_*() API for that. Other (optional) clocks must be
->> handled by the device driver itself.
->
-> A comment on that;
->
-> Before we the PM clk was introduced, we didn't have the clk_bulk_*()
-> interface. To me, using clk_bulk_*() in drivers could help to simplify
-> the code in regards to manage clocks (including SoC specific clocks)
-> during runtime PM.
->
-> Perhaps this could be an option to using PM clk, as it provides both
-> flexibility and could manage SoC specific clocks.
-
-See my comment about multiple clocks above...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Mani 
+> 
+> Daniel.
