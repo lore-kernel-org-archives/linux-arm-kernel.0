@@ -1,69 +1,114 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 1 Mar 2018 13:31:16 +0100
-Subject: Clang build of arm64 kernel fails
-In-Reply-To: <be30b204-5752-9667-b599-b394cbfbc663@arm.com>
-References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
- <be30b204-5752-9667-b599-b394cbfbc663@arm.com>
-Message-ID: <CAAeHK+ywWwsU0LO2-CK5rUsqk0VUkoU044jJTLu_q6SLfed37g@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 1 Mar 2018 18:26:49 +0530
+Subject: [PATCH v5 2/3] dmaengine: mediatek: Add MediaTek High-Speed DMA
+ controller for MT7622 and MT7623 SoC
+In-Reply-To: <1519900021.8089.136.camel@mtkswgap22>
+References: <cover.1518857746.git.sean.wang@mediatek.com>
+ <de4177cb2269c99f8d7c5738ac8a64f512122dfd.1518857747.git.sean.wang@mediatek.com>
+ <20180301082329.GD15443@localhost>
+ <1519900021.8089.136.camel@mtkswgap22>
+Message-ID: <20180301125649.GH15443@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 11:47 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Andrey,
->
-> On 28/02/18 19:32, Andrey Konovalov wrote:
->> Hi Marc!
->>
->> I've tried to pull in new upstream commits and the kernel build
->> started failing for me with the following errors (see below).
->>
->> It seems that the reason is your commit "arm64: Add
->> ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
->> doesn't like 32 bits registers being used in 64 bits build.
->
-> These are not AArch32 registers. They are AArch64 registers that the
-> compiler specialises to an x (64bit wide) or w (32bit wide) register
-> depending on the type that is used to define the corresponding variable.
-> The fact that they are named just as AArch32 is an added compatibility
-> bonus.
->
-> For example:
->
-> void foo(void)
-> {
->         register unsigned long reg0 asm("r0") = 0;
->         register unsigned int  reg1 asm("r1") = 1;
->
->         asm volatile("hvc #0" : : "r" (reg0), "r" (reg1));
-> }
->
-> results in:
->
-> Disassembly of section .text:
->
-> 0000000000000000 <foo>:
->    0:   d2800000        mov     x0, #0x0                        // #0
->    4:   52800021        mov     w1, #0x1                        // #1
->    8:   d4000002        hvc     #0x0
->    c:   d65f03c0        ret
+On Thu, Mar 01, 2018 at 06:27:01PM +0800, Sean Wang wrote:
+> On Thu, 2018-03-01 at 13:53 +0530, Vinod Koul wrote:
+> > On Sun, Feb 18, 2018 at 03:08:30AM +0800, sean.wang at mediatek.com wrote:
+> > 
+> > > @@ -0,0 +1,1054 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > // Copyright ...
+> > 
+> > The copyright line needs to follow SPDX tag line
+> > 
+> 
+> okay, I will make it reorder and be something like that
+> 
+> // SPDX-License-Identifier: GPL-2.0
+> /*
+>  * Copyright (c) 2017-2018 MediaTek Inc.
+>  * Author: Sean Wang <sean.wang@mediatek.com>
+>  *
+>  * Driver for MediaTek High-Speed DMA Controller
+>  *
+>  */
 
-OK, I see, thanks for the explanation! I assumed there was something
-wrong with the patch, since before it was applied everything was
-compiling fine.
+It needs to be:
 
->
->> Would you mind sending a fix?
->
-> I can look into it. Is there an equivalent Clang construct that wouldn't
-> result in a sea of #ifdefs?
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2017-2018 MediaTek Inc.
 
-I'm having trouble to find any LLVM documentation related to this.
+/*
+ * whatever else you want
+ */
 
-Kostya and Evgeniy, whom from the LLVM side we can ask about this?
+The first two lines are in C99 style comment and need to have SPDX tag and
+Copyright info
 
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+> the point is I learned from other subsystem makes the driver name be
+> same with the module name with KBUILD_MODNAME.
+> 
+> If you really don't like it, I can just change it into 
+> 
+> #define MTK_DMA_DEV "mtk-hsdma"
+
+It is used only once, why not use KBUILD_MODNAME directly?
+
+> 
+> > > +
+> > > +#define MTK_HSDMA_USEC_POLL		20
+> > > +#define MTK_HSDMA_TIMEOUT_POLL		200000
+> > > +#define MTK_HSDMA_DMA_BUSWIDTHS		BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED)
+> > 
+> > Undefined buswidth??
+
+??
+
+> > > +/**
+> > > + * struct mtk_hsdma_pdesc - This is the struct holding info describing physical
+> > > + *			    descriptor (PD) and its placement must be kept at
+> > > + *			    4-bytes alignment in little endian order.
+> > > + * @desc[1-4]:		    The control pad used to indicate hardware how to
+> > 
+> > pls align to 80char or lesser
+> > 
+> 
+> weird, it seems the line is already with 80 char and pass the
+> checkpatch.pl. or do I misunderstand something ?
+
+Okay please check. With text it helps to wrap before that
+
+> > > +	/*
+> > > +	 * Updating into hardware the pointer of TX ring lets HSDMA to take
+> > > +	 * action for those pending PDs.
+> > > +	 */
+> > > +	mtk_dma_write(hsdma, MTK_HSDMA_TX_CPU, ring->cur_tptr);
+> > > +
+> > > +	spin_unlock_irqrestore(&hsdma->lock, flags);
+> > > +
+> > > +	return !hvd->len ? 0 : -ENOSPC;
+> > 
+> > you already wrote and started txn, so why this?
+> > 
+> 
+> it's possible just partial virtual descriptor fits into hardware and
+> then return -ENOSPC. And it will start it to complete the remaining part
+> as soon as possible when some rooms is being freed.
+
+Either ways you have issued the descriptor, so you succeed right?
+
+> > shouldn't we check if next is in range, we can crash if we get bad value
+> > from hardware..
+> 
+> okay, there are checks for next with ddone bit check and null check in
+> the corresponding descriptor as the following.
+
+what if you get bad next value
+
+> 
+> > > +		rxd = &pc->ring.rxd[next];
+
+resulting in bad ref here
+
+-- 
+~Vinod
