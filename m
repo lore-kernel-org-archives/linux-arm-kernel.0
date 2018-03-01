@@ -1,215 +1,445 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Mar 2018 15:55:19 +0000
-Subject: [PATCH v5 04/23] arm64: KVM: Dynamically patch the kernel/hyp VA mask
-In-Reply-To: <20180301155538.26860-1-marc.zyngier@arm.com>
-References: <20180301155538.26860-1-marc.zyngier@arm.com>
-Message-ID: <20180301155538.26860-5-marc.zyngier@arm.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 1 Mar 2018 16:30:45 +0100
+Subject: [PATCH v2 2/2] phy: stm32: add support for STM32 USB PHY Controller
+ (USBPHYC)
+In-Reply-To: <1519918245-17333-1-git-send-email-amelie.delaunay@st.com>
+References: <1519918245-17333-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1519918245-17333-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we're using a complicated sequence of alternatives to
-patch the kernel/hyp VA mask on non-VHE, and NOP out the
-masking altogether when on VHE.
+This patch adds phy transceiver driver for STM32 USB PHY Controller
+(USBPHYC) that provides dual port High-Speed phy for OTG (single port)
+and EHCI/OHCI host controller (two ports).
+One port of the phy is shared between the two USB controllers through
+a UTMI+ switch.
 
-The newly introduced dynamic patching gives us the opportunity
-to simplify that code by patching a single instruction with
-the correct mask (instead of the mind bending cummulative masking
-we have at the moment) or even a single NOP on VHE. This also
-adds some initial code that will allow the patching callback
-to switch to a more complex patching.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 46 ++++++--------------
- arch/arm64/kvm/Makefile          |  2 +-
- arch/arm64/kvm/va_layout.c       | 91 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 105 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/kvm/va_layout.c
+ drivers/phy/st/Kconfig             |  14 ++
+ drivers/phy/st/Makefile            |   1 +
+ drivers/phy/st/phy-stm32-usbphyc.c | 382 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 397 insertions(+)
+ create mode 100644 drivers/phy/st/phy-stm32-usbphyc.c
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7faed6e48b46..e3bc1d0a5e93 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -69,9 +69,6 @@
-  * mappings, and none of this applies in that case.
-  */
- 
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
- #ifdef __ASSEMBLY__
- 
- #include <asm/alternative.h>
-@@ -81,28 +78,15 @@
-  * Convert a kernel VA into a HYP VA.
-  * reg: VA to be converted.
-  *
-- * This generates the following sequences:
-- * - High mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		nop
-- * - Low mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
-- * - VHE:
-- *		nop
-- *		nop
-- *
-- * The "low mask" version works because the mask is a strict subset of
-- * the "high mask", hence performing the first mask for nothing.
-- * Should be completely invisible on any viable CPU.
-+ * The actual code generation takes place in kvm_update_va_mask, and
-+ * the instructions below are only there to reserve the space and
-+ * perform the register allocation (kvm_update_va_mask uses the
-+ * specific registers encoded in the instructions).
-  */
- .macro kern_hyp_va	reg
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
--alternative_else_nop_endif
--alternative_if ARM64_HYP_OFFSET_LOW
--	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
--alternative_else_nop_endif
-+alternative_cb kvm_update_va_mask
-+	and     \reg, \reg, #1
-+alternative_cb_end
- .endm
- 
- #else
-@@ -113,18 +97,14 @@ alternative_else_nop_endif
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- 
-+void kvm_update_va_mask(struct alt_instr *alt,
-+			__le32 *origptr, __le32 *updptr, int nr_inst);
+diff --git a/drivers/phy/st/Kconfig b/drivers/phy/st/Kconfig
+index 0814d3f..609719b 100644
+--- a/drivers/phy/st/Kconfig
++++ b/drivers/phy/st/Kconfig
+@@ -31,3 +31,17 @@ config PHY_STIH407_USB
+ 	help
+ 	  Enable this support to enable the picoPHY device used by USB2
+ 	  and USB3 controllers on STMicroelectronics STiH407 SoC families.
 +
- static inline unsigned long __kern_hyp_va(unsigned long v)
- {
--	asm volatile(ALTERNATIVE("and %0, %0, %1",
--				 "nop",
--				 ARM64_HAS_VIRT_HOST_EXTN)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
--	asm volatile(ALTERNATIVE("nop",
--				 "and %0, %0, %1",
--				 ARM64_HYP_OFFSET_LOW)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
-+	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
-+				    kvm_update_va_mask)
-+		     : "+r" (v));
- 	return v;
- }
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 87c4f7ae24de..93afff91cb7c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,7 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
++config PHY_STM32_USBPHYC
++	tristate "STMicroelectronics STM32 USB HS PHY Controller driver"
++	depends on ARCH_STM32 || COMPILE_TEST
++	select GENERIC_PHY
++	help
++	  Enable this to support the High-Speed USB transceivers that are part
++	  of some STMicroelectronics STM32 SoCs.
++
++	  This driver controls the entire USB PHY block: the USB PHY controller
++	  (USBPHYC) and the two 8-bit wide UTMI+ interfaces. First interface is
++	  used by an HS USB Host controller, and the second one is shared
++	  between an HS USB OTG controller and an HS USB Host controller,
++	  selected by a USB switch.
+diff --git a/drivers/phy/st/Makefile b/drivers/phy/st/Makefile
+index e2adfe2..c0091ad 100644
+--- a/drivers/phy/st/Makefile
++++ b/drivers/phy/st/Makefile
+@@ -2,3 +2,4 @@ obj-$(CONFIG_PHY_MIPHY28LP) 		+= phy-miphy28lp.o
+ obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+ obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+ obj-$(CONFIG_PHY_STIH407_USB)		+= phy-stih407-usb.o
++obj-$(CONFIG_PHY_STM32_USBPHYC) 	+= phy-stm32-usbphyc.o
+diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
 new file mode 100644
-index 000000000000..45e7802328d4
+index 0000000..e1179ce
 --- /dev/null
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -0,0 +1,91 @@
++++ b/drivers/phy/st/phy-stm32-usbphyc.c
+@@ -0,0 +1,382 @@
++// SPDX-Licence-Identifier: GPL-2.0
 +/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ * STMicroelectronics STM32 USB PHY Controller driver
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Copyright (C) 2018 STMicroelectronics
++ * Author(s): Amelie Delaunay <amelie.delaunay@st.com>.
 + */
++#include <linux/bitfield.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/phy/phy.h>
++#include <linux/reset.h>
 +
-+#include <linux/kvm_host.h>
-+#include <asm/alternative.h>
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/kvm_mmu.h>
++#define STM32_USBPHYC_PLL	0x0
++#define STM32_USBPHYC_MISC	0x8
++#define STM32_USBPHYC_VERSION	0x3F4
 +
-+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
-+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
++/* STM32_USBPHYC_PLL bit fields */
++#define PLLNDIV			GENMASK(6, 0)
++#define PLLFRACIN		GENMASK(25, 10)
++#define PLLEN			BIT(26)
++#define PLLSTRB			BIT(27)
++#define PLLSTRBYP		BIT(28)
++#define PLLFRACCTL		BIT(29)
++#define PLLDITHEN0		BIT(30)
++#define PLLDITHEN1		BIT(31)
 +
-+static u64 va_mask;
++/* STM32_USBPHYC_MISC bit fields */
++#define SWITHOST		BIT(0)
 +
-+static void compute_layout(void)
++/* STM32_USBPHYC_VERSION bit fields */
++#define MINREV			GENMASK(3, 0)
++#define MAJREV			GENMASK(7, 4)
++
++#define MAX_PHYS		2
++
++static const char * const stm32_usbphyc_supply_names[] = {
++	"vdda1v1",	/* 1V1 */
++	"vdda1v8",	/* 1V8 */
++};
++
++#define NUM_SUPPLIES		ARRAY_SIZE(stm32_usbphyc_supply_names)
++
++#define PLL_LOCK_TIME_US	100
++#define PLL_PWR_DOWN_TIME_US	5
++#define PLL_FVCO		2880 /* in MHz */
++#define PLL_INFF_MIN_RATE	19200000 /* in Hz */
++#define PLL_INFF_MAX_RATE	38400000 /* in Hz */
++
++struct pll_params {
++	u8 ndiv;
++	u16 frac;
++};
++
++struct stm32_usbphyc {
++	struct device *dev;
++	void __iomem *base;
++	struct clk *clk;
++	struct reset_control *rst;
++	struct regulator_bulk_data supplies[NUM_SUPPLIES];
++	struct stm32_usbphyc_phy {
++		struct phy *phy;
++		int index;
++		bool init;
++	} phys[MAX_PHYS];
++};
++
++static inline struct stm32_usbphyc *
++to_usbphyc(struct stm32_usbphyc_phy *usbphyc_phy)
 +{
-+	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+
-+	/*
-+	 * Activate the lower HYP offset only if the idmap doesn't
-+	 * clash with it,
-+	 */
-+	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
-+		mask = HYP_PAGE_OFFSET_LOW_MASK;
-+
-+	va_mask = mask;
++	return container_of(usbphyc_phy, struct stm32_usbphyc,
++			    phys[usbphyc_phy->index]);
 +}
 +
-+static u32 compute_instruction(int n, u32 rd, u32 rn)
++static inline void stm32_usbphyc_set_bits(void __iomem *reg, u32 bits)
 +{
-+	u32 insn = AARCH64_BREAK_FAULT;
++	writel_relaxed(readl_relaxed(reg) | bits, reg);
++}
 +
-+	switch (n) {
-+	case 0:
-+		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
-+							  AARCH64_INSN_VARIANT_64BIT,
-+							  rn, rd, va_mask);
-+		break;
++static inline void stm32_usbphyc_clr_bits(void __iomem *reg, u32 bits)
++{
++	writel_relaxed(readl_relaxed(reg) & ~bits, reg);
++}
++
++void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
++{
++	unsigned long long fvco, ndiv, frac;
++
++	/*    _
++	 *   | FVCO = INFF*2*(NDIV + FRACT/2^16) when DITHER_DISABLE[1] = 1
++	 *   | FVCO = 2880MHz
++	 *  <
++	 *   | NDIV = integer part of input bits to set the LDF
++	 *   |_FRACT = fractional part of input bits to set the LDF
++	 *  =>	PLLNDIV = integer part of (FVCO / (INFF*2))
++	 *  =>	PLLFRACIN = fractional part of(FVCO / INFF*2) * 2^16
++	 * <=>  PLLFRACIN = ((FVCO / (INFF*2)) - PLLNDIV) * 2^16
++	 */
++	fvco = (unsigned long long)PLL_FVCO * 1000000; /* In Hz */
++
++	ndiv = fvco;
++	do_div(ndiv, (clk_rate * 2));
++	pll_params->ndiv = (u8)ndiv;
++
++	frac = fvco * (1 << 16);
++	do_div(frac, (clk_rate * 2));
++	frac = frac - (ndiv * (1 << 16));
++	pll_params->frac = (u16)frac;
++}
++
++static int stm32_usbphyc_pll_init(struct stm32_usbphyc *usbphyc)
++{
++	struct pll_params pll_params;
++	u32 clk_rate = clk_get_rate(usbphyc->clk);
++	u32 ndiv, frac;
++	u32 usbphyc_pll;
++
++	if ((clk_rate < PLL_INFF_MIN_RATE) || (clk_rate > PLL_INFF_MAX_RATE)) {
++		dev_err(usbphyc->dev, "input clk freq (%dHz) out of range\n",
++			clk_rate);
++		return -EINVAL;
 +	}
 +
-+	return insn;
++	stm32_usbphyc_get_pll_params(clk_rate, &pll_params);
++	ndiv = FIELD_PREP(PLLNDIV, pll_params.ndiv);
++	frac = FIELD_PREP(PLLFRACIN, pll_params.frac);
++
++	usbphyc_pll = PLLDITHEN1 | PLLDITHEN0 | PLLSTRBYP | ndiv;
++
++	if (pll_params.frac)
++		usbphyc_pll |= PLLFRACCTL | frac;
++
++	writel_relaxed(usbphyc_pll, usbphyc->base + STM32_USBPHYC_PLL);
++
++	dev_dbg(usbphyc->dev, "input clk freq=%dHz, ndiv=%lu, frac=%lu\n",
++		clk_rate, FIELD_GET(PLLNDIV, usbphyc_pll),
++		FIELD_GET(PLLFRACIN, usbphyc_pll));
++
++	return 0;
 +}
 +
-+void __init kvm_update_va_mask(struct alt_instr *alt,
-+			       __le32 *origptr, __le32 *updptr, int nr_inst)
++static bool stm32_usbphyc_is_init(struct stm32_usbphyc *usbphyc)
 +{
 +	int i;
 +
-+	/* We only expect a single instruction in the alternative sequence */
-+	BUG_ON(nr_inst != 1);
++	for (i = 0; i < MAX_PHYS; i++) {
++		if (usbphyc->phys[i].init)
++			return true;
++	}
 +
-+	if (!has_vhe() && !va_mask)
-+		compute_layout();
++	return false;
++}
 +
-+	for (i = 0; i < nr_inst; i++) {
-+		u32 rd, rn, insn, oinsn;
++static int stm32_usbphyc_phy_init(struct phy *phy)
++{
++	struct stm32_usbphyc_phy *usbphyc_phy = phy_get_drvdata(phy);
++	struct stm32_usbphyc *usbphyc = to_usbphyc(usbphyc_phy);
++	void __iomem *pll_reg = usbphyc->base + STM32_USBPHYC_PLL;
++	bool pllen = !!(readl_relaxed(pll_reg) & PLLEN);
++	int ret;
 +
-+		/*
-+		 * VHE doesn't need any address translation, let's NOP
-+		 * everything.
-+		 */
-+		if (has_vhe()) {
-+			updptr[i] = aarch64_insn_gen_nop();
-+			continue;
++	/* Check if one phy port has already configured the pll */
++	if (pllen && stm32_usbphyc_is_init(usbphyc))
++		goto initialized;
++
++	if (pllen) {
++		stm32_usbphyc_clr_bits(pll_reg, PLLEN);
++		udelay(PLL_PWR_DOWN_TIME_US);
++	}
++
++	ret = stm32_usbphyc_pll_init(usbphyc);
++	if (ret)
++		return ret;
++
++	stm32_usbphyc_set_bits(pll_reg, PLLEN);
++
++	/* Wait for maximum lock time */
++	udelay(PLL_LOCK_TIME_US);
++
++	if (!(readl_relaxed(pll_reg) & PLLEN)) {
++		dev_err(usbphyc->dev, "PLLEN not set\n");
++		return -EIO;
++	}
++
++initialized:
++	usbphyc_phy->init = true;
++
++	return 0;
++}
++
++static int stm32_usbphyc_phy_exit(struct phy *phy)
++{
++	struct stm32_usbphyc_phy *usbphyc_phy = phy_get_drvdata(phy);
++	struct stm32_usbphyc *usbphyc = to_usbphyc(usbphyc_phy);
++	void __iomem *pll_reg = usbphyc->base + STM32_USBPHYC_PLL;
++
++	usbphyc_phy->init = false;
++
++	/* Check if other phy port requires pllen */
++	if (stm32_usbphyc_is_init(usbphyc))
++		return 0;
++
++	stm32_usbphyc_clr_bits(pll_reg, PLLEN);
++
++	/* Wait for minimum width of powerdown pulse (ENABLE = Low) */
++	udelay(PLL_PWR_DOWN_TIME_US);
++
++	if (readl_relaxed(pll_reg) & PLLEN) {
++		dev_err(usbphyc->dev, "PLL not reset\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int stm32_usbphyc_phy_power_on(struct phy *phy)
++{
++	struct stm32_usbphyc_phy *usbphyc_phy = phy_get_drvdata(phy);
++	struct stm32_usbphyc *usbphyc = to_usbphyc(usbphyc_phy);
++
++	return regulator_bulk_enable(NUM_SUPPLIES, usbphyc->supplies);
++}
++
++static int stm32_usbphyc_phy_power_off(struct phy *phy)
++{
++	struct stm32_usbphyc_phy *usbphyc_phy = phy_get_drvdata(phy);
++	struct stm32_usbphyc *usbphyc = to_usbphyc(usbphyc_phy);
++
++	return regulator_bulk_disable(NUM_SUPPLIES, usbphyc->supplies);
++}
++
++static const struct phy_ops stm32_usbphyc_phy_ops = {
++	.init = stm32_usbphyc_phy_init,
++	.exit = stm32_usbphyc_phy_exit,
++	.power_on = stm32_usbphyc_phy_power_on,
++	.power_off = stm32_usbphyc_phy_power_off,
++	.owner = THIS_MODULE,
++};
++
++static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
++					  struct of_phandle_args *args)
++{
++	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
++
++	if (args->args[0] >= MAX_PHYS)
++		return ERR_PTR(-ENODEV);
++
++	return usbphyc->phys[args->args[0]].phy;
++}
++
++static int stm32_usbphyc_probe(struct platform_device *pdev)
++{
++	struct stm32_usbphyc *usbphyc;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct resource *res;
++	struct phy_provider *phy_provider;
++	u32 utmi_switch, version;
++	int i, ret;
++
++	usbphyc = devm_kzalloc(dev, sizeof(*usbphyc), GFP_KERNEL);
++	if (!usbphyc)
++		return -ENOMEM;
++	usbphyc->dev = dev;
++	dev_set_drvdata(dev, usbphyc);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	usbphyc->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(usbphyc->base))
++		return PTR_ERR(usbphyc->base);
++
++	usbphyc->clk = devm_clk_get(dev, 0);
++	if (IS_ERR(usbphyc->clk)) {
++		ret = PTR_ERR(usbphyc->clk);
++		dev_err(dev, "clk get failed: %d\n", ret);
++		return ret;
++	}
++
++	ret = clk_prepare_enable(usbphyc->clk);
++	if (ret) {
++		dev_err(dev, "clk enable failed: %d\n", ret);
++		return ret;
++	}
++
++	for (i = 0; i < NUM_SUPPLIES; i++)
++		usbphyc->supplies[i].supply = stm32_usbphyc_supply_names[i];
++
++	ret = devm_regulator_bulk_get(dev, NUM_SUPPLIES, usbphyc->supplies);
++	if (ret) {
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "failed to get regulators: %d\n", ret);
++		goto clk_disable;
++	}
++
++	for (i = 0; i < MAX_PHYS; i++) {
++		struct stm32_usbphyc_phy *usbphyc_phy = usbphyc->phys + i;
++
++		usbphyc_phy->phy = devm_phy_create(dev, NULL,
++						   &stm32_usbphyc_phy_ops);
++		if (IS_ERR(usbphyc_phy->phy)) {
++			ret = PTR_ERR(usbphyc_phy->phy);
++			if (ret != -EPROBE_DEFER)
++				dev_err(dev,
++					"failed to create phy%d: %d\n", i, ret);
++			goto clk_disable;
 +		}
 +
-+		oinsn = le32_to_cpu(origptr[i]);
-+		rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
-+		rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
-+
-+		insn = compute_instruction(i, rd, rn);
-+		BUG_ON(insn == AARCH64_BREAK_FAULT);
-+
-+		updptr[i] = cpu_to_le32(insn);
++		usbphyc_phy->index = i;
++		usbphyc_phy->init = false;
++		phy_set_bus_width(usbphyc_phy->phy, 8);
++		phy_set_drvdata(usbphyc_phy->phy, usbphyc_phy);
 +	}
++
++	usbphyc->rst = devm_reset_control_get(dev, 0);
++	if (!IS_ERR(usbphyc->rst)) {
++		reset_control_assert(usbphyc->rst);
++		udelay(2);
++		reset_control_deassert(usbphyc->rst);
++	}
++
++	phy_provider = devm_of_phy_provider_register(dev,
++						     stm32_usbphyc_of_xlate);
++	if (IS_ERR(phy_provider)) {
++		ret = PTR_ERR(phy_provider);
++		dev_err(dev, "failed to register phy provider: %d\n", ret);
++		goto clk_disable;
++	}
++
++	/* Check if need to configure utmi switch */
++	ret = of_property_read_u32(np, "st,utmi-switch", &utmi_switch);
++	if (ret && ret != -EINVAL) {
++		dev_err(dev, "invalid st,utmi-switch value: %d\n", ret);
++		goto clk_disable;
++	}
++	if (utmi_switch == 1)
++		stm32_usbphyc_set_bits(usbphyc->base + STM32_USBPHYC_MISC,
++				       SWITHOST);
++
++	version = readl_relaxed(usbphyc->base + STM32_USBPHYC_VERSION);
++	dev_info(dev, "registered rev:%lu.%lu\n",
++		 FIELD_GET(MAJREV, version), FIELD_GET(MINREV, version));
++
++	return 0;
++
++clk_disable:
++	clk_disable_unprepare(usbphyc->clk);
++
++	return ret;
 +}
++
++static int stm32_usbphyc_remove(struct platform_device *pdev)
++{
++	struct stm32_usbphyc *usbphyc = dev_get_drvdata(&pdev->dev);
++
++	clk_disable_unprepare(usbphyc->clk);
++
++	return 0;
++}
++
++static const struct of_device_id stm32_usbphyc_of_match[] = {
++	{ .compatible = "st,stm32mp1-usbphyc", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, stm32_usbphyc_of_match);
++
++static struct platform_driver stm32_usbphyc_driver = {
++	.probe = stm32_usbphyc_probe,
++	.remove = stm32_usbphyc_remove,
++	.driver = {
++		.of_match_table = stm32_usbphyc_of_match,
++		.name = "stm32-usbphyc",
++	}
++};
++module_platform_driver(stm32_usbphyc_driver);
++
++MODULE_DESCRIPTION("STMicroelectronics STM32 USBPHYC driver");
++MODULE_AUTHOR("Amelie Delaunay <amelie.delaunay@st.com>");
++MODULE_LICENSE("GPL v2");
 -- 
-2.14.2
+2.7.4
