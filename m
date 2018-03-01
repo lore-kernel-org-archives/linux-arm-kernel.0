@@ -1,79 +1,121 @@
-From: yi.l.liu@intel.com (Liu, Yi L)
-Date: Thu, 1 Mar 2018 03:03:25 +0000
-Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
-In-Reply-To: <ca4d4992-0c8b-dae6-e443-7c7f7164be60@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-3-jean-philippe.brucker@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
- <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191003AD6@SHSMSX101.ccr.corp.intel.com>
- <ca4d4992-0c8b-dae6-e443-7c7f7164be60@arm.com>
-Message-ID: <A2975661238FB949B60364EF0F2C257439B829DA@SHSMSX104.ccr.corp.intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 1 Mar 2018 12:18:13 +0900
+Subject: [PATCH v8 03/13] kexec_file,x86,powerpc: factor out
+ kexec_file_ops functions
+In-Reply-To: <20180228123800.GC2228@dhcp-128-65.nay.redhat.com>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-4-takahiro.akashi@linaro.org>
+ <20180223092459.GC4433@dhcp-128-65.nay.redhat.com>
+ <20180226100138.GC6019@linaro.org>
+ <20180228123800.GC2228@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180301031811.GM6019@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
-> From: Jean-Philippe Brucker [mailto:jean-philippe.brucker at arm.com]
-> Sent: Thursday, February 15, 2018 8:41 PM
-> Subject: Re: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+On Wed, Feb 28, 2018 at 08:38:00PM +0800, Dave Young wrote:
+> On 02/26/18 at 07:01pm, AKASHI Takahiro wrote:
+> > On Fri, Feb 23, 2018 at 05:24:59PM +0800, Dave Young wrote:
+> > > Hi AKASHI,
+> > > 
+> > > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
+> > > > As arch_kexec_kernel_*_{probe,load}(), arch_kimage_file_post_load_cleanup()
+> > > > and arch_kexec_kernel_verify_sg can be parameterized with a kexec_file_ops
+> > > > array and now duplicated among some architectures, let's factor them out.
+> > > > 
+> > > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > Cc: Dave Young <dyoung@redhat.com>
+> > > > Cc: Vivek Goyal <vgoyal@redhat.com>
+> > > > Cc: Baoquan He <bhe@redhat.com>
+> > > > Cc: Michael Ellerman <mpe@ellerman.id.au>
+> > > > Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+> > > > ---
+> > > >  arch/powerpc/include/asm/kexec.h            |  2 +-
+> > > >  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
+> > > >  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++------------------
+> > > >  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
+> > > >  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
+> > > >  arch/x86/kernel/machine_kexec_64.c          | 45 +----------------------
+> > > >  include/linux/kexec.h                       | 15 ++++----
+> > > >  kernel/kexec_file.c                         | 57 +++++++++++++++++++++++++++--
+> > > >  8 files changed, 70 insertions(+), 94 deletions(-)
+> > > > 
+> > > 
+> > > [snip]
+> > > 
+> > > > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > > > index 990adae52151..a6d14a768b3e 100644
+> > > > --- a/kernel/kexec_file.c
+> > > > +++ b/kernel/kexec_file.c
+> > > > @@ -26,34 +26,83 @@
+> > > >  #include <linux/vmalloc.h>
+> > > >  #include "kexec_internal.h"
+> > > >  
+> > > > +const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+> > > > +
+> > > >  #ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
+> > > >  static int kexec_calculate_store_digests(struct kimage *image);
+> > > >  #else
+> > > >  static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
+> > > >  #endif
+> > > >  
+> > > > +int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > > +			     unsigned long buf_len)
+> > > > +{
+> > > > +	const struct kexec_file_ops * const *fops;
+> > > > +	int ret = -ENOEXEC;
+> > > > +
+> > > > +	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
+> > > > +		ret = (*fops)->probe(buf, buf_len);
+> > > > +		if (!ret) {
+> > > > +			image->fops = *fops;
+> > > > +			return ret;
+> > > > +		}
+> > > > +	}
+> > > > +
+> > > > +	return ret;
+> > > > +}
+> > > > +
+> > > >  /* Architectures can provide this probe function */
+> > > >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+> > > >  					 unsigned long buf_len)
+> > > >  {
+> > > > -	return -ENOEXEC;
+> > > > +	return _kexec_kernel_image_probe(image, buf, buf_len);
+> > > 
+> > > 
+> > > I vaguely remember previously I suggest split the _kexec_kernel_image_probe
+> > > because arch code can call them, and common code also use it like above.
+> > > But in your new series I do not find where else calls this function
+> > > except the common code arch_kexec_kernel_image_probe.  If nobody use
+> > > them then it is not worth to split them out, it is better to just embed
+> > > them in the __weak functions.
+> > 
+> > Powerpc's arch_kexec_kernel_image_probe() uses
+> > _kexec_kekrnel_image_probe() as it needs an extra check to rule out
+> > crash dump for now.
 > 
-> On 13/02/18 23:34, Tian, Kevin wrote:
-> >> From: Jean-Philippe Brucker
-> >> Sent: Tuesday, February 13, 2018 8:57 PM
-> >>
-> >> On 13/02/18 07:54, Tian, Kevin wrote:
-> >>>> From: Jean-Philippe Brucker
-> >>>> Sent: Tuesday, February 13, 2018 2:33 AM
-> >>>>
-> >>>> Add bind() and unbind() operations to the IOMMU API. Device drivers
-> >> can
-> >>>> use them to share process page tables with their devices.
-> >>>> bind_group() is provided for VFIO's convenience, as it needs to
-> >>>> provide a coherent interface on containers. Other device drivers
-> >>>> will most likely want to use bind_device(), which binds a single device in the
-> group.
-> >>>
-> >>> I saw your bind_group implementation tries to bind the address space
-> >>> for all devices within a group, which IMO has some problem. Based on
-> >> PCIe
-> >>> spec, packet routing on the bus doesn't take PASID into consideration.
-> >>> since devices within same group cannot be isolated based on
-> >>> requestor-
-> >> ID
-> >>> i.e. traffic not guaranteed going to IOMMU, enabling SVA on multiple
-> >> devices
-> >>> could cause undesired p2p.
-> >> But so does enabling "classic" DMA... If two devices are not
-> >> protected by ACS for example, they are put in the same IOMMU group,
-> >> and one device might be able to snoop the other's DMA. VFIO allows
-> >> userspace to create a container for them and use MAP/UNMAP, but makes
-> >> it explicit to the user that for DMA, these devices are not isolated
-> >> and must be considered as a single device (you can't pass them to
-> >> different VMs or put them in different containers). So I tried to
-> >> keep the same idea as MAP/UNMAP for SVA, performing BIND/UNBIND
-> >> operations on the VFIO container instead of the device.
-> >
-> > there is a small difference. for classic DMA we can reserve PCI BARs
-> > when allocating IOVA, thus multiple devices in the same group can
-> > still work correctly applied with same translation, if isolation is
-> > not cared in between. However for SVA it's CPU virtual addresses
-> > managed by kernel mm thus difficult to introduce similar address
-> > reservation. Then it's possible for a VA falling into other device's
-> > BAR in the same group and cause undesired p2p traffic. In such regard,
-> > SVA is actually functionally-broken.
+> Oops, I missed that, but what about other similar functions? Such as:
+> _kexec_kernel_image_load
+> _kimage_file_post_load_cleanup
+> _kexec_kernel_verify_sig
+
+Current no users.
+Given those functions are so simple, we could go either way.
+
+-Takahiro AKASHI
+
+
+> > 
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> > 
+> > > Ditto for other similar functions.
+> > > 
+> > > [snip]
+> > > 
+> > > Thanks
+> > > Dave
 > 
-> I think the problem exists even if there is a single device in the group.
-> If for example, malloc() returns a VA that corresponds to a PCI host bridge in IOVA
-> space, performing DMA on that buffer won't reach the IOMMU and will cause
-> undesirable side-effects.
-
-If only a single device in a group, should it mean there is ACS support in
-the path from this device to root complex? It means any memory request
-from this device would be upstreamed to root complex, thus it should be
-able to avoid undesired p2p traffics. So I intend to believe, even we do
-bind in group level, we actually expect to make it work only for the case
-where a single device within a group.
-
-Thanks,
-Yi Liu
+> Thanks
+> Dave
