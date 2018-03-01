@@ -1,88 +1,37 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu, 1 Mar 2018 13:15:44 +0100
-Subject: [PATCH 1/6] phy: rockchip-typec: fall back to working in
- host-mode if extcon is missing.
-In-Reply-To: <5052573.JZoBBeufta@diego>
-References: <20180301092420.1191-1-enric.balletbo@collabora.com>
- <20180301092420.1191-2-enric.balletbo@collabora.com>
- <5052573.JZoBBeufta@diego>
-Message-ID: <38900733-42c3-4b53-74c9-30356f01d46d@collabora.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu,  1 Mar 2018 20:18:47 +0800
+Subject: [PATCH RESEND] arm64: dts: hi6220: enable watchdog
+Message-ID: <1519906727-11135-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+From: Dmitry Shmidt <dimitrysh@google.com>
 
-On 01/03/18 10:45, Heiko St?bner wrote:
-> Am Donnerstag, 1. M?rz 2018, 10:24:15 CET schrieb Enric Balletbo i Serra:
->> Right now the rockchip typec-phy does fail probing when no extcon is
->> detected. Some boards get the cable-state via the extcon interface and
->> have this supported, other boards seem to use the fusb302 chip or
->> another but the driver currently does not seem to utilize the extcon
->> interface to report the cable-state. That's required to detect
->> cable-state changes but a missing extcon shouldn't fail to probe,
->> instead, should just fall back to working in host-mode if it cannot get
->> the extcon.
-> 
-> And of course:
-> Some boards use no controller at all and just connect the type-c to a
-> standard USB-A port.
-> 
->> Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
->> support for rk3399") Reported-by: Vicente Bergas <vicencb@gmail.com>
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
->>
->>  drivers/phy/rockchip/phy-rockchip-typec.c | 9 ++++++---
->>  1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
->> b/drivers/phy/rockchip/phy-rockchip-typec.c index
->> 7492c8978217..3741afab5cd2 100644
->> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
->> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
->> @@ -782,6 +782,9 @@ static int tcphy_get_mode(struct rockchip_typec_phy
->> *tcphy) u8 mode;
->>  	int ret;
->>
->> +	if (!edev)
->> +		return MODE_DFP_USB;
->> +
->>  	ufp = extcon_get_state(edev, EXTCON_USB);
->>  	dp = extcon_get_state(edev, EXTCON_DISP_DP);
->>
->> @@ -1115,9 +1118,9 @@ static int rockchip_typec_phy_probe(struct
->> platform_device *pdev)
->>
->>  	tcphy->extcon = extcon_get_edev_by_phandle(dev, 0);
->>  	if (IS_ERR(tcphy->extcon)) {
->> -		if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
->> -			dev_err(dev, "Invalid or missing extcon\n");
->> -		return PTR_ERR(tcphy->extcon);
->> +		if (PTR_ERR(tcphy->extcon) == -EPROBE_DEFER)
->> +			return PTR_ERR(tcphy->extcon);
->> +		tcphy->extcon = NULL;
-> 
-> Do we want to keep a bit of the error handling of extcon, a la
-> 
-> +		if (PTR_ERR(tcphy->extcon) == -ENODEV) {
-> +			tcphy->extcon = NULL;
-> +		} else {
-> +			if (PTR_ERR(tcphy->extcon) != -EPROBE_DEFER)
-> +				dev_err(dev, "Invalid or extcon\n");
-> +			return PTR_ERR(tcphy->extcon);
-> +		}
-> 
-> So only make it NULL, if extcon really reports ENODEV?
-> 
+This patch is to add watchdog binding for Hi6220 on Hikey board.
 
-Sounds good to me, I'll send a second version ASAP, so people can test it with
-that change applied.
+Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Thanks for the feedback.
-
-Regards,
- Enric
-
-> 
-> Heiko
-> 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 6a180d1..e9d5bb6 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -817,6 +817,14 @@
+ 			pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle>;
+ 		};
+ 
++		watchdog0: watchdog at f8005000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xf8005000 0x0 0x1000>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ao_ctrl HI6220_WDT0_PCLK>;
++			clock-names = "apb_pclk";
++		};
++
+ 		tsensor: tsensor at 0,f7030700 {
+ 			compatible = "hisilicon,tsensor";
+ 			reg = <0x0 0xf7030700 0x0 0x1000>;
+-- 
+2.7.4
