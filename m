@@ -1,101 +1,112 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 1 Mar 2018 10:57:40 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-In-Reply-To: <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
-Message-ID: <8f328063-610f-a2e8-5f29-d3f0019384f2@st.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 1 Mar 2018 10:59:48 +0100
+Subject: [PATCH] PM / core: move device and its children to end of dpm list
+In-Reply-To: <1519843555-982-1-git-send-email-fkan@apm.com>
+References: <1519843555-982-1-git-send-email-fkan@apm.com>
+Message-ID: <CAJZ5v0jMOLSEzC9F67TJpgP6Z0JN1dr2uwjfrNfwDkTR8OVGyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf
+On Wed, Feb 28, 2018 at 7:45 PM, Feng Kan <fkan@apm.com> wrote:
+> When bridge and its endpoint is enumated the devices are added to the
+> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> This causes the bridge to be moved to the end of the dpm list when deferred
+> probe kicks in. The order of the dpm list for bridge and endpoint is
+> reversed.
+>
+> Add reordering code to re-position the bridge and its children so the order
+> for suspend and resume is not altered.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Toan Le <toanle@apm.com>
+> ---
+>  drivers/base/core.c    | 20 ++++++++++++++++++++
+>  drivers/base/dd.c      |  8 ++++----
+>  include/linux/device.h |  3 +++
+>  3 files changed, 27 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 110230d..0b4ad99 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>  }
+>
+>  /**
+> + * device_pm_reorder - reorder device and its children to end of dpm list
 
-On 03/01/2018 10:06 AM, Ulf Hansson wrote:
-> Hi Ludovic,
-> 
-> On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch serie adds support of stm32 SDMMC controller.
->> stm32h7 is the first SoC to use stm32 SDMMC controller
->> (previous SoC had pl180 controller).
-> 
-> I am a not convinced this isn't a new improved variant of the pl180.
-> According to register layout and the code you submitted in patch2,
-> there are great similarities to pl180 and the mmci driver.
+Not just the children and not just dpm_list.
 
-In fact, ST designers which created stm32-sdmmc hardware block from 
-scratch are the same which have done the modifications on pl180 variant 
-(stm32 legacy f4, f7).
-So some registers or bits name seem identical (or strongly inspirited) 
-but the engine and features are different.
+> + * @dev: current device pointer
+> + *
+> + * This is a lock held version of reordering the device to dpm list tail.
+> + * This will move the device to the end of the dpm list if it not registered.
+> + * Afterward, it will iterate through its children and do the same for them.
 
-You could find the datasheet of STM32H7x3 on:
-http://www.st.com/content/ccc/resource/technical/document/reference_manual/group0/c9/a3/76/fa/55/46/45/fa/DM00314099/files/DM00314099.pdf/jcr:content/translations/en.DM00314099.pdf
+This isn't entirely accurate as device_reorder_to_tail() does more than that.
 
-Chapters: 55 Secure digital input/output MultiMediaCard interface
-(SDMMC)
+> + */
+> +void device_pm_reorder(struct device *dev)
 
-This hardware block has own roadmap and some features are already in the 
-pipe for next SoC.
+I'd call it device_pm_move_to_tail() as that's what it does.
 
-For code design: like I also worked on pl180 in the past :-)
-my code is inspirited of this driver.
+"Reorder" is sort of overly generic IMO.
 
-BR
-Ludo
+> +{
+> +       int idx;
+> +
+> +       idx = device_links_read_lock();
+> +       device_pm_lock();
+> +       device_reorder_to_tail(dev, NULL);
+> +       device_pm_unlock();
+> +       device_links_read_unlock(idx);
+> +}
+> +EXPORT_SYMBOL_GPL(device_pm_reorder);
 
-> 
-> In other words, it more sounds like an improved variant of pl180,
-> hence I am thinking that you should try to extend the mmci driver
-> instead. Could you please have a look at that, unless you can specify
-> more exactly why that isn't suitable?
-> 
->>
->> The SDMMC features include the following:
->> -Full compliance with MultiMediaCard System Specification Version 4.51.
->>   Card support for three different databus modes:
->>   1-bit (default), 4-bit and 8-bit.
->> -Full compliance with SD memory card specifications version 4.1.
->>   SDR104 speed limited to maximum allowed I/O speed, SPI mode and
->>   UHS-II mode not supported.
->> -Full compliance with SDIO card specification version 4.0.
->>
->> change V2:
->> -dt-bindings: properties name
->> st,dir-output-high; st,neg-edge; st,use-ckin
->> -dt-bindings: node example s/sdmmc@/mmc@/g
->> -removes return of enable/disable_imask functions
->> -adds dev_warn if clk divisor is too short.
->> -replaces overprotection of n_elem by fail of dma_map_sg
->> -removes shortcut host->base
->> -Use device_property_present
->>
->> Ludovic Barre (5):
->>    dt-bindings: mmc: document the stm32 sdmmc bindings
->>    mmc: add stm32 sdmmc controller driver
->>    ARM: dts: stm32: add sdmmc support for stm32h743
->>    ARM: dts: stm32: add sdmmc1 support for stm32h743i-eval
->>    ARM: configs: stm32: add mmc and ext2/3/4 support
->>
->>   .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     |  35 +
->>   arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  26 +
->>   arch/arm/boot/dts/stm32h743.dtsi                   |  26 +
->>   arch/arm/boot/dts/stm32h743i-eval.dts              |  11 +
->>   arch/arm/configs/stm32_defconfig                   |   4 +-
->>   drivers/mmc/host/Kconfig                           |   8 +
->>   drivers/mmc/host/Makefile                          |   1 +
->>   drivers/mmc/host/stm32-sdmmc.c                     | 708 +++++++++++++++++++++
->>   drivers/mmc/host/stm32-sdmmc.h                     | 220 +++++++
->>   9 files changed, 1038 insertions(+), 1 deletion(-)
->>   create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
->>   create mode 100644 drivers/mmc/host/stm32-sdmmc.c
->>   create mode 100644 drivers/mmc/host/stm32-sdmmc.h
->>
->> --
->> 2.7.4
->>
-> 
-> Kind regards
-> Uffe
-> 
+It is not necessary to export this symbol.
+
+> +
+> +/**
+>   * device_link_add - Create a link between two devices.
+>   * @consumer: Consumer end of the link.
+>   * @supplier: Supplier end of the link.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 2c964f5..3223a30 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+>                  * Force the device to the end of the dpm_list since
+>                  * the PM code assumes that the order we add things to
+>                  * the list is a good order for suspend but deferred
+> -                * probe makes that very unsafe.
+> +                * probe makes that very unsafe. Also move any children
+> +                * belong to the device to the end of the list as well.
+> +                * This way the suspend resume order won't be corrupted.
+>                  */
+> -               device_pm_lock();
+> -               device_pm_move_last(dev);
+> -               device_pm_unlock();
+> +               device_pm_reorder(dev);
+>
+>                 dev_dbg(dev, "Retrying from deferred list\n");
+>                 if (initcall_debug && !initcalls_done)
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 9d32000..1ec12d5 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -1272,6 +1272,9 @@ extern void devm_device_remove_group(struct device *dev,
+>  /* debugging and troubleshooting/diagnostic helpers. */
+>  extern const char *dev_driver_string(const struct device *dev);
+>
+> +/* reorder device and its children to end of dpm list */
+> +void device_pm_reorder(struct device *dev);
+
+And this header can go into drivers/base/base.h as Bjorn said.
+
+> +
+>  /* Device links interface. */
+>  struct device_link *device_link_add(struct device *consumer,
+>                                     struct device *supplier, u32 flags);
+> --
+> 1.8.3.1
+>
