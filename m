@@ -1,71 +1,172 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Mar 2018 09:43:55 +0100
-Subject: [PATCH] arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs,
- wifi reset)
-In-Reply-To: <20180227204711.29357-1-dianders@chromium.org>
-References: <20180227204711.29357-1-dianders@chromium.org>
-Message-ID: <3831527.HjPPvuL6zK@diego>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 1 Mar 2018 08:47:01 +0000
+Subject: [PATCH v3] usb: host: ehci-platform: add support for optional
+ external vbus supply
+In-Reply-To: <0d16deee-1fa9-322e-4d6d-b1b023f5b2b9@ti.com>
+References: <1519393611-31367-1-git-send-email-amelie.delaunay@st.com>
+ <0d16deee-1fa9-322e-4d6d-b1b023f5b2b9@ti.com>
+Message-ID: <7ea76bf6-49b5-dd69-7764-398ddd88b088@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 27. Februar 2018, 21:47:11 CET schrieb Douglas Anderson:
-> Back in the early days when gru devices were still under development
-> we found an issue where the WiFi reset line needed to be configured as
-> early as possible during the boot process to avoid the WiFi module
-> being in a bad state.
-> 
-> We found that the way to get the kernel to do this in the earliest
-> possible place was to configure this line in the pinctrl hogs, so
-> that's what we did.  For some history here you can see
-> <http://crosreview.com/368770>.  After the time that change landed in
-> the kernel, we landed a firmware change to configure this line even
-> earlier.  See <http://crosreview.com/399919>.  However, even after the
-> firmware change landed we kept the kernel change to deal with the fact
-> that some people working on devices might take a little while to
-> update their firmware.
-> 
-> At this there are definitely zero devices out in the wild that have
-> firmware without the fix in it.  Specifically looking in the firmware
-> branch several critically important fixes for memory stability landed
-> after the patch in coreboot and I know we didn't ship without those.
-> Thus, by now, everyone should have the new firmware and it's safe to
-> not have the kernel set this up in a pinctrl hog.
-> 
-> Historically, even though it wasn't needed to have this in a pinctrl
-> hog, we still kept it since it didn't hurt.  Pinctrl would apply the
-> default hog at bootup and then would never touch things again.  That
-> all changed with commit 981ed1bfbc6c ("pinctrl: Really force states
-> during suspend/resume").  After that commit then we'll re-apply the
-> default hog at resume time and that can screw up the reset state of
-> WiFi.  ...and on rk3399 if you touch a device on PCIe in the wrong way
-> then the whole system can go haywire.  That's what was happening.
-> Specifically you'd resume a rk3399-gru-* device and it would mostly
-> resume, then would crash with some crazy weird crash.
-> 
-> One could say, perhaps, that the recent pinctrl change was at fault
-> (and should be fixed) since it changed behavior.  ...but that's not
-> really true.  The device tree for rk3399-gru is really to blame.
-> Specifically since the pinctrl is defined in the hog and not in the
-> "wlan-pd-n" node then the actual user of this pin doesn't have a
-> pinctrl entry for it.  That's bad.
-> 
-> Let's fix our problems by just moving the control of
-> "wlan_module_reset_l pinctrl" out of the hog and put them in the
-> proper place.
-> 
-> NOTE: in theory, I think it should actually be possible to have a pin
-> controlled _both_ by the hog and by an actual device.  Once the device
-> claims the pin I think the hog is supposed to let go.  I'm not 100%
-> sure that this works and in any case this solution would be more
-> complex than is necessary.
-> 
-> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> Fixes: 48f4d9796d99 ("arm64: dts: rockchip: add Gru/Kevin DTS")
-> Fixes: 981ed1bfbc6c ("pinctrl: Really force states during suspend/resume")
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Hi Roger,
 
-applied as fix for 4.16 with the 2 Tested-tags
+On 02/28/2018 12:01 PM, Roger Quadros wrote:
+> Hi Amelie,
+> 
+> On 23/02/18 15:46, Amelie Delaunay wrote:
+>> On some boards, especially when vbus supply requires large current,
+>> and the charge pump on the PHY isn't enough, an external vbus power switch
+>> may be used.
+>> Add support for optional external vbus supply per port in ehci-platform.
+>>
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>>
+>> ---
+>> Changes in v3:
+>>   * Address Felipe Balbi comments: reduce indentation in
+>>     ehci_platform_port_power.
+>>   * Address Roger Quadros and Alan Stern comments: platforms can have one
+>>     external vbus supply per port, so add support to get as many optional
+>>     regulator as implemented ports on the host controller.
+>>
+>> Changes in v2:
+>>   * Address Roger Quadros comments: move regulator_enable/disable from
+>>     ehci_platform_power_on/off to ehci_platform_port_power.
+>> ---
+>>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
+>>   drivers/usb/host/ehci-platform.c                   | 52 +++++++++++++++++++++-
+>>   2 files changed, 52 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index 3efde12..cd576db 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -19,6 +19,7 @@ Optional properties:
+>>    - phys : phandle + phy specifier pair
+>>    - phy-names : "usb"
+>>    - resets : phandle + reset specifier pair
+>> + - portN_vbus-supply : phandle of regulator supplying vbus for port N
+>>   
+>>   Example (Sequoia 440EPx):
+>>       ehci at e0000300 {
+> 
+> Sorry for not pointing this out earlier but I think patch to DT bindings
+> should come separately (before the driver changes) with the following subject.
+> 
+> "dt-bindings: usb: ehci: <subject>"
+> 
+> 
 
+Ok, I prepare a v4 with this split. Thanks!
 
-Thanks
-Heiko
+>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+>> index b065a96..8e9f201 100644
+>> --- a/drivers/usb/host/ehci-platform.c
+>> +++ b/drivers/usb/host/ehci-platform.c
+>> @@ -29,6 +29,7 @@
+>>   #include <linux/of.h>
+>>   #include <linux/phy/phy.h>
+>>   #include <linux/platform_device.h>
+>> +#include <linux/regulator/consumer.h>
+>>   #include <linux/reset.h>
+>>   #include <linux/usb.h>
+>>   #include <linux/usb/hcd.h>
+>> @@ -46,6 +47,7 @@ struct ehci_platform_priv {
+>>   	struct reset_control *rsts;
+>>   	struct phy **phys;
+>>   	int num_phys;
+>> +	struct regulator **vbus_supplies;
+>>   	bool reset_on_resume;
+>>   };
+>>   
+>> @@ -56,7 +58,8 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+>>   	struct platform_device *pdev = to_platform_device(hcd->self.controller);
+>>   	struct usb_ehci_pdata *pdata = dev_get_platdata(&pdev->dev);
+>>   	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+>> -	int retval;
+>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+>> +	int portnum, n_ports, retval;
+>>   
+>>   	ehci->has_synopsys_hc_bug = pdata->has_synopsys_hc_bug;
+>>   
+>> @@ -71,11 +74,57 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+>>   	if (retval)
+>>   		return retval;
+>>   
+>> +	n_ports = HCS_N_PORTS(ehci->hcs_params);
+>> +	priv->vbus_supplies = devm_kcalloc(&pdev->dev, n_ports,
+>> +					   sizeof(struct regulator *),
+>> +					   GFP_KERNEL);
+>> +	if (!priv->vbus_supplies)
+>> +		return -ENOMEM;
+>> +
+>> +	for (portnum = 0; portnum < n_ports; portnum++) {
+>> +		struct regulator *vbus_supply;
+>> +		char id[20];
+>> +
+>> +		sprintf(id, "port%d_vbus", portnum);
+>> +
+>> +		vbus_supply = devm_regulator_get_optional(&pdev->dev, id);
+>> +		if (IS_ERR(vbus_supply)) {
+>> +			retval = PTR_ERR(vbus_supply);
+>> +			if (retval == -ENODEV)
+>> +				priv->vbus_supplies[portnum] = NULL;
+>> +			else
+>> +				return retval;
+>> +		} else {
+>> +			priv->vbus_supplies[portnum] = vbus_supply;
+>> +		}
+>> +	}
+>> +
+>>   	if (pdata->no_io_watchdog)
+>>   		ehci->need_io_watchdog = 0;
+>>   	return 0;
+>>   }
+>>   
+>> +static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
+>> +				    bool enable)
+>> +{
+>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+>> +	int ret;
+>> +
+>> +	if (!priv->vbus_supplies[portnum])
+>> +		return 0;
+>> +
+>> +	if (enable)
+>> +		ret = regulator_enable(priv->vbus_supplies[portnum]);
+>> +	else
+>> +		ret = regulator_disable(priv->vbus_supplies[portnum]);
+> 
+> A newline could be used here.
+> 
+
+Ok.
+
+>> +	if (ret)
+>> +		dev_err(hcd->self.controller,
+>> +			"failed to %s vbus supply for port %d: %d\n",
+>> +			enable ? "enable" : "disable", portnum, ret);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>   static int ehci_platform_power_on(struct platform_device *dev)
+>>   {
+>>   	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>> @@ -134,6 +183,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
+>>   static const struct ehci_driver_overrides platform_overrides __initconst = {
+>>   	.reset =		ehci_platform_reset,
+>>   	.extra_priv_size =	sizeof(struct ehci_platform_priv),
+>> +	.port_power =		ehci_platform_port_power,
+>>   };
+>>   
+>>   static struct usb_ehci_pdata ehci_platform_defaults = {
+>>
+> 
+> Otherwise, looks good to me. So,
+> 
+> Reviewed-by: Roger Quadros <rogerq@ti.com>
+> 
+
+Thanks!
