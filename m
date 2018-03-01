@@ -1,70 +1,33 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 1 Mar 2018 09:45:24 +0000
-Subject: Clang build of arm64 kernel fails
-In-Reply-To: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
-References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
-Message-ID: <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 1 Mar 2018 10:29:33 +0100
+Subject: [PATCH v3 5/7] clk: sunxi-ng: add support for the Allwinner H6 CCU
+In-Reply-To: <20180223123555.64009-6-icenowy@aosc.io>
+References: <20180223123555.64009-6-icenowy@aosc.io>
+Message-ID: <20180301092933.eqibjnepoj3ecvo6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
-
-On 28/02/18 19:32, Andrey Konovalov wrote:
-> Hi Marc!
+On Fri, Feb 23, 2018 at 08:35:53PM +0800, Icenowy Zheng wrote:
+> The Allwinner H6 SoC has a CCU which has been largely rearranged.
 > 
-> I've tried to pull in new upstream commits and the kernel build
-> started failing for me with the following errors (see below).
+> Add support for it in the sunxi-ng CCU framework.
 > 
-> It seems that the reason is your commit "arm64: Add
-> ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
-> doesn't like 32 bits registers being used in 64 bits build.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I'd say this is really a bug in Clang. Architecturally, the register in 
-AArch64 state is still named "r0"; "x0"/"w0" are assembler operands 
-which additionally encode the size of the corresponding *access* to r0.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-I note that GCC's documentation on register variables[1] does just say 
-"the name of the register", which implies this code is not incorrect. 
-Given that Clang already likes to infer the operand size from the 
-argument type in actual inline asms, it seems funny that its register 
-allocator should care in this non-instruction context.
+Thanks!
+Maxime
 
-> Would you mind sending a fix?
-
-That said, I guess it's a bug we might have to work around anyway. Oh well.
-
-Robin.
-
-[1] 
-https://gcc.gnu.org/onlinedocs/gcc/Global-Register-Variables.html#Global-Register-Variables
-
-> 
-> Thanks!
-> 
-> arch/arm64/kernel/cpu_errata.c:156:2: error: unknown register name 'r0' in asm
->          arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
->          ^
-> ./include/linux/arm-smccc.h:276:32: note: expanded from macro
-> 'arm_smccc_1_1_smc'
-> #define arm_smccc_1_1_smc(...)  __arm_smccc_1_1(SMCCC_SMC_INST, __VA_ARGS__)
->                                  ^
-> ./include/linux/arm-smccc.h:255:3: note: expanded from macro '__arm_smccc_1_1'
->                  __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
->                  ^
-> ./include/linux/arm-smccc.h:240:37: note: expanded from macro '__declare_args'
-> #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
->                                      ^
-> ./include/linux/arm-smccc.h:239:37: note: expanded from macro '___declare_args'
-> #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
->                                      ^
-> <scratch space>:136:1: note: expanded from here
-> __declare_arg_0
-> ^
-> ./include/linux/arm-smccc.h:197:32: note: expanded from macro '__declare_arg_0'
->          register u32           r0 asm("r0") = a0;
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180301/06437b74/attachment.sig>
