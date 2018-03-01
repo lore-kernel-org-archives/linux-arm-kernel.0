@@ -1,20 +1,21 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Thu,  1 Mar 2018 20:54:14 +0800
-Subject: [PATCH 37/45] arm/arm64: KVM: Turn kvm_psci_version into a static
- inline
+Date: Thu,  1 Mar 2018 20:54:12 +0800
+Subject: [PATCH 35/45] arm/arm64: KVM: Advertise SMCCC v1.1
 In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
 References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
-Message-ID: <1519908862-11425-38-git-send-email-alex.shi@linaro.org>
+Message-ID: <1519908862-11425-36-git-send-email-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit a4097b351118 upstream.
+commit 09e6be12effd upstream.
 
-We're about to need kvm_psci_version in HYP too. So let's turn it
-into a static inline, and pass the kvm structure as a second
-parameter (so that HYP can do a kern_hyp_va on it).
+The new SMC Calling Convention (v1.1) allows for a reduced overhead
+when calling into the firmware, and provides a new feature discovery
+mechanism.
+
+Make it visible to KVM guests.
 
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
@@ -23,124 +24,127 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/kvm/psci.c         | 12 ++----------
- arch/arm64/kvm/hyp/switch.c | 20 ++++++++++++--------
- include/kvm/arm_psci.h      | 21 ++++++++++++++++++++-
- 3 files changed, 34 insertions(+), 19 deletions(-)
+ arch/arm/kvm/handle_exit.c   |  2 +-
+ arch/arm/kvm/psci.c          | 24 +++++++++++++++++++++++-
+ arch/arm64/kvm/handle_exit.c |  2 +-
+ include/kvm/arm_psci.h       |  2 +-
+ include/linux/arm-smccc.h    | 13 +++++++++++++
+ 5 files changed, 39 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index 0a2b758..de1aedc 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -36,7 +36,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		      kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
+ 
+-	ret = kvm_psci_call(vcpu);
++	ret = kvm_hvc_call_handler(vcpu);
+ 	if (ret < 0) {
+ 		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 7b44253..396eb5d 100644
+index 097632c..7b44253 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -121,7 +121,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	if (!vcpu)
- 		return PSCI_RET_INVALID_PARAMS;
- 	if (!vcpu->arch.power_off) {
--		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
-+		if (kvm_psci_version(source_vcpu, kvm) != KVM_ARM_PSCI_0_1)
- 			return PSCI_RET_ALREADY_ON;
- 		else
- 			return PSCI_RET_INVALID_PARAMS;
-@@ -231,14 +231,6 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
- 	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
- }
- 
--int kvm_psci_version(struct kvm_vcpu *vcpu)
--{
--	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
--		return KVM_ARM_PSCI_LATEST;
--
--	return KVM_ARM_PSCI_0_1;
--}
--
- static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
-@@ -396,7 +388,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+@@ -15,6 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
- static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ 
++#include <linux/arm-smccc.h>
+ #include <linux/preempt.h>
+ #include <linux/kvm_host.h>
+ #include <linux/wait.h>
+@@ -338,6 +339,7 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
+ 		case PSCI_0_2_FN_SYSTEM_OFF:
+ 		case PSCI_0_2_FN_SYSTEM_RESET:
+ 		case PSCI_1_0_FN_PSCI_FEATURES:
++		case ARM_SMCCC_VERSION_FUNC_ID:
+ 			val = 0;
+ 			break;
+ 		default:
+@@ -392,7 +394,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+  * Errors:
+  * -EINVAL: Unrecognized PSCI function
+  */
+-int kvm_psci_call(struct kvm_vcpu *vcpu)
++static int kvm_psci_call(struct kvm_vcpu *vcpu)
  {
--	switch (kvm_psci_version(vcpu)) {
-+	switch (kvm_psci_version(vcpu, vcpu->kvm)) {
+ 	switch (kvm_psci_version(vcpu)) {
  	case KVM_ARM_PSCI_1_0:
- 		return kvm_psci_1_0_call(vcpu);
- 	case KVM_ARM_PSCI_0_2:
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 3eab6ac..996328e 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -19,6 +19,8 @@
- #include <linux/jump_label.h>
- #include <uapi/linux/psci.h>
- 
-+#include <kvm/arm_psci.h>
+@@ -405,3 +407,23 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
+ 		return -EINVAL;
+ 	};
+ }
 +
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-@@ -311,14 +313,16 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 
- 	if (exit_code == ARM_EXCEPTION_TRAP &&
- 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
--	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
--	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
--		u64 val = PSCI_RET_NOT_SUPPORTED;
--		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
--			val = 2;
--
--		vcpu_set_reg(vcpu, 0, val);
--		goto again;
-+	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32)) {
-+		u32 val = vcpu_get_reg(vcpu, 0);
++int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
++{
++	u32 func_id = smccc_get_function(vcpu);
++	u32 val = PSCI_RET_NOT_SUPPORTED;
 +
-+		if (val == PSCI_0_2_FN_PSCI_VERSION) {
-+			val = kvm_psci_version(vcpu, kern_hyp_va(vcpu->kvm));
-+			if (unlikely(val == KVM_ARM_PSCI_0_1))
-+				val = PSCI_RET_NOT_SUPPORTED;
-+			vcpu_set_reg(vcpu, 0, val);
-+			goto again;
-+		}
- 	}
++	switch (func_id) {
++	case ARM_SMCCC_VERSION_FUNC_ID:
++		val = ARM_SMCCC_VERSION_1_1;
++		break;
++	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
++		/* Nothing supported yet */
++		break;
++	default:
++		return kvm_psci_call(vcpu);
++	}
++
++	smccc_set_retval(vcpu, val, 0, 0, 0);
++	return 1;
++}
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 0231ebc..d4047fc 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -43,7 +43,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			    kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
  
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+-	ret = kvm_psci_call(vcpu);
++	ret = kvm_hvc_call_handler(vcpu);
+ 	if (ret < 0) {
+ 		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
 diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index ed1dd80..e518e4e 100644
+index 3236043..ed1dd80 100644
 --- a/include/kvm/arm_psci.h
 +++ b/include/kvm/arm_psci.h
-@@ -18,6 +18,7 @@
- #ifndef __KVM_ARM_PSCI_H__
- #define __KVM_ARM_PSCI_H__
- 
-+#include <linux/kvm_host.h>
- #include <uapi/linux/psci.h>
- 
- #define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
-@@ -26,7 +27,25 @@
- 
+@@ -27,6 +27,6 @@
  #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
  
--int kvm_psci_version(struct kvm_vcpu *vcpu);
-+/*
-+ * We need the KVM pointer independently from the vcpu as we can call
-+ * this from HYP, and need to apply kern_hyp_va on it...
-+ */
-+static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
-+{
-+	/*
-+	 * Our PSCI implementation stays the same across versions from
-+	 * v0.2 onward, only adding the few mandatory functions (such
-+	 * as FEATURES with 1.0) that are required by newer
-+	 * revisions. It is thus safe to return the latest.
-+	 */
-+	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+		return KVM_ARM_PSCI_LATEST;
-+
-+	return KVM_ARM_PSCI_0_1;
-+}
-+
-+
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
+ int kvm_psci_version(struct kvm_vcpu *vcpu);
+-int kvm_psci_call(struct kvm_vcpu *vcpu);
++int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
  
  #endif /* __KVM_ARM_PSCI_H__ */
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index 4c5bca38..dc68aa5 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -60,6 +60,19 @@
+ #define ARM_SMCCC_QUIRK_NONE		0
+ #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
+ 
++#define ARM_SMCCC_VERSION_1_0		0x10000
++#define ARM_SMCCC_VERSION_1_1		0x10001
++
++#define ARM_SMCCC_VERSION_FUNC_ID					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_32,				\
++			   0, 0)
++
++#define ARM_SMCCC_ARCH_FEATURES_FUNC_ID					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_32,				\
++			   0, 1)
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/linkage.h>
 -- 
 2.7.4
