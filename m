@@ -1,72 +1,137 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 1 Mar 2018 15:09:00 +0100
-Subject: [PATCH v2 1/2] dt-bindings: stm32: Add bindings for Extended
- TrustZone Protection
-In-Reply-To: <20180301140351.gokvstohs3mghz5q@lakrids.cambridge.arm.com>
-References: <20180301135806.19982-1-benjamin.gaignard@st.com>
- <20180301135806.19982-2-benjamin.gaignard@st.com>
- <20180301140351.gokvstohs3mghz5q@lakrids.cambridge.arm.com>
-Message-ID: <CA+M3ks5mWgJRL=PeCrQK6PBmCzhjwuPHUQFS5JGUiVHxWqmBoQ@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 1 Mar 2018 16:09:11 +0200
+Subject: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
+In-Reply-To: <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+Message-ID: <CAHp75VdqDupw3E6qVj6awHJf0JrT3f7UGbO3YAeWM9Yzg-HE=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-01 15:03 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
-> On Thu, Mar 01, 2018 at 02:58:05PM +0100, Benjamin Gaignard wrote:
->> Extended TrustZone Protection driver is very basic and only needs
->> to know where are the registers (no clock, no interrupt)
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> ---
->>  .../bindings/arm/stm32/st,stm32mp1-etzpc.txt       | 25 ++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/stm32/st,stm32mp1-etzpc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/stm32/st,stm32mp1-etzpc.txt b/Documentation/devicetree/bindings/arm/stm32/st,stm32mp1-etzpc.txt
->> new file mode 100644
->> index 000000000000..9407e37f7d15
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/stm32/st,stm32mp1-etzpc.txt
->> @@ -0,0 +1,25 @@
->> +STMicroelectronics STM32 Extended TrustZone Protection driver
->> +
->> +Required properties:
->> + - compatible : value should be "st,stm32mp1-etzpc"
->> + - reg : physical base address of the IP registers and length of memory
->> +      mapped region.
->> + - protected-devices: list of phandle of devices protected by etzpc.
->> +                   Because etzpc driver rely on the phandle index in
->> +                   the list, holes must be filled with a disabled node.
->
-> ... where the index corresponds to what, exactly?
+On Tue, Feb 20, 2018 at 9:21 PM, Jolly Shah <jolly.shah@xilinx.com> wrote:
+> Add Firmware-ggs sysfs interface which provides read/write
+> interface to global storage registers.
 
-to the offset of the status bits in the register
+> +#include <linux/compiler.h>
+> +#include <linux/of.h>
 
->
-> Padding with a disabled node seems very hacky.
+> +#include <linux/init.h>
+> +#include <linux/module.h>
 
-If a device node doesn't exist in the DT I need to fill the hole by something
-to keep the index valid.
+You need to leave one of them.
 
->
-> Thanks,
-> Mark.
->
->> +
->> +Example for stm32mp1:
->> +
->> +reserved: disabled_node {
->> +     status = "disabled";
->> +};
->> +
->> +etzpc: etzpc at 5c007000 {
->> +     compatible = "st,stm32mp1-etzpc";
->> +     reg = <0x5c007000 0x400>;
->> +             protected-devices = <&usart1>,
->> +                                 <&spi6>,
->> +                                 <&i2c4>,
->> +                                 <&reserved>,
->> +                                 <&rng1>;
->> +};
->> --
->> 2.15.0
->>
+> +#include <linux/uaccess.h>
+> +#include <linux/slab.h>
+
+> +#include <linux/firmware/xilinx/zynqmp/firmware.h>
+
+Keep it in order? Or add an empty line before?
+
+> +       return sprintf(buf, "0x%x\n", ret_payload[1]);
+
+Hmm... No leading zeroes?
+
+> +static ssize_t write_register(const char *buf, size_t count, u32 read_ioctl,
+> +                             u32 write_ioctl, u32 reg)
+> +{
+> +       char *kern_buff, *inbuf, *tok;
+> +       long mask, value;
+> +       int ret;
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       if (!eemi_ops || !eemi_ops->ioctl)
+> +               return -EFAULT;
+
+> +       kern_buff = kzalloc(count, GFP_KERNEL);
+> +       if (!kern_buff)
+> +               return -ENOMEM;
+> +
+> +       ret = strlcpy(kern_buff, buf, count);
+> +       if (ret < 0) {
+> +               ret = -EFAULT;
+> +               goto err;
+> +       }
+
+kstrndup()
+
+> +
+> +       inbuf = kern_buff;
+> +
+> +       /* Read the write mask */
+> +       tok = strsep(&inbuf, " ");
+> +       if (!tok) {
+> +               ret = -EFAULT;
+> +               goto err;
+> +       }
+> +
+> +       ret = kstrtol(tok, 16, &mask);
+> +       if (ret) {
+
+> +               ret = -EFAULT;
+
+Why to shadow an error?
+
+> +               goto err;
+> +       }
+> +
+> +       /* Read the write value */
+> +       tok = strsep(&inbuf, " ");
+> +       if (!tok) {
+> +               ret = -EFAULT;
+> +               goto err;
+> +       }
+> +
+> +       ret = kstrtol(tok, 16, &value);
+> +       if (ret) {
+
+> +               ret = -EFAULT;
+
+Ditto.
+
+> +               goto err;
+> +       }
+> +
+> +       ret = eemi_ops->ioctl(0, read_ioctl, reg, 0, ret_payload);
+> +       if (ret) {
+
+> +               ret = -EFAULT;
+
+Ditto.
+
+> +               goto err;
+> +       }
+
+> +       ret_payload[1] &= ~mask;
+> +       value &= mask;
+> +       value |= ret_payload[1];
+
+Also canonical one to write in one line:
+
+      value = (value & mask) | (ret_payload[1] & ~mask);
+
+> +
+> +       ret = eemi_ops->ioctl(0, write_ioctl, reg, value, NULL);
+> +       if (ret)
+
+> +               ret = -EFAULT;
+
+Why to shadow an error?
+
+> +
+> +err:
+> +       kfree(kern_buff);
+
+
+> +       if (ret)
+> +               return ret;
+> +
+> +       return count;
+
+return ret ? ret : count;
+
+> +}
+
+-- 
+With Best Regards,
+Andy Shevchenko
