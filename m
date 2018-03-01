@@ -1,46 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Mar 2018 17:13:43 +0000
-Subject: [PATCH] arm64/efi: Make strrchr() available to the EFI namespace
-In-Reply-To: <CAKv+Gu8E=wg-=KCtsR=GFEwT1SsEaGFujBx8PNq0JkCAmJYktw@mail.gmail.com>
-References: <20180301162803.5490-1-robh@kernel.org>
- <20180301170826.GA2678@arm.com>
- <CAKv+Gu8E=wg-=KCtsR=GFEwT1SsEaGFujBx8PNq0JkCAmJYktw@mail.gmail.com>
-Message-ID: <20180301171343.GB2678@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  1 Mar 2018 17:19:01 +0000
+Subject: [PATCH] scripts/kallsyms: filter arm64's __efistub_ symbols
+Message-ID: <20180301171901.1134-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 05:10:38PM +0000, Ard Biesheuvel wrote:
-> On 1 March 2018 at 17:08, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Mar 01, 2018 at 10:28:03AM -0600, Rob Herring wrote:
-> >> libfdt gained a new dependency on strrchr, so make it available to the
-> >> EFI namespace before we update libfdt.
-> >>
-> >> Thanks to Ard for providing this fix.
-> >>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> ---
-> >> Please ack. This is a dependency on a dtc upstream sync.
-> >
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> > As an aside, I noticed that this __efistub prefixing is also being
-> > applied to mapping symbols, so we get crazy stuff like __efistub_$x. I
-> > didn't get round to working out whether that's going to be problematic,
-> > but maybe it's all fine...
-> >
-> 
-> Ugh. Those mapping symbols.
-> 
-> We can filter them explicitly in scripts/kallsyms, I guess, or even
-> better, get rid of all __efistub_ symbols entirely (since they are
-> either aliases or part of __init code)
+On arm64, the EFI stub and the kernel proper are essentially the same
+binary, although the EFI stub executes at a different virtual address
+as the kernel. For this reason, the EFI stub is restricted in the
+symbols it can link to, which is ensured by prefixing all EFI stub
+symbols with __efistub_ (and emitting __efistub_ prefixed aliases for
+routines that may be shared between the core kernel and the stub)
 
-Yeah, I started hooking into frob_arch_sections, but I didn't have my ELF
-hat on so I set it aside for the time being. There were some other weird
-symbols that ended up in modules, some of them with unprintable characters
-due to gas generating weird local labels too (I think in BUG()).
+These symbols are leaking into kallsyms, polluting the namespace, so
+let's filter them explicitly.
 
-Will
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ scripts/kallsyms.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 9ee9bf7fd1a2..1dd24c5b9b47 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -221,6 +221,7 @@ static int symbol_valid(struct sym_entry *s)
+ 
+ 	static char *special_prefixes[] = {
+ 		"__crc_",		/* modversions */
++		"__efistub_",		/* arm64 EFI stub namespace */
+ 		NULL };
+ 
+ 	static char *special_suffixes[] = {
+-- 
+2.11.0
