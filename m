@@ -1,27 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 10:25:13 -0600
-Subject: [PATCH] dt-bindings: iio: adc: stm32-dfsdm: fix types, add
- missing pinctrl
-In-Reply-To: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
-References: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180302162513.umh2a2g4io3x26uz@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Mar 2018 16:28:21 +0000
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302153221.GB9418@n2100.armlinux.org.uk>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302111931.GX9418@n2100.armlinux.org.uk>
+ <20180302124647.sfhnto77wgdh5sv6@katana>
+ <20180302125907.GA9418@n2100.armlinux.org.uk>
+ <20180302135854.76ue5jzsg7lvxjxw@katana>
+ <20180302140901.lrjqiaa2k4nxkqco@mwanda>
+ <20180302153221.GB9418@n2100.armlinux.org.uk>
+Message-ID: <20180302162821.bmsxgrqqaginjooo@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 12:11:00PM +0100, Fabrice Gasnier wrote:
-> - Add missing pinctrl description. Support is made optional as dfsdm
->   may use internal sources (e.g. via registers)
-> - Fix typo in IIO STM32 DFSDM filter "MANCH_F" description.
-> Basically, this should be "falling edge = logic 0", not "1" that applies
-> to "MANCH_R".
-> BTW, make the description complete by describing both rising/falling
-> edges as described in reference manuals.
-> 
-> Fixes: 6c82f947fc97 ("IIO: add DT bindings for stm32 DFSDM filter")
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+On Fri, Mar 02, 2018 at 03:32:22PM +0000, Russell King - ARM Linux wrote:
+> How do we break this status quo and finally solve the IRQ 0 and
+> NO_IRQ issue?
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+> Another possibility would be to change platform_get_irq() and
+> suffer the regressions that will cause, telling people that fixing
+> their platform IRQ numbering is the only solution (but this
+> requires breaking our ideals about regressions.)
+
+How about we start with a warning? That'll be visible, but shouldn't
+result in broken systems while we wait for people to fix things up.
+
+e.g. something like the below.
+
+Mark.
+
+---->8----
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index f1bf7b38d91c..bd42eeffd2aa 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -126,7 +126,12 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+                irqd_set_trigger_type(irqd, r->flags & IORESOURCE_BITS);
+        }
+ 
+-       return r ? r->start : -ENXIO;
++       if (!r)
++               return -ENXIO;
++
++       WARN_ONCE(!r->start, "Platform uses zero as a valid IRQ.");
++
++       return r->start;
+ #endif
+ }
+ EXPORT_SYMBOL_GPL(platform_get_irq);
