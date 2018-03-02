@@ -1,79 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Mar 2018 10:42:23 +0000
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <5A986425.9080007@codeaurora.org>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A90B77E.8040105@codeaurora.org>
- <20180225143653.peb4quk3ha5h3t5x@salmiak>
- <5A972A7D.9020301@codeaurora.org>
- <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
- <5A986425.9080007@codeaurora.org>
-Message-ID: <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 2 Mar 2018 11:57:19 +0100
+Subject: [PATCH v3] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
+ MT7623
+In-Reply-To: <051f401bcca48ece188023ccf10b2cedc7a25a64.1519891948.git.sean.wang@mediatek.com>
+References: <051f401bcca48ece188023ccf10b2cedc7a25a64.1519891948.git.sean.wang@mediatek.com>
+Message-ID: <20180302105719.GC27178@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 12:35:49PM -0800, Saravana Kannan wrote:
-> On 03/01/2018 03:49 AM, Mark Rutland wrote:
-> > On Wed, Feb 28, 2018 at 02:17:33PM -0800, Saravana Kannan wrote:
-> > > On 02/25/2018 06:36 AM, Mark Rutland wrote:
-> > > > On Fri, Feb 23, 2018 at 04:53:18PM -0800, Saravana Kannan wrote:
-> > > > > On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
-> > > > > > +static void dsu_pmu_event_update(struct perf_event *event)
-> > > > > > +{
-> > > > > > +	struct hw_perf_event *hwc = &event->hw;
-> > > > > > +	u64 delta, prev_count, new_count;
-> > > > > > +
-> > > > > > +	do {
-> > > > > > +		/* We may also be called from the irq handler */
-> > > > > > +		prev_count = local64_read(&hwc->prev_count);
-> > > > > > +		new_count = dsu_pmu_read_counter(event);
-> > > > > > +	} while (local64_cmpxchg(&hwc->prev_count, prev_count, new_count) !=
-> > > > > > +			prev_count);
-> > > > > > +	delta = (new_count - prev_count) & DSU_PMU_COUNTER_MASK(hwc->idx);
-> > > > > > +	local64_add(delta, &event->count);
-> > > > > > +}
-> > > > > > +
-> > > > > > +static void dsu_pmu_read(struct perf_event *event)
-> > > > > > +{
-> > > > > > +	dsu_pmu_event_update(event);
-> > > > > > +}
-> > > > 
-> > > > > I sent out a patch that'll allow PMUs to set an event flag to avoid
-> > > > > unnecessary smp calls when the event can be read from any CPU. You could
-> > > > > just always set that if you can't have multiple DSU's running the kernel (I
-> > > > > don't know if the current ARM designs support having multiple DSUs in a
-> > > > > SoC/system) or set it if associated_cpus == cpu_present_mask.
-> > > > 
-> > > > As-is, that won't be safe, given the read function calls the event_update()
-> > > > function, which has side-effects on hwc->prec_count and event->count. Those
-> > > > need to be serialized somehow.
-> > > 
-> > > You have to grab the dsu_pmu->pmu_lock spin lock anyway because the system
-> > > registers are shared across all CPUs.
-> > 
-> > I believe that lock is currently superfluous, because the perf core
-> > ensures operations are cpu-affine, and have interrupts disabled in most
-> > cases (thanks to the context lock).
+On Thu, Mar 01, 2018 at 04:19:12PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> I don't think it's superfluous. You have a common "event counter" selection
-> register and a common "event counter value" register. You can two CPUs
-> racing to read two unrelated event counters and end up causing one of them
-> to read a bogus value from the wrong event counter.
+> Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+> control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+> programming on PWM hardware causes waveform cannot be output as expected.
+> Thus, the patch adds the extra condition for fixing up the weird case to
+> let PWM4 or PWM5 able to work on MT7623.
+> 
+> v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+> v2 -> v3: add more tags for Reviewed-by, Fixes, and Cc stable
+> 
+> Cc: stable at vger.kernel.org
+> Fixes: caf065f8fd58 ("pwm: Add MediaTek PWM support")
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Zhi Mao <zhi.mao@mediatek.com>
+> Cc: John Crispin <john@phrozen.org>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+[...]
+> @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		return -EINVAL;
+>  	}
+>  
+> +	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
+> +		/*
+> +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
+> +		 * from the other PWMs on MT7623.
+> +		 */
+> +		reg_width = PWM45DWIDTH_FIXUP;
+> +		reg_thres = PWM45THRES_FIXUP;
+> +	}
 
-It's important to note that the DSU PMU's event_init() ensures events
-are affine to a single CPU, and the perf core code serializes operations
-on those events via the context lock.
+I don't understand this. According to the condition above the above
+would also use the PWM[4,5] "fixup" register offsets with PWM[3]. Should
+the condition be pwm->hwpwm > 3?
 
-Therefore, two CPUs *won't* try to access the registers simultaneously.
-
-If events could be active on multiple CPUs simultaneously, I agree that
-the lock would be necessary. However, there would also be other problems
-to deal with in that case.
-
-If we want to allow pmu::read() from arbitrary CPUs the DSU is affine
-to, I agree we'd need the lock to serialize accesses to the registers
-and data structures.
-
-Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/3758bb75/attachment-0001.sig>
