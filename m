@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:50 +0100
-Subject: [PATCH 42/52] mtd: rawnand: vf610: convert driver to nand_scan()
+Date: Fri,  2 Mar 2018 18:03:58 +0100
+Subject: [PATCH 50/52] mtd: rawnand: jz4740: convert driver to nand_scan()
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-43-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-51-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,145 +14,118 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/vf610_nfc.c | 119 ++++++++++++++++++++-------------------
- 1 file changed, 60 insertions(+), 59 deletions(-)
+ drivers/mtd/nand/raw/jz4740_nand.c | 42 +++++++++++++++++++++++---------------
+ 1 file changed, 25 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
-index 7c20915f2165..68f3d5efc519 100644
---- a/drivers/mtd/nand/raw/vf610_nfc.c
-+++ b/drivers/mtd/nand/raw/vf610_nfc.c
-@@ -615,6 +615,63 @@ static void vf610_nfc_init_controller(struct vf610_nfc *nfc)
- 	}
+diff --git a/drivers/mtd/nand/raw/jz4740_nand.c b/drivers/mtd/nand/raw/jz4740_nand.c
+index 613b00a9604b..740145fd9ff2 100644
+--- a/drivers/mtd/nand/raw/jz4740_nand.c
++++ b/drivers/mtd/nand/raw/jz4740_nand.c
+@@ -59,6 +59,7 @@
+ 
+ struct jz_nand {
+ 	struct nand_chip chip;
++	struct platform_device *pdev;
+ 	void __iomem *base;
+ 	struct resource *mem;
+ 
+@@ -329,8 +330,8 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
+ 
+ 	if (chipnr == 0) {
+-		/* Detect first chip. */
+-		ret = nand_scan_ident(mtd, 1, NULL);
++		/* Detect the first chip and register it */
++		ret = nand_scan(mtd, 1);
+ 		if (ret)
+ 			goto notfound_id;
+ 
+@@ -367,6 +368,21 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 	return ret;
  }
  
-+static int vf610_nfc_attach_chip(struct nand_chip *chip)
++static int jz_nand_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
++	struct jz_nand *nand = mtd_to_jz_nand(mtd);
++	struct device *dev = mtd->dev.parent;
++	struct jz_nand_platform_data *pdata = dev_get_platdata(dev);
 +
-+	vf610_nfc_init_controller(nfc);
-+
-+	/* Bad block options. */
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	/* Single buffer only, max 256 OOB minus ECC status */
-+	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-+		dev_err(nfc->dev, "Unsupported flash page size\n");
-+		return -ENXIO;
++	if (pdata && pdata->ident_callback) {
++		pdata->ident_callback(nand->pdev, mtd, &pdata->partitions,
++				      &pdata->num_partitions);
 +	}
-+
-+	if (chip->ecc.mode != NAND_ECC_HW)
-+		return 0;
-+
-+	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-+		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-+		return -ENXIO;
-+	}
-+
-+	if (chip->ecc.size != mtd->writesize) {
-+		dev_err(nfc->dev, "Step size needs to be page size\n");
-+		return -ENXIO;
-+	}
-+
-+	/* Only 64 byte ECC layouts known */
-+	if (mtd->oobsize > 64)
-+		mtd->oobsize = 64;
-+
-+	/*
-+	 * mtd->ecclayout is not specified here because we're using the
-+	 * default large page ECC layout defined in NAND core.
-+	 */
-+	if (chip->ecc.strength == 32) {
-+		nfc->ecc_mode = ECC_60_BYTE;
-+		chip->ecc.bytes = 60;
-+	} else if (chip->ecc.strength == 24) {
-+		nfc->ecc_mode = ECC_45_BYTE;
-+		chip->ecc.bytes = 45;
-+	} else {
-+		dev_err(nfc->dev, "Unsupported ECC strength\n");
-+		return -ENXIO;
-+	}
-+
-+	chip->ecc.read_page = vf610_nfc_read_page;
-+	chip->ecc.write_page = vf610_nfc_write_page;
-+
-+	chip->ecc.size = PAGE_2K;
 +
 +	return 0;
 +}
 +
- static int vf610_nfc_probe(struct platform_device *pdev)
+ static int jz_nand_probe(struct platform_device *pdev)
  {
- 	struct vf610_nfc *nfc;
-@@ -702,65 +759,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
+ 	int ret;
+@@ -397,6 +413,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	mtd		= nand_to_mtd(chip);
+ 	mtd->dev.parent = &pdev->dev;
+ 	mtd->name	= "jz4740-nand";
++	nand->pdev	= pdev;
  
- 	vf610_nfc_preinit_controller(nfc);
+ 	chip->ecc.hwctl		= jz_nand_hwctl;
+ 	chip->ecc.calculate	= jz_nand_calculate_ecc_rs;
+@@ -406,6 +423,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	chip->ecc.bytes		= 9;
+ 	chip->ecc.strength	= 4;
+ 	chip->ecc.options	= NAND_ECC_GENERIC_ERASED_CHECK;
++	chip->ecc.attach_chip	= jz_nand_attach_chip;
  
--	/* first scan to find the device and get the page size */
--	err = nand_scan_ident(mtd, 1, NULL);
--	if (err)
--		goto err_disable_clk;
--
--	vf610_nfc_init_controller(nfc);
--
--	/* Bad block options. */
--	if (chip->bbt_options & NAND_BBT_USE_FLASH)
--		chip->bbt_options |= NAND_BBT_NO_OOB;
--
--	/* Single buffer only, max 256 OOB minus ECC status */
--	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
--		dev_err(nfc->dev, "Unsupported flash page size\n");
--		err = -ENXIO;
--		goto err_disable_clk;
+ 	chip->chip_delay = 50;
+ 	chip->cmd_ctrl = jz_nand_cmd_ctrl;
+@@ -450,20 +468,10 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 		else
+ 			nand->banks[chipnr] = 0;
+ 	}
++
+ 	if (chipnr == 0) {
+ 		dev_err(&pdev->dev, "No NAND chips found\n");
+-		goto err_iounmap_mmio;
 -	}
 -
--	if (chip->ecc.mode == NAND_ECC_HW) {
--		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
--			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		if (chip->ecc.size != mtd->writesize) {
--			dev_err(nfc->dev, "Step size needs to be page size\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		/* Only 64 byte ECC layouts known */
--		if (mtd->oobsize > 64)
--			mtd->oobsize = 64;
--
--		/*
--		 * mtd->ecclayout is not specified here because we're using the
--		 * default large page ECC layout defined in NAND core.
--		 */
--		if (chip->ecc.strength == 32) {
--			nfc->ecc_mode = ECC_60_BYTE;
--			chip->ecc.bytes = 60;
--		} else if (chip->ecc.strength == 24) {
--			nfc->ecc_mode = ECC_45_BYTE;
--			chip->ecc.bytes = 45;
--		} else {
--			dev_err(nfc->dev, "Unsupported ECC strength\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		chip->ecc.read_page = vf610_nfc_read_page;
--		chip->ecc.write_page = vf610_nfc_write_page;
--
--		chip->ecc.size = PAGE_2K;
+-	if (pdata && pdata->ident_callback) {
+-		pdata->ident_callback(pdev, mtd, &pdata->partitions,
+-					&pdata->num_partitions);
 -	}
 -
--	/* second phase scan */
--	err = nand_scan_tail(mtd);
-+	/* Scan the NAND chip */
-+	chip->ecc.attach_chip = vf610_nfc_attach_chip;
-+	err = nand_scan(mtd, 1);
- 	if (err)
- 		goto err_disable_clk;
+-	ret = nand_scan_tail(mtd);
+-	if (ret) {
+-		dev_err(&pdev->dev,  "Failed to scan NAND\n");
+-		goto err_unclaim_banks;
++		goto err_nand_release;
+ 	}
  
+ 	ret = mtd_device_parse_register(mtd, NULL, NULL,
+@@ -472,15 +480,13 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to add mtd device\n");
+-		goto err_nand_release;
++		goto err_unclaim_banks;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "Successfully registered JZ4740 NAND driver\n");
+ 
+ 	return 0;
+ 
+-err_nand_release:
+-	nand_release(mtd);
+ err_unclaim_banks:
+ 	while (chipnr--) {
+ 		unsigned char bank = nand->banks[chipnr];
+@@ -488,6 +494,8 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 					 nand->bank_base[bank - 1]);
+ 	}
+ 	writel(0, nand->base + JZ_REG_NAND_CTRL);
++err_nand_release:
++	nand_release(mtd);
+ err_iounmap_mmio:
+ 	jz_nand_iounmap_resource(nand->mem, nand->base);
+ err_free:
 -- 
 2.14.1
