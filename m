@@ -1,89 +1,46 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 2 Mar 2018 11:21:23 +0100
-Subject: [PATCH] drm/bridge/synopsys: dsi: readl_poll_timeout return
- value clean up
-In-Reply-To: <172e7f68-8f4b-7e5f-3e9f-7aaf10a51dc9@st.com>
-References: <20180204213624.18288-1-philippe.cornu@st.com>
- <CGME20180301090106epcas2p3c47f4436b0c8a31ce71cfd3909dc77ae@epcas2p3.samsung.com>
- <172e7f68-8f4b-7e5f-3e9f-7aaf10a51dc9@st.com>
-Message-ID: <290c749a-70bf-2b74-1fb9-2de26708d001@samsung.com>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Fri,  2 Mar 2018 04:23:57 -0600
+Subject: [PATCH v2 0/2] staging: fsl-mc: Move DPBP and DPCON out of staging
+Message-ID: <20180302102359.16979-1-bogdan.purcareata@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.03.2018 10:00, Philippe CORNU wrote:
-> Hi Archit, Andrzej & Laurent,
->
-> May I ask you please your feedback on this small patch?
-> Many thanks,
->
-> Philippe :-)
->
-> On 02/04/2018 10:36 PM, Philippe Cornu wrote:
->> The readl_poll_timeout() return value is 0 in case of success
->> so it is better to detect errors without taking care of the
->> return value sign.
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+Previous submission: https://lkml.org/lkml/2018/3/1/733
 
-The patch is of course correct. However I am not sure if necessary. For
-sure functionally it does not change anything.
-AFAIK kernel CodingStyle says nothing about it, so I suppose it is
-matter of personal taste.
-Anyway I can give it:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Commit 6bd067c48ef ("staging: fsl-mc: Move core bus out of staging")
+moves the fsl-mc bus driver infrastructure out of staging to
+drivers/bus/fsl-mc. The next step is moving a couple of tightly
+connected DPAA2 objects - DPBP (Data Path Buffer Pool) and DPCON
+(Data Path Concentrator).
 
-?--
-Regards
-Andrzej
+The patches handle moving out the mentioned objects, one at a time.
 
->> ---
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 10 +++++-----
->>   1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> index 65aeb3f78b48..4d0e8471a15c 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -342,7 +342,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->>   	ret = qq(dsi->base + DSI_CMD_PKT_STATUS,
->>   				 val, !(val & GEN_CMD_FULL), 1000,
->>   				 CMD_PKT_STATUS_TIMEOUT_US);
->> -	if (ret < 0) {
->> +	if (ret) {
->>   		dev_err(dsi->dev, "failed to get available command FIFO\n");
->>   		return ret;
->>   	}
->> @@ -353,7 +353,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->>   	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->>   				 val, (val & mask) == mask,
->>   				 1000, CMD_PKT_STATUS_TIMEOUT_US);
->> -	if (ret < 0) {
->> +	if (ret) {
->>   		dev_err(dsi->dev, "failed to write command FIFO\n");
->>   		return ret;
->>   	}
->> @@ -385,7 +385,7 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
->>   		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->>   					 val, !(val & GEN_PLD_W_FULL), 1000,
->>   					 CMD_PKT_STATUS_TIMEOUT_US);
->> -		if (ret < 0) {
->> +		if (ret) {
->>   			dev_err(dsi->dev,
->>   				"failed to get available write payload FIFO\n");
->>   			return ret;
->> @@ -716,13 +716,13 @@ static void dw_mipi_dsi_dphy_enable(struct dw_mipi_dsi *dsi)
->>   
->>   	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS, val,
->>   				 val & PHY_LOCK, 1000, PHY_STATUS_TIMEOUT_US);
->> -	if (ret < 0)
->> +	if (ret)
->>   		DRM_DEBUG_DRIVER("failed to wait phy lock state\n");
->>   
->>   	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
->>   				 val, val & PHY_STOP_STATE_CLK_LANE, 1000,
->>   				 PHY_STATUS_TIMEOUT_US);
->> -	if (ret < 0)
->> +	if (ret)
->>   		DRM_DEBUG_DRIVER("failed to wait phy clk lane stop state\n");
->>   }
->>   
+v1 -> v2:
+- previous cleanup patch already applied, so removed from patchset
+- properly refactor #include line (Laurentiu)
+
+Bogdan Purcareata (2):
+  staging: fsl-mc: Move DPBP out of staging
+  staging: fsl-mc: Move DPCON out of staging
+
+ drivers/bus/fsl-mc/Makefile                        |   2 +
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c  |   4 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpcon.c |   4 +-
+ drivers/bus/fsl-mc/fsl-mc-private.h                |  87 +++++++++++++++++
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   3 +-
+ drivers/staging/fsl-mc/bus/Makefile                |   2 -
+ drivers/staging/fsl-mc/bus/dpbp-cmd.h              |  44 ---------
+ drivers/staging/fsl-mc/bus/dpcon-cmd.h             |  53 ----------
+ drivers/staging/fsl-mc/include/dpbp.h              |  53 ----------
+ drivers/staging/fsl-mc/include/dpcon.h             |  79 ---------------
+ include/linux/fsl/mc.h                             | 108 +++++++++++++++++++++
+ 11 files changed, 202 insertions(+), 237 deletions(-)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpcon.c (99%)
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpbp-cmd.h
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpcon-cmd.h
+ delete mode 100644 drivers/staging/fsl-mc/include/dpbp.h
+ delete mode 100644 drivers/staging/fsl-mc/include/dpcon.h
+
+-- 
+2.7.4
