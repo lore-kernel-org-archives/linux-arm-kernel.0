@@ -1,43 +1,38 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:20 +0100
-Subject: [PATCH 12/52] mtd: rawnand: fsl_elbc: fix probe function error path
+Date: Fri,  2 Mar 2018 18:03:18 +0100
+Subject: [PATCH 10/52] mtd: rawnand: denali: fix probe function error path
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-13-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-11-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 An error after nand_scan_tail() should trigger a nand_release().
-The helper mtd_device_parse_register() returns an error code that should
+The helper mtd_device_register() returns an error code that should
 be checked and nand_release() called accordingly.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/fsl_elbc_nand.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/raw/denali.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/raw/fsl_elbc_nand.c b/drivers/mtd/nand/raw/fsl_elbc_nand.c
-index d59ec6572548..fc6b18fc704c 100644
---- a/drivers/mtd/nand/raw/fsl_elbc_nand.c
-+++ b/drivers/mtd/nand/raw/fsl_elbc_nand.c
-@@ -926,13 +926,16 @@ static int fsl_elbc_nand_probe(struct platform_device *pdev)
- 
- 	/* First look for RedBoot table or partitions on the command
- 	 * line, these take precedence over device tree information */
--	mtd_device_parse_register(mtd, part_probe_types, NULL,
--				  NULL, 0);
-+	ret = mtd_device_parse_register(mtd, part_probe_types, NULL, NULL, 0);
-+	if (ret)
-+		goto release_nand;
- 
- 	printk(KERN_INFO "eLBC NAND device at 0x%llx, bank %d\n",
- 	       (unsigned long long)res.start, priv->bank);
+diff --git a/drivers/mtd/nand/raw/denali.c b/drivers/mtd/nand/raw/denali.c
+index 313c7f50621b..d1942155fc92 100644
+--- a/drivers/mtd/nand/raw/denali.c
++++ b/drivers/mtd/nand/raw/denali.c
+@@ -1384,10 +1384,12 @@ int denali_init(struct denali_nand_info *denali)
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret) {
+ 		dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
+-		goto free_buf;
++		goto detach;
+ 	}
  	return 0;
  
-+release_nand:
++detach:
 +	nand_release(mtd);
- err:
- 	fsl_elbc_chip_remove(priv);
- 	return ret;
+ free_buf:
+ 	kfree(denali->buf);
+ disable_irq:
 -- 
 2.14.1
