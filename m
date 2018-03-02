@@ -1,85 +1,40 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu,  1 Mar 2018 18:19:28 -0600
-Subject: [PATCHv2 0/7] Add Intel Stratix10 FPGA manager and service layer
-Message-ID: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
+Date: Thu,  1 Mar 2018 18:19:32 -0600
+Subject: [PATCHv2 4/7] dt-bindings: fpga: add Stratix10 SoC FPGA manager
+ binding
+In-Reply-To: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
+References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1519949975-13548-5-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+From: Alan Tull <atull@kernel.org>
 
-This is the 2nd submission of Intel service layer patches. Intel Stratix10
-FPGA manager, which is 1st service layer client, is included in this submission.
+Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
 
-Service layer patches have been reviewed internally by Alan Tull and other
-colleagues at Intel.
-
-Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
-processor system (HPS) and Secure Device Manager (SDM). SDM is the hardware
-which does the FPGA configuration, QSPI, Crypto and warm reset.
-
-When the FPGA is configured from HPS, there needs to be a way for HPS to
-notify SDM the location and size of the configuration data. Then SDM will
-get the configuration data from that location and perform the FPGA configuration.
-
-To meet the whole system security needs and support virtual machine
-requesting communication with SDM, only the secure world of software (EL3,
-Exception Level 3) can interface with SDM. All software entities running
-on other exception levels must channel through the EL3 software whenever it
-needs service from SDM.
-
-Intel Stratix10 service layer driver is added to provide the service for
-FPGA configuration. Running at privileged exception level (EL1, Exception
-Level 1), Intel Stratix10 service layer driver interfaces with the service
-provider at EL1 (Intel Stratix10 FPGA Manager) and manages secure monitor
-call (SMC) to communicate with secure monitor software at secure monitor
-exception level (EL3).
-
-Later the Intel Stratix10 service layer driver will be extended to provide
-services for QSPI, Crypto and warm reset.
-
-v2: add patches for FPGA manager, FPGA manager binding, dts and defconfig
-    remove intel-service subdirectory and intel-service.h, move intel-smc.h
-    and intel-service.c to driver/misc subdirectory
-    remove global variables
-    change service layer driver be 'default n'
-    correct SPDX markers
-    add timeout for do..while() loop
-    add kernel-doc for the functions and structs, correct multiline comments
-    replace kfifo_in/kfifo_out with kfifo_in_spinlocked/kfifo_out_spinlocked
-    rename struct intel_svc_data (at client header) to intel_svc_client_msg
-    rename struct intel_svc_private_mem to intel_svc_data
-    other corrections/changes from Intel internal code reviews
-
-Alan Tull (3):
-  dt-bindings: fpga: add Stratix10 SoC FPGA manager binding
-  arm64: dts: stratix10: add fpga manager and region
-  fpga: add intel stratix10 soc fpga manager driver
-
-Richard Gong (4):
-  dt-bindings, firmware: add Intel Stratix10 service layer binding
-  arm64: dts: stratix10: add service driver binding to base dtsi
-  driver, misc: add Intel Stratix10 service layer driver
-  defconfig: enable fpga and service layer
-
- .../bindings/firmware/intel,stratix10-svc.txt      |  57 ++
- .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt |  10 +
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  34 +
- arch/arm64/configs/defconfig                       |   5 +
- drivers/fpga/Kconfig                               |   6 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/stratix10-soc.c                       | 503 +++++++++++
- drivers/misc/Kconfig                               |  12 +
- drivers/misc/Makefile                              |   1 +
- drivers/misc/intel-service.c                       | 960 +++++++++++++++++++++
- drivers/misc/intel-smc.h                           | 205 +++++
- include/linux/intel-service-client.h               | 188 ++++
- 12 files changed, 1982 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+Signed-off-by: Alan Tull <atull@kernel.org>
+---
+v2: this patch is added in patch set version 2
+---
+ .../devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt  | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
- create mode 100644 drivers/fpga/stratix10-soc.c
- create mode 100644 drivers/misc/intel-service.c
- create mode 100644 drivers/misc/intel-smc.h
- create mode 100644 include/linux/intel-service-client.h
 
+diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+new file mode 100644
+index 0000000..78de689
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+@@ -0,0 +1,10 @@
++Intel Stratix10 SoC FPGA Manager
++
++Required properties:
++- compatible : should contain "intel,stratix10-soc-fpga-mgr"
++
++Example:
++
++	fpga_mgr: fpga-mgr at 0 {
++		compatible = "intel,stratix10-soc-fpga-mgr";
++	};
 -- 
 2.7.4
