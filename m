@@ -1,51 +1,114 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 2 Mar 2018 13:13:20 +0000
-Subject: [PATCH v3 01/25] dt-bindings: soc: qcom: Add bindings for APR bus
-In-Reply-To: <20180301203413.GN12864@sirena.org.uk>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
- <20180213231244.ama4bwsehzuh5sr7@rob-hp-laptop>
- <ae65a9c8-85a3-5494-f4cc-1038fd8c9bd1@linaro.org>
- <20180218230414.dkd6kb6kd35arcyv@rob-hp-laptop>
- <636d4ac2-3bc2-7290-1645-0451c089cb8a@linaro.org>
- <CAL_JsqK3KFBGqpHRaURSrHew1HhObUvFYxuhND-FOQ4tCUaAHg@mail.gmail.com>
- <465a2ca7-9f74-8977-37ea-29fe3944c27c@linaro.org>
- <20180301203413.GN12864@sirena.org.uk>
-Message-ID: <2608d36a-cf4e-5b06-a26a-8d4ee0bb41ad@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 2 Mar 2018 14:15:35 +0100
+Subject: [PATCH 2/3] soc: rockchip: power-domain: Use
+ of_clk_get_parent_count() instead of open coding
+In-Reply-To: <CAEG3pNCioW_FVXj3-j4KC_yO6ZYGXQB_eanHWSb9NUE9kYsWag@mail.gmail.com>
+References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
+ <1516375101-29836-3-git-send-email-geert+renesas@glider.be>
+ <11171053.oOJPuGlHoK@phil>
+ <CAEG3pNCioW_FVXj3-j4KC_yO6ZYGXQB_eanHWSb9NUE9kYsWag@mail.gmail.com>
+Message-ID: <CAMuHMdVsb+5T-DYfF9v6ANhVxhRk6_r+XPA34mW7Q=90HnitAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review,
+Hi Mike,
 
-On 01/03/18 20:34, Mark Brown wrote:
-> On Thu, Feb 22, 2018 at 10:03:42AM +0000, Srinivas Kandagatla wrote:
->> On 22/02/18 00:14, Rob Herring wrote:
-> 
->>> Am I saying a single DT node for this? Yes, perhaps.
->> Yes, I will give that a go.
+On Sun, Feb 18, 2018 at 8:09 PM, Michael Turquette
+<mturquette@baylibre.com> wrote:
+> On Sat, Feb 10, 2018 at 8:35 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+>> Am Freitag, 19. Januar 2018, 16:18:20 CET schrieb Geert Uytterhoeven:
+>>> As of_clk_get_parent_count() returns zero on failure, while
+>>> of_count_phandle_with_args() might return a negative error code, this
+>>> also fixes the issue of possibly using a negative number in the
+>>> allocation below.
+>>>
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>> ---
+>>>  drivers/soc/rockchip/pm_domains.c | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+>>> index 5c342167b9db7a16..9936038d38771784 100644
+>>> --- a/drivers/soc/rockchip/pm_domains.c
+>>> +++ b/drivers/soc/rockchip/pm_domains.c
+>>> @@ -16,6 +16,7 @@
+>>>  #include <linux/of_address.h>
+>>>  #include <linux/of_platform.h>
+>>>  #include <linux/clk.h>
+>>> +#include <linux/clk-provider.h>
 >>
->> So we will endup having something like this in DT for one frontend and
->> backend dailink:
-> 
-> Let's not start encoding DPCM into DT, DPCM is very much an
-> implemntation detail of the current stack which we're gradually pushing
-> towards replacing with something better.  What we want to be doing is
-> just treating components inside the SoC the same as components in a
-> CODEC, the routing within a SoC being the same as in a CODEC and
-> similarly for externally connected devices.
-> 
->> 		fe at 1 {
->>                  	is-fe;
->>                          link-name = "MultiMedia1";
-> 
-> In particular having the concept of "front end" in the DT is *very*
-> implementation specific.  We should just be describing the connections
-> that exist in the system.
-Yep, it makes sense. is-fe flag will be removed in next version, we can 
-determine this based on codec dai, so from DT side FE or BE should not 
-be any different.
+>> not wanting to be to nitpicky, but clk-provider.h seems that it should be
+>> used from drivers exposing clocks to the system, not from clock users.
+>>
+>> I just remember that in the past clk maintainers tried to keep their
+>> layering intact, so I've included them for clarification.
+>>
+>> Mike, Stephen: the power-domain driver of Rockchip socs needs
+>> to toggle all clocks of domain peripherals when turning a domain
+>> on or off, so has a variable list of clocks in the clocks property in dt.
+>> Hence the of_count_... call which could be replaced with
+>> of_clk_get_parent_count to not open-code this.
+>
+> Moving of_clk_get_parent_count to clk.h seems reasonable to me. It's
+> more of an of-specific helper than a provider-specific helper.
+>
+> Anyone up to submit a patch so that this one doesn't need to include
+> clk-provider.h?
 
-Thanks,
-srini
+I gave it a try.
+Just moving of_clk_get_parent_count() from clk-provider.h to clk.h causes
+breakage, as half of the clock providers using of_clk_get_parent_count()
+do not include <linux/clk.h>:
 
-> 
+    drivers/clk/at91/clk-generated.c
+    drivers/clk/at91/clk-main.c
+    drivers/clk/at91/clk-master.c
+    drivers/clk/at91/clk-programmable.c
+    drivers/clk/at91/clk-slow.c
+    drivers/clk/at91/clk-smd.c
+    drivers/clk/at91/clk-usb.c
+    drivers/clk/at91/sckc.c
+    drivers/clk/clk-axi-clkgen.c
+    drivers/clk/clk-gpio.c
+    drivers/clk/clk-hsdk-pll.c
+    drivers/clk/h8300/clk-div.c
+    drivers/clk/h8300/clk-h8s2678.c
+    drivers/clk/renesas/clk-div6.c
+    drivers/clk/ti/composite.c
+    drivers/clk/ti/gate.c
+    drivers/clk/ti/mux.c
+
+So our options are:
+  1. Add #include <linux/clk.h> to each of the above,
+  2. Add #include <linux/clk.h> to <linux/clk-provider.h>,
+  3. Do nothing, i.e. users of of_clk_get_parent_count () need to
+      #include <linux/clk-provider.h>, cfr. this patch series.
+
+Any preference? Any option I'm missing?
+
+Thanks!
+
+>>>  #include <linux/regmap.h>
+>>>  #include <linux/mfd/syscon.h>
+>>>  #include <dt-bindings/power/rk3288-power.h>
+>>> @@ -391,7 +392,7 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
+>>>               return -EINVAL;
+>>>       }
+>>>
+>>> -     clk_cnt = of_count_phandle_with_args(node, "clocks", "#clock-cells");
+>>> +     clk_cnt = of_clk_get_parent_count(node);
+>>>       pd = devm_kzalloc(pmu->dev,
+>>>                         sizeof(*pd) + clk_cnt * sizeof(pd->clks[0]),
+>>>                         GFP_KERNEL);
+>>>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
