@@ -1,50 +1,128 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 3 Mar 2018 00:40:40 +0800
-Subject: [PATCH 2/2] drivers: soc: xilinx: Add ZynqMP power domain driver
-In-Reply-To: <1519775750-21297-3-git-send-email-jollys@xilinx.com>
-References: <1519775750-21297-3-git-send-email-jollys@xilinx.com>
-Message-ID: <201803030009.FUisiLBP%fengguang.wu@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 2 Mar 2018 17:53:21 +0100
+Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
+In-Reply-To: <0f090cc7-2b72-a038-26ee-d43077cb9663@ti.com>
+References: <20180224214617.GA22619@amd>
+ <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+ <20180226131318.GA14045@amd>
+ <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+ <20180226231336.GA18565@amd>
+ <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
+ <20180302091025.GC30267@amd>
+ <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
+ <20180302111040.GA6344@amd>
+ <0f090cc7-2b72-a038-26ee-d43077cb9663@ti.com>
+Message-ID: <20180302165321.GG28931@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jolly,
+On Fri 2018-03-02 08:22:52, Andrew F. Davis wrote:
+> On 03/02/2018 05:10 AM, Pavel Machek wrote:
+> > Hi!
+> > 
+> >>> If this is taking longer to fix, should c85823390215 be reverted in
+> >>> the meantime? It does not seem particulary important/urgent...
+> >>
+> >> No patience between the v4.16 release candidates eh ;)
+> >>
+> >> commit 6662ae6af82df10259a70c7569b4c12ea7f3ba93
+> >> ("gpiolib: Keep returning EPROBE_DEFER when we should")
+> >>
+> >> and
+> >>
+> >> commit ce27fb2c56db6ccfe8099343bb4afdab15e77e7b
+> >> ("gpio: Handle deferred probing in of_find_gpio() properly")
+> >>
+> >> that are both in Torvalds' tree since yesterday should be fixing
+> >> this, I think? Did you try just using the upstream HEAD?
+> > 
+> > Ok, so this code looks pretty crazy to me: I tried removing the
+> > "of_find_spi_gpio" part, and audio started working.
+> > 
+> > What is going on with the ()s around == s? You made me look up C
+> > operator precedence.
+> > 
+> > Hmm, and it is also wrong, right? It turns any error code into ENOENT,
+> > as it tries to do the "special handling".
+> > 
+> >                  *                                                                      
+> >                  * This means we don't need to look any further for                     
+> >                  * alternate name conventions, and we should really                     
+> >                  * preserve the return code for our user to be able to                  
+> >                  * retry probing later.                                                 
+> >                  */
+> >                 if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
+> >                         return desc;
+> > 
+> >                 if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+> >                         break;
+> >         }
+> > 
+> >         /* Special handling for SPI GPIOs if used */
+> >         if (IS_ERR(desc))
+> >                 desc = of_find_spi_gpio(dev, con_id, &of_flags);
+> > 
+> >         /* Special handling for regulator GPIOs if used */
+> >         if (IS_ERR(desc) && PTR_ERR(desc) != -EPROBE_DEFER)
+> >                 desc = of_find_regulator_gpio(dev, con_id, &of_flags);
+> > 
+> > Something like this?
+> > 
+> > diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> > index 84e5a9d..f0fab26 100644
+> > --- a/drivers/gpio/gpiolib-of.c
+> > +++ b/drivers/gpio/gpiolib-of.c
+> > @@ -241,29 +241,17 @@ struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
+> >  
+> >  		desc = of_get_named_gpiod_flags(dev->of_node, prop_name, idx,
+> >  						&of_flags);
+> > -		/*
+> > -		 * -EPROBE_DEFER in our case means that we found a
+> > -		 * valid GPIO property, but no controller has been
+> > -		 * registered so far.
+> > -		 *
+> > -		 * This means we don't need to look any further for
+> > -		 * alternate name conventions, and we should really
+> > -		 * preserve the return code for our user to be able to
+> > -		 * retry probing later.
+> > -		 */
+> > -		if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
+> > -			return desc;
+> >  
+> > -		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+> > +		if (!IS_ERR(desc) || PTR_ERR(desc) != -ENOENT)
+> 
+> 
+> I rather like the () so one doesn't always have to look up C operator
+> precedence to verify..
 
-Thank you for the patch! Yet something to improve:
+Well, Ok, but then the ()s should be at the other ifs nearby, too. See?
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.16-rc3 next-20180302]
-[cannot apply to xlnx/master mediatek/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> >  			break;
+> >  	}
+> >  
+> >  	/* Special handling for SPI GPIOs if used */
+> > -	if (IS_ERR(desc))
+> > +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+> >  		desc = of_find_spi_gpio(dev, con_id, &of_flags);
+> >  
+> >  	/* Special handling for regulator GPIOs if used */
+> > -	if (IS_ERR(desc) && PTR_ERR(desc) != -EPROBE_DEFER)
+> > +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+> >  		desc = of_find_regulator_gpio(dev, con_id, &of_flags);
+> >  
+> >  	if (IS_ERR(desc))
+> >
+									Pavel
 
-url:    https://github.com/0day-ci/linux/commits/Jolly-Shah/drivers-soc-xilinx-Add-support-for-ZynqMP-power-domain-driver/20180302-213151
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> drivers/soc/xilinx/zynqmp/pm_domains.c:19:10: fatal error: linux/firmware/xilinx/zynqmp/firmware.h: No such file or directory
-    #include <linux/firmware/xilinx/zynqmp/firmware.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +19 drivers/soc/xilinx/zynqmp/pm_domains.c
-
-  > 19	#include <linux/firmware/xilinx/zynqmp/firmware.h>
-    20	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37892 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180303/5a338094/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/cda89865/attachment.sig>
