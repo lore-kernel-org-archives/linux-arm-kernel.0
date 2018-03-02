@@ -1,42 +1,66 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 2 Mar 2018 13:29:56 +0300
-Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
-In-Reply-To: <20180302102106.enyb2ldmylgklqom@verge.net.au>
-References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
- <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
- <20180228132707.mgunezg5o4lul7x5@verge.net.au>
- <f9574ea2-d8ee-7c9f-b850-874074eddad2@cogentembedded.com>
- <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
- <5f65b46d-be0f-a1ae-3d97-37f62ecf1657@cogentembedded.com>
- <20180302102106.enyb2ldmylgklqom@verge.net.au>
-Message-ID: <4e37c0d9-b619-1b3e-01b2-8cf762efb604@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Mar 2018 10:29:56 +0000
+Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
+In-Reply-To: <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+ <20180301164630.GB23321@kroah.com>
+ <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
+Message-ID: <86r2p23h3v.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/2/2018 1:21 PM, Simon Horman wrote:
-
->>>>>>> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
->>>>>>> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
->>>>>>> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
->>>>>>> output (we're omitting the LVDS decoder for now). These patches depend on
->>>>>>> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
->>>>>>
->>>>>>     Need to mention that the DU driver silently fails to probe now. I do
->>>>>>     hope that this is not due to my updates. :-)
->>>>>
->>>>> Please test that theory.
->>>>
->>>>     Yeah, after sucking in the recent versions of the DU/LVDS patches and uncommenting
->>>> and fixing rejects in a couple patches here, the graphical console works again. :-)
->>>
->>> Ok, but does this patchset cause a regression? If so it seems
->>
->>      Sorry, somehow missed that question. No regression is possible as the display just
->> doesn't work before these patches are applied. It's just that it doesn't start to work
->> until the recent DU/LVDS driver updates are applied.
+On Fri, 02 Mar 2018 09:02:32 +0000,
+Alex Shi wrote:
 > 
-> Ok, but my question remains: does the display work before these patches?
+> 
+> 
+> On 03/02/2018 12:46 AM, Greg KH wrote:
+> > On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
+> >> Hi All,
+> >>
+> >> Resent without non-upstream patches.
+> >>
+> >> This backport patchset fixed the spectre issue, it's original branch:
+> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+> >> A few dependency or fixingpatches are also picked up, if they are necessary
+> >>  and no functional changes.
+> >>
+> >> No bug found from kernelci.org and lkft testing. It also could be gotten from:
+> >>
+> >> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
+> > 
+> > Also, how did you test, what platforms did you test, and did you test
+> > that this actually did fix the spectre issue on your platforms?  If so,
+> > what test did you use?
+> > 
+> 
+> On the kernelci, there are 18 kinds of platoforms with different
+> configure tested booting, detailed info is here:
+> https://kernelci.org/boot/all/job/lsk/branch/linux-linaro-lsk-v4.9-test/kernel/lsk-v4.9-17.03-4844-g6f782cff6edb/
+> 
+> I also tested the qemu boot on hikey620. and normal boot on
 
-    No, there are no FCPVD/VSPD/DU/LVDS device nodes in R8A77970 TDs.
+Did you try QEMU in conjunction with KVM? Or just in emulation?
 
-MBR, Sergei
+> hikey620/db410c/junor2. The other testing include the LKFT testing which
+> is reported by email, same as test for LTS. None of testing show
+> regressions.
+> 
+> 
+> As testing the spectre bug fix, that's a good question. I also asked
+> this question to original patch authors, like Marc. They said they just
+> figure out these patches could block spectre or meltdown issue. From my
+> side, I just reproduced the process internal spectre. But all fix on arm
+> can not resolve the user space internal spectre. It can block from user
+> to kernel or kernel to user spectre according the code purose. So I
+> believe these patch could do their job. And arm cpu would drop the
+> spectre branches if it has 20+ 'nop' instructions...
+
+What are you talking about? What's that story about NOPs? There are
+clear mitigation guidelines for ARM cores, please don't make things
+up.
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
