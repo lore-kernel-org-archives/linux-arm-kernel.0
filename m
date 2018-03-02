@@ -1,115 +1,27 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 2 Mar 2018 09:23:12 -0700
-Subject: [PATCH 04/14] iommu: sva: Add support for pasid allocation
-In-Reply-To: <b71fefa1-2fdf-f14f-9e7a-0e525a103049@arm.com>
-References: <20180221225924.30737-1-jcrouse@codeaurora.org>
- <20180221225924.30737-5-jcrouse@codeaurora.org>
- <b71fefa1-2fdf-f14f-9e7a-0e525a103049@arm.com>
-Message-ID: <20180302162311.GB22596@jcrouse-lnx.qualcomm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 10:25:13 -0600
+Subject: [PATCH] dt-bindings: iio: adc: stm32-dfsdm: fix types, add
+ missing pinctrl
+In-Reply-To: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
+References: <1519384260-23875-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180302162513.umh2a2g4io3x26uz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 12:27:58PM +0000, Jean-Philippe Brucker wrote:
-> On 21/02/18 22:59, Jordan Crouse wrote:
-> [...]
-> > +int iommu_sva_alloc_pasid(struct iommu_domain *domain, struct device *dev)
-> > +{
-> > +	int ret, pasid;
-> > +	struct io_pasid *io_pasid;
-> > +
-> > +	if (!domain->ops->pasid_alloc || !domain->ops->pasid_free)
-> > +		return -ENODEV;
-> > +
-> > +	io_pasid = kzalloc(sizeof(*io_pasid), GFP_KERNEL);
-> > +	if (!io_pasid)
-> > +		return -ENOMEM;
-> > +
-> > +	io_pasid->domain = domain;
-> > +	io_pasid->base.type = IO_TYPE_PASID;
-> > +
-> > +	idr_preload(GFP_KERNEL);
-> > +	spin_lock(&iommu_sva_lock);
-> > +	pasid = idr_alloc_cyclic(&iommu_pasid_idr, &io_pasid->base,
-> > +		1, (1 << 31), GFP_ATOMIC);
+On Fri, Feb 23, 2018 at 12:11:00PM +0100, Fabrice Gasnier wrote:
+> - Add missing pinctrl description. Support is made optional as dfsdm
+>   may use internal sources (e.g. via registers)
+> - Fix typo in IIO STM32 DFSDM filter "MANCH_F" description.
+> Basically, this should be "falling edge = logic 0", not "1" that applies
+> to "MANCH_R".
+> BTW, make the description complete by describing both rising/falling
+> edges as described in reference manuals.
 > 
-> To be usable by other IOMMUs, this should restrict the PASID range to what
-> the IOMMU and the device support like io_mm_alloc(). In your case 31 bits,
-> but with PCI PASID it depends on the PASID capability and the SMMU
-> SubstreamID range.
+> Fixes: 6c82f947fc97 ("IIO: add DT bindings for stm32 DFSDM filter")
 > 
-> For this reason I think device drivers should call iommu_sva_device_init()
-> once, even for the alloc_pasid() API. For SMMUv2 I guess it will be a NOP,
-> but other IOMMUs will allocate PASID tables and enable features in the
-> device. In addition, knowing that all users of the API call
-> iommu_sva_device_init()/shutdown() could allow us to allocate and enable
-> stuff lazily in the future.
-> 
-> It would also allow a given device driver to use both
-> iommu_sva_pasid_alloc() and iommu_sva_bind() at the same time. So that the
-> driver can assigns contexts to userspace and still use some of them for
-> management.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 
-No problem.
-
-> [...]
-> > +int iommu_sva_map(int pasid, unsigned long iova,
-> > +	      phys_addr_t paddr, size_t size, int prot)
-> 
-> It would be nice to factor iommu_map(), since this logic for map, map_sg
-> and unmap should be the same regardless of the PASID argument.
-> 
-> For example
-> - iommu_sva_map(domain, pasid, ...)
-> - iommu_map(domain, ...)
-> 
-> both call
-> - __iommu_map(domain, pasid, ...)
-> 
-> which calls either
-> - ops->map(domain, ...)
-> - ops->sva_map(domain, pasid, ...)
-
-Agree.  I was kind of annoyed at the code duplication - this would be a good way
-to handle it.
-
-> [...]
-> > @@ -347,6 +353,15 @@ struct iommu_ops {
-> >  	int (*page_response)(struct iommu_domain *domain, struct device *dev,
-> >  			     struct page_response_msg *msg);
-> >  
-> > +	int (*pasid_alloc)(struct iommu_domain *domain, struct device *dev,
-> > +		int pasid);
-> > +	int (*sva_map)(struct iommu_domain *domain, int pasid,
-> > +		       unsigned long iova, phys_addr_t paddr, size_t size,
-> > +		       int prot);
-> > +	size_t (*sva_unmap)(struct iommu_domain *domain, int pasid,
-> > +			    unsigned long iova, size_t size);
-> > +	void (*pasid_free)(struct iommu_domain *domain, int pasid);
-> > +
-> 
-> Hmm, now IOMMU has the following ops:
-> 
-> * mm_alloc(): allocates a shared mm structure
-> * mm_attach(): writes the entry in the PASID table
-> * mm_detach(): removes the entry from the PASID table and invalidates it
-> * mm_free(): free shared mm
-> * pasid_alloc(): allocates a pasid structure (which I usually call
-> "private mm") and write the entry in the PASID table (or call
-> install_pasid() for SMMUv2)
-> * pasid_free(): remove from the PASID table (or call remove_pasid()) and
-> free the pasid structure.
-> 
-> Splitting mm_alloc and mm_attach is necessary because the io_mm in my case
-> can be shared between devices (allocated once, attached multiple times).
-> In your case a PASID is private to one device so only one callback is
-> needed. However mm_alloc+mm_attach will do roughly the same as
-> pasid_alloc, so to reduce redundancy in iommu_ops, maybe we could reuse
-> mm_alloc and mm_attach for the private PASID case?
-
-Okay - let me bang on it and see what we can clean up.  Thanks for the review.
-
-Jordan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Reviewed-by: Rob Herring <robh@kernel.org>
