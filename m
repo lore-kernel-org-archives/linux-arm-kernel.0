@@ -1,107 +1,28 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri,  2 Mar 2018 14:56:37 -0700
-Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
-In-Reply-To: <20180302215638.6145-1-jcrouse@codeaurora.org>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
-Message-ID: <20180302215638.6145-2-jcrouse@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Mar 2018 22:02:15 +0000
+Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: add SFP module support
+In-Reply-To: <20180302215614.GD25189@lunn.ch>
+References: <20180227160135.GU9418@n2100.armlinux.org.uk>
+ <E1eqhha-0004l3-Rd@rmk-PC.armlinux.org.uk>
+ <20180302215614.GD25189@lunn.ch>
+Message-ID: <20180302220215.GC9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree bindings for the Adreno GMU device
-available on Adreno a6xx targets.
+On Fri, Mar 02, 2018 at 10:56:14PM +0100, Andrew Lunn wrote:
+> On Tue, Feb 27, 2018 at 04:02:02PM +0000, Russell King wrote:
+> > Add SFP module support for Clearfog using the SFP phylink support.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> 
+> Using a RoboFiber SFP module, connected to a media converter. Link
+> up/down detected.
 
-Change-Id: I3cfd5fb35ab0045e39905ff12393006e60f1a124
-Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
----
- .../devicetree/bindings/display/msm/gmu.txt        | 54 ++++++++++++++++++++++
- .../devicetree/bindings/display/msm/gpu.txt        | 10 +++-
- 2 files changed, 62 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
+ethtool -m should also work.
 
-diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
-new file mode 100644
-index 000000000000..f65bb49fff36
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
-@@ -0,0 +1,54 @@
-+Qualcomm adreno/snapdragon GMU (Graphics management unit)
-+
-+The GMU is a programmable power controller for the GPU. the CPU controls the
-+GMU which in turn handles power controls for the GPU.
-+
-+Required properties:
-+- compatible:
-+  * "qcom,adreno-gmu"
-+- reg: Physical base address and length of the GMU registers.
-+- reg-names: Matching names for the register regions
-+  * "gmu"
-+  * "gmu_pdc"
-+- interrupts: The interrupt signals from the GMU.
-+- interrupt-names: Matching names for the interrupts
-+  * "hfi"
-+  * "gmu"
-+- clocks: phandles to the device clocks
-+- clock-names: Matching names for the clocks
-+   * "gmu"
-+   * "cxo"
-+   * "axi"
-+   * "mnoc"
-+- power-domains: should be <&clock_gpucc GPU_CX_GDSC>
-+- iommus: phandle to the adreno iommu
-+- operating-points-v2: phandle to the OPP operating points
-+
-+Example:
-+
-+/ {
-+	...
-+
-+	gmu: gmu at 506a000 {
-+		compatible="qcom,adreno-gmu";
-+
-+		reg = <0x506a000 0x30000>,
-+			<0xb200000 0x300000>;
-+		reg-names = "gmu", "gmu_pdc";
-+
-+		interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+			<GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "hfi", "gmu";
-+
-+		clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
-+			<&clock_gpucc GPU_CC_CXO_CLK>,
-+			<&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
-+			<&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
-+		clock-names = "gmu", "cxo", "axi", "memnoc";
-+
-+		power-domains = <&clock_gpucc GPU_CX_GDSC>;
-+		iommus = <&adreno_smmu 5>;
-+
-+	i	operating-points-v2 = <&gmu_opp_table>;
-+	};
-+};
-diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
-index 43fac0fe09bb..0e207498edd3 100644
---- a/Documentation/devicetree/bindings/display/msm/gpu.txt
-+++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
-@@ -8,12 +8,18 @@ Required properties:
-   with the chip-id.
- - reg: Physical base address and length of the controller's registers.
- - interrupts: The interrupt signal from the gpu.
--- clocks: device clocks
-+
-+Optional properties.
-+- clocks: device clocks. Required for a3xx, a4xx and a5xx targets. a6xx and
-+  newer with a GMU attached do not have direct clock control from the CPU and
-+  do not need to provide clock properties.
-   See ../clocks/clock-bindings.txt for details.
--- clock-names: the following clocks are required:
-+- clock-names: the following clocks can be provided:
-   * "core"
-   * "iface"
-   * "mem_iface"
-+- gmu: For a6xx and newer targets a phandle to the GMU device that will
-+  control the power for the GPU
- 
- Example:
- 
 -- 
-2.16.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
