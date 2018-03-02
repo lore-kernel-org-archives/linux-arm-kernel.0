@@ -1,51 +1,43 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:16 +0100
-Subject: [PATCH 08/52] mtd: rawnand: davinci: fix probe function error path
+Date: Fri,  2 Mar 2018 18:03:20 +0100
+Subject: [PATCH 12/52] mtd: rawnand: fsl_elbc: fix probe function error path
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-9-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-13-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 An error after nand_scan_tail() should trigger a nand_release().
-The helper mtd_device_register() returns an error code that should
+The helper mtd_device_parse_register() returns an error code that should
 be checked and nand_release() called accordingly.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/davinci_nand.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/raw/fsl_elbc_nand.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
-index ccc8c43abcff..b5c107f8dc53 100644
---- a/drivers/mtd/nand/raw/davinci_nand.c
-+++ b/drivers/mtd/nand/raw/davinci_nand.c
-@@ -826,7 +826,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	else
- 		ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret < 0)
--		goto err;
+diff --git a/drivers/mtd/nand/raw/fsl_elbc_nand.c b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+index d59ec6572548..fc6b18fc704c 100644
+--- a/drivers/mtd/nand/raw/fsl_elbc_nand.c
++++ b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+@@ -926,13 +926,16 @@ static int fsl_elbc_nand_probe(struct platform_device *pdev)
+ 
+ 	/* First look for RedBoot table or partitions on the command
+ 	 * line, these take precedence over device tree information */
+-	mtd_device_parse_register(mtd, part_probe_types, NULL,
+-				  NULL, 0);
++	ret = mtd_device_parse_register(mtd, part_probe_types, NULL, NULL, 0);
++	if (ret)
 +		goto release_nand;
  
- 	val = davinci_nand_readl(info, NRCSR_OFFSET);
- 	dev_info(&pdev->dev, "controller rev. %d.%d\n",
-@@ -834,14 +834,16 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 
+ 	printk(KERN_INFO "eLBC NAND device at 0x%llx, bank %d\n",
+ 	       (unsigned long long)res.start, priv->bank);
  	return 0;
  
 +release_nand:
 +	nand_release(mtd);
  err:
- 	clk_disable_unprepare(info->clk);
--
- err_clk_enable:
- 	spin_lock_irq(&davinci_nand_lock);
- 	if (info->chip.ecc.mode == NAND_ECC_HW_SYNDROME)
- 		ecc4_busy = false;
- 	spin_unlock_irq(&davinci_nand_lock);
-+
+ 	fsl_elbc_chip_remove(priv);
  	return ret;
- }
- 
 -- 
 2.14.1
