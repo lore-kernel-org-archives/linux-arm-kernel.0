@@ -1,64 +1,85 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu,  1 Mar 2018 18:19:30 -0600
-Subject: [PATCHv2 2/7] arm64: dts: stratix10: add service driver binding to
- base dtsi
-In-Reply-To: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
-References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1519949975-13548-3-git-send-email-richard.gong@linux.intel.com>
+Date: Thu,  1 Mar 2018 18:19:28 -0600
+Subject: [PATCHv2 0/7] Add Intel Stratix10 FPGA manager and service layer
+Message-ID: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Gong <richard.gong@intel.com>
 
-Add Intel Stratix10 service layer to the device tree
+This is the 2nd submission of Intel service layer patches. Intel Stratix10
+FPGA manager, which is 1st service layer client, is included in this submission.
 
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Signed-off-by: Alan Tull <atull@kernel.org>
----
-v2: Change to put service layer driver node under the firmware node
-    Change compatible to "intel, stratix10-svc"
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Service layer patches have been reviewed internally by Alan Tull and other
+colleagues at Intel.
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 5a6a699..4395e76 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -24,6 +24,20 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		service_reserved: svcbuffer at 0 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x0 0x0 0x0 0x1000000>;
-+			alignment = <0x1000>;
-+			no-map;
-+		};
-+	};
-+
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -433,5 +447,13 @@
- 			resets = <&rst WATCHDOG3_RESET>;
- 			status = "disabled";
- 		};
-+
-+		firmware {
-+			svc {
-+				compatible = "intel,stratix10-svc";
-+				method = "smc";
-+				memory-region = <&service_reserved>;
-+			};
-+		};
- 	};
- };
+Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
+processor system (HPS) and Secure Device Manager (SDM). SDM is the hardware
+which does the FPGA configuration, QSPI, Crypto and warm reset.
+
+When the FPGA is configured from HPS, there needs to be a way for HPS to
+notify SDM the location and size of the configuration data. Then SDM will
+get the configuration data from that location and perform the FPGA configuration.
+
+To meet the whole system security needs and support virtual machine
+requesting communication with SDM, only the secure world of software (EL3,
+Exception Level 3) can interface with SDM. All software entities running
+on other exception levels must channel through the EL3 software whenever it
+needs service from SDM.
+
+Intel Stratix10 service layer driver is added to provide the service for
+FPGA configuration. Running at privileged exception level (EL1, Exception
+Level 1), Intel Stratix10 service layer driver interfaces with the service
+provider at EL1 (Intel Stratix10 FPGA Manager) and manages secure monitor
+call (SMC) to communicate with secure monitor software at secure monitor
+exception level (EL3).
+
+Later the Intel Stratix10 service layer driver will be extended to provide
+services for QSPI, Crypto and warm reset.
+
+v2: add patches for FPGA manager, FPGA manager binding, dts and defconfig
+    remove intel-service subdirectory and intel-service.h, move intel-smc.h
+    and intel-service.c to driver/misc subdirectory
+    remove global variables
+    change service layer driver be 'default n'
+    correct SPDX markers
+    add timeout for do..while() loop
+    add kernel-doc for the functions and structs, correct multiline comments
+    replace kfifo_in/kfifo_out with kfifo_in_spinlocked/kfifo_out_spinlocked
+    rename struct intel_svc_data (at client header) to intel_svc_client_msg
+    rename struct intel_svc_private_mem to intel_svc_data
+    other corrections/changes from Intel internal code reviews
+
+Alan Tull (3):
+  dt-bindings: fpga: add Stratix10 SoC FPGA manager binding
+  arm64: dts: stratix10: add fpga manager and region
+  fpga: add intel stratix10 soc fpga manager driver
+
+Richard Gong (4):
+  dt-bindings, firmware: add Intel Stratix10 service layer binding
+  arm64: dts: stratix10: add service driver binding to base dtsi
+  driver, misc: add Intel Stratix10 service layer driver
+  defconfig: enable fpga and service layer
+
+ .../bindings/firmware/intel,stratix10-svc.txt      |  57 ++
+ .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt |  10 +
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  34 +
+ arch/arm64/configs/defconfig                       |   5 +
+ drivers/fpga/Kconfig                               |   6 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/stratix10-soc.c                       | 503 +++++++++++
+ drivers/misc/Kconfig                               |  12 +
+ drivers/misc/Makefile                              |   1 +
+ drivers/misc/intel-service.c                       | 960 +++++++++++++++++++++
+ drivers/misc/intel-smc.h                           | 205 +++++
+ include/linux/intel-service-client.h               | 188 ++++
+ 12 files changed, 1982 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+ create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+ create mode 100644 drivers/fpga/stratix10-soc.c
+ create mode 100644 drivers/misc/intel-service.c
+ create mode 100644 drivers/misc/intel-smc.h
+ create mode 100644 include/linux/intel-service-client.h
+
 -- 
 2.7.4
