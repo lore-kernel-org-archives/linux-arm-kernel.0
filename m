@@ -1,54 +1,56 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 2 Mar 2018 08:24:23 +0000
-Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
-In-Reply-To: <20180227095028.GG21033@krava>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <20180227095028.GG21033@krava>
-Message-ID: <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  2 Mar 2018 08:31:22 +0000
+Subject: [PATCH v5 1/2] dt-bindings: i2c: add binding for Socionext SynQuacer
+ I2C
+In-Reply-To: <20180302083123.7259-1-ard.biesheuvel@linaro.org>
+References: <20180302083123.7259-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180302083123.7259-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/2018 09:50, Jiri Olsa wrote:
-> On Sat, Feb 24, 2018 at 12:05:21AM +0800, John Garry wrote:
->> This patchset adds support for some perf events features,
->> targeted at ARM64, implemented in a generic fashion.
->>
->> The two main features are as follows:
->> - support for arch/vendor/platform pmu events directory structure
->>    - to support this, topic subdirectory support needs to be dropped
->> - support for parsing standard architecture pmu events
->>
->> On the back of these, the Cavium ThunderX2, ARM Cortex-A53,
->> and HiSilicon hip08 JSONs are relocated/added/updated.
->>
->> In addition, there is a patch to drop mutli-mapfile.csv support and
->> also a bugfix in jevents.c for an error code value.
->>
->> Differences to v1:
->> - Address coding issues from Jiri Olsa in adding arch std event
->>    support (https://lkml.org/lkml/2018/2/6/501)
->> - add patch to drop topic subdirectory support
->> - add patch for bug fix in json_events()
->> - add review tags from Jiri Olsa
->
-> can't tell if those json file changes are ok, but for all the code changes:
->
+Add a binding for the I2C controller that can be found in the Socionext
+SynQuacer SoC.
 
-Hi William, Ganapatrao,
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/i2c/i2c-synquacer.txt | 29 ++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Can you check the modifications to the ARM64 JSONs you originally 
-submitted in the patchset please?
-
-If they are not checked, I'll have to see if the maintainers will accept 
-without your review. If not, I'll have to drop them.
-
-Thanks,
-John
-
-> Acked-by: Jiri Olsa <jolsa@kernel.org>
->
-> thanks,
-> jirka
->
-> .
->
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+new file mode 100644
+index 000000000000..72f4a2f0fedc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+@@ -0,0 +1,29 @@
++Socionext SynQuacer I2C
++
++Required properties:
++- compatible      : Must be "socionext,synquacer-i2c"
++- reg             : Offset and length of the register set for the device
++- interrupts      : A single interrupt specifier
++- #address-cells  : Must be <1>;
++- #size-cells     : Must be <0>;
++- clock-names     : Must contain "pclk".
++- clocks          : Must contain an entry for each name in clock-names.
++                    (See the common clock bindings.)
++
++Optional properties:
++- clock-frequency : Desired I2C bus clock frequency in Hz. As only Normal and
++                    Fast modes are supported, possible values are 100000 and
++                    400000.
++
++Example :
++
++    i2c at 51210000 {
++        compatible = "socionext,synquacer-i2c";
++        reg = <0x51210000 0x1000>;
++        interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++        #address-cells = <1>;
++        #size-cells = <0>;
++        clock-names = "pclk";
++        clocks = <&clk_i2c>;
++        clock-frequency = <400000>;
++    };
+-- 
+2.11.0
