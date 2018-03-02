@@ -1,84 +1,38 @@
-From: sean@mess.org (Sean Young)
-Date: Fri, 2 Mar 2018 14:10:01 +0000
-Subject: [RESEND PATCH v5 0/6] IR support for A83T
-In-Reply-To: <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
-References: <20180213122952.8420-1-embed3d@gmail.com>
- <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
-Message-ID: <20180302141001.2eqbpahdl7sddtzk@gofer.mess.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 2 Mar 2018 09:12:29 -0500
+Subject: RFC on Kdump and PCIe on ARM64
+In-Reply-To: <20180302103032.GB19323@arm.com>
+References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
+ <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
+ <2b2de17c-8527-e49b-2ef2-2a3d1801e4f9@codeaurora.org>
+ <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
+ <20180302103032.GB19323@arm.com>
+Message-ID: <84121a8d-5294-0567-6c6b-f57e85dc4961@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 01:11:34PM +0100, Philipp Rossak wrote:
-> On 13.02.2018 13:29, Philipp Rossak wrote:
-> > This patch series adds support for the sunxi A83T ir module and enhances
-> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> > is a hard coded define and is set to 8 MHz.
-> > This works for the most common ir receivers. On the Sinovoip Bananapi M3
-> > the ir receiver needs, a 3 MHz base clock frequency to work without
-> > problems with this driver.
-> > 
-> > This patch series adds support for an optinal property that makes it able
-> > to override the default base clock frequency and enables the ir interface
-> > on the a83t and the Bananapi M3.
-> > 
-> > changes since v4:
-> > * rename cir pin from cir_pins to r_cir_pin
-> > * drop unit-adress from r_cir_pin
-> > * add a83t compatible to the cir node
-> > * move muxing options to dtsi
-> > * rename cir label and reorder it in the bananpim3.dts file
-> > 
-> > changes since v3:
-> > * collecting all acks & reviewd by
-> > * fixed typos
-> > 
-> > changes since v2:
-> > * reorder cir pin (alphabetical)
-> > * fix typo in documentation
-> > 
-> > changes since v1:
-> > * fix typos, reword Documentation
-> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
-> > * change dev_info() to dev_dbg()
-> > * change naming to cir* in dts/dtsi
-> > * Added acked Ackedi-by to related patch
-> > * use whole memory block instead of registers needed + fix for h3/h5
-> > 
-> > changes since rfc:
-> > * The property is now optinal. If the property is not available in
-> >    the dtb the driver uses the default base clock frequency.
-> > * the driver prints out the the selected base clock frequency.
-> > * changed devicetree property from base-clk-frequency to clock-frequency
-> > 
-> > Regards,
-> > Philipp
-> > 
-> > Philipp Rossak (6):
-> >    media: rc: update sunxi-ir driver to get base clock frequency from
-> >      devicetree
-> >    media: dt: bindings: Update binding documentation for sunxi IR
-> >      controller
-> >    arm: dts: sun8i: a83t: Add the cir pin for the A83T
-> >    arm: dts: sun8i: a83t: Add support for the cir interface
-> >    arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
-> >    arm: dts: sun8i: h3-h5: ir register size should be the whole memory
-> >      block
-> > 
-> >   Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
-> >   arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
-> >   arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
-> >   arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
-> >   drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
-> >   5 files changed, 38 insertions(+), 9 deletions(-)
-> > 
-> 
-> I talked yesterday with Maxime about this patch series. And he told me if
-> the first to patches got merged, he will apply the dts patches to the sunxi
-> tree.
-> 
-> Sean, can you merge the first two patches through the rc-core?
+Hi Will,
 
-Sure, no problem.
+On 3/2/2018 5:30 AM, Will Deacon wrote:
+>> Do you really have to reset the IOMMU?  Can you just give it new page
+>> tables that start out with all IOVAs from all devices being invalid,
+>> then add valid mappings as drivers need them (presumably after the
+>> driver has done whatever it needs to so the device stops using the old
+>> DMA addresses)?
+> We already have the option to do that via the command line using the
+> disable_bypass option, so it just sounds like we need to take this into
+> account when resetting the SMMU to take care that GBPA is configured so
+> that transactions are terminated when SMMUEN=0.
 
-Thanks
-Sean
+How about the points that Baoquan highlighted in his email regarding the
+solution from AMD and X86?
+
+I have not read the entire thread but, is this just a matter of following
+what Bjorn recommended or there is more to it?
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
