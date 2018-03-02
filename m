@@ -1,134 +1,60 @@
-From: fkan@apm.com (Feng Kan)
-Date: Fri, 2 Mar 2018 14:32:23 -0800
-Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <20180302192110.GA202062@bhelgaas-glaptop.roam.corp.google.com>
-References: <1519942514-3350-1-git-send-email-fkan@apm.com>
- <20180302192110.GA202062@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAL85gmBOXvdSbRTrbu4TO26msn7RBABRqdLR-198W19w2TzUUw@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Sat, 3 Mar 2018 06:34:50 +0800
+Subject: [PATCH v3] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
+ MT7623
+In-Reply-To: <20180302105719.GC27178@ulmo>
+References: <051f401bcca48ece188023ccf10b2cedc7a25a64.1519891948.git.sean.wang@mediatek.com>
+ <20180302105719.GC27178@ulmo>
+Message-ID: <1520030090.8089.186.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 11:21 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Mar 01, 2018 at 02:15:14PM -0800, Feng Kan wrote:
->> When bridge and its endpoint is enumerated the devices are added to the
->> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
->> This causes the bridge to be moved to the end of the dpm list when
->> deferred probe kicks in. The order of the dpm list for bridge and
->> endpoint is reversed.
->
-> I'm not very familiar with PM, so can you connect some of the dots
-> here for me?
->
-> When you say "the bridge defers probe when IOMMU is not ready", are
-> you talking about pcie_portdrv_probe() claiming a PCIe port?
-This is at driver_probe_device. Since the CCA attribute is set to 1 in the ACPI
-table, the driver attempts a dma_configure. This is where it fails.
->
-> How does this connect with the IOMMU?  Where do we figure out that the
-> IOMMU is not ready?
-The dma_configure attempts to do an iort_iommu_xlate which cause the
-probe to defer. The iort_iommu_xlate fails because the IOMMU driver has not
-been probe yet.
-        /*
-         * If the ops look-up fails, this means that either
-         * the SMMU drivers have not been probed yet or that
-         * the SMMU drivers are not built in the kernel;
-         * Depending on whether the SMMU drivers are built-in
-         * in the kernel or not, defer the IOMMU configuration
-         * or just abort it.
-         */
-        ops = iommu_ops_from_fwnode(iort_fwnode);
-        if (!ops)
-                return iort_iommu_driver_enabled(node->type) ?
-                       -EPROBE_DEFER : -ENODEV;
->
->> Add reordering code to move the bridge and its children and consumers to
->> the end of the pm list so the order for suspend and resume is not altered.
->> The code also move device and its children and consumers to the tail of
->> device_kset list if it is registered.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Toan Le <toanle@apm.com>
->> ---
->>  V2:
->>       1. change patch title from "move device and its children..."
->>       2. move define based on Bjorn's comment
->>       3. rename function name and comment content
->>  drivers/base/base.h |  3 +++
->>  drivers/base/core.c | 22 ++++++++++++++++++++++
->>  drivers/base/dd.c   |  8 ++++----
->>  3 files changed, 29 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/base/base.h b/drivers/base/base.h
->> index d800de6..a75c302 100644
->> --- a/drivers/base/base.h
->> +++ b/drivers/base/base.h
->> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
->>  extern void device_links_no_driver(struct device *dev);
->>  extern bool device_links_busy(struct device *dev);
->>  extern void device_links_unbind_consumers(struct device *dev);
->> +
->> +/* device pm support */
->> +void device_pm_move_to_tail(struct device *dev);
->> diff --git a/drivers/base/core.c b/drivers/base/core.c
->> index 110230d..0a0756b 100644
->> --- a/drivers/base/core.c
->> +++ b/drivers/base/core.c
->> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
->>  }
->>
->>  /**
->> + * device_pm_move_to_tail - move device and its children and consumers to end of
->> + *                          pm and device kset list
->> + * @dev: current device pointer
->> + *
->> + * This is a lock held version of the device_reorder_to_tail. Function checks
->> + * if the device is registered and moves it to the end of device_kset list. Also
->> + * if the device is pm initialized, move the device to the end of the pm list.
->> + * Then the function iterate through the children and device link consumers to
->> + * do the same for each found.
->> + */
->> +void device_pm_move_to_tail(struct device *dev)
->> +{
->> +     int idx;
->> +
->> +     idx = device_links_read_lock();
->> +     device_pm_lock();
->> +     device_reorder_to_tail(dev, NULL);
->> +     device_pm_unlock();
->> +     device_links_read_unlock(idx);
->> +}
->> +
->> +/**
->>   * device_link_add - Create a link between two devices.
->>   * @consumer: Consumer end of the link.
->>   * @supplier: Supplier end of the link.
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index 2c964f5..7e9d1ef 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
->>                * Force the device to the end of the dpm_list since
->>                * the PM code assumes that the order we add things to
->>                * the list is a good order for suspend but deferred
->> -              * probe makes that very unsafe.
->> +              * probe makes that very unsafe. Move any children and
->> +              * consumers belong to the device to the end of the list.
->> +              * This way the suspend resume order won't be corrupted.
->>                */
->> -             device_pm_lock();
->> -             device_pm_move_last(dev);
->> -             device_pm_unlock();
->> +             device_pm_move_to_tail(dev);
->>
->>               dev_dbg(dev, "Retrying from deferred list\n");
->>               if (initcall_debug && !initcalls_done)
->> --
->> 1.8.3.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Fri, 2018-03-02 at 11:57 +0100, Thierry Reding wrote:
+> On Thu, Mar 01, 2018 at 04:19:12PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+> > control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+> > programming on PWM hardware causes waveform cannot be output as expected.
+> > Thus, the patch adds the extra condition for fixing up the weird case to
+> > let PWM4 or PWM5 able to work on MT7623.
+> > 
+> > v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+> > v2 -> v3: add more tags for Reviewed-by, Fixes, and Cc stable
+> > 
+> > Cc: stable at vger.kernel.org
+> > Fixes: caf065f8fd58 ("pwm: Add MediaTek PWM support")
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: Zhi Mao <zhi.mao@mediatek.com>
+> > Cc: John Crispin <john@phrozen.org>
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > ---
+> >  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+> >  1 file changed, 21 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> [...]
+> > @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > +	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
+> > +		/*
+> > +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
+> > +		 * from the other PWMs on MT7623.
+> > +		 */
+> > +		reg_width = PWM45DWIDTH_FIXUP;
+> > +		reg_thres = PWM45THRES_FIXUP;
+> > +	}
+> 
+> I don't understand this. According to the condition above the above
+> would also use the PWM[4,5] "fixup" register offsets with PWM[3]. Should
+> the condition be pwm->hwpwm > 3?
+> 
+> Thierry
+
+
+PWM[4,5] are the naming specified in datasheet and kept it as is here
+and driver or userspace would use index 3 and 4 to have a reference to
+them respectively.
