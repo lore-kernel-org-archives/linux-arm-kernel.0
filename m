@@ -1,38 +1,84 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 10:40:37 -0600
-Subject: [PATCH v2 2/8] arm64: zynqmp: Add support for Xilinx zcu100-revC
-In-Reply-To: <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
-References: <cover.1519396753.git.michal.simek@xilinx.com>
- <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
-Message-ID: <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 2 Mar 2018 16:40:09 +0000
+Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
+In-Reply-To: <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+ <20180227095028.GG21033@krava>
+ <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+ <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
+ <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+Message-ID: <4d22ba78-dba7-a550-f31b-64f29e3f0cbc@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 03:40:24PM +0100, Michal Simek wrote:
-> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
-> port and usbs.
-> Board is using fixed clocks because clock driver hasn't been merged yet.
+>>> Can you check the modifications to the ARM64 JSONs you originally submitted in the patchset please?>
+>>> If they are not checked, I'll have to see if the maintainers will accept without your review. If not, I'll have to drop them.
+>
+> I am seeing issue(log below) with this patchset on our platfrom.
+> i have tried using your v2 branch [1]
+>
+> root at borg-1>perf_acme>> ./perf --version
+> perf version 4.16.rc1.g087f7ca
+> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
+>
+>  Performance counter stats for 'sleep 1':
+>
+>             23,099      bus_access_rd
+>
+>        1.000708516 seconds time elapsed
+>
+> root at borg-1>perf_acme>> cd -
+> /ganapat/perf/linux-hisi/tools/perf
+> root at borg-1>perf>> ./perf --version
+> perf version 4.16.rc1.gcb5a74
+> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
+>
+>  Performance counter stats for 'sleep 1':
+>
+>                  0      bus_access_rd
+>
+>        1.000709162 seconds time elapsed
+>
+> root at borg-1>perf>>
+>
+>
+> [1] https://github.com/hisilicon/linux-hisi.git
 
-Please get rid of the separate clocks dts file when it is merged.
+Hi Ganapatrao,
 
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - Use i2c-mux instead of i2cswitch
-> - Remove i2c mw u-boot commands
-> - Use 96boards labels for i2cs and spis
-> - Fix pmic and wifi node
-> - Record compatible string to xilinx.txt
-> - Remove Nathalie's email (she left Xilinx already)
-> 
->  Documentation/devicetree/bindings/arm/xilinx.txt  |   6 +
->  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
->  arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        | 213 ++++++++++++++++
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 292 ++++++++++++++++++++++
->  4 files changed, 512 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+Thanks for the notification. Let me check this.
 
-Reviewed-by: Rob Herring <robh@kernel.org> 
+Regards,
+John
+
+>
+>>
+>> Hi John,
+>>
+>> I will take a look at the patches this weekend and give feedback beginning of next week. -Will
+>>
+>>>
+>>> Thanks,
+>>> John
+>>>
+>>>> Acked-by: Jiri Olsa <jolsa@kernel.org>
+>>>>
+>>>> thanks,
+>>>> jirka
+>>>>
+>>>> .
+>
+> thanks
+> Ganapat
+>>>>
+>>>
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> .
+>
