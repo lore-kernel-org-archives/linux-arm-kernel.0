@@ -1,47 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 2 Mar 2018 14:56:18 +0000
-Subject: [PATCH 01/14] iommu: Add DOMAIN_ATTR_ENABLE_TTBR1
-In-Reply-To: <20180221225924.30737-2-jcrouse@codeaurora.org>
-References: <20180221225924.30737-1-jcrouse@codeaurora.org>
- <20180221225924.30737-2-jcrouse@codeaurora.org>
-Message-ID: <39425ac4-d58b-18c1-3025-837222aecc5e@arm.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Fri, 2 Mar 2018 15:56:23 +0100
+Subject: [PATCH v3 0/2] Introduce STM32 USB PHY Controller driver
+Message-ID: <1520002585-13113-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/18 22:59, Jordan Crouse wrote:
-> Add a new domain attribute to enable the TTBR1 pagetable for drivers
-> and devices that support it.  This will enabled using a TTBR1 (otherwise
-> known as a "global" or "system" pagetable for devices that support a split
-> pagetable scheme for switching pagetables quickly and safely.
+This patchset adds support for STMicroelectronics STM32 USB PHY Controller
+(USBPHYC) which is embedded in STM32MP1 SoC.
+The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
+switch that selects either USB OTG controller or USB Host controller for the
+second PHY port.
 
-TTBR1 is very much an Arm VMSA-specific term; if the concept of a split 
-address space is useful in general, is it worth trying to frame it in 
-general terms? AFAICS other IOMMU drivers could achieve the same effect 
-fairly straightforwardly by simply copying the top-level "global" 
-entries across whenever they switch "private" tables.
+---
+Changes in v3:
+* Address Kishon comments: move to phy provider + child phy sub-nodes model.
+* Remove st,utmi-switch property as the information is now passed through
+  phy cell for port#2.
+* Rework phy init/exit by extracting pll management in dedicated functions.
+* Make some clean-up around variable names and defines.
 
-FWIW even for SMMU there could potentially be cases with Arm Ltd. IP 
-where the SoC vendor implements a stage-2-only configuration in their 
-media subsystem, because they care most about minimising area and 
-stage-1-only isn't an option.
+Changes in v2:
+* Update diagram to better describe the context.
+* Change boolean dt propery st,port2-switch-to-host into u32 st,utmi-switch.
+* Silent phy creation failure in case of -EPROBE_DEFER.
 
-Robin.
+Amelie Delaunay (2):
+  dt-bindings: phy: add support for STM32 USB PHY Controller (USBPHYC)
+  phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)
 
-> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> ---
->   include/linux/iommu.h | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 641aaf0f1b81..e2c49e583d8d 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -153,6 +153,7 @@ enum iommu_attr {
->   	DOMAIN_ATTR_FSL_PAMU_ENABLE,
->   	DOMAIN_ATTR_FSL_PAMUV1,
->   	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-> +	DOMAIN_ATTR_ENABLE_TTBR1,
->   	DOMAIN_ATTR_MAX,
->   };
->   
-> 
+ .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  |  73 ++++
+ drivers/phy/st/Kconfig                             |  14 +
+ drivers/phy/st/Makefile                            |   1 +
+ drivers/phy/st/phy-stm32-usbphyc.c                 | 461 +++++++++++++++++++++
+ 4 files changed, 549 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+ create mode 100644 drivers/phy/st/phy-stm32-usbphyc.c
+
+-- 
+2.7.4
