@@ -1,106 +1,174 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:56 +0100
-Subject: [PATCH 48/52] mtd: rawnand: docg4: convert driver to nand_scan()
+Date: Fri,  2 Mar 2018 18:04:00 +0100
+Subject: [PATCH 52/52] mtd: rawnand: allocate dynamically ONFI parameters
+ during detection
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-49-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-53-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two helpers have been added to the core to make ECC-related
-configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
-both nand_scan_ident() and nand_scan_tail().
+Now that it is possible to do dynamic allocations during the
+identification phase, convert the onfi_params structure (which is only
+needed with ONFI compliant chips) into a pointer that will be allocated
+only if needed.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/docg4.c | 51 ++++++++++++++++++++++++--------------------
- 1 file changed, 28 insertions(+), 23 deletions(-)
+ drivers/mtd/nand/raw/nand_base.c    | 37 +++++++++++++++++++++++++------------
+ drivers/mtd/nand/raw/nand_micron.c  |  4 ++--
+ drivers/mtd/nand/raw/nand_timings.c | 12 ++++++------
+ include/linux/mtd/rawnand.h         |  6 +++---
+ 4 files changed, 36 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
-index 1d3d5ac24381..dce040d75af0 100644
---- a/drivers/mtd/nand/raw/docg4.c
-+++ b/drivers/mtd/nand/raw/docg4.c
-@@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
- 	 * required within a nand driver because they are performed by the nand
- 	 * infrastructure code as part of nand_scan().  In this case they need
- 	 * to be initialized here because we skip call to nand_scan_ident() (the
--	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
--	 * because for this device the chip id is not read in the manner of a
--	 * standard nand device.  Unfortunately, nand_scan_ident() does other
--	 * things as well, such as call nand_set_defaults().
-+	 * first half of nand_scan()).  The call to nand_scan_ident() could be
-+	 * skipped because for this device the chip id is not read in the manner
-+	 * of a standard nand device.
- 	 */
- 
- 	struct nand_chip *nand = mtd_to_nand(mtd);
-@@ -1315,6 +1314,23 @@ static int __init read_id_reg(struct mtd_info *mtd)
- 
- static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
- 
-+static int docg4_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
-+
-+	init_mtd_structs(mtd);
-+
-+	/* Initialize kernel BCH algorithm */
-+	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
-+	if (!doc->bch)
-+		return -EINVAL;
-+
-+	reset(mtd);
-+
-+	return read_id_reg(mtd);
-+}
-+
- static int __init probe_docg4(struct platform_device *pdev)
+diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+index 82d52112907f..1b9fdf51ed8e 100644
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -5100,6 +5100,7 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
  {
- 	struct mtd_info *mtd;
-@@ -1350,26 +1366,16 @@ static int __init probe_docg4(struct platform_device *pdev)
- 	mtd->dev.parent = &pdev->dev;
- 	doc->virtadr = virtadr;
- 	doc->dev = dev;
--
--	init_mtd_structs(mtd);
--
--	/* initialize kernel bch algorithm */
--	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
--	if (doc->bch == NULL) {
--		retval = -EINVAL;
--		goto free_nand;
--	}
--
- 	platform_set_drvdata(pdev, doc);
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct nand_onfi_params *p;
++	struct onfi_params *op;
+ 	char *model;
+ 	char id[4];
+ 	int i, ret, val;
+@@ -5154,8 +5155,6 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
+ 	if (!chip->onfi_version) {
+ 		pr_info("unsupported ONFI version: %d\n", val);
+ 		goto free_onfi_param_page;
+-	} else {
+-		ret = 1;
+ 	}
  
--	reset(mtd);
--	retval = read_id_reg(mtd);
--	if (retval == -ENODEV) {
--		dev_warn(dev, "No diskonchip G4 device found.\n");
--		goto free_bch;
--	}
--
--	retval = nand_scan_tail(mtd);
-+	/*
-+	 * Asking for 0 chips is useless here but it warns the user that the use
-+	 * of the nand_scan() function is a bit abused here because the
-+	 * initialization is actually a bit specific and re-handled again in the
-+	 * ->attach_chip() hook. It will probably leak some memory though.
-+	 */
-+	nand->ecc.attach_chip = docg4_attach_chip;
-+	retval = nand_scan(mtd, 0);
- 	if (retval)
- 		goto free_bch;
+ 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
+@@ -5224,19 +5223,31 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
+ 		bitmap_set(chip->parameters.set_feature_list,
+ 			   ONFI_FEATURE_ADDR_TIMING_MODE, 1);
+ 	}
+-	chip->parameters.onfi_params.t_prog = le16_to_cpu(p->t_prog);
+-	chip->parameters.onfi_params.t_bers = le16_to_cpu(p->t_bers);
+-	chip->parameters.onfi_params.t_r = le16_to_cpu(p->t_r);
+-	chip->parameters.onfi_params.t_ccs = le16_to_cpu(p->t_ccs);
+-	chip->parameters.onfi_params.async_timing_mode =
+-		le16_to_cpu(p->async_timing_mode);
+-	chip->parameters.onfi_params.vendor_revision =
+-		le16_to_cpu(p->vendor_revision);
+-	memcpy(chip->parameters.onfi_params.vendor, p->vendor,
+-	       sizeof(p->vendor));
  
-@@ -1389,7 +1395,6 @@ static int __init probe_docg4(struct platform_device *pdev)
- 	nand_release(mtd); /* deletes partitions and mtd devices */
- free_bch:
- 	free_bch(doc->bch);
--free_nand:
- 	kfree(nand);
- unmap:
- 	iounmap(virtadr);
++	op = kzalloc(sizeof(*op), GFP_KERNEL);
++	if (!op) {
++		ret = -ENOMEM;
++		goto free_model;
++	}
++	op->t_prog = le16_to_cpu(p->t_prog);
++	op->t_bers = le16_to_cpu(p->t_bers);
++	op->t_r = le16_to_cpu(p->t_r);
++	op->t_ccs = le16_to_cpu(p->t_ccs);
++	op->async_timing_mode = le16_to_cpu(p->async_timing_mode);
++	op->vendor_revision = le16_to_cpu(p->vendor_revision);
++	memcpy(op->vendor, p->vendor, sizeof(p->vendor));
++	chip->parameters.onfi_params = op;
++
++	/* Identification done, free the full ONFI parameter page and exit */
++	kfree(p);
++
++	return 1;
++
++free_model:
++	kfree(model);
+ free_onfi_param_page:
+ 	kfree(p);
++
+ 	return ret;
+ }
+ 
+@@ -5966,6 +5977,8 @@ static int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+ static void nand_scan_ident_cleanup(struct nand_chip *chip)
+ {
+ 	kfree(chip->parameters.model);
++	kfree(chip->parameters.onfi_params);
++
+ }
+ 
+ static int nand_set_ecc_soft_ops(struct mtd_info *mtd)
+diff --git a/drivers/mtd/nand/raw/nand_micron.c b/drivers/mtd/nand/raw/nand_micron.c
+index 651129023257..0674721acad8 100644
+--- a/drivers/mtd/nand/raw/nand_micron.c
++++ b/drivers/mtd/nand/raw/nand_micron.c
+@@ -57,9 +57,9 @@ static int micron_nand_setup_read_retry(struct mtd_info *mtd, int retry_mode)
+ static int micron_nand_onfi_init(struct nand_chip *chip)
+ {
+ 	struct nand_parameters *p = &chip->parameters;
+-	struct nand_onfi_vendor_micron *micron = (void *)p->onfi_params.vendor;
++	struct nand_onfi_vendor_micron *micron = (void *)p->onfi_params->vendor;
+ 
+-	if (chip->onfi_version && p->onfi_params.vendor_revision) {
++	if (p->onfi_params && p->onfi_params->vendor_revision) {
+ 		chip->read_retries = micron->read_retry_options;
+ 		chip->setup_read_retry = micron_nand_setup_read_retry;
+ 	}
+diff --git a/drivers/mtd/nand/raw/nand_timings.c b/drivers/mtd/nand/raw/nand_timings.c
+index b97bcf29f75a..58dc524471fa 100644
+--- a/drivers/mtd/nand/raw/nand_timings.c
++++ b/drivers/mtd/nand/raw/nand_timings.c
+@@ -292,6 +292,7 @@ int onfi_fill_data_interface(struct nand_chip *chip,
+ 			     int timing_mode)
+ {
+ 	struct nand_data_interface *iface = &chip->data_interface;
++	struct onfi_params *onfi_params = chip->parameters.onfi_params;
+ 
+ 	if (type != NAND_SDR_IFACE)
+ 		return -EINVAL;
+@@ -306,17 +307,16 @@ int onfi_fill_data_interface(struct nand_chip *chip,
+ 	 * tR, tPROG, tCCS, ...
+ 	 * These information are part of the ONFI parameter page.
+ 	 */
+-	if (chip->onfi_version) {
+-		struct nand_parameters *params = &chip->parameters;
++	if (onfi_params) {
+ 		struct nand_sdr_timings *timings = &iface->timings.sdr;
+ 
+ 		/* microseconds -> picoseconds */
+-		timings->tPROG_max = 1000000ULL * params->onfi_params.t_prog;
+-		timings->tBERS_max = 1000000ULL * params->onfi_params.t_bers;
+-		timings->tR_max = 1000000ULL * params->onfi_params.t_r;
++		timings->tPROG_max = 1000000ULL * onfi_params->t_prog;
++		timings->tBERS_max = 1000000ULL * onfi_params->t_bers;
++		timings->tR_max = 1000000ULL * onfi_params->t_r;
+ 
+ 		/* nanoseconds -> picoseconds */
+-		timings->tCCS_min = 1000UL * params->onfi_params.t_ccs;
++		timings->tCCS_min = 1000UL * onfi_params->t_ccs;
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+index 9e15256bef2b..7d43fc05d009 100644
+--- a/include/linux/mtd/rawnand.h
++++ b/include/linux/mtd/rawnand.h
+@@ -445,7 +445,7 @@ struct nand_parameters {
+ 	DECLARE_BITMAP(get_feature_list, ONFI_FEATURE_NUMBER);
+ 
+ 	/* ONFI parameters */
+-	struct onfi_params onfi_params;
++	struct onfi_params *onfi_params;
+ };
+ 
+ /* The maximum expected count of bytes in the NAND ID sequence */
+@@ -1559,10 +1559,10 @@ struct platform_nand_data {
+ /* return the supported asynchronous timing mode. */
+ static inline int onfi_get_async_timing_mode(struct nand_chip *chip)
+ {
+-	if (!chip->onfi_version)
++	if (!chip->parameters.onfi_params)
+ 		return ONFI_TIMING_MODE_UNKNOWN;
+ 
+-	return chip->parameters.onfi_params.async_timing_mode;
++	return chip->parameters.onfi_params->async_timing_mode;
+ }
+ 
+ int onfi_fill_data_interface(struct nand_chip *chip,
 -- 
 2.14.1
