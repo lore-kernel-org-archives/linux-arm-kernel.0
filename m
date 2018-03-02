@@ -1,97 +1,39 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri,  2 Mar 2018 09:20:35 +0530
-Subject: [PATCH v4 00/10] Add Actions Semi S900 pinctrl and gpio support
-Message-ID: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri,  2 Mar 2018 11:50:59 +0800
+Subject: [PATCH v3 0/3] gpio-keys: Add support for specifying wakeup event
+ action
+Message-ID: <20180302035102.10084-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
-Pinctrl and gpio subsystems share the common set of register range but
-implemented as individual drivers for making it less complex.
 
-Pinmux functions are only accessible for pin groups while pinconf
-parameters are available for both pin groups and individual pins.
+On chromebook kevin, we are using gpio-keys for pen insert event. But
+we only want it to wakeup the system when ejecting the pen.
 
-gpio-line-names has been added for the Bubblegum-96 board matching the
-96Boards CE specification v1.0.
-
-Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
-
-This patchset depends on the clock driver which is still under review:
-https://lkml.org/lkml/2018/2/9/831
-
-There is also S500 pinctrl and gpio driver developed by Andreas Farber
-independently to this patchset.
-https://github.com/afaerber/linux/commits/bg96-next
-
-If this patchseries seems to be good enough to add base OWL pinctrl and
-gpio support. Then, we may decide on adding S500 support on top of this later
-by reusing the pinctrl definitions from Andreas.
-
-Thanks,
-Mani
-
-Changes in v4:
-
-* Incorporated Andy's review for pinctrl driver
-* Used _relaxed functions for pinctrl driver
-* Added Andy's Reviewed-by tag for gpio driver
-* Added (back) Rob's Reviewed-by tag for pinctrl bindings
+So we may need to change the interrupt trigger type during suspending.
 
 Changes in v3:
-
-* Simplified owl_gpio_set_reg() with _relaxed functions
-* Added interrupt controller properties to gpio node bindings as suggested
-  by Rob
-* Minor code cleanups
+Adding more comments as Brian suggested.
 
 Changes in v2:
+Specify wakeup event action instead of irq trigger type as Brian
+suggested.
+Specify wakeup event action instead of irq trigger type as Brian
+suggested.
+Specify wakeup event action instead of irq trigger type as Brian
+suggested.
 
-* Implemented each GPIO bank as its own gpio-controller
-* Added gpio-ranges property
-* Modified pin group to follow pad names instead of register names
-* Incorporated review comments from Andy
-* Incorporated review comments from Andreas
-* Fixed the MODULE_LICENSE with respect to SPDX tag
-* Added Reviewed by tag from Rob for pinctrl binding
+Jeffy Chen (3):
+  Input: gpio-keys - add support for wakeup event action
+  Input: gpio-keys - allow setting wakeup event action in DT
+  arm64: dts: rockchip: Avoid wakeup when inserting the pen
 
-Manivannan Sadhasivam (10):
-  dt-bindings: pinctrl: Add bindings for Actions S900 SoC
-  arm64: dts: actions: Add pinctrl node for S900
-  arm64: actions: Enable PINCTRL in platforms Kconfig
-  pinctrl: actions: Add Actions S900 pinctrl driver
-  dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
-  arm64: dts: actions: Add S900 gpio nodes
-  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
-  gpio: Add gpio driver for Actions OWL S900 SoC
-  MAINTAINERS: Add reviewer for ACTIONS platforms
-  MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
-
- .../devicetree/bindings/gpio/actions,owl-gpio.txt  |   95 +
- .../bindings/pinctrl/actions,s900-pinctrl.txt      |  178 ++
- MAINTAINERS                                        |    5 +
- arch/arm64/Kconfig.platforms                       |    1 +
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  201 ++
- arch/arm64/boot/dts/actions/s900.dtsi              |   54 +
- drivers/gpio/Kconfig                               |    8 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-owl.c                            |  218 ++
- drivers/pinctrl/Kconfig                            |    1 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/actions/Kconfig                    |   12 +
- drivers/pinctrl/actions/Makefile                   |    2 +
- drivers/pinctrl/actions/pinctrl-owl.c              |  579 +++++
- drivers/pinctrl/actions/pinctrl-owl.h              |  142 ++
- drivers/pinctrl/actions/pinctrl-s900.c             | 2505 ++++++++++++++++++++
- 16 files changed, 4003 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
- create mode 100644 drivers/gpio/gpio-owl.c
- create mode 100644 drivers/pinctrl/actions/Kconfig
- create mode 100644 drivers/pinctrl/actions/Makefile
- create mode 100644 drivers/pinctrl/actions/pinctrl-owl.c
- create mode 100644 drivers/pinctrl/actions/pinctrl-owl.h
- create mode 100644 drivers/pinctrl/actions/pinctrl-s900.c
+ .../devicetree/bindings/input/gpio-keys.txt        |  8 +++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  2 ++
+ drivers/input/keyboard/gpio_keys.c                 | 39 ++++++++++++++++++++++
+ include/linux/gpio_keys.h                          |  2 ++
+ include/uapi/linux/input-event-codes.h             |  9 +++++
+ 5 files changed, 60 insertions(+)
 
 -- 
-2.14.1
+2.11.0
