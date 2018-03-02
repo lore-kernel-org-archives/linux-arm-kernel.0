@@ -1,252 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 2 Mar 2018 13:57:02 -0300
-Subject: [PATCH] ARM: dts: tpc: Device tree description of the TPC board
-In-Reply-To: <20180302121750.12865-1-lukma@denx.de>
-References: <20180302121750.12865-1-lukma@denx.de>
-Message-ID: <CAOMZO5BTnfHRkGnROh3LJoGVPcBcQk=rroYip4V1DDBUbkRuKw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Mar 2018 16:57:39 +0000
+Subject: [PATCH] arm64: kdump: fix interrupt handling done during
+ machine_crash_shutdown
+In-Reply-To: <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
+References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
+ <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+ <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
+ <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
+ <20180302120556.xujh3hoy44y7ouz7@lakrids.cambridge.arm.com>
+ <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
+ <20180302131545.q2vf6uc3yofofqdb@lakrids.cambridge.arm.com>
+ <CAH76GKOe=+WTrw8QEJ43+fyEfRPuo7+ds8VNoMCUqSNBMtxkyg@mail.gmail.com>
+ <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
+Message-ID: <20180302165739.dc726v3yf2mxli3u@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+On Fri, Mar 02, 2018 at 04:44:13PM +0000, Mark Rutland wrote:
+> On Fri, Mar 02, 2018 at 02:52:07PM +0100, Grzegorz Jaszczyk wrote:
+> > 2018-03-02 14:15 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+> > > Do you see this for a panic() in *any* interrupt handler?
+> > 
+> > I only test with this two interrupt handlers: watchdog and i2c but I
+> > think it will behave the same with others - I can try with other if
+> > you want, any suggestion which? Maybe with some PPI interrupt instead?
+> > >
+> > > Can you trigger the issue with magic-sysrq c, for example?
+> > 
+> > There is no problem when I trigger it via 'echo c >
+> > /proc/sysrq-trigger' - it works well all the time. The problem appears
+> > only, when the kexec/kdump procedure is triggered from interrupt
+> > context
+> 
+> I'd meant that you'd send sysrq + c over serial, rather than writing to
+> /proc/sysrq-trigger. That way, the panic will be in the context of the
+> UART IRQ handler.
+> 
+> If that shows the issue, that's ilikely to be the easiest way for
+> someone else to reproduce and investigate this.
 
-In addition to Sascha's comments:
+FWIW, having just given this a go on my Juno R1 with v4.16-rc3
+defconfig, the UART IRQs work fine in the crash kernel. That crash
+happened in IRQ context:
 
-On Fri, Mar 2, 2018 at 9:17 AM, Lukasz Majewski <lukma@denx.de> wrote:
+[  384.653153] Call trace:
+[  384.655581]  sysrq_handle_crash+0x20/0x30
+[  384.659559]  __handle_sysrq+0xa8/0x1a0
+[  384.663278]  handle_sysrq+0x28/0x38
+[  384.666738]  pl011_fifo_to_tty+0x150/0x1a8
+[  384.670801]  pl011_int+0x30c/0x430
+[  384.674177]  __handle_irq_event_percpu+0x5c/0x148
+[  384.678843]  handle_irq_event_percpu+0x34/0x88
+[  384.683250]  handle_irq_event+0x48/0x78
+[  384.687056]  handle_fasteoi_irq+0xa8/0x180
+[  384.691119]  generic_handle_irq+0x24/0x38
+[  384.695095]  __handle_domain_irq+0x5c/0xb0
+[  384.699158]  gic_handle_irq+0x58/0xa8
+[  384.702790]  el1_irq+0xb0/0x128
+[  384.705907]  cpuidle_enter_state+0x138/0x220
+[  384.710142]  cpuidle_enter+0x18/0x20
+[  384.713690]  call_cpuidle+0x1c/0x38
+[  384.717151]  do_idle+0x1b0/0x1e8
+[  384.720354]  cpu_startup_entry+0x20/0x28
+[  384.724246]  rest_init+0xd0/0xe0
+[  384.727450]  start_kernel+0x3e4/0x410
 
-> diff --git a/arch/arm/boot/dts/imx6q-kp-tpc.dts b/arch/arm/boot/dts/imx6q-kp-tpc.dts
-> new file mode 100644
-> index 000000000000..955462e778c9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-kp-tpc.dts
-> @@ -0,0 +1,84 @@
-> +/*
-> + * Copyright 2018
-> + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is licensed under the terms of the GNU General Public
-> + *     License version 2.  This program is licensed "as is" without
-> + *     any warranty of any kind, whether express or implied.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
+On a separate note, the crashkernel complained:
 
-Please consider using SPDX tag instead.
+[    0.224730] CPU: CPUs started in inconsistent modes
 
-> +/dts-v1/;
-> +
-> +#include "imx6q-kp.dtsi"
-> +
-> +/ {
-> +       model = "Freescale i.MX6 Quad K+P TPC Board";
-> +       compatible = "fsl,imx6q-tpc", "fsl,imx6q";
+... which is a separate disaster. I suspect the kexec code failed to punt the
+crash CPU back to EL2 as it should have.
 
-Use the board manufacturer symbol instead.
-
-If needed, add an entry for the vendor at
-Documentation/devicetree/bindings/vendor-prefixes.txt
-
-> +};
-> +
-> +&lcd_display {
-> +       display-timings {
-> +               800x480x60 {
-> +                       clock-frequency = <34209000>;
-> +                       hactive = <800>;
-> +                       vactive = <480>;
-> +                       hback-porch = <85>;
-> +                       hfront-porch = <15>;
-> +                       vback-porch = <34>;
-> +                       vfront-porch = <10>;
-> +                       hsync-len = <28>;
-> +                       vsync-len = <1>;
-> +                       hsync-active = <1>;
-> +                       vsync-active = <1>;
-> +                       de-active = <1>;
-> +               };
-> +       };
-> +};
-
-We prefer to use a compatible panel entry instead of keeping the panel
-timings inside the dts.
-
-> +
-> +&ipu1_di0_disp0 {
-> +       remote-endpoint = <&lcd_display_in>;
-> +};
-> +
-> +&can1 {
-> +       status = "disabled";
-> +};
-> +
-> +&can2 {
-> +       status = "disabled";
-> +};
-> +
-> +&uart1 {
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       status = "disabled";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-kp.dtsi b/arch/arm/boot/dts/imx6q-kp.dtsi
-> new file mode 100644
-> index 000000000000..47a10fb1d46b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-kp.dtsi
-> @@ -0,0 +1,468 @@
-> +/*
-> + * Copyright 2018
-> + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is licensed under the terms of the GNU General Public
-> + *     License version 2.  This program is licensed "as is" without
-> + *     any warranty of any kind, whether express or implied.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-
-SPDX, please.
-
-
-> +       leds {
-> +               compatible = "gpio-leds";
-> +
-> +               green {
-> +                       label = "led1";
-> +                       gpios = <&gpio3 16 0>;
-
-gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
-
-> +                       linux,default-trigger = "gpio";
-> +                       default-state = "off";
-> +               };
-> +
-> +               red {
-> +                       label = "led0";
-> +                       gpios = <&gpio3 23 0>;
-
-GPIO_ACTIVE_HIGH
-
-> +                       linux,default-trigger = "gpio";
-> +                       default-state = "off";
-> +               };
-> +       };
-> +
-> +       memory: memory {
-> +               reg = <0x10000000 0x40000000>;
-> +       };
-
- memory at 10000000 otherwise warnings are seen when building with W=1.
-
-Make sure that building the dtb with W=1 introduces no warnings.
-
-> +&i2c1 {
-> +       clock-frequency = <400000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c1>;
-> +       status = "okay";
-> +
-> +       goodix_ts at 5d {
-> +               compatible = "goodix,gt911";
-> +               reg = <0x5d>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ts>;
-> +
-
-No need for these blank lines.
-
-> +               interrupt-parent = <&gpio1>;
-> +               interrupts = <9 2>;
-
-Please use an IRQ flag.
-
-> +               irq-gpios = <&gpio1 9 0>;
-
-GPIO_ACTIVE_HIGH
-
-> +               reset-gpios = <&gpio5 2 0>;
-
-GPIO_ACTIVE_HIGH.
-
-> +&i2c2 {
-> +       clock-frequency = <400000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c2>;
-> +       status = "okay";
-> +
-> +       codec: sgtl5000 at a {
-> +               compatible = "fsl,sgtl5000";
-> +               #sound-dai-cells = <0>;
-> +               reg = <0x0a>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_codec>;
-> +
-
-No need for these blank lines.
-
-> +               clocks = <&clks IMX6QDL_CLK_CKO>;
-> +               VDDA-supply = <&reg_3p3v>;
-> +               VDDIO-supply = <&reg_3p3v>;
-
-> +&uart2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart2>;
-> +       fsl,uart-has-rtscts;
-
- fsl,uart-has-rtscts has been deprecated. Please use  uart-has-rtscts instead.
+Thanks,
+Mark.
