@@ -1,41 +1,47 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 2 Mar 2018 15:52:38 +0100
-Subject: [PATCH v4 3/4] dt-bindings: display: amlogic: DT fix
- s/resets-names/reset-names/
-In-Reply-To: <1519998993-14398-4-git-send-email-geert+renesas@glider.be>
-References: <1519998993-14398-1-git-send-email-geert+renesas@glider.be>
- <1519998993-14398-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <d2be8243-caf1-32e3-bda2-b454a2cc147c@baylibre.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Mar 2018 14:56:18 +0000
+Subject: [PATCH 01/14] iommu: Add DOMAIN_ATTR_ENABLE_TTBR1
+In-Reply-To: <20180221225924.30737-2-jcrouse@codeaurora.org>
+References: <20180221225924.30737-1-jcrouse@codeaurora.org>
+ <20180221225924.30737-2-jcrouse@codeaurora.org>
+Message-ID: <39425ac4-d58b-18c1-3025-837222aecc5e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2018 14:56, Geert Uytterhoeven wrote:
-> Fixes: 8cceda5349377e30 ("dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> v4:
->   - Add Acked-by,
-> 
-> v3:
->   - New.
-> ---
->  Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> index bf4a18047309a5f8..d8f6268849f43621 100644
-> --- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> +++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-> @@ -43,7 +43,7 @@ Required properties:
->    and the Amlogic Meson venci clocks as described in
->    Documentation/devicetree/bindings/clock/clock-bindings.txt,
->    the clocks are soc specific, the clock-names should be "iahb", "isfr", "venci"
-> -- resets, resets-names: must have the phandles to the HDMI apb, glue and phy
-> +- resets, reset-names: must have the phandles to the HDMI apb, glue and phy
->    resets as described in :
->    Documentation/devicetree/bindings/reset/reset.txt,
->    the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
-> 
+On 21/02/18 22:59, Jordan Crouse wrote:
+> Add a new domain attribute to enable the TTBR1 pagetable for drivers
+> and devices that support it.  This will enabled using a TTBR1 (otherwise
+> known as a "global" or "system" pagetable for devices that support a split
+> pagetable scheme for switching pagetables quickly and safely.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+TTBR1 is very much an Arm VMSA-specific term; if the concept of a split 
+address space is useful in general, is it worth trying to frame it in 
+general terms? AFAICS other IOMMU drivers could achieve the same effect 
+fairly straightforwardly by simply copying the top-level "global" 
+entries across whenever they switch "private" tables.
+
+FWIW even for SMMU there could potentially be cases with Arm Ltd. IP 
+where the SoC vendor implements a stage-2-only configuration in their 
+media subsystem, because they care most about minimising area and 
+stage-1-only isn't an option.
+
+Robin.
+
+> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> ---
+>   include/linux/iommu.h | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 641aaf0f1b81..e2c49e583d8d 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -153,6 +153,7 @@ enum iommu_attr {
+>   	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>   	DOMAIN_ATTR_FSL_PAMUV1,
+>   	DOMAIN_ATTR_NESTING,	/* two stages of translation */
+> +	DOMAIN_ATTR_ENABLE_TTBR1,
+>   	DOMAIN_ATTR_MAX,
+>   };
+>   
+> 
