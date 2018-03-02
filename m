@@ -1,102 +1,145 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 2 Mar 2018 19:39:22 +0100
-Subject: [PATCH v2 3/8] arm64: zynqmp: Add support for Xilinx zcu102
-In-Reply-To: <20180302164803.nb45aqgqvnzxuyn5@rob-hp-laptop>
+Date: Fri, 2 Mar 2018 19:42:26 +0100
+Subject: [PATCH v2 4/8] arm64: zynqmp: Add support for Xilinx zcu104-revA
+In-Reply-To: <20180302180258.hex77xmptf5ab3xd@rob-hp-laptop>
 References: <cover.1519396753.git.michal.simek@xilinx.com>
- <dd5933d6a49247de4b3b7516ed7fab55d1b3eb90.1519396753.git.michal.simek@xilinx.com>
- <20180302164803.nb45aqgqvnzxuyn5@rob-hp-laptop>
-Message-ID: <f935102d-149f-cc67-e811-ab62caf4abd1@monstr.eu>
+ <68acadbb82fb0a8ac5abb9b1e156b9a9cf5b0f11.1519396753.git.michal.simek@xilinx.com>
+ <20180302180258.hex77xmptf5ab3xd@rob-hp-laptop>
+Message-ID: <b73d92a9-bbe0-e4a9-c0d7-c9379ac4ad80@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.3.2018 17:48, Rob Herring wrote:
-> On Fri, Feb 23, 2018 at 03:40:25PM +0100, Michal Simek wrote:
->> This patch is adding revA, revB and rev1.0. There are also other
->> revisions between which should be backward compatible with previous
->> versions. Unfortunately all revs are still in use.
+On 2.3.2018 19:02, Rob Herring wrote:
+> On Fri, Feb 23, 2018 at 03:40:26PM +0100, Michal Simek wrote:
+>> Xilinx zcu104 is another customer board. It is sort of zcu102 clone
+>> with some differences.
 >>
 >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 >> ---
 >>
 >> Changes in v2:
 >> - Remove i2c mw u-boot commands
->> - Use i2c-mux instead of i2cswitch
->> - Use clock generator without numbers.
->> - Use dash in node name zcu102 rev1.0
 >> - Record compatible string to xilinx.txt
 >>
->>  Documentation/devicetree/bindings/arm/xilinx.txt   |   5 +
->>  arch/arm64/boot/dts/xilinx/Makefile                |   3 +
->>  .../arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts |  36 ++
->>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts  | 550 +++++++++++++++++++++
->>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts  |  42 ++
->>  5 files changed, 636 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org> 
-> 
-> but...
-> 
-> 
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
+>>  Documentation/devicetree/bindings/arm/xilinx.txt  |   3 +
+>>  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
+>>  arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts | 197 ++++++++++++++++++++++
+>>  3 files changed, 201 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+>> index 2b922ec3c82a..a9ce08a68711 100644
+>> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
+>> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+>> @@ -26,3 +26,6 @@ Additional compatible strings:
+>>    "xlnx,zynqmp-zcu102-revA", "xlnx,zynqmp-zcu102"
+>>    "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102"
+>>    "xlnx,zynqmp-zcu102-rev1.0", "xlnx,zynqmp-zcu102"
+>> +
+>> +- Xilinx evaluation board zcu104
+>> +  "xlnx,zynqmp-zcu104-revA", "xlnx,zynqmp-zcu104"
+>> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+>> index 24e3ce801304..1c039e59c7c3 100644
+>> --- a/arch/arm64/boot/dts/xilinx/Makefile
+>> +++ b/arch/arm64/boot/dts/xilinx/Makefile
+>> @@ -4,3 +4,4 @@ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
+>>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
+>>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
+>>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-rev1.0.dtb
+>> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu104-revA.dtb
+>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
 >> new file mode 100644
->> index 000000000000..ed3cc684931f
+>> index 000000000000..89d26f56514b
 >> --- /dev/null
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
->> @@ -0,0 +1,42 @@
+>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu104-revA.dts
+>> @@ -0,0 +1,197 @@
 >> +// SPDX-License-Identifier: GPL-2.0+
 >> +/*
->> + * dts file for Xilinx ZynqMP ZCU102 RevB
+>> + * dts file for Xilinx ZynqMP ZCU104
 >> + *
->> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
+>> + * (C) Copyright 2017 - 2018, Xilinx, Inc.
 >> + *
 >> + * Michal Simek <michal.simek@xilinx.com>
 >> + */
 >> +
->> +#include "zynqmp-zcu102-revA.dts"
+>> +/dts-v1/;
+>> +
+>> +#include "zynqmp.dtsi"
+>> +#include "zynqmp-clk.dtsi"
+>> +#include <dt-bindings/gpio/gpio.h>
 >> +
 >> +/ {
->> +	model = "ZynqMP ZCU102 RevB";
->> +	compatible = "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102", "xlnx,zynqmp";
+>> +	model = "ZynqMP ZCU104 RevA";
+>> +	compatible = "xlnx,zynqmp-zcu104-revA", "xlnx,zynqmp-zcu104", "xlnx,zynqmp";
+>> +
+>> +	aliases {
+>> +		ethernet0 = &gem3;
+>> +		gpio0 = &gpio;
+> 
+> Drop. Not a supported alias.
+> 
+>> +		i2c0 = &i2c1;
+>> +		mmc0 = &sdhci1;
+>> +		rtc0 = &rtc;
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> +		serial2 = &dcc;
+>> +		usb0 = &usb0;
+> 
+> Drop. Not a supported alias.
+> 
+>> +	};
+>> +
+>> +	chosen {
+>> +		bootargs = "earlycon";
+>> +		stdout-path = "serial0:115200n8";
+>> +	};
+>> +
+>> +	memory at 0 {
+>> +		device_type = "memory";
+>> +		reg = <0x0 0x0 0x0 0x80000000>;
+>> +	};
+>> +};
+>> +
+>> +&can1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&dcc {
+>> +	status = "okay";
 >> +};
 >> +
 >> +&gem3 {
->> +	phy-handle = <&phyc>;
->> +	phyc: phy at c {
+>> +	status = "okay";
+>> +	phy-handle = <&phy0>;
+>> +	phy-mode = "rgmii-id";
+>> +	phy0: phy at c {
 >> +		reg = <0xc>;
 >> +		ti,rx-internal-delay = <0x8>;
 >> +		ti,tx-internal-delay = <0xa>;
 >> +		ti,fifo-depth = <0x1>;
 >> +	};
->> +	/* Cleanup from RevA */
->> +	/delete-node/ phy at 21;
 >> +};
 >> +
->> +/* Different qspi 512Mbit version */
-> 
-> Stray comment
-
-will remove.
-
-> 
+>> +&gpio {
+>> +	status = "okay";
+>> +};
 >> +
->> +/* Fix collision with u61 */
->> +&i2c0 {
->> +	i2cswitch at 75 {
+>> +&i2c1 {
+>> +	status = "okay";
+>> +	clock-frequency = <400000>;
+>> +
+>> +	/* Another connection to this bus via PL i2c via PCA9306 - u45 */
+>> +	i2cswitch at 74 { /* u34 */
 > 
-> Missed this name.
-> 
-> This probably creates a new node rather than going into the existing 
-> tree. If this compiles, we should fix it to not allow the same 
-> unit-address twice.
+> i2c-mux at 74
 
-hmm interesting I didn't see that before I sent this. There is a warning
-but not error.
+grrr - this was done but squashed to 5/8 instead.
 
-Thanks,
-Michal
+Will fix.
+
+M
+
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -112,4 +155,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/cb7a1f14/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/e3fdaae6/attachment-0001.sig>
