@@ -1,24 +1,240 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Mar 2018 14:23:27 +0100
-Subject: [PATCH v4 09/10] MAINTAINERS: Add reviewer for ACTIONS platforms
-In-Reply-To: <20180302035045.14660-10-manivannan.sadhasivam@linaro.org>
-References: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
- <20180302035045.14660-10-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdaUGnKZ+QG5DGa6KP_dhDZu3w0C3epEWoB57VkA9uTBaw@mail.gmail.com>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Fri, 2 Mar 2018 14:25:37 +0100
+Subject: [PATCH] ARM: dts: tpc: Device tree description of the TPC board
+In-Reply-To: <20180302125159.gufvhyy4ipyunmil@pengutronix.de>
+References: <20180302121750.12865-1-lukma@denx.de>
+ <20180302125159.gufvhyy4ipyunmil@pengutronix.de>
+Message-ID: <20180302142537.25764c8e@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 4:50 AM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+Hi Sascha,
 
-> Since I'll be working on improving support for ACTIONS platforms, adding
-> myself as the reviewer.
->
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Hi Lukasz,
+> 
+> On Fri, Mar 02, 2018 at 01:17:50PM +0100, Lukasz Majewski wrote:
+> > This commit adds device tree description of K+P's TPC board.  
+> 
+> Can we get a hint what this board is? I assume this one:
+> 
+> Technologic Systems' Full i.MX6 Portfolio Including SBC, COM, and
+> Touch Panel PCs
 
-Andreas it would be great of I can have your ACK on this so I
-can merge the new pinctrl drivers and maintainer changes
-through the pinctrl tree.
+I just took other imx6q boards as an example - e.g. 
 
-Yours,
-Linus Walleij
+420127e5a5b53ff2cb5effaa781aed93709b09bb
+
+Generally, descriptions of DTSes are rather short and simple.
+
+> 
+> Anyway, future developers are thankful if they have the information
+> around when they have to work on that file or have to decide if it is
+> to be removed.
+
+IMHO, there is plenty of information around (iMX6 Quad SoC, with
+components described in dts).
+
+> 
+> > 
+> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile         |   1 +
+> >  arch/arm/boot/dts/imx6q-kp-tpc.dts |  84 +++++++
+> >  arch/arm/boot/dts/imx6q-kp.dtsi    | 468
+> > +++++++++++++++++++++++++++++++++++++ 3 files changed, 553
+> > insertions(+) create mode 100644 arch/arm/boot/dts/imx6q-kp-tpc.dts
+> >  create mode 100644 arch/arm/boot/dts/imx6q-kp.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index ade7a38543dc..c148c4cf28f2 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -459,6 +459,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+> >  	imx6q-icore-ofcap10.dtb \
+> >  	imx6q-icore-ofcap12.dtb \
+> >  	imx6q-icore-rqs.dtb \
+> > +	imx6q-kp-tpc.dtb \
+> >  	imx6q-marsboard.dtb \
+> >  	imx6q-mccmon6.dtb \
+> >  	imx6q-nitrogen6x.dtb \
+> > diff --git a/arch/arm/boot/dts/imx6q-kp-tpc.dts
+> > b/arch/arm/boot/dts/imx6q-kp-tpc.dts new file mode 100644
+> > index 000000000000..955462e778c9
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6q-kp-tpc.dts
+> > +/dts-v1/;
+> > +
+> > +#include "imx6q-kp.dtsi"
+> > +
+> > +/ {
+> > +	model = "Freescale i.MX6 Quad K+P TPC Board";
+> > +	compatible = "fsl,imx6q-tpc", "fsl,imx6q";  
+> 
+> If it is what I think it is the vendor is not fsl.
+
+Yes. It is not from fsl.
+
+> 
+> > +};
+> > +
+> > +&lcd_display {
+> > +	display-timings {
+> > +		800x480x60 {
+> > +			clock-frequency = <34209000>;
+> > +			hactive = <800>;
+> > +			vactive = <480>;
+> > +			hback-porch = <85>;
+> > +			hfront-porch = <15>;
+> > +			vback-porch = <34>;
+> > +			vfront-porch = <10>;
+> > +			hsync-len = <28>;
+> > +			vsync-len = <1>;
+> > +			hsync-active = <1>;
+> > +			vsync-active = <1>;
+> > +			de-active = <1>;
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&ipu1_di0_disp0 {
+> > +	remote-endpoint = <&lcd_display_in>;
+> > +};
+> > +
+> > +&can1 {
+> > +	status = "disabled";
+> > +};
+> > +
+> > +&can2 {
+> > +	status = "disabled";
+> > +};  
+> 
+> These are not enabled in your base dtsi, so no need to disabled it
+> here.
+
+But they can be enabled if needed.
+
+> 
+> > +
+> > +&uart1 {
+> > +	status = "okay";
+> > +};  
+> 
+> This is already enabled in your base dtsi.
+> 
+> > +
+> > +&uart2 {
+> > +	status = "disabled";
+> > +};  
+> 
+> This is still disabled, no need to enable.
+
+The goal here is to group those buses in one "logical" item - to allow
+easy enabling if needed.
+
+> 
+> > diff --git a/arch/arm/boot/dts/imx6q-kp.dtsi
+> > b/arch/arm/boot/dts/imx6q-kp.dtsi new file mode 100644
+> > index 000000000000..47a10fb1d46b
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6q-kp.dtsi
+> > +
+> > +	memory: memory {
+> > +		reg = <0x10000000 0x40000000>;
+> > +	};
+> > +
+> > +	pwm-buzzer {
+> > +		compatible = "pwm-backlight";  
+> 
+> What is it? A backlight or a buzzer?
+
+It is a buzzer, which is controlled by PWM.
+
+> 
+> > +		pwms = <&pwm2 0 500000>; //2kHz
+> > +		brightness-levels = <
+> > +			0   7  8  9
+> > +			10 11 12 13 14 15 16 17 18 19
+> > +			20 21 22 23 24 25 26 27 28 29
+> > +			30 31 32 33 34 35 36 37 38 39
+> > +			40 41 42 43 44 45 46 47 48 49
+> > +			50 51 52 53 54 55 56 57 58 59
+> > +			60 61 62 63 64 65 66 67 68 69
+> > +			70 71 72 73 74 75 76 77 78 79
+> > +			80 81 82 83 84 85 86 87 88 89
+> > +			90 91 92 93 94 95 96 97 98 99
+> > +			100
+> > +			>;
+> > +		default-brightness-level = <0>;
+> > +	};
+> > +
+> > +	regulators {  
+> 
+> AFAIK regulators shall no longer be in a separate subnode.
+> 
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		reg_usb_h1_vbus: regulator at 1 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <1>;  
+> 
+> drop the reg property and also the @1 in the name.
+> 
+> > +			regulator-name = "usb_h1_vbus";
+> > +			regulator-min-microvolt = <5000000>;
+> > +			regulator-max-microvolt = <5000000>;
+> > +			enable-active-high;
+> > +		};
+> > +
+> > +		reg_audio: regulator at 2 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <2>;  
+> 
+> ditto
+
+Ok.
+
+> 
+> > +			regulator-name = "sgtl5000-supply";
+> > +			gpio = <&gpio6 31 GPIO_ACTIVE_HIGH>;
+> > +			enable-active-high;
+> > +			regulator-always-on;
+> > +		};
+> > +
+> > +		reg_3p3v: regulator at 3 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <4>;  
+> 
+> ditto.
+> 
+> (You have to change the node names of course to make them unique
+> again)
+
+Yes. correct.
+
+Thanks for your review.
+
+> 
+> 
+> Sascha
+> 
+> 
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/1aca93dd/attachment.sig>
