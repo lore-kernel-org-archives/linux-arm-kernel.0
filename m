@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Mar 2018 08:43:38 +0100
-Subject: [PATCH v1 01/19] dt-bindings: pinctrl: mediatek: use - instead of
- _ in examples
-In-Reply-To: <44956252092b19ece67c5a0df1492a5baeaa4dab.1519378871.git.sean.wang@mediatek.com>
+Date: Fri, 2 Mar 2018 08:44:48 +0100
+Subject: [PATCH v1 03/19] dt-bindings: pinctrl: mediatek: add bindings for
+ I2C2 and SPI2 on MT7623
+In-Reply-To: <607af13d88f733057df2ea057228e1cdbf77262a.1519378871.git.sean.wang@mediatek.com>
 References: <cover.1519378871.git.sean.wang@mediatek.com>
- <44956252092b19ece67c5a0df1492a5baeaa4dab.1519378871.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdaH+LPTv-ruNesf2D+RixYwBOxa44rwuZ8V616W5rLbXQ@mail.gmail.com>
+ <607af13d88f733057df2ea057228e1cdbf77262a.1519378871.git.sean.wang@mediatek.com>
+Message-ID: <CACRpkdYZmx-jxbjJDPpJ_wn0xszdKBPQiEa=tnCr2KVn1QBz6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +13,13 @@ On Fri, Feb 23, 2018 at 11:16 AM,  <sean.wang@mediatek.com> wrote:
 
 > From: Sean Wang <sean.wang@mediatek.com>
 >
-> It should be good that no use "_" is in examples. Consequently,
-> those nodes in certain files which have an inappropriate name containing
-> "_" are all being replaced with "-".
+> Add missing pinctrl binding about I2C2 and SPI2 which would be used in
+> devicetree related files.
 >
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: linux-gpio at vger.kernel.org
 > Cc: devicetree at vger.kernel.org
 
