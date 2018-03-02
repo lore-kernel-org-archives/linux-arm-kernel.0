@@ -1,45 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 09:42:15 -0600
-Subject: [PATCH v1 16/19] arm: dts: mt7623: fixup available memory size
- on bananapi-r2
-In-Reply-To: <e49485aac14bec85c14514c1953f8d7ea5401695.1519378872.git.sean.wang@mediatek.com>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <e49485aac14bec85c14514c1953f8d7ea5401695.1519378872.git.sean.wang@mediatek.com>
-Message-ID: <20180302154215.xr3b2zlmuojw5i6l@rob-hp-laptop>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Fri, 2 Mar 2018 15:43:44 +0000
+Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
+In-Reply-To: <d5f71ef3-60f1-dea8-0a6f-3d8c6f095cb6@arm.com>
+References: <20180302090948.6399-1-linus.walleij@linaro.org>
+ <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
+ <CACRpkdaVXrT24XvzJ4ciqEp8NRXFNG+e0VkM_JtgGBdpKa8P8w@mail.gmail.com>
+ <d5f71ef3-60f1-dea8-0a6f-3d8c6f095cb6@arm.com>
+Message-ID: <20180302154344.GB16053@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 06:16:36PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Fri, Mar 02, 2018 at 01:50:20PM +0000, Robin Murphy wrote:
+> On 02/03/18 12:37, Linus Walleij wrote:
+> > On Fri, Mar 2, 2018 at 1:11 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > > On 02/03/18 09:09, Linus Walleij wrote:
+> > 
+> > > > Also the Versatile Express CLCD on the motherboard has
+> > > > a dedicated video memory, and cannot use CMA (ha! complex!)
+> > > > and I will need to figure out a way to work around that.
+> > > > The CLCDs synthesized on the core tiles for CA9 work
+> > > > fine with this though.
+> > > 
+> > > Out of curiosity, what's the issue with declaring the VRAM as a CMA region?
+> > > That's certainly worked for stuff like local RAM on FPGA tiles in the past,
+> > > and I can't think offhand of any way in which VExpress is wildly different
+> > > (but I am of course open to being wrong...)
+> > 
+> > There is nothing wrong with that apart from my ignorance
+> > of that solution. So thanks! :D
+> > 
+> > My experience with CMA is limited to using the 7 areas
+> > that are defined by default in Kconfig and the DRM helpers
+> > just plugging in on the front.
+> > 
+> > Do you have some pointers? Is this something I can
+> > handily just set up in the device tree?
 > 
-> There is 2GB DDR3 available on bananapi-r2 board as [1] specified.
+> It should be - the inner workings of dma-{coherent,contiguous} are a maze of
+> twisty little passages, all alike, and it'll take me a while to page the
+> details back in, but IIRC it's mostly just a case of having a
+> reserved-memory node covering the VRAM with the right combination of magic
+> properties for rmem_dma_setup() to pick up, such that it gets assigned as
+> the CLCD's private region. The subsequent "just plugging in" aspect doesn't
+> change, it just makes allocations start taking this route under the covers:
 > 
-> [1] http://www.banana-pi.org/r2.html
+>   drm_gem_cma_create()
+>     dma_alloc_wc()
+>       dma_alloc_attrs()
+>         dma_alloc_from_dev_coherent()
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> index 140ff78..3e8d02c 100644
-> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> @@ -38,6 +38,11 @@
->  			default-state = "off";
->  		};
->  	};
-> +
-> +	memory {
+> I could have sworn I've exchanged relevant FPGA DT fragments with Liviu in
+> the past, but now I can't seem to find one to refer back to :(
 
-Unit address?
+Maybe something line this:
+https://github.com/ARM-software/linux/blob/development/malidp/arch/arm64/boot/dts/arm/juno-base.dtsi#L792
 
-> +		device_type = "memory";
-> +		reg = <0 0x80000000 0 0x80000000>;
-> +	};
->  };
->  
->  &afe {
-> -- 
-> 2.7.4
+And look at line 855 for the possible use of it.
+
+That is how we currently make CMA allocate buffers in FPGA for the Mali
+DP "hardware" (bitstream on FPGA) that we have in Juno.
+
+Best regards,
+Liviu
+
 > 
+> Robin.
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
