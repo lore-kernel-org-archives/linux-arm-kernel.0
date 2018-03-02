@@ -1,172 +1,106 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 2 Mar 2018 20:16:27 +0100
-Subject: [PATCH v2 2/5] arm: zynq: Add support for Xilinx zc770 xm010 dc1
- board
-In-Reply-To: <20180302185006.yciyjcchsx4aa7lu@rob-hp-laptop>
-References: <cover.1519398009.git.michal.simek@xilinx.com>
- <f049c5121edab27227337ccd607db4f38f8d76f3.1519398009.git.michal.simek@xilinx.com>
- <20180302185006.yciyjcchsx4aa7lu@rob-hp-laptop>
-Message-ID: <1ec3a67e-92b3-0453-44a2-24b23ffc9ac2@monstr.eu>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 02 Mar 2018 11:19:56 -0800
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
+ <5A972A7D.9020301@codeaurora.org>
+ <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
+ <5A986425.9080007@codeaurora.org>
+ <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+Message-ID: <5A99A3DC.9020400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.3.2018 19:50, Rob Herring wrote:
-> On Fri, Feb 23, 2018 at 04:00:20PM +0100, Michal Simek wrote:
->> zc770 is based board which is extended by FMC/DC cards for SoC
->> validation. FMCs/DCs are supposed to cover all SoC configurations.
->> FMC/DC contains ethernet port, can, i2c, sd, qspi, spi, uart and usb.
+On 03/02/2018 02:42 AM, Mark Rutland wrote:
+> On Thu, Mar 01, 2018 at 12:35:49PM -0800, Saravana Kannan wrote:
+>> On 03/01/2018 03:49 AM, Mark Rutland wrote:
+>>> On Wed, Feb 28, 2018 at 02:17:33PM -0800, Saravana Kannan wrote:
+>>>> On 02/25/2018 06:36 AM, Mark Rutland wrote:
+>>>>> On Fri, Feb 23, 2018 at 04:53:18PM -0800, Saravana Kannan wrote:
+>>>>>> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
+>>>>>>> +static void dsu_pmu_event_update(struct perf_event *event)
+>>>>>>> +{
+>>>>>>> +	struct hw_perf_event *hwc = &event->hw;
+>>>>>>> +	u64 delta, prev_count, new_count;
+>>>>>>> +
+>>>>>>> +	do {
+>>>>>>> +		/* We may also be called from the irq handler */
+>>>>>>> +		prev_count = local64_read(&hwc->prev_count);
+>>>>>>> +		new_count = dsu_pmu_read_counter(event);
+>>>>>>> +	} while (local64_cmpxchg(&hwc->prev_count, prev_count, new_count) !=
+>>>>>>> +			prev_count);
+>>>>>>> +	delta = (new_count - prev_count) & DSU_PMU_COUNTER_MASK(hwc->idx);
+>>>>>>> +	local64_add(delta, &event->count);
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +static void dsu_pmu_read(struct perf_event *event)
+>>>>>>> +{
+>>>>>>> +	dsu_pmu_event_update(event);
+>>>>>>> +}
+>>>>>
+>>>>>> I sent out a patch that'll allow PMUs to set an event flag to avoid
+>>>>>> unnecessary smp calls when the event can be read from any CPU. You could
+>>>>>> just always set that if you can't have multiple DSU's running the kernel (I
+>>>>>> don't know if the current ARM designs support having multiple DSUs in a
+>>>>>> SoC/system) or set it if associated_cpus == cpu_present_mask.
+>>>>>
+>>>>> As-is, that won't be safe, given the read function calls the event_update()
+>>>>> function, which has side-effects on hwc->prec_count and event->count. Those
+>>>>> need to be serialized somehow.
+>>>>
+>>>> You have to grab the dsu_pmu->pmu_lock spin lock anyway because the system
+>>>> registers are shared across all CPUs.
+>>>
+>>> I believe that lock is currently superfluous, because the perf core
+>>> ensures operations are cpu-affine, and have interrupts disabled in most
+>>> cases (thanks to the context lock).
 >>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Changes in v2:
->> - Record compatible string to xilinx.txt
->>
->>  Documentation/devicetree/bindings/arm/xilinx.txt |  3 +
->>  arch/arm/boot/dts/Makefile                       |  1 +
->>  arch/arm/boot/dts/zynq-zc770-xm010.dts           | 92 ++++++++++++++++++++++++
->>  3 files changed, 96 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/zynq-zc770-xm010.dts
->>
->> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
->> index 425c74fcc560..019e69037d42 100644
->> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
->> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
->> @@ -11,6 +11,9 @@ Additional compatible strings:
->>  - Xilinx internal board cc108
->>    "xlnx,zynq-cc108"
->>  
->> +- Xilinx internal board zc770 with different FMC cards
->> +  "xlnx,zynq-zc770-xm010"
->> +
->>  ---------------------------------------------------------------
->>  
->>  Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index c6810e84d4d7..be9ffae2a1ec 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -1067,6 +1067,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
->>  	zynq-parallella.dtb \
->>  	zynq-zc702.dtb \
->>  	zynq-zc706.dtb \
->> +	zynq-zc770-xm010.dtb \
->>  	zynq-zed.dtb \
->>  	zynq-zybo.dtb
->>  dtb-$(CONFIG_MACH_ARMADA_370) += \
->> diff --git a/arch/arm/boot/dts/zynq-zc770-xm010.dts b/arch/arm/boot/dts/zynq-zc770-xm010.dts
->> new file mode 100644
->> index 000000000000..b1cfb4ede434
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/zynq-zc770-xm010.dts
->> @@ -0,0 +1,92 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * Xilinx ZC770 XM010 board DTS
->> + *
->> + * Copyright (C) 2013-2018 Xilinx, Inc.
->> + */
->> +/dts-v1/;
->> +#include "zynq-7000.dtsi"
->> +
->> +/ {
->> +	compatible = "xlnx,zynq-zc770-xm010", "xlnx,zynq-7000";
->> +	model = "Xilinx Zynq";
->> +
->> +	aliases {
->> +		ethernet0 = &gem0;
->> +		i2c0 = &i2c0;
->> +		serial0 = &uart1;
->> +		spi1 = &spi1;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "";
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	memory at 0 {
->> +		device_type = "memory";
->> +		reg = <0x0 0x40000000>;
->> +	};
->> +
->> +	usb_phy0: phy0 {
->> +		compatible = "usb-nop-xceiv";
->> +		#phy-cells = <0>;
->> +	};
->> +};
->> +
->> +&can0 {
->> +	status = "okay";
->> +};
->> +
->> +&gem0 {
->> +	status = "okay";
->> +	phy-mode = "rgmii-id";
->> +	phy-handle = <&ethernet_phy>;
->> +
->> +	ethernet_phy: ethernet-phy at 7 {
->> +		reg = <7>;
->> +		device_type = "ethernet-phy";
->> +	};
->> +};
->> +
->> +&i2c0 {
->> +	status = "okay";
->> +	clock-frequency = <400000>;
->> +
->> +	eeprom: eeprom at 52 {
->> +		compatible = "atmel,24c02";
->> +		reg = <0x52>;
->> +	};
->> +
->> +};
->> +
->> +&sdhci0 {
->> +	status = "okay";
->> +};
->> +
->> +&spi1 {
->> +	status = "okay";
->> +	num-cs = <4>;
->> +	is-decoded-cs = <0>;
->> +	flash at 0 {
->> +		compatible = "sst25wf080", "jedec,spi-nor";
->> +		reg = <1>;
->> +		spi-max-frequency = <1000000>;
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		partition at test {
-> 
-> @test?
-> 
-> Use a partitions node too.
+>> I don't think it's superfluous. You have a common "event counter" selection
+>> register and a common "event counter value" register. You can two CPUs
+>> racing to read two unrelated event counters and end up causing one of them
+>> to read a bogus value from the wrong event counter.
+>
+> It's important to note that the DSU PMU's event_init() ensures events
+> are affine to a single CPU, and the perf core code serializes operations
+> on those events via the context lock.
 
-ok done.
+Ah, I see that now. Thanks!
 
-> 
->> +			label = "spi-flash";
-> 
-> Should be what the partition contains.
+> Therefore, two CPUs *won't* try to access the registers simultaneously.
 
+Right, and this driver seems to be going through a lot of work to make 
+sure all events are read in one CPU.
 
-I have fixed this to data.
+Do you even have an upstream target where there are multiple DSU's in a 
+system? If not, we can simplify a ton of this code (no hotplug 
+notifiers, no migrating PMUs, no SMP calls, etc) by just adding a 
+spinlock and letting any CPU read these DSU counters.
+
+If you need to support a system with multiple DSUs, I think it's still 
+useful to add CPU mask for events and letting the perf framework read 
+events on any of those CPUs.
+
+> If events could be active on multiple CPUs simultaneously, I agree that
+> the lock would be necessary. However, there would also be other problems
+> to deal with in that case.
+>
+> If we want to allow pmu::read() from arbitrary CPUs the DSU is affine
+> to, I agree we'd need the lock to serialize accesses to the registers
+> and data structures.
+
+Agreed.
+
+So, depending on how many DSUs you want to support in the mainline 
+kernel, we can simplify it a ton. And if not, we can still try to remove 
+the need for smp calls so that we don't cause power impact when trying 
+to profile while measuring power.
 
 Thanks,
-M
+Saravana
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/ac4d3e42/attachment.sig>
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
