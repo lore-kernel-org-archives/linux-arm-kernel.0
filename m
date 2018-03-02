@@ -1,116 +1,300 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 2 Mar 2018 14:11:14 +0800
-Subject: [PATCH 1/7] kexec_file: make an use of purgatory optional
-In-Reply-To: <20180302055859.GB15422@dhcp-128-65.nay.redhat.com>
-References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
- <20180227044814.24808-2-takahiro.akashi@linaro.org>
- <20180302055859.GB15422@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180302061114.GE15422@dhcp-128-65.nay.redhat.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri,  2 Mar 2018 11:18:58 +0530
+Subject: [PATCH v4 09/11] clk: actions: Add composite clock support
+In-Reply-To: <20180302054900.11275-1-manivannan.sadhasivam@linaro.org>
+References: <20180302054900.11275-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180302054900.11275-10-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/18 at 01:58pm, Dave Young wrote:
-> On 02/27/18 at 01:48pm, AKASHI Takahiro wrote:
-> > On arm64, crash dump kernel's usable memory is protected by
-> > *unmapping* it from kernel virtual space unlike other architectures
-> > where the region is just made read-only. It is highly unlikely that
-> > the region is accidentally corrupted and this observation rationalizes
-> > that digest check code can also be dropped from purgatory.
-> > The resulting code is so simple as it doesn't require a bit ugly
-> > re-linking/relocation stuff, i.e. arch_kexec_apply_relocations_add().
-> > 
-> > Please see:
-> >    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
-> > All that the purgatory does is to shuffle arguments and jump into a new
-> > kernel, while we still need to have some space for a hash value
-> > (purgatory_sha256_digest) which is never checked against.
-> > 
-> > As such, it doesn't make sense to have trampline code between old kernel
-> > and new kernel on arm64.
-> > 
-> > This patch introduces a new configuration, ARCH_HAS_KEXEC_PURGATORY, and
-> > allows related code to be compiled in only if necessary.
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Dave Young <dyoung@redhat.com>
-> > Cc: Vivek Goyal <vgoyal@redhat.com>
-> > Cc: Baoquan He <bhe@redhat.com>
-> > ---
-> >  arch/powerpc/Kconfig | 3 +++
-> >  arch/x86/Kconfig     | 3 +++
-> >  kernel/kexec_file.c  | 6 ++++++
-> >  3 files changed, 12 insertions(+)
-> > 
-> > diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> > index 73ce5dd07642..c32a181a7cbb 100644
-> > --- a/arch/powerpc/Kconfig
-> > +++ b/arch/powerpc/Kconfig
-> > @@ -552,6 +552,9 @@ config KEXEC_FILE
-> >  	  for kernel and initramfs as opposed to a list of segments as is the
-> >  	  case for the older kexec call.
-> >  
-> > +config ARCH_HAS_KEXEC_PURGATORY
-> > +	def_bool KEXEC_FILE
-> > +
-> >  config RELOCATABLE
-> >  	bool "Build a relocatable kernel"
-> >  	depends on PPC64 || (FLATMEM && (44x || FSL_BOOKE))
-> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> > index c1236b187824..f031c3efe47e 100644
-> > --- a/arch/x86/Kconfig
-> > +++ b/arch/x86/Kconfig
-> > @@ -2019,6 +2019,9 @@ config KEXEC_FILE
-> >  	  for kernel and initramfs as opposed to list of segments as
-> >  	  accepted by previous system call.
-> >  
-> > +config ARCH_HAS_KEXEC_PURGATORY
-> > +	def_bool KEXEC_FILE
-> > +
-> >  config KEXEC_VERIFY_SIG
-> >  	bool "Verify kernel signature during kexec_file_load() syscall"
-> >  	depends on KEXEC_FILE
-> > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > index e5bcd94c1efb..990adae52151 100644
-> > --- a/kernel/kexec_file.c
-> > +++ b/kernel/kexec_file.c
-> > @@ -26,7 +26,11 @@
-> >  #include <linux/vmalloc.h>
-> >  #include "kexec_internal.h"
-> >  
-> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
-> >  static int kexec_calculate_store_digests(struct kimage *image);
-> > +#else
-> > +static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
-> > +#endif
-> >  
-> >  /* Architectures can provide this probe function */
-> >  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> > @@ -520,6 +524,7 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
-> >  	return 0;
-> >  }
-> >  
-> > +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
-> >  /* Calculate and store the digest of segments */
-> >  static int kexec_calculate_store_digests(struct kimage *image)
-> >  {
-> > @@ -1022,3 +1027,4 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
-> >  
-> >  	return 0;
-> >  }
-> > +#endif /* CONFIG_ARCH_HAS_KEXEC_PURGATORY */
-> > -- 
-> > 2.16.2
-> > 
-> 
-> For this one, I think purgatory digest verification is still good to
-> have, but I do not insist since this is arch specific.
-> 
-> If nobody else objects then I think I can ack the series after some
-> testing passed.
+Add support for Actions Semi composite clock. This clock
+consists of gate, mux, divider and factor clocks.
 
-For the #ifdefs, they can be changed to IS_ENABLED like other similar
-thing.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ drivers/clk/actions/Makefile        |   1 +
+ drivers/clk/actions/owl-composite.c | 155 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-composite.h | 101 +++++++++++++++++++++++
+ 3 files changed, 257 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-composite.c
+ create mode 100644 drivers/clk/actions/owl-composite.h
 
-> 
-> Thanks
-> Dave
+diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+index 994357fa560b..53431aef6e9c 100644
+--- a/drivers/clk/actions/Makefile
++++ b/drivers/clk/actions/Makefile
+@@ -5,3 +5,4 @@ clk-owl-y			+= owl-gate.o
+ clk-owl-y			+= owl-mux.o
+ clk-owl-y			+= owl-divider.o
+ clk-owl-y			+= owl-factor.o
++clk-owl-y			+= owl-composite.o
+diff --git a/drivers/clk/actions/owl-composite.c b/drivers/clk/actions/owl-composite.c
+new file mode 100644
+index 000000000000..04fe1645a60d
+--- /dev/null
++++ b/drivers/clk/actions/owl-composite.c
+@@ -0,0 +1,155 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL composite clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include "owl-composite.h"
++
++static u8 owl_comp_get_parent(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_mux_helper_get_parent(&comp->common, &comp->mux_hw);
++}
++
++static int owl_comp_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_mux_helper_set_parent(&comp->common, &comp->mux_hw, index);
++}
++
++static void owl_comp_disable(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	clk_gate_set(common, &comp->gate_hw, false);
++}
++
++static int owl_comp_enable(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	clk_gate_set(common, &comp->gate_hw, true);
++
++	return 0;
++}
++
++static int owl_comp_is_enabled(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	return clk_is_enabled(common, &comp->gate_hw);
++}
++
++static long owl_comp_div_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_divider_helper_round_rate(&comp->common, &comp->rate.div_hw,
++					rate, parent_rate);
++}
++
++static unsigned long owl_comp_div_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_divider_helper_recalc_rate(&comp->common, &comp->rate.div_hw,
++					parent_rate);
++}
++
++static int owl_comp_div_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_divider_helper_set_rate(&comp->common, &comp->rate.div_hw,
++					rate, parent_rate);
++}
++
++static long owl_comp_fact_round_rate(struct clk_hw *hw, unsigned long rate,
++			unsigned long *parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_factor_helper_round_rate(&comp->common,
++					&comp->rate.factor_hw,
++					rate, parent_rate);
++}
++
++static unsigned long owl_comp_fact_recalc_rate(struct clk_hw *hw,
++			unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_factor_helper_recalc_rate(&comp->common,
++					&comp->rate.factor_hw,
++					parent_rate);
++}
++
++static int owl_comp_fact_set_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_factor_helper_set_rate(&comp->common,
++					&comp->rate.factor_hw,
++					rate, parent_rate);
++}
++
++const struct clk_ops owl_comp_div_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++
++	/* div_ops */
++	.round_rate	= owl_comp_div_round_rate,
++	.recalc_rate	= owl_comp_div_recalc_rate,
++	.set_rate	= owl_comp_div_set_rate,
++};
++
++
++const struct clk_ops owl_comp_fact_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++
++	/* fact_ops */
++	.round_rate	= owl_comp_fact_round_rate,
++	.recalc_rate	= owl_comp_fact_recalc_rate,
++	.set_rate	= owl_comp_fact_set_rate,
++};
++
++const struct clk_ops owl_comp_pass_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++};
+diff --git a/drivers/clk/actions/owl-composite.h b/drivers/clk/actions/owl-composite.h
+new file mode 100644
+index 000000000000..386a93ac951e
+--- /dev/null
++++ b/drivers/clk/actions/owl-composite.h
+@@ -0,0 +1,101 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL composite clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#ifndef _OWL_COMPOSITE_H_
++#define _OWL_COMPOSITE_H_
++
++#include "owl-common.h"
++#include "owl-mux.h"
++#include "owl-gate.h"
++#include "owl-factor.h"
++#include "owl-divider.h"
++
++union owl_rate {
++	struct owl_divider_hw	div_hw;
++	struct owl_factor_hw	factor_hw;
++};
++
++struct owl_composite {
++	struct owl_mux_hw	mux_hw;
++	struct owl_gate_hw	gate_hw;
++	union owl_rate		rate;
++	struct owl_clk_common	common;
++};
++
++#define OWL_COMP_DIV(_struct, _name, _parent,				\
++		     _mux, _gate, _div, _flags)				\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.rate.div_hw	= _div,					\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						      &owl_comp_div_ops,\
++						     _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_DIV_FIXED(_struct, _name, _parent,			\
++		     _gate, _div, _flags)				\
++	struct owl_composite _struct = {				\
++		.gate_hw	= _gate,				\
++		.rate.div_hw	= _div,					\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						     _parent,		\
++						      &owl_comp_div_ops,\
++						     _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_FACTOR(_struct, _name, _parent,			\
++			_mux, _gate, _factor, _flags)			\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.rate.factor_hw	= _factor,				\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						     &owl_comp_fact_ops,\
++						     _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_PASS(_struct, _name, _parent,				\
++		      _mux, _gate, _flags)				\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						     &owl_comp_pass_ops,\
++						     _flags),		\
++		},							\
++	}
++
++static inline struct owl_composite *hw_to_owl_comp(const struct clk_hw *hw)
++{
++	struct owl_clk_common *common = hw_to_owl_clk_common(hw);
++
++	return container_of(common, struct owl_composite, common);
++}
++
++extern const struct clk_ops owl_comp_div_ops;
++extern const struct clk_ops owl_comp_fact_ops;
++extern const struct clk_ops owl_comp_pass_ops;
++
++#endif /* _OWL_COMPOSITE_H_ */
+-- 
+2.14.1
