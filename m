@@ -1,41 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Mar 2018 16:44:13 +0000
-Subject: [PATCH] arm64: kdump: fix interrupt handling done during
- machine_crash_shutdown
-In-Reply-To: <CAH76GKOe=+WTrw8QEJ43+fyEfRPuo7+ds8VNoMCUqSNBMtxkyg@mail.gmail.com>
-References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
- <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
- <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
- <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
- <20180302120556.xujh3hoy44y7ouz7@lakrids.cambridge.arm.com>
- <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
- <20180302131545.q2vf6uc3yofofqdb@lakrids.cambridge.arm.com>
- <CAH76GKOe=+WTrw8QEJ43+fyEfRPuo7+ds8VNoMCUqSNBMtxkyg@mail.gmail.com>
-Message-ID: <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 10:48:03 -0600
+Subject: [PATCH v2 3/8] arm64: zynqmp: Add support for Xilinx zcu102
+In-Reply-To: <dd5933d6a49247de4b3b7516ed7fab55d1b3eb90.1519396753.git.michal.simek@xilinx.com>
+References: <cover.1519396753.git.michal.simek@xilinx.com>
+ <dd5933d6a49247de4b3b7516ed7fab55d1b3eb90.1519396753.git.michal.simek@xilinx.com>
+Message-ID: <20180302164803.nb45aqgqvnzxuyn5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 02:52:07PM +0100, Grzegorz Jaszczyk wrote:
-> 2018-03-02 14:15 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
-> > Do you see this for a panic() in *any* interrupt handler?
+On Fri, Feb 23, 2018 at 03:40:25PM +0100, Michal Simek wrote:
+> This patch is adding revA, revB and rev1.0. There are also other
+> revisions between which should be backward compatible with previous
+> versions. Unfortunately all revs are still in use.
 > 
-> I only test with this two interrupt handlers: watchdog and i2c but I
-> think it will behave the same with others - I can try with other if
-> you want, any suggestion which? Maybe with some PPI interrupt instead?
-> >
-> > Can you trigger the issue with magic-sysrq c, for example?
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
 > 
-> There is no problem when I trigger it via 'echo c >
-> /proc/sysrq-trigger' - it works well all the time. The problem appears
-> only, when the kexec/kdump procedure is triggered from interrupt
-> context
+> Changes in v2:
+> - Remove i2c mw u-boot commands
+> - Use i2c-mux instead of i2cswitch
+> - Use clock generator without numbers.
+> - Use dash in node name zcu102 rev1.0
+> - Record compatible string to xilinx.txt
+> 
+>  Documentation/devicetree/bindings/arm/xilinx.txt   |   5 +
+>  arch/arm64/boot/dts/xilinx/Makefile                |   3 +
+>  .../arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts |  36 ++
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts  | 550 +++++++++++++++++++++
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts  |  42 ++
+>  5 files changed, 636 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
 
-I'd meant that you'd send sysrq + c over serial, rather than writing to
-/proc/sysrq-trigger. That way, the panic will be in the context of the
-UART IRQ handler.
+Reviewed-by: Rob Herring <robh@kernel.org> 
 
-If that shows the issue, that's ilikely to be the easiest way for
-someone else to reproduce and investigate this.
+but...
 
-Thanks,
-Mark.
+
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
+> new file mode 100644
+> index 000000000000..ed3cc684931f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
+> @@ -0,0 +1,42 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP ZCU102 RevB
+> + *
+> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +#include "zynqmp-zcu102-revA.dts"
+> +
+> +/ {
+> +	model = "ZynqMP ZCU102 RevB";
+> +	compatible = "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102", "xlnx,zynqmp";
+> +};
+> +
+> +&gem3 {
+> +	phy-handle = <&phyc>;
+> +	phyc: phy at c {
+> +		reg = <0xc>;
+> +		ti,rx-internal-delay = <0x8>;
+> +		ti,tx-internal-delay = <0xa>;
+> +		ti,fifo-depth = <0x1>;
+> +	};
+> +	/* Cleanup from RevA */
+> +	/delete-node/ phy at 21;
+> +};
+> +
+> +/* Different qspi 512Mbit version */
+
+Stray comment
+
+> +
+> +/* Fix collision with u61 */
+> +&i2c0 {
+> +	i2cswitch at 75 {
+
+Missed this name.
+
+This probably creates a new node rather than going into the existing 
+tree. If this compiles, we should fix it to not allow the same 
+unit-address twice.
+
+> +		i2c at 2 {
+> +			max15303 at 1b { /* u8 */
+> +				compatible = "maxim,max15303";
+> +				reg = <0x1b>;
+> +			};
+> +			/delete-node/ max15303 at 20;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
