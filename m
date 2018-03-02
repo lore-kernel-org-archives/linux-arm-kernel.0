@@ -1,41 +1,42 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri,  2 Mar 2018 11:18:59 +0530
-Subject: [PATCH v4 10/11] clk: actions: Add pll clock support
+Date: Fri,  2 Mar 2018 11:18:56 +0530
+Subject: [PATCH v4 07/11] clk: actions: Add divider clock support
 In-Reply-To: <20180302054900.11275-1-manivannan.sadhasivam@linaro.org>
 References: <20180302054900.11275-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180302054900.11275-11-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180302054900.11275-8-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Actions Semi PLL clock
+Add support for Actions Semi divider clock together with
+helper functions to be used in composite clock.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/clk/actions/Makefile  |   1 +
- drivers/clk/actions/owl-pll.c | 194 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/actions/owl-pll.h |  92 ++++++++++++++++++++
- 3 files changed, 287 insertions(+)
- create mode 100644 drivers/clk/actions/owl-pll.c
- create mode 100644 drivers/clk/actions/owl-pll.h
+ drivers/clk/actions/Makefile      |  1 +
+ drivers/clk/actions/owl-divider.c | 94 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-divider.h | 75 +++++++++++++++++++++++++++++++
+ 3 files changed, 170 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-divider.c
+ create mode 100644 drivers/clk/actions/owl-divider.h
 
 diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
-index 53431aef6e9c..31b68eab9309 100644
+index 2d4aa8f35d90..5ce75df57e1a 100644
 --- a/drivers/clk/actions/Makefile
 +++ b/drivers/clk/actions/Makefile
-@@ -6,3 +6,4 @@ clk-owl-y			+= owl-mux.o
- clk-owl-y			+= owl-divider.o
- clk-owl-y			+= owl-factor.o
- clk-owl-y			+= owl-composite.o
-+clk-owl-y			+= owl-pll.o
-diff --git a/drivers/clk/actions/owl-pll.c b/drivers/clk/actions/owl-pll.c
+@@ -3,3 +3,4 @@ obj-$(CONFIG_CLK_ACTIONS)	+= clk-owl.o
+ clk-owl-y			+= owl-common.o
+ clk-owl-y			+= owl-gate.o
+ clk-owl-y			+= owl-mux.o
++clk-owl-y			+= owl-divider.o
+diff --git a/drivers/clk/actions/owl-divider.c b/drivers/clk/actions/owl-divider.c
 new file mode 100644
-index 000000000000..3560c7324f9c
+index 000000000000..cddac00fe324
 --- /dev/null
-+++ b/drivers/clk/actions/owl-pll.c
-@@ -0,0 +1,194 @@
++++ b/drivers/clk/actions/owl-divider.c
+@@ -0,0 +1,94 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +//
-+// OWL pll clock driver
++// OWL divider clock driver
 +//
 +// Copyright (c) 2014 Actions Semi Inc.
 +// Author: David Liu <liuwei@actions-semi.com>
@@ -44,198 +45,98 @@ index 000000000000..3560c7324f9c
 +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 +
 +#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
++#include <linux/regmap.h>
 +
-+#include "owl-pll.h"
++#include "owl-divider.h"
 +
-+static u32 owl_pll_calculate_mul(struct owl_pll_hw *pll_hw, unsigned long rate)
++long owl_divider_helper_round_rate(struct owl_clk_common *common,
++				const struct owl_divider_hw *div_hw,
++				unsigned long rate,
++				unsigned long *parent_rate)
 +{
-+	u32 mul;
-+
-+	mul = DIV_ROUND_CLOSEST(rate, pll_hw->bfreq);
-+	if (mul < pll_hw->min_mul)
-+		mul = pll_hw->min_mul;
-+	else if (mul > pll_hw->max_mul)
-+		mul = pll_hw->max_mul;
-+
-+	return mul &= mul_mask(pll_hw);
++	return divider_round_rate(&common->hw, rate, parent_rate,
++				  div_hw->table, div_hw->width,
++				  div_hw->div_flags);
 +}
 +
-+static unsigned int _get_table_rate(const struct clk_pll_table *table,
-+		unsigned int val)
++static long owl_divider_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
 +{
-+	const struct clk_pll_table *clkt;
++	struct owl_divider *div = hw_to_owl_divider(hw);
 +
-+	for (clkt = table; clkt->rate; clkt++)
-+		if (clkt->val == val)
-+			return clkt->rate;
++	return owl_divider_helper_round_rate(&div->common, &div->div_hw,
++					     rate, parent_rate);
++}
++
++unsigned long owl_divider_helper_recalc_rate(struct owl_clk_common *common,
++					 const struct owl_divider_hw *div_hw,
++					 unsigned long parent_rate)
++{
++	unsigned long val;
++	unsigned int reg;
++
++	regmap_read(common->regmap, div_hw->reg, &reg);
++	val = reg >> div_hw->shift;
++	val &= (1 << div_hw->width) - 1;
++
++	return divider_recalc_rate(&common->hw, parent_rate,
++				   val, div_hw->table,
++				   div_hw->div_flags,
++				   div_hw->width);
++}
++
++static unsigned long owl_divider_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct owl_divider *div = hw_to_owl_divider(hw);
++
++	return owl_divider_helper_recalc_rate(&div->common,
++					      &div->div_hw, parent_rate);
++}
++
++int owl_divider_helper_set_rate(const struct owl_clk_common *common,
++				const struct owl_divider_hw *div_hw,
++				unsigned long rate,
++				unsigned long parent_rate)
++{
++	unsigned long val;
++	unsigned int reg;
++
++	val = divider_get_val(rate, parent_rate, div_hw->table,
++			      div_hw->width, 0);
++
++	regmap_read(common->regmap, div_hw->reg, &reg);
++	reg &= ~GENMASK(div_hw->width + div_hw->shift - 1, div_hw->shift);
++
++	regmap_write(common->regmap, div_hw->reg,
++			  reg | (val << div_hw->shift));
 +
 +	return 0;
 +}
 +
-+static const struct clk_pll_table *_get_pll_table(
-+		const struct clk_pll_table *table, unsigned long rate)
++static int owl_divider_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
 +{
-+	const struct clk_pll_table *clkt;
++	struct owl_divider *div = hw_to_owl_divider(hw);
 +
-+	for (clkt = table; clkt->rate; clkt++) {
-+		if (clkt->rate == rate) {
-+			table = clkt;
-+			break;
-+		} else if (clkt->rate < rate)
-+			table = clkt;
-+	}
-+
-+	return table;
++	return owl_divider_helper_set_rate(&div->common, &div->div_hw,
++					rate, parent_rate);
 +}
 +
-+static long owl_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *parent_rate)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	struct owl_pll_hw *pll_hw = &pll->pll_hw;
-+	const struct clk_pll_table *clkt;
-+	u32 mul;
-+
-+	if (pll_hw->table) {
-+		clkt = _get_pll_table(pll_hw->table, rate);
-+		return clkt->rate;
-+	}
-+
-+	/* fixed frequency */
-+	if (pll_hw->width == 0)
-+		return pll_hw->bfreq;
-+
-+	mul = owl_pll_calculate_mul(pll_hw, rate);
-+
-+	return pll_hw->bfreq * mul;
-+}
-+
-+static unsigned long owl_pll_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	struct owl_pll_hw *pll_hw = &pll->pll_hw;
-+	const struct owl_clk_common *common = &pll->common;
-+	u32 val;
-+
-+	if (pll_hw->table) {
-+		regmap_read(common->regmap, pll_hw->reg, &val);
-+
-+		val = val >> pll_hw->shift;
-+		val &= mul_mask(pll_hw);
-+
-+		return _get_table_rate(pll_hw->table, val);
-+	}
-+
-+	/* fixed frequency */
-+	if (pll_hw->width == 0)
-+		return pll_hw->bfreq;
-+
-+	regmap_read(common->regmap, pll_hw->reg, &val);
-+
-+	val = val >> pll_hw->shift;
-+	val &= mul_mask(pll_hw);
-+
-+	return pll_hw->bfreq * val;
-+}
-+
-+static int owl_pll_is_enabled(struct clk_hw *hw)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	struct owl_pll_hw *pll_hw = &pll->pll_hw;
-+	const struct owl_clk_common *common = &pll->common;
-+	u32 reg;
-+
-+	regmap_read(common->regmap, pll_hw->reg, &reg);
-+
-+	return !!(reg & BIT(pll_hw->bit_idx));
-+}
-+
-+static void owl_pll_set(const struct owl_clk_common *common,
-+		       const struct owl_pll_hw *pll_hw, bool enable)
-+{
-+	u32 reg;
-+
-+	regmap_read(common->regmap, pll_hw->reg, &reg);
-+
-+	if (enable)
-+		reg |= BIT(pll_hw->bit_idx);
-+	else
-+		reg &= ~BIT(pll_hw->bit_idx);
-+
-+	regmap_write(common->regmap, pll_hw->reg, reg);
-+}
-+
-+static int owl_pll_enable(struct clk_hw *hw)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	const struct owl_clk_common *common = &pll->common;
-+
-+	owl_pll_set(common, &pll->pll_hw, true);
-+
-+	return 0;
-+}
-+
-+static void owl_pll_disable(struct clk_hw *hw)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	const struct owl_clk_common *common = &pll->common;
-+
-+	owl_pll_set(common, &pll->pll_hw, false);
-+}
-+
-+static int owl_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long parent_rate)
-+{
-+	struct owl_pll *pll = hw_to_owl_pll(hw);
-+	struct owl_pll_hw *pll_hw = &pll->pll_hw;
-+	const struct owl_clk_common *common = &pll->common;
-+	const struct clk_pll_table *clkt;
-+	u32 val, reg;
-+
-+	/* fixed frequency */
-+	if (pll_hw->width == 0)
-+		return 0;
-+
-+	if (pll_hw->table) {
-+		clkt = _get_pll_table(pll_hw->table, rate);
-+		val = clkt->val;
-+	} else {
-+		val = owl_pll_calculate_mul(pll_hw, rate);
-+	}
-+
-+	regmap_read(common->regmap, pll_hw->reg, &reg);
-+
-+	reg &= ~mul_mask(pll_hw);
-+	reg |= val << pll_hw->shift;
-+
-+	regmap_write(common->regmap, pll_hw->reg, reg);
-+
-+	udelay(PLL_STABILITY_WAIT_US);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops owl_pll_ops = {
-+	.enable = owl_pll_enable,
-+	.disable = owl_pll_disable,
-+	.is_enabled = owl_pll_is_enabled,
-+	.round_rate = owl_pll_round_rate,
-+	.recalc_rate = owl_pll_recalc_rate,
-+	.set_rate = owl_pll_set_rate,
++const struct clk_ops owl_divider_ops = {
++	.recalc_rate = owl_divider_recalc_rate,
++	.round_rate = owl_divider_round_rate,
++	.set_rate = owl_divider_set_rate,
 +};
-diff --git a/drivers/clk/actions/owl-pll.h b/drivers/clk/actions/owl-pll.h
+diff --git a/drivers/clk/actions/owl-divider.h b/drivers/clk/actions/owl-divider.h
 new file mode 100644
-index 000000000000..0aae30abd5dc
+index 000000000000..92d3e3d23967
 --- /dev/null
-+++ b/drivers/clk/actions/owl-pll.h
-@@ -0,0 +1,92 @@
++++ b/drivers/clk/actions/owl-divider.h
+@@ -0,0 +1,75 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +//
-+// OWL pll clock driver
++// OWL divider clock driver
 +//
 +// Copyright (c) 2014 Actions Semi Inc.
 +// Author: David Liu <liuwei@actions-semi.com>
@@ -243,87 +144,70 @@ index 000000000000..0aae30abd5dc
 +// Copyright (c) 2018 Linaro Ltd.
 +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 +
-+#ifndef _OWL_PLL_H_
-+#define _OWL_PLL_H_
++#ifndef _OWL_DIVIDER_H_
++#define _OWL_DIVIDER_H_
 +
 +#include "owl-common.h"
 +
-+/* last entry should have rate = 0 */
-+struct clk_pll_table {
-+	unsigned int		val;
-+	unsigned long		rate;
-+};
-+
-+struct owl_pll_hw {
++struct owl_divider_hw {
 +	u32			reg;
-+	u32			bfreq;
-+	u8			bit_idx;
 +	u8			shift;
 +	u8			width;
-+	u8			min_mul;
-+	u8			max_mul;
-+	const struct clk_pll_table *table;
++	u8			div_flags;
++	struct clk_div_table	*table;
 +};
 +
-+struct owl_pll {
-+	struct owl_pll_hw	pll_hw;
++struct owl_divider {
++	struct owl_divider_hw	div_hw;
 +	struct owl_clk_common	common;
 +};
 +
-+#define OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,			\
-+		   _width, _min_mul, _max_mul, _table)			\
++#define OWL_DIVIDER_HW(_reg, _shift, _width, _div_flags, _table)	\
 +	{								\
 +		.reg		= _reg,					\
-+		.bfreq		= _bfreq,				\
-+		.bit_idx	= _bit_idx,				\
 +		.shift		= _shift,				\
 +		.width		= _width,				\
-+		.min_mul	= _min_mul,				\
-+		.max_mul	= _max_mul,				\
++		.div_flags	= _div_flags,				\
 +		.table		= _table,				\
 +	}
 +
-+#define OWL_PLL(_struct, _name, _parent, _reg, _bfreq, _bit_idx,	\
-+		_shift, _width, _min_mul, _max_mul, _table, _flags)	\
-+	struct owl_pll _struct = {					\
-+		.pll_hw	= OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,	\
-+				     _width, _min_mul,			\
-+				     _max_mul, _table),			\
++#define OWL_DIVIDER(_struct, _name, _parent, _reg,			\
++		    _shift, _width, _table, _div_flags, _flags)		\
++	struct owl_divider _struct = {					\
++		.div_hw	= OWL_DIVIDER_HW(_reg, _shift, _width,		\
++					 _div_flags, _table),		\
 +		.common = {						\
-+			.regmap = NULL,					\
-+			.hw.init = CLK_HW_INIT(_name,			\
-+					       _parent,			\
-+					       &owl_pll_ops,		\
-+					       _flags),			\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &owl_divider_ops,	\
++						      _flags),		\
 +		},							\
 +	}
 +
-+#define OWL_PLL_NO_PARENT(_struct, _name, _reg, _bfreq, _bit_idx,	\
-+		_shift, _width, _min_mul, _max_mul, _table, _flags)	\
-+	struct owl_pll _struct = {					\
-+		.pll_hw	= OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,	\
-+				     _width, _min_mul,			\
-+				     _max_mul, _table),			\
-+		.common = {						\
-+			.regmap = NULL,					\
-+			.hw.init = CLK_HW_INIT_NO_PARENT(_name,		\
-+					       &owl_pll_ops,		\
-+					       _flags),			\
-+		},							\
-+	}
-+
-+#define mul_mask(m)		((1 << ((m)->width)) - 1)
-+#define PLL_STABILITY_WAIT_US	(50)
-+
-+static inline struct owl_pll *hw_to_owl_pll(const struct clk_hw *hw)
++static inline struct owl_divider *hw_to_owl_divider(const struct clk_hw *hw)
 +{
 +	struct owl_clk_common *common = hw_to_owl_clk_common(hw);
 +
-+	return container_of(common, struct owl_pll, common);
++	return container_of(common, struct owl_divider, common);
 +}
 +
-+extern const struct clk_ops owl_pll_ops;
++long owl_divider_helper_round_rate(struct owl_clk_common *common,
++				const struct owl_divider_hw *div_hw,
++				unsigned long rate,
++				unsigned long *parent_rate);
 +
-+#endif /* _OWL_PLL_H_ */
++unsigned long owl_divider_helper_recalc_rate(struct owl_clk_common *common,
++					 const struct owl_divider_hw *div_hw,
++					 unsigned long parent_rate);
++
++int owl_divider_helper_set_rate(const struct owl_clk_common *common,
++				const struct owl_divider_hw *div_hw,
++				unsigned long rate,
++				unsigned long parent_rate);
++
++extern const struct clk_ops owl_divider_ops;
++
++#endif /* _OWL_DIVIDER_H_ */
 -- 
 2.14.1
