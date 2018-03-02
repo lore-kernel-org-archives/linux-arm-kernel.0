@@ -1,187 +1,134 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 16:12:36 -0600
-Subject: [PATCH v10 2/3] NPCM750: add clock tree doc and binding
-In-Reply-To: <1519553539-15899-3-git-send-email-tali.perry1@gmail.com>
-References: <1519553539-15899-1-git-send-email-tali.perry1@gmail.com>
- <1519553539-15899-3-git-send-email-tali.perry1@gmail.com>
-Message-ID: <20180302221236.qsxooi5l53wx6lby@rob-hp-laptop>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 2 Mar 2018 14:32:23 -0800
+Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <20180302192110.GA202062@bhelgaas-glaptop.roam.corp.google.com>
+References: <1519942514-3350-1-git-send-email-fkan@apm.com>
+ <20180302192110.GA202062@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAL85gmBOXvdSbRTrbu4TO26msn7RBABRqdLR-198W19w2TzUUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 25, 2018 at 12:12:18PM +0200, Tali Perry wrote:
-> 
-Need a commit msg.
-
-The subject should be "dt-bindings: clock: ..."
-
-> Signed-off-by: Tali Perry <tali.perry1@gmail.com>
-> 
-> ---
->  .../bindings/clock/nuvoton,npcm750-clk.txt         | 100 +++++++++++++++++++++
->  include/dt-bindings/clock/nuvoton,npcm7xx-clock.h  |  44 +++++++++
->  2 files changed, 144 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
->  create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt b/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
-> new file mode 100644
-> index 000000000000..dd17b86bd577
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
-> @@ -0,0 +1,100 @@
-> +* Nuvoton NPCM7XX Clock Controller
-> +
-> +Nuvoton Poleg BMC NPCM7XX contains an integrated clock controller, which
-> +generates and supplies clocks to all modules within the BMC.
-> +
-> +External clocks:
-> +
-> +There are six fixed clocks that are generated outside the BMC. All clocks are of
-> +a known fixed value that cannot be changed. clk_refclk, clk_mcbypck and
-> +clk_sysbypck are inputs to the clock controller.
-> +clk_rg1refck, clk_rg2refck and clk_xin are external clocks suppling the
-> +network. They are set on the device tree, but not used by the clock module. The
-> +network devices use them directly.
-> +Example can be found below.
-> +
-> +All available clocks are defined as preprocessor macros in:
-> +dt-bindings/clock/nuvoton,npcm7xx-clock.h
-> +and can be reused as DT sources.
-> +
-> +Required Properties of clock controller:
-> +
-> +	- compatible: "nuvoton,npcm750-clk" : for clock controller of Nuvoton
-> +		  Poleg BMC NPCM750
-> +
-> +	- reg: physical base address of the clock controller and length of
-> +		memory mapped region.
-> +
-> +	- #clock-cells: should be 1.
-> +
-> +Example: Clock controller node:
-> +
-> +	clk: clock-controller at f0801000 {
-> +		compatible = "nuvoton,npcm750-clk";
-> +		#clock-cells = <1>;
-> +		reg = <0xf0801000 0x1000>;
-> +		clock-names = "refclk", "sysbypck", "mcbypck";
-> +		clocks = <&clk_refclk>, <&clk_sysbypck>, <&clk_mcbypck>;
-> +	};
-> +
-> +Example: Required external clocks for network:
-> +
-> +	/* external reference clock */
-> +	clk_refclk: clk-refclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +		clock-output-names = "refclk";
-> +	};
-> +
-> +	/* external reference clock for cpu. float in normal operation */
-> +	clk_sysbypck: clk-sysbypck {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <800000000>;
-> +		clock-output-names = "sysbypck";
-> +	};
-> +
-> +	/* external reference clock for MC. float in normal operation */
-> +	clk_mcbypck: clk-mcbypck {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <800000000>;
-> +		clock-output-names = "mcbypck";
-> +	};
-> +
-> +	 /* external clock signal rg1refck, supplied by the phy */
-> +	clk_rg1refck: clk-rg1refck {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "clk_rg1refck";
-> +	};
-> +
-> +	 /* external clock signal rg2refck, supplied by the phy */
-> +	clk_rg2refck: clk-rg2refck {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "clk_rg2refck";
-> +	};
-> +
-> +	clk_xin: clk-xin {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <50000000>;
-> +		clock-output-names = "clk_xin";
-> +	};
-> +
-> +
-> +Example: GMAC controller node that consumes two clocks: a generated clk by the
-> +clock controller and a fixed clock from DT (clk_rg1refck).
-> +
-> +	ethernet0: eth at f0802000 {
-
-ethernet at ...
-
-> +		compatible = "snps,dwmac";
-> +		reg = <0xf0802000 0x2000>;
-> +		interrupts = <0 14 4>;
-> +		interrupt-names = "macirq";
-> +		clocks	= <&clk_rg1refck>, <&clk NPCM7XX_CLK_AHB>;
-> +		clock-names = "stmmaceth", "clk_gmac";
-> +	};
-> diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
-> new file mode 100644
-> index 000000000000..f21522605b94
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
-> @@ -0,0 +1,44 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Nuvoton NPCM7xx Clock Generator binding
-> + * clock binding number for all clocks supportted by nuvoton,npcm7xx-clk
-> + *
-> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
-> + *
-> + */
-> +
-> +#ifndef __DT_BINDINGS_CLOCK_NPCM7XX_H
-> +#define __DT_BINDINGS_CLOCK_NPCM7XX_H
-> +
-> +
-> +#define NPCM7XX_CLK_CPU 0
-> +#define NPCM7XX_CLK_GFX_PIXEL 1
-> +#define NPCM7XX_CLK_MC 2
-> +#define NPCM7XX_CLK_ADC 3
-> +#define NPCM7XX_CLK_AHB 4
-> +#define NPCM7XX_CLK_TIMER 5
-> +#define NPCM7XX_CLK_UART 6
-> +#define NPCM7XX_CLK_MMC  7
-> +#define NPCM7XX_CLK_SPI3 8
-> +#define NPCM7XX_CLK_PCI  9
-> +#define NPCM7XX_CLK_AXI 10
-> +#define NPCM7XX_CLK_APB4 11
-> +#define NPCM7XX_CLK_APB3 12
-> +#define NPCM7XX_CLK_APB2 13
-> +#define NPCM7XX_CLK_APB1 14
-> +#define NPCM7XX_CLK_APB5 15
-> +#define NPCM7XX_CLK_CLKOUT 16
-> +#define NPCM7XX_CLK_GFX  17
-> +#define NPCM7XX_CLK_SU   18
-> +#define NPCM7XX_CLK_SU48 19
-> +#define NPCM7XX_CLK_SDHC 20
-> +#define NPCM7XX_CLK_SPI0 21
-> +#define NPCM7XX_CLK_SPIX 22
-> +
-> +#define NPCM7XX_CLK_REFCLK 23
-> +#define NPCM7XX_CLK_SYSBYPCK 24
-> +#define NPCM7XX_CLK_MCBYPCK 25
-> +
-> +#define NPCM7XX_NUM_CLOCKS	 (NPCM7XX_CLK_MCBYPCK+1)
-> +
-> +#endif
-> -- 
-> 2.14.1
-> 
+On Fri, Mar 2, 2018 at 11:21 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Mar 01, 2018 at 02:15:14PM -0800, Feng Kan wrote:
+>> When bridge and its endpoint is enumerated the devices are added to the
+>> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+>> This causes the bridge to be moved to the end of the dpm list when
+>> deferred probe kicks in. The order of the dpm list for bridge and
+>> endpoint is reversed.
+>
+> I'm not very familiar with PM, so can you connect some of the dots
+> here for me?
+>
+> When you say "the bridge defers probe when IOMMU is not ready", are
+> you talking about pcie_portdrv_probe() claiming a PCIe port?
+This is at driver_probe_device. Since the CCA attribute is set to 1 in the ACPI
+table, the driver attempts a dma_configure. This is where it fails.
+>
+> How does this connect with the IOMMU?  Where do we figure out that the
+> IOMMU is not ready?
+The dma_configure attempts to do an iort_iommu_xlate which cause the
+probe to defer. The iort_iommu_xlate fails because the IOMMU driver has not
+been probe yet.
+        /*
+         * If the ops look-up fails, this means that either
+         * the SMMU drivers have not been probed yet or that
+         * the SMMU drivers are not built in the kernel;
+         * Depending on whether the SMMU drivers are built-in
+         * in the kernel or not, defer the IOMMU configuration
+         * or just abort it.
+         */
+        ops = iommu_ops_from_fwnode(iort_fwnode);
+        if (!ops)
+                return iort_iommu_driver_enabled(node->type) ?
+                       -EPROBE_DEFER : -ENODEV;
+>
+>> Add reordering code to move the bridge and its children and consumers to
+>> the end of the pm list so the order for suspend and resume is not altered.
+>> The code also move device and its children and consumers to the tail of
+>> device_kset list if it is registered.
+>>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Toan Le <toanle@apm.com>
+>> ---
+>>  V2:
+>>       1. change patch title from "move device and its children..."
+>>       2. move define based on Bjorn's comment
+>>       3. rename function name and comment content
+>>  drivers/base/base.h |  3 +++
+>>  drivers/base/core.c | 22 ++++++++++++++++++++++
+>>  drivers/base/dd.c   |  8 ++++----
+>>  3 files changed, 29 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/base/base.h b/drivers/base/base.h
+>> index d800de6..a75c302 100644
+>> --- a/drivers/base/base.h
+>> +++ b/drivers/base/base.h
+>> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
+>>  extern void device_links_no_driver(struct device *dev);
+>>  extern bool device_links_busy(struct device *dev);
+>>  extern void device_links_unbind_consumers(struct device *dev);
+>> +
+>> +/* device pm support */
+>> +void device_pm_move_to_tail(struct device *dev);
+>> diff --git a/drivers/base/core.c b/drivers/base/core.c
+>> index 110230d..0a0756b 100644
+>> --- a/drivers/base/core.c
+>> +++ b/drivers/base/core.c
+>> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>>  }
+>>
+>>  /**
+>> + * device_pm_move_to_tail - move device and its children and consumers to end of
+>> + *                          pm and device kset list
+>> + * @dev: current device pointer
+>> + *
+>> + * This is a lock held version of the device_reorder_to_tail. Function checks
+>> + * if the device is registered and moves it to the end of device_kset list. Also
+>> + * if the device is pm initialized, move the device to the end of the pm list.
+>> + * Then the function iterate through the children and device link consumers to
+>> + * do the same for each found.
+>> + */
+>> +void device_pm_move_to_tail(struct device *dev)
+>> +{
+>> +     int idx;
+>> +
+>> +     idx = device_links_read_lock();
+>> +     device_pm_lock();
+>> +     device_reorder_to_tail(dev, NULL);
+>> +     device_pm_unlock();
+>> +     device_links_read_unlock(idx);
+>> +}
+>> +
+>> +/**
+>>   * device_link_add - Create a link between two devices.
+>>   * @consumer: Consumer end of the link.
+>>   * @supplier: Supplier end of the link.
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index 2c964f5..7e9d1ef 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+>>                * Force the device to the end of the dpm_list since
+>>                * the PM code assumes that the order we add things to
+>>                * the list is a good order for suspend but deferred
+>> -              * probe makes that very unsafe.
+>> +              * probe makes that very unsafe. Move any children and
+>> +              * consumers belong to the device to the end of the list.
+>> +              * This way the suspend resume order won't be corrupted.
+>>                */
+>> -             device_pm_lock();
+>> -             device_pm_move_last(dev);
+>> -             device_pm_unlock();
+>> +             device_pm_move_to_tail(dev);
+>>
+>>               dev_dbg(dev, "Retrying from deferred list\n");
+>>               if (initcall_debug && !initcalls_done)
+>> --
+>> 1.8.3.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
