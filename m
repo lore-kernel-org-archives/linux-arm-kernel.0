@@ -1,38 +1,38 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 2 Mar 2018 11:17:17 +0100
-Subject: [PATCH 2/4] dt-bindings: at24: add compatible for nxp,se97b
-In-Reply-To: <20180116160618.27859-3-peda@axentia.se>
-References: <20180116160618.27859-1-peda@axentia.se>
- <20180116160618.27859-3-peda@axentia.se>
-Message-ID: <CAMRc=MfcyxsupU9-9Bv+U-U6bcNVYx44ixnmXM8r=xn6b-7sVA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 2 Mar 2018 11:21:06 +0100
+Subject: [PATCH v2 0/5] Add R8A77970/V3MSK LVDS/HDMI support
+In-Reply-To: <5f65b46d-be0f-a1ae-3d97-37f62ecf1657@cogentembedded.com>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+ <2fd26075-525c-8d86-ef81-f32c73cf3e8b@cogentembedded.com>
+ <20180228132707.mgunezg5o4lul7x5@verge.net.au>
+ <f9574ea2-d8ee-7c9f-b850-874074eddad2@cogentembedded.com>
+ <20180301095451.jvsybu5k6pnahfbi@verge.net.au>
+ <5f65b46d-be0f-a1ae-3d97-37f62ecf1657@cogentembedded.com>
+Message-ID: <20180302102106.enyb2ldmylgklqom@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-16 17:06 GMT+01:00 Peter Rosin <peda@axentia.se>:
-> The datasheet talks about the chip being an spd, but the chip is writable
-> so atmel,24c02 is more appropriate as fallback.
->
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  Documentation/devicetree/bindings/eeprom/at24.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/eeprom/at24.txt b/Documentation/devicetree/bindings/eeprom/at24.txt
-> index abfae1beca2b..edf9247613f6 100644
-> --- a/Documentation/devicetree/bindings/eeprom/at24.txt
-> +++ b/Documentation/devicetree/bindings/eeprom/at24.txt
-> @@ -46,6 +46,7 @@ Required properties:
->                  Some vendors use different model names for chips which are just
->                  variants of the above. Known such exceptions are listed below:
->
-> +                "nxp,se97b" - the fallback is "atmel,24c02",
->                  "renesas,r1ex24002" - the fallback is "atmel,24c02"
->
->    - reg: The I2C address of the EEPROM.
-> --
-> 2.11.0
->
+On Thu, Mar 01, 2018 at 06:28:29PM +0300, Sergei Shtylyov wrote:
+> On 03/01/2018 12:54 PM, Simon Horman wrote:
+> 
+> >>>>> Here's the set of 5 patches against Simon Horman's 'renesas.git' repo's
+> >>>>> 'renesas-devel-20180227-v4.16-rc3' tag. We're adding the R8A77970 FCPVD/VSPD/
+> >>>>> DU/LVDS device nodes and then describing the HDMI encoder connected to the LVDS
+> >>>>> output (we're omitting the LVDS decoder for now). These patches depend on
+> >>>>> the recent R8A77970 DU/LVDS rework patches by Laurent in order to work...	
+> >>>>
+> >>>>    Need to mention that the DU driver silently fails to probe now. I do
+> >>>>    hope that this is not due to my updates. :-)
+> >>>
+> >>> Please test that theory.
+> >>
+> >>    Yeah, after sucking in the recent versions of the DU/LVDS patches and uncommenting
+> >> and fixing rejects in a couple patches here, the graphical console works again. :-)
+> > 
+> > Ok, but does this patchset cause a regression? If so it seems
+> 
+>     Sorry, somehow missed that question. No regression is possible as the display just
+> doesn't work before these patches are applied. It's just that it doesn't start to work
+> until the recent DU/LVDS driver updates are applied.
 
-Applied to for-next, thanks.
-
-Bart
+Ok, but my question remains: does the display work before these patches?
