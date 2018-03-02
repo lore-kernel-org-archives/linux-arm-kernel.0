@@ -1,10 +1,9 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri,  2 Mar 2018 09:20:40 +0530
-Subject: [PATCH v4 05/10] dt-bindings: gpio: Add gpio nodes for Actions S900
- SoC
+Date: Fri,  2 Mar 2018 09:20:41 +0530
+Subject: [PATCH v4 06/10] arm64: dts: actions: Add S900 gpio nodes
 In-Reply-To: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
 References: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180302035045.14660-6-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180302035045.14660-7-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,110 +11,85 @@ Add gpio nodes for Actions Semi S900 SoC.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../devicetree/bindings/gpio/actions,owl-gpio.txt  | 95 ++++++++++++++++++++++
- 1 file changed, 95 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts |  6 +++
+ arch/arm64/boot/dts/actions/s900.dtsi             | 48 +++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-new file mode 100644
-index 000000000000..d2939ca6cfaf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-@@ -0,0 +1,95 @@
-+* Actions Semi OWL GPIO controller bindings
+diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+index ff043c961d75..60ddaf98401b 100644
+--- a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
++++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+@@ -14,6 +14,12 @@
+ 
+ 	aliases {
+ 		serial5 = &uart5;
++		gpio0 = &gpioa;
++		gpio1 = &gpiob;
++		gpio2 = &gpioc;
++		gpio3 = &gpiod;
++		gpio4 = &gpioe;
++		gpio5 = &gpiof;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+index 0156483f0f4d..9c7843045850 100644
+--- a/arch/arm64/boot/dts/actions/s900.dtsi
++++ b/arch/arm64/boot/dts/actions/s900.dtsi
+@@ -180,6 +180,54 @@
+ 			clocks = <&cmu CLK_GPIO>;
+ 		};
+ 
++		gpioa: gpioa at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 0 32>;
++		};
 +
-+The GPIOs are organized as individual banks/ports with variable number
-+of GPIOs. Each bank is represented as an individual GPIO controller.
++		gpiob: gpiob at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 32 32>;
++		};
 +
-+Required properties:
-+- compatible            : Should be "actions,s900-gpio"
-+- reg                   : Address and range of the GPIO controller registers.
-+- gpio-controller       : Marks the device node as a GPIO controller.
-+- #gpio-cells           : Should be <2>. The first cell is the gpio number
-+                          and the second cell is used to specify optional
-+                          parameters.
-+- interrupt-controller  : Marks the device node as an interrupt controller.
-+- #interrupt-cells      : Specifies the number of cells needed to encode an
-+                          interrupt.  Shall be set to 2.  The first cell
-+                          defines the interrupt number, the second encodes
-+                          the trigger flags described in
-+                          bindings/interrupt-controller/interrupts.txt
++		gpioc: gpioc at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 64 12>;
++		};
 +
-+Optional properties:
-+- gpio-ranges           : Mapping between GPIO and pinctrl
++		gpiod: gpiod at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 76 30>;
++		};
 +
-+Note: Each GPIO port should have an alias correctly numbered in "aliases"
-+node.
++		gpioe: gpioe at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 106 32>;
++		};
 +
-+Examples:
++		gpiof: gpiof at e01b0000 {
++			compatible = "actions,s900-gpio";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 138 8>;
++		};
 +
-+aliases {
-+        gpio0 = &gpioa;
-+        gpio1 = &gpiob;
-+        gpio2 = &gpioc;
-+        gpio3 = &gpiod;
-+        gpio4 = &gpioe;
-+        gpio5 = &gpiof;
-+};
-+
-+       gpioa: gpioa at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 0 32>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
-+
-+       gpiob: gpiob at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 32 32>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
-+
-+       gpioc: gpioc at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 64 12>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
-+
-+       gpiod: gpiod at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 76 30>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
-+
-+       gpioe: gpioe at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 106 32>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
-+
-+       gpiof: gpiof at e01b0000 {
-+               compatible = "actions,s900-gpio";
-+               reg = <0x0 0xe01b0000 0x0 0x1000>;
-+               gpio-controller;
-+               #gpio-cells = <2>;
-+               gpio-ranges = <&pinctrl 0 138 8>;
-+               interrupt-controller;
-+               #interrupt-cells = <2>;
-+       };
+ 		timer: timer at e0228000 {
+ 			compatible = "actions,s900-timer";
+ 			reg = <0x0 0xe0228000 0x0 0x8000>;
 -- 
 2.14.1
