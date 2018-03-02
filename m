@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:25 +0100
-Subject: [PATCH 17/52] mtd: rawnand: fsmc: convert driver to nand_scan()
+Date: Fri,  2 Mar 2018 18:03:34 +0100
+Subject: [PATCH 26/52] mtd: rawnand: marvell: convert driver to nand_scan()
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-18-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-27-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,182 +14,229 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/fsmc_nand.c | 148 ++++++++++++++++++++-------------------
- 1 file changed, 76 insertions(+), 72 deletions(-)
+ drivers/mtd/nand/raw/marvell_nand.c | 201 +++++++++++++++++++-----------------
+ 1 file changed, 104 insertions(+), 97 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/fsmc_nand.c b/drivers/mtd/nand/raw/fsmc_nand.c
-index 1bf73d4d4c0d..8e0c27f9961b 100644
---- a/drivers/mtd/nand/raw/fsmc_nand.c
-+++ b/drivers/mtd/nand/raw/fsmc_nand.c
-@@ -918,6 +918,78 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
+diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
+index cc21f9633edd..d7765445246f 100644
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -2284,6 +2284,107 @@ static int marvell_nfc_setup_data_interface(struct mtd_info *mtd, int chipnr,
  	return 0;
  }
  
-+static int fsmc_nand_attach_chip(struct nand_chip *nand)
++static int marvell_nand_attach_chip(struct nand_chip *chip)
 +{
-+	struct mtd_info *mtd = nand_to_mtd(nand);
-+	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
++	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
++	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(nfc->dev);
++	int ret;
 +
-+	if (AMBA_REV_BITS(host->pid) >= 8) {
-+		switch (mtd->oobsize) {
-+		case 16:
-+		case 64:
-+		case 128:
-+		case 224:
-+		case 256:
-+			break;
-+		default:
-+			dev_warn(host->dev,
-+				 "No oob scheme defined for oobsize %d\n",
-+				 mtd->oobsize);
-+			return -EINVAL;
-+		}
++	if (pdata && pdata->flash_bbt)
++		chip->bbt_options |= NAND_BBT_USE_FLASH;
 +
-+		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
-+
-+		return 0;
++	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
++		/*
++		 * We'll use a bad block table stored in-flash and don't
++		 * allow writing the bad block marker to the flash.
++		 */
++		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
++		chip->bbt_td = &bbt_main_descr;
++		chip->bbt_md = &bbt_mirror_descr;
 +	}
 +
-+	switch (nand->ecc.mode) {
-+	case NAND_ECC_HW:
-+		dev_info(host->dev, "Using 1-bit HW ECC scheme\n");
-+		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
-+		nand->ecc.correct = nand_correct_data;
-+		nand->ecc.bytes = 3;
-+		nand->ecc.strength = 1;
-+		break;
++	/* Save the chip-specific fields of NDCR */
++	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
++	if (chip->options & NAND_BUSWIDTH_16)
++		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
 +
-+	case NAND_ECC_SOFT:
-+		if (nand->ecc.algo == NAND_ECC_BCH) {
-+			dev_info(host->dev,
-+				 "Using 4-bit SW BCH ECC scheme\n");
-+			break;
-+		}
-+
-+	case NAND_ECC_ON_DIE:
-+		break;
-+
-+	default:
-+		dev_err(host->dev, "Unsupported ECC mode!\n");
-+		return -ENOTSUPP;
++	/*
++	 * On small page NANDs, only one cycle is needed to pass the
++	 * column address.
++	 */
++	if (mtd->writesize <= 512) {
++		marvell_nand->addr_cyc = 1;
++	} else {
++		marvell_nand->addr_cyc = 2;
++		marvell_nand->ndcr |= NDCR_RA_START;
 +	}
 +
 +	/*
-+	 * Don't set layout for BCH4 SW ECC. This will be
-+	 * generated later in nand_bch_init() later.
++	 * Now add the number of cycles needed to pass the row
++	 * address.
++	 *
++	 * Addressing a chip using CS 2 or 3 should also need the third row
++	 * cycle but due to inconsistance in the documentation and lack of
++	 * hardware to test this situation, this case is not supported.
 +	 */
-+	if (nand->ecc.mode == NAND_ECC_HW) {
-+		switch (mtd->oobsize) {
-+		case 16:
-+		case 64:
-+		case 128:
-+			mtd_set_ooblayout(mtd,
-+					  &fsmc_ecc1_ooblayout_ops);
-+			break;
-+		default:
-+			dev_warn(host->dev,
-+				 "No oob scheme defined for oobsize %d\n",
-+				 mtd->oobsize);
-+			return -EINVAL;
++	if (chip->options & NAND_ROW_ADDR_3)
++		marvell_nand->addr_cyc += 3;
++	else
++		marvell_nand->addr_cyc += 2;
++
++	if (pdata) {
++		chip->ecc.size = pdata->ecc_step_size;
++		chip->ecc.strength = pdata->ecc_strength;
++	}
++
++	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
++	if (ret) {
++		dev_err(nfc->dev, "ECC init failed: %d\n", ret);
++		return ret;
++	}
++
++	if (chip->ecc.mode == NAND_ECC_HW) {
++		/*
++		 * Subpage write not available with hardware ECC, prohibit also
++		 * subpage read as in userspace subpage access would still be
++		 * allowed and subpage write, if used, would lead to numerous
++		 * uncorrectable ECC errors.
++		 */
++		chip->options |= NAND_NO_SUBPAGE_WRITE;
++	}
++
++	if (pdata || nfc->caps->legacy_of_bindings) {
++		/*
++		 * We keep the MTD name unchanged to avoid breaking platforms
++		 * where the MTD cmdline parser is used and the bootloader
++		 * has not been updated to use the new naming scheme.
++		 */
++		mtd->name = "pxa3xx_nand-0";
++	} else if (!mtd->name) {
++		/*
++		 * If the new bindings are used and the bootloader has not been
++		 * updated to pass a new mtdparts parameter on the cmdline, you
++		 * should define the following property in your NAND node, ie:
++		 *
++		 *	label = "main-storage";
++		 *
++		 * This way, mtd->name will be set by the core when
++		 * nand_set_flash_node() is called.
++		 */
++		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
++					   "%s:nand.%d", dev_name(nfc->dev),
++					   marvell_nand->sels[0].cs);
++		if (!mtd->name) {
++			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
++			return -ENOMEM;
 +		}
 +	}
 +
 +	return 0;
 +}
 +
- /*
-  * fsmc_nand_probe - Probe function
-  * @pdev:       platform device structure
-@@ -1047,78 +1119,10 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 	/*
- 	 * Scan to find existence of the device
- 	 */
--	ret = nand_scan_ident(mtd, 1, NULL);
+ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
+ 				  struct device_node *np)
+ {
+@@ -2435,105 +2536,11 @@ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
+ 	marvell_nand->ndtr1 = readl_relaxed(nfc->regs + NDTR1);
+ 
+ 	chip->options |= NAND_BUSWIDTH_AUTO;
+-	ret = nand_scan_ident(mtd, marvell_nand->nsels, NULL);
 -	if (ret) {
--		dev_err(&pdev->dev, "No NAND Device found!\n");
--		goto err_scan_ident;
+-		dev_err(dev, "could not identify the nand chip\n");
+-		return ret;
 -	}
 -
--	if (AMBA_REV_BITS(host->pid) >= 8) {
--		switch (mtd->oobsize) {
--		case 16:
--		case 64:
--		case 128:
--		case 224:
--		case 256:
--			break;
--		default:
--			dev_warn(&pdev->dev, "No oob scheme defined for oobsize %d\n",
--				 mtd->oobsize);
--			ret = -EINVAL;
--			goto err_probe;
--		}
+-	if (pdata && pdata->flash_bbt)
+-		chip->bbt_options |= NAND_BBT_USE_FLASH;
 -
--		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
--	} else {
--		switch (nand->ecc.mode) {
--		case NAND_ECC_HW:
--			dev_info(&pdev->dev, "Using 1-bit HW ECC scheme\n");
--			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
--			nand->ecc.correct = nand_correct_data;
--			nand->ecc.bytes = 3;
--			nand->ecc.strength = 1;
--			break;
--
--		case NAND_ECC_SOFT:
--			if (nand->ecc.algo == NAND_ECC_BCH) {
--				dev_info(&pdev->dev, "Using 4-bit SW BCH ECC scheme\n");
--				break;
--			}
--
--		case NAND_ECC_ON_DIE:
--			break;
--
--		default:
--			dev_err(&pdev->dev, "Unsupported ECC mode!\n");
--			goto err_probe;
--		}
--
+-	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
 -		/*
--		 * Don't set layout for BCH4 SW ECC. This will be
--		 * generated later in nand_bch_init() later.
+-		 * We'll use a bad block table stored in-flash and don't
+-		 * allow writing the bad block marker to the flash.
 -		 */
--		if (nand->ecc.mode == NAND_ECC_HW) {
--			switch (mtd->oobsize) {
--			case 16:
--			case 64:
--			case 128:
--				mtd_set_ooblayout(mtd,
--						  &fsmc_ecc1_ooblayout_ops);
--				break;
--			default:
--				dev_warn(&pdev->dev,
--					 "No oob scheme defined for oobsize %d\n",
--					 mtd->oobsize);
--				ret = -EINVAL;
--				goto err_probe;
--			}
--		}
+-		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+-		chip->bbt_td = &bbt_main_descr;
+-		chip->bbt_md = &bbt_mirror_descr;
 -	}
 -
--	/* Second stage of scan to fill MTD data-structures */
+-	/* Save the chip-specific fields of NDCR */
+-	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
+-	if (chip->options & NAND_BUSWIDTH_16)
+-		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
+-
+-	/*
+-	 * On small page NANDs, only one cycle is needed to pass the
+-	 * column address.
+-	 */
+-	if (mtd->writesize <= 512) {
+-		marvell_nand->addr_cyc = 1;
+-	} else {
+-		marvell_nand->addr_cyc = 2;
+-		marvell_nand->ndcr |= NDCR_RA_START;
+-	}
+-
+-	/*
+-	 * Now add the number of cycles needed to pass the row
+-	 * address.
+-	 *
+-	 * Addressing a chip using CS 2 or 3 should also need the third row
+-	 * cycle but due to inconsistance in the documentation and lack of
+-	 * hardware to test this situation, this case is not supported.
+-	 */
+-	if (chip->options & NAND_ROW_ADDR_3)
+-		marvell_nand->addr_cyc += 3;
+-	else
+-		marvell_nand->addr_cyc += 2;
+-
+-	if (pdata) {
+-		chip->ecc.size = pdata->ecc_step_size;
+-		chip->ecc.strength = pdata->ecc_strength;
+-	}
+-
+-	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
+-	if (ret) {
+-		dev_err(dev, "ECC init failed: %d\n", ret);
+-		return ret;
+-	}
+-
+-	if (chip->ecc.mode == NAND_ECC_HW) {
+-		/*
+-		 * Subpage write not available with hardware ECC, prohibit also
+-		 * subpage read as in userspace subpage access would still be
+-		 * allowed and subpage write, if used, would lead to numerous
+-		 * uncorrectable ECC errors.
+-		 */
+-		chip->options |= NAND_NO_SUBPAGE_WRITE;
+-	}
+-
+-	if (pdata || nfc->caps->legacy_of_bindings) {
+-		/*
+-		 * We keep the MTD name unchanged to avoid breaking platforms
+-		 * where the MTD cmdline parser is used and the bootloader
+-		 * has not been updated to use the new naming scheme.
+-		 */
+-		mtd->name = "pxa3xx_nand-0";
+-	} else if (!mtd->name) {
+-		/*
+-		 * If the new bindings are used and the bootloader has not been
+-		 * updated to pass a new mtdparts parameter on the cmdline, you
+-		 * should define the following property in your NAND node, ie:
+-		 *
+-		 *	label = "main-storage";
+-		 *
+-		 * This way, mtd->name will be set by the core when
+-		 * nand_set_flash_node() is called.
+-		 */
+-		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+-					   "%s:nand.%d", dev_name(nfc->dev),
+-					   marvell_nand->sels[0].cs);
+-		if (!mtd->name) {
+-			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
+-			return -ENOMEM;
+-		}
+-	}
+ 
 -	ret = nand_scan_tail(mtd);
-+	nand->ecc.attach_chip = fsmc_nand_attach_chip;
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
--		goto err_probe;
-+		goto err_scan;
++	chip->ecc.attach_chip = marvell_nand_attach_chip;
++	ret = nand_scan(mtd, marvell_nand->nsels);
+ 	if (ret) {
+-		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
++		dev_err(dev, "could not scan the nand chip\n");
+ 		return ret;
+ 	}
  
- 	mtd->name = "nand";
- 	ret = mtd_device_register(mtd, NULL, 0);
-@@ -1132,7 +1136,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 
- err_release_nand:
- 	nand_release(mtd);
--err_probe:
-+err_scan:
- 	if (host->mode == USE_DMA_ACCESS)
- 		dma_release_channel(host->write_dma_chan);
- err_req_write_chnl:
 -- 
 2.14.1
