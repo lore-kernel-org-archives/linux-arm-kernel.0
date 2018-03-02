@@ -1,30 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 12:06:58 -0600
-Subject: [PATCH v2 7/8] arm64: zynqmp: Add support for Xilinx zc12XX boards
-In-Reply-To: <10883c083dfe48fe5349292f78e47143d87c0a15.1519396753.git.michal.simek@xilinx.com>
-References: <cover.1519396753.git.michal.simek@xilinx.com>
- <10883c083dfe48fe5349292f78e47143d87c0a15.1519396753.git.michal.simek@xilinx.com>
-Message-ID: <20180302180658.26qjuqeiucvam4yk@rob-hp-laptop>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Fri,  2 Mar 2018 18:57:57 +0100
+Subject: [PATCH v9 5/5] drm/bridge/synopsys: dw-hdmi: Add missing bridge detach
+In-Reply-To: <20180302175757.28192-1-enric.balletbo@collabora.com>
+References: <20180302175757.28192-1-enric.balletbo@collabora.com>
+Message-ID: <20180302175757.28192-6-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 03:40:29PM +0100, Michal Simek wrote:
-> These 3 boards requires minimal support to get Linux up and running.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - Record compatible string to xilinx.txt
-> 
->  Documentation/devicetree/bindings/arm/xilinx.txt  |  9 ++++
->  arch/arm64/boot/dts/xilinx/Makefile               |  3 ++
->  arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts | 54 +++++++++++++++++++++++
->  arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts | 42 ++++++++++++++++++
->  arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts | 42 ++++++++++++++++++
->  5 files changed, 150 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+We inited connector in attach(), so need a detach() to cleanup.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+
+Changes in v9: None
+
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index f9802399cc0d..5626922f95f9 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1985,6 +1985,13 @@ static int dw_hdmi_bridge_attach(struct drm_bridge *bridge)
+ 	return 0;
+ }
+ 
++static void dw_hdmi_bridge_detach(struct drm_bridge *bridge)
++{
++	struct dw_hdmi *hdmi = bridge->driver_private;
++
++	drm_connector_cleanup(&hdmi->connector);
++}
++
+ static enum drm_mode_status
+ dw_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
+ 			  const struct drm_display_mode *mode)
+@@ -2041,6 +2048,7 @@ static void dw_hdmi_bridge_enable(struct drm_bridge *bridge)
+ 
+ static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
+ 	.attach = dw_hdmi_bridge_attach,
++	.detach = dw_hdmi_bridge_detach,
+ 	.enable = dw_hdmi_bridge_enable,
+ 	.disable = dw_hdmi_bridge_disable,
+ 	.mode_set = dw_hdmi_bridge_mode_set,
+-- 
+2.16.1
