@@ -1,45 +1,881 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  2 Mar 2018 18:57:55 +0100
-Subject: [PATCH v9 3/5] drm/rockchip: inno_hdmi: reorder clk_disable_unprepare
- call in unbind
-In-Reply-To: <20180302175757.28192-1-enric.balletbo@collabora.com>
-References: <20180302175757.28192-1-enric.balletbo@collabora.com>
-Message-ID: <20180302175757.28192-4-enric.balletbo@collabora.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 12:12:28 -0600
+Subject: [PATCH v2 8/8] arm64: zynqmp: Add support for Xilinx zc1751
+In-Reply-To: <10c8f7ee495ea73547f683ce1e3ad8e0e1880410.1519396753.git.michal.simek@xilinx.com>
+References: <cover.1519396753.git.michal.simek@xilinx.com>
+ <10c8f7ee495ea73547f683ce1e3ad8e0e1880410.1519396753.git.michal.simek@xilinx.com>
+Message-ID: <20180302181228.r7pdll5lyc6os374@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeffy Chen <jeffy.chen@rock-chips.com>
+On Fri, Feb 23, 2018 at 03:40:30PM +0100, Michal Simek wrote:
+> Xilinx zc1751 boards is used for silicon validation. Board can be
+> extended with 5 FMCs/DCs cards to connect various IPs. Describe all
+> these combinations.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v2:
+> - Record compatible string to xilinx.txt
+> 
+>  Documentation/devicetree/bindings/arm/xilinx.txt   |   3 +
+>  arch/arm64/boot/dts/xilinx/Makefile                |   5 +
+>  .../boot/dts/xilinx/zynqmp-zc1751-xm015-dc1.dts    | 133 +++++++++++++++
+>  .../boot/dts/xilinx/zynqmp-zc1751-xm016-dc2.dts    | 170 +++++++++++++++++++
+>  .../boot/dts/xilinx/zynqmp-zc1751-xm017-dc3.dts    | 153 +++++++++++++++++
+>  .../boot/dts/xilinx/zynqmp-zc1751-xm018-dc4.dts    | 181 +++++++++++++++++++++
+>  .../boot/dts/xilinx/zynqmp-zc1751-xm019-dc5.dts    | 126 ++++++++++++++
+>  7 files changed, 771 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm015-dc1.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm016-dc2.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm017-dc3.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm018-dc4.dts
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm019-dc5.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+> index aceccf2bf43b..0cf6fb61631d 100644
+> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
+> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+> @@ -28,6 +28,9 @@ Additional compatible strings:
+>  - Xilinx internal board zc1275
+>    "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275"
+>  
+> +- Xilinx internal board zc1751
+> +  "xlnx,zynqmp-zc1751"
+> +
+>  - Xilinx 96boards compatible board zcu100
+>    "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100"
+>  
+> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+> index bdda451afaad..c2a0c00272e2 100644
+> --- a/arch/arm64/boot/dts/xilinx/Makefile
+> +++ b/arch/arm64/boot/dts/xilinx/Makefile
+> @@ -3,6 +3,11 @@ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1751-xm015-dc1.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1751-xm016-dc2.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1751-xm017-dc3.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1751-xm018-dc4.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1751-xm019-dc5.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm015-dc1.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm015-dc1.dts
+> new file mode 100644
+> index 000000000000..41f9e987c559
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm015-dc1.dts
+> @@ -0,0 +1,133 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP zc1751-xm015-dc1
+> + *
+> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "ZynqMP zc1751-xm015-dc1 RevA";
+> +	compatible = "xlnx,zynqmp-zc1751", "xlnx,zynqmp";
+> +
+> +	aliases {
+> +		ethernet0 = &gem3;
+> +		gpio0 = &gpio;
+> +		i2c0 = &i2c1;
+> +		mmc0 = &sdhci0;
+> +		mmc1 = &sdhci1;
+> +		rtc0 = &rtc;
+> +		serial0 = &uart0;
+> +		usb0 = &usb0;
 
-In bind the clk_prepare_enable of the HDMI pclk is called before adding the
-i2c_adapter. So it should be the other way around in unbind, first remove
-the i2c_adapter and then call the clk_disable_unprepare.
+Same alias comments.
 
-Fixes: 412d4ae6b7a5 ("drm/rockchip: hdmi: add Innosilicon HDMI support")
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&gem3 {
+> +	status = "okay";
+> +	phy-handle = <&phy0>;
+> +	phy-mode = "rgmii-id";
+> +	phy0: phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&gpio {
+> +	status = "okay";
+> +};
+> +
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	eeprom: eeprom at 55 {
+> +		compatible = "atmel,24c64"; /* 24AA64 */
+> +		reg = <0x55>;
+> +	};
+> +};
+> +
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +	/* SATA phy OOB timing settings */
+> +	ceva,p0-cominit-params = /bits/ 8 <0x1B 0x4D 0x18 0x28>;
+> +	ceva,p0-comwake-params = /bits/ 8 <0x06 0x19 0x08 0x0E>;
+> +	ceva,p0-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
+> +	ceva,p0-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
+> +	ceva,p1-cominit-params = /bits/ 8 <0x1B 0x4D 0x18 0x28>;
+> +	ceva,p1-comwake-params = /bits/ 8 <0x06 0x19 0x08 0x0E>;
+> +	ceva,p1-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
+> +	ceva,p1-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
+> +};
+> +
+> +/* eMMC */
+> +&sdhci0 {
+> +	status = "okay";
+> +	bus-width = <8>;
+> +};
+> +
+> +/* SD1 with level shifter */
+> +&sdhci1 {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +/* ULPI SMSC USB3320 */
+> +&usb0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm016-dc2.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm016-dc2.dts
+> new file mode 100644
+> index 000000000000..c4d253cec526
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm016-dc2.dts
+> @@ -0,0 +1,170 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP zc1751-xm016-dc2
+> + *
+> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "ZynqMP zc1751-xm016-dc2 RevA";
+> +	compatible = "xlnx,zynqmp-zc1751", "xlnx,zynqmp";
+> +
+> +	aliases {
+> +		can0 = &can0;
+> +		can1 = &can1;
+> +		ethernet0 = &gem2;
+> +		gpio0 = &gpio;
+> +		i2c0 = &i2c0;
+> +		rtc0 = &rtc;
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		spi0 = &spi0;
+> +		spi1 = &spi1;
+> +		usb0 = &usb1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +&can0 {
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&gem2 {
+> +	status = "okay";
+> +	phy-handle = <&phy0>;
+> +	phy-mode = "rgmii-id";
+> +	phy0: phy at 5 {
+> +		reg = <5>;
+> +		ti,rx-internal-delay = <0x8>;
+> +		ti,tx-internal-delay = <0xa>;
+> +		ti,fifo-depth = <0x1>;
+> +	};
+> +};
+> +
+> +&gpio {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	tca6416_u26: gpio at 20 {
+> +		compatible = "ti,tca6416";
+> +		reg = <0x20>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		/* IRQ not connected */
+> +	};
+> +
+> +	rtc at 68 {
+> +		compatible = "dallas,ds1339";
+> +		reg = <0x68>;
+> +	};
+> +};
+> +
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+> +&spi0 {
+> +	status = "okay";
+> +	num-cs = <1>;
+> +
+> +	spi0_flash0: spi0_flash0 at 0 {
 
-Changes in v9:
-- Added new patch to reorder clk_disable_unprepare call in inno_hdmi
-  unbind()
+flash at 0
 
- drivers/gpu/drm/rockchip/inno_hdmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "sst,sst25wf080", "jedec,spi-nor";
+> +		spi-max-frequency = <50000000>;
+> +		reg = <0>;
+> +
+> +		spi0_flash0 at 0 {
 
-diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-index a5c661930250..88d0774c97bd 100644
---- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-+++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-@@ -906,8 +906,8 @@ static void inno_hdmi_unbind(struct device *dev, struct device *master,
- 	hdmi->connector.funcs->destroy(&hdmi->connector);
- 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
- 
--	clk_disable_unprepare(hdmi->pclk);
- 	i2c_put_adapter(hdmi->ddc);
-+	clk_disable_unprepare(hdmi->pclk);
- }
- 
- static const struct component_ops inno_hdmi_ops = {
--- 
-2.16.1
+Don't use underscores.
+
+Also, this is a partition, right? Follow the partitions binding. For 
+example, there should be a "partitions" node. And the name should be 
+partition at 0
+
+> +			label = "spi0_flash0";
+
+This should be something that describes what is in the partition like 
+say "rootfs".
+
+> +			reg = <0x0 0x100000>;
+> +		};
+> +	};
+> +};
+> +
+> +&spi1 {
+> +	status = "okay";
+> +	num-cs = <1>;
+> +
+> +	spi1_flash0: spi1_flash0 at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "atmel,at45db041e", "atmel,at45", "atmel,dataflash";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +
+> +		spi1_flash0 at 0 {
+> +			label = "spi1_flash0";
+> +			reg = <0x0 0x84000>;
+> +		};
+> +	};
+> +};
+> +
+> +/* ULPI SMSC USB3320 */
+> +&usb1 {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm017-dc3.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm017-dc3.dts
+> new file mode 100644
+> index 000000000000..9f312ef0e061
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm017-dc3.dts
+> @@ -0,0 +1,153 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP zc1751-xm017-dc3
+> + *
+> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +
+> +/ {
+> +	model = "ZynqMP zc1751-xm017-dc3 RevA";
+> +	compatible = "xlnx,zynqmp-zc1751", "xlnx,zynqmp";
+> +
+> +	aliases {
+> +		ethernet0 = &gem0;
+> +		gpio0 = &gpio;
+> +		i2c0 = &i2c0;
+> +		i2c1 = &i2c1;
+> +		mmc0 = &sdhci1;
+> +		rtc0 = &rtc;
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		usb0 = &usb0;
+> +		usb1 = &usb1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&gem0 {
+> +	status = "okay";
+> +	phy-handle = <&phy0>;
+> +	phy-mode = "rgmii-id";
+> +	phy0: phy at 0 { /* VSC8211 */
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&gpio {
+> +	status = "okay";
+> +};
+> +
+> +/* just eeprom here */
+> +&i2c0 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	tca6416_u26: gpio at 20 {
+> +		compatible = "ti,tca6416";
+> +		reg = <0x20>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		/* IRQ not connected */
+> +	};
+> +
+> +	rtc at 68 {
+> +		compatible = "dallas,ds1339";
+> +		reg = <0x68>;
+> +	};
+> +};
+> +
+> +/* eeprom24c02 and SE98A temp chip pca9306 */
+> +&i2c1 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +	/* SATA phy OOB timing settings */
+> +	ceva,p0-cominit-params = /bits/ 8 <0x1B 0x4D 0x18 0x28>;
+> +	ceva,p0-comwake-params = /bits/ 8 <0x06 0x19 0x08 0x0E>;
+> +	ceva,p0-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
+> +	ceva,p0-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
+> +	ceva,p1-cominit-params = /bits/ 8 <0x1B 0x4D 0x18 0x28>;
+> +	ceva,p1-comwake-params = /bits/ 8 <0x06 0x19 0x08 0x0E>;
+> +	ceva,p1-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
+> +	ceva,p1-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
+> +};
+> +
+> +&sdhci1 { /* emmc with some settings */
+> +	status = "okay";
+> +};
+> +
+> +/* main */
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +/* DB9 */
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +};
+> +
+> +/* ULPI SMSC USB3320 */
+> +&usb1 {
+> +	status = "okay";
+> +	dr_mode = "host";
+> +};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm018-dc4.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm018-dc4.dts
+> new file mode 100644
+> index 000000000000..c6eb888d7812
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm018-dc4.dts
+> @@ -0,0 +1,181 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP zc1751-xm018-dc4
+> + *
+> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +
+> +/ {
+> +	model = "ZynqMP zc1751-xm018-dc4";
+> +	compatible = "xlnx,zynqmp-zc1751", "xlnx,zynqmp";
+> +
+> +	aliases {
+> +		can0 = &can0;
+> +		can1 = &can1;
+
+These too should be dropped I think.
+
+> +		ethernet0 = &gem0;
+> +		ethernet1 = &gem1;
+> +		ethernet2 = &gem2;
+> +		ethernet3 = &gem3;
+> +		gpio0 = &gpio;
+> +		i2c0 = &i2c0;
+> +		i2c1 = &i2c1;
+> +		rtc0 = &rtc;
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +&can0 {
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&lpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&gem0 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy0>;
+> +	ethernet_phy0: ethernet-phy at 0 { /* Marvell 88e1512 */
+> +		reg = <0>;
+> +	};
+> +	ethernet_phy7: ethernet-phy at 7 { /* Vitesse VSC8211 */
+> +		reg = <7>;
+> +	};
+> +	ethernet_phy3: ethernet-phy at 3 { /* Realtek RTL8211DN */
+> +		reg = <3>;
+> +	};
+> +	ethernet_phy8: ethernet-phy at 8 { /* Vitesse VSC8211 */
+> +		reg = <8>;
+> +	};
+> +};
+> +
+> +&gem1 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy7>;
+> +};
+> +
+> +&gem2 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy3>;
+> +};
+> +
+> +&gem3 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy8>;
+> +};
+> +
+> +&gpio {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	clock-frequency = <400000>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <400000>;
+> +	status = "okay";
+> +};
+> +
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&watchdog0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm019-dc5.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm019-dc5.dts
+> new file mode 100644
+> index 000000000000..2422f939ab53
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1751-xm019-dc5.dts
+> @@ -0,0 +1,126 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP zc1751-xm019-dc5
+> + *
+> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
+> + *
+> + * Siva Durga Prasad <siva.durga.paladugu@xilinx.com>
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "ZynqMP zc1751-xm019-dc5 RevA";
+> +	compatible = "xlnx,zynqmp-zc1751", "xlnx,zynqmp";
+> +
+> +	aliases {
+> +		ethernet0 = &gem1;
+> +		gpio0 = &gpio;
+> +		i2c0 = &i2c0;
+> +		i2c1 = &i2c1;
+> +		mmc0 = &sdhci0;
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +	status = "okay";
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +	status = "okay";
+> +};
+> +
+> +&gem1 {
+> +	status = "okay";
+> +	phy-handle = <&phy0>;
+> +	phy-mode = "rgmii-id";
+> +	phy0: phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&gpio {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +};
+> +
+> +&sdhci0 {
+> +	status = "okay";
+> +	no-1-8-v;
+> +};
+> +
+> +&ttc0 {
+> +	status = "okay";
+> +};
+> +
+> +&ttc1 {
+> +	status = "okay";
+> +};
+> +
+> +&ttc2 {
+> +	status = "okay";
+> +};
+> +
+> +&ttc3 {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&watchdog0 {
+> +	status = "okay";
+> +};
+> -- 
+> 1.9.1
+> 
