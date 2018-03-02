@@ -1,39 +1,30 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri,  2 Mar 2018 11:51:02 +0800
-Subject: [PATCH v3 3/3] arm64: dts: rockchip: Avoid wakeup when inserting the
- pen
-In-Reply-To: <20180302035102.10084-1-jeffy.chen@rock-chips.com>
-References: <20180302035102.10084-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180302035102.10084-4-jeffy.chen@rock-chips.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri,  2 Mar 2018 09:20:38 +0530
+Subject: [PATCH v4 03/10] arm64: actions: Enable PINCTRL in platforms Kconfig
+In-Reply-To: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
+References: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180302035045.14660-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wakeup event action for Pen Insert gpio key, to avoid wakeup when
-inserting the pen.
+Select PINCTRL for Actions Semi SoCs
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes in v3: None
-Changes in v2:
-Specify wakeup event action instead of irq trigger type as Brian
-suggested.
-
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 191a6bcb1704..ef2de0057c5c 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -134,6 +134,8 @@
- 		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
- 		linux,code = <SW_PEN_INSERTED>;
- 		linux,input-type = <EV_SW>;
-+		/* Wakeup only when ejecting */
-+		wakeup-event-action = <EV_ACT_DEASSERTED>;
- 		wakeup-source;
- 	};
- };
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index fbedbd8f619a..bae1289bdc3f 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -3,6 +3,7 @@ menu "Platform selection"
+ config ARCH_ACTIONS
+ 	bool "Actions Semi Platforms"
+ 	select OWL_TIMER
++	select PINCTRL
+ 	help
+ 	  This enables support for the Actions Semiconductor S900 SoC family.
+ 
 -- 
-2.11.0
+2.14.1
