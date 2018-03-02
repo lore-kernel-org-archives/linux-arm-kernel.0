@@ -1,52 +1,112 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 2 Mar 2018 09:20:54 -0500
-Subject: RFC on Kdump and PCIe on ARM64
-In-Reply-To: <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
-References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
- <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
- <2b2de17c-8527-e49b-2ef2-2a3d1801e4f9@codeaurora.org>
- <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <feeab007-951d-7743-70e6-122486feddf7@codeaurora.org>
+From: afd@ti.com (Andrew F. Davis)
+Date: Fri, 2 Mar 2018 08:22:52 -0600
+Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
+In-Reply-To: <20180302111040.GA6344@amd>
+References: <20180224214617.GA22619@amd>
+ <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+ <20180226131318.GA14045@amd>
+ <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+ <20180226231336.GA18565@amd>
+ <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
+ <20180302091025.GC30267@amd>
+ <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
+ <20180302111040.GA6344@amd>
+Message-ID: <0f090cc7-2b72-a038-26ee-d43077cb9663@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/1/2018 7:03 PM, Bjorn Helgaas wrote:
->> 3. The last one is adapter gets into fuzzy state due to not coming
->> out of clean state in the second time init and being rejected by
->> SMMUv3 multiple times.
+On 03/02/2018 05:10 AM, Pavel Machek wrote:
+> Hi!
+> 
+>>> If this is taking longer to fix, should c85823390215 be reverted in
+>>> the meantime? It does not seem particulary important/urgent...
 >>
->> [   16.093441] pci 0000:01:00.0: aer_status: 0x00040000, aer_mask: 0x00000000
->> [   16.099356] pci 0000:01:00.0: Malformed TLP
->> [   16.103522] pci 0000:01:00.0: aer_layer=Transaction Layer, aer_agent=Receiver ID
->> [   16.110900] pci 0000:01:00.0: aer_uncor_severity: 0x00062011
->> [   16.116543] pci 0000:01:00.0:   TLP Header: 0a00a000 00008100 01010100 00000000
-> I'm not clear on this.  I don't remember what an IOMMU fault looks
-> like to an Endpoint.  Are you saying that if an Endpoint sees too many
-> of those faults, it gets into this "fuzzy state" (whatever that is :))?
-> Is this a hardware defect?  Do we care (this is a kdump kernel, after
-> all)?  If we do care, can we fix the device by resetting it?
+>> No patience between the v4.16 release candidates eh ;)
+>>
+>> commit 6662ae6af82df10259a70c7569b4c12ea7f3ba93
+>> ("gpiolib: Keep returning EPROBE_DEFER when we should")
+>>
+>> and
+>>
+>> commit ce27fb2c56db6ccfe8099343bb4afdab15e77e7b
+>> ("gpio: Handle deferred probing in of_find_gpio() properly")
+>>
+>> that are both in Torvalds' tree since yesterday should be fixing
+>> this, I think? Did you try just using the upstream HEAD?
+> 
+> Ok, so this code looks pretty crazy to me: I tried removing the
+> "of_find_spi_gpio" part, and audio started working.
+> 
+> What is going on with the ()s around == s? You made me look up C
+> operator precedence.
+> 
+> Hmm, and it is also wrong, right? It turns any error code into ENOENT,
+> as it tries to do the "special handling".
+> 
+>                  *                                                                      
+>                  * This means we don't need to look any further for                     
+>                  * alternate name conventions, and we should really                     
+>                  * preserve the return code for our user to be able to                  
+>                  * retry probing later.                                                 
+>                  */
+>                 if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
+>                         return desc;
+> 
+>                 if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+>                         break;
+>         }
+> 
+>         /* Special handling for SPI GPIOs if used */
+>         if (IS_ERR(desc))
+>                 desc = of_find_spi_gpio(dev, con_id, &of_flags);
+> 
+>         /* Special handling for regulator GPIOs if used */
+>         if (IS_ERR(desc) && PTR_ERR(desc) != -EPROBE_DEFER)
+>                 desc = of_find_regulator_gpio(dev, con_id, &of_flags);
+> 
+> Something like this?
+> 
+> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> index 84e5a9d..f0fab26 100644
+> --- a/drivers/gpio/gpiolib-of.c
+> +++ b/drivers/gpio/gpiolib-of.c
+> @@ -241,29 +241,17 @@ struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
+>  
+>  		desc = of_get_named_gpiod_flags(dev->of_node, prop_name, idx,
+>  						&of_flags);
+> -		/*
+> -		 * -EPROBE_DEFER in our case means that we found a
+> -		 * valid GPIO property, but no controller has been
+> -		 * registered so far.
+> -		 *
+> -		 * This means we don't need to look any further for
+> -		 * alternate name conventions, and we should really
+> -		 * preserve the return code for our user to be able to
+> -		 * retry probing later.
+> -		 */
+> -		if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
+> -			return desc;
+>  
+> -		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+> +		if (!IS_ERR(desc) || PTR_ERR(desc) != -ENOENT)
 
-fuzzy=funky=funny=wierd
 
-Regardless of what we do in the IOMMU driver, I think we still have to reset
-the endpoint in order to have a clean initialization.
+I rather like the () so one doesn't always have to look up C operator
+precedence to verify..
 
-I'm not sure if all endpoint drivers can recover an adapter from a live state.
 
-I wasn't expecting to see a Malformed TLP error. I was guessing that this was
-caused by SMMU giving a CA or UR to the endpoint or having a live adapter
-in the middle of driver initialization. 
-
-I think we do care about the adapter coming up properly otherwise how would
-you collect the dumps from the system?
-
-I was expecting to come through the network interface and download it from
-the target.
-
-That's why, I was suggesting FLR/PM reset etc. when we know that we are
-booting a kdump kernel.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>  			break;
+>  	}
+>  
+>  	/* Special handling for SPI GPIOs if used */
+> -	if (IS_ERR(desc))
+> +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+>  		desc = of_find_spi_gpio(dev, con_id, &of_flags);
+>  
+>  	/* Special handling for regulator GPIOs if used */
+> -	if (IS_ERR(desc) && PTR_ERR(desc) != -EPROBE_DEFER)
+> +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+>  		desc = of_find_regulator_gpio(dev, con_id, &of_flags);
+>  
+>  	if (IS_ERR(desc))
+> 
