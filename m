@@ -1,53 +1,47 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri, 2 Mar 2018 17:02:32 +0800
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <20180301164630.GB23321@kroah.com>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180301164630.GB23321@kroah.com>
-Message-ID: <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  2 Mar 2018 10:09:44 +0100
+Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
+Message-ID: <20180302090948.6399-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is the base for finally getting RealView and Versatile
+Express supported in the PL111 DRM driver.
 
+We have then moved all the way up from the first ARM
+Integrator versions to the last Versatile Express reference
+designs using PL111.
 
-On 03/02/2018 12:46 AM, Greg KH wrote:
-> On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
->> Hi All,
->>
->> Resent without non-upstream patches.
->>
->> This backport patchset fixed the spectre issue, it's original branch:
->> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
->> A few dependency or fixingpatches are also picked up, if they are necessary
->>  and no functional changes.
->>
->> No bug found from kernelci.org and lkft testing. It also could be gotten from:
->>
->> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
-> 
-> Also, how did you test, what platforms did you test, and did you test
-> that this actually did fix the spectre issue on your platforms?  If so,
-> what test did you use?
-> 
+After this, forked hardware such as Nomadik and SPEAr
+remains to be moved over.
 
-On the kernelci, there are 18 kinds of platoforms with different
-configure tested booting, detailed info is here:
-https://kernelci.org/boot/all/job/lsk/branch/linux-linaro-lsk-v4.9-test/kernel/lsk-v4.9-17.03-4844-g6f782cff6edb/
+Some infrastructure for adjusting depth (ARGB5551) etc
+on the Integrator and some bridge fixups are still needed
+but this is the core of the support for these platforms
+and the rest can be done on top before switching over.
 
-I also tested the qemu boot on hikey620. and normal boot on
-hikey620/db410c/junor2. The other testing include the LKFT testing which
-is reported by email, same as test for LTS. None of testing show
-regressions.
+Also the Versatile Express CLCD on the motherboard has
+a dedicated video memory, and cannot use CMA (ha! complex!)
+and I will need to figure out a way to work around that.
+The CLCDs synthesized on the core tiles for CA9 work
+fine with this though.
 
+Linus Walleij (4):
+  drm/pl111: Make the default BPP a per-variant variable
+  drm/pl111: Use max memory bandwidth for resolution
+  drm/pl111: Handle the RealView variant separately
+  drm/pl111: Support the Versatile Express
 
-As testing the spectre bug fix, that's a good question. I also asked
-this question to original patch authors, like Marc. They said they just
-figure out these patches could block spectre or meltdown issue. From my
-side, I just reproduced the process internal spectre. But all fix on arm
-can not resolve the user space internal spectre. It can block from user
-to kernel or kernel to user spectre according the code purose. So I
-believe these patch could do their job. And arm cpu would drop the
-spectre branches if it has 20+ 'nop' instructions...
+ drivers/gpu/drm/pl111/Makefile          |   1 +
+ drivers/gpu/drm/pl111/pl111_display.c   |  36 +++++++++++
+ drivers/gpu/drm/pl111/pl111_drm.h       |   6 +-
+ drivers/gpu/drm/pl111/pl111_drv.c       |  10 ++-
+ drivers/gpu/drm/pl111/pl111_versatile.c |  80 +++++++++++++++++++++++-
+ drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
+ 7 files changed, 258 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+ create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
 
-Regards
-Alex
+-- 
+2.14.3
