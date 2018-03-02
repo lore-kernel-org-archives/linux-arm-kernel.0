@@ -1,110 +1,83 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 2 Mar 2018 13:58:59 +0800
-Subject: [PATCH 1/7] kexec_file: make an use of purgatory optional
-In-Reply-To: <20180227044814.24808-2-takahiro.akashi@linaro.org>
-References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
- <20180227044814.24808-2-takahiro.akashi@linaro.org>
-Message-ID: <20180302055859.GB15422@dhcp-128-65.nay.redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 2 Mar 2018 11:32:57 +0530
+Subject: [PATCH v2 1/2] dt-bindings: phy: add support for STM32 USB PHY
+ Controller (USBPHYC)
+In-Reply-To: <1519918245-17333-2-git-send-email-amelie.delaunay@st.com>
+References: <1519918245-17333-1-git-send-email-amelie.delaunay@st.com>
+ <1519918245-17333-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <bac8ba1a-dd66-4df6-1976-c6144e35040c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/18 at 01:48pm, AKASHI Takahiro wrote:
-> On arm64, crash dump kernel's usable memory is protected by
-> *unmapping* it from kernel virtual space unlike other architectures
-> where the region is just made read-only. It is highly unlikely that
-> the region is accidentally corrupted and this observation rationalizes
-> that digest check code can also be dropped from purgatory.
-> The resulting code is so simple as it doesn't require a bit ugly
-> re-linking/relocation stuff, i.e. arch_kexec_apply_relocations_add().
+
+
+On Thursday 01 March 2018 09:00 PM, Amelie Delaunay wrote:
+> This patch adds the device tree bindings description for STM32 USBPHYC
+> (USB PHY Controller).
 > 
-> Please see:
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545428.html
-> All that the purgatory does is to shuffle arguments and jump into a new
-> kernel, while we still need to have some space for a hash value
-> (purgatory_sha256_digest) which is never checked against.
-> 
-> As such, it doesn't make sense to have trampline code between old kernel
-> and new kernel on arm64.
-> 
-> This patch introduces a new configuration, ARCH_HAS_KEXEC_PURGATORY, and
-> allows related code to be compiled in only if necessary.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->  arch/powerpc/Kconfig | 3 +++
->  arch/x86/Kconfig     | 3 +++
->  kernel/kexec_file.c  | 6 ++++++
->  3 files changed, 12 insertions(+)
+>  .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
 > 
-> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> index 73ce5dd07642..c32a181a7cbb 100644
-> --- a/arch/powerpc/Kconfig
-> +++ b/arch/powerpc/Kconfig
-> @@ -552,6 +552,9 @@ config KEXEC_FILE
->  	  for kernel and initramfs as opposed to a list of segments as is the
->  	  case for the older kexec call.
->  
-> +config ARCH_HAS_KEXEC_PURGATORY
-> +	def_bool KEXEC_FILE
+> diff --git a/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+> new file mode 100644
+> index 0000000..1ad3893
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+> @@ -0,0 +1,46 @@
+> +STMicroelectronics STM32 USB HS PHY controller
 > +
->  config RELOCATABLE
->  	bool "Build a relocatable kernel"
->  	depends on PPC64 || (FLATMEM && (44x || FSL_BOOKE))
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index c1236b187824..f031c3efe47e 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -2019,6 +2019,9 @@ config KEXEC_FILE
->  	  for kernel and initramfs as opposed to list of segments as
->  	  accepted by previous system call.
->  
-> +config ARCH_HAS_KEXEC_PURGATORY
-> +	def_bool KEXEC_FILE
+> +The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
+> +switch. It controls PHY configuration and status, and the UTMI+ switch that
+> +selects either OTG or HOST controller for the second PHY port. It also sets
+> +PLL configuration.
 > +
->  config KEXEC_VERIFY_SIG
->  	bool "Verify kernel signature during kexec_file_load() syscall"
->  	depends on KEXEC_FILE
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index e5bcd94c1efb..990adae52151 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -26,7 +26,11 @@
->  #include <linux/vmalloc.h>
->  #include "kexec_internal.h"
->  
-> +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
->  static int kexec_calculate_store_digests(struct kimage *image);
-> +#else
-> +static int kexec_calculate_store_digests(struct kimage *image) { return 0; };
-> +#endif
->  
->  /* Architectures can provide this probe function */
->  int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
-> @@ -520,6 +524,7 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ARCH_HAS_KEXEC_PURGATORY
->  /* Calculate and store the digest of segments */
->  static int kexec_calculate_store_digests(struct kimage *image)
->  {
-> @@ -1022,3 +1027,4 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
->  
->  	return 0;
->  }
-> +#endif /* CONFIG_ARCH_HAS_KEXEC_PURGATORY */
-> -- 
-> 2.16.2
-> 
+> +USBPHYC
+> +      |_ PLL
+> +      |
+> +      |_ PHY port#1 _________________ HOST controller
+> +      |                    _                 |
+> +      |                  / 1|________________|
+> +      |_ PHY port#2 ----|   |________________
+> +      |                  \_0|                |
+> +      |_ UTMI switch_______|          OTG controller
+> +
+> +
 
-For this one, I think purgatory digest verification is still good to
-have, but I do not insist since this is arch specific.
-
-If nobody else objects then I think I can ack the series after some
-testing passed.
+This should be modeled as a phy provider node with two separate sub-nodes for
+each of the PHYs.
 
 Thanks
-Dave
+Kishon
+
+> +Required properties:
+> +- compatible: must be "st,stm32mp1-usbphyc"
+> +- reg: address and length of the usb phy control register set
+> +- clocks: phandle + clock specifier for the PLL phy clock
+> +- phy-supply: from the generic phy bindings, phandle to the regulator
+> +  providing 3V3 power to the PHY, see phy-bindings.txt
+> +- vdda1v1-supply: phandle to the regulator providing 1V1 power to the PHY
+> +- vdda1v8-supply: phandle to the regulator providing 1V8 power to the PHY
+> +
+> +Optional properties:
+> +- assigned-clocks: phandle + clock specifier for the PLL phy clock
+> +- assigned-clock-parents: the PLL phy clock parent
+> +- resets: phandle + reset specifier
+> +- st,utmi-switch: should be <0> or <1>, to select USB controller for PHY
+> +  port#2. If not specified, 0 is the default selection.
+> +
+> +
+> +Example:
+> +		usbphyc: usb-phy at 5a006000 {
+> +			compatible = "st,stm32mp1-usbphyc";
+> +			reg = <0x5a006000 0x1000>;
+> +			clocks = <&rcc_clk USBPHY_K>;
+> +			resets = <&rcc_rst USBPHY_R>;
+> +			st,utmi-switch = <1>;
+> +			phy-supply = <&vdd_usb>;
+> +			vdda1v1-supply = <&reg11>;
+> +			vdda1v8-supply = <&reg18>
+> +		};
+> 
