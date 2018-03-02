@@ -1,84 +1,84 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 2 Mar 2018 16:40:09 +0000
-Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
-In-Reply-To: <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <20180227095028.GG21033@krava>
- <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
- <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
- <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
-Message-ID: <4d22ba78-dba7-a550-f31b-64f29e3f0cbc@huawei.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 2 Mar 2018 16:40:53 +0000
+Subject: [PATCH 2/3] rpmsg: core: make rpmsg bus DMA capable
+In-Reply-To: <07503032-b08b-10ea-9d34-ddf85c682a9d@arm.com>
+References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
+ <20180302145531.20463-3-srinivas.kandagatla@linaro.org>
+ <07503032-b08b-10ea-9d34-ddf85c682a9d@arm.com>
+Message-ID: <469cfe2c-d4d0-6050-339d-430f893e7775@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Can you check the modifications to the ARM64 JSONs you originally submitted in the patchset please?>
->>> If they are not checked, I'll have to see if the maintainers will accept without your review. If not, I'll have to drop them.
->
-> I am seeing issue(log below) with this patchset on our platfrom.
-> i have tried using your v2 branch [1]
->
-> root at borg-1>perf_acme>> ./perf --version
-> perf version 4.16.rc1.g087f7ca
-> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
->
->  Performance counter stats for 'sleep 1':
->
->             23,099      bus_access_rd
->
->        1.000708516 seconds time elapsed
->
-> root at borg-1>perf_acme>> cd -
-> /ganapat/perf/linux-hisi/tools/perf
-> root at borg-1>perf>> ./perf --version
-> perf version 4.16.rc1.gcb5a74
-> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
->
->  Performance counter stats for 'sleep 1':
->
->                  0      bus_access_rd
->
->        1.000709162 seconds time elapsed
->
-> root at borg-1>perf>>
->
->
-> [1] https://github.com/hisilicon/linux-hisi.git
+Thanks for your time,
 
-Hi Ganapatrao,
+On 02/03/18 16:14, Robin Murphy wrote:
+> On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
+>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>
+>> Many of the rpmsg clients like audio drivers need to allocate
+>> dma memory. Make this bus DMA capable so that the child devices
+>> can use dma apis.
+> 
+> AFAICS after 15 minutes in the docs and code, the rpmsg "bus" is a 
+> virtual one based around shared-memory mailbox communication, so I don't 
+> really see how DMA exists in that context - I think maybe that 
+> abstraction needs looking at.
+> 
+> However, from grepping through the DTs it seems at first glance like the 
+> non-trivial things under the "qcom,smd" bus mostly map to actual 
+> platform devices via the "qcom,smd-edge" property - if those platform 
+> devices are the physical DMA masters, they should be the ones used for 
+> DMA API operations.
 
-Thanks for the notification. Let me check this.
+Currently there are very limited rpmsg devices in the mainline that use 
+dma. Only one I can think of is wcnss WIFI driver which models up itself 
+into another layer of platform device. Not sure if the DMA was the 
+reason to do that.
 
-Regards,
-John
+However am working on audio drivers [1] which I modeled up as children 
+of the rpmsg bus, so the problem started. There is an IOMMU in between 
+APPs and DSP which provides audio services.
+There are also other projects like FastRPC which have used similar 
+driver model which ended up with same issues.
 
->
+It all depends on how you model your driver. Audio case we have a rpmsg 
+channel which exposes audio functionality. so If we want to use the 
+iommu/dma operations we have to add another layer of platform device.
+Which also means that rpmsg channel notifications have to be passed to 
+these platform devices in some way.
+
+Am not 100% sure if this correct way to fix the issue.
+
+> 
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   drivers/rpmsg/rpmsg_core.c | 1 +
+>>   1 file changed, 1 insertion(+)
 >>
->> Hi John,
+>> diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
+>> index e84c71f8d6ab..540a3f3567b8 100644
+>> --- a/drivers/rpmsg/rpmsg_core.c
+>> +++ b/drivers/rpmsg/rpmsg_core.c
+>> @@ -472,6 +472,7 @@ struct bus_type rpmsg_bus = {
+>>       .uevent        = rpmsg_uevent,
+>>       .probe        = rpmsg_dev_probe,
+>>       .remove        = rpmsg_dev_remove,
+>> +    .force_dma    = true,
+> 
+> Regardless of the above, would you really need to use this brute force 
+> hack instead of just fixing the DTs? I'm struggling to find which 
+> drivers might currently be relying on this :/
+
+This is one of the two issues. dma-ranges might work in this case, but 
+we still have iommu case.
+
+> 
+> Robin.
+> 
+>>   };
+>>   EXPORT_SYMBOL(rpmsg_bus);
 >>
->> I will take a look at the patches this weekend and give feedback beginning of next week. -Will
->>
->>>
->>> Thanks,
->>> John
->>>
->>>> Acked-by: Jiri Olsa <jolsa@kernel.org>
->>>>
->>>> thanks,
->>>> jirka
->>>>
->>>> .
->
-> thanks
-> Ganapat
->>>>
->>>
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+
+thanks,
+srini
+[1]: https://lkml.org/lkml/2018/2/13/719
