@@ -1,60 +1,33 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 2 Mar 2018 09:14:58 -0700
-Subject: [PATCH 03/14] iommu: Create a base struct for io_mm
-In-Reply-To: <fddafdae-4384-4826-ef63-9075e9866ae9@arm.com>
-References: <20180221225924.30737-1-jcrouse@codeaurora.org>
- <20180221225924.30737-4-jcrouse@codeaurora.org>
- <fddafdae-4384-4826-ef63-9075e9866ae9@arm.com>
-Message-ID: <20180302161458.GA22596@jcrouse-lnx.qualcomm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 2 Mar 2018 16:19:31 +0000
+Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
+In-Reply-To: <5A97A324.9050605@linux.intel.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+ <5A97A324.9050605@linux.intel.com>
+Message-ID: <087d3daa-5b63-038b-a81e-92ab752fdd26@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 12:25:48PM +0000, Jean-Philippe Brucker wrote:
-> Hi Jordan,
-> 
-> Thank you for this, SMMUv3 and virtio-iommu need these SVA patches as well.
-> 
-> On 21/02/18 22:59, Jordan Crouse wrote:
-> [...]> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> > index e2c49e583d8d..e998389cf195 100644
-> > --- a/include/linux/iommu.h
-> > +++ b/include/linux/iommu.h
-> > @@ -110,8 +110,17 @@ struct iommu_domain {
-> >  	struct list_head mm_list;
-> >  };
-> >  
-> > +enum iommu_io_type {
-> > +	IO_TYPE_MM,
-> > +};
-> > +
-> > +struct io_base {
-> > +	int type;
-> > +	int pasid;
-> > +};
-> 
-> "io_base" is a bit vague. I'm bad at naming so my opinion doesn't hold
-> much water, but I'd rather this be something like "io_mm_base". When I
-> initially toyed with the idea I intended to keep io_mm as parent structure
-> and have "private" and "shared" sub-structures. Even if private PASIDs
-> don't rely on the kernel mm subsystem, this structure would still
-> represent an I/O mm of sorts, with a pgd and pgtable info.
+On 01/03/18 06:52, Lu Baolu wrote:
+> Can the pasid management code be moved into a common library?
+> PASID is not stick to SVA. An IOMMU model device could be designed
+> to use PASID for second level translation (classical DMA translation)
+> as well.
 
-I'm also bad at naming but I don't mind changing it. io_mm_base seems okay to me
-unless somebody has a better idea. I also like the terms "private" and
-"shared". I'm going to start adopting those where it makes sense.
+What do you mean by second level translation? Do you see a use-case with
+nesting translation within the host?
 
-Jordan
-> 
-> > +
-> >  struct io_mm {
-> > -	int			pasid;
-> > +	struct io_base		base;
-> >  	struct list_head	devices;
-> >  	struct kref		kref;
-> >  #if defined(CONFIG_MMU_NOTIFIER)
-> > 
-> 
+I agree that PASID + classical DMA is desirable. A device driver would
+allocate PASIDs and perform iommu_sva_map(domain, pasid, iova, pa, size,
+prot) and iommu_sva_unmap(domain, pasid, iova, size). I'm hoping that we
+can also augment the DMA API with PASIDs, and that a driver can use both
+shared and private contexts simultaneously. So that it can use a few
+PASIDs for management purpose, and assign the rest to userspace.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The intent is for iommu-sva.c to be this common library. Work for
+"private" PASID allocation is underway, see Jordan Crouse's series
+posted last week https://www.spinics.net/lists/arm-kernel/msg635857.html
+
+Thanks,
+Jean
