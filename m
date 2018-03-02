@@ -1,128 +1,71 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:43 +0100
-Subject: [PATCH 35/52] mtd: rawnand: sh_flctl: move all NAND chip related
- setup in one function
+Date: Fri,  2 Mar 2018 18:03:42 +0100
+Subject: [PATCH 34/52] mtd: rawnand: s3c2410: convert driver to nand_scan()
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-36-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-35-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the conversion of the sh_flctl driver to nand_scan() by moving
-all the configuration that must be made after nand_scan_ident() in one
-single function. Create a pdata entry in the controller structure for
-that.
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/sh_flctl.c | 38 +++++++++++++++++++-------------------
- include/linux/mtd/sh_flctl.h    |  1 +
- 2 files changed, 20 insertions(+), 19 deletions(-)
+ drivers/mtd/nand/raw/s3c2410.c | 26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
-index 9eb3cf9db111..d14c26cb59df 100644
---- a/drivers/mtd/nand/raw/sh_flctl.c
-+++ b/drivers/mtd/nand/raw/sh_flctl.c
-@@ -1007,6 +1007,16 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
- 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
- 	struct nand_chip *chip = &flctl->chip;
+diff --git a/drivers/mtd/nand/raw/s3c2410.c b/drivers/mtd/nand/raw/s3c2410.c
+index 1bc0458063d8..67cf185ed116 100644
+--- a/drivers/mtd/nand/raw/s3c2410.c
++++ b/drivers/mtd/nand/raw/s3c2410.c
+@@ -915,20 +915,19 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+ }
  
-+	if (chip->options & NAND_BUSWIDTH_16) {
-+		/*
-+		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
-+		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
-+		 * flctl->flcmncr_base to pdata->flcmncr_val.
-+		 */
-+		flctl->pdata->flcmncr_val |= SEL_16BIT;
-+		flctl->flcmncr_base = flctl->pdata->flcmncr_val;
-+	}
-+
- 	if (mtd->writesize == 512) {
- 		flctl->page_size = 0;
- 		if (chip->chipsize > (32 << 20)) {
-@@ -1122,7 +1132,6 @@ static int flctl_probe(struct platform_device *pdev)
- 	struct sh_flctl *flctl;
- 	struct mtd_info *flctl_mtd;
- 	struct nand_chip *nand;
--	struct sh_flctl_platform_data *pdata;
- 	int ret;
- 	int irq;
+ /**
+- * s3c2410_nand_update_chip - post probe update
+- * @info: The controller instance.
+- * @nmtd: The driver version of the MTD instance.
++ * s3c2410_nand_attach_chip - Init the ECC engine after NAND scan
++ * @chip: The NAND chip
+  *
+- * This routine is called after the chip probe has successfully completed
+- * and the relevant per-chip information updated. This call ensure that
++ * This hook is called by the core after the identification of the NAND chip,
++ * once the relevant per-chip information is up to date.. This call ensure that
+  * we update the internal state accordingly.
+  *
+  * The internal state is currently limited to the ECC state information.
+ */
+-static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+-				    struct s3c2410_nand_mtd *nmtd)
++static int s3c2410_nand_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = &nmtd->chip;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
  
-@@ -1150,11 +1159,11 @@ static int flctl_probe(struct platform_device *pdev)
- 	}
+ 	switch (chip->ecc.mode) {
  
- 	if (pdev->dev.of_node)
--		pdata = flctl_parse_dt(&pdev->dev);
-+		flctl->pdata = flctl_parse_dt(&pdev->dev);
- 	else
--		pdata = dev_get_platdata(&pdev->dev);
-+		flctl->pdata = dev_get_platdata(&pdev->dev);
+@@ -1161,15 +1160,8 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 		mtd->dev.parent = &pdev->dev;
+ 		s3c2410_nand_init_chip(info, nmtd, sets);
  
--	if (!pdata) {
-+	if (!flctl->pdata) {
- 		dev_err(&pdev->dev, "no setup data defined\n");
- 		return -EINVAL;
- 	}
-@@ -1165,9 +1174,9 @@ static int flctl_probe(struct platform_device *pdev)
- 	nand_set_flash_node(nand, pdev->dev.of_node);
- 	flctl_mtd->dev.parent = &pdev->dev;
- 	flctl->pdev = pdev;
--	flctl->hwecc = pdata->has_hwecc;
--	flctl->holden = pdata->use_holden;
--	flctl->flcmncr_base = pdata->flcmncr_val;
-+	flctl->hwecc = flctl->pdata->has_hwecc;
-+	flctl->holden = flctl->pdata->use_holden;
-+	flctl->flcmncr_base = flctl->pdata->flcmncr_val;
- 	flctl->flintdmacr_base = flctl->hwecc ? (STERINTE | ECERB) : STERINTE;
- 
- 	/* Set address of hardware control function */
-@@ -1183,7 +1192,7 @@ static int flctl_probe(struct platform_device *pdev)
- 	nand->set_features = nand_get_set_features_notsupp;
- 	nand->get_features = nand_get_set_features_notsupp;
- 
--	if (pdata->flcmncr_val & SEL_16BIT)
-+	if (flctl->pdata->flcmncr_val & SEL_16BIT)
- 		nand->options |= NAND_BUSWIDTH_16;
- 
- 	pm_runtime_enable(&pdev->dev);
-@@ -1195,16 +1204,6 @@ static int flctl_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_chip;
- 
--	if (nand->options & NAND_BUSWIDTH_16) {
--		/*
--		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
--		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
--		 * flctl->flcmncr_base to pdata->flcmncr_val.
--		 */
--		pdata->flcmncr_val |= SEL_16BIT;
--		flctl->flcmncr_base = pdata->flcmncr_val;
--	}
+-		err = nand_scan_ident(mtd, (sets) ? sets->nr_chips : 1, NULL);
+-		if (err)
+-			goto exit_error;
 -
- 	ret = flctl_chip_init_tail(flctl_mtd);
- 	if (ret)
- 		goto err_chip;
-@@ -1213,7 +1212,8 @@ static int flctl_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_chip;
+-		err = s3c2410_nand_update_chip(info, nmtd);
+-		if (err < 0)
+-			goto exit_error;
+-
+-		err = nand_scan_tail(mtd);
++		nmtd->chip.ecc.attach_chip = s3c2410_nand_attach_chip;
++		err = nand_scan(mtd, sets ? sets->nr_chips : 1);
+ 		if (err)
+ 			goto exit_error;
  
--	ret = mtd_device_register(flctl_mtd, pdata->parts, pdata->nr_parts);
-+	ret = mtd_device_register(flctl_mtd, flctl->pdata->parts,
-+				  flctl->pdata->nr_parts);
- 
- 	return 0;
- 
-diff --git a/include/linux/mtd/sh_flctl.h b/include/linux/mtd/sh_flctl.h
-index c759d403cbc0..c9f486c6c019 100644
---- a/include/linux/mtd/sh_flctl.h
-+++ b/include/linux/mtd/sh_flctl.h
-@@ -148,6 +148,7 @@ struct sh_flctl {
- 	struct dev_pm_qos_request pm_qos;
- 	void __iomem		*reg;
- 	resource_size_t		fifo;
-+	struct sh_flctl_platform_data *pdata;
- 
- 	uint8_t	done_buff[2048 + 64];	/* max size 2048 + 64 */
- 	int	read_bytes;
 -- 
 2.14.1
