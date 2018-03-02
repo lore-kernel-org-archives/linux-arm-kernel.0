@@ -1,29 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Mar 2018 12:34:44 +0000
-Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
-In-Reply-To: <20180302122655.uckejonjyzt4vjd3@mwanda>
-References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
- <20180302111931.GX9418@n2100.armlinux.org.uk>
- <20180302114909.u6kqdszt3aew2io2@mwanda>
- <20180302121929.GY9418@n2100.armlinux.org.uk>
- <20180302122655.uckejonjyzt4vjd3@mwanda>
-Message-ID: <20180302123444.GZ9418@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Mar 2018 13:37:37 +0100
+Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
+In-Reply-To: <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
+References: <20180302090948.6399-1-linus.walleij@linaro.org>
+ <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
+Message-ID: <CACRpkdaVXrT24XvzJ4ciqEp8NRXFNG+e0VkM_JtgGBdpKa8P8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 03:26:56PM +0300, Dan Carpenter wrote:
-> Ok, but in that case the original code is still wrong because it returns
-> early with success.  I guess it could be changed to:
-> 
-> 	if (irq <= 0)
-> 		return -ENXIO;
+On Fri, Mar 2, 2018 at 1:11 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 02/03/18 09:09, Linus Walleij wrote:
 
-What if platform_get_irq() returns -EPROBE_DEFER or some other error
-code?
+>> Also the Versatile Express CLCD on the motherboard has
+>> a dedicated video memory, and cannot use CMA (ha! complex!)
+>> and I will need to figure out a way to work around that.
+>> The CLCDs synthesized on the core tiles for CA9 work
+>> fine with this though.
+>
+> Out of curiosity, what's the issue with declaring the VRAM as a CMA region?
+> That's certainly worked for stuff like local RAM on FPGA tiles in the past,
+> and I can't think offhand of any way in which VExpress is wildly different
+> (but I am of course open to being wrong...)
 
-So we're now re-hashing all the discussion from last November.
+There is nothing wrong with that apart from my ignorance
+of that solution. So thanks! :D
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+My experience with CMA is limited to using the 7 areas
+that are defined by default in Kconfig and the DRM helpers
+just plugging in on the front.
+
+Do you have some pointers? Is this something I can
+handily just set up in the device tree?
+
+Yours,
+Linus Walleij
