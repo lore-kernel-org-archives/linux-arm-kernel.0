@@ -1,101 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 10:48:03 -0600
-Subject: [PATCH v2 3/8] arm64: zynqmp: Add support for Xilinx zcu102
-In-Reply-To: <dd5933d6a49247de4b3b7516ed7fab55d1b3eb90.1519396753.git.michal.simek@xilinx.com>
-References: <cover.1519396753.git.michal.simek@xilinx.com>
- <dd5933d6a49247de4b3b7516ed7fab55d1b3eb90.1519396753.git.michal.simek@xilinx.com>
-Message-ID: <20180302164803.nb45aqgqvnzxuyn5@rob-hp-laptop>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Fri, 2 Mar 2018 17:50:24 +0100
+Subject: [PATCH 2/2] drm/sun4i: add lvds mode_valid function
+In-Reply-To: <20180302143736.kkxx54og2ppcmpzh@flea.lan>
+References: <1519840432-61489-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1519840432-61489-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180301095721.4iga7dcgg566j44m@flea>
+ <ebe7cfe5-e731-10cf-17cd-fe79bee0fdc4@micronovasrl.com>
+ <20180302143736.kkxx54og2ppcmpzh@flea.lan>
+Message-ID: <0d10e2ef-8b7a-3ec2-fb8b-ee72345cbbb1@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 03:40:25PM +0100, Michal Simek wrote:
-> This patch is adding revA, revB and rev1.0. There are also other
-> revisions between which should be backward compatible with previous
-> versions. Unfortunately all revs are still in use.
+Hi,
+
+Il 02/03/2018 15:37, Maxime Ripard ha scritto:
+> On Fri, Mar 02, 2018 at 12:42:14PM +0100, Giulio Benetti wrote:
+>> Hi,
+>>
+>> Il 01/03/2018 10:57, Maxime Ripard ha scritto:
+>>> On Wed, Feb 28, 2018 at 06:53:52PM +0100, Giulio Benetti wrote:
+>>>>    static struct drm_connector_helper_funcs sun4i_lvds_con_helper_funcs = {
+>>>>    	.get_modes	= sun4i_lvds_get_modes,
+>>>> +	.mode_valid	= sun4i_lvds_mode_valid,
+>>>>    };
+>>>
+>>> This should be on the encoder, not the connector.
+>>
+>> I've seen it is bound to connector in rgb and to encoder in hdmi.
+>> Is it correct rgb mode_valid under connector funcs?
+>> Otherwise I send a patch also for that one.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - Remove i2c mw u-boot commands
-> - Use i2c-mux instead of i2cswitch
-> - Use clock generator without numbers.
-> - Use dash in node name zcu102 rev1.0
-> - Record compatible string to xilinx.txt
-> 
->  Documentation/devicetree/bindings/arm/xilinx.txt   |   5 +
->  arch/arm64/boot/dts/xilinx/Makefile                |   3 +
->  .../arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts |  36 ++
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts  | 550 +++++++++++++++++++++
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts  |  42 ++
->  5 files changed, 636 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
->  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
+> This would need to be fixed as well. Bridges attach to encoder, not
+> connectors, so if you ever have a bridge connected to the RGB output
+> (like on the A13-Olinuxino), mode_valid isn't called at the moment.
 
-Reviewed-by: Rob Herring <robh@kernel.org> 
+Ok, I will do the same for rgb and submit a patchset,
+need some time to test both lvds and rgb.
 
-but...
+-- 
+Giulio Benetti
+CTO
 
-
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
-> new file mode 100644
-> index 000000000000..ed3cc684931f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
-> @@ -0,0 +1,42 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * dts file for Xilinx ZynqMP ZCU102 RevB
-> + *
-> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
-> + *
-> + * Michal Simek <michal.simek@xilinx.com>
-> + */
-> +
-> +#include "zynqmp-zcu102-revA.dts"
-> +
-> +/ {
-> +	model = "ZynqMP ZCU102 RevB";
-> +	compatible = "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102", "xlnx,zynqmp";
-> +};
-> +
-> +&gem3 {
-> +	phy-handle = <&phyc>;
-> +	phyc: phy at c {
-> +		reg = <0xc>;
-> +		ti,rx-internal-delay = <0x8>;
-> +		ti,tx-internal-delay = <0xa>;
-> +		ti,fifo-depth = <0x1>;
-> +	};
-> +	/* Cleanup from RevA */
-> +	/delete-node/ phy at 21;
-> +};
-> +
-> +/* Different qspi 512Mbit version */
-
-Stray comment
-
-> +
-> +/* Fix collision with u61 */
-> +&i2c0 {
-> +	i2cswitch at 75 {
-
-Missed this name.
-
-This probably creates a new node rather than going into the existing 
-tree. If this compiles, we should fix it to not allow the same 
-unit-address twice.
-
-> +		i2c at 2 {
-> +			max15303 at 1b { /* u8 */
-> +				compatible = "maxim,max15303";
-> +				reg = <0x1b>;
-> +			};
-> +			/delete-node/ max15303 at 20;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
