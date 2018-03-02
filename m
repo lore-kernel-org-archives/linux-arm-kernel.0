@@ -1,64 +1,51 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Fri, 2 Mar 2018 15:13:15 +0200
-Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <20180227071134.28063-2-a.hajda@samsung.com>
-References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
- <20180227071134.28063-2-a.hajda@samsung.com>
-Message-ID: <20180302131315.GA10598@kuha.fi.intel.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 2 Mar 2018 13:13:20 +0000
+Subject: [PATCH v3 01/25] dt-bindings: soc: qcom: Add bindings for APR bus
+In-Reply-To: <20180301203413.GN12864@sirena.org.uk>
+References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
+ <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
+ <20180213231244.ama4bwsehzuh5sr7@rob-hp-laptop>
+ <ae65a9c8-85a3-5494-f4cc-1038fd8c9bd1@linaro.org>
+ <20180218230414.dkd6kb6kd35arcyv@rob-hp-laptop>
+ <636d4ac2-3bc2-7290-1645-0451c089cb8a@linaro.org>
+ <CAL_JsqK3KFBGqpHRaURSrHew1HhObUvFYxuhND-FOQ4tCUaAHg@mail.gmail.com>
+ <465a2ca7-9f74-8977-37ea-29fe3944c27c@linaro.org>
+ <20180301203413.GN12864@sirena.org.uk>
+Message-ID: <2608d36a-cf4e-5b06-a26a-8d4ee0bb41ad@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks for the review,
 
-On Tue, Feb 27, 2018 at 08:11:29AM +0100, Andrzej Hajda wrote:
-> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
-> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
-> +DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
-> +
-> +ccic: s2mm005 at 33 {
-> +	...
-> +	usb_con: connector {
-> +		compatible = "usb-c-connector";
-> +		label = "USB-C";
-
-Is this child node really necessary? There will never be more then
-one connector per CC line.
-
-We should prefer device_graph* functions over of_graph* and
-acpi_graph* functions in the drivers so we don't have to handle the
-same thing multiple times with separate APIs. Is it still possible if
-there is that connector child node?
-
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				usb_con_hs: endpoint {
-> +					remote-endpoint = <&max77865_usbc_hs>;
-> +				};
-> +			};
-> +			port at 1 {
-> +				reg = <1>;
-> +				usb_con_ss: endpoint {
-> +					remote-endpoint = <&usbdrd_phy_ss>;
-> +				};
-> +			};
-> +			port at 2 {
-> +				reg = <2>;
-> +				usb_con_sbu: endpoint {
-> +					remote-endpoint = <&dp_aux>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-
+On 01/03/18 20:34, Mark Brown wrote:
+> On Thu, Feb 22, 2018 at 10:03:42AM +0000, Srinivas Kandagatla wrote:
+>> On 22/02/18 00:14, Rob Herring wrote:
+> 
+>>> Am I saying a single DT node for this? Yes, perhaps.
+>> Yes, I will give that a go.
+>>
+>> So we will endup having something like this in DT for one frontend and
+>> backend dailink:
+> 
+> Let's not start encoding DPCM into DT, DPCM is very much an
+> implemntation detail of the current stack which we're gradually pushing
+> towards replacing with something better.  What we want to be doing is
+> just treating components inside the SoC the same as components in a
+> CODEC, the routing within a SoC being the same as in a CODEC and
+> similarly for externally connected devices.
+> 
+>> 		fe at 1 {
+>>                  	is-fe;
+>>                          link-name = "MultiMedia1";
+> 
+> In particular having the concept of "front end" in the DT is *very*
+> implementation specific.  We should just be describing the connections
+> that exist in the system.
+Yep, it makes sense. is-fe flag will be removed in next version, we can 
+determine this based on codec dai, so from DT side FE or BE should not 
+be any different.
 
 Thanks,
+srini
 
--- 
-heikki
+> 
