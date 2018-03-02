@@ -1,48 +1,38 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 2 Mar 2018 16:42:25 +0000
-Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
-In-Reply-To: <cd4d7a98-e45e-7066-345f-52d8eef926a2@amd.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-4-jean-philippe.brucker@arm.com>
- <5A97A324.9050605@linux.intel.com>
- <cd4d7a98-e45e-7066-345f-52d8eef926a2@amd.com>
-Message-ID: <ebd22a3b-8507-8fd1-3efb-357931613c47@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 10:40:37 -0600
+Subject: [PATCH v2 2/8] arm64: zynqmp: Add support for Xilinx zcu100-revC
+In-Reply-To: <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
+References: <cover.1519396753.git.michal.simek@xilinx.com>
+ <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
+Message-ID: <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/18 08:04, Christian K?nig wrote:
-> Am 01.03.2018 um 07:52 schrieb Lu Baolu:
->> Hi Jean,
->>
->> On 02/13/2018 02:33 AM, Jean-Philippe Brucker wrote:
->>> [SNIP]
->>> +	pasid = idr_alloc_cyclic(&iommu_pasid_idr, io_mm, dev_param->min_pasid,
->>> +				 dev_param->max_pasid + 1, GFP_ATOMIC);
->> Can the pasid management code be moved into a common library?
->> PASID is not stick to SVA. An IOMMU model device could be designed
->> to use PASID for second level translation (classical DMA translation)
->> as well.
-> 
-> Yeah, we have the same problem on amdgpu.
-> 
-> We assign PASIDs to clients even when IOMMU isn't present in the system 
-> just because we need it for debugging.
-> 
-> E.g. when the hardware detects that some shader program is doing 
-> something nasty we get the PASID in the interrupt and could for example 
-> use it to inform the client about the fault.
+On Fri, Feb 23, 2018 at 03:40:24PM +0100, Michal Simek wrote:
+> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
+> port and usbs.
+> Board is using fixed clocks because clock driver hasn't been merged yet.
 
-This seems like a new requirement altogether, and a bit outside the
-scope of this series to be honest. Is the client userspace in this
-context? I guess it would be mostly for prototyping then? Otherwise you
-probably don't want to hand GPU contexts to userspace without an IOMMU
-isolating them?
+Please get rid of the separate clocks dts file when it is merged.
 
-If you don't need mm tracking/sharing or iommu_map/unmap, then maybe an
-IDR private to the GPU driver would be enough? If you do need mm
-tracking, I suppose we could modify iommu_sva_bind() to allocate and
-track io_mm even if the given device doesn't have an IOMMU, but it seems
-a bit backward.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v2:
+> - Use i2c-mux instead of i2cswitch
+> - Remove i2c mw u-boot commands
+> - Use 96boards labels for i2cs and spis
+> - Fix pmic and wifi node
+> - Record compatible string to xilinx.txt
+> - Remove Nathalie's email (she left Xilinx already)
+> 
+>  Documentation/devicetree/bindings/arm/xilinx.txt  |   6 +
+>  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
+>  arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        | 213 ++++++++++++++++
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 292 ++++++++++++++++++++++
+>  4 files changed, 512 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
 
-Thanks,
-Jean
+Reviewed-by: Rob Herring <robh@kernel.org> 
