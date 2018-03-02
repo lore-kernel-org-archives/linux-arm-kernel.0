@@ -1,89 +1,55 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Fri, 2 Mar 2018 09:44:02 +0800
-Subject: RFC on Kdump and PCIe on ARM64
-In-Reply-To: <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
-References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
- <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180302014402.GA32509@localhost.localdomain>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Fri, 2 Mar 2018 09:59:29 +0800
+Subject: [PATCH V6 1/2] ARM: dts: imx7s: add temperature monitor support
+Message-ID: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/18 at 01:05pm, Bjorn Helgaas wrote:
-> [+cc Joerg, David, iommu list]
-> 
-> On Thu, Mar 01, 2018 at 12:44:26PM -0500, Sinan Kaya wrote:
-> > Hi,
-> > 
-> > We are seeing IOMMU faults when booting the kdump kernel on ARM64.
-> > 
-> > [    7.220162] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x02 received:
-> > [    7.226123] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000010000000002
-> > [    7.232023] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
-> > [    7.237925] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
-> > [    7.243827] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
-> > 
-> > This is Nate's interpretation of the fault:
-> > 
-> > "The PCI device is sending transactions just after the SMMU was
-> > reset/reinitialized which is problematic because the device has not
-> > yet been added to the SMMU and thus should not be doing *any* DMA.
-> > DMA from the PCI devices should be quiesced prior to starting the
-> > crashdump kernel or you risk overwriting portions of memory you
-> > meant to preserve. In this case the SMMU was actually doing you a
-> > favor by blocking these errant DMA operations!!"
+Add i.MX7 temperature monitor support.
 
-This seems an known issue which existed on x86 arch with intel vt-d
-or amd-vi iommu deployed. Both of them have been fixed on x86. The root
-cause is that kexec/kdump jumping is a warm reboot, it skips
-bios/firmware. That left behind on-flight DMA which is started in 1st
-kernel, and on-going during kdump kernel bootup. Then iommu devices
-init will cause the on-flight DMA being stray and access those memory
-region violently until pci devices initialization.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Acked-by: Shawn Guo <shawnguo@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+changes since V5:
+	no code change, just add Reviewed-by.
+ arch/arm/boot/dts/imx7s.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-On x86, for intel vt-d iommu, patches and discussion can be found here:
-https://lists.onap.org/pipermail/iommu/2015-May/012948.html
-
-Finally, Joerg made a formal fix to make it.
-
-On amd-iommu, I made a patchset with Joerg's help.
-
-http://linux.kernel.narkive.com/Przi0Xaf/patch-v10-00-12-fix-the-on-flight-dma-issue-on-system-with-amd-iommu
-
-On arm64, not sure how different the smmu is, you might need to do the
-similar thing. Personal opinion, just for reference.
-
-Thanks
-Baoquan
-
-> > 
-> > I think this makes sense especially for the IOMMU enabled case on
-> > the host where an IOVA can overlap with the region of memory kdump
-> > reserved for itself.
-> > 
-> > Apparently, there has been similar concerns in the past.
-> > 
-> > https://www.fujitsu.com/jp/documents/products/software/os/linux/catalog/LinuxConJapan2013-Indoh.pdf
-> > 
-> > and was not addressed globally due to IOMMU+PCI driver ordering
-> > issues and bugs in HW due to hot reset.
-> > 
-> > https://lkml.org/lkml/2012/8/3/160
-> > 
-> > Hot reset as mentioned is destructive and may not be the best
-> > implementation choice.  However, most of the modern endpoints
-> > support PCIE function level reset.
-> > 
-> > One other solution is for SMMUv3 driver to reserve the kdump used
-> > IOVA addresses.
-> > 
-> > Another solution is for the SMMUv3 driver to disable PCIe devices
-> > behind the SMMU if it see SMMU is already enabled.
-> 
-> What problem are you trying to solve?  If the IOMMU is blocking DMA
-> after the kdump kernel starts up, that sounds like the desired
-> behavior.
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 9aa2bb9..6a5c1bf 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -511,9 +511,29 @@
+ 			};
+ 
+ 			ocotp: ocotp-ctrl at 30350000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				compatible = "fsl,imx7d-ocotp", "syscon";
+ 				reg = <0x30350000 0x10000>;
+ 				clocks = <&clks IMX7D_OCOTP_CLK>;
++
++				tempmon_calib: calib at 3c {
++					reg = <0x3c 0x4>;
++				};
++
++				tempmon_temp_grade: temp-grade at 10 {
++					reg = <0x10 0x4>;
++				};
++			};
++
++			tempmon: tempmon {
++				compatible = "fsl,imx7d-tempmon";
++				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++				fsl,tempmon =<&anatop>;
++				nvmem-cells = <&tempmon_calib>,
++					<&tempmon_temp_grade>;
++				nvmem-cell-names = "calib", "temp_grade";
++				clocks = <&clks IMX7D_PLL_SYS_MAIN_CLK>;
+ 			};
+ 
+ 			anatop: anatop at 30360000 {
+-- 
+2.7.4
