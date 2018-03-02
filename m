@@ -1,20 +1,33 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 2 Mar 2018 15:26:56 +0300
-Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
-In-Reply-To: <20180302121929.GY9418@n2100.armlinux.org.uk>
-References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
- <20180302111931.GX9418@n2100.armlinux.org.uk>
- <20180302114909.u6kqdszt3aew2io2@mwanda>
- <20180302121929.GY9418@n2100.armlinux.org.uk>
-Message-ID: <20180302122655.uckejonjyzt4vjd3@mwanda>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 2 Mar 2018 12:32:22 +0000
+Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
+In-Reply-To: <bce32071-4159-3bdd-1e03-77f540ee4509@codeaurora.org>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-3-jean-philippe.brucker@arm.com>
+ <bce32071-4159-3bdd-1e03-77f540ee4509@codeaurora.org>
+Message-ID: <78212417-ae79-0fb2-1233-d1604412bfec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, but in that case the original code is still wrong because it returns
-early with success.  I guess it could be changed to:
+On 28/02/18 20:34, Sinan Kaya wrote:
+> On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
+>> +int iommu_sva_unbind_group(struct iommu_group *group, int pasid)
+>> +{
+>> +	struct group_device *device;
+>> +
+>> +	mutex_lock(&group->mutex);
+>> +	list_for_each_entry(device, &group->devices, list)
+>> +		iommu_sva_unbind_device(device->dev, pasid);
+>> +	mutex_unlock(&group->mutex);
+>> +
+>> +	return 0;
+>> +}
+> 
+> I think we should handle the errors returned by iommu_sva_unbind_device() here
+> or at least print a warning if we want to still continue unbinding. 
 
-	if (irq <= 0)
-		return -ENXIO;
+Agreed, though bind_group/unbind_group are probably going away in next
+series
 
-regards,
-dan carpenter
+Thanks,
+Jean
