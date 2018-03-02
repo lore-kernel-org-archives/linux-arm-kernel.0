@@ -1,38 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 2 Mar 2018 09:12:29 -0500
-Subject: RFC on Kdump and PCIe on ARM64
-In-Reply-To: <20180302103032.GB19323@arm.com>
-References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
- <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
- <2b2de17c-8527-e49b-2ef2-2a3d1801e4f9@codeaurora.org>
- <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
- <20180302103032.GB19323@arm.com>
-Message-ID: <84121a8d-5294-0567-6c6b-f57e85dc4961@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 2 Mar 2018 19:42:41 +0530
+Subject: [PATCH v8 00/15] Krait clocks + Krait CPUfreq
+In-Reply-To: <CACRpkdbu9Kxvuwr-nLHxyEYiTeGK38o7MKCFf-MMjYxwgcJPPA@mail.gmail.com>
+References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+ <CACRpkdbu9Kxvuwr-nLHxyEYiTeGK38o7MKCFf-MMjYxwgcJPPA@mail.gmail.com>
+Message-ID: <e133630b-36b2-ed0e-3052-3e2e1c958405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Linus,
 
-On 3/2/2018 5:30 AM, Will Deacon wrote:
->> Do you really have to reset the IOMMU?  Can you just give it new page
->> tables that start out with all IOVAs from all devices being invalid,
->> then add valid mappings as drivers need them (presumably after the
->> driver has done whatever it needs to so the device stops using the old
->> DMA addresses)?
-> We already have the option to do that via the command line using the
-> disable_bypass option, so it just sounds like we need to take this into
-> account when resetting the SMMU to take care that GBPA is configured so
-> that transactions are terminated when SMMUEN=0.
+On 3/1/2018 6:58 PM, Linus Walleij wrote:
+> Hi Sricharan,
+> 
+> thanks for picking up Stephen's patch set and working on this
+> clocking business!
+> 
+> Would you happen to know if the MSM8660/APQ8060 that
+> I'm using a bit has the same Krait clocking so I need to augment
+> that SoC to use this too (on top of this, naturally, this is a good first
+> step)?
+> 
 
-How about the points that Baoquan highlighted in his email regarding the
-solution from AMD and X86?
+After digging a bit for data, looks like the clock controller in msm8660
+is called the acpuclk/scplls [1] . So the support for these clocks have
+to be added. rpm_pm8901_regulators is in place.
 
-I have not read the entire thread but, is this just a matter of following
-what Bjorn recommended or there is more to it?
+Looks like it is using the same PVS cpufreq table as in Krait. so once
+the support for clks is added, the krait cpufreq bindings can be used.
+ 
+[1] https://bitbucket.org/carvsdriver/android_kernel_samsung_msm8660-common/src/0a8b2f30db72e00d6e0b9ad1b9630fe33099ccd0/arch/arm/mach-msm/acpuclock-8x60.c?at=moretz&fileviewer=file-view-default 
 
-Sinan
+> On Tue, Feb 27, 2018 at 3:06 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+> 
+>>   * Dropped the DT update from the series. Will send separatelyssbi
+> 
+> Are these available somewhere so I can test the sum total on
+> the Nexus 7 and see if I get some graphics? I've been sticking a
+> patch from Stephen's series in for some time and it makes the
+> MDP graphics works on the 2013 Nexus 7.
+> 
+
+ok, Nexus 7 -> apq8064 right ?
+
+Just pushed the data for apq8064 as per latest bindings for reference [1].
+Don't have an board to test that data. Also have not added the cpu-supply
+as well.
+
+[1] https://github.com/sricharanaz/kernel/commit/464aa4fd5fc642a6b296d5ad438211042496dabb
+
+Regards,
+ Sricharan
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
