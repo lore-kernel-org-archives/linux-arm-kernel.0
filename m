@@ -1,157 +1,400 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  2 Mar 2018 20:21:34 +0100
-Subject: [PATCH v3 2/5] arm: zynq: Add support for Xilinx zc770 xm010 dc1 board
-In-Reply-To: <cover.1520018484.git.michal.simek@xilinx.com>
-References: <cover.1520018484.git.michal.simek@xilinx.com>
-Message-ID: <44eba6a11ccc653a07b8c44640cecb78e711a2be.1520018484.git.michal.simek@xilinx.com>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Fri,  2 Mar 2018 14:41:55 -0500
+Subject: [PATCH v2] ARM: dts: BCM5301X: Add support for Linksys EA9500
+In-Reply-To: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+Message-ID: <20180302194155.50808-1-npcomplete13@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-zc770 is based board which is extended by FMC/DC cards for SoC
-validation. FMCs/DCs are supposed to cover all SoC configurations.
-FMC/DC contains ethernet port, can, i2c, sd, qspi, spi, uart and usb.
+Hardware Info
+-------------
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Processor	- Broadcom BCM4709C0KFEBG dual-core @ 1.4 GHz
+Switch		- BCM53012 in BCM4709C0KFEBG & external BCM53125
+DDR3 RAM	- 256 MB
+Flash		- 128 MB (Toshiba TC58BVG0S3HTA00)
+2.4GHz		- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
+Power Amp	- Skyworks SE2623L 2.4 GHz power amp (x4)
+5GHz x 2	- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
+Power Amp	- PLX Technology PEX8603 3-lane, 3-port PCIe switch
+Ports		- 8 Ports, 1 WAN Ports
+Antennas	- 8 Antennas
+Serial Port	- @J6 [GND,TX,RX] (VCC NC)    115200 8n1
+
+Tested with OpenWrt built with DSA driver and Kernel v4.14
+
+Note:
+
+"make sure that port 0 of the internal switch is not accidentally
+configured back to untagged since that would cause problem when
+terminating the VLAN tag on the SW side." - Florian Fainelli [1]
+
+This can be ensured by running following command in OpenWrt:
+
+bridge vlan add vid 1 dev extsw pvid tagged
+
+[1] https://www.spinics.net/lists/arm-kernel/msg590992.html
+
+Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
 ---
-
-Changes in v3:
-- Fix partition for flash
-
 Changes in v2:
-- Record compatible string to xilinx.txt
+ - Properly define mdio mux, internal mdio, external mdio, mii bus
+ - Now we define usb3 phy as a mdio node connected to internal mdio,
+   thanks to work done by Rafa? Mi?ecki on the bcm usb3 phy mdio driver
+ - Define external SW as a mdio-mii node connected to external mdio
+---
+ arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 239 +++++++++++++++++++++++-
+ arch/arm/boot/dts/bcm47094.dtsi                 |   6 +-
+ arch/arm/boot/dts/bcm5301x.dtsi                 |  55 +++++-
+ 3 files changed, 288 insertions(+), 12 deletions(-)
 
- Documentation/devicetree/bindings/arm/xilinx.txt |  3 +
- arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/zynq-zc770-xm010.dts           | 95 ++++++++++++++++++++++++
- 3 files changed, 99 insertions(+)
- create mode 100644 arch/arm/boot/dts/zynq-zc770-xm010.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-index 425c74fcc560..019e69037d42 100644
---- a/Documentation/devicetree/bindings/arm/xilinx.txt
-+++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-@@ -11,6 +11,9 @@ Additional compatible strings:
- - Xilinx internal board cc108
-   "xlnx,zynq-cc108"
+diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+index b6750f7..5f53207 100644
+--- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
++++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+@@ -7,7 +7,7 @@
+ /dts-v1/;
  
-+- Xilinx internal board zc770 with different FMC cards
-+  "xlnx,zynq-zc770-xm010"
-+
- ---------------------------------------------------------------
+ #include "bcm47094.dtsi"
+-#include "bcm5301x-nand-cs0-bch8.dtsi"
++#include "bcm5301x-nand-cs0-bch1.dtsi"
  
- Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c6810e84d4d7..be9ffae2a1ec 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1067,6 +1067,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-parallella.dtb \
- 	zynq-zc702.dtb \
- 	zynq-zc706.dtb \
-+	zynq-zc770-xm010.dtb \
- 	zynq-zed.dtb \
- 	zynq-zybo.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
-diff --git a/arch/arm/boot/dts/zynq-zc770-xm010.dts b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-new file mode 100644
-index 000000000000..6884f1ad66b7
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-@@ -0,0 +1,95 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Xilinx ZC770 XM010 board DTS
-+ *
-+ * Copyright (C) 2013-2018 Xilinx, Inc.
-+ */
-+/dts-v1/;
-+#include "zynq-7000.dtsi"
+ / {
+ 	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
+@@ -32,5 +32,242 @@
+ 			linux,code = <KEY_WPS_BUTTON>;
+ 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
+ 		};
 +
-+/ {
-+	compatible = "xlnx,zynq-zc770-xm010", "xlnx,zynq-7000";
-+	model = "Xilinx Zynq";
++		rfkill {
++				label = "WiFi";
++				linux,code = <KEY_RFKILL>;
++				gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
++		};
 +
-+	aliases {
-+		ethernet0 = &gem0;
-+		i2c0 = &i2c0;
-+		serial0 = &uart1;
-+		spi1 = &spi1;
++		reset {
++				label = "Reset";
++				linux,code = <KEY_RESTART>;
++				gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
 +	};
 +
-+	chosen {
-+		bootargs = "";
-+		stdout-path = "serial0:115200n8";
-+	};
++	leds {
++		compatible = "gpio-leds";
 +
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
++		wps {
++			label = "bcm53xx:white:wps";
++			gpios = <&chipcommon 22 GPIO_ACTIVE_LOW>;
++		};
 +
-+	usb_phy0: phy0 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
-+};
++		usb2 {
++			label = "bcm53xx:green:usb2";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++			trigger-sources = <&ohci_port2>, <&ehci_port2>;
++			linux,default-trigger = "usbport";
++		};
 +
-+&can0 {
-+	status = "okay";
-+};
++		usb3 {
++			label = "bcm53xx:green:usb3";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++			trigger-sources = <&ohci_port1>, <&ehci_port1>,
++					  <&xhci_port1>;
++			linux,default-trigger = "usbport";
++		};
 +
-+&gem0 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
++		power {
++			label = "bcm53xx:white:power";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++		};
 +
-+	ethernet_phy: ethernet-phy at 7 {
-+		reg = <7>;
-+		device_type = "ethernet-phy";
-+	};
-+};
++		wifi-disabled {
++			label = "bcm53xx:amber:wifi-disabled";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++		};
 +
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
++		wifi-enabled {
++			label = "bcm53xx:white:wifi-enabled";
++			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++		};
 +
-+	eeprom: eeprom at 52 {
-+		compatible = "atmel,24c02";
-+		reg = <0x52>;
-+	};
++		bluebar1 {
++			label = "bcm53xx:white:bluebar1";
++			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
++		};
 +
-+};
++		bluebar2 {
++			label = "bcm53xx:white:bluebar2";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++		};
 +
-+&sdhci0 {
-+	status = "okay";
-+};
++		bluebar3 {
++			label = "bcm53xx:white:bluebar3";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
 +
-+&spi1 {
-+	status = "okay";
-+	num-cs = <4>;
-+	is-decoded-cs = <0>;
-+	flash at 0 {
-+		compatible = "sst25wf080", "jedec,spi-nor";
-+		reg = <1>;
-+		spi-max-frequency = <1000000>;
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			partition at 0 {
-+				label = "data";
-+				reg = <0x0 0x100000>;
-+			};
++		bluebar4 {
++			label = "bcm53xx:white:bluebar4";
++			gpios = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar5 {
++			label = "bcm53xx:white:bluebar5";
++			gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar6 {
++			label = "bcm53xx:white:bluebar6";
++			gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar7 {
++			label = "bcm53xx:white:bluebar7";
++			gpios = <&chipcommon 21 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar8 {
++			label = "bcm53xx:white:bluebar8";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +};
 +
-+&uart1 {
++&usb2 {
++	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
++};
++
++&usb3 {
++	vcc-gpio = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
++};
++
++&mdio_mii_mux {
 +	status = "okay";
 +};
 +
-+&usb0 {
++&mdio_ext {
 +	status = "okay";
-+	dr_mode = "host";
-+	usb-phy = <&usb_phy0>;
 +};
++
++&srab {
++	compatible = "brcm,bcm53012-srab", "brcm,bcm5301x-srab";
++	status = "okay";
++	dsa,member = <0 0>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 1 {
++			reg = <1>;
++			label = "lan7";
++		};
++
++		port at 2 {
++			reg = <2>;
++			label = "lan4";
++		};
++
++		port at 3 {
++			reg = <3>;
++			label = "lan8";
++		};
++
++		port at 4 {
++			reg = <4>;
++			label = "wan";
++		};
++
++		port at 5 {
++			reg = <5>;
++			ethernet = <&gmac0>;
++			label = "cpu";
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++
++		port at 7 {
++			reg = <7>;
++			ethernet = <&gmac1>;
++			label = "cpu";
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++
++		port at 8 {
++			reg = <8>;
++			ethernet = <&gmac2>;
++			label = "cpu";
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++
++		sw0_p0: port at 0 {
++			reg = <0>;
++			label = "extsw";
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
+ 	};
+ };
++
++&mdio_mii {
++	status = "okay";
++
++		switch at 0  {
++			compatible = "brcm,bcm53125";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reset-gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
++			reset-names = "robo_reset";
++			reg = <0>;
++			dsa,member = <1 0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					label = "lan1";
++				};
++
++				port at 1 {
++					reg = <1>;
++					label = "lan5";
++				};
++
++				port at 2 {
++					reg = <2>;
++					label = "lan2";
++				};
++
++				port at 3 {
++					reg = <3>;
++					label = "lan6";
++				};
++
++				port at 4 {
++					reg = <4>;
++					label = "lan3";
++				};
++
++				sw1_p8: port at 8 {
++					reg = <8>;
++					ethernet = <&sw0_p0>;
++					label = "cpu";
++
++					fixed-link {
++						speed = <1000>;
++						full-duplex;
++					};
++				};
++			};
++		};
++};
++
+diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
+index 4840a78..8f3ec57 100644
+--- a/arch/arm/boot/dts/bcm47094.dtsi
++++ b/arch/arm/boot/dts/bcm47094.dtsi
+@@ -6,10 +6,8 @@
+ 
+ #include "bcm4708.dtsi"
+ 
+-/ {
+-	usb3_phy: usb3-phy {
+-		compatible = "brcm,ns-bx-usb3-phy";
+-	};
++&usb3_phy {
++	compatible = "brcm,ns-bx-usb3-phy";
+ };
+ 
+ &uart0 {
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 9a076c4..9e4386a 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -154,13 +154,6 @@
+ 		clock-names = "phy-ref-clk";
+ 	};
+ 
+-	usb3_phy: usb3-phy {
+-		compatible = "brcm,ns-ax-usb3-phy";
+-		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
+-		reg-names = "dmp", "ccb-mii";
+-		#phy-cells = <0>;
+-	};
+-
+ 	axi at 18000000 {
+ 		compatible = "brcm,bus-axi";
+ 		reg = <0x18000000 0x1000>;
+@@ -359,7 +352,55 @@
+ 		reg = <0x18003000 0x8>;
+ 		#size-cells = <1>;
+ 		#address-cells = <0>;
++	};
++
++	mdio-bus-mux {
++		compatible = "mdio-mux-mmioreg";
++		mdio-parent-bus = <&mdio>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x18003000 0x4>;
++		mux-mask = <0x200>;
++
++		mdio_int: mdio at 0 {		/* BIT(9) = 0 => internal mdio */
++			reg = <0x0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			usb3_phy: usb3-phy at 10 {
++				compatible = "brcm,ns-ax-usb3-phy";
++				reg = <0x10>;
++				usb3-dmp-syscon = <&usb3_dmp>;
++				#phy-cells = <0>;
++			};
++		};
++
++		mdio_ext: mdio at 200 {		/* BIT(9) = 1 => external mdio */
++			reg = <0x200>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++	};
++
++	mdio_mii_mux: mdio-mii-mux {
++		compatible = "mdio-mux-mmioreg";
++		mdio-parent-bus = <&mdio_ext>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x1800c1c0 0x4>;
++		mux-mask = <0xc0>;		/* BIT(6) = mdc, BIT(7) = mdio */
+ 		status = "disabled";
++
++		mdio_mii: mdio-mii at 0 {
++			reg = <0x0>;		/* Enable mii function */
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
++	usb3_dmp: syscon at 18105000 {
++		reg = <0x18105000 0x1000>;
+ 	};
+ 
+ 	i2c0: i2c at 18009000 {
 -- 
-1.9.1
+2.9.3
