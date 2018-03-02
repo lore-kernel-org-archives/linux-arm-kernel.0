@@ -1,89 +1,72 @@
-From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Fri, 2 Mar 2018 09:55:43 +0000
-Subject: [PATCH 2/3] staging: fsl-mc: Move DPBP out of staging
-In-Reply-To: <5A9916C0.6090804@nxp.com>
-References: <20180301174712.2660-1-bogdan.purcareata@nxp.com>
- <20180301174712.2660-3-bogdan.purcareata@nxp.com> <5A9916C0.6090804@nxp.com>
-Message-ID: <AM0PR0402MB364957B0E5A21228C1D8BD1DEAC50@AM0PR0402MB3649.eurprd04.prod.outlook.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 2 Mar 2018 10:07:52 +0000
+Subject: [PATCH] pinctrl: sunxi: always look for apb block
+In-Reply-To: <20180301114855.s7rbk7wiealepqrf@flea>
+References: <20180301113701.8888-1-andre.przywara@arm.com>
+ <20180301114855.s7rbk7wiealepqrf@flea>
+Message-ID: <3c781379-0b67-85ed-fbe5-6aa5df585897@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Laurentiu Tudor
-> Sent: Friday, March 02, 2018 11:18 AM
-> To: Bogdan Purcareata <bogdan.purcareata@nxp.com>; gregkh at linuxfoundation.org;
-> Ruxandra Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>
-> Cc: stuyoder at gmail.com; Ioana Ciornei <ioana.ciornei@nxp.com>; Nipun Gupta
-> <nipun.gupta@nxp.com>; Roy Pledge <roy.pledge@nxp.com>; Horia Geant?
-> <horia.geanta@nxp.com>; devel at driverdev.osuosl.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/3] staging: fsl-mc: Move DPBP out of staging
-> 
-> Hi Bogdan,
-> 
-> On 03/01/2018 07:47 PM, Bogdan Purcareata wrote:
-> > Move the source files out of staging into their final locations:
-> > - dpbp.c goes to drivers/bus/fsl-mc/, next to the core infrastructure
-> > - dpbp-cmd.h gets merged into drivers/bus/fsl-mc/fsl-mc-private.h, next
-> >    to the other internally used APIs
-> > - dpbp.h gets merged into include/linux/fsl/mc.h, exposing the public
-> >    API
-> >
-> > Update references in the dpaa2-eth staging driver.
-> >
-> > DPBP stands for Data Path Buffer Pool - you can read more about the
-> > object in Documentation/networking/dpaa2/overview.rst
-> >
-> > Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
-> > ---
-> >   drivers/bus/fsl-mc/Makefile                       |  1 +
-> >   drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c |  4 +-
-> >   drivers/bus/fsl-mc/fsl-mc-private.h               | 39 +++++++++++++++++
-> >   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h    |  2 +-
-> >   drivers/staging/fsl-mc/bus/Makefile               |  3 +-
-> >   drivers/staging/fsl-mc/bus/dpbp-cmd.h             | 44 -------------------
-> >   drivers/staging/fsl-mc/include/dpbp.h             | 53 --------------------
-> ---
-> >   include/linux/fsl/mc.h                            | 42 ++++++++++++++++++
-> >   8 files changed, 86 insertions(+), 102 deletions(-)
-> >   rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c (98%)
-> >   delete mode 100644 drivers/staging/fsl-mc/bus/dpbp-cmd.h
-> >   delete mode 100644 drivers/staging/fsl-mc/include/dpbp.h
-> >
-> > diff --git a/drivers/bus/fsl-mc/Makefile b/drivers/bus/fsl-mc/Makefile
-> > index 6a97f2c..da26e52 100644
-> > --- a/drivers/bus/fsl-mc/Makefile
-> > +++ b/drivers/bus/fsl-mc/Makefile
-> > @@ -9,6 +9,7 @@ obj-$(CONFIG_FSL_MC_BUS) += mc-bus-driver.o
-> >   mc-bus-driver-objs := fsl-mc-bus.o \
-> >   		      mc-sys.o \
-> >   		      mc-io.o \
-> > +		      dpbp.o \
-> >   		      dprc.o \
-> >   		      dprc-driver.o \
-> >   		      fsl-mc-allocator.o \
-> > diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/bus/fsl-mc/dpbp.c
-> > similarity index 98%
-> > rename from drivers/staging/fsl-mc/bus/dpbp.c
-> > rename to drivers/bus/fsl-mc/dpbp.c
-> > index 85735bb..31a360b 100644
-> > --- a/drivers/staging/fsl-mc/bus/dpbp.c
-> > +++ b/drivers/bus/fsl-mc/dpbp.c
-> > @@ -5,9 +5,9 @@
-> >    */
-> >   #include <linux/kernel.h>
-> >   #include <linux/fsl/mc.h>
-> > -#include "../include/dpbp.h"
-> > +#include "linux/fsl/mc.h"
-> 
-> I think we can use <> here, same comment for patch 3/3.
-> 
-> Other than that, the series looks ok to me so for all the patches:
-> 
-> Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Hi Maxime,
 
-Thank you!
-I will update the patchset - seeing that the cleanup one has already been applied - and will send a v2 shortly.
+On 01/03/18 11:48, Maxime Ripard wrote:
+> Hi,
+> 
+> On Thu, Mar 01, 2018 at 11:37:01AM +0000, Andre Przywara wrote:
+>> The Allwinner pinctrl device tree binding suggests that a clock named
+>> "apb" would drive the pin controller IP. However (for legacy reasons) we
+>> rely on this clock actually being the first clock defined.
+>> Since named clocks can be in any order, let's explicitly check for a
+>> clock called "apb" first, then revert to using the first (and only!)
+>> clock to keep compatibility with older DTs.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 17 ++++++++++++++---
+>>  1 file changed, 14 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> index 4b6cb25bc796..897ba13e6a03 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> @@ -1360,10 +1360,21 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+>>  			goto gpiochip_error;
+>>  	}
+>>  
+>> -	clk = devm_clk_get(&pdev->dev, NULL);
+>> +	clk = devm_clk_get(&pdev->dev, "apb");
+>>  	if (IS_ERR(clk)) {
+>> -		ret = PTR_ERR(clk);
+>> -		goto gpiochip_error;
+>> +		/*
+>> +		 * If no "apb" clock can be found, try the first one, which
+>> +		 * must be the only one defined.
+>> +		 */
+>> +		if (PTR_ERR(clk) == -ENOENT &&
+>> +		    of_count_phandle_with_args(node, "clocks",
+>> +					       "#clock-cells") == 1)
+>> +			clk = devm_clk_get(&pdev->dev, NULL);
+>> +
+>> +		if (IS_ERR(clk)) {
+>> +			ret = PTR_ERR(clk);
+>> +			goto gpiochip_error;
+>> +		}
+> 
+> I guess this can be made slightly less convoluted using something like
 
-Best regards,
-Bogdan
+                           ^^^^^^^^ that's a slight understatement
+
+> 
+> ret = of_count_phandle_with_args(node, "clocks", "#clock-cells");
+> clk = devm_clk_get(&pdev->dev, ret == 1 ? NULL : "apb");
+
+Pah, that's just embarrassing.
+I guess I will need to back your Kickstarter now to buy me out of this.
+
+Will send v2 after testing tonight.
+
+Thanks a lot for having a look!
+
+Cheers,
+Andre.
