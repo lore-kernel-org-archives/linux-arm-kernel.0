@@ -1,27 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Mar 2018 10:30:46 +0000
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180301164630.GB23321@kroah.com>
- <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
-Message-ID: <20180302103046.GC19323@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Mar 2018 10:32:25 +0000
+Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
+In-Reply-To: <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
+References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+ <20180301152450.GA4061@kroah.com>
+ <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
+Message-ID: <86po4m3gzq.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 05:02:32PM +0800, Alex Shi wrote:
-> As testing the spectre bug fix, that's a good question. I also asked
-> this question to original patch authors, like Marc. They said they just
-> figure out these patches could block spectre or meltdown issue. From my
-> side, I just reproduced the process internal spectre. But all fix on arm
-> can not resolve the user space internal spectre. It can block from user
-> to kernel or kernel to user spectre according the code purose. So I
-> believe these patch could do their job. And arm cpu would drop the
-> spectre branches if it has 20+ 'nop' instructions...
+On Fri, 02 Mar 2018 09:14:50 +0000,
+Alex Shi wrote:
+> 
+> 
+> 
+> On 03/01/2018 11:24 PM, Greg KH wrote:
+> > On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
+> >> Hi All,
+> >>
+> >> This backport patchset fixed the meltdown issue, it's original branch:
+> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+> >> A few dependency or fixingpatches are also picked up, if they are necessary
+> >>  and no functional changes.
+> >>
+> >> The patchset also on repository:
+> >> 	git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2 
+> >>
+> >> No bug found yet from kernelci.org and lkft testing.
+> > 
+> > No bugs is good, but does it actually fix the meltdown problem?  What
+> > did you test it on?
+> 
+> Oh, I have no A73/A75 cpu, so I can not reproduce meltdown bug.
 
-Since this is archived on a public list and I don't want people to rely on
-this, no, you cannot rely on "20+ 'nop' instructions" to work around
-spectre on arm/arm64. It might prevent a particular PoC working on a
-particular SoC, but it's fragile at best.
+Cortex-A73 is not affected by Meltdown. Only A75 is. Please don't
+spread misinformation. They are both affected by Spectre though.
 
-Will
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
