@@ -1,57 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 2 Mar 2018 12:11:43 +0000
-Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
-In-Reply-To: <20180302090948.6399-1-linus.walleij@linaro.org>
-References: <20180302090948.6399-1-linus.walleij@linaro.org>
-Message-ID: <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 2 Mar 2018 13:14:42 +0100
+Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
+In-Reply-To: <CACRpkda-VLsMVqYx3Y6+3JtLJERhmeJZF5g4Gd9ecvgR1Nnr0A@mail.gmail.com>
+References: <20180224214617.GA22619@amd>
+ <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+ <20180226131318.GA14045@amd>
+ <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+ <20180226231336.GA18565@amd>
+ <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
+ <20180302091025.GC30267@amd>
+ <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
+ <20180302103127.GA2081@amd>
+ <CACRpkda-VLsMVqYx3Y6+3JtLJERhmeJZF5g4Gd9ecvgR1Nnr0A@mail.gmail.com>
+Message-ID: <20180302121442.GB28931@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi!
 
-On 02/03/18 09:09, Linus Walleij wrote:
-> This is the base for finally getting RealView and Versatile
-> Express supported in the PL111 DRM driver.
+> >> Ok, so this code looks pretty crazy to me: I tried removing the
+> >> "of_find_spi_gpio" part, and audio started working.
+> >
+> > Hmm. Looks like audio is working w/o any changes, too. Not sure why
+> > festival hung on me before.
 > 
-> We have then moved all the way up from the first ARM
-> Integrator versions to the last Versatile Express reference
-> designs using PL111.
-> 
-> After this, forked hardware such as Nomadik and SPEAr
-> remains to be moved over.
-> 
-> Some infrastructure for adjusting depth (ARGB5551) etc
-> on the Integrator and some bridge fixups are still needed
-> but this is the core of the support for these platforms
-> and the rest can be done on top before switching over.
-> 
-> Also the Versatile Express CLCD on the motherboard has
-> a dedicated video memory, and cannot use CMA (ha! complex!)
-> and I will need to figure out a way to work around that.
-> The CLCDs synthesized on the core tiles for CA9 work
-> fine with this though.
+> Does it mean that mainline is working find for you or
+> do we need to look deeper into the problem in the OF
+> lookup?
 
-Out of curiosity, what's the issue with declaring the VRAM as a CMA 
-region? That's certainly worked for stuff like local RAM on FPGA tiles 
-in the past, and I can't think offhand of any way in which VExpress is 
-wildly different (but I am of course open to being wrong...)
+It now works for me.
 
-Robin.
+(But take a look at the patch I sent -- I believe you are still
+overwriting return values in a bad way, and code is quite confusing).
 
-> Linus Walleij (4):
->    drm/pl111: Make the default BPP a per-variant variable
->    drm/pl111: Use max memory bandwidth for resolution
->    drm/pl111: Handle the RealView variant separately
->    drm/pl111: Support the Versatile Express
-> 
->   drivers/gpu/drm/pl111/Makefile          |   1 +
->   drivers/gpu/drm/pl111/pl111_display.c   |  36 +++++++++++
->   drivers/gpu/drm/pl111/pl111_drm.h       |   6 +-
->   drivers/gpu/drm/pl111/pl111_drv.c       |  10 ++-
->   drivers/gpu/drm/pl111/pl111_versatile.c |  80 +++++++++++++++++++++++-
->   drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
->   drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
->   7 files changed, 258 insertions(+), 3 deletions(-)
->   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
->   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
-> 
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/c97368ff/attachment-0001.sig>
