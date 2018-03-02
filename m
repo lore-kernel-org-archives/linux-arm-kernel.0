@@ -1,79 +1,86 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Sat, 3 Mar 2018 07:27:09 +0800
-Subject: [PATCH v1 16/19] arm: dts: mt7623: fixup available memory size
- on bananapi-r2
-In-Reply-To: <20180302154215.xr3b2zlmuojw5i6l@rob-hp-laptop>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <e49485aac14bec85c14514c1953f8d7ea5401695.1519378872.git.sean.wang@mediatek.com>
- <20180302154215.xr3b2zlmuojw5i6l@rob-hp-laptop>
-Message-ID: <1520033229.8089.198.camel@mtkswgap22>
+From: wcohen@redhat.com (William Cohen)
+Date: Fri, 2 Mar 2018 18:38:40 -0500
+Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
+In-Reply-To: <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+ <20180227095028.GG21033@krava>
+ <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+ <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
+ <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+Message-ID: <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-03-02 at 09:42 -0600, Rob Herring wrote:
-> On Fri, Feb 23, 2018 at 06:16:36PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > There is 2GB DDR3 available on bananapi-r2 board as [1] specified.
-> > 
-> > [1] http://www.banana-pi.org/r2.html
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > index 140ff78..3e8d02c 100644
-> > --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > @@ -38,6 +38,11 @@
-> >  			default-state = "off";
-> >  		};
-> >  	};
-> > +
-> > +	memory {
+On 03/02/2018 11:35 AM, Ganapatrao Kulkarni wrote:
+> Hi John,
 > 
-> Unit address?
+> On Fri, Mar 2, 2018 at 9:35 PM, William Cohen <wcohen@redhat.com> wrote:
+>> On 03/02/2018 03:24 AM, John Garry wrote:
+>>> On 27/02/2018 09:50, Jiri Olsa wrote:
+>>>> On Sat, Feb 24, 2018 at 12:05:21AM +0800, John Garry wrote:
+>>>>> This patchset adds support for some perf events features,
+>>>>> targeted at ARM64, implemented in a generic fashion.
+>>>>>
+>>>>> The two main features are as follows:
+>>>>> - support for arch/vendor/platform pmu events directory structure
+>>>>>    - to support this, topic subdirectory support needs to be dropped
+>>>>> - support for parsing standard architecture pmu events
+>>>>>
+>>>>> On the back of these, the Cavium ThunderX2, ARM Cortex-A53,
+>>>>> and HiSilicon hip08 JSONs are relocated/added/updated.
+>>>>>
+>>>>> In addition, there is a patch to drop mutli-mapfile.csv support and
+>>>>> also a bugfix in jevents.c for an error code value.
+>>>>>
+>>>>> Differences to v1:
+>>>>> - Address coding issues from Jiri Olsa in adding arch std event
+>>>>>    support (https://lkml.org/lkml/2018/2/6/501)
+>>>>> - add patch to drop topic subdirectory support
+>>>>> - add patch for bug fix in json_events()
+>>>>> - add review tags from Jiri Olsa
+>>>>
+>>>> can't tell if those json file changes are ok, but for all the code changes:
+>>>>
+>>>
+>>> Hi William, Ganapatrao,
+>>>
+>>> Can you check the modifications to the ARM64 JSONs you originally submitted in the patchset please?>
+>>> If they are not checked, I'll have to see if the maintainers will accept without your review. If not, I'll have to drop them.
 > 
+> I am seeing issue(log below) with this patchset on our platfrom.
+> i have tried using your v2 branch [1]
+> 
+> root at borg-1>perf_acme>> ./perf --version
+> perf version 4.16.rc1.g087f7ca
+> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
+> 
+>  Performance counter stats for 'sleep 1':
+> 
+>             23,099      bus_access_rd
+> 
+>        1.000708516 seconds time elapsed
+> 
+> root at borg-1>perf_acme>> cd -
+> /ganapat/perf/linux-hisi/tools/perf
+> root at borg-1>perf>> ./perf --version
+> perf version 4.16.rc1.gcb5a74
+> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
+> 
+>  Performance counter stats for 'sleep 1':
+> 
+>                  0      bus_access_rd
+> 
+>        1.000709162 seconds time elapsed
+> 
+> root at borg-1>perf>>
+> 
+> 
+> [1] https://github.com/hisilicon/linux-hisi.git
+> 
+Hi,
 
-If I did it with adding unit address
+I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.  For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.  That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
 
--       memory {
-+       memory at 80000000 {
-                device_type = "memory";
-                reg = <0 0x80000000 0 0x80000000>;
-        };
+Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.  This would further reduce the amount of redundant fields between the specific implementations and the common set.
 
-
-bad dtc blob is being generated and contains two memory nodes, one is
-memory and the other is memory at 80000000 whose blob disassembly detail is
-as the following.
-
-      memory {
-                device_type = "memory";
-                reg = <0x0 0x0 0x0 0x0>;
-        };
-
-
-
-      memory at 80000000 {
-                device_type = "memory";
-                reg = <0x0 0x80000000 0x0 0x80000000>;
-        };
-
-
-and bad memory node with size 0 would cause the boot fails.
-
-
-is it a dtc compiler problem ?
-
-> > +		device_type = "memory";
-> > +		reg = <0 0x80000000 0 0x80000000>;
-> > +	};
-> >  };
-> >  
-> >  &afe {
-> > -- 
-> > 2.7.4
-> > 
+-Will
