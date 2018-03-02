@@ -1,51 +1,125 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 2 Mar 2018 10:10:26 +0100
-Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
-In-Reply-To: <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
-References: <20180224214617.GA22619@amd>
- <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
- <20180226131318.GA14045@amd>
- <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
- <20180226231336.GA18565@amd>
- <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
-Message-ID: <20180302091025.GC30267@amd>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 2 Mar 2018 10:11:06 +0100
+Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <1519942514-3350-1-git-send-email-fkan@apm.com>
+References: <1519942514-3350-1-git-send-email-fkan@apm.com>
+Message-ID: <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+[+Greg]
 
-Linux-Regression-ID: lr#4b650f
+On Thu, Mar 1, 2018 at 11:15 PM, Feng Kan <fkan@apm.com> wrote:
+> When bridge and its endpoint is enumerated the devices are added to the
+> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> This causes the bridge to be moved to the end of the dpm list when
+> deferred probe kicks in. The order of the dpm list for bridge and
+> endpoint is reversed.
+>
+> Add reordering code to move the bridge and its children and consumers to
+> the end of the pm list so the order for suspend and resume is not altered.
+> The code also move device and its children and consumers to the tail of
+> device_kset list if it is registered.
 
-On Tue 2018-02-27 09:43:32, Linus Walleij wrote:
-> On Tue, Feb 27, 2018 at 12:13 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> 
-> > I did git bisect, and the winner seems to be:
-> >
-> > pavel at duo:/data/l/linux-n900$ git bisect bad
-> > c85823390215e52d68d3826df92a447ed31e5c80 is the first bad commit
-> > commit c85823390215e52d68d3826df92a447ed31e5c80
-> > Author: Linus Walleij <linus.walleij@linaro.org>
-> > Date:   Wed Dec 27 16:37:44 2017 +0100
-> >
-> >     gpio: of: Support SPI nonstandard GPIO properties
-> 
-> I have fixes queued for this, tried to send a pull request yesterday
-> but it turns out the fixes need fixing... OK I'm onto it anyways.
+I assume that this has been tested and works as expected.
 
-Do you have any updates? Is there way to fix dts so that this does not
-trigger on N900?
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Toan Le <toanle@apm.com>
+> ---
+>  V2:
+>         1. change patch title from "move device and its children..."
+>         2. move define based on Bjorn's comment
+>         3. rename function name and comment content
+>  drivers/base/base.h |  3 +++
+>  drivers/base/core.c | 22 ++++++++++++++++++++++
+>  drivers/base/dd.c   |  8 ++++----
+>  3 files changed, 29 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/base/base.h b/drivers/base/base.h
+> index d800de6..a75c302 100644
+> --- a/drivers/base/base.h
+> +++ b/drivers/base/base.h
+> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
+>  extern void device_links_no_driver(struct device *dev);
+>  extern bool device_links_busy(struct device *dev);
+>  extern void device_links_unbind_consumers(struct device *dev);
+> +
+> +/* device pm support */
+> +void device_pm_move_to_tail(struct device *dev);
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 110230d..0a0756b 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>  }
+>
+>  /**
+> + * device_pm_move_to_tail - move device and its children and consumers to end of
+> + *                          pm and device kset list
 
-If this is taking longer to fix, should c85823390215 be reverted in
-the meantime? It does not seem particulary important/urgent...
+This has to be one line.  Maybe something like "Move set of devices to
+the end of device lists" and then describe how it works below.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/736069e8/attachment.sig>
+> + * @dev: current device pointer
+> + *
+> + * This is a lock held version of the device_reorder_to_tail.
+
+I'd say "This is a device_reorder_to_tail() wrapper taking the
+requisite locks." and put an empty comment line after that.
+
+> +  Function checks
+
+"It checks"
+
+> + * if the device is registered and moves it to the end of device_kset list. Also
+> + * if the device is pm initialized, move the device to the end of the pm list.
+> + * Then the function iterate through the children and device link consumers to
+> + * do the same for each found.
+
+But generally I'd say "It moves the device along with all of its
+children and all of its consumers to the ends of the device_kset and
+dpm_list lists, recursively".
+
+> + */
+> +void device_pm_move_to_tail(struct device *dev)
+> +{
+> +       int idx;
+> +
+> +       idx = device_links_read_lock();
+> +       device_pm_lock();
+> +       device_reorder_to_tail(dev, NULL);
+> +       device_pm_unlock();
+> +       device_links_read_unlock(idx);
+> +}
+> +
+> +/**
+>   * device_link_add - Create a link between two devices.
+>   * @consumer: Consumer end of the link.
+>   * @supplier: Supplier end of the link.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 2c964f5..7e9d1ef 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+>                  * Force the device to the end of the dpm_list since
+>                  * the PM code assumes that the order we add things to
+>                  * the list is a good order for suspend but deferred
+> -                * probe makes that very unsafe.
+> +                * probe makes that very unsafe. Move any children and
+> +                * consumers belong to the device to the end of the list.
+> +                * This way the suspend resume order won't be corrupted.
+
+Why do you need to change this comment?
+
+>                  */
+> -               device_pm_lock();
+> -               device_pm_move_last(dev);
+> -               device_pm_unlock();
+> +               device_pm_move_to_tail(dev);
+>
+>                 dev_dbg(dev, "Retrying from deferred list\n");
+>                 if (initcall_debug && !initcalls_done)
+> --
+> 1.8.3.1
+>
