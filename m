@@ -1,89 +1,53 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu,  1 Mar 2018 18:19:29 -0600
-Subject: [PATCHv2 1/7] dt-bindings,
- firmware: add Intel Stratix10 service layer binding
+Date: Thu,  1 Mar 2018 18:19:33 -0600
+Subject: [PATCHv2 5/7] arm64: dts: stratix10: add fpga manager and region
 In-Reply-To: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
 References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1519949975-13548-2-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1519949975-13548-6-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+From: Alan Tull <atull@kernel.org>
 
-Add a device tree binding for the Intel Stratix10 service layer driver
+Add the Stratix10 FPGA manager and a FPGA region to the
+device tree.
 
-Signed-off-by: Richard Gong <richard.gong@intel.com>
 Signed-off-by: Alan Tull <atull@kernel.org>
 ---
-v2: Change to put service layer driver node under the firmware node
-    Change compatible to "intel, stratix10-svc"
+v2: this patch is added in patch set version 2
 ---
- .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-new file mode 100644
-index 0000000..1fa6606
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
-@@ -0,0 +1,57 @@
-+Intel Service Layer Driver for Stratix10 SoC
-+============================================
-+Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
-+processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
-+configured from HPS, there needs to be a way for HPS to notify SDM the
-+location and size of the configuration data. Then SDM will get the
-+configuration data from that location and perform the FPGA configuration.
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+index 4395e76..2f0067e 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+@@ -107,6 +107,14 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 
++		base_fpga_region {
++			#address-cells = <0x1>;
++			#size-cells = <0x1>;
 +
-+To meet the whole system security needs and support virtual machine requesting
-+communication with SDM, only the secure world of software (EL3, Exception
-+Layer 3) can interface with SDM. All software entities running on other
-+exception layers must channel through the EL3 software whenever it needs
-+service from SDM.
-+
-+Intel Stratix10 service layer driver, running at privileged exception level
-+(EL1, Exception Layer 1), interfaces with the service providers and provides
-+the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
-+driver also manages secure monitor call (SMC) to communicate with secure monitor
-+code running in EL3.
-+
-+Required properties:
-+-------------------
-+The svc node has the following mandatory properties, must be located under
-+the firmware node.
-+
-+- compatible: "intel,stratix10-svc"
-+- method: smc or hvc
-+        smc - Secure Monitor Call
-+        hvc - Hypervisor Call
-+- memory-region:
-+	phandle to the reserved memory node. See
-+	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-+	for details
-+
-+Example:
-+-------
-+
-+	reserved-memory {
-+                #address-cells = <2>;
-+                #size-cells = <2>;
-+                ranges;
-+
-+                service_reserved: svcbuffer at 0 {
-+                        compatible = "shared-dma-pool";
-+                        reg = <0x0 0x0 0x0 0x1000000>;
-+                        alignment = <0x1000>;
-+                        no-map;
-+                };
-+        };
-+
-+	firmware {
-+		svc {
-+			compatible = "intel,stratix10-svc";
-+			method = "smc";
-+			memory-region = <&service_reserved>;
++			compatible = "fpga-region";
++			fpga-mgr = <&fpga_mgr>;
 +		};
-+	};
++
+ 		clkmgr: clock-controller at ffd10000 {
+ 			compatible = "intel,stratix10-clkmgr";
+ 			reg = <0xffd10000 0x1000>;
+@@ -138,6 +146,10 @@
+ 			};
+ 		};
+ 
++		fpga_mgr: fpga-mgr at 0 {
++			compatible = "intel,stratix10-soc-fpga-mgr";
++		};
++
+ 		gmac0: ethernet at ff800000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
+ 			reg = <0xff800000 0x2000>;
 -- 
 2.7.4
