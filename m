@@ -1,101 +1,55 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 2 Mar 2018 11:28:09 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <87r2p4hod7.fsf@intel.com>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180228194429.GD22932@mithrandir> <87r2p4hod7.fsf@intel.com>
-Message-ID: <585cc4ae-3674-c119-295b-e59f4242e619@microchip.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Mar 2018 10:33:24 +0100
+Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
+In-Reply-To: <20180302091025.GC30267@amd>
+References: <20180224214617.GA22619@amd>
+ <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+ <20180226131318.GA14045@amd>
+ <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+ <20180226231336.GA18565@amd>
+ <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
+ <20180302091025.GC30267@amd>
+Message-ID: <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 2, 2018 at 10:10 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Linux-Regression-ID: lr#4b650f
+>
+> On Tue 2018-02-27 09:43:32, Linus Walleij wrote:
+>> On Tue, Feb 27, 2018 at 12:13 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>>
+>> > I did git bisect, and the winner seems to be:
+>> >
+>> > pavel at duo:/data/l/linux-n900$ git bisect bad
+>> > c85823390215e52d68d3826df92a447ed31e5c80 is the first bad commit
+>> > commit c85823390215e52d68d3826df92a447ed31e5c80
+>> > Author: Linus Walleij <linus.walleij@linaro.org>
+>> > Date:   Wed Dec 27 16:37:44 2017 +0100
+>> >
+>> >     gpio: of: Support SPI nonstandard GPIO properties
+>>
+>> I have fixes queued for this, tried to send a pull request yesterday
+>> but it turns out the fixes need fixing... OK I'm onto it anyways.
+>
+> Do you have any updates? Is there way to fix dts so that this does not
+> trigger on N900?
+>
+> If this is taking longer to fix, should c85823390215 be reverted in
+> the meantime? It does not seem particulary important/urgent...
 
+No patience between the v4.16 release candidates eh ;)
 
-On 28.02.2018 22:04, Jani Nikula wrote:
-> On Wed, 28 Feb 2018, Thierry Reding <thierry.reding@gmail.com> wrote:
->> Anyone that needs something other than normal mode should use the new
->> atomic PWM API.
-> 
-> At the risk of revealing my true ignorance, what is the new atomic PWM
-> API? Where? Examples of how one would convert old code over to the new
-> API?
-As far as I know, the old PWM core code uses config(), set_polarity(),
-enable(), disable() methods of driver, registered as pwm_ops:
-struct pwm_ops {
+commit 6662ae6af82df10259a70c7569b4c12ea7f3ba93
+("gpiolib: Keep returning EPROBE_DEFER when we should")
 
-        int (*request)(struct pwm_chip *chip, struct pwm_device *pwm);
+and
 
-        void (*free)(struct pwm_chip *chip, struct pwm_device *pwm);
+commit ce27fb2c56db6ccfe8099343bb4afdab15e77e7b
+("gpio: Handle deferred probing in of_find_gpio() properly")
 
-        int (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+that are both in Torvalds' tree since yesterday should be fixing
+this, I think? Did you try just using the upstream HEAD?
 
-                      int duty_ns, int period_ns);
-
-        int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
-
-                            enum pwm_polarity polarity);
-
-        int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
-
-                       struct pwm_capture *result, unsigned long timeout);
-
-        int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
-
-        void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
-
-        int (*apply)(struct pwm_chip *chip, struct pwm_device *pwm,
-
-                     struct pwm_state *state);
-
-        void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
-
-                          struct pwm_state *state);
-
-#ifdef CONFIG_DEBUG_FS
-
-        void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
-
-#endif
-
-        struct module *owner;
-
-};
-
-
-to do settings on hardware. In order to so settings on a PWM the users
-should have been follow the below steps:
-->config()
-->set_polarity()
-->enable()
-Moreover, if the PWM was previously enabled it should have been first
-disable and then to follow the above steps in order to apply a new settings
-on hardware.
-The driver should have been provide, at probe, all the above function:
-->config(), ->set_polarity(), ->disable(), ->enable(), function that were
-used by PWM core.
-
-Now, having atomic PWM, the driver should provide one function to PWM core,
-which is ->apply() function. Every PWM has a state associated, which keeps
-the period, duty cycle, polarity and enable/disable status. The driver's
-->apply() function takes as argument the state that should be applied and
-it takes care of applying this new state directly without asking user to
-call ->disable(), then ->config()/->set_polarity(), then ->enable() to
-apply new hardware settings.
-
-The PWM consumer could set a new state for PWM it uses, using
-pwm_apply_state(pwm, new_state);
-
-Regarding the models to switch on atomic PWM, on the controller side you
-can check for drivers that registers apply function at probe time.
-Regarding the PWM users, you can look for pwm_apply_state()
-(drivers/hwmon/pwm-fan.c or drivers/input/misc/pwm-beeper.c are some examples).
-
-Thierry, please correct me if I'm wrong.
-
-Thank you,
-Claudiu Beznea
-
-> 
-> BR,
-> Jani.
-> 
+Yours,
+Linus Walleij
