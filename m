@@ -1,93 +1,87 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Fri, 2 Mar 2018 14:42:36 +0000
-Subject: [PATCH v2 1/2] dt-bindings: phy: add support for STM32 USB PHY
- Controller (USBPHYC)
-In-Reply-To: <bac8ba1a-dd66-4df6-1976-c6144e35040c@ti.com>
-References: <1519918245-17333-1-git-send-email-amelie.delaunay@st.com>
- <1519918245-17333-2-git-send-email-amelie.delaunay@st.com>
- <bac8ba1a-dd66-4df6-1976-c6144e35040c@ti.com>
-Message-ID: <6a11cbdc-a7db-31c5-740c-06857f051e38@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 2 Mar 2018 15:44:20 +0100
+Subject: [PATCH] ARM: dts: tpc: Device tree description of the TPC board
+In-Reply-To: <20180302142537.25764c8e@jawa>
+References: <20180302121750.12865-1-lukma@denx.de>
+ <20180302125159.gufvhyy4ipyunmil@pengutronix.de>
+ <20180302142537.25764c8e@jawa>
+Message-ID: <20180302144420.37trllgposf4yet3@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 02, 2018 at 02:25:37PM +0100, Lukasz Majewski wrote:
+> Hi Sascha,
+> 
+> > Hi Lukasz,
+> > 
+> > On Fri, Mar 02, 2018 at 01:17:50PM +0100, Lukasz Majewski wrote:
+> > > This commit adds device tree description of K+P's TPC board.  
+> > 
+> > Can we get a hint what this board is? I assume this one:
+> > 
+> > Technologic Systems' Full i.MX6 Portfolio Including SBC, COM, and
+> > Touch Panel PCs
+> 
+> I just took other imx6q boards as an example - e.g. 
+> 
+> 420127e5a5b53ff2cb5effaa781aed93709b09bb
+> 
+> Generally, descriptions of DTSes are rather short and simple.
+> 
+> > 
+> > Anyway, future developers are thankful if they have the information
+> > around when they have to work on that file or have to decide if it is
+> > to be removed.
+> 
+> IMHO, there is plenty of information around (iMX6 Quad SoC, with
+> components described in dts).
 
+There may be future changes necessary which may be done by people who do
+not know which hardware this. For them it will be convenient to be able
+to search for the hardware and maybe even find a schematics. Anyway, it
+will just help to have that information around.
 
-On 03/02/2018 07:02 AM, Kishon Vijay Abraham I wrote:
+> > > +&can1 {
+> > > +	status = "disabled";
+> > > +};
+> > > +
+> > > +&can2 {
+> > > +	status = "disabled";
+> > > +};  
+> > 
+> > These are not enabled in your base dtsi, so no need to disabled it
+> > here.
 > 
-> 
-> On Thursday 01 March 2018 09:00 PM, Amelie Delaunay wrote:
->> This patch adds the device tree bindings description for STM32 USBPHYC
->> (USB PHY Controller).
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> ---
->>   .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  | 46 ++++++++++++++++++++++
->>   1 file changed, 46 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->> new file mode 100644
->> index 0000000..1ad3893
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
->> @@ -0,0 +1,46 @@
->> +STMicroelectronics STM32 USB HS PHY controller
->> +
->> +The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
->> +switch. It controls PHY configuration and status, and the UTMI+ switch that
->> +selects either OTG or HOST controller for the second PHY port. It also sets
->> +PLL configuration.
->> +
->> +USBPHYC
->> +      |_ PLL
->> +      |
->> +      |_ PHY port#1 _________________ HOST controller
->> +      |                    _                 |
->> +      |                  / 1|________________|
->> +      |_ PHY port#2 ----|   |________________
->> +      |                  \_0|                |
->> +      |_ UTMI switch_______|          OTG controller
->> +
->> +
-> 
-> This should be modeled as a phy provider node with two separate sub-nodes for
-> each of the PHYs.
-> 
-> Thanks
-> Kishon
-> 
+> But they can be enabled if needed.
 
-Thank you for pointing me to the right solution. I send a V3.
+Yes, they can, but that still doesn't make these node references necessary.
+If I read this it seems to me that you explicitly want to disable these
+nodes. A reader can't know you add them for convenience here.
+
+> > > diff --git a/arch/arm/boot/dts/imx6q-kp.dtsi
+> > > b/arch/arm/boot/dts/imx6q-kp.dtsi new file mode 100644
+> > > index 000000000000..47a10fb1d46b
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/imx6q-kp.dtsi
+> > > +
+> > > +	memory: memory {
+> > > +		reg = <0x10000000 0x40000000>;
+> > > +	};
+> > > +
+> > > +	pwm-buzzer {
+> > > +		compatible = "pwm-backlight";  
+> > 
+> > What is it? A backlight or a buzzer?
+> 
+> It is a buzzer, which is controlled by PWM.
+
+Then you should bind the pwm-beeper driver to it, not a backlight.
 
 Regards,
-Amelie
+  Sascha
 
->> +Required properties:
->> +- compatible: must be "st,stm32mp1-usbphyc"
->> +- reg: address and length of the usb phy control register set
->> +- clocks: phandle + clock specifier for the PLL phy clock
->> +- phy-supply: from the generic phy bindings, phandle to the regulator
->> +  providing 3V3 power to the PHY, see phy-bindings.txt
->> +- vdda1v1-supply: phandle to the regulator providing 1V1 power to the PHY
->> +- vdda1v8-supply: phandle to the regulator providing 1V8 power to the PHY
->> +
->> +Optional properties:
->> +- assigned-clocks: phandle + clock specifier for the PLL phy clock
->> +- assigned-clock-parents: the PLL phy clock parent
->> +- resets: phandle + reset specifier
->> +- st,utmi-switch: should be <0> or <1>, to select USB controller for PHY
->> +  port#2. If not specified, 0 is the default selection.
->> +
->> +
->> +Example:
->> +		usbphyc: usb-phy at 5a006000 {
->> +			compatible = "st,stm32mp1-usbphyc";
->> +			reg = <0x5a006000 0x1000>;
->> +			clocks = <&rcc_clk USBPHY_K>;
->> +			resets = <&rcc_rst USBPHY_R>;
->> +			st,utmi-switch = <1>;
->> +			phy-supply = <&vdd_usb>;
->> +			vdda1v1-supply = <&reg11>;
->> +			vdda1v8-supply = <&reg18>
->> +		};
->>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
