@@ -1,89 +1,81 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Fri, 2 Mar 2018 11:18:10 -0600
-Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
-In-Reply-To: <20180302170841.GP28231@n2100.armlinux.org.uk>
-References: <20180224214617.GA22619@amd>
- <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
- <20180226131318.GA14045@amd>
- <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
- <20180226231336.GA18565@amd>
- <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
- <20180302091025.GC30267@amd>
- <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
- <20180302111040.GA6344@amd> <0f090cc7-2b72-a038-26ee-d43077cb9663@ti.com>
- <20180302170841.GP28231@n2100.armlinux.org.uk>
-Message-ID: <8cf3f026-4d65-71ac-60ed-3e9427139843@ti.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 2 Mar 2018 23:26:57 +0530
+Subject: [PATCH v4 04/10] pinctrl: actions: Add Actions S900 pinctrl driver
+In-Reply-To: <CACRpkdYKm9CuKb+0CDwddVK7uJvVKpkR_mubzDe1n2joUom-FA@mail.gmail.com>
+References: <20180302035045.14660-1-manivannan.sadhasivam@linaro.org>
+ <20180302035045.14660-5-manivannan.sadhasivam@linaro.org>
+ <CACRpkdYKm9CuKb+0CDwddVK7uJvVKpkR_mubzDe1n2joUom-FA@mail.gmail.com>
+Message-ID: <20180302175657.cnudp24fp3ejevwc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2018 11:08 AM, Russell King - ARM Linux wrote:
-> On Fri, Mar 02, 2018 at 08:22:52AM -0600, Andrew F. Davis wrote:
->>> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
->>> index 84e5a9d..f0fab26 100644
->>> --- a/drivers/gpio/gpiolib-of.c
->>> +++ b/drivers/gpio/gpiolib-of.c
->>> @@ -241,29 +241,17 @@ struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
->>>  
->>>  		desc = of_get_named_gpiod_flags(dev->of_node, prop_name, idx,
->>>  						&of_flags);
->>> -		/*
->>> -		 * -EPROBE_DEFER in our case means that we found a
->>> -		 * valid GPIO property, but no controller has been
->>> -		 * registered so far.
->>> -		 *
->>> -		 * This means we don't need to look any further for
->>> -		 * alternate name conventions, and we should really
->>> -		 * preserve the return code for our user to be able to
->>> -		 * retry probing later.
->>> -		 */
->>> -		if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
->>> -			return desc;
->>>  
->>> -		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
->>> +		if (!IS_ERR(desc) || PTR_ERR(desc) != -ENOENT)
->>
->>
->> I rather like the () so one doesn't always have to look up C operator
->> precedence to verify..
+Hi Linus,
+
+On Fri, Mar 02, 2018 at 02:21:37PM +0100, Linus Walleij wrote:
+> On Fri, Mar 2, 2018 at 4:50 AM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
 > 
-> Too many make it impossible to see which close paren ties up with
-> which open paren.  I've spent way too long in the past reformatting
-> code, where people think that () are a good thing, to work out what
-> the comparison is actually doing before then rewriting the damn
-> thing with less () and in a much clearer way.  I'm now convinced
-> that unnecessary () are a very bad thing as they severely harm
-> readability as test complexity increases.
+> > Add pinctrl driver for Actions Semi S900 SoC. The driver supports
+> > pinctrl, pinmux and pinconf functionalities through a range of registers
+> > common to both gpio driver and pinctrl driver.
+> >
+> > Pinmux functionality is available only for the pin groups while the
+> > pinconf functionality is available for both pin groups and individual
+> > pins.
+> >
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> 
+> Seems like this is pretty much finished.
+> 
+> Let's see if you can collect some ACKs before we apply it.
 > 
 
+Andreas is at Embedded World conference. I hope once he is
+back, he will have a look at this patchset.
 
-Fair enough, I personally prefer always having a new line per condition
-when doing chained conditionals:
+> Now just minor things remain.
+> 
+> Random chosen example:
+> 
+> > +static unsigned int lvds_e_drv_pads[] = {
+> > +       LVDS_EEP,
+> > +       LVDS_EEN,
+> > +       LVDS_EDP,
+> > +       LVDS_EDN,
+> > +       LVDS_ECP,
+> > +       LVDS_ECN,
+> > +       LVDS_EBP,
+> > +       LVDS_EBN,
+> > +};
+> > +
+> > +static unsigned int sd0_d3_d0_drv_pads[] = {
+> > +       SD0_D3,
+> > +       SD0_D2,
+> > +       SD0_D1,
+> > +       SD0_D0,
+> > +};
+> 
+> People (e.g. Torvalds) sometimes get upset with files with too many lines
+> in them. This file has a lot of lines. A lot of pin control drivers try to cut
+> down the lines with macros, and you do it in some places too,
+> would you consider to see if you can cut down these tables with
+> macros?
+> 
+> S900_PADS(LVDS_EEP, LVDS_EEN, LVDS_EDP, LVDS_EDN,
+>                     LVDS_ECP, LVDS_ECN, LVDS_EBP, LVDS_EBN);
+> S900_PADS(SD0_D3, SD0_D2, SD0_D1, SD0_D0);
+> 
 
-if (something &&
-    this == that &&
-    !not_this)
+I don't think it would be efficient to use macros here. However, I can
+align the pads and func definitions in a single line. This will also
+save a considerable amount of space.
 
+Thanks,
+Mani
 
->>
->>
->>>  			break;
->>>  	}
->>>  
->>>  	/* Special handling for SPI GPIOs if used */
->>> -	if (IS_ERR(desc))
->>> +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+> Would be so much more compact.
 > 
-> These can be simplified to:
+> It's not the biggest problem though.
 > 
-> 	if (desc == ERR_PTR(-ENOENT))
-> 
-> since error pointers are unique - ERR_PTR(-ENOENT) is what was
-> returned as an error-pointer, and if IS_ERR(ERR_PTR(-ENOMENT)) etc
-> were false, we'd have big problems as it'd mean we couldn't detect
-> error pointers!
-> 
-> As an added bonus, they don't involve any operator precedence
-> questions either.
-> 
-
-Looks like your suggestion clears up this one anyway.
+> Yours,
+> Linus Walleij
