@@ -1,187 +1,145 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 02 Mar 2018 11:11:05 +0000
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
-Message-ID: <86o9k63f7a.wl-marc.zyngier@arm.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Fri, 2 Mar 2018 14:14:36 +0300
+Subject: [PATCH 1/2] stackleak: Update for arm64
+In-Reply-To: <87woywxezi.fsf@e105548-lin.cambridge.arm.com>
+References: <20180221011303.20392-1-labbott@redhat.com>
+ <20180221011303.20392-2-labbott@redhat.com> <20180222165834.GC18421@arm.com>
+ <97090ca6-efad-7c03-6084-a97674ae61c7@linux.com>
+ <874lm2d96q.fsf@e105548-lin.cambridge.arm.com>
+ <5d10c6ad-b4b6-eb27-79f0-ca235b73e7eb@linux.com>
+ <87woywxezi.fsf@e105548-lin.cambridge.arm.com>
+Message-ID: <b0575fc6-79f4-9aad-ee31-e761a9cac5d8@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Mar 2018 10:44:48 +0000,
-Auger Eric wrote:
+Thanks for your reply, Richard!
+
+On 01.03.2018 13:33, Richard Sandiford wrote:
+> Alexander Popov <alex.popov@linux.com> writes:
+>> On 27.02.2018 13:21, Richard Sandiford wrote:
+>>> Alexander Popov <alex.popov@linux.com> writes:
+>>>> Would you be so kind to take a look at the whole STACKLEAK plugin?
+>>>> http://www.openwall.com/lists/kernel-hardening/2018/02/16/4
+>>>> https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/commit/?h=kspp/gcc-plugin/stackleak&id=57a0a6763b12e82dd462593d0f42be610e93cdc9
+>>>>
+>>>> It's not very big. I documented it in detail. I would be really
+>>>> grateful for the
+>>>> review!
+>>>
+>>> Looks good to me FWIW.  Just a couple of minor things:
+>>>
+>>>> +	/*
+>>>> +	 * 1. Loop through the GIMPLE statements in each of cfun basic blocks.
+>>>> +	 * cfun is a global variable which represents the function that is
+>>>> +	 * currently processed.
+>>>> +	 */
+>>>> +	FOR_EACH_BB_FN(bb, cfun) {
+>>>> +		for (gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi)) {
+>>>> +			gimple stmt;
+>>>> +
+>>>> +			stmt = gsi_stmt(gsi);
+>>>> +
+>>>> +			/* Leaf function is a function which makes no calls */
+>>>> +			if (is_gimple_call(stmt))
+>>>> +				is_leaf = false;
+>>>
+>>> It's probably not going to matter in practice, but it might be worth
+>>> emphasising in the comments that this leafness is only approximate.
+>>
+>> That's important, thank you! May I ask why you think it's not going to matter in
+>> practice?
 > 
-> Hi Marc,
+> I just thought the kind of calls it misses are going to have very
+> shallow frames, but from what you said later I guess that isn't the
+> point.  It also might be a bit too hand-wavy for something like this :-)
 > 
-> On 15/02/18 18:58, Marc Zyngier wrote:
-> > Although we've implemented PSCI 0.1, 0.2 and 1.0, we expose either 0.1
-> > or 1.0 to a guest, defaulting to the latest version of the PSCI
-> > implementation that is compatible with the requested version. This is
-> > no different from doing a firmware upgrade on KVM.
-> > 
-> > But in order to give a chance to hypothetical badly implemented guests
-> > that would have a fit by discovering something other than PSCI 0.2,
-> > let's provide a new API that allows userspace to pick one particular
-> > version of the API.
+>>> It will sometimes be a false positive, because we could still
+>>> end up creating calls to libgcc functions from non-call statements
+>>> (or for target-specific reasons).  It can also be a false negative,
+>>> since call statements can be to built-in or internal functions that
+>>> end up being open-coded.
+>>
+>> Oh, that raises the question: how does this leafness inaccuracy affect in my
+>> particular case?
+>>
+>> is_leaf is currently used for finding the special cases to skip the
+>> track_stack() call insertion:
+>>
+>> /*
+>>  * Special cases to skip the instrumentation.
+>>  *
+>>  * Taking the address of static inline functions materializes them,
+>>  * but we mustn't instrument some of them as the resulting stack
+>>  * alignment required by the function call ABI will break other
+>>  * assumptions regarding the expected (but not otherwise enforced)
+>>  * register clobbering ABI.
+>>  *
+>>  * Case in point: native_save_fl on amd64 when optimized for size
+>>  * clobbers rdx if it were instrumented here.
+>>  *
+>>  * TODO: any more special cases?
+>>  */
+>> if (is_leaf &&
+>>     !TREE_PUBLIC(current_function_decl) &&
+>>     DECL_DECLARED_INLINE_P(current_function_decl)) {
+>> 	return 0;
+>> }
+>>
+>>
+>> And now it seems to me that the stackleak plugin should not instrument all
+>> static inline functions, regardless of is_leaf. Do you agree?
 > 
-> I understand the get/set is called as part of the migration process.
-> So my understanding is the benefit of this series is migration fails in
-> those cases:
+> OK.  I'd missed that this was just a heuristic to detect certain kinds
+> of linux function, so it's probably fine as it is.
 > 
-> >=0.2 source -> 0.1 destination
-> 0.1 source -> >=0.2 destination
+> Not sure whether it's safe to punt for general static inline functions.
+> E.g. couldn't you have a static inline function that just provides a
+> more convenient interface to another function?  But I guess it's a
+> linux-specific heuristic, so I can't really say.
 
-It also fails in the case where you migrate a 1.0 guest to something
-that cannot support it.
+Huh, I got the insight! I think that the current approach (originally by PaX
+Team) should work fine despite the false positives which you described:
 
-> However in the above mentioned use case where the guest would absolutely
-> need a 0.2 and not a 1.0 I don't get on which event the userspace would
-> do a set to force 0.2?
+If some static inline function already does explicit calls (so is_leaf is
+false), adding the track_stack() call will not introduce anything special that
+can break the aforementioned register clobbering ABI in that function.
 
-You'd have to know that your guest cannot support 0.2, and force 0.2
-by doing a SET_ONE_REG(KVM_REG_ARM_PSCI_VERSION, PSCI_VERSION(0, 2)).
+Does it sound reasonable?
 
-Or am I missing what you're asking for?
+However, I don't know what to with false negatives.
 
-> > 
-> > This is implemented as a new class of "firmware" registers, where
-> > we expose the PSCI version. This allows the PSCI version to be
-> > save/restored as part of a guest migration, and also set to
-> > any supported version if the guest requires it.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> > This is a repost of this proposal for a firmware selection API, as
-> > there was some discussion during the merging window. Now that the core
-> > variant-2 stuff is merged, we can have a go at more
-> > bikesheding. Please open fire!
-> > 
-> >  Documentation/virtual/kvm/api.txt      |  9 ++++-
-> >  Documentation/virtual/kvm/arm/psci.txt | 30 +++++++++++++++++
-> >  arch/arm/include/asm/kvm_host.h        |  3 ++
-> >  arch/arm/include/uapi/asm/kvm.h        |  6 ++++
-> >  arch/arm/kvm/guest.c                   | 13 ++++++++
-> >  arch/arm64/include/asm/kvm_host.h      |  3 ++
-> >  arch/arm64/include/uapi/asm/kvm.h      |  6 ++++
-> >  arch/arm64/kvm/guest.c                 | 14 +++++++-
-> >  include/kvm/arm_psci.h                 | 16 +++++++--
-> >  virt/kvm/arm/psci.c                    | 60 ++++++++++++++++++++++++++++++++++
-> >  10 files changed, 156 insertions(+), 4 deletions(-)
-> >  create mode 100644 Documentation/virtual/kvm/arm/psci.txt
+> TBH the paravirt save_fl stuff seems like dancing on the edge,
+> but that's another story. :-)
+
+That's interesting. Could you elaborate on that?
+
+>>>> +	/*
+>>>> +	 * The stackleak_final pass should be executed before the "final" pass,
+>>>> +	 * which turns the RTL (Register Transfer Language) into assembly.
+>>>> +	 */
+>>>> +	PASS_INFO(stackleak_final, "final", 1, PASS_POS_INSERT_BEFORE);
+>>>
+>>> This might be too late, since it happens e.g. after addresses have
+>>> been calculated for branch ranges, and after machine-specific passes
+>>> (e.g. bundling on ia64).
+>>>
+>>> The stack size is final after reload, so inserting the pass after that
+>>> might be better.
+>>
+>> Thanks for that notice. May I ask for the additional clarification?
+>>
+>> I specified -fdump-passes and see a lot of passes between reload and final:
+...
+>>
+>> Where exactly would you recommend me to insert the stackleak_final pass, which
+>> removes the unneeded track_stack() calls?
 > 
-> > 
-> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> > index 57d3ee9e4bde..d2b41e1608b4 100644
-> > --- a/Documentation/virtual/kvm/api.txt
-> > +++ b/Documentation/virtual/kvm/api.txt
-> > @@ -1943,6 +1943,9 @@ ARM 32-bit VFP control registers have the following id bit patterns:
-> >  ARM 64-bit FP registers have the following id bit patterns:
-> >    0x4030 0000 0012 0 <regno:12>
-> >  
-> > +ARM firmware pseudo-registers have the following bit pattern:
-> s/bit pattern/id bit patterns?
-> > +  0x4030 0000 0014 <regno:16>
-> > +
-> >  
-> >  arm64 registers are mapped using the lower 32 bits. The upper 16 of
-> >  that is the register group type, or coprocessor number:
-> > @@ -1959,6 +1962,9 @@ arm64 CCSIDR registers are demultiplexed by CSSELR value:
-> >  arm64 system registers have the following id bit patterns:
-> >    0x6030 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
-> >  
-> > +arm64 firmware pseudo-registers have the following bit pattern:
-> s/bit pattern/id bit patterns?
-> > +  0x6030 0000 0014 <regno:16>
-> > +
-> >  
-> >  MIPS registers are mapped using the lower 32 bits.  The upper 16 of that is
-> >  the register group type:
-> > @@ -2493,7 +2499,8 @@ Possible features:
-> >  	  and execute guest code when KVM_RUN is called.
-> >  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> >  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
-> > -	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-> > +	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-> > +          backward compatible with v0.2) for the CPU.
-> >  	  Depends on KVM_CAP_ARM_PSCI_0_2.
-> >  	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
-> >  	  Depends on KVM_CAP_ARM_PMU_V3.
-> > diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-> > new file mode 100644
-> > index 000000000000..aafdab887b04
-> > --- /dev/null
-> > +++ b/Documentation/virtual/kvm/arm/psci.txt
-> > @@ -0,0 +1,30 @@
-> > +KVM implements the PSCI (Power State Coordination Interface)
-> > +specification in order to provide services such as CPU on/off, reset
-> > +and power-off to the guest.
-> > +
-> > +The PSCI specification is regularly updated to provide new features,
-> > +and KVM implements these updates if they make sense from a virtualization
-> > +point of view.
-> > +
-> > +This means that a guest booted on two different versions of KVM can
-> > +observe two different "firmware" revisions. This could cause issues if
-> > +a given guest is tied to a particular PSCI revision (unlikely), or if
-> > +a migration causes a different PSCI version to be exposed out of the
-> > +blue to an unsuspecting guest.
-> > +
-> > +In order to remedy this situation, KVM exposes a set of "firmware
-> > +pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
-> > +interface. These registers can be saved/restored by userspace, and set
-> > +to a convenient value if required.
-> > +
-> > +The following register is defined:
-> > +
-> > +* KVM_REG_ARM_PSCI_VERSION:
-> > +
-> > +  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
-> > +    (and thus has already been initialized)
-> > +  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
-> > +    highest PSCI version implemented by KVM and compatible with v0.2)
-> backwards compatible?
-> > +  - Allows any PSCI version implemented by KVM and compatible with
-> backwards compatible?
-> > +    v0.2 to be set with SET_ONE_REG
-> > +  - Affects the whole VM (even if the register view is per-vcpu)
-> > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > index ef54013b5b9f..6c05e3b13081 100644
-> > --- a/arch/arm/include/asm/kvm_host.h
-> > +++ b/arch/arm/include/asm/kvm_host.h
-> > @@ -75,6 +75,9 @@ struct kvm_arch {
-> >  	/* Interrupt controller */
-> >  	struct vgic_dist	vgic;
-> >  	int max_vcpus;
-> > +
-> > +	/* Mandated version of PSCI */
-> > +	u32 psci_version;
-> >  };
-> >  
-> >  #define KVM_NR_MEM_OBJS     40
-> > diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> > index 6edd177bb1c7..47dfc99f5cd0 100644
-> > --- a/arch/arm/include/uapi/asm/kvm.h
-> > +++ b/arch/arm/include/uapi/asm/kvm.h
-> > @@ -186,6 +186,12 @@ struct kvm_arch_memory_slot {
-> >  #define KVM_REG_ARM_VFP_FPINST		0x1009
-> >  #define KVM_REG_ARM_VFP_FPINST2		0x100A
-> >  
-> > +/* KVM-as-firmware specific pseudo-registers */
-> > +#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-> > +#define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM | KVM_REG_SIZE_U64 | \
-> > +					 KVM_REG_ARM_FW | ((r) & 0xffff))
-> > +#define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-> 
-> #define KVM_ARM_VCPU_PSCI_0_2           2 /* CPU uses PSCI v0.2 */
-> Comment may deserve an upgrade too
+> Directly after rtl-reload seems best.  That's the first point at which
+> the frame size is final, and reload is one of the few rtl passes that
+> always runs.  Doing it there could also help with things like shrink
+> wrapping (part of rtl-pro_and_epilogue).
+Thanks a lot for your detailed answer. I'll follow your advice in the next
+version of the patch series.
 
-I'm not sure we want this. KVM_REG_PSCI_VERSION takes a PSCI version
-number, as indicated in the PSCI spec. You should use
-PSCI_VERSION(0,2), as defined in include/uapi/linux/psci.h.
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+Best regards,
+Alexander
