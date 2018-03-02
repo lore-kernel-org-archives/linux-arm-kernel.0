@@ -1,60 +1,123 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Sat, 3 Mar 2018 06:34:50 +0800
-Subject: [PATCH v3] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
- MT7623
-In-Reply-To: <20180302105719.GC27178@ulmo>
-References: <051f401bcca48ece188023ccf10b2cedc7a25a64.1519891948.git.sean.wang@mediatek.com>
- <20180302105719.GC27178@ulmo>
-Message-ID: <1520030090.8089.186.camel@mtkswgap22>
+Date: Sat, 3 Mar 2018 06:46:58 +0800
+Subject: [PATCH v1 13/19] arm: dts: mt7623: move node mt6323 leds to
+ mt6323.dtsi
+In-Reply-To: <20180302154050.lfxojro4woucl6lh@rob-hp-laptop>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+ <20180302154050.lfxojro4woucl6lh@rob-hp-laptop>
+Message-ID: <1520030818.8089.190.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-03-02 at 11:57 +0100, Thierry Reding wrote:
-> On Thu, Mar 01, 2018 at 04:19:12PM +0800, sean.wang at mediatek.com wrote:
+On Fri, 2018-03-02 at 09:40 -0600, Rob Herring wrote:
+> On Fri, Feb 23, 2018 at 06:16:33PM +0800, sean.wang at mediatek.com wrote:
 > > From: Sean Wang <sean.wang@mediatek.com>
 > > 
-> > Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
-> > control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
-> > programming on PWM hardware causes waveform cannot be output as expected.
-> > Thus, the patch adds the extra condition for fixing up the weird case to
-> > let PWM4 or PWM5 able to work on MT7623.
+> > Since those LEDs are parts of PMIC MT6323, it is reasonable to merge
+> > those LEDs node definition back into mt6323.dtsi. This way can improve
+> > the reusability of those nodes among different boards with the same PMIC.
 > > 
-> > v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
-> > v2 -> v3: add more tags for Reviewed-by, Fixes, and Cc stable
-> > 
-> > Cc: stable at vger.kernel.org
-> > Fixes: caf065f8fd58 ("pwm: Add MediaTek PWM support")
 > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > Cc: Zhi Mao <zhi.mao@mediatek.com>
-> > Cc: John Crispin <john@phrozen.org>
-> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
 > > ---
-> >  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
-> >  1 file changed, 21 insertions(+), 3 deletions(-)
+> >  arch/arm/boot/dts/mt6323.dtsi                 | 26 ++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 28 ---------------------------
+> >  2 files changed, 25 insertions(+), 29 deletions(-)
 > > 
-> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> [...]
-> > @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> >  		return -EINVAL;
-> >  	}
+> > diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
+> > index 7c783d6..44c5642 100644
+> > --- a/arch/arm/boot/dts/mt6323.dtsi
+> > +++ b/arch/arm/boot/dts/mt6323.dtsi
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * Copyright (c) 2017 MediaTek Inc.
+> > + * Copyright (c) 2017-2018 MediaTek Inc.
+> >   * Author: John Crispin <john@phrozen.org>
+> >   *	   Sean Wang <sean.wang@mediatek.com>
+> >   * This program is free software; you can redistribute it and/or modify
+> > @@ -237,5 +237,29 @@
+> >  				regulator-enable-ramp-delay = <216>;
+> >  			};
+> >  		};
+> > +
+> > +		leds {
+> > +			compatible = "mediatek,mt6323-led";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			led at 0 {
+> > +				reg = <0>;
+> > +				label = "mt6323:isink:green";
+> 
+> Changing the label potentially breaks userspace. And the fact that it is 
+> a green LED is very much board specific. So I think the old location was 
+> correct. You could put the parent node here and leave these child nodes 
+> in the board specific dts file.
+> 
+
+yes, I really made a mistake on breaking userspace with a label change.
+
+I will keep the parent node here and then leave these child nodes into
+board specific dts files. thanks for your idea!
+
+> 
+> > +				default-state = "off";
+> > +			};
+> > +
+> > +			led at 1 {
+> > +				reg = <1>;
+> > +				label = "mt6323:isink:red";
+> > +				default-state = "off";
+> > +			};
+> > +
+> > +			led at 2 {
+> > +				reg = <2>;
+> > +				label = "mt6323:isink:blue";
+> > +				default-state = "off";
+> > +			};
+> > +		};
+> >  	};
+> >  };
+> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> > index 75e61c4..767b225 100644
+> > --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> > @@ -483,34 +483,6 @@
+> >  	status = "okay";
+> >  };
 > >  
-> > +	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
-> > +		/*
-> > +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
-> > +		 * from the other PWMs on MT7623.
-> > +		 */
-> > +		reg_width = PWM45DWIDTH_FIXUP;
-> > +		reg_thres = PWM45THRES_FIXUP;
-> > +	}
-> 
-> I don't understand this. According to the condition above the above
-> would also use the PWM[4,5] "fixup" register offsets with PWM[3]. Should
-> the condition be pwm->hwpwm > 3?
-> 
-> Thierry
-
-
-PWM[4,5] are the naming specified in datasheet and kept it as is here
-and driver or userspace would use index 3 and 4 to have a reference to
-them respectively.
+> > -&pwrap {
+> > -	mt6323 {
+> > -		mt6323led: led {
+> > -			compatible = "mediatek,mt6323-led";
+> > -			#address-cells = <1>;
+> > -			#size-cells = <0>;
+> > -
+> > -			led at 0 {
+> > -				reg = <0>;
+> > -				label = "bpi-r2:isink:green";
+> > -				default-state = "off";
+> > -			};
+> > -
+> > -			led at 1 {
+> > -				reg = <1>;
+> > -				label = "bpi-r2:isink:red";
+> > -				default-state = "off";
+> > -			};
+> > -
+> > -			led at 2 {
+> > -				reg = <2>;
+> > -				label = "bpi-r2:isink:blue";
+> > -				default-state = "off";
+> > -			};
+> > -		};
+> > -	};
+> > -};
+> > -
+> >  &spi0 {
+> >  	pinctrl-names = "default";
+> >  	pinctrl-0 = <&spi0_pins_a>;
+> > -- 
+> > 2.7.4
+> > 
