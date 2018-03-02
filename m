@@ -1,29 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Mar 2018 09:51:56 +0100
-Subject: [PATCH v3 0/7] Initial Allwinner H6 support
-In-Reply-To: <20180223122552.58049-1-icenowy@aosc.io>
-References: <20180223122552.58049-1-icenowy@aosc.io>
-Message-ID: <CACRpkdYtTLV1R+LpPp8J8uGX9f7sFXOkPuH8du0zz_v=FZHMBw@mail.gmail.com>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Fri, 2 Mar 2018 00:55:03 -0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_SND_SOC_WM8962
+ explicitly
+In-Reply-To: <1519931336-9710-1-git-send-email-festevam@gmail.com>
+References: <1519931336-9710-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180302085502.GA9596@Asurada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 1:25 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Thu, Mar 01, 2018 at 04:08:56PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Currently CONFIG_SND_SOC_WM8962 is selected via SND_SOC_IMX_WM8962
+> machine driver option.
+> 
+> SND_SOC_IMX_WM8962 will be removed in the next kernel cycle, so
+> select the codec driver directly so that it can still be used
+> by default via the generic fsl-asoc-card machine driver.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-> This patchset adds initial support for the Allwinner H6 SoC.
->
-> It's quite different from earlier Allwinner SoCs. For example, the
-> memory map is refactored, and the CCU is rearranged. It's also the first
-> Allwinner SoC with PCI Express interface, and the second one with USB
-> 3.0 (the first one is A80).
->
-> This patchset adds the most basical support for it, including the main pin
-> controller, the main CCU and the basical device tree.
+Acked-by: Nicolin Chen <nicoleotsuka@gmail.com>
 
-It seems the pin control part is more or less finished, I will
-apply it after v4 if Maxime provides ACKs for it.
-
-Is it fine to merge the pinctrl drivers/* portions in isolation from the
-rest?
-
-Yours,
-Linus Walleij
+Btw, we may also do this to imx-sgtl5000? I don't have a board
+to verify it though..
