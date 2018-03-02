@@ -1,53 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 2 Mar 2018 16:14:44 +0000
-Subject: [PATCH 2/3] rpmsg: core: make rpmsg bus DMA capable
-In-Reply-To: <20180302145531.20463-3-srinivas.kandagatla@linaro.org>
-References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
- <20180302145531.20463-3-srinivas.kandagatla@linaro.org>
-Message-ID: <07503032-b08b-10ea-9d34-ddf85c682a9d@arm.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 2 Mar 2018 09:14:58 -0700
+Subject: [PATCH 03/14] iommu: Create a base struct for io_mm
+In-Reply-To: <fddafdae-4384-4826-ef63-9075e9866ae9@arm.com>
+References: <20180221225924.30737-1-jcrouse@codeaurora.org>
+ <20180221225924.30737-4-jcrouse@codeaurora.org>
+ <fddafdae-4384-4826-ef63-9075e9866ae9@arm.com>
+Message-ID: <20180302161458.GA22596@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Fri, Mar 02, 2018 at 12:25:48PM +0000, Jean-Philippe Brucker wrote:
+> Hi Jordan,
 > 
-> Many of the rpmsg clients like audio drivers need to allocate
-> dma memory. Make this bus DMA capable so that the child devices
-> can use dma apis.
-
-AFAICS after 15 minutes in the docs and code, the rpmsg "bus" is a 
-virtual one based around shared-memory mailbox communication, so I don't 
-really see how DMA exists in that context - I think maybe that 
-abstraction needs looking at.
-
-However, from grepping through the DTs it seems at first glance like the 
-non-trivial things under the "qcom,smd" bus mostly map to actual 
-platform devices via the "qcom,smd-edge" property - if those platform 
-devices are the physical DMA masters, they should be the ones used for 
-DMA API operations.
-
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->   drivers/rpmsg/rpmsg_core.c | 1 +
->   1 file changed, 1 insertion(+)
+> Thank you for this, SMMUv3 and virtio-iommu need these SVA patches as well.
 > 
-> diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
-> index e84c71f8d6ab..540a3f3567b8 100644
-> --- a/drivers/rpmsg/rpmsg_core.c
-> +++ b/drivers/rpmsg/rpmsg_core.c
-> @@ -472,6 +472,7 @@ struct bus_type rpmsg_bus = {
->   	.uevent		= rpmsg_uevent,
->   	.probe		= rpmsg_dev_probe,
->   	.remove		= rpmsg_dev_remove,
-> +	.force_dma	= true,
-
-Regardless of the above, would you really need to use this brute force 
-hack instead of just fixing the DTs? I'm struggling to find which 
-drivers might currently be relying on this :/
-
-Robin.
-
->   };
->   EXPORT_SYMBOL(rpmsg_bus);
->   
+> On 21/02/18 22:59, Jordan Crouse wrote:
+> [...]> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index e2c49e583d8d..e998389cf195 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -110,8 +110,17 @@ struct iommu_domain {
+> >  	struct list_head mm_list;
+> >  };
+> >  
+> > +enum iommu_io_type {
+> > +	IO_TYPE_MM,
+> > +};
+> > +
+> > +struct io_base {
+> > +	int type;
+> > +	int pasid;
+> > +};
 > 
+> "io_base" is a bit vague. I'm bad at naming so my opinion doesn't hold
+> much water, but I'd rather this be something like "io_mm_base". When I
+> initially toyed with the idea I intended to keep io_mm as parent structure
+> and have "private" and "shared" sub-structures. Even if private PASIDs
+> don't rely on the kernel mm subsystem, this structure would still
+> represent an I/O mm of sorts, with a pgd and pgtable info.
+
+I'm also bad at naming but I don't mind changing it. io_mm_base seems okay to me
+unless somebody has a better idea. I also like the terms "private" and
+"shared". I'm going to start adopting those where it makes sense.
+
+Jordan
+> 
+> > +
+> >  struct io_mm {
+> > -	int			pasid;
+> > +	struct io_base		base;
+> >  	struct list_head	devices;
+> >  	struct kref		kref;
+> >  #if defined(CONFIG_MMU_NOTIFIER)
+> > 
+> 
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
