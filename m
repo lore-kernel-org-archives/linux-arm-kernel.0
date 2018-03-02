@@ -1,76 +1,74 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 2 Mar 2018 14:15:05 +0530
-Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
-In-Reply-To: <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <20180227095028.GG21033@krava>
- <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
-Message-ID: <CAKTKpr4vDByhQ_16XT_+Uo4An3KF_UOB7CTYBrG7Miu0ujDaXA@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 2 Mar 2018 16:49:14 +0800
+Subject: [PATCH v1] pwm: mediatek: improve precision in rate calculation
+Message-ID: <72b74a30ced1c7e7549dcbb56d6123fc27fac405.1519980119.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+From: Sean Wang <sean.wang@mediatek.com>
 
-On Fri, Mar 2, 2018 at 1:54 PM, John Garry <john.garry@huawei.com> wrote:
-> On 27/02/2018 09:50, Jiri Olsa wrote:
->>
->> On Sat, Feb 24, 2018 at 12:05:21AM +0800, John Garry wrote:
->>>
->>> This patchset adds support for some perf events features,
->>> targeted at ARM64, implemented in a generic fashion.
->>>
->>> The two main features are as follows:
->>> - support for arch/vendor/platform pmu events directory structure
->>>    - to support this, topic subdirectory support needs to be dropped
->>> - support for parsing standard architecture pmu events
->>>
->>> On the back of these, the Cavium ThunderX2, ARM Cortex-A53,
->>> and HiSilicon hip08 JSONs are relocated/added/updated.
->>>
->>> In addition, there is a patch to drop mutli-mapfile.csv support and
->>> also a bugfix in jevents.c for an error code value.
->>>
->>> Differences to v1:
->>> - Address coding issues from Jiri Olsa in adding arch std event
->>>    support (https://lkml.org/lkml/2018/2/6/501)
->>> - add patch to drop topic subdirectory support
->>> - add patch for bug fix in json_events()
->>> - add review tags from Jiri Olsa
->>
->>
->> can't tell if those json file changes are ok, but for all the code
->> changes:
->>
->
-> Hi William, Ganapatrao,
->
-> Can you check the modifications to the ARM64 JSONs you originally submitted
-> in the patchset please?
+Add a way that turning resolution from in nanosecond into in picosecond
+to improve noticeably almost 4.5% precision.
 
-Sorry,  i have missed to notice. I will go through this series and
-share my feedback in couple of days.
+It's necessary to hold the new resolution with type u64 and thus related
+operations on u64 are applied instead in those rate calculations.
 
->
-> If they are not checked, I'll have to see if the maintainers will accept
-> without your review. If not, I'll have to drop them.
->
-> Thanks,
-> John
->
->> Acked-by: Jiri Olsa <jolsa@kernel.org>
->>
->> thanks,
->> jirka
->>
->> .
+And the patch has a dependency on [1].
 
-thanks
-Ganapat
->>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2018-March/012225.html
+
+Cc: stable at vger.kernel.org
+Fixes: caf065f8fd58 ("pwm: Add MediaTek PWM support")
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/pwm/pwm-mediatek.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+index 796baea..98b0a93 100644
+--- a/drivers/pwm/pwm-mediatek.c
++++ b/drivers/pwm/pwm-mediatek.c
+@@ -135,19 +135,25 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ {
+ 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+ 	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+-	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
++	u32 clkdiv = 0, cnt_period, cnt_duty, reg_width = PWMDWIDTH,
+ 	    reg_thres = PWMTHRES;
++	u64 resolution;
+ 	int ret;
+ 
+ 	ret = mtk_pwm_clk_enable(chip, pwm);
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	resolution = NSEC_PER_SEC / clk_get_rate(clk);
++	/* Using resolution in picosecond gets accuracy higher */
++	resolution = (u64)NSEC_PER_SEC * 1000;
++	do_div(resolution, clk_get_rate(clk));
+ 
+-	while (period_ns / resolution > 8191) {
++	cnt_period = DIV_ROUND_CLOSEST_ULL((u64)period_ns * 1000, resolution);
++	while (cnt_period > 8191) {
+ 		resolution *= 2;
+ 		clkdiv++;
++		cnt_period = DIV_ROUND_CLOSEST_ULL((u64)period_ns * 1000,
++						   resolution);
+ 	}
+ 
+ 	if (clkdiv > PWM_CLK_DIV_MAX) {
+@@ -165,9 +171,10 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		reg_thres = PWM45THRES_FIXUP;
+ 	}
+ 
++	cnt_duty = DIV_ROUND_CLOSEST_ULL((u64)duty_ns * 1000, resolution);
+ 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+-	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
+-	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, cnt_period);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, cnt_duty);
+ 
+ 	mtk_pwm_clk_disable(chip, pwm);
+ 
+-- 
+2.7.4
