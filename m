@@ -1,114 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 2 Mar 2018 14:15:35 +0100
-Subject: [PATCH 2/3] soc: rockchip: power-domain: Use
- of_clk_get_parent_count() instead of open coding
-In-Reply-To: <CAEG3pNCioW_FVXj3-j4KC_yO6ZYGXQB_eanHWSb9NUE9kYsWag@mail.gmail.com>
-References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
- <1516375101-29836-3-git-send-email-geert+renesas@glider.be>
- <11171053.oOJPuGlHoK@phil>
- <CAEG3pNCioW_FVXj3-j4KC_yO6ZYGXQB_eanHWSb9NUE9kYsWag@mail.gmail.com>
-Message-ID: <CAMuHMdVsb+5T-DYfF9v6ANhVxhRk6_r+XPA34mW7Q=90HnitAA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Mar 2018 13:15:46 +0000
+Subject: [PATCH] arm64: kdump: fix interrupt handling done during
+ machine_crash_shutdown
+In-Reply-To: <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
+References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
+ <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+ <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
+ <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
+ <20180302120556.xujh3hoy44y7ouz7@lakrids.cambridge.arm.com>
+ <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
+Message-ID: <20180302131545.q2vf6uc3yofofqdb@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri, Mar 02, 2018 at 01:59:27PM +0100, Grzegorz Jaszczyk wrote:
+> 2018-03-02 13:05 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+> > Do you have a way to reproduce the problem?
+> >
+> > Is there an easy way to cause the watchdog to trigger a kdump as above,
+> > e.g. via LKDTM?
+> 
+> You can reproduce this problem by:
+> - enabling CONFIG_ARM_SBSA_WATCHDOG in your kernel
+> - passing via command-line: sbsa_gwdt.action=1 sbsa_gwdt.timeout=170
+> - then load/prepare crasdump kernel (I am doing it via kexec tool)
+> - echo 1 > /dev/watchdog
+> 
+> and after 170s the watchdog interrupt will hit triggering panic and
+> the whole kexec machinery will run. The sbsa_gwdt.timeout can't be too
+> small since it is also used for reset:
+> |----timeout-----(panic)----timeout-----reset.
+> If it is too small the crasdump kernel will not have enough time to start.
+> 
+> It is also reproducible with different interrupts, e.g. for test I put
+> the panic to i2c interrupt handler and it was behaving the same.
 
-On Sun, Feb 18, 2018 at 8:09 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> On Sat, Feb 10, 2018 at 8:35 AM, Heiko Stuebner <heiko@sntech.de> wrote:
->> Am Freitag, 19. Januar 2018, 16:18:20 CET schrieb Geert Uytterhoeven:
->>> As of_clk_get_parent_count() returns zero on failure, while
->>> of_count_phandle_with_args() might return a negative error code, this
->>> also fixes the issue of possibly using a negative number in the
->>> allocation below.
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>> ---
->>>  drivers/soc/rockchip/pm_domains.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
->>> index 5c342167b9db7a16..9936038d38771784 100644
->>> --- a/drivers/soc/rockchip/pm_domains.c
->>> +++ b/drivers/soc/rockchip/pm_domains.c
->>> @@ -16,6 +16,7 @@
->>>  #include <linux/of_address.h>
->>>  #include <linux/of_platform.h>
->>>  #include <linux/clk.h>
->>> +#include <linux/clk-provider.h>
->>
->> not wanting to be to nitpicky, but clk-provider.h seems that it should be
->> used from drivers exposing clocks to the system, not from clock users.
->>
->> I just remember that in the past clk maintainers tried to keep their
->> layering intact, so I've included them for clarification.
->>
->> Mike, Stephen: the power-domain driver of Rockchip socs needs
->> to toggle all clocks of domain peripherals when turning a domain
->> on or off, so has a variable list of clocks in the clocks property in dt.
->> Hence the of_count_... call which could be replaced with
->> of_clk_get_parent_count to not open-code this.
->
-> Moving of_clk_get_parent_count to clk.h seems reasonable to me. It's
-> more of an of-specific helper than a provider-specific helper.
->
-> Anyone up to submit a patch so that this one doesn't need to include
-> clk-provider.h?
+Do you see this for a panic() in *any* interrupt handler?
 
-I gave it a try.
-Just moving of_clk_get_parent_count() from clk-provider.h to clk.h causes
-breakage, as half of the clock providers using of_clk_get_parent_count()
-do not include <linux/clk.h>:
+Can you trigger the issue with magic-sysrq c, for example?
 
-    drivers/clk/at91/clk-generated.c
-    drivers/clk/at91/clk-main.c
-    drivers/clk/at91/clk-master.c
-    drivers/clk/at91/clk-programmable.c
-    drivers/clk/at91/clk-slow.c
-    drivers/clk/at91/clk-smd.c
-    drivers/clk/at91/clk-usb.c
-    drivers/clk/at91/sckc.c
-    drivers/clk/clk-axi-clkgen.c
-    drivers/clk/clk-gpio.c
-    drivers/clk/clk-hsdk-pll.c
-    drivers/clk/h8300/clk-div.c
-    drivers/clk/h8300/clk-h8s2678.c
-    drivers/clk/renesas/clk-div6.c
-    drivers/clk/ti/composite.c
-    drivers/clk/ti/gate.c
-    drivers/clk/ti/mux.c
+> > I think you just mean GICv2 here. GICv2m is an MSI controller, and
+> > shouldn't interact with the SBSA watchdog's SPI.
+> 
+> Yes of course, I just wanted to mention that it has MSI controller.
 
-So our options are:
-  1. Add #include <linux/clk.h> to each of the above,
-  2. Add #include <linux/clk.h> to <linux/clk-provider.h>,
-  3. Do nothing, i.e. users of of_clk_get_parent_count () need to
-      #include <linux/clk-provider.h>, cfr. this patch series.
+Can you please tell us which platform you're seeing this on?
 
-Any preference? Any option I'm missing?
-
-Thanks!
-
->>>  #include <linux/regmap.h>
->>>  #include <linux/mfd/syscon.h>
->>>  #include <dt-bindings/power/rk3288-power.h>
->>> @@ -391,7 +392,7 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
->>>               return -EINVAL;
->>>       }
->>>
->>> -     clk_cnt = of_count_phandle_with_args(node, "clocks", "#clock-cells");
->>> +     clk_cnt = of_clk_get_parent_count(node);
->>>       pd = devm_kzalloc(pmu->dev,
->>>                         sizeof(*pd) + clk_cnt * sizeof(pd->clks[0]),
->>>                         GFP_KERNEL);
->>>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Mark.
