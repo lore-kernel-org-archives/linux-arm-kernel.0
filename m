@@ -1,35 +1,27 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  2 Mar 2018 15:04:47 +0100
-Subject: [PATCH v2] ARM: socfpga: PM: Drop useless check for PM_SUSPEND_STANDBY
-Message-ID: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 2 Mar 2018 14:58:54 +0100
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302125907.GA9418@n2100.armlinux.org.uk>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302111931.GX9418@n2100.armlinux.org.uk>
+ <20180302124647.sfhnto77wgdh5sv6@katana>
+ <20180302125907.GA9418@n2100.armlinux.org.uk>
+Message-ID: <20180302135854.76ue5jzsg7lvxjxw@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As SoCFPGA uses the standard suspend_valid_only_mem() for its
-platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
-callback will never be called with state equal to PM_SUSPEND_STANDBY.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Dinh Nguyen <dinguyen@kernel.org>
----
-v2:
-  - Add Acked-by.
----
- arch/arm/mach-socfpga/pm.c | 1 -
- 1 file changed, 1 deletion(-)
+> It needs platform maintainers to be motivated to fix it, and one way to
+> provide that motivation is for subsystem maintainers to say no to patches
+> like this.  If patches like this get accepted, then the "problem" gets
+> solved, and there is very little motivation to fix the platform itself.
 
-diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
-index c378ab0c24317ccf..d4866788702cb87a 100644
---- a/arch/arm/mach-socfpga/pm.c
-+++ b/arch/arm/mach-socfpga/pm.c
-@@ -116,7 +116,6 @@ static int socfpga_pm_suspend(unsigned long arg)
- static int socfpga_pm_enter(suspend_state_t state)
- {
- 	switch (state) {
--	case PM_SUSPEND_STANDBY:
- 	case PM_SUSPEND_MEM:
- 		outer_disable();
- 		cpu_suspend(0, socfpga_pm_suspend);
--- 
-2.7.4
+Yes, I can see this. I will drop / revert the patch.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/d2724e24/attachment-0001.sig>
