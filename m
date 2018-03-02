@@ -1,125 +1,41 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 2 Mar 2018 10:11:06 +0100
-Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <1519942514-3350-1-git-send-email-fkan@apm.com>
-References: <1519942514-3350-1-git-send-email-fkan@apm.com>
-Message-ID: <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  2 Mar 2018 10:14:26 +0100
+Subject: [PATCH v3] bridge: Elaborate a bit on dumb VGA bridges in Kconfig
+Message-ID: <20180302091426.8463-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Greg]
+It's better if we explain a bit that this pertains to
+non-programmable VGA DAC bridges.
 
-On Thu, Mar 1, 2018 at 11:15 PM, Feng Kan <fkan@apm.com> wrote:
-> When bridge and its endpoint is enumerated the devices are added to the
-> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> This causes the bridge to be moved to the end of the dpm list when
-> deferred probe kicks in. The order of the dpm list for bridge and
-> endpoint is reversed.
->
-> Add reordering code to move the bridge and its children and consumers to
-> the end of the pm list so the order for suspend and resume is not altered.
-> The code also move device and its children and consumers to the tail of
-> device_kset list if it is registered.
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Fix wording and commit message.
+- Collect Laurent's review tag.
+ChangeLog v1->v2:
+- Write that these bridges are non-programmable rather than
+  discrete, as that reflects the name of the bridge being
+  "dumb". Discrete is wrong as it has a specific electronic
+  meaning, as in "non-integrated" and this is integrated.
+---
+ drivers/gpu/drm/bridge/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I assume that this has been tested and works as expected.
-
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Toan Le <toanle@apm.com>
-> ---
->  V2:
->         1. change patch title from "move device and its children..."
->         2. move define based on Bjorn's comment
->         3. rename function name and comment content
->  drivers/base/base.h |  3 +++
->  drivers/base/core.c | 22 ++++++++++++++++++++++
->  drivers/base/dd.c   |  8 ++++----
->  3 files changed, 29 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index d800de6..a75c302 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
->  extern void device_links_no_driver(struct device *dev);
->  extern bool device_links_busy(struct device *dev);
->  extern void device_links_unbind_consumers(struct device *dev);
-> +
-> +/* device pm support */
-> +void device_pm_move_to_tail(struct device *dev);
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 110230d..0a0756b 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
->  }
->
->  /**
-> + * device_pm_move_to_tail - move device and its children and consumers to end of
-> + *                          pm and device kset list
-
-This has to be one line.  Maybe something like "Move set of devices to
-the end of device lists" and then describe how it works below.
-
-> + * @dev: current device pointer
-> + *
-> + * This is a lock held version of the device_reorder_to_tail.
-
-I'd say "This is a device_reorder_to_tail() wrapper taking the
-requisite locks." and put an empty comment line after that.
-
-> +  Function checks
-
-"It checks"
-
-> + * if the device is registered and moves it to the end of device_kset list. Also
-> + * if the device is pm initialized, move the device to the end of the pm list.
-> + * Then the function iterate through the children and device link consumers to
-> + * do the same for each found.
-
-But generally I'd say "It moves the device along with all of its
-children and all of its consumers to the ends of the device_kset and
-dpm_list lists, recursively".
-
-> + */
-> +void device_pm_move_to_tail(struct device *dev)
-> +{
-> +       int idx;
-> +
-> +       idx = device_links_read_lock();
-> +       device_pm_lock();
-> +       device_reorder_to_tail(dev, NULL);
-> +       device_pm_unlock();
-> +       device_links_read_unlock(idx);
-> +}
-> +
-> +/**
->   * device_link_add - Create a link between two devices.
->   * @consumer: Consumer end of the link.
->   * @supplier: Supplier end of the link.
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 2c964f5..7e9d1ef 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
->                  * Force the device to the end of the dpm_list since
->                  * the PM code assumes that the order we add things to
->                  * the list is a good order for suspend but deferred
-> -                * probe makes that very unsafe.
-> +                * probe makes that very unsafe. Move any children and
-> +                * consumers belong to the device to the end of the list.
-> +                * This way the suspend resume order won't be corrupted.
-
-Why do you need to change this comment?
-
->                  */
-> -               device_pm_lock();
-> -               device_pm_move_last(dev);
-> -               device_pm_unlock();
-> +               device_pm_move_to_tail(dev);
->
->                 dev_dbg(dev, "Retrying from deferred list\n");
->                 if (initcall_debug && !initcalls_done)
-> --
-> 1.8.3.1
->
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 3b99d5a06c16..3aa65bdecb0e 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -30,7 +30,8 @@ config DRM_DUMB_VGA_DAC
+ 	depends on OF
+ 	select DRM_KMS_HELPER
+ 	help
+-	  Support for RGB to VGA DAC based bridges
++	  Support for non-programmable RGB to VGA DAC bridges, such as ADI
++	  ADV7123, TI THS8134 and THS8135 or passive resistor ladder DACs.
+ 
+ config DRM_LVDS_ENCODER
+ 	tristate "Transparent parallel to LVDS encoder support"
+-- 
+2.14.3
