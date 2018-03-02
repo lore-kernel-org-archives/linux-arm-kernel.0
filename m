@@ -1,100 +1,77 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 2 Mar 2018 18:39:41 +0100
-Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <1519071723-31790-11-git-send-email-david@lechnology.com>
- <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
- <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
- <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
- <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
-Message-ID: <CAMRc=Mc=QFizXRDS7=_v6K9Z7c7dSBZdLbW9zCR01LFSk08MEg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 2 Mar 2018 17:54:51 +0000
+Subject: [PATCH v3 05/25] ASoC: qcom: qdsp6: Add support to Q6AFE
+In-Reply-To: <66d37327-b8ea-0da5-3e05-435cec5d84ab@linaro.org>
+References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
+ <20180213165837.1620-6-srinivas.kandagatla@linaro.org>
+ <20180301205940.GR12864@sirena.org.uk>
+ <66d37327-b8ea-0da5-3e05-435cec5d84ab@linaro.org>
+Message-ID: <20180302175451.GB3482@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-01 17:44 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 03/01/2018 02:36 AM, Bartosz Golaszewski wrote:
->>
->> 2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
->>>
->>> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
->>>>
->>>>
->>>>
->>>> I think I found the reason for the strange crashes we were
->>>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
->>>> me in the right direction.
->>>>
->>>> The mdio driver fails to probe with v7 due to the supplied clock rate
->>>> being wrong. Before failing we register the emac clock with
->>>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
->>>> reference count of the clock, but we never actually increased it in
->>>> the first place in the line above. The core clock code then destroys
->>>> the associated clk_core structure. When the next user comes around (in
->>>> our case the clk debug functions) the system crashes.
->>>>
->>>> I believe there to be two issues: one is with v7 - we need to increase
->>>> the clock reference count in davinci_psc_genpd_attach_dev().
->>>>
->>>> Second is the error path in the clock framework - we should remove the
->>>> destroyed clk_core from the debug list, which is not being done now.
->>>>
->>>> Why we even need to track the refcount of clk_core is a mistery for me
->>>> though. Stephen, Mike?
->>>>
->>>> Best regards,
->>>> Bartosz Golaszewski
->>>
->>>
->>>
->>> Great find. I figured it had to be something like this, but I wasn't
->>> able to reproduce the problem yet.
->>>
->>> I suppose it is time to spin up a v8 with some fixes.
->>
->>
->> I still don't know why the mdio clock rate is much lower than in
->> mainline though. Any ideas?
->>
->> Thanks,
->> Bart
->>
->
-> Now that you have fixed the crash, can you answer the questions I have
-> asked earlier?
->
->> Can you post the output of this command so that I can see how your
->
-> clocks are setup:
->
-> cat /sys/kernel/debug/clk/clk_summary
->
->> Using your workaround, can you run:
->
->
-> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->
-> If you see:
->   1e27000.clock-controller: emac  off-0
->
-> then genpd is not working like it is supposed to. You should see something
-> like this for device that are working:
->           1e27000.clock-controller: uart2  on
->     /devices/platform/soc at 1c00000/1d0d000.serial        active
+On Fri, Mar 02, 2018 at 01:13:17PM +0000, Srinivas Kandagatla wrote:
+> On 01/03/18 20:59, Mark Brown wrote:
+> > On Tue, Feb 13, 2018 at 04:58:17PM +0000, srinivas.kandagatla at linaro.org wrote:
 
-I used of_clk_get() in the genpd attach callback so the crash no
-longer happens, but I still can't boot it over NFS due to mdio
-failing. Do you have any idea why the clock rate differs between v7
-and mainline?
+> > > +static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+> > > +	[AFE_PORT_HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX,
+> > > +				AFE_PORT_HDMI_RX, 1, 1},
+> > > +};
 
->From the logs I can see that genpd domains are correctly registered,
-and the provider is added (you should probably skip setting up the
-domains in legacy mode though), the pm clocks are enabled (after being
-disabled by mdio after its failed probe()) but the boot process gets
-stuck after the kernel gets an IP address over DHCP (which is strange
-because apparently it had some kind of network connection).
+> > Is this not device specific in any way?  It looks likely to be.
 
-On Monday I'll prepare a small ramfs and boot over tftp only and see from there.
+> It is specific to Audio firmware build.
+> AFAIK, DSP port IDs are consistent across a given range of AVS firmware
+> builds. So far I have seen them not change in any of the B family SoCs.
+> However on older A family SOCs these are very different numbers. Which is
+> where ADSP version info would help select correct map.
 
-Best regards,
-Bartosz
+Can we have some documentation of this in the code please?
+
+> > > +static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
+> > > +{
+> > > +	struct q6afe_port *p = NULL;
+> > > +
+> > > +	spin_lock(&afe->port_list_lock);
+> > > +	list_for_each_entry(p, &afe->port_list, node)
+> > > +		if (p->token == token)
+> > > +			break;
+> > > +
+> > > +	spin_unlock(&afe->port_list_lock);
+
+> > Why do we need to lock the port list, what are we protecting it against?
+
+> This is just to protect the list from anyone deleting this.
+
+> Its very rare but the use case could be somelike the adsp is up and we are
+> in the middle of finding a port and then adsp went down or crashed we would
+> delete an entry in the list.
+
+If that's what we're protecting against then this also needs to do
+something to ensure that the port we looked up doesn't get deallocated
+before or while we look at it.
+
+> > > +int q6afe_port_start(struct q6afe_port *port)
+> > > +{
+> > > +	return afe_port_start(port, &port->port_cfg);
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(q6afe_port_start);
+
+> > This is the third level of wrapper for the port start command in this
+> > file.  Do we *really* need all these wrappers?
+
+> Intention here is that we have plans to support different version of ADSP,
+> on A family this command is different, so having this wrapper would help
+> tackle this use-case.
+
+Why not just take out the level of wrapper for now then add it in when
+there's actually an abstraction in there?  The code might end up looking
+different anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/16cd367c/attachment.sig>
