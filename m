@@ -1,34 +1,35 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  2 Mar 2018 15:02:45 +0100
-Subject: [PATCH resend] ARM: dts: atlas7: Use generic uart-has-rtscts DT
- property
-Message-ID: <1519999365-15201-1-git-send-email-geert+renesas@glider.be>
+Date: Fri,  2 Mar 2018 15:04:47 +0100
+Subject: [PATCH v2] ARM: socfpga: PM: Drop useless check for PM_SUSPEND_STANDBY
+Message-ID: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit 7f60830ab1511d94 ("serial: sirf: Use generic
-uart-has-rtscts DT property property"), the SiRF UART driver recognizes
-the generic "uart-has-rtscts" DT property, deprecating the
-vendor-specific "sirf,uart-has-rtscts" DT property. Hence replace the
-latter by the former in all DTS files.
+As SoCFPGA uses the standard suspend_valid_only_mem() for its
+platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
+callback will never be called with state equal to PM_SUSPEND_STANDBY.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Dinh Nguyen <dinguyen@kernel.org>
 ---
- arch/arm/boot/dts/atlas7-evb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v2:
+  - Add Acked-by.
+---
+ arch/arm/mach-socfpga/pm.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/atlas7-evb.dts b/arch/arm/boot/dts/atlas7-evb.dts
-index 1e9cd1a8508e17c2..900e03b7a7b21011 100644
---- a/arch/arm/boot/dts/atlas7-evb.dts
-+++ b/arch/arm/boot/dts/atlas7-evb.dts
-@@ -73,7 +73,7 @@
- 		btm {
- 			uart6: uart at 11000000 {
- 				status = "okay";
--				sirf,uart-has-rtscts;
-+				uart-has-rtscts;
- 			};
- 		};
- 
+diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
+index c378ab0c24317ccf..d4866788702cb87a 100644
+--- a/arch/arm/mach-socfpga/pm.c
++++ b/arch/arm/mach-socfpga/pm.c
+@@ -116,7 +116,6 @@ static int socfpga_pm_suspend(unsigned long arg)
+ static int socfpga_pm_enter(suspend_state_t state)
+ {
+ 	switch (state) {
+-	case PM_SUSPEND_STANDBY:
+ 	case PM_SUSPEND_MEM:
+ 		outer_disable();
+ 		cpu_suspend(0, socfpga_pm_suspend);
 -- 
 2.7.4
