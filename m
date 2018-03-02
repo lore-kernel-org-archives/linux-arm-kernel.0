@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:28 +0100
-Subject: [PATCH 20/52] mtd: rawnand: hisi504: convert driver to nand_scan()
+Date: Fri,  2 Mar 2018 18:03:25 +0100
+Subject: [PATCH 17/52] mtd: rawnand: fsmc: convert driver to nand_scan()
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-21-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-18-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,105 +14,182 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/hisi504_nand.c | 74 ++++++++++++++++++++-----------------
- 1 file changed, 40 insertions(+), 34 deletions(-)
+ drivers/mtd/nand/raw/fsmc_nand.c | 148 ++++++++++++++++++++-------------------
+ 1 file changed, 76 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/hisi504_nand.c b/drivers/mtd/nand/raw/hisi504_nand.c
-index 3c64a6281b54..94d02539d150 100644
---- a/drivers/mtd/nand/raw/hisi504_nand.c
-+++ b/drivers/mtd/nand/raw/hisi504_nand.c
-@@ -709,9 +709,46 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
+diff --git a/drivers/mtd/nand/raw/fsmc_nand.c b/drivers/mtd/nand/raw/fsmc_nand.c
+index 1bf73d4d4c0d..8e0c27f9961b 100644
+--- a/drivers/mtd/nand/raw/fsmc_nand.c
++++ b/drivers/mtd/nand/raw/fsmc_nand.c
+@@ -918,6 +918,78 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
  	return 0;
  }
  
-+static int hisi_nfc_attach_chip(struct nand_chip *chip)
++static int fsmc_nand_attach_chip(struct nand_chip *nand)
 +{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct hinfc_host *host = nand_get_controller_data(chip);
-+	int flag;
++	struct mtd_info *mtd = nand_to_mtd(nand);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
 +
-+	host->buffer = dmam_alloc_coherent(host->dev,
-+					   mtd->writesize + mtd->oobsize,
-+					   &host->dma_buffer, GFP_KERNEL);
-+	if (!host->buffer)
-+		return -ENOMEM;
++	if (AMBA_REV_BITS(host->pid) >= 8) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++		case 224:
++		case 256:
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
 +
-+	host->dma_oob = host->dma_buffer + mtd->writesize;
-+	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
++		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
 +
-+	flag = hinfc_read(host, HINFC504_CON);
-+	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-+	switch (mtd->writesize) {
-+	case 2048:
-+		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT);
-+		break;
-+	/*
-+	 * TODO: add more pagesize support,
-+	 * default pagesize has been set in hisi_nfc_host_init
-+	 */
-+	default:
-+		dev_err(host->dev, "NON-2KB page size nand flash\n");
-+		return -EINVAL;
++		return 0;
 +	}
-+	hinfc_write(host, flag, HINFC504_CON);
 +
-+	if (chip->ecc.mode == NAND_ECC_HW)
-+		hisi_nfc_ecc_probe(host);
++	switch (nand->ecc.mode) {
++	case NAND_ECC_HW:
++		dev_info(host->dev, "Using 1-bit HW ECC scheme\n");
++		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
++		nand->ecc.correct = nand_correct_data;
++		nand->ecc.bytes = 3;
++		nand->ecc.strength = 1;
++		break;
++
++	case NAND_ECC_SOFT:
++		if (nand->ecc.algo == NAND_ECC_BCH) {
++			dev_info(host->dev,
++				 "Using 4-bit SW BCH ECC scheme\n");
++			break;
++		}
++
++	case NAND_ECC_ON_DIE:
++		break;
++
++	default:
++		dev_err(host->dev, "Unsupported ECC mode!\n");
++		return -ENOTSUPP;
++	}
++
++	/*
++	 * Don't set layout for BCH4 SW ECC. This will be
++	 * generated later in nand_bch_init() later.
++	 */
++	if (nand->ecc.mode == NAND_ECC_HW) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++			mtd_set_ooblayout(mtd,
++					  &fsmc_ecc1_ooblayout_ops);
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
++	}
 +
 +	return 0;
 +}
 +
- static int hisi_nfc_probe(struct platform_device *pdev)
- {
--	int ret = 0, irq, flag, max_chips = HINFC504_MAX_CHIP;
-+	int ret = 0, irq, max_chips = HINFC504_MAX_CHIP;
- 	struct device *dev = &pdev->dev;
- 	struct hinfc_host *host;
- 	struct nand_chip  *chip;
-@@ -769,42 +806,11 @@ static int hisi_nfc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = nand_scan_ident(mtd, max_chips, NULL);
-+	chip->ecc.attach_chip = hisi_nfc_attach_chip;
-+	ret = nand_scan(mtd, max_chips);
- 	if (ret)
- 		return ret;
- 
--	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
--		&host->dma_buffer, GFP_KERNEL);
--	if (!host->buffer)
--		return -ENOMEM;
--
--	host->dma_oob = host->dma_buffer + mtd->writesize;
--	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
--
--	flag = hinfc_read(host, HINFC504_CON);
--	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
--	switch (mtd->writesize) {
--	case 2048:
--		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
--	/*
--	 * TODO: add more pagesize support,
--	 * default pagesize has been set in hisi_nfc_host_init
--	 */
--	default:
--		dev_err(dev, "NON-2KB page size nand flash\n");
--		return -EINVAL;
--	}
--	hinfc_write(host, flag, HINFC504_CON);
--
--	if (chip->ecc.mode == NAND_ECC_HW)
--		hisi_nfc_ecc_probe(host);
--
--	ret = nand_scan_tail(mtd);
+ /*
+  * fsmc_nand_probe - Probe function
+  * @pdev:       platform device structure
+@@ -1047,78 +1119,10 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Scan to find existence of the device
+ 	 */
+-	ret = nand_scan_ident(mtd, 1, NULL);
 -	if (ret) {
--		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
--		return ret;
+-		dev_err(&pdev->dev, "No NAND Device found!\n");
+-		goto err_scan_ident;
 -	}
 -
+-	if (AMBA_REV_BITS(host->pid) >= 8) {
+-		switch (mtd->oobsize) {
+-		case 16:
+-		case 64:
+-		case 128:
+-		case 224:
+-		case 256:
+-			break;
+-		default:
+-			dev_warn(&pdev->dev, "No oob scheme defined for oobsize %d\n",
+-				 mtd->oobsize);
+-			ret = -EINVAL;
+-			goto err_probe;
+-		}
+-
+-		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
+-	} else {
+-		switch (nand->ecc.mode) {
+-		case NAND_ECC_HW:
+-			dev_info(&pdev->dev, "Using 1-bit HW ECC scheme\n");
+-			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+-			nand->ecc.correct = nand_correct_data;
+-			nand->ecc.bytes = 3;
+-			nand->ecc.strength = 1;
+-			break;
+-
+-		case NAND_ECC_SOFT:
+-			if (nand->ecc.algo == NAND_ECC_BCH) {
+-				dev_info(&pdev->dev, "Using 4-bit SW BCH ECC scheme\n");
+-				break;
+-			}
+-
+-		case NAND_ECC_ON_DIE:
+-			break;
+-
+-		default:
+-			dev_err(&pdev->dev, "Unsupported ECC mode!\n");
+-			goto err_probe;
+-		}
+-
+-		/*
+-		 * Don't set layout for BCH4 SW ECC. This will be
+-		 * generated later in nand_bch_init() later.
+-		 */
+-		if (nand->ecc.mode == NAND_ECC_HW) {
+-			switch (mtd->oobsize) {
+-			case 16:
+-			case 64:
+-			case 128:
+-				mtd_set_ooblayout(mtd,
+-						  &fsmc_ecc1_ooblayout_ops);
+-				break;
+-			default:
+-				dev_warn(&pdev->dev,
+-					 "No oob scheme defined for oobsize %d\n",
+-					 mtd->oobsize);
+-				ret = -EINVAL;
+-				goto err_probe;
+-			}
+-		}
+-	}
+-
+-	/* Second stage of scan to fill MTD data-structures */
+-	ret = nand_scan_tail(mtd);
++	nand->ecc.attach_chip = fsmc_nand_attach_chip;
++	ret = nand_scan(mtd, 1);
+ 	if (ret)
+-		goto err_probe;
++		goto err_scan;
+ 
+ 	mtd->name = "nand";
  	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret) {
- 		dev_err(dev, "Err MTD partition=%d\n", ret);
+@@ -1132,7 +1136,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 
+ err_release_nand:
+ 	nand_release(mtd);
+-err_probe:
++err_scan:
+ 	if (host->mode == USE_DMA_ACCESS)
+ 		dma_release_channel(host->write_dma_chan);
+ err_req_write_chnl:
 -- 
 2.14.1
