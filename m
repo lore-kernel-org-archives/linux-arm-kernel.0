@@ -1,220 +1,172 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  2 Mar 2018 20:04:33 +0100
-Subject: [PATCH v3 7/8] arm64: zynqmp: Add support for Xilinx zc12XX boards
-In-Reply-To: <cover.1520017397.git.michal.simek@xilinx.com>
-References: <cover.1520017397.git.michal.simek@xilinx.com>
-Message-ID: <7a1bf88c742150f93cf5b3df4ffa5d6fe3a3f862.1520017397.git.michal.simek@xilinx.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 2 Mar 2018 20:16:27 +0100
+Subject: [PATCH v2 2/5] arm: zynq: Add support for Xilinx zc770 xm010 dc1
+ board
+In-Reply-To: <20180302185006.yciyjcchsx4aa7lu@rob-hp-laptop>
+References: <cover.1519398009.git.michal.simek@xilinx.com>
+ <f049c5121edab27227337ccd607db4f38f8d76f3.1519398009.git.michal.simek@xilinx.com>
+ <20180302185006.yciyjcchsx4aa7lu@rob-hp-laptop>
+Message-ID: <1ec3a67e-92b3-0453-44a2-24b23ffc9ac2@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These 3 boards requires minimal support to get Linux up and running.
+On 2.3.2018 19:50, Rob Herring wrote:
+> On Fri, Feb 23, 2018 at 04:00:20PM +0100, Michal Simek wrote:
+>> zc770 is based board which is extended by FMC/DC cards for SoC
+>> validation. FMCs/DCs are supposed to cover all SoC configurations.
+>> FMC/DC contains ethernet port, can, i2c, sd, qspi, spi, uart and usb.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>> Changes in v2:
+>> - Record compatible string to xilinx.txt
+>>
+>>  Documentation/devicetree/bindings/arm/xilinx.txt |  3 +
+>>  arch/arm/boot/dts/Makefile                       |  1 +
+>>  arch/arm/boot/dts/zynq-zc770-xm010.dts           | 92 ++++++++++++++++++++++++
+>>  3 files changed, 96 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/zynq-zc770-xm010.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+>> index 425c74fcc560..019e69037d42 100644
+>> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
+>> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+>> @@ -11,6 +11,9 @@ Additional compatible strings:
+>>  - Xilinx internal board cc108
+>>    "xlnx,zynq-cc108"
+>>  
+>> +- Xilinx internal board zc770 with different FMC cards
+>> +  "xlnx,zynq-zc770-xm010"
+>> +
+>>  ---------------------------------------------------------------
+>>  
+>>  Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index c6810e84d4d7..be9ffae2a1ec 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -1067,6 +1067,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+>>  	zynq-parallella.dtb \
+>>  	zynq-zc702.dtb \
+>>  	zynq-zc706.dtb \
+>> +	zynq-zc770-xm010.dtb \
+>>  	zynq-zed.dtb \
+>>  	zynq-zybo.dtb
+>>  dtb-$(CONFIG_MACH_ARMADA_370) += \
+>> diff --git a/arch/arm/boot/dts/zynq-zc770-xm010.dts b/arch/arm/boot/dts/zynq-zc770-xm010.dts
+>> new file mode 100644
+>> index 000000000000..b1cfb4ede434
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/zynq-zc770-xm010.dts
+>> @@ -0,0 +1,92 @@
+>> +// SPDX-License-Identifier: GPL-2.0+
+>> +/*
+>> + * Xilinx ZC770 XM010 board DTS
+>> + *
+>> + * Copyright (C) 2013-2018 Xilinx, Inc.
+>> + */
+>> +/dts-v1/;
+>> +#include "zynq-7000.dtsi"
+>> +
+>> +/ {
+>> +	compatible = "xlnx,zynq-zc770-xm010", "xlnx,zynq-7000";
+>> +	model = "Xilinx Zynq";
+>> +
+>> +	aliases {
+>> +		ethernet0 = &gem0;
+>> +		i2c0 = &i2c0;
+>> +		serial0 = &uart1;
+>> +		spi1 = &spi1;
+>> +	};
+>> +
+>> +	chosen {
+>> +		bootargs = "";
+>> +		stdout-path = "serial0:115200n8";
+>> +	};
+>> +
+>> +	memory at 0 {
+>> +		device_type = "memory";
+>> +		reg = <0x0 0x40000000>;
+>> +	};
+>> +
+>> +	usb_phy0: phy0 {
+>> +		compatible = "usb-nop-xceiv";
+>> +		#phy-cells = <0>;
+>> +	};
+>> +};
+>> +
+>> +&can0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&gem0 {
+>> +	status = "okay";
+>> +	phy-mode = "rgmii-id";
+>> +	phy-handle = <&ethernet_phy>;
+>> +
+>> +	ethernet_phy: ethernet-phy at 7 {
+>> +		reg = <7>;
+>> +		device_type = "ethernet-phy";
+>> +	};
+>> +};
+>> +
+>> +&i2c0 {
+>> +	status = "okay";
+>> +	clock-frequency = <400000>;
+>> +
+>> +	eeprom: eeprom at 52 {
+>> +		compatible = "atmel,24c02";
+>> +		reg = <0x52>;
+>> +	};
+>> +
+>> +};
+>> +
+>> +&sdhci0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&spi1 {
+>> +	status = "okay";
+>> +	num-cs = <4>;
+>> +	is-decoded-cs = <0>;
+>> +	flash at 0 {
+>> +		compatible = "sst25wf080", "jedec,spi-nor";
+>> +		reg = <1>;
+>> +		spi-max-frequency = <1000000>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		partition at test {
+> 
+> @test?
+> 
+> Use a partitions node too.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
+ok done.
 
-Changes in v3: None
-Changes in v2:
-- Record compatible string to xilinx.txt
+> 
+>> +			label = "spi-flash";
+> 
+> Should be what the partition contains.
 
- Documentation/devicetree/bindings/arm/xilinx.txt  |  9 ++++
- arch/arm64/boot/dts/xilinx/Makefile               |  3 ++
- arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts | 54 +++++++++++++++++++++++
- arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts | 42 ++++++++++++++++++
- arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts | 42 ++++++++++++++++++
- 5 files changed, 150 insertions(+)
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-index c2bc75774010..aceccf2bf43b 100644
---- a/Documentation/devicetree/bindings/arm/xilinx.txt
-+++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-@@ -19,6 +19,15 @@ Required root node properties:
- 
- Additional compatible strings:
- 
-+- Xilinx internal board zc1232
-+  "xlnx,zynqmp-zc1232-revA", "xlnx,zynqmp-zc1232"
-+
-+- Xilinx internal board zc1254
-+  "xlnx,zynqmp-zc1254-revA", "xlnx,zynqmp-zc1254"
-+
-+- Xilinx internal board zc1275
-+  "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275"
-+
- - Xilinx 96boards compatible board zcu100
-   "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100"
- 
-diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-index d15c9dc1d8f2..bdda451afaad 100644
---- a/arch/arm64/boot/dts/xilinx/Makefile
-+++ b/arch/arm64/boot/dts/xilinx/Makefile
-@@ -1,5 +1,8 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
-+dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
-+dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
-+dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
-new file mode 100644
-index 000000000000..0f7b4cf6078e
---- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1232-revA.dts
-@@ -0,0 +1,54 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * dts file for Xilinx ZynqMP ZC1232
-+ *
-+ * (C) Copyright 2017 - 2018, Xilinx, Inc.
-+ *
-+ * Michal Simek <michal.simek@xilinx.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "zynqmp.dtsi"
-+#include "zynqmp-clk.dtsi"
-+
-+/ {
-+	model = "ZynqMP ZC1232 RevA";
-+	compatible = "xlnx,zynqmp-zc1232-revA", "xlnx,zynqmp-zc1232", "xlnx,zynqmp";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &dcc;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-+
-+&dcc {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+	/* SATA OOB timing settings */
-+	ceva,p0-cominit-params = /bits/ 8 <0x18 0x40 0x18 0x28>;
-+	ceva,p0-comwake-params = /bits/ 8 <0x06 0x14 0x08 0x0E>;
-+	ceva,p0-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
-+	ceva,p0-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
-+	ceva,p1-cominit-params = /bits/ 8 <0x18 0x40 0x18 0x28>;
-+	ceva,p1-comwake-params = /bits/ 8 <0x06 0x14 0x08 0x0E>;
-+	ceva,p1-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
-+	ceva,p1-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
-new file mode 100644
-index 000000000000..9092828f92ec
---- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1254-revA.dts
-@@ -0,0 +1,42 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * dts file for Xilinx ZynqMP ZC1254
-+ *
-+ * (C) Copyright 2015 - 2018, Xilinx, Inc.
-+ *
-+ * Michal Simek <michal.simek@xilinx.com>
-+ * Siva Durga Prasad Paladugu <sivadur@xilinx.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "zynqmp.dtsi"
-+#include "zynqmp-clk.dtsi"
-+
-+/ {
-+	model = "ZynqMP ZC1254 RevA";
-+	compatible = "xlnx,zynqmp-zc1254-revA", "xlnx,zynqmp-zc1254", "xlnx,zynqmp";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &dcc;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-+
-+&dcc {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
-new file mode 100644
-index 000000000000..4f404c580eec
---- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zc1275-revA.dts
-@@ -0,0 +1,42 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * dts file for Xilinx ZynqMP ZC1275
-+ *
-+ * (C) Copyright 2017 - 2018, Xilinx, Inc.
-+ *
-+ * Michal Simek <michal.simek@xilinx.com>
-+ * Siva Durga Prasad Paladugu <sivadur@xilinx.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "zynqmp.dtsi"
-+#include "zynqmp-clk.dtsi"
-+
-+/ {
-+	model = "ZynqMP ZC1275 RevA";
-+	compatible = "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275", "xlnx,zynqmp";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &dcc;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-+
-+&dcc {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
+I have fixed this to data.
+
+Thanks,
+M
+
 -- 
-1.9.1
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/ac4d3e42/attachment.sig>
