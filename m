@@ -1,55 +1,102 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 2 Mar 2018 09:12:36 +0100
-Subject: [PATCH v2 06/16] drm/sun4i: Don't process LVDS if TCON doesn't
- support it
-In-Reply-To: <5333678.QYsGi30oEL@jernej-laptop>
-References: <20180227222701.9716-1-jernej.skrabec@siol.net>
- <20180227222701.9716-7-jernej.skrabec@siol.net>
- <20180228073608.r2zd3qkiudm2uarm@flea>
- <5333678.QYsGi30oEL@jernej-laptop>
-Message-ID: <20180302081236.zlt52z6jjsglzk3i@flea.lan>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 2 Mar 2018 13:47:06 +0530
+Subject: [PATCH v5 2/3] dmaengine: mediatek: Add MediaTek High-Speed DMA
+ controller for MT7622 and MT7623 SoC
+In-Reply-To: <1519973271.8089.166.camel@mtkswgap22>
+References: <cover.1518857746.git.sean.wang@mediatek.com>
+ <de4177cb2269c99f8d7c5738ac8a64f512122dfd.1518857747.git.sean.wang@mediatek.com>
+ <20180301082329.GD15443@localhost>
+ <1519900021.8089.136.camel@mtkswgap22>
+ <20180301125649.GH15443@localhost>
+ <1519973271.8089.166.camel@mtkswgap22>
+Message-ID: <20180302081706.GL15443@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Feb 28, 2018 at 10:43:30PM +0100, Jernej ?krabec wrote:
-> Dne sreda, 28. februar 2018 ob 08:36:08 CET je Maxime Ripard napisal(a):
-> > On Tue, Feb 27, 2018 at 11:26:51PM +0100, Jernej Skrabec wrote:
-> > > TCON checks for LVDS properties even if it doesn't support it. Add a
-> > > check to skip that part of the code if TCON doesn't support channel 0.
-> > > 
-> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > 
-> > I have already sent a similar patch here:
-> > https://lists.freedesktop.org/archives/dri-devel/2018-February/166665.html
+On Fri, Mar 02, 2018 at 02:47:51PM +0800, Sean Wang wrote:
+> Hi, Vinod
 > 
-> Right. However, check last chunk in my patch. There is no need to call 
-> sun4i_rgb_init() if TCON doesn't support channel 0. It doesn't do anything, 
-> except producing warning. Will you add that this change to your patch and then 
-> I can remove this patch from next revision?
+> On Thu, 2018-03-01 at 18:26 +0530, Vinod Koul wrote:
+> > On Thu, Mar 01, 2018 at 06:27:01PM +0800, Sean Wang wrote:
+> > > On Thu, 2018-03-01 at 13:53 +0530, Vinod Koul wrote:
+> > > > On Sun, Feb 18, 2018 at 03:08:30AM +0800, sean.wang at mediatek.com wrote:
+> > > > 
+> > > > > @@ -0,0 +1,1054 @@
+> > > > > +// SPDX-License-Identifier: GPL-2.0
+> > > > // Copyright ...
+> > > > 
+> > > > The copyright line needs to follow SPDX tag line
+> > > > 
+> > > 
+> > > okay, I will make it reorder and be something like that
+> > > 
+> > > // SPDX-License-Identifier: GPL-2.0
+> > > /*
+> > >  * Copyright (c) 2017-2018 MediaTek Inc.
+> > >  * Author: Sean Wang <sean.wang@mediatek.com>
+> > >  *
+> > >  * Driver for MediaTek High-Speed DMA Controller
+> > >  *
+> > >  */
+> > 
+> > It needs to be:
+> > 
+> > // SPDX-License-Identifier: GPL-2.0
+> > // Copyright (c) 2017-2018 MediaTek Inc.
+> > 
+> > /*
+> >  * whatever else you want
+> >  */
+> > 
+> > The first two lines are in C99 style comment and need to have SPDX tag and
+> > Copyright info
+> 
+> Sure, I can do it using C99 style comments at the first two lines.
+> 
+> In addition, I'm really curious where we can find a reference to the
+> rule and if it 's a strict rule for all the drivers.
+> 
+> Because I'm considering whether I should turn other driver into using
+> the same rule.
 
-They are orthogonal to me though. Mine fixes the spurious LVDS error
-messages that you were mentionning in your commit log. Your point here
-is that we shouldn't need to even register the LVDS and RGB output
-when there's no channel 0. This is obviously true, but it should be in
-a separate patch.
+Yes that seems to be the rule now https://lkml.org/lkml/2017/11/2/715
 
-> BTW, your patch won't apply cleanly, since you didn't base it on latest code 
-> (every TCON variant has at least one entry now).
+> > > > > +#define MTK_HSDMA_USEC_POLL		20
+> > > > > +#define MTK_HSDMA_TIMEOUT_POLL		200000
+> > > > > +#define MTK_HSDMA_DMA_BUSWIDTHS		BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED)
+> > > > 
+> > > > Undefined buswidth??
+> > 
+> > ??
+> 
+> Sorry for I didn't answer the question in the short time.
+> 
+> After spending some time on a confirmation with design, it is
+> DMA_SLAVE_BUSWIDTH_4_BYTES and not be configurable. 
 
-I'll fix it when applying.
+Then it should be DMA_SLAVE_BUSWIDTH_4_BYTES and not
+DMA_SLAVE_BUSWIDTH_UNDEFINED...
 
-Maxime
+> > > > shouldn't we check if next is in range, we can crash if we get bad value
+> > > > from hardware..
+> > > 
+> > > okay, there are checks for next with ddone bit check and null check in
+> > > the corresponding descriptor as the following.
+> > 
+> > what if you get bad next value
+> > 
+> 
+> next is not hardware value. it's maintained by software which is always
+> between 0 to MTK_DMA_SIZE - 1, and definitely doesn't get a bad value.
+> 
+> > > 
+> > > > > +		rxd = &pc->ring.rxd[next];
+> > 
+> > resulting in bad ref here
+> 
+> rxd is also definitely a good ref
+
+not if next is out of range, say you read -1 or 200000?
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/addc48ec/attachment-0001.sig>
+~Vinod
