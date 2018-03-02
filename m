@@ -1,46 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Mar 2018 14:28:55 +0100
-Subject: [PATCH] drm/bridge: sii902x: Fall back to standard modes
-In-Reply-To: <20180302080708.GF5453@intel.com>
-References: <20180214130059.19052-1-linus.walleij@linaro.org>
- <CACRpkdYuZE+ohhLf6mmPHEsGmNw6r7UOBCyQEFOcYOYxdVj2oA@mail.gmail.com>
- <20180301211840.GD5453@intel.com>
- <CACRpkdbMfzWSH1bAtjhW_ykJGPnycVFtbUp816KShX5wCDu+0Q@mail.gmail.com>
- <20180302080708.GF5453@intel.com>
-Message-ID: <CACRpkdbEMTgD4UJ7q=+=EGUotP56iJoi=LA4bFnU45q-oiBv1g@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  2 Mar 2018 14:38:05 +0100
+Subject: [PATCH resend^2] ARM: nspire: Remove unneeded nspire_map_io()
+Message-ID: <1519997885-12374-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 9:07 AM, Ville Syrj?l?
-<ville.syrjala@linux.intel.com> wrote:
-> On Thu, Mar 01, 2018 at 11:12:15PM +0100, Linus Walleij wrote:
->> On Thu, Mar 1, 2018 at 10:18 PM, Ville Syrj?l?
->> <ville.syrjala@linux.intel.com> wrote:
->> > On Thu, Mar 01, 2018 at 10:02:55PM +0100, Linus Walleij wrote:
->> >> Hm, hard to get review feedback on this one.
->> >>
->> >> It gives me proper video on an ARM Versatile Express utilizing the
->> >> bridge driver with a plugged in DVI-to-VGA dongle with the new
->> >> PL111 DRI driver.
->> >>
->> >> Liviu? Pawel?
->> >>
->> >> Some ACK is fine to know I am doing the right thing :)
->> >
->> > Why isn't the probe helper's noedid fallback working?
->>
->> Where is that in the call chain?
->>
->> The problem I have is that the bridge is there, it gets properly
->> initialized and used as connector and all. The only problem is
->> that the DDI I2C portion of it is not working, so no modes are
->> really added from the struct drm_connector_helper_funcs
->> .get_modes() callback.
->
-> The helper is what calls .get_modes(), and it has a noedid
-> fallback for mode count==0.
+nspire_map_io() just calls debug_ll_io_init().
 
-OK I'll debug from here and try to see what's wrong.
+If machine_desc.map_io is not set, devicemaps_init() in the
+common ARM code will call debug_ll_io_init(), so nspire_map_io() and the
+initialization of .map_io can be removed.
 
-Yours,
-Linus Walleij
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-nspire/nspire.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
+index f0808fcc5accad2e..8584cdd1c827687e 100644
+--- a/arch/arm/mach-nspire/nspire.c
++++ b/arch/arm/mach-nspire/nspire.c
+@@ -33,11 +33,6 @@ static const char *const nspire_dt_match[] __initconst = {
+ 	NULL,
+ };
+ 
+-static void __init nspire_map_io(void)
+-{
+-	debug_ll_io_init();
+-}
+-
+ static struct clcd_board nspire_clcd_data = {
+ 	.name		= "LCD",
+ 	.caps		= CLCD_CAP_5551 | CLCD_CAP_565,
+@@ -71,7 +66,6 @@ static void nspire_restart(enum reboot_mode mode, const char *cmd)
+ 
+ DT_MACHINE_START(NSPIRE, "TI-NSPIRE")
+ 	.dt_compat	= nspire_dt_match,
+-	.map_io		= nspire_map_io,
+ 	.init_machine	= nspire_init,
+ 	.restart	= nspire_restart,
+ MACHINE_END
+-- 
+2.7.4
