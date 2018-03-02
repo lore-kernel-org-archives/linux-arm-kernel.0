@@ -1,84 +1,21 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 2 Mar 2018 16:40:53 +0000
-Subject: [PATCH 2/3] rpmsg: core: make rpmsg bus DMA capable
-In-Reply-To: <07503032-b08b-10ea-9d34-ddf85c682a9d@arm.com>
-References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
- <20180302145531.20463-3-srinivas.kandagatla@linaro.org>
- <07503032-b08b-10ea-9d34-ddf85c682a9d@arm.com>
-Message-ID: <469cfe2c-d4d0-6050-339d-430f893e7775@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 3 Mar 2018 00:42:02 +0800
+Subject: [PATCH] crypto: marvell/cesa - Clean up redundant #include
+In-Reply-To: <99d8deb60039adf572aec26b091f2b0c61edf397.1519048413.git.robin.murphy@arm.com>
+References: <99d8deb60039adf572aec26b091f2b0c61edf397.1519048413.git.robin.murphy@arm.com>
+Message-ID: <20180302164202.GD21579@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your time,
-
-On 02/03/18 16:14, Robin Murphy wrote:
-> On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>
->> Many of the rpmsg clients like audio drivers need to allocate
->> dma memory. Make this bus DMA capable so that the child devices
->> can use dma apis.
+On Mon, Feb 19, 2018 at 01:55:36PM +0000, Robin Murphy wrote:
+> The inclusion of dma-direct.h was only needed temporarily to prevent
+> breakage from the DMA API rework, since the actual CESA fix making it
+> redundant was merged in parallel. Now that both have landed, it can go.
 > 
-> AFAICS after 15 minutes in the docs and code, the rpmsg "bus" is a 
-> virtual one based around shared-memory mailbox communication, so I don't 
-> really see how DMA exists in that context - I think maybe that 
-> abstraction needs looking at.
-> 
-> However, from grepping through the DTs it seems at first glance like the 
-> non-trivial things under the "qcom,smd" bus mostly map to actual 
-> platform devices via the "qcom,smd-edge" property - if those platform 
-> devices are the physical DMA masters, they should be the ones used for 
-> DMA API operations.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Currently there are very limited rpmsg devices in the mainline that use 
-dma. Only one I can think of is wcnss WIFI driver which models up itself 
-into another layer of platform device. Not sure if the DMA was the 
-reason to do that.
-
-However am working on audio drivers [1] which I modeled up as children 
-of the rpmsg bus, so the problem started. There is an IOMMU in between 
-APPs and DSP which provides audio services.
-There are also other projects like FastRPC which have used similar 
-driver model which ended up with same issues.
-
-It all depends on how you model your driver. Audio case we have a rpmsg 
-channel which exposes audio functionality. so If we want to use the 
-iommu/dma operations we have to add another layer of platform device.
-Which also means that rpmsg channel notifications have to be passed to 
-these platform devices in some way.
-
-Am not 100% sure if this correct way to fix the issue.
-
-> 
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/rpmsg/rpmsg_core.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
->> index e84c71f8d6ab..540a3f3567b8 100644
->> --- a/drivers/rpmsg/rpmsg_core.c
->> +++ b/drivers/rpmsg/rpmsg_core.c
->> @@ -472,6 +472,7 @@ struct bus_type rpmsg_bus = {
->>       .uevent        = rpmsg_uevent,
->>       .probe        = rpmsg_dev_probe,
->>       .remove        = rpmsg_dev_remove,
->> +    .force_dma    = true,
-> 
-> Regardless of the above, would you really need to use this brute force 
-> hack instead of just fixing the DTs? I'm struggling to find which 
-> drivers might currently be relying on this :/
-
-This is one of the two issues. dma-ranges might work in this case, but 
-we still have iommu case.
-
-> 
-> Robin.
-> 
->>   };
->>   EXPORT_SYMBOL(rpmsg_bus);
->>
-
-thanks,
-srini
-[1]: https://lkml.org/lkml/2018/2/13/719
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
