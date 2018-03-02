@@ -1,34 +1,45 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  2 Mar 2018 14:55:30 +0000
-Subject: [PATCH 2/3] rpmsg: core: make rpmsg bus DMA capable
-In-Reply-To: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
-References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180302145531.20463-3-srinivas.kandagatla@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 09:42:15 -0600
+Subject: [PATCH v1 16/19] arm: dts: mt7623: fixup available memory size
+ on bananapi-r2
+In-Reply-To: <e49485aac14bec85c14514c1953f8d7ea5401695.1519378872.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <e49485aac14bec85c14514c1953f8d7ea5401695.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <20180302154215.xr3b2zlmuojw5i6l@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Fri, Feb 23, 2018 at 06:16:36PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> There is 2GB DDR3 available on bananapi-r2 board as [1] specified.
+> 
+> [1] http://www.banana-pi.org/r2.html
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 140ff78..3e8d02c 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -38,6 +38,11 @@
+>  			default-state = "off";
+>  		};
+>  	};
+> +
+> +	memory {
 
-Many of the rpmsg clients like audio drivers need to allocate
-dma memory. Make this bus DMA capable so that the child devices
-can use dma apis.
+Unit address?
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/rpmsg/rpmsg_core.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
-index e84c71f8d6ab..540a3f3567b8 100644
---- a/drivers/rpmsg/rpmsg_core.c
-+++ b/drivers/rpmsg/rpmsg_core.c
-@@ -472,6 +472,7 @@ struct bus_type rpmsg_bus = {
- 	.uevent		= rpmsg_uevent,
- 	.probe		= rpmsg_dev_probe,
- 	.remove		= rpmsg_dev_remove,
-+	.force_dma	= true,
- };
- EXPORT_SYMBOL(rpmsg_bus);
- 
--- 
-2.15.1
+> +		device_type = "memory";
+> +		reg = <0 0x80000000 0 0x80000000>;
+> +	};
+>  };
+>  
+>  &afe {
+> -- 
+> 2.7.4
+> 
