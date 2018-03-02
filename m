@@ -1,37 +1,34 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  2 Mar 2018 14:56:31 +0100
-Subject: [PATCH v4 2/4] arm64: dts: lg1313: DT fix
- s/#interrupts-cells/#interrupt-cells/
-In-Reply-To: <1519998993-14398-1-git-send-email-geert+renesas@glider.be>
-References: <1519998993-14398-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1519998993-14398-3-git-send-email-geert+renesas@glider.be>
+Date: Fri,  2 Mar 2018 15:02:45 +0100
+Subject: [PATCH resend] ARM: dts: atlas7: Use generic uart-has-rtscts DT
+ property
+Message-ID: <1519999365-15201-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Chanho Min <chanho.min@lge.com>
----
-v3:
-  - Add Acked-by,
+As of commit 7f60830ab1511d94 ("serial: sirf: Use generic
+uart-has-rtscts DT property property"), the SiRF UART driver recognizes
+the generic "uart-has-rtscts" DT property, deprecating the
+vendor-specific "sirf,uart-has-rtscts" DT property. Hence replace the
+latter by the former in all DTS files.
 
-v2:
-  - New.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/lg/lg1313.dtsi | 2 +-
+ arch/arm/boot/dts/atlas7-evb.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/lg/lg1313.dtsi b/arch/arm64/boot/dts/lg/lg1313.dtsi
-index 1887af654a7db966..fb1f5252977da967 100644
---- a/arch/arm64/boot/dts/lg/lg1313.dtsi
-+++ b/arch/arm64/boot/dts/lg/lg1313.dtsi
-@@ -124,7 +124,7 @@
- 	amba {
- 		#address-cells = <2>;
- 		#size-cells = <1>;
--		#interrupts-cells = <3>;
-+		#interrupt-cells = <3>;
+diff --git a/arch/arm/boot/dts/atlas7-evb.dts b/arch/arm/boot/dts/atlas7-evb.dts
+index 1e9cd1a8508e17c2..900e03b7a7b21011 100644
+--- a/arch/arm/boot/dts/atlas7-evb.dts
++++ b/arch/arm/boot/dts/atlas7-evb.dts
+@@ -73,7 +73,7 @@
+ 		btm {
+ 			uart6: uart at 11000000 {
+ 				status = "okay";
+-				sirf,uart-has-rtscts;
++				uart-has-rtscts;
+ 			};
+ 		};
  
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
 -- 
 2.7.4
