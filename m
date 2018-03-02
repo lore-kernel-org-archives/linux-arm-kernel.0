@@ -1,74 +1,115 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Mar 2018 15:32:22 +0000
-Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
-In-Reply-To: <20180302140901.lrjqiaa2k4nxkqco@mwanda>
-References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
- <20180302111931.GX9418@n2100.armlinux.org.uk>
- <20180302124647.sfhnto77wgdh5sv6@katana>
- <20180302125907.GA9418@n2100.armlinux.org.uk>
- <20180302135854.76ue5jzsg7lvxjxw@katana>
- <20180302140901.lrjqiaa2k4nxkqco@mwanda>
-Message-ID: <20180302153221.GB9418@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 09:40:50 -0600
+Subject: [PATCH v1 13/19] arm: dts: mt7623: move node mt6323 leds to
+ mt6323.dtsi
+In-Reply-To: <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <20180302154050.lfxojro4woucl6lh@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 05:09:01PM +0300, Dan Carpenter wrote:
-> On Fri, Mar 02, 2018 at 02:58:54PM +0100, Wolfram Sang wrote:
-> > 
-> > > It needs platform maintainers to be motivated to fix it, and one way to
-> > > provide that motivation is for subsystem maintainers to say no to patches
-> > > like this.  If patches like this get accepted, then the "problem" gets
-> > > solved, and there is very little motivation to fix the platform itself.
-> > 
-> > Yes, I can see this. I will drop / revert the patch.
-> > 
+On Fri, Feb 23, 2018 at 06:16:33PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> TBH, I can't find the threads from November so I feel a bit lost and
-> there is no documentation for platform_get_irq().
+> Since those LEDs are parts of PMIC MT6323, it is reasonable to merge
+> those LEDs node definition back into mt6323.dtsi. This way can improve
+> the reusability of those nodes among different boards with the same PMIC.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/mt6323.dtsi                 | 26 ++++++++++++++++++++++++-
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 28 ---------------------------
+>  2 files changed, 25 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
+> index 7c783d6..44c5642 100644
+> --- a/arch/arm/boot/dts/mt6323.dtsi
+> +++ b/arch/arm/boot/dts/mt6323.dtsi
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (c) 2017 MediaTek Inc.
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+>   * Author: John Crispin <john@phrozen.org>
+>   *	   Sean Wang <sean.wang@mediatek.com>
+>   * This program is free software; you can redistribute it and/or modify
+> @@ -237,5 +237,29 @@
+>  				regulator-enable-ramp-delay = <216>;
+>  			};
+>  		};
+> +
+> +		leds {
+> +			compatible = "mediatek,mt6323-led";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			led at 0 {
+> +				reg = <0>;
+> +				label = "mt6323:isink:green";
 
-Start from here:
+Changing the label potentially breaks userspace. And the fact that it is 
+a green LED is very much board specific. So I think the old location was 
+correct. You could put the parent node here and leave these child nodes 
+in the board specific dts file.
 
-http://archive.armlinux.org.uk/lurker/search/20380101.000000.00000000 at ml:linux-arm-kernel,sb:platform%5Fget%5Firq.en.html
 
-With the right list archiving software with a built-in search facility,
-it becomes much easier to find stuff!  There's quite a number of messages
-there though, as there were multiple patch series posted.
-
-Some specific messages:
-
-http://archive.armlinux.org.uk/lurker/message/20171204.182556.775e16ab.en.html
-http://archive.armlinux.org.uk/lurker/message/20171120.164840.87002f9c.en.html
-http://archive.armlinux.org.uk/lurker/message/20171118.182704.3e1a5553.en.html
-
-The reason it hasn't be trivially done (just by changing
-platform_get_irq() now) is that doing so will cause a bunch of
-regressions, precisely because people _are_ using IRQ 0 with some
-platform drivers.
-
-The patch series above has died a death, so yet again the IRQ0/NO_IRQ
-issue has disappeared off people's radars and there's no reason to
-fix the situation.  So, we're yet again back to the status quo of
-almost nothing happening.
-
-How do we break this status quo and finally solve the IRQ 0 and
-NO_IRQ issue?
-
-I believe that we have to bite the bullet and start by saying no to
-these trivial patches which try to preserve the current situation.
-That at least provides some motivation for things to get fixed in
-the right way.
-
-Another possibility would be to change platform_get_irq() and
-suffer the regressions that will cause, telling people that fixing
-their platform IRQ numbering is the only solution (but this
-requires breaking our ideals about regressions.)
-
-The alternative is everyone (including Linus) stops whinging about
-NO_IRQ and IRQ0 and put up with the fact that some platforms treat
-IRQ0 as a valid interrupt - which, I think we can all agree, isn't
-going to happen.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> +				default-state = "off";
+> +			};
+> +
+> +			led at 1 {
+> +				reg = <1>;
+> +				label = "mt6323:isink:red";
+> +				default-state = "off";
+> +			};
+> +
+> +			led at 2 {
+> +				reg = <2>;
+> +				label = "mt6323:isink:blue";
+> +				default-state = "off";
+> +			};
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 75e61c4..767b225 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -483,34 +483,6 @@
+>  	status = "okay";
+>  };
+>  
+> -&pwrap {
+> -	mt6323 {
+> -		mt6323led: led {
+> -			compatible = "mediatek,mt6323-led";
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			led at 0 {
+> -				reg = <0>;
+> -				label = "bpi-r2:isink:green";
+> -				default-state = "off";
+> -			};
+> -
+> -			led at 1 {
+> -				reg = <1>;
+> -				label = "bpi-r2:isink:red";
+> -				default-state = "off";
+> -			};
+> -
+> -			led at 2 {
+> -				reg = <2>;
+> -				label = "bpi-r2:isink:blue";
+> -				default-state = "off";
+> -			};
+> -		};
+> -	};
+> -};
+> -
+>  &spi0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&spi0_pins_a>;
+> -- 
+> 2.7.4
+> 
