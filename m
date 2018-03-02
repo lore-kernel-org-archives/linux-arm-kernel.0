@@ -1,40 +1,37 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 2 Mar 2018 19:34:55 +0100
-Subject: [PATCH v2 2/8] arm64: zynqmp: Add support for Xilinx zcu100-revC
-In-Reply-To: <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
-References: <cover.1519396753.git.michal.simek@xilinx.com>
- <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
- <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
-Message-ID: <c9d4bc3a-888e-3faf-4b1d-6ad309048078@monstr.eu>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 2 Mar 2018 13:37:11 -0500
+Subject: RFC on Kdump and PCIe on ARM64
+In-Reply-To: <20180302180219.GB20579@arm.com>
+References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
+ <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
+ <2b2de17c-8527-e49b-2ef2-2a3d1801e4f9@codeaurora.org>
+ <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
+ <20180302103032.GB19323@arm.com>
+ <84121a8d-5294-0567-6c6b-f57e85dc4961@codeaurora.org>
+ <20180302180219.GB20579@arm.com>
+Message-ID: <2f8e1f65-5f70-9556-5d96-c50421982f73@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.3.2018 17:40, Rob Herring wrote:
-> On Fri, Feb 23, 2018 at 03:40:24PM +0100, Michal Simek wrote:
->> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
->> port and usbs.
->> Board is using fixed clocks because clock driver hasn't been merged yet.
+On 3/2/2018 1:02 PM, Will Deacon wrote:
+>> How about the points that Baoquan highlighted in his email regarding the
+>> solution from AMD and X86?
+> Which specific points do you think this proposal doesn't address?
 > 
-> Please get rid of the separate clocks dts file when it is merged.
 
-Will do.
+No specific concerns at this moment.
 
-Thanks,
-Michal
+>> I have not read the entire thread but, is this just a matter of following
+>> what Bjorn recommended or there is more to it?
+> I'm trying to say how I think Bjorn's idea can be implemented for SMMUv3.
+> I basically want to avoid a situation where the SMMU driver tries to walk
+> the in-memory data structures left by a previous kernel and infer the
+> setup from that.
 
+Let me know if you have something to test. We have a test case with the
+crash.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/d3f5d9c1/attachment.sig>
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
