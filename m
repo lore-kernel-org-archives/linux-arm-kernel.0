@@ -1,400 +1,69 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Fri,  2 Mar 2018 14:41:55 -0500
-Subject: [PATCH v2] ARM: dts: BCM5301X: Add support for Linksys EA9500
-In-Reply-To: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
-References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
-Message-ID: <20180302194155.50808-1-npcomplete13@gmail.com>
+From: klaus.goger@theobroma-systems.com (klaus.goger at theobroma-systems.com)
+Date: Fri, 2 Mar 2018 20:49:49 +0100
+Subject: [PATCH v2 5/6] arm64: dts: rockchip: enable typec-phy1 for
+ rk3399-puma.
+In-Reply-To: <20180301152515.20940-6-enric.balletbo@collabora.com>
+References: <20180301152515.20940-1-enric.balletbo@collabora.com>
+ <20180301152515.20940-6-enric.balletbo@collabora.com>
+Message-ID: <056BCD2A-CBAF-46B2-831B-5E60BE4CC74D@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware Info
--------------
+> On 01.03.2018, at 16:25, Enric Balletbo i Serra <enric.balletbo@collabora.com> wrote:
+> 
+> Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
+> support for rk3399") caused a regression regarding the USB3. During boot,
+> the following message appears a few times:
+> 
+>      dwc3: failed to initialize core
+> 
+> The driver is deferred waiting for the typec-phy, but this never happens
+> beause is disabled. So, enable it.
+> 
+> Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support for rk3399")
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+> 
+> Changes in v2: None
+> 
+> arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi | 4 ++++
+> 1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
+> index 1fc5060d7027..3a3b24383482 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
+> @@ -505,6 +505,10 @@
+> 	};
+> };
+> 
+> +&tcphy1 {
+> +	status = "okay";
+> +};
+> +
+> &u2phy1 {
+> 	status = "okay";
+> 
+> -- 
+> 2.16.1
 
-Processor	- Broadcom BCM4709C0KFEBG dual-core @ 1.4 GHz
-Switch		- BCM53012 in BCM4709C0KFEBG & external BCM53125
-DDR3 RAM	- 256 MB
-Flash		- 128 MB (Toshiba TC58BVG0S3HTA00)
-2.4GHz		- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-Power Amp	- Skyworks SE2623L 2.4 GHz power amp (x4)
-5GHz x 2	- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-Power Amp	- PLX Technology PEX8603 3-lane, 3-port PCIe switch
-Ports		- 8 Ports, 1 WAN Ports
-Antennas	- 8 Antennas
-Serial Port	- @J6 [GND,TX,RX] (VCC NC)    115200 8n1
 
-Tested with OpenWrt built with DSA driver and Kernel v4.14
+Tested-by: Klaus Goger <klaus.goger@theobroma-systems.com>
 
-Note:
+Looks good. With your patch,the onboard USB hub on tcphy1 is found 
+at bootup.
 
-"make sure that port 0 of the internal switch is not accidentally
-configured back to untagged since that would cause problem when
-terminating the VLAN tag on the SW side." - Florian Fainelli [1]
+# lsusb  -t
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 5000M
+        |__ Port 2: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 5000M
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+        |__ Port 4: Dev 4, If 0, Class=, Driver=, 12M
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=ohci-platform/1p, 12M
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=ohci-platform/1p, 12M
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=ehci-platform/1p, 480M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=ehci-platform/1p, 480M
 
-This can be ensured by running following command in OpenWrt:
-
-bridge vlan add vid 1 dev extsw pvid tagged
-
-[1] https://www.spinics.net/lists/arm-kernel/msg590992.html
-
-Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
----
-Changes in v2:
- - Properly define mdio mux, internal mdio, external mdio, mii bus
- - Now we define usb3 phy as a mdio node connected to internal mdio,
-   thanks to work done by Rafa? Mi?ecki on the bcm usb3 phy mdio driver
- - Define external SW as a mdio-mii node connected to external mdio
----
- arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 239 +++++++++++++++++++++++-
- arch/arm/boot/dts/bcm47094.dtsi                 |   6 +-
- arch/arm/boot/dts/bcm5301x.dtsi                 |  55 +++++-
- 3 files changed, 288 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-index b6750f7..5f53207 100644
---- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-+++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-@@ -7,7 +7,7 @@
- /dts-v1/;
- 
- #include "bcm47094.dtsi"
--#include "bcm5301x-nand-cs0-bch8.dtsi"
-+#include "bcm5301x-nand-cs0-bch1.dtsi"
- 
- / {
- 	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
-@@ -32,5 +32,242 @@
- 			linux,code = <KEY_WPS_BUTTON>;
- 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
- 		};
-+
-+		rfkill {
-+				label = "WiFi";
-+				linux,code = <KEY_RFKILL>;
-+				gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		reset {
-+				label = "Reset";
-+				linux,code = <KEY_RESTART>;
-+				gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		wps {
-+			label = "bcm53xx:white:wps";
-+			gpios = <&chipcommon 22 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		usb2 {
-+			label = "bcm53xx:green:usb2";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
-+			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-+			linux,default-trigger = "usbport";
-+		};
-+
-+		usb3 {
-+			label = "bcm53xx:green:usb3";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>;
-+			linux,default-trigger = "usbport";
-+		};
-+
-+		power {
-+			label = "bcm53xx:white:power";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wifi-disabled {
-+			label = "bcm53xx:amber:wifi-disabled";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wifi-enabled {
-+			label = "bcm53xx:white:wifi-enabled";
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar1 {
-+			label = "bcm53xx:white:bluebar1";
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar2 {
-+			label = "bcm53xx:white:bluebar2";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar3 {
-+			label = "bcm53xx:white:bluebar3";
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		bluebar4 {
-+			label = "bcm53xx:white:bluebar4";
-+			gpios = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar5 {
-+			label = "bcm53xx:white:bluebar5";
-+			gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar6 {
-+			label = "bcm53xx:white:bluebar6";
-+			gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar7 {
-+			label = "bcm53xx:white:bluebar7";
-+			gpios = <&chipcommon 21 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar8 {
-+			label = "bcm53xx:white:bluebar8";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&usb2 {
-+	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb3 {
-+	vcc-gpio = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&mdio_mii_mux {
-+	status = "okay";
-+};
-+
-+&mdio_ext {
-+	status = "okay";
-+};
-+
-+&srab {
-+	compatible = "brcm,bcm53012-srab", "brcm,bcm5301x-srab";
-+	status = "okay";
-+	dsa,member = <0 0>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 1 {
-+			reg = <1>;
-+			label = "lan7";
-+		};
-+
-+		port at 2 {
-+			reg = <2>;
-+			label = "lan4";
-+		};
-+
-+		port at 3 {
-+			reg = <3>;
-+			label = "lan8";
-+		};
-+
-+		port at 4 {
-+			reg = <4>;
-+			label = "wan";
-+		};
-+
-+		port at 5 {
-+			reg = <5>;
-+			ethernet = <&gmac0>;
-+			label = "cpu";
-+
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
-+
-+		port at 7 {
-+			reg = <7>;
-+			ethernet = <&gmac1>;
-+			label = "cpu";
-+
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
-+
-+		port at 8 {
-+			reg = <8>;
-+			ethernet = <&gmac2>;
-+			label = "cpu";
-+
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
-+
-+		sw0_p0: port at 0 {
-+			reg = <0>;
-+			label = "extsw";
-+
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
- 	};
- };
-+
-+&mdio_mii {
-+	status = "okay";
-+
-+		switch at 0  {
-+			compatible = "brcm,bcm53125";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reset-gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
-+			reset-names = "robo_reset";
-+			reg = <0>;
-+			dsa,member = <1 0>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					label = "lan1";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "lan5";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "lan2";
-+				};
-+
-+				port at 3 {
-+					reg = <3>;
-+					label = "lan6";
-+				};
-+
-+				port at 4 {
-+					reg = <4>;
-+					label = "lan3";
-+				};
-+
-+				sw1_p8: port at 8 {
-+					reg = <8>;
-+					ethernet = <&sw0_p0>;
-+					label = "cpu";
-+
-+					fixed-link {
-+						speed = <1000>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
-+};
-+
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index 4840a78..8f3ec57 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -6,10 +6,8 @@
- 
- #include "bcm4708.dtsi"
- 
--/ {
--	usb3_phy: usb3-phy {
--		compatible = "brcm,ns-bx-usb3-phy";
--	};
-+&usb3_phy {
-+	compatible = "brcm,ns-bx-usb3-phy";
- };
- 
- &uart0 {
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 9a076c4..9e4386a 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -154,13 +154,6 @@
- 		clock-names = "phy-ref-clk";
- 	};
- 
--	usb3_phy: usb3-phy {
--		compatible = "brcm,ns-ax-usb3-phy";
--		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
--		reg-names = "dmp", "ccb-mii";
--		#phy-cells = <0>;
--	};
--
- 	axi at 18000000 {
- 		compatible = "brcm,bus-axi";
- 		reg = <0x18000000 0x1000>;
-@@ -359,7 +352,55 @@
- 		reg = <0x18003000 0x8>;
- 		#size-cells = <1>;
- 		#address-cells = <0>;
-+	};
-+
-+	mdio-bus-mux {
-+		compatible = "mdio-mux-mmioreg";
-+		mdio-parent-bus = <&mdio>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x18003000 0x4>;
-+		mux-mask = <0x200>;
-+
-+		mdio_int: mdio at 0 {		/* BIT(9) = 0 => internal mdio */
-+			reg = <0x0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			usb3_phy: usb3-phy at 10 {
-+				compatible = "brcm,ns-ax-usb3-phy";
-+				reg = <0x10>;
-+				usb3-dmp-syscon = <&usb3_dmp>;
-+				#phy-cells = <0>;
-+			};
-+		};
-+
-+		mdio_ext: mdio at 200 {		/* BIT(9) = 1 => external mdio */
-+			reg = <0x200>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	mdio_mii_mux: mdio-mii-mux {
-+		compatible = "mdio-mux-mmioreg";
-+		mdio-parent-bus = <&mdio_ext>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x1800c1c0 0x4>;
-+		mux-mask = <0xc0>;		/* BIT(6) = mdc, BIT(7) = mdio */
- 		status = "disabled";
-+
-+		mdio_mii: mdio-mii at 0 {
-+			reg = <0x0>;		/* Enable mii function */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
-+	usb3_dmp: syscon at 18105000 {
-+		reg = <0x18105000 0x1000>;
- 	};
- 
- 	i2c0: i2c at 18009000 {
--- 
-2.9.3
+? 
+Klaus
