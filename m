@@ -1,150 +1,107 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri,  2 Mar 2018 14:56:38 -0700
-Subject: [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+Date: Fri,  2 Mar 2018 14:56:37 -0700
+Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
 In-Reply-To: <20180302215638.6145-1-jcrouse@codeaurora.org>
 References: <20180302215638.6145-1-jcrouse@codeaurora.org>
-Message-ID: <20180302215638.6145-3-jcrouse@codeaurora.org>
+Message-ID: <20180302215638.6145-2-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the nodes and other bits to describe the Adreno GPU and GMU
-devices.
+Document the device tree bindings for the Adreno GMU device
+available on Adreno a6xx targets.
 
-Change-Id: Ibf4dc0ebb0ac03d8b6b8e65747e142c440e70b0a
+Change-Id: I3cfd5fb35ab0045e39905ff12393006e60f1a124
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 120 +++++++++++++++++++++++++++++++++++
- 1 file changed, 120 insertions(+)
+ .../devicetree/bindings/display/msm/gmu.txt        | 54 ++++++++++++++++++++++
+ .../devicetree/bindings/display/msm/gpu.txt        | 10 +++-
+ 2 files changed, 62 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 7b5c16eb63b7..cc6d367ee55e 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -312,5 +312,125 @@
- 				status = "disabled";
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
+new file mode 100644
+index 000000000000..f65bb49fff36
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
+@@ -0,0 +1,54 @@
++Qualcomm adreno/snapdragon GMU (Graphics management unit)
 +
-+		adreno_smmu: arm,smmu-adreno at 5040000 {
-+			compatible = "qcom,msm8996-smmu-v2";
-+			reg = <0x5040000 0x10000>;
-+			#iommu-cells = <1>;
-+			#global-interrupts = <2>;
-+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
-+				 <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
-+			clock-names = "bus", "iface";
++The GMU is a programmable power controller for the GPU. the CPU controls the
++GMU which in turn handles power controls for the GPU.
 +
-+			power-domains = <&clock_gpucc GPU_CX_GDSC>;
-+		};
++Required properties:
++- compatible:
++  * "qcom,adreno-gmu"
++- reg: Physical base address and length of the GMU registers.
++- reg-names: Matching names for the register regions
++  * "gmu"
++  * "gmu_pdc"
++- interrupts: The interrupt signals from the GMU.
++- interrupt-names: Matching names for the interrupts
++  * "hfi"
++  * "gmu"
++- clocks: phandles to the device clocks
++- clock-names: Matching names for the clocks
++   * "gmu"
++   * "cxo"
++   * "axi"
++   * "mnoc"
++- power-domains: should be <&clock_gpucc GPU_CX_GDSC>
++- iommus: phandle to the adreno iommu
++- operating-points-v2: phandle to the OPP operating points
 +
-+		gpu_opp_table: adreno-opp-table {
-+			compatible = "operating-points-v2";
++Example:
 +
-+			opp-710000000 {
-+				opp-hz = /bits/ 64 <710000000>;
-+				qcom,arc-level = <416>;
-+			};
++/ {
++	...
 +
-+			opp-675000000 {
-+				opp-hz = /bits/ 64 <675000000>;
-+				qcom,arc-level = <384>;
-+			};
++	gmu: gmu at 506a000 {
++		compatible="qcom,adreno-gmu";
 +
-+			opp-596000000 {
-+				opp-hz = /bits/ 64 <596000000>;
-+				qcom,arc-level = <320>;
-+			};
++		reg = <0x506a000 0x30000>,
++			<0xb200000 0x300000>;
++		reg-names = "gmu", "gmu_pdc";
 +
-+			opp-520000000 {
-+				opp-hz = /bits/ 64 <520000000>;
-+				qcom,arc-level = <256>;
-+			};
++		interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "hfi", "gmu";
 +
-+			opp-414000000 {
-+				opp-hz = /bits/ 64 <414000000>;
-+				qcom,arc-level = <192>;
-+			};
++		clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
++			<&clock_gpucc GPU_CC_CXO_CLK>,
++			<&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
++			<&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
++		clock-names = "gmu", "cxo", "axi", "memnoc";
 +
-+			opp-342000000 {
-+				opp-hz = /bits/ 64 <342000000>;
-+				qcom,arc-level = <128>;
-+			};
++		power-domains = <&clock_gpucc GPU_CX_GDSC>;
++		iommus = <&adreno_smmu 5>;
 +
-+			opp-257000000 {
-+				opp-hz = /bits/ 64 <257000000>;
-+				qcom,arc-level = <64>;
-+			};
-+		};
++	i	operating-points-v2 = <&gmu_opp_table>;
++	};
++};
+diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
+index 43fac0fe09bb..0e207498edd3 100644
+--- a/Documentation/devicetree/bindings/display/msm/gpu.txt
++++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
+@@ -8,12 +8,18 @@ Required properties:
+   with the chip-id.
+ - reg: Physical base address and length of the controller's registers.
+ - interrupts: The interrupt signal from the gpu.
+-- clocks: device clocks
 +
-+		gpu at 5000000 {
-+			compatible = "qcom,adreno-630.2", "qcom,adreno";
-+			#stream-id-cells = <16>;
-+
-+			reg = <0x5000000 0x40000>;
-+			reg-names = "kgsl_3d0_reg_memory";
-+
-+			/*
-+			 * Look ma, no clocks! The GPU clocks and power are
-+			 * controlled entirely by the GMU
-+			 */
-+
-+			interrupts = <GCI_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "kgsl_3d0_irq";
-+
-+			iommus = <&adreno_smmu 0>;
-+
-+			operating-points-v2 = <&gpu_opp_table>;
-+
-+			gmu = <&gmu>;
-+		};
-+
-+		gmu_opp_table: adreno-gmu-opp-table {
-+			compatible = "operating-points-v2";
-+
-+			opp-400000000 {
-+				opp-hz = /bits/ 64 <400000000>;
-+				qcom,arc-level = <128>;
-+			};
-+
-+			opp-200000000 {
-+				opp-hz = /bits/ 64 <200000000>;
-+				qcom,arc-level = <48>;
-+			};
-+		};
-+
-+		gmu: gmu at 506a000 {
-+			compatible="qcom,adreno-gmu";
-+
-+			reg = <0x506a000 0x30000>,
-+			      <0xb200000 0x300000>;
-+			reg-names = "gmu", "gmu_pdc";
-+
-+			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "hfi", "gmu";
-+
-+			clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
-+				 <&clock_gpucc GPU_CC_CXO_CLK>,
-+				 <&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
-+				 <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
-+			clock-names = "gmu", "cxo", "axi", "memnoc";
-+
-+			power-domains = <&clock_gpucc GPU_CX_GDSC>;
-+			iommus = <&adreno_smmu 5>;
-+
-+			operating-points-v2 = <&gmu_opp_table>;
-+		};
- 	};
- };
++Optional properties.
++- clocks: device clocks. Required for a3xx, a4xx and a5xx targets. a6xx and
++  newer with a GMU attached do not have direct clock control from the CPU and
++  do not need to provide clock properties.
+   See ../clocks/clock-bindings.txt for details.
+-- clock-names: the following clocks are required:
++- clock-names: the following clocks can be provided:
+   * "core"
+   * "iface"
+   * "mem_iface"
++- gmu: For a6xx and newer targets a phandle to the GMU device that will
++  control the power for the GPU
+ 
+ Example:
+ 
 -- 
 2.16.1
