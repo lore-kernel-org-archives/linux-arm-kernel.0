@@ -1,66 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 02 Mar 2018 10:29:56 +0000
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180301164630.GB23321@kroah.com>
- <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
-Message-ID: <86r2p23h3v.wl-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Mar 2018 10:30:32 +0000
+Subject: RFC on Kdump and PCIe on ARM64
+In-Reply-To: <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
+References: <c5c2d8d2-0384-442a-7bc6-8929457b8447@codeaurora.org>
+ <20180301190552.GK13722@bhelgaas-glaptop.roam.corp.google.com>
+ <2b2de17c-8527-e49b-2ef2-2a3d1801e4f9@codeaurora.org>
+ <20180302000303.GD74737@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180302103032.GB19323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Mar 2018 09:02:32 +0000,
-Alex Shi wrote:
-> 
-> 
-> 
-> On 03/02/2018 12:46 AM, Greg KH wrote:
-> > On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
-> >> Hi All,
-> >>
-> >> Resent without non-upstream patches.
-> >>
-> >> This backport patchset fixed the spectre issue, it's original branch:
-> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-> >> A few dependency or fixingpatches are also picked up, if they are necessary
-> >>  and no functional changes.
-> >>
-> >> No bug found from kernelci.org and lkft testing. It also could be gotten from:
-> >>
-> >> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
+On Thu, Mar 01, 2018 at 06:03:03PM -0600, Bjorn Helgaas wrote:
+> On Thu, Mar 01, 2018 at 02:19:09PM -0500, Sinan Kaya wrote:
+> > On 3/1/2018 2:05 PM, Bjorn Helgaas wrote:
+> > > On Thu, Mar 01, 2018 at 12:44:26PM -0500, Sinan Kaya wrote:
+> > >> Hi,
+> > >>
+> > >> We are seeing IOMMU faults when booting the kdump kernel on ARM64.
+> > >>
+> > >> [    7.220162] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x02 received:
+> > >> [    7.226123] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000010000000002
+> > >> [    7.232023] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
+> > >> [    7.237925] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
+> > >> [    7.243827] arm-smmu-v3 arm-smmu-v3.0.auto:            0x0000000000000000
+> > >>
+> > >> This is Nate's interpretation of the fault:
+> > >>
+> > >> "The PCI device is sending transactions just after the SMMU was
+> > >> reset/reinitialized which is problematic because the device has not
+> > >> yet been added to the SMMU and thus should not be doing *any* DMA.
+> > >> DMA from the PCI devices should be quiesced prior to starting the
+> > >> crashdump kernel or you risk overwriting portions of memory you
+> > >> meant to preserve. In this case the SMMU was actually doing you a
+> > >> favor by blocking these errant DMA operations!!"
+> > >>
+> > >> I think this makes sense especially for the IOMMU enabled case on
+> > >> the host where an IOVA can overlap with the region of memory kdump
+> > >> reserved for itself.
+> > >>
+> > >> Apparently, there has been similar concerns in the past.
+> > >>
+> > >> https://www.fujitsu.com/jp/documents/products/software/os/linux/catalog/LinuxConJapan2013-Indoh.pdf
+> > >>
+> > >> and was not addressed globally due to IOMMU+PCI driver ordering
+> > >> issues and bugs in HW due to hot reset.
+> > >>
+> > >> https://lkml.org/lkml/2012/8/3/160
+> > >>
+> > >> Hot reset as mentioned is destructive and may not be the best
+> > >> implementation choice.  However, most of the modern endpoints
+> > >> support PCIE function level reset.
+> > >>
+> > >> One other solution is for SMMUv3 driver to reserve the kdump used
+> > >> IOVA addresses.
+> > >>
+> > >> Another solution is for the SMMUv3 driver to disable PCIe devices
+> > >> behind the SMMU if it see SMMU is already enabled.
+> > > 
+> > > What problem are you trying to solve?  If the IOMMU is blocking DMA
+> > > after the kdump kernel starts up, that sounds like the desired
+> > > behavior.
+> > > 
 > > 
-> > Also, how did you test, what platforms did you test, and did you test
-> > that this actually did fix the spectre issue on your platforms?  If so,
-> > what test did you use?
+> > Three issues:
+> > 1. I'm seeing a flood of SMMUv3 faults due to adapter using
+> > addresses from the previous kernel. This might be OK. 
+> 
+> Yep.  That's cosmetic and we could suppress the messages if they were
+> a problem.
+> 
+> Isn't part of the point of an IOMMU protection against malicious
+> devices and drivers?  If so, we should be able to withstand an
+> arbitrary number of faults.
+> 
+> > 2. When the SMMUv3 driver sees that it is enabled, it resets itself
+> > and configures it one more time. 
 > > 
+> > [    7.018304] arm-smmu-v3 arm-smmu-v3.0.auto: ias 44-bit, oas 44-bit (features 0x00001fef)
+> > [    7.026379] arm-smmu-v3 arm-smmu-v3.0.auto: SMMU currently enabled! Resetting...
+> > 
+> > From the moment IOMMU is disabled to the point where IOMMU get
+> > enabled again, there is a potential for the PCIE device to corrupt
+> > the kdump kernel memory as the bus master and memory enable bits are
+> > left enabled.
 > 
-> On the kernelci, there are 18 kinds of platoforms with different
-> configure tested booting, detailed info is here:
-> https://kernelci.org/boot/all/job/lsk/branch/linux-linaro-lsk-v4.9-test/kernel/lsk-v4.9-17.03-4844-g6f782cff6edb/
-> 
-> I also tested the qemu boot on hikey620. and normal boot on
+> Do you really have to reset the IOMMU?  Can you just give it new page
+> tables that start out with all IOVAs from all devices being invalid,
+> then add valid mappings as drivers need them (presumably after the
+> driver has done whatever it needs to so the device stops using the old
+> DMA addresses)?
 
-Did you try QEMU in conjunction with KVM? Or just in emulation?
+We already have the option to do that via the command line using the
+disable_bypass option, so it just sounds like we need to take this into
+account when resetting the SMMU to take care that GBPA is configured so
+that transactions are terminated when SMMUEN=0.
 
-> hikey620/db410c/junor2. The other testing include the LKFT testing which
-> is reported by email, same as test for LTS. None of testing show
-> regressions.
-> 
-> 
-> As testing the spectre bug fix, that's a good question. I also asked
-> this question to original patch authors, like Marc. They said they just
-> figure out these patches could block spectre or meltdown issue. From my
-> side, I just reproduced the process internal spectre. But all fix on arm
-> can not resolve the user space internal spectre. It can block from user
-> to kernel or kernel to user spectre according the code purose. So I
-> believe these patch could do their job. And arm cpu would drop the
-> spectre branches if it has 20+ 'nop' instructions...
-
-What are you talking about? What's that story about NOPs? There are
-clear mitigation guidelines for ARM cores, please don't make things
-up.
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+Will
