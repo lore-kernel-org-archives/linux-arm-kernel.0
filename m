@@ -1,42 +1,55 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Fri, 2 Mar 2018 10:07:08 +0200
-Subject: [PATCH] drm/bridge: sii902x: Fall back to standard modes
-In-Reply-To: <CACRpkdbMfzWSH1bAtjhW_ykJGPnycVFtbUp816KShX5wCDu+0Q@mail.gmail.com>
-References: <20180214130059.19052-1-linus.walleij@linaro.org>
- <CACRpkdYuZE+ohhLf6mmPHEsGmNw6r7UOBCyQEFOcYOYxdVj2oA@mail.gmail.com>
- <20180301211840.GD5453@intel.com>
- <CACRpkdbMfzWSH1bAtjhW_ykJGPnycVFtbUp816KShX5wCDu+0Q@mail.gmail.com>
-Message-ID: <20180302080708.GF5453@intel.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 2 Mar 2018 09:12:36 +0100
+Subject: [PATCH v2 06/16] drm/sun4i: Don't process LVDS if TCON doesn't
+ support it
+In-Reply-To: <5333678.QYsGi30oEL@jernej-laptop>
+References: <20180227222701.9716-1-jernej.skrabec@siol.net>
+ <20180227222701.9716-7-jernej.skrabec@siol.net>
+ <20180228073608.r2zd3qkiudm2uarm@flea>
+ <5333678.QYsGi30oEL@jernej-laptop>
+Message-ID: <20180302081236.zlt52z6jjsglzk3i@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 11:12:15PM +0100, Linus Walleij wrote:
-> On Thu, Mar 1, 2018 at 10:18 PM, Ville Syrj?l?
-> <ville.syrjala@linux.intel.com> wrote:
-> > On Thu, Mar 01, 2018 at 10:02:55PM +0100, Linus Walleij wrote:
-> >> Hm, hard to get review feedback on this one.
-> >>
-> >> It gives me proper video on an ARM Versatile Express utilizing the
-> >> bridge driver with a plugged in DVI-to-VGA dongle with the new
-> >> PL111 DRI driver.
-> >>
-> >> Liviu? Pawel?
-> >>
-> >> Some ACK is fine to know I am doing the right thing :)
-> >
-> > Why isn't the probe helper's noedid fallback working?
-> 
-> Where is that in the call chain?
-> 
-> The problem I have is that the bridge is there, it gets properly
-> initialized and used as connector and all. The only problem is
-> that the DDI I2C portion of it is not working, so no modes are
-> really added from the struct drm_connector_helper_funcs
-> .get_modes() callback.
+Hi,
 
-The helper is what calls .get_modes(), and it has a noedid
-fallback for mode count==0.
+On Wed, Feb 28, 2018 at 10:43:30PM +0100, Jernej ?krabec wrote:
+> Dne sreda, 28. februar 2018 ob 08:36:08 CET je Maxime Ripard napisal(a):
+> > On Tue, Feb 27, 2018 at 11:26:51PM +0100, Jernej Skrabec wrote:
+> > > TCON checks for LVDS properties even if it doesn't support it. Add a
+> > > check to skip that part of the code if TCON doesn't support channel 0.
+> > > 
+> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > 
+> > I have already sent a similar patch here:
+> > https://lists.freedesktop.org/archives/dri-devel/2018-February/166665.html
+> 
+> Right. However, check last chunk in my patch. There is no need to call 
+> sun4i_rgb_init() if TCON doesn't support channel 0. It doesn't do anything, 
+> except producing warning. Will you add that this change to your patch and then 
+> I can remove this patch from next revision?
+
+They are orthogonal to me though. Mine fixes the spurious LVDS error
+messages that you were mentionning in your commit log. Your point here
+is that we shouldn't need to even register the LVDS and RGB output
+when there's no channel 0. This is obviously true, but it should be in
+a separate patch.
+
+> BTW, your patch won't apply cleanly, since you didn't base it on latest code 
+> (every TCON variant has at least one entry now).
+
+I'll fix it when applying.
+
+Maxime
 
 -- 
-Ville Syrj?l?
-Intel OTC
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/addc48ec/attachment-0001.sig>
