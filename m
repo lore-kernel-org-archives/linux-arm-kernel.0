@@ -1,106 +1,115 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 02 Mar 2018 11:19:56 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
- <5A972A7D.9020301@codeaurora.org>
- <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
- <5A986425.9080007@codeaurora.org>
- <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
-Message-ID: <5A99A3DC.9020400@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 2 Mar 2018 13:21:10 -0600
+Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <1519942514-3350-1-git-send-email-fkan@apm.com>
+References: <1519942514-3350-1-git-send-email-fkan@apm.com>
+Message-ID: <20180302192110.GA202062@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2018 02:42 AM, Mark Rutland wrote:
-> On Thu, Mar 01, 2018 at 12:35:49PM -0800, Saravana Kannan wrote:
->> On 03/01/2018 03:49 AM, Mark Rutland wrote:
->>> On Wed, Feb 28, 2018 at 02:17:33PM -0800, Saravana Kannan wrote:
->>>> On 02/25/2018 06:36 AM, Mark Rutland wrote:
->>>>> On Fri, Feb 23, 2018 at 04:53:18PM -0800, Saravana Kannan wrote:
->>>>>> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
->>>>>>> +static void dsu_pmu_event_update(struct perf_event *event)
->>>>>>> +{
->>>>>>> +	struct hw_perf_event *hwc = &event->hw;
->>>>>>> +	u64 delta, prev_count, new_count;
->>>>>>> +
->>>>>>> +	do {
->>>>>>> +		/* We may also be called from the irq handler */
->>>>>>> +		prev_count = local64_read(&hwc->prev_count);
->>>>>>> +		new_count = dsu_pmu_read_counter(event);
->>>>>>> +	} while (local64_cmpxchg(&hwc->prev_count, prev_count, new_count) !=
->>>>>>> +			prev_count);
->>>>>>> +	delta = (new_count - prev_count) & DSU_PMU_COUNTER_MASK(hwc->idx);
->>>>>>> +	local64_add(delta, &event->count);
->>>>>>> +}
->>>>>>> +
->>>>>>> +static void dsu_pmu_read(struct perf_event *event)
->>>>>>> +{
->>>>>>> +	dsu_pmu_event_update(event);
->>>>>>> +}
->>>>>
->>>>>> I sent out a patch that'll allow PMUs to set an event flag to avoid
->>>>>> unnecessary smp calls when the event can be read from any CPU. You could
->>>>>> just always set that if you can't have multiple DSU's running the kernel (I
->>>>>> don't know if the current ARM designs support having multiple DSUs in a
->>>>>> SoC/system) or set it if associated_cpus == cpu_present_mask.
->>>>>
->>>>> As-is, that won't be safe, given the read function calls the event_update()
->>>>> function, which has side-effects on hwc->prec_count and event->count. Those
->>>>> need to be serialized somehow.
->>>>
->>>> You have to grab the dsu_pmu->pmu_lock spin lock anyway because the system
->>>> registers are shared across all CPUs.
->>>
->>> I believe that lock is currently superfluous, because the perf core
->>> ensures operations are cpu-affine, and have interrupts disabled in most
->>> cases (thanks to the context lock).
->>
->> I don't think it's superfluous. You have a common "event counter" selection
->> register and a common "event counter value" register. You can two CPUs
->> racing to read two unrelated event counters and end up causing one of them
->> to read a bogus value from the wrong event counter.
->
-> It's important to note that the DSU PMU's event_init() ensures events
-> are affine to a single CPU, and the perf core code serializes operations
-> on those events via the context lock.
+On Thu, Mar 01, 2018 at 02:15:14PM -0800, Feng Kan wrote:
+> When bridge and its endpoint is enumerated the devices are added to the
+> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> This causes the bridge to be moved to the end of the dpm list when
+> deferred probe kicks in. The order of the dpm list for bridge and
+> endpoint is reversed.
 
-Ah, I see that now. Thanks!
+I'm not very familiar with PM, so can you connect some of the dots
+here for me?
 
-> Therefore, two CPUs *won't* try to access the registers simultaneously.
+When you say "the bridge defers probe when IOMMU is not ready", are
+you talking about pcie_portdrv_probe() claiming a PCIe port?
 
-Right, and this driver seems to be going through a lot of work to make 
-sure all events are read in one CPU.
+How does this connect with the IOMMU?  Where do we figure out that the
+IOMMU is not ready?
 
-Do you even have an upstream target where there are multiple DSU's in a 
-system? If not, we can simplify a ton of this code (no hotplug 
-notifiers, no migrating PMUs, no SMP calls, etc) by just adding a 
-spinlock and letting any CPU read these DSU counters.
-
-If you need to support a system with multiple DSUs, I think it's still 
-useful to add CPU mask for events and letting the perf framework read 
-events on any of those CPUs.
-
-> If events could be active on multiple CPUs simultaneously, I agree that
-> the lock would be necessary. However, there would also be other problems
-> to deal with in that case.
->
-> If we want to allow pmu::read() from arbitrary CPUs the DSU is affine
-> to, I agree we'd need the lock to serialize accesses to the registers
-> and data structures.
-
-Agreed.
-
-So, depending on how many DSUs you want to support in the mainline 
-kernel, we can simplify it a ton. And if not, we can still try to remove 
-the need for smp calls so that we don't cause power impact when trying 
-to profile while measuring power.
-
-Thanks,
-Saravana
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Add reordering code to move the bridge and its children and consumers to
+> the end of the pm list so the order for suspend and resume is not altered.
+> The code also move device and its children and consumers to the tail of
+> device_kset list if it is registered.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Toan Le <toanle@apm.com>
+> ---
+>  V2:
+> 	1. change patch title from "move device and its children..."
+> 	2. move define based on Bjorn's comment
+> 	3. rename function name and comment content
+>  drivers/base/base.h |  3 +++
+>  drivers/base/core.c | 22 ++++++++++++++++++++++
+>  drivers/base/dd.c   |  8 ++++----
+>  3 files changed, 29 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/base/base.h b/drivers/base/base.h
+> index d800de6..a75c302 100644
+> --- a/drivers/base/base.h
+> +++ b/drivers/base/base.h
+> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
+>  extern void device_links_no_driver(struct device *dev);
+>  extern bool device_links_busy(struct device *dev);
+>  extern void device_links_unbind_consumers(struct device *dev);
+> +
+> +/* device pm support */
+> +void device_pm_move_to_tail(struct device *dev);
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 110230d..0a0756b 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>  }
+>  
+>  /**
+> + * device_pm_move_to_tail - move device and its children and consumers to end of
+> + *                          pm and device kset list
+> + * @dev: current device pointer
+> + *
+> + * This is a lock held version of the device_reorder_to_tail. Function checks
+> + * if the device is registered and moves it to the end of device_kset list. Also
+> + * if the device is pm initialized, move the device to the end of the pm list.
+> + * Then the function iterate through the children and device link consumers to
+> + * do the same for each found.
+> + */
+> +void device_pm_move_to_tail(struct device *dev)
+> +{
+> +	int idx;
+> +
+> +	idx = device_links_read_lock();
+> +	device_pm_lock();
+> +	device_reorder_to_tail(dev, NULL);
+> +	device_pm_unlock();
+> +	device_links_read_unlock(idx);
+> +}
+> +
+> +/**
+>   * device_link_add - Create a link between two devices.
+>   * @consumer: Consumer end of the link.
+>   * @supplier: Supplier end of the link.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 2c964f5..7e9d1ef 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+>  		 * Force the device to the end of the dpm_list since
+>  		 * the PM code assumes that the order we add things to
+>  		 * the list is a good order for suspend but deferred
+> -		 * probe makes that very unsafe.
+> +		 * probe makes that very unsafe. Move any children and
+> +		 * consumers belong to the device to the end of the list.
+> +		 * This way the suspend resume order won't be corrupted.
+>  		 */
+> -		device_pm_lock();
+> -		device_pm_move_last(dev);
+> -		device_pm_unlock();
+> +		device_pm_move_to_tail(dev);
+>  
+>  		dev_dbg(dev, "Retrying from deferred list\n");
+>  		if (initcall_debug && !initcalls_done)
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
