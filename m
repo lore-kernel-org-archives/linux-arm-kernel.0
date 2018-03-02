@@ -1,163 +1,135 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Mar 2018 12:50:06 -0600
-Subject: [PATCH v2 2/5] arm: zynq: Add support for Xilinx zc770 xm010 dc1
- board
-In-Reply-To: <f049c5121edab27227337ccd607db4f38f8d76f3.1519398009.git.michal.simek@xilinx.com>
-References: <cover.1519398009.git.michal.simek@xilinx.com>
- <f049c5121edab27227337ccd607db4f38f8d76f3.1519398009.git.michal.simek@xilinx.com>
-Message-ID: <20180302185006.yciyjcchsx4aa7lu@rob-hp-laptop>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 2 Mar 2018 10:50:07 -0800
+Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
+References: <1519942514-3350-1-git-send-email-fkan@apm.com>
+ <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
+Message-ID: <CAL85gmCkNGqi9QjT60ybbMDOdJGsZrraGEK+8Js2AxKG6+8ZVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 23, 2018 at 04:00:20PM +0100, Michal Simek wrote:
-> zc770 is based board which is extended by FMC/DC cards for SoC
-> validation. FMCs/DCs are supposed to cover all SoC configurations.
-> FMC/DC contains ethernet port, can, i2c, sd, qspi, spi, uart and usb.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - Record compatible string to xilinx.txt
-> 
->  Documentation/devicetree/bindings/arm/xilinx.txt |  3 +
->  arch/arm/boot/dts/Makefile                       |  1 +
->  arch/arm/boot/dts/zynq-zc770-xm010.dts           | 92 ++++++++++++++++++++++++
->  3 files changed, 96 insertions(+)
->  create mode 100644 arch/arm/boot/dts/zynq-zc770-xm010.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-> index 425c74fcc560..019e69037d42 100644
-> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
-> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-> @@ -11,6 +11,9 @@ Additional compatible strings:
->  - Xilinx internal board cc108
->    "xlnx,zynq-cc108"
->  
-> +- Xilinx internal board zc770 with different FMC cards
-> +  "xlnx,zynq-zc770-xm010"
-> +
->  ---------------------------------------------------------------
->  
->  Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c6810e84d4d7..be9ffae2a1ec 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -1067,6 +1067,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
->  	zynq-parallella.dtb \
->  	zynq-zc702.dtb \
->  	zynq-zc706.dtb \
-> +	zynq-zc770-xm010.dtb \
->  	zynq-zed.dtb \
->  	zynq-zybo.dtb
->  dtb-$(CONFIG_MACH_ARMADA_370) += \
-> diff --git a/arch/arm/boot/dts/zynq-zc770-xm010.dts b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-> new file mode 100644
-> index 000000000000..b1cfb4ede434
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-> @@ -0,0 +1,92 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Xilinx ZC770 XM010 board DTS
-> + *
-> + * Copyright (C) 2013-2018 Xilinx, Inc.
-> + */
-> +/dts-v1/;
-> +#include "zynq-7000.dtsi"
-> +
-> +/ {
-> +	compatible = "xlnx,zynq-zc770-xm010", "xlnx,zynq-7000";
-> +	model = "Xilinx Zynq";
-> +
-> +	aliases {
-> +		ethernet0 = &gem0;
-> +		i2c0 = &i2c0;
-> +		serial0 = &uart1;
-> +		spi1 = &spi1;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "";
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x40000000>;
-> +	};
-> +
-> +	usb_phy0: phy0 {
-> +		compatible = "usb-nop-xceiv";
-> +		#phy-cells = <0>;
-> +	};
-> +};
-> +
-> +&can0 {
-> +	status = "okay";
-> +};
-> +
-> +&gem0 {
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +	phy-handle = <&ethernet_phy>;
-> +
-> +	ethernet_phy: ethernet-phy at 7 {
-> +		reg = <7>;
-> +		device_type = "ethernet-phy";
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +	clock-frequency = <400000>;
-> +
-> +	eeprom: eeprom at 52 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x52>;
-> +	};
-> +
-> +};
-> +
-> +&sdhci0 {
-> +	status = "okay";
-> +};
-> +
-> +&spi1 {
-> +	status = "okay";
-> +	num-cs = <4>;
-> +	is-decoded-cs = <0>;
-> +	flash at 0 {
-> +		compatible = "sst25wf080", "jedec,spi-nor";
-> +		reg = <1>;
-> +		spi-max-frequency = <1000000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		partition at test {
+On Fri, Mar 2, 2018 at 1:11 AM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> [+Greg]
+>
+> On Thu, Mar 1, 2018 at 11:15 PM, Feng Kan <fkan@apm.com> wrote:
+>> When bridge and its endpoint is enumerated the devices are added to the
+>> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+>> This causes the bridge to be moved to the end of the dpm list when
+>> deferred probe kicks in. The order of the dpm list for bridge and
+>> endpoint is reversed.
+>>
+>> Add reordering code to move the bridge and its children and consumers to
+>> the end of the pm list so the order for suspend and resume is not altered.
+>> The code also move device and its children and consumers to the tail of
+>> device_kset list if it is registered.
+>
+> I assume that this has been tested and works as expected.
+Yes, we have tested it on our arm64 system with suspend on resume
+cycles over night.
+We wanted to test on x86, but it doesn't suffer the same problem since IOMMU
+comes before the PCIe.
 
-@test?
-
-Use a partitions node too.
-
-> +			label = "spi-flash";
-
-Should be what the partition contains.
-
-> +			reg = <0x0 0x100000>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +	usb-phy = <&usb_phy0>;
-> +};
-> -- 
-> 1.9.1
-> 
+>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Toan Le <toanle@apm.com>
+>> ---
+>>  V2:
+>>         1. change patch title from "move device and its children..."
+>>         2. move define based on Bjorn's comment
+>>         3. rename function name and comment content
+>>  drivers/base/base.h |  3 +++
+>>  drivers/base/core.c | 22 ++++++++++++++++++++++
+>>  drivers/base/dd.c   |  8 ++++----
+>>  3 files changed, 29 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/base/base.h b/drivers/base/base.h
+>> index d800de6..a75c302 100644
+>> --- a/drivers/base/base.h
+>> +++ b/drivers/base/base.h
+>> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
+>>  extern void device_links_no_driver(struct device *dev);
+>>  extern bool device_links_busy(struct device *dev);
+>>  extern void device_links_unbind_consumers(struct device *dev);
+>> +
+>> +/* device pm support */
+>> +void device_pm_move_to_tail(struct device *dev);
+>> diff --git a/drivers/base/core.c b/drivers/base/core.c
+>> index 110230d..0a0756b 100644
+>> --- a/drivers/base/core.c
+>> +++ b/drivers/base/core.c
+>> @@ -148,6 +148,28 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>>  }
+>>
+>>  /**
+>> + * device_pm_move_to_tail - move device and its children and consumers to end of
+>> + *                          pm and device kset list
+>
+> This has to be one line.  Maybe something like "Move set of devices to
+> the end of device lists" and then describe how it works below.
+>
+>> + * @dev: current device pointer
+>> + *
+>> + * This is a lock held version of the device_reorder_to_tail.
+>
+> I'd say "This is a device_reorder_to_tail() wrapper taking the
+> requisite locks." and put an empty comment line after that.
+>
+>> +  Function checks
+>
+> "It checks"
+>
+>> + * if the device is registered and moves it to the end of device_kset list. Also
+>> + * if the device is pm initialized, move the device to the end of the pm list.
+>> + * Then the function iterate through the children and device link consumers to
+>> + * do the same for each found.
+>
+> But generally I'd say "It moves the device along with all of its
+> children and all of its consumers to the ends of the device_kset and
+> dpm_list lists, recursively".
+>
+>> + */
+>> +void device_pm_move_to_tail(struct device *dev)
+>> +{
+>> +       int idx;
+>> +
+>> +       idx = device_links_read_lock();
+>> +       device_pm_lock();
+>> +       device_reorder_to_tail(dev, NULL);
+>> +       device_pm_unlock();
+>> +       device_links_read_unlock(idx);
+>> +}
+>> +
+>> +/**
+>>   * device_link_add - Create a link between two devices.
+>>   * @consumer: Consumer end of the link.
+>>   * @supplier: Supplier end of the link.
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index 2c964f5..7e9d1ef 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -121,11 +121,11 @@ static void deferred_probe_work_func(struct work_struct *work)
+>>                  * Force the device to the end of the dpm_list since
+>>                  * the PM code assumes that the order we add things to
+>>                  * the list is a good order for suspend but deferred
+>> -                * probe makes that very unsafe.
+>> +                * probe makes that very unsafe. Move any children and
+>> +                * consumers belong to the device to the end of the list.
+>> +                * This way the suspend resume order won't be corrupted.
+>
+> Why do you need to change this comment?
+Will remove. Do you know other than this problem, what was the
+original issue that is referred by the
+comment "makes that very unsafe"?
+>
+>>                  */
+>> -               device_pm_lock();
+>> -               device_pm_move_last(dev);
+>> -               device_pm_unlock();
+>> +               device_pm_move_to_tail(dev);
+>>
+>>                 dev_dbg(dev, "Retrying from deferred list\n");
+>>                 if (initcall_debug && !initcalls_done)
+>> --
+>> 1.8.3.1
+>>
