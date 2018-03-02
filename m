@@ -1,32 +1,43 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 2 Mar 2018 12:00:26 -0500
-Subject: [PATCH v2 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <20180301164343.5794-3-alexander.sverdlin@nokia.com>
-References: <20180301164343.5794-1-alexander.sverdlin@nokia.com>
- <20180301164343.5794-3-alexander.sverdlin@nokia.com>
-Message-ID: <20180302120026.52f34ad2@vmware.local.home>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri,  2 Mar 2018 18:03:10 +0100
+Subject: [PATCH 02/52] mtd: rawnand: bf5xx: fix probe function error path
+In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
+References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-3-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  1 Mar 2018 17:43:43 +0100
-Alexander Sverdlin <alexander.sverdlin@nokia.com> wrote:
+An error after nand_scan_tail() should trigger a nand_release().
+The helper mtd_device_register() (wrapped by bf5xx_nand_add_partition())
+returns an error code that should be checked and nand_release() called
+accordingly.
 
-> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> index 9e842ff..3e663f9 100644
-> --- a/arch/arm/include/asm/ftrace.h
-> +++ b/arch/arm/include/asm/ftrace.h
-> @@ -19,6 +19,7 @@ struct dyn_arch_ftrace {
->  #ifdef CONFIG_OLD_MCOUNT
->  	bool	old_mcount;
->  #endif
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/mtd/nand/raw/bf5xx_nand.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-I think you want to add:
-
-#ifdef CONFIG_ARM_MODULE_PLTS
-> +	struct module *mod;
-#endif
-
-This will add more memory overhead, and we don't want to add that if it
-is not needed.
-
--- Steve
+diff --git a/drivers/mtd/nand/raw/bf5xx_nand.c b/drivers/mtd/nand/raw/bf5xx_nand.c
+index 9a1d8d104570..da7a6083b0e5 100644
+--- a/drivers/mtd/nand/raw/bf5xx_nand.c
++++ b/drivers/mtd/nand/raw/bf5xx_nand.c
+@@ -831,11 +831,16 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
+ #endif
+ 
+ 	/* add NAND partition */
+-	bf5xx_nand_add_partition(info);
++	err = bf5xx_nand_add_partition(info);
++	if (err)
++		goto out_err_release_nand;
+ 
+ 	dev_dbg(&pdev->dev, "initialised ok\n");
++
+ 	return 0;
+ 
++out_err_release_nand:
++	nand_release(mtd);
+ out_err_nand_scan:
+ 	bf5xx_nand_dma_remove(info);
+ out_err:
+-- 
+2.14.1
