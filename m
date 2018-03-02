@@ -1,50 +1,50 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Fri, 2 Mar 2018 17:50:24 +0100
-Subject: [PATCH 2/2] drm/sun4i: add lvds mode_valid function
-In-Reply-To: <20180302143736.kkxx54og2ppcmpzh@flea.lan>
-References: <1519840432-61489-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1519840432-61489-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180301095721.4iga7dcgg566j44m@flea>
- <ebe7cfe5-e731-10cf-17cd-fe79bee0fdc4@micronovasrl.com>
- <20180302143736.kkxx54og2ppcmpzh@flea.lan>
-Message-ID: <0d10e2ef-8b7a-3ec2-fb8b-ee72345cbbb1@micronovasrl.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 3 Mar 2018 00:40:40 +0800
+Subject: [PATCH 2/2] drivers: soc: xilinx: Add ZynqMP power domain driver
+In-Reply-To: <1519775750-21297-3-git-send-email-jollys@xilinx.com>
+References: <1519775750-21297-3-git-send-email-jollys@xilinx.com>
+Message-ID: <201803030009.FUisiLBP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jolly,
 
-Il 02/03/2018 15:37, Maxime Ripard ha scritto:
-> On Fri, Mar 02, 2018 at 12:42:14PM +0100, Giulio Benetti wrote:
->> Hi,
->>
->> Il 01/03/2018 10:57, Maxime Ripard ha scritto:
->>> On Wed, Feb 28, 2018 at 06:53:52PM +0100, Giulio Benetti wrote:
->>>>    static struct drm_connector_helper_funcs sun4i_lvds_con_helper_funcs = {
->>>>    	.get_modes	= sun4i_lvds_get_modes,
->>>> +	.mode_valid	= sun4i_lvds_mode_valid,
->>>>    };
->>>
->>> This should be on the encoder, not the connector.
->>
->> I've seen it is bound to connector in rgb and to encoder in hdmi.
->> Is it correct rgb mode_valid under connector funcs?
->> Otherwise I send a patch also for that one.
-> 
-> This would need to be fixed as well. Bridges attach to encoder, not
-> connectors, so if you ever have a bridge connected to the RGB output
-> (like on the A13-Olinuxino), mode_valid isn't called at the moment.
+Thank you for the patch! Yet something to improve:
 
-Ok, I will do the same for rgb and submit a patchset,
-need some time to test both lvds and rgb.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.16-rc3 next-20180302]
+[cannot apply to xlnx/master mediatek/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
--- 
-Giulio Benetti
-CTO
+url:    https://github.com/0day-ci/linux/commits/Jolly-Shah/drivers-soc-xilinx-Add-support-for-ZynqMP-power-domain-driver/20180302-213151
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+All errors (new ones prefixed by >>):
+
+>> drivers/soc/xilinx/zynqmp/pm_domains.c:19:10: fatal error: linux/firmware/xilinx/zynqmp/firmware.h: No such file or directory
+    #include <linux/firmware/xilinx/zynqmp/firmware.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +19 drivers/soc/xilinx/zynqmp/pm_domains.c
+
+  > 19	#include <linux/firmware/xilinx/zynqmp/firmware.h>
+    20	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37892 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180303/5a338094/attachment-0001.gz>
