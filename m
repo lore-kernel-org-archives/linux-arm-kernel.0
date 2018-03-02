@@ -1,30 +1,20 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 2 Mar 2018 12:29:07 +0000
-Subject: [PATCH 11/14] drm/msm: Add support for iommu-sva PASIDs
-In-Reply-To: <20180221225924.30737-12-jcrouse@codeaurora.org>
-References: <20180221225924.30737-1-jcrouse@codeaurora.org>
- <20180221225924.30737-12-jcrouse@codeaurora.org>
-Message-ID: <a0ab61d6-1894-c3ba-4955-ca6d4f74a4d7@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 2 Mar 2018 15:26:56 +0300
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302121929.GY9418@n2100.armlinux.org.uk>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302111931.GX9418@n2100.armlinux.org.uk>
+ <20180302114909.u6kqdszt3aew2io2@mwanda>
+ <20180302121929.GY9418@n2100.armlinux.org.uk>
+Message-ID: <20180302122655.uckejonjyzt4vjd3@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/18 22:59, Jordan Crouse wrote:
-[...]> +static int install_pasid_cb(int pasid, u64 ttbr, u32 asid, void *data)
-> +{
-> +	struct pasid_entry *entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-> +
-> +	if (!entry)
-> +		return -ENOMEM;
-> +
-> +	entry->pasid = pasid;
-> +	entry->ttbr = ttbr;
-> +	entry->asid = asid;
-> +
-> +	/* FIXME: Assume that we'll never have a pasid conflict? */
+Ok, but in that case the original code is still wrong because it returns
+early with success.  I guess it could be changed to:
 
-I think a conflict would be a bug on the IOMMU side. Users should not have
-to check this. Then again, I have a few WARNs on the SMMUv3 context table
-code that uncovered nasty bugs during development.
+	if (irq <= 0)
+		return -ENXIO;
 
-Thanks,
-Jean
+regards,
+dan carpenter
