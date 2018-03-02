@@ -1,76 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Mar 2018 16:57:39 +0000
-Subject: [PATCH] arm64: kdump: fix interrupt handling done during
- machine_crash_shutdown
-In-Reply-To: <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
-References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
- <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
- <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
- <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
- <20180302120556.xujh3hoy44y7ouz7@lakrids.cambridge.arm.com>
- <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
- <20180302131545.q2vf6uc3yofofqdb@lakrids.cambridge.arm.com>
- <CAH76GKOe=+WTrw8QEJ43+fyEfRPuo7+ds8VNoMCUqSNBMtxkyg@mail.gmail.com>
- <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
-Message-ID: <20180302165739.dc726v3yf2mxli3u@lakrids.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Mar 2018 16:59:12 +0000
+Subject: [PATCH 3/3] iommu: armsmmu: set iommu ops for rpmsg bus
+In-Reply-To: <20180302145531.20463-4-srinivas.kandagatla@linaro.org>
+References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
+ <20180302145531.20463-4-srinivas.kandagatla@linaro.org>
+Message-ID: <57fc5480-c57e-dfd3-e6af-5e5bba296430@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 04:44:13PM +0000, Mark Rutland wrote:
-> On Fri, Mar 02, 2018 at 02:52:07PM +0100, Grzegorz Jaszczyk wrote:
-> > 2018-03-02 14:15 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
-> > > Do you see this for a panic() in *any* interrupt handler?
-> > 
-> > I only test with this two interrupt handlers: watchdog and i2c but I
-> > think it will behave the same with others - I can try with other if
-> > you want, any suggestion which? Maybe with some PPI interrupt instead?
-> > >
-> > > Can you trigger the issue with magic-sysrq c, for example?
-> > 
-> > There is no problem when I trigger it via 'echo c >
-> > /proc/sysrq-trigger' - it works well all the time. The problem appears
-> > only, when the kexec/kdump procedure is triggered from interrupt
-> > context
+On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > 
-> I'd meant that you'd send sysrq + c over serial, rather than writing to
-> /proc/sysrq-trigger. That way, the panic will be in the context of the
-> UART IRQ handler.
+> On Qualcomm SoCs, ADSP exposes many functions like audio and
+> others. These services need iommu access to allocate any
+> memory for the DSP. As these drivers are childeren of
+> rpmsg bus, able to allocate memory from iommus is basic
+> requirement. So set arm smmu iommu ops for this bus type.
+
+Documentation/rpmsg.txt: "Every rpmsg device is a communication channel 
+with a remote processor (thus rpmsg devices are called channels)."
+
+I'd instinctively assume that a remote processor already has its own 
+memory, and that a communication channel doesn't somehow go directly 
+through an IOMMU, so that "basic requirement" seems like a pretty big 
+assumption.
+
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>   drivers/iommu/arm-smmu.c | 5 +++++
+>   1 file changed, 5 insertions(+)
 > 
-> If that shows the issue, that's ilikely to be the easiest way for
-> someone else to reproduce and investigate this.
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index e6920d32ac9e..9b63489af15c 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -53,6 +53,7 @@
+>   #include <linux/spinlock.h>
+>   
+>   #include <linux/amba/bus.h>
+> +#include <linux/rpmsg.h>
+>   
+>   #include "io-pgtable.h"
+>   #include "arm-smmu-regs.h"
+> @@ -2168,6 +2169,10 @@ static void arm_smmu_bus_init(void)
+>   		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+>   	}
+>   #endif
+> +#ifdef CONFIG_RPMSG
 
-FWIW, having just given this a go on my Juno R1 with v4.16-rc3
-defconfig, the UART IRQs work fine in the crash kernel. That crash
-happened in IRQ context:
+Ah, so this will at least build OK with RPMSG=m, but I doubt it does 
+what you want it to in that case.
 
-[  384.653153] Call trace:
-[  384.655581]  sysrq_handle_crash+0x20/0x30
-[  384.659559]  __handle_sysrq+0xa8/0x1a0
-[  384.663278]  handle_sysrq+0x28/0x38
-[  384.666738]  pl011_fifo_to_tty+0x150/0x1a8
-[  384.670801]  pl011_int+0x30c/0x430
-[  384.674177]  __handle_irq_event_percpu+0x5c/0x148
-[  384.678843]  handle_irq_event_percpu+0x34/0x88
-[  384.683250]  handle_irq_event+0x48/0x78
-[  384.687056]  handle_fasteoi_irq+0xa8/0x180
-[  384.691119]  generic_handle_irq+0x24/0x38
-[  384.695095]  __handle_domain_irq+0x5c/0xb0
-[  384.699158]  gic_handle_irq+0x58/0xa8
-[  384.702790]  el1_irq+0xb0/0x128
-[  384.705907]  cpuidle_enter_state+0x138/0x220
-[  384.710142]  cpuidle_enter+0x18/0x20
-[  384.713690]  call_cpuidle+0x1c/0x38
-[  384.717151]  do_idle+0x1b0/0x1e8
-[  384.720354]  cpu_startup_entry+0x20/0x28
-[  384.724246]  rest_init+0xd0/0xe0
-[  384.727450]  start_kernel+0x3e4/0x410
+Robin.
 
-On a separate note, the crashkernel complained:
-
-[    0.224730] CPU: CPUs started in inconsistent modes
-
-... which is a separate disaster. I suspect the kexec code failed to punt the
-crash CPU back to EL2 as it should have.
-
-Thanks,
-Mark.
+> +	if (!iommu_present(&rpmsg_bus))
+> +		bus_set_iommu(&rpmsg_bus, &arm_smmu_ops);
+> +#endif
+>   }
+>   
+>   static int arm_smmu_device_probe(struct platform_device *pdev)
+> 
