@@ -1,115 +1,53 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 2 Mar 2018 09:56:13 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-In-Reply-To: <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
-References: <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
-Message-ID: <af8422d5-a257-a8af-3191-27e486c2a88d@st.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Fri, 2 Mar 2018 17:02:32 +0800
+Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
+In-Reply-To: <20180301164630.GB23321@kroah.com>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+ <20180301164630.GB23321@kroah.com>
+Message-ID: <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 03/01/2018 11:44 AM, Ulf Hansson wrote:
-> On 1 March 2018 at 10:57, Ludovic BARRE <ludovic.barre@st.com> wrote:
->> Hi Ulf
+
+On 03/02/2018 12:46 AM, Greg KH wrote:
+> On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
+>> Hi All,
 >>
->> On 03/01/2018 10:06 AM, Ulf Hansson wrote:
->>>
->>> Hi Ludovic,
->>>
->>> On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>>
->>>> From: Ludovic Barre <ludovic.barre@st.com>
->>>>
->>>> This patch serie adds support of stm32 SDMMC controller.
->>>> stm32h7 is the first SoC to use stm32 SDMMC controller
->>>> (previous SoC had pl180 controller).
->>>
->>>
->>> I am a not convinced this isn't a new improved variant of the pl180.
->>> According to register layout and the code you submitted in patch2,
->>> there are great similarities to pl180 and the mmci driver.
+>> Resent without non-upstream patches.
 >>
+>> This backport patchset fixed the spectre issue, it's original branch:
+>> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+>> A few dependency or fixingpatches are also picked up, if they are necessary
+>>  and no functional changes.
 >>
->> In fact, ST designers which created stm32-sdmmc hardware block from scratch
->> are the same which have done the modifications on pl180 variant (stm32
->> legacy f4, f7).
->> So some registers or bits name seem identical (or strongly inspirited) but
->> the engine and features are different.
+>> No bug found from kernelci.org and lkft testing. It also could be gotten from:
+>>
+>> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
 > 
-> Well, in that case, I assume the driver would also need work
-> differently, but when looking at the code in patch2 this doesn't seem
-> to be the case.
+> Also, how did you test, what platforms did you test, and did you test
+> that this actually did fix the spectre issue on your platforms?  If so,
+> what test did you use?
 > 
 
-I understand why you push to avoid drivers multiplication. But I'm
-scared to squash 2 different hardware block which are their own roadmap
-in the same drivers. I fear that it complicates the features management 
-and maintenance of this driver.
+On the kernelci, there are 18 kinds of platoforms with different
+configure tested booting, detailed info is here:
+https://kernelci.org/boot/all/job/lsk/branch/linux-linaro-lsk-v4.9-test/kernel/lsk-v4.9-17.03-4844-g6f782cff6edb/
 
-there are some difference:
--the stm32-sdmmc use an internal dma (stm32-sdmmc is master on the bus), 
--idma alignment constraint.
--idma transfer mode single buffer, double buffer... (future evolution)
--need a command to stop transmission for data state machine
--same bit naming could have offset, mask width or set in different register.
-=> I will try to synthesis register difference in a document
--voltage switch sequence
--delay block: calibration, tunning (sdr104)
--reset line required
--the same feature have not the same impact, example ddr mode
-stm32:no bypass clk, activated in clk register
-pl180: clkreg_neg_edge_enable, activated in datactrl register,
-...
+I also tested the qemu boot on hikey620. and normal boot on
+hikey620/db410c/junor2. The other testing include the LKFT testing which
+is reported by email, same as test for LTS. None of testing show
+regressions.
 
-stm32-sdmmc is just at begining of its life cycle. Each revision of this 
-block increases the difference with pl180. Today, I've just push the 
-minimal driver to start a request, but I've not yet send all features of 
-this revision like sdio, sdr104 support. After this revision there 
-already are 2 other revisions in the pipe (at short term).
 
-I am Out of Office with limited access to my e-mail till 2018 march 12th
-I'll try to think about it on ski slope. euh, in fact no just ski and 
-enjoy ;-)
+As testing the spectre bug fix, that's a good question. I also asked
+this question to original patch authors, like Marc. They said they just
+figure out these patches could block spectre or meltdown issue. From my
+side, I just reproduced the process internal spectre. But all fix on arm
+can not resolve the user space internal spectre. It can block from user
+to kernel or kernel to user spectre according the code purose. So I
+believe these patch could do their job. And arm cpu would drop the
+spectre branches if it has 20+ 'nop' instructions...
 
-BR
-Ludo
-
->>
->> You could find the datasheet of STM32H7x3 on:
->> http://www.st.com/content/ccc/resource/technical/document/reference_manual/group0/c9/a3/76/fa/55/46/45/fa/DM00314099/files/DM00314099.pdf/jcr:content/translations/en.DM00314099.pdf
->>
->> Chapters: 55 Secure digital input/output MultiMediaCard interface
->> (SDMMC)
-> 
-> Thanks for sharing this. However this confirms my view, it looks
-> exactly as a new improved mmci variant. :-)
-> 
->>
->> This hardware block has own roadmap and some features are already in the
->> pipe for next SoC.
-> 
-> That's fine. I don't have a problem extending the mmci driver, even
-> several times, as to cope with new revisions.
-> 
->>
->> For code design: like I also worked on pl180 in the past :-)
->> my code is inspirited of this driver.
-> 
-> Right, that may explain things a bit.
-> 
-> However, besides a re-name of the registers, I really think that the
-> code execution, dealing with IRQs etc, is very similar to the mmci
-> driver. Isn't it?
-> 
-> So, I think it's at least worth to give it a go with the mmci driver
-> first, to see if we can get it to work.
-> 
-> I guess you understand why I am pushing!? This is about maintenance -
-> and I really want to avoid having a yet another driver to maintain,
-> unless we can extend an existing one.
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+Regards
+Alex
