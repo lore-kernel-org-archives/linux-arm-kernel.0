@@ -1,82 +1,57 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 2 Mar 2018 13:11:34 +0100
-Subject: [RESEND PATCH v5 0/6] IR support for A83T
-In-Reply-To: <20180213122952.8420-1-embed3d@gmail.com>
-References: <20180213122952.8420-1-embed3d@gmail.com>
-Message-ID: <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Mar 2018 12:11:43 +0000
+Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
+In-Reply-To: <20180302090948.6399-1-linus.walleij@linaro.org>
+References: <20180302090948.6399-1-linus.walleij@linaro.org>
+Message-ID: <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+On 02/03/18 09:09, Linus Walleij wrote:
+> This is the base for finally getting RealView and Versatile
+> Express supported in the PL111 DRM driver.
+> 
+> We have then moved all the way up from the first ARM
+> Integrator versions to the last Versatile Express reference
+> designs using PL111.
+> 
+> After this, forked hardware such as Nomadik and SPEAr
+> remains to be moved over.
+> 
+> Some infrastructure for adjusting depth (ARGB5551) etc
+> on the Integrator and some bridge fixups are still needed
+> but this is the core of the support for these platforms
+> and the rest can be done on top before switching over.
+> 
+> Also the Versatile Express CLCD on the motherboard has
+> a dedicated video memory, and cannot use CMA (ha! complex!)
+> and I will need to figure out a way to work around that.
+> The CLCDs synthesized on the core tiles for CA9 work
+> fine with this though.
 
-On 13.02.2018 13:29, Philipp Rossak wrote:
-> This patch series adds support for the sunxi A83T ir module and enhances
-> the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> is a hard coded define and is set to 8 MHz.
-> This works for the most common ir receivers. On the Sinovoip Bananapi M3
-> the ir receiver needs, a 3 MHz base clock frequency to work without
-> problems with this driver.
-> 
-> This patch series adds support for an optinal property that makes it able
-> to override the default base clock frequency and enables the ir interface
-> on the a83t and the Bananapi M3.
-> 
-> changes since v4:
-> * rename cir pin from cir_pins to r_cir_pin
-> * drop unit-adress from r_cir_pin
-> * add a83t compatible to the cir node
-> * move muxing options to dtsi
-> * rename cir label and reorder it in the bananpim3.dts file
-> 
-> changes since v3:
-> * collecting all acks & reviewd by
-> * fixed typos
-> 
-> changes since v2:
-> * reorder cir pin (alphabetical)
-> * fix typo in documentation
-> 
-> changes since v1:
-> * fix typos, reword Documentation
-> * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
-> * change dev_info() to dev_dbg()
-> * change naming to cir* in dts/dtsi
-> * Added acked Ackedi-by to related patch
-> * use whole memory block instead of registers needed + fix for h3/h5
-> 
-> changes since rfc:
-> * The property is now optinal. If the property is not available in
->    the dtb the driver uses the default base clock frequency.
-> * the driver prints out the the selected base clock frequency.
-> * changed devicetree property from base-clk-frequency to clock-frequency
-> 
-> Regards,
-> Philipp
-> 
-> Philipp Rossak (6):
->    media: rc: update sunxi-ir driver to get base clock frequency from
->      devicetree
->    media: dt: bindings: Update binding documentation for sunxi IR
->      controller
->    arm: dts: sun8i: a83t: Add the cir pin for the A83T
->    arm: dts: sun8i: a83t: Add support for the cir interface
->    arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
->    arm: dts: sun8i: h3-h5: ir register size should be the whole memory
->      block
-> 
->   Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
->   arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
->   arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
->   arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
->   drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
->   5 files changed, 38 insertions(+), 9 deletions(-)
->
+Out of curiosity, what's the issue with declaring the VRAM as a CMA 
+region? That's certainly worked for stuff like local RAM on FPGA tiles 
+in the past, and I can't think offhand of any way in which VExpress is 
+wildly different (but I am of course open to being wrong...)
 
-I talked yesterday with Maxime about this patch series. And he told me 
-if the first to patches got merged, he will apply the dts patches to the 
-sunxi tree.
+Robin.
 
-Sean, can you merge the first two patches through the rc-core?
-
-Thanks,
-Philipp
+> Linus Walleij (4):
+>    drm/pl111: Make the default BPP a per-variant variable
+>    drm/pl111: Use max memory bandwidth for resolution
+>    drm/pl111: Handle the RealView variant separately
+>    drm/pl111: Support the Versatile Express
+> 
+>   drivers/gpu/drm/pl111/Makefile          |   1 +
+>   drivers/gpu/drm/pl111/pl111_display.c   |  36 +++++++++++
+>   drivers/gpu/drm/pl111/pl111_drm.h       |   6 +-
+>   drivers/gpu/drm/pl111/pl111_drv.c       |  10 ++-
+>   drivers/gpu/drm/pl111/pl111_versatile.c |  80 +++++++++++++++++++++++-
+>   drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
+>   drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
+>   7 files changed, 258 insertions(+), 3 deletions(-)
+>   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+>   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
+> 
