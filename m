@@ -1,50 +1,103 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 2 Mar 2018 12:25:48 +0000
-Subject: [PATCH 03/14] iommu: Create a base struct for io_mm
-In-Reply-To: <20180221225924.30737-4-jcrouse@codeaurora.org>
+Date: Fri, 2 Mar 2018 12:27:58 +0000
+Subject: [PATCH 04/14] iommu: sva: Add support for pasid allocation
+In-Reply-To: <20180221225924.30737-5-jcrouse@codeaurora.org>
 References: <20180221225924.30737-1-jcrouse@codeaurora.org>
- <20180221225924.30737-4-jcrouse@codeaurora.org>
-Message-ID: <fddafdae-4384-4826-ef63-9075e9866ae9@arm.com>
+ <20180221225924.30737-5-jcrouse@codeaurora.org>
+Message-ID: <b71fefa1-2fdf-f14f-9e7a-0e525a103049@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jordan,
-
-Thank you for this, SMMUv3 and virtio-iommu need these SVA patches as well.
-
 On 21/02/18 22:59, Jordan Crouse wrote:
-[...]> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index e2c49e583d8d..e998389cf195 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -110,8 +110,17 @@ struct iommu_domain {
->  	struct list_head mm_list;
->  };
->  
-> +enum iommu_io_type {
-> +	IO_TYPE_MM,
-> +};
+[...]
+> +int iommu_sva_alloc_pasid(struct iommu_domain *domain, struct device *dev)
+> +{
+> +	int ret, pasid;
+> +	struct io_pasid *io_pasid;
 > +
-> +struct io_base {
-> +	int type;
-> +	int pasid;
-> +};
+> +	if (!domain->ops->pasid_alloc || !domain->ops->pasid_free)
+> +		return -ENODEV;
+> +
+> +	io_pasid = kzalloc(sizeof(*io_pasid), GFP_KERNEL);
+> +	if (!io_pasid)
+> +		return -ENOMEM;
+> +
+> +	io_pasid->domain = domain;
+> +	io_pasid->base.type = IO_TYPE_PASID;
+> +
+> +	idr_preload(GFP_KERNEL);
+> +	spin_lock(&iommu_sva_lock);
+> +	pasid = idr_alloc_cyclic(&iommu_pasid_idr, &io_pasid->base,
+> +		1, (1 << 31), GFP_ATOMIC);
 
-"io_base" is a bit vague. I'm bad at naming so my opinion doesn't hold
-much water, but I'd rather this be something like "io_mm_base". When I
-initially toyed with the idea I intended to keep io_mm as parent structure
-and have "private" and "shared" sub-structures. Even if private PASIDs
-don't rely on the kernel mm subsystem, this structure would still
-represent an I/O mm of sorts, with a pgd and pgtable info.
+To be usable by other IOMMUs, this should restrict the PASID range to what
+the IOMMU and the device support like io_mm_alloc(). In your case 31 bits,
+but with PCI PASID it depends on the PASID capability and the SMMU
+SubstreamID range.
+
+For this reason I think device drivers should call iommu_sva_device_init()
+once, even for the alloc_pasid() API. For SMMUv2 I guess it will be a NOP,
+but other IOMMUs will allocate PASID tables and enable features in the
+device. In addition, knowing that all users of the API call
+iommu_sva_device_init()/shutdown() could allow us to allocate and enable
+stuff lazily in the future.
+
+It would also allow a given device driver to use both
+iommu_sva_pasid_alloc() and iommu_sva_bind()@the same time. So that the
+driver can assigns contexts to userspace and still use some of them for
+management.
+
+[...]
+> +int iommu_sva_map(int pasid, unsigned long iova,
+> +	      phys_addr_t paddr, size_t size, int prot)
+
+It would be nice to factor iommu_map(), since this logic for map, map_sg
+and unmap should be the same regardless of the PASID argument.
+
+For example
+- iommu_sva_map(domain, pasid, ...)
+- iommu_map(domain, ...)
+
+both call
+- __iommu_map(domain, pasid, ...)
+
+which calls either
+- ops->map(domain, ...)
+- ops->sva_map(domain, pasid, ...)
+
+[...]
+> @@ -347,6 +353,15 @@ struct iommu_ops {
+>  	int (*page_response)(struct iommu_domain *domain, struct device *dev,
+>  			     struct page_response_msg *msg);
+>  
+> +	int (*pasid_alloc)(struct iommu_domain *domain, struct device *dev,
+> +		int pasid);
+> +	int (*sva_map)(struct iommu_domain *domain, int pasid,
+> +		       unsigned long iova, phys_addr_t paddr, size_t size,
+> +		       int prot);
+> +	size_t (*sva_unmap)(struct iommu_domain *domain, int pasid,
+> +			    unsigned long iova, size_t size);
+> +	void (*pasid_free)(struct iommu_domain *domain, int pasid);
+> +
+
+Hmm, now IOMMU has the following ops:
+
+* mm_alloc(): allocates a shared mm structure
+* mm_attach(): writes the entry in the PASID table
+* mm_detach(): removes the entry from the PASID table and invalidates it
+* mm_free(): free shared mm
+* pasid_alloc(): allocates a pasid structure (which I usually call
+"private mm") and write the entry in the PASID table (or call
+install_pasid() for SMMUv2)
+* pasid_free(): remove from the PASID table (or call remove_pasid()) and
+free the pasid structure.
+
+Splitting mm_alloc and mm_attach is necessary because the io_mm in my case
+can be shared between devices (allocated once, attached multiple times).
+In your case a PASID is private to one device so only one callback is
+needed. However mm_alloc+mm_attach will do roughly the same as
+pasid_alloc, so to reduce redundancy in iommu_ops, maybe we could reuse
+mm_alloc and mm_attach for the private PASID case?
 
 Thanks,
 Jean
-
-> +
->  struct io_mm {
-> -	int			pasid;
-> +	struct io_base		base;
->  	struct list_head	devices;
->  	struct kref		kref;
->  #if defined(CONFIG_MMU_NOTIFIER)
-> 
