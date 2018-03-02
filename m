@@ -1,59 +1,84 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 2 Mar 2018 11:19:43 +0200
-Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
-In-Reply-To: <20180228194429.GD22932@mithrandir>
-References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
- <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
- <20180228194429.GD22932@mithrandir>
-Message-ID: <0c3fc3ba-8640-0b2c-a9ec-ab848227c92d@microchip.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 2 Mar 2018 10:12:53 +0100
+Subject: v4.16-rc0: missing includes in framebuffers break N900 compilation
+In-Reply-To: <46d9fddf-7e6d-b157-0745-6366ccd57a41@ti.com>
+References: <20180226130007.GA5634@amd>
+ <46d9fddf-7e6d-b157-0745-6366ccd57a41@ti.com>
+Message-ID: <20180302091253.GB15948@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon 2018-02-26 16:05:53, Tomi Valkeinen wrote:
+> v4.16-rc1 has a fix (b9058afcd6c7).
 
+Yep, thanks. I was bisecting sound problem on N900, so this hit me...
 
-On 28.02.2018 21:44, Thierry Reding wrote:
-> On Thu, Feb 22, 2018 at 02:01:16PM +0200, Claudiu Beznea wrote:
->> Add PWM mode to pwm_config() function. The drivers which uses pwm_config()
->> were adapted to this change.
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
->>  arch/arm/mach-s3c24xx/mach-rx1950.c  | 11 +++++++++--
->>  drivers/bus/ts-nbus.c                |  2 +-
->>  drivers/clk/clk-pwm.c                |  3 ++-
->>  drivers/gpu/drm/i915/intel_panel.c   | 17 ++++++++++++++---
->>  drivers/hwmon/pwm-fan.c              |  2 +-
->>  drivers/input/misc/max77693-haptic.c |  2 +-
->>  drivers/input/misc/max8997_haptic.c  |  6 +++++-
->>  drivers/leds/leds-pwm.c              |  5 ++++-
->>  drivers/media/rc/ir-rx51.c           |  5 ++++-
->>  drivers/media/rc/pwm-ir-tx.c         |  5 ++++-
->>  drivers/video/backlight/lm3630a_bl.c |  4 +++-
->>  drivers/video/backlight/lp855x_bl.c  |  4 +++-
->>  drivers/video/backlight/lp8788_bl.c  |  5 ++++-
->>  drivers/video/backlight/pwm_bl.c     | 11 +++++++++--
->>  drivers/video/fbdev/ssd1307fb.c      |  3 ++-
->>  include/linux/pwm.h                  |  6 ++++--
->>  16 files changed, 70 insertions(+), 21 deletions(-)
+     	       	   	     	   	      	       	    Pavel
+
+> On 26/02/18 15:00, Pavel Machek wrote:
+> > I needed this to get -rc0 to compile.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > 
+> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/dss.c b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> > index 48c6500..990f1c9 100644
+> > --- a/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
+> > @@ -38,6 +38,7 @@
+> >  #include <linux/regmap.h>
+> >  #include <linux/of.h>
+> >  #include <linux/regulator/consumer.h>
+> > +#include <linux/pinctrl/consumer.h>
+> >  #include <linux/suspend.h>
+> >  #include <linux/component.h>
+> >  
+> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> > index 9a13c35..4862b12 100644
+> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
+> > @@ -12,6 +12,7 @@
+> >  #include <linux/err.h>
+> >  #include <linux/io.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/seq_file.h>
+> >  #include <linux/slab.h>
+> >  #include <video/omapfb_dss.h>
+> >  
+> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> > index eac3665..39014e2 100644
+> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/err.h>
+> >  #include <linux/io.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/seq_file.h>
+> >  #include <linux/clk.h>
+> >  
+> >  #include <video/omapfb_dss.h>
+> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> > index 705373e..e93e7a7 100644
+> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/io.h>
+> >  #include <linux/platform_device.h>
+> >  #include <video/omapfb_dss.h>
+> > +#include <linux/seq_file.h>
+> >  
+> >  #include "dss.h"
+> >  #include "hdmi.h"
+> > 
 > 
-> I don't think it makes sense to leak mode support into the legacy API.
-> The pwm_config() function is considered legacy
-I missed this aspect.
 
- and should eventually go
-> away. As such it doesn't make sense to integrate a new feature such as
-> PWM modes into it. 
-Agree.
-
-All users of pwm_config() assume normal mode, and
-> that's what pwm_config() should provide.
-Agree.
-
-> 
-> Anyone that needs something other than normal mode should use the new
-> atomic PWM API.
-Agree.
-
-> 
-> Thierry
-> 
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/5c8e9edc/attachment-0001.sig>
