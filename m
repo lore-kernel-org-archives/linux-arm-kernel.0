@@ -1,57 +1,187 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 2 Mar 2018 23:04:45 +0100
-Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: add SFP module support
-In-Reply-To: <20180302220215.GC9418@n2100.armlinux.org.uk>
-References: <20180227160135.GU9418@n2100.armlinux.org.uk>
- <E1eqhha-0004l3-Rd@rmk-PC.armlinux.org.uk>
- <20180302215614.GD25189@lunn.ch>
- <20180302220215.GC9418@n2100.armlinux.org.uk>
-Message-ID: <20180302220445.GF25189@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 16:12:36 -0600
+Subject: [PATCH v10 2/3] NPCM750: add clock tree doc and binding
+In-Reply-To: <1519553539-15899-3-git-send-email-tali.perry1@gmail.com>
+References: <1519553539-15899-1-git-send-email-tali.perry1@gmail.com>
+ <1519553539-15899-3-git-send-email-tali.perry1@gmail.com>
+Message-ID: <20180302221236.qsxooi5l53wx6lby@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 10:02:15PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Mar 02, 2018 at 10:56:14PM +0100, Andrew Lunn wrote:
-> > On Tue, Feb 27, 2018 at 04:02:02PM +0000, Russell King wrote:
-> > > Add SFP module support for Clearfog using the SFP phylink support.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
-> > 
-> > Using a RoboFiber SFP module, connected to a media converter. Link
-> > up/down detected.
+On Sun, Feb 25, 2018 at 12:12:18PM +0200, Tali Perry wrote:
 > 
-> ethtool -m should also work.
+Need a commit msg.
 
-Yes, it does. Sorry, should of said that.
+The subject should be "dt-bindings: clock: ..."
 
-root at clearfog:~# ethtool -m eth1
-        Identifier                                : 0x03 (SFP)
-        Extended identifier                       : 0x04 (GBIC/SFP defined by 2-wire interface ID)
-        Connector                                 : 0x07 (LC)
-        Transceiver codes                         : 0x00 0x00 0x00 0x01 0x00 0x00 0x00 0x00
-        Transceiver type                          : Ethernet: 1000BASE-SX
-        Encoding                                  : 0x01 (8B/10B)
-        BR, Nominal                               : 1300MBd
-        Rate identifier                           : 0x00 (unspecified)
-        Length (SMF,km)                           : 0km
-        Length (SMF)                              : 0m
-        Length (50um)                             : 550m
-        Length (62.5um)                           : 270m
-        Length (Copper)                           : 0m
-        Length (OM3)                              : 0m
-        Laser wavelength                          : 850nm
-        Vendor name                               : OEM             
-        Vendor OUI                                : 20:20:20
-        Vendor PN                                 : SFP-7000-85     
-        Vendor rev                                : 11.0
-        Optical diagnostics support               : Yes
-        Laser bias current                        : 45.512 mA
-        Laser output power                        : 0.2861 mW / -5.43 dBm
-        Receiver signal average optical power     : 0.2749 mW / -5.61 dBm
-        Module temperature                        : 25.72 degrees C / 78.29 degrees F
-        Module voltage                            : 3.2856 V
-...
+> Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+> 
+> ---
+>  .../bindings/clock/nuvoton,npcm750-clk.txt         | 100 +++++++++++++++++++++
+>  include/dt-bindings/clock/nuvoton,npcm7xx-clock.h  |  44 +++++++++
+>  2 files changed, 144 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
+>  create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt b/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
+> new file mode 100644
+> index 000000000000..dd17b86bd577
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
+> @@ -0,0 +1,100 @@
+> +* Nuvoton NPCM7XX Clock Controller
+> +
+> +Nuvoton Poleg BMC NPCM7XX contains an integrated clock controller, which
+> +generates and supplies clocks to all modules within the BMC.
+> +
+> +External clocks:
+> +
+> +There are six fixed clocks that are generated outside the BMC. All clocks are of
+> +a known fixed value that cannot be changed. clk_refclk, clk_mcbypck and
+> +clk_sysbypck are inputs to the clock controller.
+> +clk_rg1refck, clk_rg2refck and clk_xin are external clocks suppling the
+> +network. They are set on the device tree, but not used by the clock module. The
+> +network devices use them directly.
+> +Example can be found below.
+> +
+> +All available clocks are defined as preprocessor macros in:
+> +dt-bindings/clock/nuvoton,npcm7xx-clock.h
+> +and can be reused as DT sources.
+> +
+> +Required Properties of clock controller:
+> +
+> +	- compatible: "nuvoton,npcm750-clk" : for clock controller of Nuvoton
+> +		  Poleg BMC NPCM750
+> +
+> +	- reg: physical base address of the clock controller and length of
+> +		memory mapped region.
+> +
+> +	- #clock-cells: should be 1.
+> +
+> +Example: Clock controller node:
+> +
+> +	clk: clock-controller at f0801000 {
+> +		compatible = "nuvoton,npcm750-clk";
+> +		#clock-cells = <1>;
+> +		reg = <0xf0801000 0x1000>;
+> +		clock-names = "refclk", "sysbypck", "mcbypck";
+> +		clocks = <&clk_refclk>, <&clk_sysbypck>, <&clk_mcbypck>;
+> +	};
+> +
+> +Example: Required external clocks for network:
+> +
+> +	/* external reference clock */
+> +	clk_refclk: clk-refclk {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <25000000>;
+> +		clock-output-names = "refclk";
+> +	};
+> +
+> +	/* external reference clock for cpu. float in normal operation */
+> +	clk_sysbypck: clk-sysbypck {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <800000000>;
+> +		clock-output-names = "sysbypck";
+> +	};
+> +
+> +	/* external reference clock for MC. float in normal operation */
+> +	clk_mcbypck: clk-mcbypck {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <800000000>;
+> +		clock-output-names = "mcbypck";
+> +	};
+> +
+> +	 /* external clock signal rg1refck, supplied by the phy */
+> +	clk_rg1refck: clk-rg1refck {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "clk_rg1refck";
+> +	};
+> +
+> +	 /* external clock signal rg2refck, supplied by the phy */
+> +	clk_rg2refck: clk-rg2refck {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "clk_rg2refck";
+> +	};
+> +
+> +	clk_xin: clk-xin {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <50000000>;
+> +		clock-output-names = "clk_xin";
+> +	};
+> +
+> +
+> +Example: GMAC controller node that consumes two clocks: a generated clk by the
+> +clock controller and a fixed clock from DT (clk_rg1refck).
+> +
+> +	ethernet0: eth at f0802000 {
 
-	Andrew
+ethernet at ...
+
+> +		compatible = "snps,dwmac";
+> +		reg = <0xf0802000 0x2000>;
+> +		interrupts = <0 14 4>;
+> +		interrupt-names = "macirq";
+> +		clocks	= <&clk_rg1refck>, <&clk NPCM7XX_CLK_AHB>;
+> +		clock-names = "stmmaceth", "clk_gmac";
+> +	};
+> diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+> new file mode 100644
+> index 000000000000..f21522605b94
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+> @@ -0,0 +1,44 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Nuvoton NPCM7xx Clock Generator binding
+> + * clock binding number for all clocks supportted by nuvoton,npcm7xx-clk
+> + *
+> + * Copyright (C) 2018 Nuvoton Technologies tali.perry at nuvoton.com
+> + *
+> + */
+> +
+> +#ifndef __DT_BINDINGS_CLOCK_NPCM7XX_H
+> +#define __DT_BINDINGS_CLOCK_NPCM7XX_H
+> +
+> +
+> +#define NPCM7XX_CLK_CPU 0
+> +#define NPCM7XX_CLK_GFX_PIXEL 1
+> +#define NPCM7XX_CLK_MC 2
+> +#define NPCM7XX_CLK_ADC 3
+> +#define NPCM7XX_CLK_AHB 4
+> +#define NPCM7XX_CLK_TIMER 5
+> +#define NPCM7XX_CLK_UART 6
+> +#define NPCM7XX_CLK_MMC  7
+> +#define NPCM7XX_CLK_SPI3 8
+> +#define NPCM7XX_CLK_PCI  9
+> +#define NPCM7XX_CLK_AXI 10
+> +#define NPCM7XX_CLK_APB4 11
+> +#define NPCM7XX_CLK_APB3 12
+> +#define NPCM7XX_CLK_APB2 13
+> +#define NPCM7XX_CLK_APB1 14
+> +#define NPCM7XX_CLK_APB5 15
+> +#define NPCM7XX_CLK_CLKOUT 16
+> +#define NPCM7XX_CLK_GFX  17
+> +#define NPCM7XX_CLK_SU   18
+> +#define NPCM7XX_CLK_SU48 19
+> +#define NPCM7XX_CLK_SDHC 20
+> +#define NPCM7XX_CLK_SPI0 21
+> +#define NPCM7XX_CLK_SPIX 22
+> +
+> +#define NPCM7XX_CLK_REFCLK 23
+> +#define NPCM7XX_CLK_SYSBYPCK 24
+> +#define NPCM7XX_CLK_MCBYPCK 25
+> +
+> +#define NPCM7XX_NUM_CLOCKS	 (NPCM7XX_CLK_MCBYPCK+1)
+> +
+> +#endif
+> -- 
+> 2.14.1
+> 
