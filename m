@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri,  2 Mar 2018 18:03:49 +0100
-Subject: [PATCH 41/52] mtd: rawnand: txx9ndfmc: convert driver to nand_scan()
+Date: Fri,  2 Mar 2018 18:03:48 +0100
+Subject: [PATCH 40/52] mtd: rawnand: tango: convert driver to nand_scan()
 In-Reply-To: <20180302170400.6712-1-miquel.raynal@bootlin.com>
 References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
-Message-ID: <20180302170400.6712-42-miquel.raynal@bootlin.com>
+Message-ID: <20180302170400.6712-41-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,61 +14,62 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/txx9ndfmc.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
+ drivers/mtd/nand/raw/tango_nand.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/txx9ndfmc.c b/drivers/mtd/nand/raw/txx9ndfmc.c
-index b567d212fe7d..5c20219bca98 100644
---- a/drivers/mtd/nand/raw/txx9ndfmc.c
-+++ b/drivers/mtd/nand/raw/txx9ndfmc.c
-@@ -254,21 +254,17 @@ static void txx9ndfmc_initialize(struct platform_device *dev)
- #define TXX9NDFMC_NS_TO_CYC(gbusclk, ns) \
- 	DIV_ROUND_UP((ns) * DIV_ROUND_UP(gbusclk, 1000), 1000000)
- 
--static int txx9ndfmc_nand_scan(struct mtd_info *mtd)
-+static int txx9ndfmc_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = mtd_to_nand(mtd);
--	int ret;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (!ret) {
--		if (mtd->writesize >= 512) {
--			/* Hardware ECC 6 byte ECC per 512 Byte data */
--			chip->ecc.size = 512;
--			chip->ecc.bytes = 6;
--		}
--		ret = nand_scan_tail(mtd);
-+	if (mtd->writesize >= 512) {
-+		/* Hardware ECC 6 byte ECC per 512 Byte data */
-+		chip->ecc.size = 512;
-+		chip->ecc.bytes = 6;
- 	}
--	return ret;
-+
-+	return 0;
+diff --git a/drivers/mtd/nand/raw/tango_nand.c b/drivers/mtd/nand/raw/tango_nand.c
+index 69e5eb136edc..a45ad30bc095 100644
+--- a/drivers/mtd/nand/raw/tango_nand.c
++++ b/drivers/mtd/nand/raw/tango_nand.c
+@@ -517,6 +517,24 @@ static int tango_set_timings(struct mtd_info *mtd, int csline,
+ 	return 0;
  }
  
- static int __init txx9ndfmc_probe(struct platform_device *dev)
-@@ -332,7 +328,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		chip->ecc.correct = txx9ndfmc_correct_data;
- 		chip->ecc.hwctl = txx9ndfmc_enable_hwecc;
- 		chip->ecc.mode = NAND_ECC_HW;
--		/* txx9ndfmc_nand_scan will overwrite ecc.size and ecc.bytes */
-+		/* nand_scan() will overwrite ecc.size and ecc.bytes */
- 		chip->ecc.size = 256;
- 		chip->ecc.bytes = 3;
- 		chip->ecc.strength = 1;
-@@ -359,7 +355,8 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		if (plat->wide_mask & (1 << i))
- 			chip->options |= NAND_BUSWIDTH_16;
++static int tango_attach_chip(struct nand_chip *chip)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++
++	ecc->mode = NAND_ECC_HW;
++	ecc->algo = NAND_ECC_BCH;
++	ecc->bytes = DIV_ROUND_UP(ecc->strength * FIELD_ORDER, BITS_PER_BYTE);
++
++	ecc->read_page_raw = tango_read_page_raw;
++	ecc->write_page_raw = tango_write_page_raw;
++	ecc->read_page = tango_read_page;
++	ecc->write_page = tango_write_page;
++	ecc->read_oob = tango_read_oob;
++	ecc->write_oob = tango_write_oob;
++
++	return 0;
++}
++
+ static int chip_init(struct device *dev, struct device_node *np)
+ {
+ 	u32 cs;
+@@ -566,22 +584,8 @@ static int chip_init(struct device *dev, struct device_node *np)
+ 	mtd_set_ooblayout(mtd, &tango_nand_ooblayout_ops);
+ 	mtd->dev.parent = dev;
  
--		if (txx9ndfmc_nand_scan(mtd)) {
-+		chip->ecc.attach_chip = txx9ndfmc_attach_chip;
-+		if (nand_scan(mtd, 1)) {
- 			kfree(txx9_priv->mtdname);
- 			kfree(txx9_priv);
- 			continue;
+-	err = nand_scan_ident(mtd, 1, NULL);
+-	if (err)
+-		return err;
+-
+-	ecc->mode = NAND_ECC_HW;
+-	ecc->algo = NAND_ECC_BCH;
+-	ecc->bytes = DIV_ROUND_UP(ecc->strength * FIELD_ORDER, BITS_PER_BYTE);
+-
+-	ecc->read_page_raw = tango_read_page_raw;
+-	ecc->write_page_raw = tango_write_page_raw;
+-	ecc->read_page = tango_read_page;
+-	ecc->write_page = tango_write_page;
+-	ecc->read_oob = tango_read_oob;
+-	ecc->write_oob = tango_write_oob;
+-
+-	err = nand_scan_tail(mtd);
++	chip->ecc.attach_chip = tango_attach_chip;
++	err = nand_scan(mtd, 1);
+ 	if (err)
+ 		return err;
+ 
 -- 
 2.14.1
