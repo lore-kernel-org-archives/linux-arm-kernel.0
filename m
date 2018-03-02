@@ -1,77 +1,246 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Fri, 2 Mar 2018 15:43:44 +0000
-Subject: [PATCH 0/4] drm/pl111: RealView and Versatile Express
-In-Reply-To: <d5f71ef3-60f1-dea8-0a6f-3d8c6f095cb6@arm.com>
-References: <20180302090948.6399-1-linus.walleij@linaro.org>
- <6b215e16-5245-7550-f1cb-a0f41d4a3178@arm.com>
- <CACRpkdaVXrT24XvzJ4ciqEp8NRXFNG+e0VkM_JtgGBdpKa8P8w@mail.gmail.com>
- <d5f71ef3-60f1-dea8-0a6f-3d8c6f095cb6@arm.com>
-Message-ID: <20180302154344.GB16053@e110455-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Mar 2018 09:45:47 -0600
+Subject: [PATCH v1 18/19] arm: dts: mt7623: add MT7623A reference boards
+In-Reply-To: <ddffdff293734954ba368be8a54edd3c84a4f4e6.1519378872.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <ddffdff293734954ba368be8a54edd3c84a4f4e6.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <20180302154547.xq5nkmkdk3oenbta@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 01:50:20PM +0000, Robin Murphy wrote:
-> On 02/03/18 12:37, Linus Walleij wrote:
-> > On Fri, Mar 2, 2018 at 1:11 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > On 02/03/18 09:09, Linus Walleij wrote:
-> > 
-> > > > Also the Versatile Express CLCD on the motherboard has
-> > > > a dedicated video memory, and cannot use CMA (ha! complex!)
-> > > > and I will need to figure out a way to work around that.
-> > > > The CLCDs synthesized on the core tiles for CA9 work
-> > > > fine with this though.
-> > > 
-> > > Out of curiosity, what's the issue with declaring the VRAM as a CMA region?
-> > > That's certainly worked for stuff like local RAM on FPGA tiles in the past,
-> > > and I can't think offhand of any way in which VExpress is wildly different
-> > > (but I am of course open to being wrong...)
-> > 
-> > There is nothing wrong with that apart from my ignorance
-> > of that solution. So thanks! :D
-> > 
-> > My experience with CMA is limited to using the 7 areas
-> > that are defined by default in Kconfig and the DRM helpers
-> > just plugging in on the front.
-> > 
-> > Do you have some pointers? Is this something I can
-> > handily just set up in the device tree?
+On Fri, Feb 23, 2018 at 06:16:38PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> It should be - the inner workings of dma-{coherent,contiguous} are a maze of
-> twisty little passages, all alike, and it'll take me a while to page the
-> details back in, but IIRC it's mostly just a case of having a
-> reserved-memory node covering the VRAM with the right combination of magic
-> properties for rmem_dma_setup() to pick up, such that it gets assigned as
-> the CLCD's private region. The subsequent "just plugging in" aspect doesn't
-> change, it just makes allocations start taking this route under the covers:
+> Add mt7623a-rfb.dtsi where most nodes can be inherited from
+> mt7623n-rfb.dtsi and keep these distinctions from MT7623A boards in
+> mt7623a-rfb.dtsi for most definition can be reused among MT7623A board
+> variants.
 > 
->   drm_gem_cma_create()
->     dma_alloc_wc()
->       dma_alloc_attrs()
->         dma_alloc_from_dev_coherent()
+> MT7623A has its specific definition of power domain and thus we need
+> to change related devices such as audio, ethernet, crypto, high-speed
+> DMA, NAND, and USB controller to the power domain they specifically
+> belong to. In addition, MT7530 exists as built-in module inside MT7623A
+> SoC and I2C2 and UART[0-1] get being removed and UART2 have distinct pin
+> usage. Those all differences can be totally seen in mt7623a-rfb.dtsi.
 > 
-> I could have sworn I've exchanged relevant FPGA DT fragments with Liviu in
-> the past, but now I can't seem to find one to refer back to :(
-
-Maybe something line this:
-https://github.com/ARM-software/linux/blob/development/malidp/arch/arm64/boot/dts/arm/juno-base.dtsi#L792
-
-And look at line 855 for the possible use of it.
-
-That is how we currently make CMA allocate buffers in FPGA for the Mali
-DP "hardware" (bitstream on FPGA) that we have in Juno.
-
-Best regards,
-Liviu
-
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  arch/arm/boot/dts/Makefile             |  2 +
+>  arch/arm/boot/dts/mt7623a-rfb-emmc.dts | 22 +++++++++
+>  arch/arm/boot/dts/mt7623a-rfb-nand.dts | 26 +++++++++++
+>  arch/arm/boot/dts/mt7623a-rfb.dtsi     | 84 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt7623n-rfb.dtsi     | 15 ++++++
+>  5 files changed, 149 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt7623a-rfb-emmc.dts
+>  create mode 100644 arch/arm/boot/dts/mt7623a-rfb-nand.dts
+>  create mode 100644 arch/arm/boot/dts/mt7623a-rfb.dtsi
 > 
-> Robin.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5af6fce..818817c 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1122,6 +1122,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+>  	mt6580-evbp1.dtb \
+>  	mt6589-aquaris5.dtb \
+>  	mt6592-evb.dtb \
+> +	mt7623a-rfb-emmc.dtb \
+> +	mt7623a-rfb-nand.dtb \
+>  	mt7623n-rfb-emmc.dtb \
+>  	mt7623n-rfb-nand.dtb \
+>  	mt7623n-bananapi-bpi-r2.dtb \
+> diff --git a/arch/arm/boot/dts/mt7623a-rfb-emmc.dts b/arch/arm/boot/dts/mt7623a-rfb-emmc.dts
+> new file mode 100644
+> index 0000000..ef6398e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt7623a-rfb-emmc.dts
+> @@ -0,0 +1,22 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+> + * Author: Sean Wang <sean.wang@mediatek.com>
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt7623a-rfb.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT7623A with eMMC reference board";
+> +	compatible = "mediatek,mt7623a-rfb-emmc", "mediatek,mt7623";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Use stdout-path instead. earlyprintk option only works for a kernel 
+built with a debug uart at a fixed address, so drop it.
+
+> +	};
+> +};
+> +
+> +&mmc0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/mt7623a-rfb-nand.dts b/arch/arm/boot/dts/mt7623a-rfb-nand.dts
+> new file mode 100644
+> index 0000000..592d5d7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt7623a-rfb-nand.dts
+> @@ -0,0 +1,26 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+> + * Author: Sean Wang <sean.wang@mediatek.com>
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt7623a-rfb.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT7623A with NAND reference board";
+> +	compatible = "mediatek,mt7623a-rfb-nand", "mediatek,mt7623";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
+
+ditto.
+
+> +	};
+> +};
+> +
+> +&bch {
+> +	status = "okay";
+> +};
+> +
+> +&nandc {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/mt7623a-rfb.dtsi b/arch/arm/boot/dts/mt7623a-rfb.dtsi
+> new file mode 100644
+> index 0000000..3a15c46
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt7623a-rfb.dtsi
+> @@ -0,0 +1,84 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+> + * Author: Sean Wang <sean.wang@mediatek.com>
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/power/mt7623a-power.h>
+> +#include "mt7623n-rfb.dtsi"
+> +
+> +/ {
+> +	memory {
+
+Unit-address?
+
+> +		device_type = "memory";
+> +		reg = <0 0x80000000 0 0x20000000>;
+> +	};
+> +};
+> +
+> +&afe {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_IFR_MSC>;
+> +};
+> +
+> +&cir {
+> +	status = "disabled";
+> +};
+> +
+> +&crypto {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_ETH>;
+> +};
+> +
+> +&eth {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_ETH>;
+> +};
+> +
+> +&hsdma {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_ETH>;
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins_b>;
+> +};
+> +
+> +&mt7530 {
+> +	mediatek,mcm;
+> +	resets = <&ethsys MT2701_ETHSYS_MCM_RST>;
+> +	reset-names = "mcm";
+> +};
+> +
+> +&nandc {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_IFR_MSC>;
+> +};
+> +
+> +&pcie {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_HIF>;
+> +};
+> +
+> +&scpsys {
+> +	compatible = "mediatek,mt7623a-scpsys",
+> +		     "syscon";
+> +	clocks = <&topckgen CLK_TOP_ETHIF_SEL>;
+> +	clock-names = "ethif";
+> +};
+> +
+> +&uart0 {
+> +	status = "disabled";
+> +};
+> +
+> +&uart1 {
+> +	status = "disabled";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins_b>;
+> +};
+> +
+> +&usb1 {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_HIF>;
+> +};
+> +
+> +&usb2 {
+> +	power-domains = <&scpsys MT7623A_POWER_DOMAIN_HIF>;
+> +};
+> diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+> index 0237476..07ed15d 100644
+> --- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
+> +++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+> @@ -380,6 +380,14 @@
+>  		};
+>  	};
+>  
+> +	i2c2_pins_b: i2c2-alt {
+> +		pin-i2c2 {
+> +			pinmux = <MT7623_PIN_122_GPIO122_FUNC_SDA2>,
+> +				 <MT7623_PIN_123_HTPLG_FUNC_SCL2>;
+> +			bias-disable;
+> +		};
+> +	};
+> +
+>  	i2s0_pins_a: i2s0-default {
+>  		pin-i2s0 {
+>  			pinmux = <MT7623_PIN_49_I2S0_DATA_FUNC_I2S0_DATA>,
+> @@ -629,6 +637,13 @@
+>  				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
+>  		};
+>  	};
+> +
+> +	uart2_pins_b: uart2-alt {
+> +		pins-dat {
+> +			pinmux = <MT7623_PIN_200_URXD2_FUNC_URXD2>,
+> +				 <MT7623_PIN_201_UTXD2_FUNC_UTXD2>;
+> +		};
+> +	};
+>  };
+>  
+>  &pwm {
+> -- 
+> 2.7.4
+> 
