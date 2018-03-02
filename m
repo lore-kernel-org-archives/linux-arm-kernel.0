@@ -1,85 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 2 Mar 2018 11:31:27 +0100
-Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
-In-Reply-To: <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
-References: <20180224214617.GA22619@amd>
- <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
- <20180226131318.GA14045@amd>
- <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
- <20180226231336.GA18565@amd>
- <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
- <20180302091025.GC30267@amd>
- <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
-Message-ID: <20180302103127.GA2081@amd>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 2 Mar 2018 14:00:03 +0300
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302102926.fuqmfyaxiujjwill@ninjato>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302102926.fuqmfyaxiujjwill@ninjato>
+Message-ID: <20180302110002.wmkvktobi7ssmin5@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-03-02 10:33:24, Linus Walleij wrote:
-> On Fri, Mar 2, 2018 at 10:10 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> > Linux-Regression-ID: lr#4b650f
-> >
-> > On Tue 2018-02-27 09:43:32, Linus Walleij wrote:
-> >> On Tue, Feb 27, 2018 at 12:13 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> >>
-> >> > I did git bisect, and the winner seems to be:
-> >> >
-> >> > pavel at duo:/data/l/linux-n900$ git bisect bad
-> >> > c85823390215e52d68d3826df92a447ed31e5c80 is the first bad commit
-> >> > commit c85823390215e52d68d3826df92a447ed31e5c80
-> >> > Author: Linus Walleij <linus.walleij@linaro.org>
-> >> > Date:   Wed Dec 27 16:37:44 2017 +0100
-> >> >
-> >> >     gpio: of: Support SPI nonstandard GPIO properties
-> >>
-> >> I have fixes queued for this, tried to send a pull request yesterday
-> >> but it turns out the fixes need fixing... OK I'm onto it anyways.
-> >
-> > Do you have any updates? Is there way to fix dts so that this does not
-> > trigger on N900?
-> >
-> > If this is taking longer to fix, should c85823390215 be reverted in
-> > the meantime? It does not seem particulary important/urgent...
+On Fri, Mar 02, 2018 at 11:29:26AM +0100, Wolfram Sang wrote:
+> On Thu, Mar 01, 2018 at 09:34:44PM +0100, Krzysztof Kozlowski wrote:
+> > Interrupt number 0 (returned by platform_get_irq()) might be a valid IRQ
+> > so do not treat it as an error.  If interrupt 0 was configured, the driver
+> > would exit the probe early, before finishing initialization, but with
+> > 0-exit status.
+> > 
+> > Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > Cc: stable at vger.kernel.org
+> > Fixes: e0d1ec97853f ("i2c-s3c2410: Change IRQ to be plain integer.")
 > 
-> No patience between the v4.16 release candidates eh ;)
-> 
-> commit 6662ae6af82df10259a70c7569b4c12ea7f3ba93
-> ("gpiolib: Keep returning EPROBE_DEFER when we should")
-> 
-> and
-> 
-> commit ce27fb2c56db6ccfe8099343bb4afdab15e77e7b
-> ("gpio: Handle deferred probing in of_find_gpio() properly")
-> 
-> that are both in Torvalds' tree since yesterday should be fixing
-> this, I think? Did you try just using the upstream HEAD?
+> Please configure git to use 14 digits here.
 
-After I spent hours bisecting, I was kind of assuming you'd cc me on
-merge request or something like that... so that I could test it before
-going mainline. Which of those should fix it?
+Wait, when did we decide that 12 wasn't enough?
 
-I tested today's mainline, and... sound fails, different way:
+I just did a `git log | grep Fixes | tee baz | head -n 200` and only on
+my git tree tehre were only 2 which used exactly 14 digits.  The
+standard is 12.
 
-pavel at n900:~$ cat /proc/asound/cards
- 0 [RX51           ]: RX-51 - RX-51
-                       RX-51
-pavel at n900:~$ cd g/tui/ofone/
-pavel at n900:~/g/tui/ofone$ cd
-pavel at n900:~$ festival --tts
-		       ahoj
-		       ^D
-		       uname -a
-
-(Festival is hung).
-
-Let me try the revert again...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/ab363011/attachment.sig>
+regards,
+dan carpenter
