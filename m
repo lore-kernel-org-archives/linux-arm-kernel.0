@@ -1,77 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 2 Mar 2018 17:54:51 +0000
-Subject: [PATCH v3 05/25] ASoC: qcom: qdsp6: Add support to Q6AFE
-In-Reply-To: <66d37327-b8ea-0da5-3e05-435cec5d84ab@linaro.org>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-6-srinivas.kandagatla@linaro.org>
- <20180301205940.GR12864@sirena.org.uk>
- <66d37327-b8ea-0da5-3e05-435cec5d84ab@linaro.org>
-Message-ID: <20180302175451.GB3482@sirena.org.uk>
+From: afd@ti.com (Andrew F. Davis)
+Date: Fri, 2 Mar 2018 11:18:10 -0600
+Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
+In-Reply-To: <20180302170841.GP28231@n2100.armlinux.org.uk>
+References: <20180224214617.GA22619@amd>
+ <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
+ <20180226131318.GA14045@amd>
+ <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
+ <20180226231336.GA18565@amd>
+ <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
+ <20180302091025.GC30267@amd>
+ <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
+ <20180302111040.GA6344@amd> <0f090cc7-2b72-a038-26ee-d43077cb9663@ti.com>
+ <20180302170841.GP28231@n2100.armlinux.org.uk>
+Message-ID: <8cf3f026-4d65-71ac-60ed-3e9427139843@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 01:13:17PM +0000, Srinivas Kandagatla wrote:
-> On 01/03/18 20:59, Mark Brown wrote:
-> > On Tue, Feb 13, 2018 at 04:58:17PM +0000, srinivas.kandagatla at linaro.org wrote:
+On 03/02/2018 11:08 AM, Russell King - ARM Linux wrote:
+> On Fri, Mar 02, 2018 at 08:22:52AM -0600, Andrew F. Davis wrote:
+>>> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+>>> index 84e5a9d..f0fab26 100644
+>>> --- a/drivers/gpio/gpiolib-of.c
+>>> +++ b/drivers/gpio/gpiolib-of.c
+>>> @@ -241,29 +241,17 @@ struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
+>>>  
+>>>  		desc = of_get_named_gpiod_flags(dev->of_node, prop_name, idx,
+>>>  						&of_flags);
+>>> -		/*
+>>> -		 * -EPROBE_DEFER in our case means that we found a
+>>> -		 * valid GPIO property, but no controller has been
+>>> -		 * registered so far.
+>>> -		 *
+>>> -		 * This means we don't need to look any further for
+>>> -		 * alternate name conventions, and we should really
+>>> -		 * preserve the return code for our user to be able to
+>>> -		 * retry probing later.
+>>> -		 */
+>>> -		if (IS_ERR(desc) && PTR_ERR(desc) == -EPROBE_DEFER)
+>>> -			return desc;
+>>>  
+>>> -		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+>>> +		if (!IS_ERR(desc) || PTR_ERR(desc) != -ENOENT)
+>>
+>>
+>> I rather like the () so one doesn't always have to look up C operator
+>> precedence to verify..
+> 
+> Too many make it impossible to see which close paren ties up with
+> which open paren.  I've spent way too long in the past reformatting
+> code, where people think that () are a good thing, to work out what
+> the comparison is actually doing before then rewriting the damn
+> thing with less () and in a much clearer way.  I'm now convinced
+> that unnecessary () are a very bad thing as they severely harm
+> readability as test complexity increases.
+> 
 
-> > > +static struct afe_port_map port_maps[AFE_PORT_MAX] = {
-> > > +	[AFE_PORT_HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX,
-> > > +				AFE_PORT_HDMI_RX, 1, 1},
-> > > +};
 
-> > Is this not device specific in any way?  It looks likely to be.
+Fair enough, I personally prefer always having a new line per condition
+when doing chained conditionals:
 
-> It is specific to Audio firmware build.
-> AFAIK, DSP port IDs are consistent across a given range of AVS firmware
-> builds. So far I have seen them not change in any of the B family SoCs.
-> However on older A family SOCs these are very different numbers. Which is
-> where ADSP version info would help select correct map.
+if (something &&
+    this == that &&
+    !not_this)
 
-Can we have some documentation of this in the code please?
 
-> > > +static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
-> > > +{
-> > > +	struct q6afe_port *p = NULL;
-> > > +
-> > > +	spin_lock(&afe->port_list_lock);
-> > > +	list_for_each_entry(p, &afe->port_list, node)
-> > > +		if (p->token == token)
-> > > +			break;
-> > > +
-> > > +	spin_unlock(&afe->port_list_lock);
+>>
+>>
+>>>  			break;
+>>>  	}
+>>>  
+>>>  	/* Special handling for SPI GPIOs if used */
+>>> -	if (IS_ERR(desc))
+>>> +	if (IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
+> 
+> These can be simplified to:
+> 
+> 	if (desc == ERR_PTR(-ENOENT))
+> 
+> since error pointers are unique - ERR_PTR(-ENOENT) is what was
+> returned as an error-pointer, and if IS_ERR(ERR_PTR(-ENOMENT)) etc
+> were false, we'd have big problems as it'd mean we couldn't detect
+> error pointers!
+> 
+> As an added bonus, they don't involve any operator precedence
+> questions either.
+> 
 
-> > Why do we need to lock the port list, what are we protecting it against?
-
-> This is just to protect the list from anyone deleting this.
-
-> Its very rare but the use case could be somelike the adsp is up and we are
-> in the middle of finding a port and then adsp went down or crashed we would
-> delete an entry in the list.
-
-If that's what we're protecting against then this also needs to do
-something to ensure that the port we looked up doesn't get deallocated
-before or while we look at it.
-
-> > > +int q6afe_port_start(struct q6afe_port *port)
-> > > +{
-> > > +	return afe_port_start(port, &port->port_cfg);
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(q6afe_port_start);
-
-> > This is the third level of wrapper for the port start command in this
-> > file.  Do we *really* need all these wrappers?
-
-> Intention here is that we have plans to support different version of ADSP,
-> on A family this command is different, so having this wrapper would help
-> tackle this use-case.
-
-Why not just take out the level of wrapper for now then add it in when
-there's actually an abstraction in there?  The code might end up looking
-different anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/16cd367c/attachment.sig>
+Looks like your suggestion clears up this one anyway.
