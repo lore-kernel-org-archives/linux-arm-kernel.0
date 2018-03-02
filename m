@@ -1,84 +1,101 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 2 Mar 2018 10:12:53 +0100
-Subject: v4.16-rc0: missing includes in framebuffers break N900 compilation
-In-Reply-To: <46d9fddf-7e6d-b157-0745-6366ccd57a41@ti.com>
-References: <20180226130007.GA5634@amd>
- <46d9fddf-7e6d-b157-0745-6366ccd57a41@ti.com>
-Message-ID: <20180302091253.GB15948@amd>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Fri, 2 Mar 2018 11:28:09 +0200
+Subject: [PATCH v3 05/10] pwm: add PWM mode to pwm_config()
+In-Reply-To: <87r2p4hod7.fsf@intel.com>
+References: <1519300881-8136-1-git-send-email-claudiu.beznea@microchip.com>
+ <1519300881-8136-6-git-send-email-claudiu.beznea@microchip.com>
+ <20180228194429.GD22932@mithrandir> <87r2p4hod7.fsf@intel.com>
+Message-ID: <585cc4ae-3674-c119-295b-e59f4242e619@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-02-26 16:05:53, Tomi Valkeinen wrote:
-> v4.16-rc1 has a fix (b9058afcd6c7).
 
-Yep, thanks. I was bisecting sound problem on N900, so this hit me...
 
-     	       	   	     	   	      	       	    Pavel
-
-> On 26/02/18 15:00, Pavel Machek wrote:
-> > I needed this to get -rc0 to compile.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > 
-> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/dss.c b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
-> > index 48c6500..990f1c9 100644
-> > --- a/drivers/video/fbdev/omap2/omapfb/dss/dss.c
-> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/dss.c
-> > @@ -38,6 +38,7 @@
-> >  #include <linux/regmap.h>
-> >  #include <linux/of.h>
-> >  #include <linux/regulator/consumer.h>
-> > +#include <linux/pinctrl/consumer.h>
-> >  #include <linux/suspend.h>
-> >  #include <linux/component.h>
-> >  
-> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
-> > index 9a13c35..4862b12 100644
-> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
-> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_phy.c
-> > @@ -12,6 +12,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/seq_file.h>
-> >  #include <linux/slab.h>
-> >  #include <video/omapfb_dss.h>
-> >  
-> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
-> > index eac3665..39014e2 100644
-> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
-> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_pll.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/seq_file.h>
-> >  #include <linux/clk.h>
-> >  
-> >  #include <video/omapfb_dss.h>
-> > diff --git a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
-> > index 705373e..e93e7a7 100644
-> > --- a/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
-> > +++ b/drivers/video/fbdev/omap2/omapfb/dss/hdmi_wp.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/io.h>
-> >  #include <linux/platform_device.h>
-> >  #include <video/omapfb_dss.h>
-> > +#include <linux/seq_file.h>
-> >  
-> >  #include "dss.h"
-> >  #include "hdmi.h"
-> > 
+On 28.02.2018 22:04, Jani Nikula wrote:
+> On Wed, 28 Feb 2018, Thierry Reding <thierry.reding@gmail.com> wrote:
+>> Anyone that needs something other than normal mode should use the new
+>> atomic PWM API.
 > 
+> At the risk of revealing my true ignorance, what is the new atomic PWM
+> API? Where? Examples of how one would convert old code over to the new
+> API?
+As far as I know, the old PWM core code uses config(), set_polarity(),
+enable(), disable() methods of driver, registered as pwm_ops:
+struct pwm_ops {
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/5c8e9edc/attachment-0001.sig>
+        int (*request)(struct pwm_chip *chip, struct pwm_device *pwm);
+
+        void (*free)(struct pwm_chip *chip, struct pwm_device *pwm);
+
+        int (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+
+                      int duty_ns, int period_ns);
+
+        int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
+
+                            enum pwm_polarity polarity);
+
+        int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
+
+                       struct pwm_capture *result, unsigned long timeout);
+
+        int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+
+        void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+
+        int (*apply)(struct pwm_chip *chip, struct pwm_device *pwm,
+
+                     struct pwm_state *state);
+
+        void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
+
+                          struct pwm_state *state);
+
+#ifdef CONFIG_DEBUG_FS
+
+        void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
+
+#endif
+
+        struct module *owner;
+
+};
+
+
+to do settings on hardware. In order to so settings on a PWM the users
+should have been follow the below steps:
+->config()
+->set_polarity()
+->enable()
+Moreover, if the PWM was previously enabled it should have been first
+disable and then to follow the above steps in order to apply a new settings
+on hardware.
+The driver should have been provide, at probe, all the above function:
+->config(), ->set_polarity(), ->disable(), ->enable(), function that were
+used by PWM core.
+
+Now, having atomic PWM, the driver should provide one function to PWM core,
+which is ->apply() function. Every PWM has a state associated, which keeps
+the period, duty cycle, polarity and enable/disable status. The driver's
+->apply() function takes as argument the state that should be applied and
+it takes care of applying this new state directly without asking user to
+call ->disable(), then ->config()/->set_polarity(), then ->enable() to
+apply new hardware settings.
+
+The PWM consumer could set a new state for PWM it uses, using
+pwm_apply_state(pwm, new_state);
+
+Regarding the models to switch on atomic PWM, on the controller side you
+can check for drivers that registers apply function at probe time.
+Regarding the PWM users, you can look for pwm_apply_state()
+(drivers/hwmon/pwm-fan.c or drivers/input/misc/pwm-beeper.c are some examples).
+
+Thierry, please correct me if I'm wrong.
+
+Thank you,
+Claudiu Beznea
+
+> 
+> BR,
+> Jani.
+> 
