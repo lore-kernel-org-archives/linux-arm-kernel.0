@@ -1,43 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Mar 2018 13:33:04 +0100
-Subject: [alsa-devel] regression v4.16 on Nokia N900: sound does not work
-In-Reply-To: <20180302121442.GB28931@amd>
-References: <20180224214617.GA22619@amd>
- <71aa88ec-d4df-b49c-7d73-27197f468491@leemhuis.info>
- <20180226131318.GA14045@amd>
- <CAEnQRZBbMTeaxb+=AaarX6PSGasfVjtAUdpbPvJavZyTRMpdgQ@mail.gmail.com>
- <20180226231336.GA18565@amd>
- <CACRpkdarR_7HqGMPwfa8YpG9wnFs5mJrNwuctycn=MrdwaRxyw@mail.gmail.com>
- <20180302091025.GC30267@amd>
- <CACRpkda=deFSmk2iyrtde3Z-aj6rW9_jNfE3Ep4X=ejprGxRUw@mail.gmail.com>
- <20180302103127.GA2081@amd>
- <CACRpkda-VLsMVqYx3Y6+3JtLJERhmeJZF5g4Gd9ecvgR1Nnr0A@mail.gmail.com>
- <20180302121442.GB28931@amd>
-Message-ID: <CACRpkdawRd6aGpj7hjVPv7TZ+YqLjgJaqphkDnkX6xR+3Gx-xA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Mar 2018 12:34:44 +0000
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302122655.uckejonjyzt4vjd3@mwanda>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302111931.GX9418@n2100.armlinux.org.uk>
+ <20180302114909.u6kqdszt3aew2io2@mwanda>
+ <20180302121929.GY9418@n2100.armlinux.org.uk>
+ <20180302122655.uckejonjyzt4vjd3@mwanda>
+Message-ID: <20180302123444.GZ9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> >> Ok, so this code looks pretty crazy to me: I tried removing the
->> >> "of_find_spi_gpio" part, and audio started working.
->> >
->> > Hmm. Looks like audio is working w/o any changes, too. Not sure why
->> > festival hung on me before.
->>
->> Does it mean that mainline is working find for you or
->> do we need to look deeper into the problem in the OF
->> lookup?
->
-> It now works for me.
->
-> (But take a look at the patch I sent -- I believe you are still
-> overwriting return values in a bad way, and code is quite confusing).
+On Fri, Mar 02, 2018 at 03:26:56PM +0300, Dan Carpenter wrote:
+> Ok, but in that case the original code is still wrong because it returns
+> early with success.  I guess it could be changed to:
+> 
+> 	if (irq <= 0)
+> 		return -ENXIO;
 
-I think that code is a result of piled fixes, so noone
-really designed it to look like that.
+What if platform_get_irq() returns -EPROBE_DEFER or some other error
+code?
 
-I'll try to look at it, I am a bit afraid of the code since I've
-broken so many things with it.
+So we're now re-hashing all the discussion from last November.
 
-Yours,
-Linus Walleij
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
