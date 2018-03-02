@@ -1,74 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Mar 2018 18:16:37 +0000
-Subject: [PATCH] arm64/debug: Fix registers on sleeping tasks
-In-Reply-To: <20180302180131.GA20579@arm.com>
-References: <20180301193803.129195-1-dianders@chromium.org>
- <20180302180131.GA20579@arm.com>
-Message-ID: <20180302181636.a2nqgm4ezrbcdxkc@lakrids.cambridge.arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 2 Mar 2018 19:34:55 +0100
+Subject: [PATCH v2 2/8] arm64: zynqmp: Add support for Xilinx zcu100-revC
+In-Reply-To: <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
+References: <cover.1519396753.git.michal.simek@xilinx.com>
+ <26229dbbeb0ced5db870a8cf636f6d3d5855199e.1519396753.git.michal.simek@xilinx.com>
+ <20180302164037.5mzzc4ixxvph46bf@rob-hp-laptop>
+Message-ID: <c9d4bc3a-888e-3faf-4b1d-6ad309048078@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 06:01:31PM +0000, Will Deacon wrote:
-> On Thu, Mar 01, 2018 at 11:38:03AM -0800, Douglas Anderson wrote:
-> > This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
-> > registers on sleeping tasks") but for arm64.  Nuff said.
+On 2.3.2018 17:40, Rob Herring wrote:
+> On Fri, Feb 23, 2018 at 03:40:24PM +0100, Michal Simek wrote:
+>> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
+>> port and usbs.
+>> Board is using fixed clocks because clock driver hasn't been merged yet.
 > 
-> It's a pity that 001bf455d206 doesn't explain *why* past_pt_regs doesn't
-> work.
+> Please get rid of the separate clocks dts file when it is merged.
 
-The task_pt_regs are the userspace regs at the highest address on the
-kernel stack:
-
-#define task_pt_regs(p) \
-	((struct pt_regs *)(THREAD_SIZE + task_stack_page(p)) - 1)
-
-... for kernel tasks, that's meaningless, and for user tasks, that won't
-correspond to kernel state.
-
-> > diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> > index 2122cd187f19..01285d4dcdc3 100644
-> > --- a/arch/arm64/kernel/kgdb.c
-> > +++ b/arch/arm64/kernel/kgdb.c
-> > @@ -138,14 +138,26 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
-> >  void
-> >  sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
-> >  {
-> > -	struct pt_regs *thread_regs;
-> > +	struct thread_struct *thread = &task->thread;
-> > +	struct cpu_context *cpu_context = &thread->cpu_context;
-
-We can do this in one go:
-
-	struct cpu_context *cpu_context = &task->thread.cpu_context;
-
-... since we don't need the thread variable otherwise.
-
-> >  
-> >  	/* Initialize to zero */
-> >  	memset((char *)gdb_regs, 0, NUMREGBYTES);
-> > -	thread_regs = task_pt_regs(task);
-> > -	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
-> > -	/* Special case for PSTATE (check comments in asm/kgdb.h for details) */
-> > -	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
-> > +
-> > +	gdb_regs[19] = cpu_context->x19;
-> > +	gdb_regs[20] = cpu_context->x20;
-> > +	gdb_regs[21] = cpu_context->x21;
-> > +	gdb_regs[22] = cpu_context->x22;
-> > +	gdb_regs[23] = cpu_context->x23;
-> > +	gdb_regs[24] = cpu_context->x24;
-> > +	gdb_regs[25] = cpu_context->x25;
-> > +	gdb_regs[26] = cpu_context->x26;
-> > +	gdb_regs[27] = cpu_context->x27;
-> > +	gdb_regs[28] = cpu_context->x28;
-> > +	gdb_regs[29] = cpu_context->fp;
-> > +
-> > +	gdb_regs[31] = cpu_context->sp;
-> > +	gdb_regs[32] = cpu_context->pc;
-
-Are the other reg fields initialised elsewhere?
-
-We might want to zero them here.
+Will do.
 
 Thanks,
-Mark.
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180302/d3f5d9c1/attachment.sig>
