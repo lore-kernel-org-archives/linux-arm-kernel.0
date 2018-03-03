@@ -1,100 +1,46 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 3 Mar 2018 14:58:45 +0100 (CET)
-Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
-In-Reply-To: <20180214202454.6e7ebeaf@naga.suse.cz>
-References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
- <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
- <20180214163649.3a0c9476@kitsune.suse.cz>
- <20180214165827.386b9bb1@kitsune.suse.cz>
- <ecf8dd61-ab16-b298-d197-ea93ecf5982b@i2se.com>
- <20180214202454.6e7ebeaf@naga.suse.cz>
-Message-ID: <166274019.307112.1520085525833@email.1und1.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 3 Mar 2018 22:27:53 +0800
+Subject: [kernel-hardening] [PATCH 2/2] arm: Kconfig: Add
+ ARCH_HAS_FORTIFY_SOURCE
+In-Reply-To: <20180228143037.GA3150@pjb1027-Latitude-E5410>
+References: <20180228143037.GA3150@pjb1027-Latitude-E5410>
+Message-ID: <201803032227.0fjGmsYp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Jinbum,
 
-[add Stefan to CC]
+Thank you for the patch! Yet something to improve:
 
-> Michal Such?nek <msuchanek@suse.de> hat am 14. Februar 2018 um 20:24 geschrieben:
-> 
-> 
-> On Wed, 14 Feb 2018 17:49:31 +0100
-> Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> 
-> > Hi Michal,
-> > 
-> > [add Phil]
-> > 
-> > Am 14.02.2018 um 17:13 schrieb Michal Such?nek:
-> > > On Wed, 14 Feb 2018 16:36:49 +0100
-> > > Michal Such?nek <msuchanek@suse.de> wrote:
-> > >  
-> > >> On Wed, 14 Feb 2018 15:58:31 +0100
-> > >> Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > >>  
-> > >>> Hi Michal,
-> > >>>
-> > >>> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:    
-> > >>>> The bcm2835 mmc host tends to lock up for unknown reason so reset
-> > >>>> it on timeout. The upper mmc block layer tries retransimitting
-> > >>>> with single blocks which tends to work out after a long wait.
-> > >>>>
-> > >>>> This is better than giving up and leaving the machine broken for
-> > >>>> no obvious reason.      
-> > >>> could you please provide more information about this issue
-> > >>> (affected hardware, kernel config, version, dmesg, reproducible
-> > >>> scenario)? 
-> > > It tends to reproduce when upgrading a few packages with zypper and
-> > > otherwise at random during system operation. It seems that for my
-> > > card it worsens with age to some degree so perhaps it depends on the
-> > > fragmentation of the internal card flash.
-> > >
-> > > Attaching dmesg and kernel config.  
-> > 
-> > do you noticed this issue before 4.15-rc4?
-> 
-> I initially noticed it with 4.4 kernel with some backports to make it
-> bootable on RPi.
-> > 
-> > Could you please test with 4.15 final again?
-> 
-> Right, I can apply the patches on something more recent.
-> 
-> > 
-> > What kind of SD card (name) triggers the issue?
-> 
-> Samsung EVO MB-MP16D
-> 
-> Also see https://elinux.org/RPi_SD_cards#Which_SD_card.3F
-> 
-> Thanks
-> 
-> Michal
-> 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.16-rc3 next-20180302]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-yesterday i finished my stress tests with Raspberry Pi 3.
+url:    https://github.com/0day-ci/linux/commits/Jinbum-Park/arm-Add-ARCH_HAS_FORTIFY_SOURCE/20180303-184154
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Scenario:
-- copy Tumbleweed on SD card (openSUSE-Tumbleweed-ARM-JeOS-raspberrypi3.aarch64-2018.02.02-Build1.2.raw, Linux 4.14.15)
-- setup locales with yast
-- run zypper update
-- reboot
-- install and remove java 1.8 in a loop for at least 1 hour
+All errors (new ones prefixed by >>):
 
-Results of the different SD cards:
-Toshiba uSDHC Class 10 UHS-1 32 GB: PASS
-BASETech uSDHC Class 10 16 GB: PASS
-Samsung uSDHC EVO+ UHS-1 16 GB: PASS
-Samsung uSDHC Class 6 32 GB: PASS
-SanDisk Edge Class 4 16 GB: PASS
-Kingston uSDHC Class 10 UHS-1 32 GB: PASS
-QUMOX uSDHC Class 10 UHS-1 16 GB: FAIL (zypper segfaulted permantently)
-Transcend uSDHC Class 10 UHS-1 32 GB: PASS
+   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_count':
+>> fdt_ro.c:(.text+0xc90): undefined reference to `fortify_panic'
+   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_search':
+   fdt_ro.c:(.text+0xd40): undefined reference to `fortify_panic'
+   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_get':
+   fdt_ro.c:(.text+0xe28): undefined reference to `fortify_panic'
 
-I was never able to reproduce this timeout. So i still need the feedback about the 4.15 and i a reliable test scenario.
-
-In a github issue, i've read that badblocks could reproduce the issue more likely.
-
-Regards
-Stefan
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180303/c5bcbe51/attachment-0001.gz>
