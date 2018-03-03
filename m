@@ -1,331 +1,146 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Sat, 3 Mar 2018 08:06:04 +0100
-Subject: [PATCH] ARM: dts: tpc: Device tree description of the TPC board
-In-Reply-To: <CAOMZO5BTnfHRkGnROh3LJoGVPcBcQk=rroYip4V1DDBUbkRuKw@mail.gmail.com>
-References: <20180302121750.12865-1-lukma@denx.de>
- <CAOMZO5BTnfHRkGnROh3LJoGVPcBcQk=rroYip4V1DDBUbkRuKw@mail.gmail.com>
-Message-ID: <20180303080604.6fe8a9d3@jawa>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sun, 4 Mar 2018 00:09:39 +0800
+Subject: [PATCH v10 4/5] ACPI / APEI: Add SEI notification type support for
+ ARMv8
+In-Reply-To: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
+References: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1520093380-42577-5-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+ACPI 6.x adds support for NOTIFY_SEI as a GHES notification
+mechanism, so add new GHES notification handling functions.
+Expose API ghes_notify_sei() to arch code, arch code will call
+this API when it gets this NOTIFY_SEI.
 
-> Hi Lukasz,
-> 
-> In addition to Sascha's comments:
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ drivers/acpi/apei/Kconfig | 15 ++++++++++++++
+ drivers/acpi/apei/ghes.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/acpi/ghes.h       |  1 +
+ 3 files changed, 69 insertions(+)
 
-Thanks for your input - please see my reply below.
-
-> 
-> On Fri, Mar 2, 2018 at 9:17 AM, Lukasz Majewski <lukma@denx.de> wrote:
-> 
-> > diff --git a/arch/arm/boot/dts/imx6q-kp-tpc.dts
-> > b/arch/arm/boot/dts/imx6q-kp-tpc.dts new file mode 100644
-> > index 000000000000..955462e778c9
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6q-kp-tpc.dts
-> > @@ -0,0 +1,84 @@
-> > +/*
-> > + * Copyright 2018
-> > + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> > + *
-> > + * This file is dual-licensed: you can use it either under the
-> > terms
-> > + * of the GPL or the X11 license, at your option. Note that this
-> > dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This file is licensed under the terms of the GNU General
-> > Public
-> > + *     License version 2.  This program is licensed "as is" without
-> > + *     any warranty of any kind, whether express or implied.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated
-> > documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom
-> > the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall
-> > be
-> > + *     included in all copies or substantial portions of the
-> > Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> > KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> > WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-> > OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
-> > +  
-> 
-> Please consider using SPDX tag instead.
-
-Ok.
-
-> 
-> > +/dts-v1/;
-> > +
-> > +#include "imx6q-kp.dtsi"
-> > +
-> > +/ {
-> > +       model = "Freescale i.MX6 Quad K+P TPC Board";
-> > +       compatible = "fsl,imx6q-tpc", "fsl,imx6q";  
-> 
-> Use the board manufacturer symbol instead.
-> 
-> If needed, add an entry for the vendor at
-> Documentation/devicetree/bindings/vendor-prefixes.txt
-
-I see.
-
-> 
-> > +};
-> > +
-> > +&lcd_display {
-> > +       display-timings {
-> > +               800x480x60 {
-> > +                       clock-frequency = <34209000>;
-> > +                       hactive = <800>;
-> > +                       vactive = <480>;
-> > +                       hback-porch = <85>;
-> > +                       hfront-porch = <15>;
-> > +                       vback-porch = <34>;
-> > +                       vfront-porch = <10>;
-> > +                       hsync-len = <28>;
-> > +                       vsync-len = <1>;
-> > +                       hsync-active = <1>;
-> > +                       vsync-active = <1>;
-> > +                       de-active = <1>;
-> > +               };
-> > +       };
-> > +};  
-> 
-> We prefer to use a compatible panel entry instead of keeping the panel
-> timings inside the dts.
-
-Previously (for other imx6q board) I've added entry to e.g.
-panel-simple.c file [1] to describe the display.
-
-I thought that adding timings to DTS is more welcome - hence we do not
-need to add any extra code to Linux when porting new board?
-
-> 
-> > +
-> > +&ipu1_di0_disp0 {
-> > +       remote-endpoint = <&lcd_display_in>;
-> > +};
-> > +
-> > +&can1 {
-> > +       status = "disabled";
-> > +};
-> > +
-> > +&can2 {
-> > +       status = "disabled";
-> > +};
-> > +
-> > +&uart1 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&uart2 {
-> > +       status = "disabled";
-> > +};
-> > diff --git a/arch/arm/boot/dts/imx6q-kp.dtsi
-> > b/arch/arm/boot/dts/imx6q-kp.dtsi new file mode 100644
-> > index 000000000000..47a10fb1d46b
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6q-kp.dtsi
-> > @@ -0,0 +1,468 @@
-> > +/*
-> > + * Copyright 2018
-> > + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> > + *
-> > + * This file is dual-licensed: you can use it either under the
-> > terms
-> > + * of the GPL or the X11 license, at your option. Note that this
-> > dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This file is licensed under the terms of the GNU General
-> > Public
-> > + *     License version 2.  This program is licensed "as is" without
-> > + *     any warranty of any kind, whether express or implied.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated
-> > documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom
-> > the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall
-> > be
-> > + *     included in all copies or substantial portions of the
-> > Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> > KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> > WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-> > OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */  
-> 
-> SPDX, please.
-
-The other upstreamed imx6q board used dual license - GPLv2 or X11
-(which is also called MIT license).
-
-I suppose that this license header shall be replaced with:
-
-SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-Am I correct?
-
-> 
-> 
-> > +       leds {
-> > +               compatible = "gpio-leds";
-> > +
-> > +               green {
-> > +                       label = "led1";
-> > +                       gpios = <&gpio3 16 0>;  
-> 
-> gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
-> 
-> > +                       linux,default-trigger = "gpio";
-> > +                       default-state = "off";
-> > +               };
-> > +
-> > +               red {
-> > +                       label = "led0";
-> > +                       gpios = <&gpio3 23 0>;  
-> 
-> GPIO_ACTIVE_HIGH
-
-Ok.
-
-> 
-> > +                       linux,default-trigger = "gpio";
-> > +                       default-state = "off";
-> > +               };
-> > +       };
-> > +
-> > +       memory: memory {
-> > +               reg = <0x10000000 0x40000000>;
-> > +       };  
-> 
->  memory at 10000000 otherwise warnings are seen when building with W=1.
-> 
-> Make sure that building the dtb with W=1 introduces no warnings.
-
-Ok. Thanks for pointing this out.
-
-> 
-> > +&i2c1 {
-> > +       clock-frequency = <400000>;
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_i2c1>;
-> > +       status = "okay";
-> > +
-> > +       goodix_ts at 5d {
-> > +               compatible = "goodix,gt911";
-> > +               reg = <0x5d>;
-> > +
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_ts>;
-> > +  
-> 
-> No need for these blank lines.
-
-Ok.
-
-> 
-> > +               interrupt-parent = <&gpio1>;
-> > +               interrupts = <9 2>;  
-> 
-> Please use an IRQ flag.
-> 
-> > +               irq-gpios = <&gpio1 9 0>;  
-> 
-> GPIO_ACTIVE_HIGH
-> 
-> > +               reset-gpios = <&gpio5 2 0>;  
-> 
-> GPIO_ACTIVE_HIGH.
-> 
-> > +&i2c2 {
-> > +       clock-frequency = <400000>;
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_i2c2>;
-> > +       status = "okay";
-> > +
-> > +       codec: sgtl5000 at a {
-> > +               compatible = "fsl,sgtl5000";
-> > +               #sound-dai-cells = <0>;
-> > +               reg = <0x0a>;
-> > +
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_codec>;
-> > +  
-> 
-> No need for these blank lines.
-> 
-> > +               clocks = <&clks IMX6QDL_CLK_CKO>;
-> > +               VDDA-supply = <&reg_3p3v>;
-> > +               VDDIO-supply = <&reg_3p3v>;  
-> 
-> > +&uart2 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_uart2>;
-> > +       fsl,uart-has-rtscts;  
-> 
->  fsl,uart-has-rtscts has been deprecated. Please use  uart-has-rtscts
-> instead.
-
-Ok.
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180303/a3a7b2b7/attachment.sig>
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index 52ae543..ff4afc3 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -55,6 +55,21 @@ config ACPI_APEI_SEA
+ 	  option allows the OS to look for such hardware error record, and
+ 	  take appropriate action.
+ 
++config ACPI_APEI_SEI
++	bool "APEI SError(System Error) Interrupt logging/recovering support"
++	depends on ARM64 && ACPI_APEI_GHES
++	default y
++	help
++	  This option should be enabled if the system supports
++	  firmware first handling of SEI (SError interrupt).
++
++	  SEI happens with asynchronous external abort for errors on device
++	  memory reads on ARMv8 systems. If a system supports firmware first
++	  handling of SEI, the platform analyzes and handles hardware error
++	  notifications from SEI, and it may then form a hardware error record for
++	  the OS to parse and handle. This option allows the OS to look for
++	  such hardware error record, and take appropriate action.
++
+ config ACPI_APEI_MEMORY_FAILURE
+ 	bool "APEI memory error recovering support"
+ 	depends on ACPI_APEI && MEMORY_FAILURE
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 1efefe9..33f77ae 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -827,6 +827,46 @@ static inline void ghes_sea_add(struct ghes *ghes) { }
+ static inline void ghes_sea_remove(struct ghes *ghes) { }
+ #endif /* CONFIG_ACPI_APEI_SEA */
+ 
++#ifdef CONFIG_ACPI_APEI_SEI
++static LIST_HEAD(ghes_sei);
++
++/*
++ * Return 0 only if one of the SEI error sources successfully reported an error
++ * record sent from the firmware.
++ */
++int ghes_notify_sei(void)
++{
++	struct ghes *ghes;
++	int ret = -ENOENT;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
++		if (!ghes_proc(ghes))
++			ret = 0;
++	}
++	rcu_read_unlock();
++	return ret;
++}
++
++static void ghes_sei_add(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_add_rcu(&ghes->list, &ghes_sei);
++	mutex_unlock(&ghes_list_mutex);
++}
++
++static void ghes_sei_remove(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_del_rcu(&ghes->list);
++	mutex_unlock(&ghes_list_mutex);
++	synchronize_rcu();
++}
++#else /* CONFIG_ACPI_APEI_SEI */
++static inline void ghes_sei_add(struct ghes *ghes) { }
++static inline void ghes_sei_remove(struct ghes *ghes) { }
++#endif /* CONFIG_ACPI_APEI_SEI */
++
+ #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+ /*
+  * printk is not safe in NMI context.  So in NMI handler, we allocate
+@@ -1055,6 +1095,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 			goto err;
+ 		}
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
++			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
++				generic->header.source_id);
++		goto err;
++	}
++	break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+ 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+@@ -1126,6 +1173,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_add(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_add(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_add(ghes);
+ 		break;
+@@ -1179,6 +1229,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_remove(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_remove(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_remove(ghes);
+ 		break;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 8feb0c8..9ba59e2 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -120,5 +120,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+ 	     section = acpi_hest_get_next(section))
+ 
+ int ghes_notify_sea(void);
++int ghes_notify_sei(void);
+ 
+ #endif /* GHES_H */
+-- 
+1.9.1
