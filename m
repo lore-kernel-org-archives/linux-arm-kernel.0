@@ -1,18 +1,20 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  3 Mar 2018 19:40:41 -0300
-Subject: [PATCH v2 2/5] ARM: dts: vf: Add memory node unit name
+Date: Sat,  3 Mar 2018 19:40:43 -0300
+Subject: [PATCH v2 4/5] ARM: dts: vf610m4: Remove skeleton.dtsi inclusion
 In-Reply-To: <1520116844-1145-1-git-send-email-festevam@gmail.com>
 References: <1520116844-1145-1-git-send-email-festevam@gmail.com>
-Message-ID: <1520116844-1145-2-git-send-email-festevam@gmail.com>
+Message-ID: <1520116844-1145-4-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Include memory node unit name in order to fix the following W=1
-warnings:
+Since commit 9c0da3cc61f1 ("ARM: dts: explicitly mark skeleton.dtsi as
+deprecated") the inclusion of skeleton.dtsi is deprecated, so
+remove it as this file will eventually go away someday.
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Move its content to the SoC dtsi file, so that the resultant dtb
+is the same.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 Reviewed-by: Stefan Agner <stefan@agner.ch>
@@ -20,91 +22,31 @@ Reviewed-by: Stefan Agner <stefan@agner.ch>
 Changes since v1:
 - None
 
- arch/arm/boot/dts/vf500-colibri.dtsi  | 2 +-
- arch/arm/boot/dts/vf610-colibri.dtsi  | 2 +-
- arch/arm/boot/dts/vf610-cosmic.dts    | 2 +-
- arch/arm/boot/dts/vf610-twr.dts       | 2 +-
- arch/arm/boot/dts/vf610-zii-dev.dtsi  | 2 +-
- arch/arm/boot/dts/vf610m4-colibri.dts | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/vf610m4.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
-index 515c4d2f..2e7e3ce 100644
---- a/arch/arm/boot/dts/vf500-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf500-colibri.dtsi
-@@ -46,7 +46,7 @@
- 	model = "Toradex Colibri VF50 COM";
- 	compatible = "toradex,vf610-colibri_vf50", "fsl,vf500";
+diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
+index 1474bd3..5d52af2 100644
+--- a/arch/arm/boot/dts/vf610m4.dtsi
++++ b/arch/arm/boot/dts/vf610m4.dtsi
+@@ -42,10 +42,17 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x8000000>;
- 	};
+-#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include "vfxxx.dtsi"
  
-diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-index 395812c..aeaf99f 100644
---- a/arch/arm/boot/dts/vf610-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-@@ -46,7 +46,7 @@
- 	model = "Toradex Colibri VF61 COM";
- 	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x10000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
-index 5447f25..a3014e8 100644
---- a/arch/arm/boot/dts/vf610-cosmic.dts
-+++ b/arch/arm/boot/dts/vf610-cosmic.dts
-@@ -19,7 +19,7 @@
- 		bootargs = "console=ttyLP1,115200";
- 	};
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x10000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 6f787e67..6be7a82 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -50,7 +50,7 @@
- 		bootargs = "console=ttyLP1,115200";
- 	};
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x8000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/vf610-zii-dev.dtsi b/arch/arm/boot/dts/vf610-zii-dev.dtsi
-index aadd36d..4890b8a 100644
---- a/arch/arm/boot/dts/vf610-zii-dev.dtsi
-+++ b/arch/arm/boot/dts/vf610-zii-dev.dtsi
-@@ -49,7 +49,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x20000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
-index 7198e8c..2b237ef 100644
---- a/arch/arm/boot/dts/vf610m4-colibri.dts
-+++ b/arch/arm/boot/dts/vf610m4-colibri.dts
-@@ -54,7 +54,7 @@
- 		linux,stdout-path = "&uart2";
- 	};
- 
--	memory {
-+	memory at 8c000000 {
- 		reg = <0x8c000000 0x3000000>;
- 	};
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0>; };
++};
++
+ &mscm_ir {
+ 	interrupt-parent = <&nvic>;
  };
 -- 
 2.7.4
