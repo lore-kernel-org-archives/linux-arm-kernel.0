@@ -1,46 +1,99 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 3 Mar 2018 22:27:53 +0800
-Subject: [kernel-hardening] [PATCH 2/2] arm: Kconfig: Add
- ARCH_HAS_FORTIFY_SOURCE
-In-Reply-To: <20180228143037.GA3150@pjb1027-Latitude-E5410>
-References: <20180228143037.GA3150@pjb1027-Latitude-E5410>
-Message-ID: <201803032227.0fjGmsYp%fengguang.wu@intel.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Sat, 3 Mar 2018 15:34:36 +0100
+Subject: [RFC V2 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
+ <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20180303143436.GA14563@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jinbum,
+On Fri, Mar 02, 2018 at 06:41:30PM -0500, Agustin Vega-Frias wrote:
 
-Thank you for the patch! Yet something to improve:
+SNIP
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.16-rc3 next-20180302]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
+> index 655ecff..a1a01b1 100644
+> --- a/tools/perf/util/parse-events.l
+> +++ b/tools/perf/util/parse-events.l
+> @@ -175,7 +175,7 @@ bpf_source	[^,{}]+\.c[a-zA-Z0-9._]*
+>  num_dec		[0-9]+
+>  num_hex		0x[a-fA-F0-9]+
+>  num_raw_hex	[a-fA-F0-9]+
+> -name		[a-zA-Z_*?][a-zA-Z0-9_*?.]*
+> +name		[a-zA-Z_*?\[\]][a-zA-Z0-9_*?.\[\]]*
+>  name_minus	[a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
+>  drv_cfg_term	[a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
+>  /* If you add a modifier you need to update check_modifier() */
+> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+> index e81a20e..c528469 100644
+> --- a/tools/perf/util/parse-events.y
+> +++ b/tools/perf/util/parse-events.y
+> @@ -8,6 +8,7 @@
+> 
+>  #define YYDEBUG 1
+> 
+> +#include <fnmatch.h>
+>  #include <linux/compiler.h>
+>  #include <linux/list.h>
+>  #include <linux/types.h>
+> @@ -241,7 +242,7 @@ PE_NAME opt_event_config
+>  			if (!strncmp(name, "uncore_", 7) &&
+>  			    strncmp($1, "uncore_", 7))
+>  				name += 7;
+> -			if (!strncmp($1, name, strlen($1))) {
+> +			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
 
-url:    https://github.com/0day-ci/linux/commits/Jinbum-Park/arm-Add-ARCH_HAS_FORTIFY_SOURCE/20180303-184154
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+could we now get rid of the strncmp in here and keep the
+glob matching only? I find it confusing now that following
+commands give me same results:
 
-All errors (new ones prefixed by >>):
+	- [root at krava perf]# ./perf stat -e 'cbox/clockticks/' --no-merge -a sleep 1
 
-   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_count':
->> fdt_ro.c:(.text+0xc90): undefined reference to `fortify_panic'
-   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_search':
-   fdt_ro.c:(.text+0xd40): undefined reference to `fortify_panic'
-   arch/arm/boot/compressed/fdt_ro.o: In function `fdt_stringlist_get':
-   fdt_ro.c:(.text+0xe28): undefined reference to `fortify_panic'
+	 Performance counter stats for 'system wide':
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180303/c5bcbe51/attachment-0001.gz>
+	   <not supported>      uncore_cbox_1/clockticks/                                   
+	281,474,957,674,239      uncore_cbox_0/clockticks/                                   
+
+	       1.000958335 seconds time elapsed
+
+	- [root at krava perf]# ./perf stat -e '*cbox*/clockticks/' --no-merge -a sleep 1
+
+	 Performance counter stats for 'system wide':
+
+	   <not supported>      uncore_cbox_1/clockticks/                                   
+		 5,427,337      uncore_cbox_0/clockticks/                                   
+
+	       1.000962724 seconds time elapsed
+
+	- [root at krava perf]# ./perf stat -e 'cbox*/clockticks/' --no-merge -a sleep 1
+
+	 Performance counter stats for 'system wide':
+
+	   <not supported>      uncore_cbox_1/clockticks/                                   
+	281,474,969,621,374      uncore_cbox_0/clockticks/                                   
+
+	       1.001026179 seconds time elapsed
+
+and this one fails:
+
+	- [root at krava perf]# ./perf stat -e '*cbox/clockticks/' --no-merge -a sleep 1
+	event syntax error: '*cbox/clockticks/'
+			     \___ Cannot find PMU `*cbox'. Missing kernel support?
+	Run 'perf list' for a list of valid events
+
+	 Usage: perf stat [<options>] [<command>]
+
+	    -e, --event <event>   event selector. use 'perf list' to list available events
+
+
+despite the fact that it makes as much sense as the previous one: perf stat -e 'cbox*/clockticks/'
+
+
+I'd think let's keep just the glob matching, so it's clear
+you what you use wildcards for.. thoughts?
+
+thanks,
+jirka
