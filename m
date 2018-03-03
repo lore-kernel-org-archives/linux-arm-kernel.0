@@ -1,37 +1,27 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sat, 3 Mar 2018 16:41:13 +0100
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180224084106.GC25201@hirez.programming.kicks-ass.net>
- <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
-Message-ID: <20180303154113.GH25201@hirez.programming.kicks-ass.net>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sat, 3 Mar 2018 18:25:17 +0200
+Subject: [PATCH] i2c: s3c2410: Properly handle interrupts of number 0
+In-Reply-To: <20180302162821.bmsxgrqqaginjooo@lakrids.cambridge.arm.com>
+References: <1519936484-23132-1-git-send-email-krzk@kernel.org>
+ <20180302111931.GX9418@n2100.armlinux.org.uk>
+ <20180302124647.sfhnto77wgdh5sv6@katana>
+ <20180302125907.GA9418@n2100.armlinux.org.uk>
+ <20180302135854.76ue5jzsg7lvxjxw@katana>
+ <20180302140901.lrjqiaa2k4nxkqco@mwanda>
+ <20180302153221.GB9418@n2100.armlinux.org.uk>
+ <20180302162821.bmsxgrqqaginjooo@lakrids.cambridge.arm.com>
+Message-ID: <CAHp75VcPMmATbCCczm3NqNDGCda6J5vga-FDW4SFABaqBKe4iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 05:53:57PM -0800, skannan at codeaurora.org wrote:
-> On 2018-02-24 00:41, Peter Zijlstra wrote:
-> > On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
-> > > Some PMUs events can be read from any CPU. So allow the PMU to mark
-> > > events as such. For these events, we don't need to reject reads or
-> > > make smp calls to the event's CPU and cause unnecessary wake ups.
-> > > 
-> > > Good examples of such events would be events from caches shared across
-> > > all CPUs.
-> > 
-> > So why would the existing ACTIVE_PKG not work for you? Because clearly
-> > your example does not cross a package.
-> 
-> Because based on testing it on hardware, it looks like the two clusters in
-> an ARM DynamIQ design are not considered part of the same "package". When I
-> say clusters, I using the more common interpretation of "homogeneous CPUs
-> running on the same clock"/CPUs in a cpufreq policy and not ARM's new
-> redefinition of cluster. So, on a SoC with 4 little and 4 big cores, it'll
-> still trigger a lot of unnecessary smp calls/IPIs that cause unnecessary
-> wakeups.
+On Fri, Mar 2, 2018 at 6:28 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Mar 02, 2018 at 03:32:22PM +0000, Russell King - ARM Linux wrote:
+>> How do we break this status quo and finally solve the IRQ 0 and
+>> NO_IRQ issue?
 
-arch/arm64/include/asm/topology.h:#define topology_physical_package_id(cpu)     (cpu_topology[cpu].cluster_id)
+Guys, the question: Wouldn't be request_irq() failed when it gets a
+wrong number on input?
 
-*sigh*... that's just broken...
+-- 
+With Best Regards,
+Andy Shevchenko
