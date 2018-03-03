@@ -1,36 +1,35 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Sat,  3 Mar 2018 12:25:54 +0000
-Subject: [PATCH v2] pinctrl: sunxi: always look for apb block
-Message-ID: <20180303122554.20984-1-andre.przywara@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 3 Mar 2018 09:38:28 -0300
+Subject: [PATCH] ARM: dts: tpc: Device tree description of the TPC board
+In-Reply-To: <20180303080604.6fe8a9d3@jawa>
+References: <20180302121750.12865-1-lukma@denx.de>
+ <CAOMZO5BTnfHRkGnROh3LJoGVPcBcQk=rroYip4V1DDBUbkRuKw@mail.gmail.com>
+ <20180303080604.6fe8a9d3@jawa>
+Message-ID: <CAOMZO5CL7kiiw-y2Tdt7C+G1T2GxFRR3bJKQi_mzWeMSNugutQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner pinctrl device tree binding suggests that a clock named
-"apb" would drive the pin controller IP. However (for legacy reasons) we
-rely on this clock actually being the first clock defined.
-Since named clocks can be in any order, let's explicitly check for a
-clock called "apb" if there is more than one clock referenced.
+Hi Lukasz,
 
-Kudo to Maxime for suggesting this much more elegant approach.
+On Sat, Mar 3, 2018 at 4:06 AM, Lukasz Majewski <lukma@denx.de> wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Previously (for other imx6q board) I've added entry to e.g.
+> panel-simple.c file [1] to describe the display.
+>
+> I thought that adding timings to DTS is more welcome - hence we do not
+> need to add any extra code to Linux when porting new board?
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 341312d66512..bc3d59f2173f 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -1363,7 +1363,8 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
- 			goto gpiochip_error;
- 	}
- 
--	clk = devm_clk_get(&pdev->dev, NULL);
-+	ret = of_count_phandle_with_args(node, "clocks", "#clock-cells");
-+	clk = devm_clk_get(&pdev->dev, ret == 1 ? NULL : "apb");
- 	if (IS_ERR(clk)) {
- 		ret = PTR_ERR(clk);
- 		goto gpiochip_error;
--- 
-2.14.1
+Adding an entry to panel-simple helps when people want to use this
+panel into their dts, as they need only to pass a compatible string
+line instead of passing all the LCD timings.
+
+> The other upstreamed imx6q board used dual license - GPLv2 or X11
+> (which is also called MIT license).
+>
+> I suppose that this license header shall be replaced with:
+>
+> SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>
+> Am I correct?
+
+Yes, correct.
