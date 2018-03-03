@@ -1,44 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 4 Mar 2018 05:58:56 +0800
-Subject: [PATCH v7 08/13] arm64: Add support for ACPI based firmware tables
-In-Reply-To: <20180228220619.6992-9-jeremy.linton@arm.com>
-References: <20180228220619.6992-9-jeremy.linton@arm.com>
-Message-ID: <201803040538.WEhZAEzX%fengguang.wu@intel.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 03 Mar 2018 23:30:32 +0100
+Subject: [PATCH 3/5] ARM: dts: vf500: Remove empty reg memory property
+In-Reply-To: <1519755447-9666-3-git-send-email-festevam@gmail.com>
+References: <1519755447-9666-1-git-send-email-festevam@gmail.com>
+ <1519755447-9666-3-git-send-email-festevam@gmail.com>
+Message-ID: <84bafc30cee782f72cb5e897bf2be0a7@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+On 27.02.2018 19:17, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> All the vf500 based boards include the real memory size in their
+> dts files, so remove the empty reg memory property.
 
-Thank you for the patch! Yet something to improve:
+Nit: This is somewhat confusing, it almost sounds as if you want to
+remove the memory node.
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.16-rc3 next-20180302]
-[cannot apply to arm64/for-next/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+How about:
+...so remove the zero length reg property.
 
-url:    https://github.com/0day-ci/linux/commits/Jeremy-Linton/Support-PPTT-for-ARM64/20180304-005730
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: s390-default_defconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
+Otherwise this series looks good to me:
 
-All errors (new ones prefixed by >>):
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-   drivers/base/cacheinfo.o: In function `acpi_find_last_cache_level':
->> (.text+0x900): multiple definition of `acpi_find_last_cache_level'
-   arch/s390/kernel/cache.o:(.text+0xc8): first defined here
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 17664 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180304/9c07f3bf/attachment-0001.gz>
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/vf500.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+> index 1e3b479..bbff011 100644
+> --- a/arch/arm/boot/dts/vf500.dtsi
+> +++ b/arch/arm/boot/dts/vf500.dtsi
+> @@ -47,7 +47,7 @@
+>  	#size-cells = <1>;
+>  	chosen { };
+>  	aliases { };
+> -	memory { device_type = "memory"; reg = <0 0>; };
+> +	memory { device_type = "memory"; };
+>  
+>  	cpus {
+>  		#address-cells = <1>;
