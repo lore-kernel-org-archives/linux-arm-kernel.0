@@ -1,49 +1,38 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  3 Mar 2018 19:40:40 -0300
-Subject: [PATCH v2 1/5] ARM: dts: vf500: Remove skeleton.dtsi inclusion
-Message-ID: <1520116844-1145-1-git-send-email-festevam@gmail.com>
+Date: Sat,  3 Mar 2018 19:40:42 -0300
+Subject: [PATCH v2 3/5] ARM: dts: vf500: Remove the zero length reg property
+In-Reply-To: <1520116844-1145-1-git-send-email-festevam@gmail.com>
+References: <1520116844-1145-1-git-send-email-festevam@gmail.com>
+Message-ID: <1520116844-1145-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Since commit 9c0da3cc61f1 ("ARM: dts: explicitly mark skeleton.dtsi as
-deprecated") the inclusion of skeleton.dtsi is deprecated, so
-remove it as this file will eventually go away someday.
-
-Move its content to the SoC dtsi file, so that the resultant dtb
-is the same.
+All the vf500 based boards include the real memory size in their
+dts files, so remove the zero length reg property.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 Reviewed-by: Stefan Agner <stefan@agner.ch>
 ---
 Changes since v1:
-- None
+- Improve the wording to "zero length reg property" (Stefan Agner)
 
- arch/arm/boot/dts/vf500.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf500.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index 348bcd3..1e3b479 100644
+index 1e3b479..bbff011 100644
 --- a/arch/arm/boot/dts/vf500.dtsi
 +++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -39,11 +39,16 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -47,7 +47,7 @@
+ 	#size-cells = <1>;
+ 	chosen { };
+ 	aliases { };
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
--#include "skeleton.dtsi"
- #include "vfxxx.dtsi"
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	chosen { };
-+	aliases { };
-+	memory { device_type = "memory"; reg = <0 0>; };
-+
  	cpus {
  		#address-cells = <1>;
- 		#size-cells = <0>;
 -- 
 2.7.4
