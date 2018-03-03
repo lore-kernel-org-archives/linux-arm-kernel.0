@@ -1,110 +1,77 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Sat, 03 Mar 2018 08:20:07 +0800
-Subject: [PATCH v9 5/5] drm/bridge/synopsys: dw-hdmi: Add missing bridge
- detach
-In-Reply-To: <2714218.VptbnhJPkd@avalon>
-References: <20180302175757.28192-1-enric.balletbo@collabora.com>
- <20180302175757.28192-6-enric.balletbo@collabora.com>
- <2714218.VptbnhJPkd@avalon>
-Message-ID: <5A99EA37.6070006@rock-chips.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Sat, 3 Mar 2018 08:52:07 +0800
+Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
+In-Reply-To: <86r2p23h3v.wl-marc.zyngier@arm.com>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+ <20180301164630.GB23321@kroah.com>
+ <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
+ <86r2p23h3v.wl-marc.zyngier@arm.com>
+Message-ID: <a16dc104-2ede-77db-506e-266a7127e373@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
 
-On 03/03/2018 05:49 AM, Laurent Pinchart wrote:
-> Hi Enric,
->
-> Thank you for the patch.
->
-> On Friday, 2 March 2018 19:57:57 EET Enric Balletbo i Serra wrote:
->> From: Jeffy Chen <jeffy.chen@rock-chips.com>
+
+On 03/02/2018 06:29 PM, Marc Zyngier wrote:
+> On Fri, 02 Mar 2018 09:02:32 +0000,
+> Alex Shi wrote:
 >>
->> We inited connector in attach(), so need a detach() to cleanup.
->
-> Do we ? The dw-hdmi driver already sets drm_connector_cleanup() as the
-> connector .destroy() handler, and the .destroy() operation is called by the
-> DRM core. None of the other bridge drivers call drm_connector_cleanup()
-> directly.
-
-hmmm, checking the code, there are also lots of drivers do the 
-cleanup(drm_connector_cleanup or funcs->destroy):
-drm# grep -r "connector.*funcs->destroy" .
-./rockchip/inno_hdmi.c: hdmi->connector.funcs->destroy(&hdmi->connector);
-./rockchip/cdn-dp-core.c:       connector->funcs->destroy(connector);
-./bridge/analogix/analogix_dp_core.c: 
-dp->connector.funcs->destroy(&dp->connector);
-./msm/hdmi/hdmi.c: 
-hdmi->connector->funcs->destroy(hdmi->connector);
-./msm/dsi/dsi.c: 
-msm_dsi->connector->funcs->destroy(msm_dsi->connector);
-./msm/edp/edp.c: 
-edp->connector->funcs->destroy(edp->connector);
-./zte/zx_hdmi.c:        hdmi->connector.funcs->destroy(&hdmi->connector);
-./drm_connector.c:      connector->funcs->destroy(connector);
-./drm_connector.c:              connector->funcs->destroy(connector);
-./nouveau/dispnv04/disp.c: 
-connector->funcs->destroy(connector);
-./nouveau/nv50_display.c: 
-mstc->connector.funcs->destroy(&mstc->connector);
-./nouveau/nv50_display.c: 
-connector->funcs->destroy(connector);
-
-
-
-when i debug analogix_dp bind/unbind, i found that we need to cleanup 
-the connector(reported by kmemleak). so i added it to 
-./bridge/analogix/analogix_dp_core.c...after that i saw dw-hdmi missing 
-that too(by checking the code), so make this patch.
-
-but i didn't really tested it on devices using dw-hdmi, so i'm not very 
-sure the dw-hdmi(maybe also other bridges) is the same with analogix_dp.
-
-i can try to find a chromebook veyron to check it next week :)
-
-but even there's a leak, i'm still not very sure about:
-should the caller of drm_connector_init cleanup it
-or the caller of drm_bridge_attach should do it(for example 
-analogix_dp_bind/analogix_dp_unbind)
-or should the DRM core take care of that?
-
->
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
 >>
->> Changes in v9: None
 >>
->>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 ++++++++
->>   1 file changed, 8 insertions(+)
+>> On 03/02/2018 12:46 AM, Greg KH wrote:
+>>> On Thu, Mar 01, 2018 at 08:53:37PM +0800, Alex Shi wrote:
+>>>> Hi All,
+>>>>
+>>>> Resent without non-upstream patches.
+>>>>
+>>>> This backport patchset fixed the spectre issue, it's original branch:
+>>>> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+>>>> A few dependency or fixingpatches are also picked up, if they are necessary
+>>>>  and no functional changes.
+>>>>
+>>>> No bug found from kernelci.org and lkft testing. It also could be gotten from:
+>>>>
+>>>> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
+>>>
+>>> Also, how did you test, what platforms did you test, and did you test
+>>> that this actually did fix the spectre issue on your platforms?  If so,
+>>> what test did you use?
+>>>
 >>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
->> f9802399cc0d..5626922f95f9 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> @@ -1985,6 +1985,13 @@ static int dw_hdmi_bridge_attach(struct drm_bridge
->> *bridge) return 0;
->>   }
+>> On the kernelci, there are 18 kinds of platoforms with different
+>> configure tested booting, detailed info is here:
+>> https://kernelci.org/boot/all/job/lsk/branch/linux-linaro-lsk-v4.9-test/kernel/lsk-v4.9-17.03-4844-g6f782cff6edb/
 >>
->> +static void dw_hdmi_bridge_detach(struct drm_bridge *bridge)
->> +{
->> +	struct dw_hdmi *hdmi = bridge->driver_private;
->> +
->> +	drm_connector_cleanup(&hdmi->connector);
->> +}
->> +
->>   static enum drm_mode_status
->>   dw_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
->>   			  const struct drm_display_mode *mode)
->> @@ -2041,6 +2048,7 @@ static void dw_hdmi_bridge_enable(struct drm_bridge
->> *bridge)
+>> I also tested the qemu boot on hikey620. and normal boot on
+> 
+> Did you try QEMU in conjunction with KVM? Or just in emulation?
+
+Many many thanks for response!
+
+Yes, I tried both of type boot with or w/o KVM. Both works.
+
+> 
+>> hikey620/db410c/junor2. The other testing include the LKFT testing which
+>> is reported by email, same as test for LTS. None of testing show
+>> regressions.
 >>
->>   static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
->>   	.attach = dw_hdmi_bridge_attach,
->> +	.detach = dw_hdmi_bridge_detach,
->>   	.enable = dw_hdmi_bridge_enable,
->>   	.disable = dw_hdmi_bridge_disable,
->>   	.mode_set = dw_hdmi_bridge_mode_set,
->
+>>
+>> As testing the spectre bug fix, that's a good question. I also asked
+>> this question to original patch authors, like Marc. They said they just
+>> figure out these patches could block spectre or meltdown issue. From my
+>> side, I just reproduced the process internal spectre. But all fix on arm
+>> can not resolve the user space internal spectre. It can block from user
+>> to kernel or kernel to user spectre according the code purose. So I
+>> believe these patch could do their job. And arm cpu would drop the
+>> spectre branches if it has 20+ 'nop' instructions...
+> 
+> What are you talking about? What's that story about NOPs? There are
+> clear mitigation guidelines for ARM cores, please don't make things
+> up.
+
+Oops, sorry for misunderstanding! what's I meaning is, among many kind
+of solution to mitigation issues, like ATF changes, compiler change, BT
+changes, 'nop' is interesting for me. Sorry for bad expression.
+
+Regards
+Alex
