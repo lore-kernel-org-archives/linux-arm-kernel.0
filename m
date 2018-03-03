@@ -1,97 +1,44 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  3 Mar 2018 22:43:09 +0100
-Subject: [usb-next PATCH v11 8/8] usb: core: hcd: remove support for
- initializing a single PHY
-In-Reply-To: <20180303214309.25643-1-martin.blumenstingl@googlemail.com>
-References: <20180303214309.25643-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180303214309.25643-9-martin.blumenstingl@googlemail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 4 Mar 2018 05:58:56 +0800
+Subject: [PATCH v7 08/13] arm64: Add support for ACPI based firmware tables
+In-Reply-To: <20180228220619.6992-9-jeremy.linton@arm.com>
+References: <20180228220619.6992-9-jeremy.linton@arm.com>
+Message-ID: <201803040538.WEhZAEzX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new PHY wrapper in place we can now handle multiple PHYs.
-Remove the code which handles only one generic PHY as this is now
-covered (with support for multiple PHYs as well as suspend/resume
-support) by the new PHY wrapper.
+Hi Jeremy,
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.16-rc3 next-20180302]
+[cannot apply to arm64/for-next/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Jeremy-Linton/Support-PPTT-for-ARM64/20180304-005730
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: s390-default_defconfig (attached as .config)
+compiler: s390x-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=s390 
+
+All errors (new ones prefixed by >>):
+
+   drivers/base/cacheinfo.o: In function `acpi_find_last_cache_level':
+>> (.text+0x900): multiple definition of `acpi_find_last_cache_level'
+   arch/s390/kernel/cache.o:(.text+0xc8): first defined here
+
 ---
- drivers/usb/core/hcd.c  | 37 -------------------------------------
- include/linux/usb/hcd.h |  1 -
- 2 files changed, 38 deletions(-)
-
-diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-index 32797c25ac3b..5a92d8f7c484 100644
---- a/drivers/usb/core/hcd.c
-+++ b/drivers/usb/core/hcd.c
-@@ -2757,30 +2757,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- 		}
- 	}
- 
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->skip_phy_initialization) {
--		struct phy *phy = phy_get(hcd->self.sysdev, "usb");
--
--		if (IS_ERR(phy)) {
--			retval = PTR_ERR(phy);
--			if (retval == -EPROBE_DEFER)
--				goto err_phy;
--		} else {
--			retval = phy_init(phy);
--			if (retval) {
--				phy_put(phy);
--				goto err_phy;
--			}
--			retval = phy_power_on(phy);
--			if (retval) {
--				phy_exit(phy);
--				phy_put(phy);
--				goto err_phy;
--			}
--			hcd->phy = phy;
--			hcd->remove_phy = 1;
--		}
--	}
--
- 	if (!hcd->skip_phy_initialization) {
- 		hcd->phy_roothub = usb_phy_roothub_init(hcd->self.sysdev);
- 		if (IS_ERR(hcd->phy_roothub)) {
-@@ -2961,13 +2937,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- err_usb_phy_roothub_power_on:
- 	usb_phy_roothub_exit(hcd->phy_roothub);
- err_phy_roothub_init:
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
--err_phy:
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-@@ -3048,12 +3017,6 @@ void usb_remove_hcd(struct usb_hcd *hcd)
- 	usb_phy_roothub_power_off(hcd->phy_roothub);
- 	usb_phy_roothub_exit(hcd->phy_roothub);
- 
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
-index a042675e03ba..aef50cb2ed1b 100644
---- a/include/linux/usb/hcd.h
-+++ b/include/linux/usb/hcd.h
-@@ -103,7 +103,6 @@ struct usb_hcd {
- 	 * other external phys should be software-transparent
- 	 */
- 	struct usb_phy		*usb_phy;
--	struct phy		*phy;
- 	struct usb_phy_roothub	*phy_roothub;
- 
- 	/* Flags that need to be manipulated atomically because they can
--- 
-2.16.2
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 17664 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180304/9c07f3bf/attachment-0001.gz>
