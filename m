@@ -1,43 +1,63 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sun, 4 Mar 2018 00:09:35 +0800
-Subject: [PATCH v10 0/5] set VSESR_EL2 by user space and support NOTIFY_SEI
- notification
-Message-ID: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
+Date: Sun, 4 Mar 2018 00:09:36 +0800
+Subject: [PATCH v10 1/5] arm64: KVM: Prepare set virtual SEI syndrome value
+In-Reply-To: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
+References: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1520093380-42577-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Detect whether KVM can set set guest SError syndrome
-2. Support to Set VSESR_EL2 and inject SError by user space.
-3. Support live migration to keep SError pending state and VSESR_EL2 value.
-4. ACPI 6.1 adds support for NOTIFY_SEI as a GHES notification mechanism, so support this
-   notification in software, KVM or kernel ARCH code call handle_guest_sei() to let ACP driver
-   to handle this notification.
+Export one API to specify virtual SEI syndrome value
+for guest, and add a helper to get the VSESR_EL2 value.
 
-Dongjiu Geng (5):
-  arm64: KVM: Prepare set virtual SEI syndrome value
-  arm64: KVM: export the capability to set guest SError syndrome
-  arm/arm64: KVM: Introduce set and get per-vcpu event
-  ACPI / APEI: Add SEI notification type support for ARMv8
-  arm64: handle NOTIFY_SEI notification by the APEI driver
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ arch/arm64/include/asm/kvm_emulate.h | 5 +++++
+ arch/arm64/include/asm/kvm_host.h    | 2 ++
+ arch/arm64/kvm/inject_fault.c        | 5 +++++
+ 3 files changed, 12 insertions(+)
 
- Documentation/virtual/kvm/api.txt    | 37 +++++++++++++++++++++++--
- arch/arm/include/asm/kvm_host.h      |  6 ++++
- arch/arm/kvm/guest.c                 | 12 ++++++++
- arch/arm64/include/asm/kvm_emulate.h |  5 ++++
- arch/arm64/include/asm/kvm_host.h    |  7 +++++
- arch/arm64/include/asm/system_misc.h |  1 +
- arch/arm64/include/uapi/asm/kvm.h    | 10 +++++++
- arch/arm64/kernel/traps.c            |  4 +++
- arch/arm64/kvm/guest.c               | 26 ++++++++++++++++++
- arch/arm64/kvm/inject_fault.c        |  5 ++++
- arch/arm64/kvm/reset.c               |  4 +++
- arch/arm64/mm/fault.c                | 10 +++++++
- drivers/acpi/apei/Kconfig            | 15 ++++++++++
- drivers/acpi/apei/ghes.c             | 53 ++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h                  |  1 +
- include/uapi/linux/kvm.h             |  1 +
- virt/kvm/arm/arm.c                   | 18 ++++++++++++
- 17 files changed, 213 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 413dc82..3294885 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -71,6 +71,11 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+ 	vcpu->arch.hcr_el2 = hcr;
+ }
+ 
++static inline unsigned long vcpu_get_vsesr(struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.vsesr_el2;
++}
++
+ static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
+ {
+ 	vcpu->arch.vsesr_el2 = vsesr;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index a73f63a..3dc49b7 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -354,6 +354,8 @@ void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
+ 
++void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 syndrome);
++
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
+ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 60666a0..78ecb28 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -186,3 +186,8 @@ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+ 	pend_guest_serror(vcpu, ESR_ELx_ISV);
+ }
++
++void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 syndrome)
++{
++	pend_guest_serror(vcpu, syndrome & ESR_ELx_ISS_MASK);
++}
 -- 
 1.9.1
