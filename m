@@ -1,39 +1,94 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Sat, 3 Mar 2018 08:54:10 +0800
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <20180302103046.GC19323@arm.com>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180301164630.GB23321@kroah.com>
- <c96bc4d8-25b8-684b-83f6-7d6c6c0fea4b@linaro.org>
- <20180302103046.GC19323@arm.com>
-Message-ID: <f12aee2c-556b-f146-17eb-707bb901dbd8@linaro.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri,  2 Mar 2018 17:14:53 -0800
+Subject: [PATCH v2] perf/core: Add support for PMUs that can be read from more
+ than 1 CPU
+Message-ID: <1520039693-30914-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some PMUs events can be read from more than the one CPU. So allow the
+PMU driver to mark events as such. For these events, we don't need to
+reject reads or make smp calls to the event's CPU (and cause
+unnecessary overhead and wake ups).
 
+When a PMU driver marks an event as such, care must be taken by the
+driver to make sure they can handle the event being read/updated from
+more than 1 CPU at the same time (Eg: due to an IRQ indicating event
+counter overflow and another thread trying to read the latest values).
 
-On 03/02/2018 06:30 PM, Will Deacon wrote:
-> On Fri, Mar 02, 2018 at 05:02:32PM +0800, Alex Shi wrote:
->> As testing the spectre bug fix, that's a good question. I also asked
->> this question to original patch authors, like Marc. They said they just
->> figure out these patches could block spectre or meltdown issue. From my
->> side, I just reproduced the process internal spectre. But all fix on arm
->> can not resolve the user space internal spectre. It can block from user
->> to kernel or kernel to user spectre according the code purose. So I
->> believe these patch could do their job. And arm cpu would drop the
->> spectre branches if it has 20+ 'nop' instructions...
-> 
-> Since this is archived on a public list and I don't want people to rely on
-> this, no, you cannot rely on "20+ 'nop' instructions" to work around
-> spectre on arm/arm64. It might prevent a particular PoC working on a
-> particular SoC, but it's fragile at best.
-> 
+Good examples of such events would be events from caches shared across
+CPUs.
 
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+---
+Changes since v1:
+- Use cpumasks instead of capability flag as that's more flexible.
 
-Thanks for comments, Will!
+ include/linux/perf_event.h |  1 +
+ kernel/events/core.c       | 14 +++++++++-----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
 
-Yes, I full understand the difference between SoCs. Thanks for point it out!
-
-
-Regards
-Alex
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 7546822..4cec431 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -629,6 +629,7 @@ struct perf_event {
+ 
+ 	int				oncpu;
+ 	int				cpu;
++	cpumask_t			readable_on_cpus;
+ 
+ 	struct list_head		owner_entry;
+ 	struct task_struct		*owner;
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 5d3df58..1a8fbfa 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -3483,10 +3483,12 @@ struct perf_read_data {
+ static int __perf_event_read_cpu(struct perf_event *event, int event_cpu)
+ {
+ 	u16 local_pkg, event_pkg;
++	int local_cpu = smp_processor_id();
+ 
+-	if (event->group_caps & PERF_EV_CAP_READ_ACTIVE_PKG) {
+-		int local_cpu = smp_processor_id();
++	if (cpumask_test_cpu(local_cpu, &event->readable_on_cpus))
++		return local_cpu;
+ 
++	if (event->group_caps & PERF_EV_CAP_READ_ACTIVE_PKG) {
+ 		event_pkg = topology_physical_package_id(event_cpu);
+ 		local_pkg = topology_physical_package_id(local_cpu);
+ 
+@@ -3575,7 +3577,8 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
+ {
+ 	unsigned long flags;
+ 	int ret = 0;
+-
++	int local_cpu = smp_processor_id();
++	bool readable = cpumask_test_cpu(local_cpu, &event->readable_on_cpus);
+ 	/*
+ 	 * Disabling interrupts avoids all counter scheduling (context
+ 	 * switches, timer based rotation and IPIs).
+@@ -3600,7 +3603,8 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
+ 
+ 	/* If this is a per-CPU event, it must be for this CPU */
+ 	if (!(event->attach_state & PERF_ATTACH_TASK) &&
+-	    event->cpu != smp_processor_id()) {
++	    event->cpu != local_cpu &&
++	    !readable) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+@@ -3610,7 +3614,7 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
+ 	 * or local to this CPU. Furthermore it means its ACTIVE (otherwise
+ 	 * oncpu == -1).
+ 	 */
+-	if (event->oncpu == smp_processor_id())
++	if (event->oncpu == smp_processor_id() || readable)
+ 		event->pmu->read(event);
+ 
+ 	*value = local64_read(&event->count);
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
