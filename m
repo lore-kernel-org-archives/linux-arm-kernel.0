@@ -1,166 +1,110 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Fri,  2 Mar 2018 18:41:32 -0500
-Subject: [RFC V2 3/3] perf pmu: Auto-merge PMU events created by prefix or
- glob match
-In-Reply-To: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
-References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <1520034092-35275-4-git-send-email-agustinv@codeaurora.org>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Sat, 03 Mar 2018 08:20:07 +0800
+Subject: [PATCH v9 5/5] drm/bridge/synopsys: dw-hdmi: Add missing bridge
+ detach
+In-Reply-To: <2714218.VptbnhJPkd@avalon>
+References: <20180302175757.28192-1-enric.balletbo@collabora.com>
+ <20180302175757.28192-6-enric.balletbo@collabora.com>
+ <2714218.VptbnhJPkd@avalon>
+Message-ID: <5A99EA37.6070006@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Auto-merge for these events was disabled when auto-merging of non-alias
-events was disabled in commit 63ce844 (perf stat: Only auto-merge events
-that are PMU aliases).
+Hi Laurent,
 
-Non-merging of legacy events is preserved:
+On 03/03/2018 05:49 AM, Laurent Pinchart wrote:
+> Hi Enric,
+>
+> Thank you for the patch.
+>
+> On Friday, 2 March 2018 19:57:57 EET Enric Balletbo i Serra wrote:
+>> From: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>
+>> We inited connector in attach(), so need a detach() to cleanup.
+>
+> Do we ? The dw-hdmi driver already sets drm_connector_cleanup() as the
+> connector .destroy() handler, and the .destroy() operation is called by the
+> DRM core. None of the other bridge drivers call drm_connector_cleanup()
+> directly.
 
-    $ ./perf stat -ag -e cache-misses,cache-misses sleep 1
+hmmm, checking the code, there are also lots of drivers do the 
+cleanup(drm_connector_cleanup or funcs->destroy):
+drm# grep -r "connector.*funcs->destroy" .
+./rockchip/inno_hdmi.c: hdmi->connector.funcs->destroy(&hdmi->connector);
+./rockchip/cdn-dp-core.c:       connector->funcs->destroy(connector);
+./bridge/analogix/analogix_dp_core.c: 
+dp->connector.funcs->destroy(&dp->connector);
+./msm/hdmi/hdmi.c: 
+hdmi->connector->funcs->destroy(hdmi->connector);
+./msm/dsi/dsi.c: 
+msm_dsi->connector->funcs->destroy(msm_dsi->connector);
+./msm/edp/edp.c: 
+edp->connector->funcs->destroy(edp->connector);
+./zte/zx_hdmi.c:        hdmi->connector.funcs->destroy(&hdmi->connector);
+./drm_connector.c:      connector->funcs->destroy(connector);
+./drm_connector.c:              connector->funcs->destroy(connector);
+./nouveau/dispnv04/disp.c: 
+connector->funcs->destroy(connector);
+./nouveau/nv50_display.c: 
+mstc->connector.funcs->destroy(&mstc->connector);
+./nouveau/nv50_display.c: 
+connector->funcs->destroy(connector);
 
-     Performance counter stats for 'system wide':
 
-                86,323      cache-misses
-                86,323      cache-misses
 
-           1.002623307 seconds time elapsed
+when i debug analogix_dp bind/unbind, i found that we need to cleanup 
+the connector(reported by kmemleak). so i added it to 
+./bridge/analogix/analogix_dp_core.c...after that i saw dw-hdmi missing 
+that too(by checking the code), so make this patch.
 
-But prefix or glob matching auto-merges the events created:
+but i didn't really tested it on devices using dw-hdmi, so i'm not very 
+sure the dw-hdmi(maybe also other bridges) is the same with analogix_dp.
 
-    $ ./perf stat -a -e l3cache/read-miss/ sleep 1
+i can try to find a chromebook veyron to check it next week :)
 
-     Performance counter stats for 'system wide':
+but even there's a leak, i'm still not very sure about:
+should the caller of drm_connector_init cleanup it
+or the caller of drm_bridge_attach should do it(for example 
+analogix_dp_bind/analogix_dp_unbind)
+or should the DRM core take care of that?
 
-                   328      l3cache/read-miss/
-
-           1.002627008 seconds time elapsed
-
-    $ ./perf stat -a -e l3cache_0_[01]/read-miss/ sleep 1
-
-     Performance counter stats for 'system wide':
-
-                   172      l3cache/read-miss/
-
-           1.002627008 seconds time elapsed
-
-As with events created with aliases, auto-merging can be suppressed with
-the --no-merge option:
-
-    $ ./perf stat -a -e l3cache/read-miss/ --no-merge sleep 1
-
-     Performance counter stats for 'system wide':
-
-                    67      l3cache/read-miss/
-                    67      l3cache/read-miss/
-                    63      l3cache/read-miss/
-                    60      l3cache/read-miss/
-
-           1.002622192 seconds time elapsed
-
-Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
----
- tools/perf/Documentation/perf-stat.txt | 14 +++++++++-----
- tools/perf/util/parse-events.c         | 13 +++----------
- tools/perf/util/parse-events.h         |  2 +-
- tools/perf/util/parse-events.y         |  4 ++--
- 4 files changed, 15 insertions(+), 18 deletions(-)
-
-diff --git a/tools/perf/Documentation/perf-stat.txt b/tools/perf/Documentation/perf-stat.txt
-index 49983a7..ae406f7 100644
---- a/tools/perf/Documentation/perf-stat.txt
-+++ b/tools/perf/Documentation/perf-stat.txt
-@@ -252,11 +252,15 @@ taskset.
- --no-merge::
- Do not merge results from same PMUs.
-
--When multiple events are created from a single event alias, stat will,
--by default, aggregate the event counts and show the result in a single
--row. This option disables that behavior and shows the individual events
--and counts. Aliases are listed immediately after the Kernel PMU events
--by perf list.
-+When multiple events are created from a single event specification,
-+stat will, by default, aggregate the event counts and show the result
-+in a single row. This option disables that behavior and shows
-+the individual events and counts.
-+
-+Multiple events are created from a single event specification when:
-+1. Prefix or glob matching is used for the PMU name.
-+2. Aliases, which are listed immediately after the Kernel PMU events
-+   by perf list, are used.
-
- --smi-cost::
- Measure SMI cost if msr/aperf/ and msr/smi/ events are supported.
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index bafc91e..4e80ca3 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -1217,7 +1217,7 @@ int parse_events_add_numeric(struct parse_events_state *parse_state,
- 			 get_config_name(head_config), &config_terms);
- }
-
--static int __parse_events_add_pmu(struct parse_events_state *parse_state,
-+int parse_events_add_pmu(struct parse_events_state *parse_state,
- 			 struct list_head *list, char *name,
- 			 struct list_head *head_config, bool auto_merge_stats)
- {
-@@ -1287,13 +1287,6 @@ static int __parse_events_add_pmu(struct parse_events_state *parse_state,
- 	return evsel ? 0 : -ENOMEM;
- }
-
--int parse_events_add_pmu(struct parse_events_state *parse_state,
--			 struct list_head *list, char *name,
--			 struct list_head *head_config)
--{
--	return __parse_events_add_pmu(parse_state, list, name, head_config, false);
--}
--
- int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 			       char *str, struct list_head **listp)
- {
-@@ -1323,8 +1316,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 					return -1;
- 				list_add_tail(&term->list, head);
-
--				if (!__parse_events_add_pmu(parse_state, list,
--							    pmu->name, head, true)) {
-+				if (!parse_events_add_pmu(parse_state, list,
-+							  pmu->name, head, true)) {
- 					pr_debug("%s -> %s/%s/\n", str,
- 						 pmu->name, alias->str);
- 					ok++;
-diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
-index 88108cd..5015cfd 100644
---- a/tools/perf/util/parse-events.h
-+++ b/tools/perf/util/parse-events.h
-@@ -167,7 +167,7 @@ int parse_events_add_breakpoint(struct list_head *list, int *idx,
- 				void *ptr, char *type, u64 len);
- int parse_events_add_pmu(struct parse_events_state *parse_state,
- 			 struct list_head *list, char *name,
--			 struct list_head *head_config);
-+			 struct list_head *head_config, bool auto_merge_stats);
-
- int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 			       char *str,
-diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-index c528469..b51278f 100644
---- a/tools/perf/util/parse-events.y
-+++ b/tools/perf/util/parse-events.y
-@@ -232,7 +232,7 @@ PE_NAME opt_event_config
- 		YYABORT;
-
- 	ALLOC_LIST(list);
--	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
-+	if (parse_events_add_pmu(_parse_state, list, $1, $2, false)) {
- 		struct perf_pmu *pmu = NULL;
- 		int ok = 0;
-
-@@ -245,7 +245,7 @@ PE_NAME opt_event_config
- 			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
- 				if (parse_events_copy_term_list(orig_terms, &terms))
- 					YYABORT;
--				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms))
-+				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms, true))
- 					ok++;
- 				parse_events_terms__delete(terms);
- 			}
---
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>
+>> Changes in v9: None
+>>
+>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
+>> f9802399cc0d..5626922f95f9 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> @@ -1985,6 +1985,13 @@ static int dw_hdmi_bridge_attach(struct drm_bridge
+>> *bridge) return 0;
+>>   }
+>>
+>> +static void dw_hdmi_bridge_detach(struct drm_bridge *bridge)
+>> +{
+>> +	struct dw_hdmi *hdmi = bridge->driver_private;
+>> +
+>> +	drm_connector_cleanup(&hdmi->connector);
+>> +}
+>> +
+>>   static enum drm_mode_status
+>>   dw_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
+>>   			  const struct drm_display_mode *mode)
+>> @@ -2041,6 +2048,7 @@ static void dw_hdmi_bridge_enable(struct drm_bridge
+>> *bridge)
+>>
+>>   static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
+>>   	.attach = dw_hdmi_bridge_attach,
+>> +	.detach = dw_hdmi_bridge_detach,
+>>   	.enable = dw_hdmi_bridge_enable,
+>>   	.disable = dw_hdmi_bridge_disable,
+>>   	.mode_set = dw_hdmi_bridge_mode_set,
+>
