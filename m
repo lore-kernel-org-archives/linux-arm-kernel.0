@@ -1,61 +1,114 @@
 From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
-Date: Sun, 4 Mar 2018 16:46:16 +0100
-Subject: [PATCH 2/2] mmc: bcm2835: print some informational messages
- during reset
-In-Reply-To: <1950058855.86123.1518718920111@email.1und1.de>
+Date: Sun, 4 Mar 2018 16:57:17 +0100
+Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
+In-Reply-To: <431948292.48734.1518640216077@email.1und1.de>
 References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
- <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
- <57ff1e429a7fc12300a3cca0c5e9a637beed0d3a.1518619058.git.msuchanek@suse.de>
- <F404E9C8-AE64-4B36-AD1B-911BD3C33946@gmail.com>
- <20180214204733.7987d16c@naga.suse.cz>
- <1950058855.86123.1518718920111@email.1und1.de>
-Message-ID: <20180304164616.75e8e55e@naga.suse.cz>
+ <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+ <20180214163649.3a0c9476@kitsune.suse.cz>
+ <20180214165827.386b9bb1@kitsune.suse.cz>
+ <ecf8dd61-ab16-b298-d197-ea93ecf5982b@i2se.com>
+ <20180214202454.6e7ebeaf@naga.suse.cz>
+ <431948292.48734.1518640216077@email.1und1.de>
+Message-ID: <20180304165717.6d4d8e68@naga.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Feb 2018 19:22:00 +0100 (CET)
+On Wed, 14 Feb 2018 21:30:16 +0100 (CET)
 Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
 > Hi Michal,
 > 
 > > Michal Such?nek <msuchanek@suse.de> hat am 14. Februar 2018 um
-> > 20:47 geschrieben:
+> > 20:24 geschrieben:
 > > 
 > > 
-> > On Wed, 14 Feb 2018 08:50:16 -0800
-> > Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > On Wed, 14 Feb 2018 17:49:31 +0100
+> > Stefan Wahren <stefan.wahren@i2se.com> wrote:
 > >   
-> > > On February 14, 2018 6:38:58 AM PST, Michal Suchanek
-> > > <msuchanek@suse.de> wrote:  
-> > > >The previous patch does reset during hardware error so make the
-> > > >reset progress more visible.    
+> > > Hi Michal,
 > > > 
-> > > Based on your previous email it looks like this can happen quite
-> > > frequently so we might be spamming the kernel log with such reset
-> > > messages. Turning this into a debug print would not be great
-> > > either, how about a custom sysfs attribute counting the number of
-> > > times a reset was done?  
+> > > [add Phil]
+> > > 
+> > > Am 14.02.2018 um 17:13 schrieb Michal Such?nek:  
+> > > > On Wed, 14 Feb 2018 16:36:49 +0100
+> > > > Michal Such?nek <msuchanek@suse.de> wrote:
+> > > >    
+> > > >> On Wed, 14 Feb 2018 15:58:31 +0100
+> > > >> Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > > >>    
+> > > >>> Hi Michal,
+> > > >>>
+> > > >>> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:      
+> > > >>>> The bcm2835 mmc host tends to lock up for unknown reason so
+> > > >>>> reset it on timeout. The upper mmc block layer tries
+> > > >>>> retransimitting with single blocks which tends to work out
+> > > >>>> after a long wait.
+> > > >>>>
+> > > >>>> This is better than giving up and leaving the machine broken
+> > > >>>> for no obvious reason.        
+> > > >>> could you please provide more information about this issue
+> > > >>> (affected hardware, kernel config, version, dmesg,
+> > > >>> reproducible scenario)?   
+> > > > It tends to reproduce when upgrading a few packages with zypper
+> > > > and otherwise at random during system operation. It seems that
+> > > > for my card it worsens with age to some degree so perhaps it
+> > > > depends on the fragmentation of the internal card flash.
+> > > >
+> > > > Attaching dmesg and kernel config.    
+> > > 
+> > > do you noticed this issue before 4.15-rc4?  
 > > 
-> > Since every such message happens when the system stalls for like
-> > half a minute I don't think there will be that many until somebody
-> > notices something is amiss. It might be also helpful in diagnosing
-> > if other cards lock up in different way - for me the DMA shutdown
-> > is short so I guess it's the mmc host that is locked up and the DMA
-> > engine is fine. It might look differently on different systems,
-> > though.  
+> > I initially noticed it with 4.4 kernel with some backports to make
+> > it bootable on RPi.  
 > 
-> FWIW according to your dmesg your RPi doesn't use the DMA engine:
+> this confuses me. Gerd and i ported this driver from downstream and
+> finally it's got merged in 4.12. 
 > 
-> [ 5.004609] sdhost-bcm2835 3f202000.sdhost: unable to initialise DMA
-> channel. Falling back to PIO [ 5.154518] sdhost-bcm2835
-> 3f202000.sdhost: loaded - DMA disabled
-> 
-> For me it's a chicken and egg problem if the DMA driver is build as a
-> kernel module.
+> So do you mean that you backported the mainline version to 4.4 or the
+> downstream version of 4.4?
 
-It can be included in the ramdisk but somebody would have to add it to
-the list of required modules because the dependency is non-obvious.
+I did not backport it but looking at the changelog it is backport of
+the 4.12 driver. It does not look as the 4.15 driver though. Looks like
+there was some reorganization of the bcm mmc since then.
+
+> 
+> On a quick look they seems identical, but they aren't.
+> 
+> > > 
+> > > Could you please test with 4.15 final again?  
+> >
+
+I tried upgrading to the current master (4.16-rc3+) and the issue is
+still reproducible although less frequent. I did full upgrade from the
+install image which installs over 300 packages and the issue triggered
+somewhere around 200th while before installing a half dozen packages
+would usually trigger it.
+
+ 
+> > Right, I can apply the patches on something more recent.
+> >   
+> > > 
+> > > What kind of SD card (name) triggers the issue?  
+> > 
+> > Samsung EVO MB-MP16D  
+> 
+> Thanks
+> 
+> > 
+> > Also see https://elinux.org/RPi_SD_cards#Which_SD_card.3F  
+> 
+> I'm very sceptical about this list. The card above is listed as OK
+> and NOK. The experienced issues doesn't need to be direct related to
+> the card (unproperly umounted, bad driver, ...).
+
+Right, it just shows that this is not an isolated problem. Not all test
+results are reliable, of course. Some include interesting details,
+though.
 
 Thanks
 
 Michal
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: dmesg.4.16.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180304/a88acd5a/attachment-0001.txt>
