@@ -1,123 +1,99 @@
 From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sun, 4 Mar 2018 18:20:18 +0100
-Subject: TS-x09 fails to boot when obtaining MAC
-Message-ID: <20180304172018.c56ocfomqka4dzra@jirafa.cyrius.com>
+Date: Sun, 4 Mar 2018 18:41:57 +0100
+Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
+ kernel memory overwrite attempt detected" on QNAP NAS (ARM)
+In-Reply-To: <151652931598.757.4527606947579667082.reportbug@massive.lan>
+References: <151652931598.757.4527606947579667082.reportbug@massive.lan>
+Message-ID: <20180304174157.ajom7whbo7pr3qb4@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several Debian users reported that Debian 9 (4.9 kernel) fails to boot
-on their QNAP TS-x09 wheras Debian 8 (3.16) works fine.  One user
-provided the following kernel log with earlyprintk.  I suspect the
-issue was introduced in 4904dbda41c860fd117b20f3c48adb2780eee37e.
+A Debian user reported the following issue on QNAP TS-119P II with
+4.9.65:
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.9.0-4-marvell (debian-kernel at lists.debian.org) (gcc version 6.3.0 20170516 (Debian 6.3.0-18) ) #1 Debian 4.9.65-3 (2017-12-03)
-[    0.000000] CPU: Feroceon [41069260] revision 0 (ARMv5TEJ), cr=a005317f
-[    0.000000] CPU: VIVT data cache, VIVT instruction cache
-[    0.000000] Machine: QNAP TS-109/TS-209
-[    0.000000] Clearing invalid memory bank 0KB at 0x00000000
-[    0.000000] Clearing invalid memory bank 0KB at 0x00000000
-[    0.000000] Clearing invalid memory bank 0KB at 0x00000000
-[    0.000000] Ignoring unrecognised tag 0x00000000
-[    0.000000] Ignoring unrecognised tag 0x00000000
-[    0.000000] Ignoring unrecognised tag 0x00000000
-[    0.000000] Ignoring unrecognised tag 0x41000403
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: Data cache writeback
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
-[    0.000000] Kernel command line: console=ttyS0,115200n8 earlyprintk root=/dev/ram rw initrd=0x800000,0x3fffff
-[    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
-[    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
-[    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
-[    0.000000] Memory: 119792K/131072K available (3778K kernel code, 395K rwdata, 1128K rodata, 296K init, 249K bss, 11280K reserved, 0K cma-reserved, 0K highmem)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xc8800000 - 0xff800000   ( 880 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc03b8b98   (3779 kB)
-[    0.000000]       .init : 0xc04f4000 - 0xc053e000   ( 296 kB)
-[    0.000000]       .data : 0xc053e000 - 0xc05a0d78   ( 396 kB)
-[    0.000000]        .bss : 0xc05a0d78 - 0xc05df35c   ( 250 kB)
-[    0.000000] NR_IRQS:16 nr_irqs:65 65
-[    0.000000] Switching to timer-based delay loop, resolution 6ns
-[    0.000023] sched_clock: 32 bits at 166MHz, resolution 6ns, wraps every 12884901885ns
-[   13.004006] clocksource: orion_clocksource: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 11467562657 ns
-[   13.015612] Console: colour dummy device 80x30
-[   13.020264] Calibrating delay loop (skipped), value calculated using timer frequency.. 333.33 BogoMIPS (lpj=666666)
-[   13.030865] pid_max: default: 32768 minimum: 301
-[   13.036032] Security Framework initialized
-[   13.040280] Yama: disabled by default; enable with sysctl kernel.yama.*
-[   13.047387] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-[   13.054151] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-[   13.063776] CPU: Testing write buffer coherency: ok
-[   13.069101] ftrace: allocating 16964 entries in 34 pages
-[   13.162371] Setting up static identity map for 0x8200 - 0x823c
-[   13.175052] devtmpfs: initialized
-[   13.181423] VFP support v0.3: not present
-[   13.186057] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
-[   13.195942] futex hash table entries: 256 (order: -1, 3072 bytes)
-[   13.202738] pinctrl core: initialized pinctrl subsystem
-[   13.211090] NET: Registered protocol family 16
-[   13.216980] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[   13.232956] cpuidle: using governor ladder
-[   13.237224] cpuidle: using governor menu
-[   13.241425] Orion ID: MV88F5182-A2. TCLK=166666667.
-[   13.246864]  00000003
- 55550000[   13.250024]  03ff0000
-[   13.252440]
-[   13.254041]  00000003
- 55550000[   13.257238]  03ff0500
-[   13.259637]
-[   13.266814] Unable to handle kernel paging request at virtual address c8886000
-[   13.274195] pgd = c0004000
-[   13.277037] [c8886000] *pgd=07833811, *pte=00000000, *ppte=00000000
-[   13.283508] Internal error: Oops: 7 [#1] ARM
-[   13.287859] Modules linked in:
-[   13.291011] CPU: 0 PID: 1 Comm: swapper Not tainted 4.9.0-4-marvell #1 Debian 4.9.65-3
-[   13.298998] Hardware name: QNAP TS-109/TS-209
-[   13.303436] task: c78a0020 task.stack: c78a2000
-[   13.308066] PC is at strlen+0x4/0x24
-[   13.311732] LR is at mac_pton+0x10/0xb0
-[   13.315660] pc : [<c01f7554>]    lr : [<c0215bec>]    psr: 20000053
-[   13.315660] sp : c78a3eb0  ip : 00000000  fp : 00000000
-[   13.327282] r10: c0523838  r9 : c053c628  r8 : c8885c00
-[   13.332589] r7 : ffffffff  r6 : c78a3eca  r5 : c8885c00  r4 : f4707c00
-[   13.339189] r3 : c8886000  r2 : 00000030  r1 : c8886000  r0 : c8885c00
-[   13.345790] Flags: nzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment none
-[   13.353082] Control: a005317f  Table: 00004000  DAC: 00000053
-[   13.358905] Process swapper (pid: 1, stack limit = 0xc78a2190)
-[   13.364814] Stack: (0xc78a3eb0 to 0xc78a4000)
-[   13.369262] 3ea0:                                     f4707c00 ffffffff f4760000 ffffffff
-[   13.377520] 3ec0: c8885c00 c04fbee8 f4700000 00060000 c052748c c0546620 ffffe000 00000000
-[   13.385781] 3ee0: c05a0d80 c04fbd68 c04f6758 c054082c ffffe000 c04f6774 c04f6758 c000986c
-[   13.394039] 3f00: 00000000 c78cad00 c03bb2cc c054082c 00000040 c05a0d00 00000000 c003ac1c
-[   13.402300] 3f20: c7ffce94 c7ffce9b 0000003e c003ad34 c05c7554 c0049160 c04d2498 0000003e
-[   13.410557] 3f40: 00000003 00000003 c04d2970 c04d2970 00000000 a4ae9beb 0000003e 00000004
-[   13.418810] 3f60: 0000003e c05a0d80 c0523824 c05a0d80 c053c628 c04f4e64 00000003 00000003
-[   13.427068] 3f80: 00000000 c04f459c 00000000 c03b4ed4 00000000 00000000 00000000 00000000
-[   13.435319] 3fa0: 00000000 c03b4ee4 00000000 c000f610 00000000 00000000 00000000 00000000
-[   13.443569] 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[   13.451820] 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
-[   13.460097] [<c01f7554>] (strlen) from [<c0215bec>] (mac_pton+0x10/0xb0)
-[   13.466906] [<c0215bec>] (mac_pton) from [<c04fbee8>] (qnap_tsx09_find_mac_addr+0x3c/0x98)
-[   13.475264] [<c04fbee8>] (qnap_tsx09_find_mac_addr) from [<c04fbd68>] (qnap_ts209_init+0x4c/0x10c)
-[   13.484312] [<c04fbd68>] (qnap_ts209_init) from [<c04f6774>] (customize_machine+0x1c/0x30)
-[   13.492666] [<c04f6774>] (customize_machine) from [<c000986c>] (do_one_initcall+0x150/0x188)
-[   13.501192] [<c000986c>] (do_one_initcall) from [<c04f4e64>] (kernel_init_freeable+0x1c0/0x204)
-[   13.509986] [<c04f4e64>] (kernel_init_freeable) from [<c03b4ee4>] (kernel_init+0x10/0xf0)
-[   13.518253] [<c03b4ee4>] (kernel_init) from [<c000f610>] (ret_from_fork+0x14/0x24)
-[   13.525901] Code: 1afffff9 e12fff1e c03e0a78 e1a03000 (e5d32000)
-[   13.532147] ---[ end trace f0cd4d4c1f83d298 ]---
-[   13.536952] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-[   13.536952]
-[   13.546250] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-[   13.546250]
-[   14.370296] random: fast init done
-[   66.850433] random: crng init done
+* Menno Finlay-Smits <inbox@menno.io> [2018-01-21 23:08]:
+> Rsyncing files between 2 HDDs on a QNAP 119p with a fresh, minimal install of
+> stretch NAS (armel) causes the kernel to fail after ~20mins with a kernel
+> memory overwrite attempt (full error below). 
+> 
+> This happens reliably for any large rsync attempt. I have about 1TB of data to
+> copy between these 2 HDDs and have not managed to copy more than ~2% of the
+> total amount.
+> 
+> ** Kernel log:
+> 
+> [ 2775.213733] usercopy: kernel memory overwrite attempt detected to c29454e0 (<wrapped address>) (4294802208 bytes)
+> [ 2775.224095] ------------[ cut here ]------------
+> [ 2775.228728] kernel BUG at /build/linux-myVvPm/linux-4.9.65/mm/usercopy.c:75!
+> [ 2775.235800] Internal error: Oops - BUG: 0 [#1] ARM
+> [ 2775.240604] Modules linked in: marvell ehci_orion mvmdio mv643xx_eth ehci_hcd of_mdio fixed_phy xhci_pci xhci_hcd marvell_cesa des_generic sg usbcore libphy m25p80 spi_nor orion_wdt usb_common kirkwood_thermal evdev gpio_keys ip_tables x_tables ipv6 autofs4 ext4 crc16 jbd2 crc32c_generic fscrypto ecb mbcache sd_mod sata_mv libata scsi_mod
+> [ 2775.271023] CPU: 0 PID: 601 Comm: rsync Not tainted 4.9.0-5-marvell #1 Debian 4.9.65-3+deb9u2
+> [ 2775.279582] Hardware name: Marvell Kirkwood (Flattened Device Tree)
+> [ 2775.285870] task: c0d496c0 task.stack: d5ffe000
+> [ 2775.290418] PC is at __check_object_size+0x120/0x1d8
+> [ 2775.295401] LR is at __check_object_size+0x120/0x1d8
+> [ 2775.300382] pc : [<c0111908>]    lr : [<c0111908>]    psr: 60000013
+>                sp : d5fffdb8  ip : 00000000  fp : d5ffff08
+> [ 2775.311908] r10: d5ffe000  r9 : fffd7b20  r8 : c29454e0
+> [ 2775.317148] r7 : c291d000  r6 : 00000000  r5 : fffd7b20  r4 : c29454e0
+> [ 2775.323697] r3 : c0554fa0  r2 : c055a20c  r1 : c055094c  r0 : 00000065
+> [ 2775.330247] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> [ 2775.337405] Control: 0005397f  Table: 14810000  DAC: 00000051
+> [ 2775.343168] Process rsync (pid: 601, stack limit = 0xd5ffe190)
+> [ 2775.349020] Stack: (0xd5fffdb8 to 0xd6000000)
+> [ 2775.353390] fda0:                                                       c04623b8 fffd7b20
+> [ 2775.361598] fdc0: 000294e8 fffd7b20 00001000 d5fffec0 c29454e0 c0202360 00000008 008eafe8
+> [ 2775.369812] fde0: dfc4a380 c291c000 00000051 69000008 d5fffec0 00008000 00000008 00000008
+> [ 2775.378026] fe00: 00001000 00000000 c0c26b40 00001008 c0495cf7 c02fc3d0 c0c26b40 d5fffec0
+> [ 2775.386240] fe20: d5fffec0 00000000 00008008 c0c26b40 df782d80 d5fffeb8 00000001 00000000
+> [ 2775.394445] fe40: df782b40 c03a21d0 d5fffe64 00000003 de65b2c0 00008000 00000008 00008008
+> [ 2775.402651] fe60: 5a644f89 00000000 00000000 00000000 00000000 ffffffff ffffffff 00000000
+> [ 2775.410866] fe80: d2bebb80 d5fffeb8 de65b2c0 de65b2c0 df79caa0 008c1b00 d5ffe000 00000000
+> [ 2775.419080] fea0: 00512e6c c02ee92c d5ffff10 d5ffff28 de65b2c0 c02ee9cc 00000000 00000000
+> [ 2775.427294] fec0: 00000001 00000008 00008000 d5ffff08 00000001 3b9aa9ee 00000000 00000000
+> [ 2775.435499] fee0: 00000040 d5ffff28 00000000 00000000 df79caa0 d5ffff88 00008008 c0114048
+> [ 2775.443705] ff00: 00008008 00000000 008c1b00 00008008 00000001 00000000 00008008 d5ffff08
+> [ 2775.451909] ff20: 00000001 3b9aa9ee df79caa0 00000000 00000000 00000000 00000000 00000000
+> [ 2775.460116] ff40: 00000000 00000000 00000000 df79caa0 00008008 00000000 d5ffff88 c0114cb4
+> [ 2775.468321] ff60: df79caa0 008c1b00 00008008 df79caa0 df79caa0 008c1b00 00008008 c000f704
+> [ 2775.476527] ff80: d5ffe000 c0115b68 00000000 00000000 00008008 00512e6c bedfb878 bedfb7f8
+> [ 2775.484733] ffa0: 00000004 c000f560 00512e6c bedfb878 00000004 008c1b00 00008008 008c1b00
+> [ 2775.492947] ffc0: 00512e6c bedfb878 bedfb7f8 00000004 00520a80 00512e84 0051095c 00512e6c
+> [ 2775.501161] ffe0: 00000000 bedfb69c 004c6978 b6ea3d1c 40000010 00000004 0000624f 0000624f
+> [ 2775.509384] [<c0111908>] (__check_object_size) from [<c0202360>] (copy_page_from_iter+0x2e8/0x3d0)
+> [ 2775.518388] [<c0202360>] (copy_page_from_iter) from [<c02fc3d0>] (skb_copy_datagram_from_iter+0xfc/0x188)
+> [ 2775.527997] [<c02fc3d0>] (skb_copy_datagram_from_iter) from [<c03a21d0>] (unix_stream_sendmsg+0x208/0x2f8)
+> [ 2775.537691] [<c03a21d0>] (unix_stream_sendmsg) from [<c02ee92c>] (sock_sendmsg+0x3c/0x50)
+> [ 2775.545903] [<c02ee92c>] (sock_sendmsg) from [<c02ee9cc>] (sock_write_iter+0x8c/0xb4)
+> [ 2775.553771] [<c02ee9cc>] (sock_write_iter) from [<c0114048>] (new_sync_write+0xc0/0xe4)
+> [ 2775.561810] [<c0114048>] (new_sync_write) from [<c0114cb4>] (vfs_write+0xc0/0x194)
+> [ 2775.569414] [<c0114cb4>] (vfs_write) from [<c0115b68>] (SyS_write+0x44/0x7c)
+> [ 2775.576497] [<c0115b68>] (SyS_write) from [<c000f560>] (ret_fast_syscall+0x0/0x38)
+> [ 2775.584098] Code: e59f10a0 01a01000 e59f009c ebff04bf (e7f001f2)
+> [ 2775.590218] ---[ end trace 9c6c6370c712b384 ]---
+
+> 
+> ** Network status:
+> *** IP interfaces and addresses:
+> 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+>     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+>     inet 127.0.0.1/8 scope host lo
+>        valid_lft forever preferred_lft forever
+>     inet6 ::1/128 scope host 
+>        valid_lft forever preferred_lft forever
+> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+>     link/ether 00:08:9b:c8:50:26 brd ff:ff:ff:ff:ff:ff
+>     inet 192.168.164.3/24 brd 192.168.164.255 scope global eth0
+>        valid_lft forever preferred_lft forever
+>     inet6 fe80::208:9bff:fec8:5026/64 scope link 
+>        valid_lft forever preferred_lft forever
+> 
+> *** Device statistics:
+> Inter-|   Receive                                                |  Transmit
+>  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+>     lo:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+>   eth0:  667374    2622    0    0    0     0          0         0   420218    1869    0    0    0     0       0          0
+> 
 
 -- 
 Martin Michlmayr
