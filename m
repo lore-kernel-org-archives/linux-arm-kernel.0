@@ -1,114 +1,61 @@
 From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
-Date: Sun, 4 Mar 2018 16:57:17 +0100
+Date: Sun, 4 Mar 2018 17:04:47 +0100
 Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
-In-Reply-To: <431948292.48734.1518640216077@email.1und1.de>
+In-Reply-To: <166274019.307112.1520085525833@email.1und1.de>
 References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
  <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
  <20180214163649.3a0c9476@kitsune.suse.cz>
  <20180214165827.386b9bb1@kitsune.suse.cz>
  <ecf8dd61-ab16-b298-d197-ea93ecf5982b@i2se.com>
  <20180214202454.6e7ebeaf@naga.suse.cz>
- <431948292.48734.1518640216077@email.1und1.de>
-Message-ID: <20180304165717.6d4d8e68@naga.suse.cz>
+ <166274019.307112.1520085525833@email.1und1.de>
+Message-ID: <20180304170447.3a507088@naga.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Feb 2018 21:30:16 +0100 (CET)
+Hello,
+
+On Sat, 3 Mar 2018 14:58:45 +0100 (CET)
 Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
 > Hi Michal,
-> 
-> > Michal Such?nek <msuchanek@suse.de> hat am 14. Februar 2018 um
-> > 20:24 geschrieben:
-> > 
-> > 
-> > On Wed, 14 Feb 2018 17:49:31 +0100
-> > Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >   
-> > > Hi Michal,
-> > > 
-> > > [add Phil]
-> > > 
-> > > Am 14.02.2018 um 17:13 schrieb Michal Such?nek:  
-> > > > On Wed, 14 Feb 2018 16:36:49 +0100
-> > > > Michal Such?nek <msuchanek@suse.de> wrote:
-> > > >    
-> > > >> On Wed, 14 Feb 2018 15:58:31 +0100
-> > > >> Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > > >>    
-> > > >>> Hi Michal,
-> > > >>>
-> > > >>> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:      
-> > > >>>> The bcm2835 mmc host tends to lock up for unknown reason so
-> > > >>>> reset it on timeout. The upper mmc block layer tries
-> > > >>>> retransimitting with single blocks which tends to work out
-> > > >>>> after a long wait.
-> > > >>>>
-> > > >>>> This is better than giving up and leaving the machine broken
-> > > >>>> for no obvious reason.        
-> > > >>> could you please provide more information about this issue
-> > > >>> (affected hardware, kernel config, version, dmesg,
-> > > >>> reproducible scenario)?   
-> > > > It tends to reproduce when upgrading a few packages with zypper
-> > > > and otherwise at random during system operation. It seems that
-> > > > for my card it worsens with age to some degree so perhaps it
-> > > > depends on the fragmentation of the internal card flash.
-> > > >
-> > > > Attaching dmesg and kernel config.    
-> > > 
-> > > do you noticed this issue before 4.15-rc4?  
-> > 
-> > I initially noticed it with 4.4 kernel with some backports to make
-> > it bootable on RPi.  
-> 
-> this confuses me. Gerd and i ported this driver from downstream and
-> finally it's got merged in 4.12. 
-> 
-> So do you mean that you backported the mainline version to 4.4 or the
-> downstream version of 4.4?
 
-I did not backport it but looking at the changelog it is backport of
-the 4.12 driver. It does not look as the 4.15 driver though. Looks like
-there was some reorganization of the bcm mmc since then.
+> yesterday i finished my stress tests with Raspberry Pi 3.
+> 
+> Scenario:
+> - copy Tumbleweed on SD card
+> (openSUSE-Tumbleweed-ARM-JeOS-raspberrypi3.aarch64-2018.02.02-Build1.2.raw,
+> Linux 4.14.15)
+> - setup locales with yast
+> - run zypper update
+> - reboot
+> - install and remove java 1.8 in a loop for at least 1 hour
+
+How many cycles does that perform?
 
 > 
-> On a quick look they seems identical, but they aren't.
-> 
-> > > 
-> > > Could you please test with 4.15 final again?  
-> >
+> Results of the different SD cards:
+> Toshiba uSDHC Class 10 UHS-1 32 GB: PASS
+> BASETech uSDHC Class 10 16 GB: PASS
+> Samsung uSDHC EVO+ UHS-1 16 GB: PASS
+> Samsung uSDHC Class 6 32 GB: PASS
+> SanDisk Edge Class 4 16 GB: PASS
+> Kingston uSDHC Class 10 UHS-1 32 GB: PASS
+> QUMOX uSDHC Class 10 UHS-1 16 GB: FAIL (zypper segfaulted
+> permantently) 
 
-I tried upgrading to the current master (4.16-rc3+) and the issue is
-still reproducible although less frequent. I did full upgrade from the
-install image which installs over 300 packages and the issue triggered
-somewhere around 200th while before installing a half dozen packages
-would usually trigger it.
+It may very well segfault because the card disconnected due to the
+timeout and it is missing some pages of its code. It did for me as well
+without the workaround.
 
- 
-> > Right, I can apply the patches on something more recent.
-> >   
-> > > 
-> > > What kind of SD card (name) triggers the issue?  
-> > 
-> > Samsung EVO MB-MP16D  
+> Transcend uSDHC Class 10 UHS-1 32 GB: PASS
 > 
-> Thanks
-> 
-> > 
-> > Also see https://elinux.org/RPi_SD_cards#Which_SD_card.3F  
-> 
-> I'm very sceptical about this list. The card above is listed as OK
-> and NOK. The experienced issues doesn't need to be direct related to
-> the card (unproperly umounted, bad driver, ...).
+> I was never able to reproduce this timeout. So i still need the
+> feedback about the 4.15 and i a reliable test scenario.
 
-Right, it just shows that this is not an isolated problem. Not all test
-results are reliable, of course. Some include interesting details,
-though.
+You may very well never get any. AFAICT this is some kind of heisenbug
+in the hardware.
 
 Thanks
 
 Michal
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: dmesg.4.16.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180304/a88acd5a/attachment-0001.txt>
