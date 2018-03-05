@@ -1,38 +1,37 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 5 Mar 2018 16:00:25 +0100
-Subject: [PATCH 2/2] tty: st-asc: Convert tty alias in lowercase
-In-Reply-To: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
-References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1520262025-21088-3-git-send-email-patrice.chotard@st.com>
+Date: Mon, 5 Mar 2018 16:00:23 +0100
+Subject: [PATCH 0/2] Fix STi aliases property name
+Message-ID: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Since dtc v1.4.6-9-gaadd0b65c987, aliases property name
-must include only lowercase and '-'.
+Since dtc v1.4.6-9-gaadd0b65c987, when compiling dtb with W=1 option,
+the following warnings are triggered :
+    
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
 
-After having converted all STi boards serial aliases in lowercase,
-st-asc driver need to be updated accordingly as tty aliases id is
-retrieved using of_alias_get_id(np, ASC_SERIAL_NAME);
+_ Patch 1, convert the aliases property name in lowercase in 
+  all STi board dts files.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- drivers/tty/serial/st-asc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+_ Patch 2, rework the tty driver st-asc accordingly, as aliases id is retrieved 
+  using of_alias_get_id() with a defined string with is not lowercase only.
 
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index c763253514e9..8d2167759258 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -29,7 +29,7 @@
- #include <linux/gpio/consumer.h>
- 
- #define DRIVER_NAME "st-asc"
--#define ASC_SERIAL_NAME "ttyAS"
-+#define ASC_SERIAL_NAME "ttyas"
- #define ASC_FIFO_SIZE 16
- #define ASC_MAX_PORTS 8
- 
+
+Patrice Chotard (2):
+  ARM: dts: STi: Fix aliases property name for STi boards
+  tty: st-asc: Convert tty alias in lowercase
+
+ arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
+ arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
+ arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
+ arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
+ drivers/tty/serial/st-asc.c         | 2 +-
+ 5 files changed, 9 insertions(+), 9 deletions(-)
+
 -- 
 1.9.1
