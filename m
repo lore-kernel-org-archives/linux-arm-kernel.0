@@ -1,39 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:24:19 +0000
-Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
- fault on kernel VA
-In-Reply-To: <20180305140506.GJ32331@e103592.cambridge.arm.com>
-References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
- <20180305140506.GJ32331@e103592.cambridge.arm.com>
-Message-ID: <20180305172418.GD12869@arm.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  5 Mar 2018 18:24:55 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77970: sort subnodes of root node
+ alphabetically
+Message-ID: <1520270695-18161-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 02:05:06PM +0000, Dave Martin wrote:
-> On Mon, Mar 05, 2018 at 10:31:15AM +0000, Will Deacon wrote:
-> > User faults on kernel addresses are a good sign that the faulting task
-> > is either up to no good or is in deep trouble. In such situations,
-> > exposing the optional ESR context on the sigframe as part of the
-> > delivered signal is only useful to attackers who are using information
-> > about underlying hardware fault (e.g. translation vs permission) as a
-> > mechanism to defeat KASLR.
-> > 
-> > Remove the ESR context from the sigframe for user faults on kernel
-> > addresses.
-> 
-> As this wording suggests, this change causes esr_context to disappear
-> entirely from the signal frame.  Previously, I think user code could
-> have relied on its being present for certain signals.
-> 
-> Does Debian's codesearch throw up any nontrivial users of esr_context?
+Sort root sub-nodes alphabetically for allow for easier maintenance of
+this file.
 
-The main one seems to be ASAN, which uses the RnW bit to report "READ",
-"WRITE" or "UNKNOWN". So with this change, the access will be treated as
-UNKNOWN for kernel addresses.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Whilst I can see how that might cause a testsuite regression, I'm struggling
-to see how it could sensible impact ASAN given that userspace never has
-permission to access these addresses and so the fault should be treated as
-fatal regardless of whether or not it's a read or a write.
-
-Will
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index e44281cc1047a7af..c6db8ea4390624c4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -27,11 +27,6 @@
+ 		i2c4 = &i2c4;
+ 	};
+ 
+-	psci {
+-		compatible = "arm,psci-1.0", "arm,psci-0.2";
+-		method = "smc";
+-	};
+-
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -68,6 +63,11 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	psci {
++		compatible = "arm,psci-1.0", "arm,psci-0.2";
++		method = "smc";
++	};
++
+ 	/* External SCIF clock - to be overridden by boards that provide it */
+ 	scif_clk: scif {
+ 		compatible = "fixed-clock";
+-- 
+2.7.4
