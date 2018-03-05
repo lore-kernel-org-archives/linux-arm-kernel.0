@@ -1,78 +1,230 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 5 Mar 2018 09:31:14 +0100
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180305085148.1de2a99c@dell-desktop.home>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
- <CAGb2v67SuK9Xr7_dVb7RVGXUJwYRKnTiJwDrOJ-Su5CXmm7HXA@mail.gmail.com>
- <20180226101252.ozdsxjvawgkemz2c@flea.lan>
- <CAGb2v64SaBR-_nL9S20eXe57r_kJTiqSg-di=_mZrv3Yx2-2JA@mail.gmail.com>
- <20180305085148.1de2a99c@dell-desktop.home>
-Message-ID: <20180305083114.dwqfdqlziwptfnxq@flea.lan>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 5 Mar 2018 16:31:29 +0800
+Subject: [usb-next PATCH v11 5/8] usb: host: xhci-mtk: remove custom USB
+ PHY handling
+In-Reply-To: <20180303214309.25643-6-martin.blumenstingl@googlemail.com>
+References: <20180303214309.25643-1-martin.blumenstingl@googlemail.com>
+ <20180303214309.25643-6-martin.blumenstingl@googlemail.com>
+Message-ID: <1520238689.8089.227.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 08:51:48AM +0100, Myl?ne Josserand wrote:
-> > >> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> > >> > index 5e9602ce1573..4bb041492b54 100644
-> > >> > --- a/arch/arm/mach-sunxi/sunxi.c
-> > >> > +++ b/arch/arm/mach-sunxi/sunxi.c
-> > >> > @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
-> > >> >  };
-> > >> >
-> > >> >  extern void __init sun6i_reset_init(void);
-> > >> > +extern void sunxi_init_cntvoff(void);
-> > >> > +
-> > >> >  static void __init sun6i_timer_init(void)
-> > >> >  {
-> > >> > +       sunxi_init_cntvoff();  
-> > >>
-> > >> You should check the enable-method to see if PSCI is set or not,
-> > >> as an indicator whether the kernel is booted secure or non-secure.  
-> > >
-> > > It's an indicator, but it's not really a perfect one. You could very
-> > > well have your kernel booted in non-secure, without PSCI. Or even with
-> > > PSCI, but without the SMP ops.
-> > >
-> > > We have a quite big number of these cases already, where, depending on
-> > > the configuration, we might not have access to the device we write to,
-> > > the number of hacks to just enable that device for non-secure is a
-> > > good example of that.  
-> > 
-> > I wouldn't consider them hacks though. The hardware gives the option
-> > to have control of many devices delegated solely to secure-only, or
-> > secure/non-secure. Our present model is to support everything we can
-> > in Linux directly, instead of through some firmware interface to a
-> > non-existent firmware.
+Hi, Martin
+
+Tested-by: Sean Wang <sean.wang@mediatek.com>
+
+I've tested the series with U2 storage and U3 ethernet devices on both
+boards MT7623 BPI-R2 and MT7622 RFB1 using xhci-mtk driver, they are
+still working well.
+
+Below is related logs for test devices probing
+
+----
+
+# [   42.590356] usb 2-1: new SuperSpeed USB device number 2 using
+xhci-mtk
+[   42.719883] usb-storage 2-1:1.0: USB Mass Storage device detected
+[   42.726339] scsi host2: usb-storage 2-1:1.0
+[   43.815572] scsi 2:0:0:0: Direct-Access     Kingston DataTraveler 3.0
+PMAP PQ: 0 ANSI: 6
+[   44.792938] sd 2:0:0:0: [sda] 30728832 512-byte logical blocks: (15.7
+GB/14.7 GiB)
+[   44.800658] sd 2:0:0:0: [sda] Write Protect is off
+[   44.805582] sd 2:0:0:0: [sda] No Caching mode page found
+[   44.810888] sd 2:0:0:0: [sda] Assuming drive cache: write through
+
+----
+
+# [  134.270617] usb 2-1: new SuperSpeed USB device number 3 using
+xhci-mtk
+[  134.664163] ax88179_178a 2-1:1.0 eth1: register 'ax88179_178a' at
+usb-1a1c0000.usb-1, ASIX AX88179 USB 3.0 Gigabit Ethernet,
+00:11:6b:68:4c:9e
+
+
+On Sat, 2018-03-03 at 22:43 +0100, Martin Blumenstingl wrote:
+> The new PHY wrapper is now wired up in the core HCD code. This means
+> that PHYs are now controlled (initialized, enabled, disabled, exited)
+> without requiring any host-driver specific code.
+> Remove the custom USB PHY handling from the xhci-mtk driver as the core
+> HCD code now handles this.
 > 
-> I am not sure to understand what is the conclusion about it.
-> Should I use "psci"/enable-method or should I use another mechanism to
-> detect we are in secure/non-secure (if it exists)?
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c | 98 +--------------------------------------------
+>  1 file changed, 2 insertions(+), 96 deletions(-)
 > 
-> Otherwise, for the moment, I can use machine-compatible on sun8i-a83t
-> and we will see later how we can handle it in a better way.
-
-Can't we have another approach here?
-
-If we use an enable-method (and we should), instead of having it tied
-to the machine compatible, the SMP setup code will run only if our
-enable-method is the one we set up. If PSCI is in use, the
-enable-method is not going to be the one defined here, and the code
-will not run.
-
-So why not just move that call to the SMP ops setup function, just
-like renesas does?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180305/6708b4d0/attachment.sig>
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index b0ab4d5e2751..7334da9e9779 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -14,7 +14,6 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> -#include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> @@ -352,62 +351,6 @@ static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
+>  
+>  static struct hc_driver __read_mostly xhci_mtk_hc_driver;
+>  
+> -static int xhci_mtk_phy_init(struct xhci_hcd_mtk *mtk)
+> -{
+> -	int i;
+> -	int ret;
+> -
+> -	for (i = 0; i < mtk->num_phys; i++) {
+> -		ret = phy_init(mtk->phys[i]);
+> -		if (ret)
+> -			goto exit_phy;
+> -	}
+> -	return 0;
+> -
+> -exit_phy:
+> -	for (; i > 0; i--)
+> -		phy_exit(mtk->phys[i - 1]);
+> -
+> -	return ret;
+> -}
+> -
+> -static int xhci_mtk_phy_exit(struct xhci_hcd_mtk *mtk)
+> -{
+> -	int i;
+> -
+> -	for (i = 0; i < mtk->num_phys; i++)
+> -		phy_exit(mtk->phys[i]);
+> -
+> -	return 0;
+> -}
+> -
+> -static int xhci_mtk_phy_power_on(struct xhci_hcd_mtk *mtk)
+> -{
+> -	int i;
+> -	int ret;
+> -
+> -	for (i = 0; i < mtk->num_phys; i++) {
+> -		ret = phy_power_on(mtk->phys[i]);
+> -		if (ret)
+> -			goto power_off_phy;
+> -	}
+> -	return 0;
+> -
+> -power_off_phy:
+> -	for (; i > 0; i--)
+> -		phy_power_off(mtk->phys[i - 1]);
+> -
+> -	return ret;
+> -}
+> -
+> -static void xhci_mtk_phy_power_off(struct xhci_hcd_mtk *mtk)
+> -{
+> -	unsigned int i;
+> -
+> -	for (i = 0; i < mtk->num_phys; i++)
+> -		phy_power_off(mtk->phys[i]);
+> -}
+> -
+>  static int xhci_mtk_ldos_enable(struct xhci_hcd_mtk *mtk)
+>  {
+>  	int ret;
+> @@ -488,8 +431,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	struct xhci_hcd *xhci;
+>  	struct resource *res;
+>  	struct usb_hcd *hcd;
+> -	struct phy *phy;
+> -	int phy_num;
+>  	int ret = -ENODEV;
+>  	int irq;
+>  
+> @@ -529,16 +470,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	mtk->num_phys = of_count_phandle_with_args(node,
+> -			"phys", "#phy-cells");
+> -	if (mtk->num_phys > 0) {
+> -		mtk->phys = devm_kcalloc(dev, mtk->num_phys,
+> -					sizeof(*mtk->phys), GFP_KERNEL);
+> -		if (!mtk->phys)
+> -			return -ENOMEM;
+> -	} else {
+> -		mtk->num_phys = 0;
+> -	}
+>  	pm_runtime_enable(dev);
+>  	pm_runtime_get_sync(dev);
+>  	device_enable_async_suspend(dev);
+> @@ -596,23 +527,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  		mtk->has_ippc = false;
+>  	}
+>  
+> -	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+> -		phy = devm_of_phy_get_by_index(dev, node, phy_num);
+> -		if (IS_ERR(phy)) {
+> -			ret = PTR_ERR(phy);
+> -			goto put_usb2_hcd;
+> -		}
+> -		mtk->phys[phy_num] = phy;
+> -	}
+> -
+> -	ret = xhci_mtk_phy_init(mtk);
+> -	if (ret)
+> -		goto put_usb2_hcd;
+> -
+> -	ret = xhci_mtk_phy_power_on(mtk);
+> -	if (ret)
+> -		goto exit_phys;
+> -
+>  	device_init_wakeup(dev, true);
+>  
+>  	xhci = hcd_to_xhci(hcd);
+> @@ -630,7 +544,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  			dev_name(dev), hcd);
+>  	if (!xhci->shared_hcd) {
+>  		ret = -ENOMEM;
+> -		goto power_off_phys;
+> +		goto disable_device_wakeup;
+>  	}
+>  
+>  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+> @@ -653,13 +567,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	xhci_mtk_sch_exit(mtk);
+>  	usb_put_hcd(xhci->shared_hcd);
+>  
+> -power_off_phys:
+> -	xhci_mtk_phy_power_off(mtk);
+> +disable_device_wakeup:
+>  	device_init_wakeup(dev, false);
+>  
+> -exit_phys:
+> -	xhci_mtk_phy_exit(mtk);
+> -
+>  put_usb2_hcd:
+>  	usb_put_hcd(hcd);
+>  
+> @@ -682,8 +592,6 @@ static int xhci_mtk_remove(struct platform_device *dev)
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+>  
+>  	usb_remove_hcd(xhci->shared_hcd);
+> -	xhci_mtk_phy_power_off(mtk);
+> -	xhci_mtk_phy_exit(mtk);
+>  	device_init_wakeup(&dev->dev, false);
+>  
+>  	usb_remove_hcd(hcd);
+> @@ -718,7 +626,6 @@ static int __maybe_unused xhci_mtk_suspend(struct device *dev)
+>  	del_timer_sync(&xhci->shared_hcd->rh_timer);
+>  
+>  	xhci_mtk_host_disable(mtk);
+> -	xhci_mtk_phy_power_off(mtk);
+>  	xhci_mtk_clks_disable(mtk);
+>  	usb_wakeup_set(mtk, true);
+>  	return 0;
+> @@ -732,7 +639,6 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+>  
+>  	usb_wakeup_set(mtk, false);
+>  	xhci_mtk_clks_enable(mtk);
+> -	xhci_mtk_phy_power_on(mtk);
+>  	xhci_mtk_host_enable(mtk);
+>  
+>  	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
