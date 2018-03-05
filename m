@@ -1,83 +1,24 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 05 Mar 2018 16:48:54 +0100
-Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: increase speed of i2c0
- to 400kHz
-In-Reply-To: <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Tue, 27 Feb 2018 16:01:57 +0000")
-References: <20180227160135.GU9418@n2100.armlinux.org.uk>
- <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk>
-Message-ID: <87d10i5xqx.fsf@bootlin.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 5 Mar 2018 09:52:19 -0600
+Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <CAOZdJXV3QE2mKSf3GvTSdoVmfjJ1UEXPY8OJfW=-9E1dN1TeZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On mar., f?vr. 27 2018, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+On Fri, Mar 2, 2018 at 3:50 PM, Shanker Donthineni
+<shankerd@codeaurora.org> wrote:
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index bb26382..6ecc249 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -43,7 +43,7 @@
+>  #define ARM64_SVE                              22
+>  #define ARM64_UNMAP_KERNEL_AT_EL0              23
+>  #define ARM64_HARDEN_BRANCH_PREDICTOR          24
+> -#define ARM64_HARDEN_BP_POST_GUEST_EXIT                25
+> +/* #define ARM64_UNALLOCATED_ENTRY                     25 */
 
-> All the devices on I2C0 support fast mode, so increase the bus speed
-> to match.
-
-I agree with this part. I didn't pay attention to it in the initial
-submission but now I've checked it, and indeed according to the
-datasheet the MCP3021 support "standard (100 kHz) and Fast (400 kHz) I2C
-Compatible modes"
-
-> The Armada 388 is known to have a timing issue when in
-> standard mode, which we believe causes the ficticious device at 0x64
-> to appear.
-
-This errata "FE-8471889 I2C Repeated Start is not supported in standard
-mode (up to 100K)" was supposed to be fixed with the commit c1d15b68aab8
-("i2c: mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)"). And
-it was used on the Armada 38x SoCs since fbffee74986c ("ARM: dts: Fix I2C
-repeated start issue on Armada-38x") in 4.14.
-
-So I think that now even at 100kHz the ficticious device should not
-appear any more. If it is still the case then there might be an issue
-with the fix in the 2c driver.
-
-Gregory
-
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/boot/dts/armada-388-clearfog.dtsi | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> index 68acfc968706..0e3b1f140e6d 100644
-> --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> @@ -143,8 +143,7 @@
->  };
->  
->  &i2c0 {
-> -	/* Is there anything on this? */
-> -	clock-frequency = <100000>;
-> +	clock-frequency = <400000>;
->  	pinctrl-0 = <&i2c0_pins>;
->  	pinctrl-names = "default";
->  	status = "okay";
-> @@ -239,13 +238,11 @@
->  		};
->  	};
->  
-> -	/* The MCP3021 is 100kHz clock only */
-> +	/* The MCP3021 supports standard and fast modes */
->  	mikrobus_adc: mcp3021 at 4c {
->  		compatible = "microchip,mcp3021";
->  		reg = <0x4c>;
->  	};
-> -
-> -	/* Also something at 0x64 */
->  };
->  
->  &i2c1 {
-> -- 
-> 2.7.4
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Why not just delete the entry?  Is ARM64_NCAPS never supposed to get smaller?
