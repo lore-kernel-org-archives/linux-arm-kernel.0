@@ -1,35 +1,79 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 5 Mar 2018 16:13:35 +0530
-Subject: [PATCH v5 4/4] arm64: dts: sdm845: Add serial console support
-In-Reply-To: <20180304195930.GQ93895@bjorns-mbp-2.lan>
-References: <20180222061208.2031-1-rnayak@codeaurora.org>
- <20180222061208.2031-5-rnayak@codeaurora.org>
- <20180304195930.GQ93895@bjorns-mbp-2.lan>
-Message-ID: <9d24e89f-38be-59e4-6f76-c273dd4d4e79@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Mar 2018 11:46:03 +0100
+Subject: [PATCH 5/5] soc: renesas: rcar-topology: Add support to be aware
+ cpu capacity
+In-Reply-To: <1519697995-6061-6-git-send-email-gaku.inami.xh@renesas.com>
+References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
+ <1519697995-6061-6-git-send-email-gaku.inami.xh@renesas.com>
+Message-ID: <CAMuHMdVZzCOqatGA4PH0Gr+noTEhQ8RAW=pK5K1e7KrAM8VS-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Inami-san,
 
+On Tue, Feb 27, 2018 at 3:19 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
+> Some R-Car SoCs support big LITTLE architecture produced by ARM, that
+> have different power/performance characteristics between each CPUs.
+> In order to aware such as difference, this patch changes the sched
+> domain flags that the tasks can be scheduled with capacity awareness.
+> If you use big LITTLE without this patch, the scheduler may make
+> unintended behaviors.
+>
+> Signed-off-by: Gaku Inami <gaku.inami.xh@renesas.com>
 
-On 03/05/2018 01:29 AM, Bjorn Andersson wrote:
-> On Wed 21 Feb 22:12 PST 2018, Rajendra Nayak wrote:
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> [..]
->> +			qup_uart2: serial at a84000 {
->> +				compatible = "qcom,geni-debug-uart";
->> +				reg = <0xa84000 0x4000>;
->> +				reg-names = "se-phys";
->> +				clock-names = "se-clk";
-> 
-> This was changed to "se" in v3 of the GENI patchset, with that this
-> boots nicely again.
+Thanks for your patch!
 
-Thanks Bjorn for testing.
+> --- /dev/null
+> +++ b/drivers/soc/renesas/rcar-topology.c
+> @@ -0,0 +1,36 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + *  R-Car CPU topology for ARM big.LITTLE platforms
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corporation.
+> + *
+> + */
+> +
+> +#include <linux/cpuset.h>
+> +#include <linux/init.h>
+> +#include <linux/of.h>
+> +#include <linux/sched/topology.h>
+> +#include <linux/topology.h>
+> +
+> +static int rcar_cpu_cpu_flags(void)
+> +{
+> +       return SD_ASYM_CPUCAPACITY;
+> +}
+> +
+> +static struct sched_domain_topology_level rcar_topology[] = {
+> +#ifdef CONFIG_SCHED_MC
+> +       { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
+> +#endif
+> +       { cpu_cpu_mask, rcar_cpu_cpu_flags, SD_INIT_NAME(DIE) },
+> +       { NULL, }
+> +};
+> +
+> +static int __init rcar_topology_init(void)
+> +{
+> +       if (of_machine_is_compatible("renesas,r8a7795") ||
+> +           of_machine_is_compatible("renesas,r8a7796"))
+> +               set_sched_topology(rcar_topology);
+> +
+> +       return 0;
+> +}
+> +early_initcall(rcar_topology_init);
 
-Karthik, it would be good if you could include just this patch from this series as part
-of your GENI series for the next (and subsequent) repost, with updates as needed based on
-binding changes?
+None of the above seems R-Car specific to me. So please explain why this
+can't just be added to arch/arm64/kernel/topology.c instead, and enabled
+unconditionally.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
