@@ -1,144 +1,44 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 5 Mar 2018 16:28:39 +0000
-Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
-In-Reply-To: <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <20180227095028.GG21033@krava>
- <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
- <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
- <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
- <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
- <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
- <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
-Message-ID: <39385b47-b8f2-7673-ea17-8550787663e8@huawei.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 5 Mar 2018 16:31:28 +0000
+Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
+In-Reply-To: <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
+References: <20180215175803.6870-1-marc.zyngier@arm.com>
+ <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
+ <86o9k63f7a.wl-marc.zyngier@arm.com>
+ <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
+Message-ID: <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2018 15:39, William Cohen wrote:
-> On 03/05/2018 06:24 AM, John Garry wrote:
->>>> I am seeing issue(log below) with this patchset on our platfrom.
->>>> i have tried using your v2 branch [1]
->>>>
->>>> root at borg-1>perf_acme>> ./perf --version
->>>> perf version 4.16.rc1.g087f7ca
->>>> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
->>>>
->>>>  Performance counter stats for 'sleep 1':
->>>>
->>>>             23,099      bus_access_rd
->>>>
->>>>        1.000708516 seconds time elapsed
->>>>
->>>> root at borg-1>perf_acme>> cd -
->>>> /ganapat/perf/linux-hisi/tools/perf
->>>> root at borg-1>perf>> ./perf --version
->>>> perf version 4.16.rc1.gcb5a74
->>>> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
->>>>
->>>>  Performance counter stats for 'sleep 1':
->>>>
->>>>                  0      bus_access_rd
->>>>
->>>>        1.000709162 seconds time elapsed
->>>>
->>>> root at borg-1>perf>>
->>>>
->>>>
->>>> [1] https://github.com/hisilicon/linux-hisi.git
->>>>
->>> Hi,
->>
->> Hi Will Cohen, Ganapatrao,
->>
+On 2 March 2018 at 12:26, Auger Eric <eric.auger@redhat.com> wrote:
+> Hi Marc,
+> On 02/03/18 12:11, Marc Zyngier wrote:
+>> On Fri, 02 Mar 2018 10:44:48 +0000,
+>> Auger Eric wrote:
+>>> I understand the get/set is called as part of the migration process.
+>>> So my understanding is the benefit of this series is migration fails in
+>>> those cases:
 >>>
->>> I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.  For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.  That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
->>>
+>>>> =0.2 source -> 0.1 destination
+>>> 0.1 source -> >=0.2 destination
 >>
->> Thanks for this. I see the problem. At the end I missed bringing across something from v1. Easily fixed.
->>
->>> Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.  This would further reduce the amount of redundant fields between the specific implementations and the common set.
->>>
->>
->> I did consider it and it could work. But it all depends on whether the "EventName" only is always readable/descriptive enough in the JSON, without requiring the "BriefDescription". The "EventName" can be rather succinct for any arch. And we need to guarantee that the "EventName" is unique.
->>
->> Here's a sample:
->> [
->>     {
->>         "ArchStdEvent": "L1D_CACHE_RD",
->>     },
->>     {
->>         "ArchStdEvent": "L1D_CACHE_WR",
->>     },
->>
->> vs.
->>
->> [
->>     {
->>         "ArchStdEvent": "0x40",
->>         "BriefDescription": "L1D cache access, read"
->>     },
->>     {
->>         "ArchStdEvent": "0x41",
->>         "BriefDescription": "L1D cache access, write"
->>     },
->>
->>
->> Opinion?
+>> It also fails in the case where you migrate a 1.0 guest to something
+>> that cannot support it.
 >
+> That's because on the destination, the number of regs is less than on
+> source, right?
 
-Hi Will,
+I think it fails because the KVM_REG_ARM_PSCI_VERSION register will be
+in the migration state but not in the destination's list of registers:
+the code in QEMU's target/arm/machine.c:cpu_post_load() function that
+checks "register in their list but not ours: fail migration" will
+catch this.
 
-> Hi John,
->
-> The "ArchStdEvent" version is more concise by avoiding the duplication
-> of "BriefDescription" field and possible differences in
-> "BriefDescription" due to typos.  Would it make easier for people coding
-> up descriptions for specific processors?  It would depend on how the
-> documentation is written up.  For the armv8 documentation in "D5.10.3
-> Common event numbers" list the event mnemonic in "Table D5-8 PMU common
-> architectural and microarchitectural event numbers" so just using the
-> event names seems like it would be pretty clear.
+That also means that we will fail migration from a new kernel where
+we've specifically asked for PSCI 0.2 to an old PSCI-0.2-only kernel
+(because the KVM_REG_ARM_PSCI_VERSION reg will appear in the migration
+stream even if its value is the one value that matches the old kernel
+behaviour). I don't know if we care about that.
 
-Fine. ***If anyone disagrees on this then please say so.***
-
-For different Intel
-> ia64 microarchitecture implementations there are different event coding
-> to implement the same event name.  Not sure how would handle the
-> universe of different families of ia64 processor implementations.
-
-I think for this example, if we were to use the "EventName" as the 
-matching field, then it may be still possible to support by overriding 
-the "EventCode" in the platform JSON.
-
-The support in this patchset allows fields to be overriden; the 
-following is a sample of how it would look:
-{
-     "ArchStdEvent": "L1D_CACHE_RD", // Arch EventCode 0x40
-     "EventCode": "0x123456"   // override the eventcode
-},
-
->
-> Is the armv8-common.json being used as a template that fills out the
-> fields of the json elements that match up an entry in the
-> armv8-common.json? Or does it only use the information from the
-> armv8-common.json.  If the code treated the armv8-common.json as default
-> values, then if something differs in the architecture specific entry it
-> could overwrite the default value from the template.
-
-Yes, this is supported. By default, the values in template 
-armv8-common.json are used (I called it armv8-recommended.json); 
-however, any fields defined in the platform JSON for a matching event 
-are prioritized, as above.
-
->
-> -Will Cohen
-
-Thanks,
-John
-
->
->
-> .
->
-> .
->
+thanks
+-- PMM
