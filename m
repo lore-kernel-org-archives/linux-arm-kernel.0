@@ -1,83 +1,106 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon,  5 Mar 2018 10:35:34 +0100
-Subject: [PATCH 7/7] media: sun6i: Expose controls on the v4l2_device
-In-Reply-To: <20180305093535.11801-1-maxime.ripard@bootlin.com>
-References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
- <20180305093535.11801-1-maxime.ripard@bootlin.com>
-Message-ID: <20180305093535.11801-8-maxime.ripard@bootlin.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 5 Mar 2018 11:38:00 +0200
+Subject: [PATCH v2 09/16] mmc: sdhci: Add quirk to disable HW timeout
+In-Reply-To: <a7ba98cd-7a3c-00f9-bfaa-a982126c9185@ti.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+ <20180205125029.21570-10-kishon@ti.com>
+ <cda22332-ed17-9309-4989-19765744879b@intel.com>
+ <a7ba98cd-7a3c-00f9-bfaa-a982126c9185@ti.com>
+Message-ID: <18a7cff5-5cc5-4eb1-17c8-033bd5ddf6c1@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c   | 8 ++++++++
- drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h   | 2 ++
- drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c | 6 ++++++
- 3 files changed, 16 insertions(+)
+On 05/03/18 11:30, Kishon Vijay Abraham I wrote:
+> Hi Adrian,
+> 
+> On Monday 19 February 2018 02:21 PM, Adrian Hunter wrote:
+>> On 05/02/18 14:50, Kishon Vijay Abraham I wrote:
+>>> Add quirk to disable HW timeout if the requested timeout is more than
+>>> the maximum obtainable timeout.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  drivers/mmc/host/sdhci.c | 12 ++++++++++++
+>>>  drivers/mmc/host/sdhci.h |  7 +++++++
+>>>  2 files changed, 19 insertions(+)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>>> index 070aff9c108f..1aa74b4682f3 100644
+>>> --- a/drivers/mmc/host/sdhci.c
+>>> +++ b/drivers/mmc/host/sdhci.c
+>>> @@ -735,6 +735,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>>>  		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+>>>  		    count, cmd->opcode);
+>>>  		count = 0xE;
+>>> +		if (host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
+>>> +			host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+>>> +			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>> +			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>> +			host->hw_timeout_disabled = true;
+>>> +		}
+>>
+>> sdhci_calc_timeout() is really for calculations so please do this in
+>> sdhci_set_timeout() instead (i.e. change sdhci_calc_timeout() to return
+>> whether the timeout is too big).  Note that you need to cater for the "/*
+>> Unspecified timeout, assume max */" case and the
+>> SDHCI_QUIRK_BROKEN_TIMEOUT_VAL case.
+>>
+>> Also if SDHCI_INT_DATA_TIMEOUT is not being disabled, check here to
+>> re-enable it and leave sdhci_request_done() alone. i.e.
+>>
+>> 	else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
+>> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>> 		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>> 		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>> 	}
+>>
+>> Maybe make a separate subroutine for the update:
+>>
+>> void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
+>> {
+>> 	if (enable)
+>> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>> 	else
+>> 		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+>> 	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>> 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>> }
+>>
+>>
+>>>  	}
+>>>  
+>>>  	return count;
+>>> @@ -2349,6 +2355,12 @@ static bool sdhci_request_done(struct sdhci_host *host)
+>>>  	}
+>>>  
+>>>  	sdhci_del_timer(host, mrq);
+>>> +	if (sdhci_data_line_cmd(mrq->cmd) && host->hw_timeout_disabled) {
+>>> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>>> +		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>> +		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>> +		host->hw_timeout_disabled = false;
+>>> +	}
+>>>  
+>>>  	/*
+>>>  	 * Always unmap the data buffers if they were mapped by
+>>> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+>>> index afab26fd70e6..3a967a56fcc3 100644
+>>> --- a/drivers/mmc/host/sdhci.h
+>>> +++ b/drivers/mmc/host/sdhci.h
+>>> @@ -437,6 +437,11 @@ struct sdhci_host {
+>>>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+>>>  /* Controller has CRC in 136 bit Command Response */
+>>>  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+>>> +/*
+>>> + * Disable HW timeout if the requested timeout is more than the maximum
+>>> + * obtainable timeout
+>>> + */
+>>> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
+> 
+> Are you okay with the definition of this quirk? i.e this quirk is applied only
+> when the requested timeout is "more" than the maximum obtainable timeout.
+> 
+> By this way platforms can continue to use hardware timeout for smaller timeout
+> value.
 
-diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-index a93bc25ff372..26d57e6053df 100644
---- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-+++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-@@ -729,7 +729,15 @@ static int sun6i_csi_v4l2_init(struct sun6i_csi *csi)
- 
- 	media_device_init(&csi->media_dev);
- 
-+	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
-+	if (ret) {
-+		dev_err(csi->dev, "V4L2 controls handler init failed (%d)\n",
-+			ret);
-+		goto clean_media;
-+	}
-+
- 	csi->v4l2_dev.mdev = &csi->media_dev;
-+	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
- 	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
- 	if (ret) {
- 		dev_err(csi->dev, "V4L2 device registration failed (%d)\n",
-diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
-index c1a1e3aefaa8..c0e8b14073d1 100644
---- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
-+++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
-@@ -8,6 +8,7 @@
- #ifndef __SUN6I_CSI_H__
- #define __SUN6I_CSI_H__
- 
-+#include <media/v4l2-ctrls.h>
- #include <media/v4l2-device.h>
- #include <media/v4l2-fwnode.h>
- 
-@@ -33,6 +34,7 @@ struct sun6i_csi_config {
- 
- struct sun6i_csi {
- 	struct device			*dev;
-+	struct v4l2_ctrl_handler	ctrl_handler;
- 	struct v4l2_device		v4l2_dev;
- 	struct media_device		media_dev;
- 
-diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
-index c74565d15014..bf7c0d1d1d47 100644
---- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
-+++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
-@@ -8,6 +8,7 @@
- #include <linux/of.h>
- 
- #include <media/v4l2-device.h>
-+#include <media/v4l2-event.h>
- #include <media/v4l2-ioctl.h>
- #include <media/v4l2-mc.h>
- #include <media/videobuf2-dma-contig.h>
-@@ -497,6 +498,11 @@ static const struct v4l2_ioctl_ops sun6i_video_ioctl_ops = {
- 	.vidioc_prepare_buf		= vb2_ioctl_prepare_buf,
- 	.vidioc_streamon		= vb2_ioctl_streamon,
- 	.vidioc_streamoff		= vb2_ioctl_streamoff,
-+
-+	.vidioc_log_status		= v4l2_ctrl_log_status,
-+	.vidioc_subscribe_event		= v4l2_ctrl_subscribe_event,
-+	.vidioc_unsubscribe_event	= v4l2_event_unsubscribe,
-+
- };
- 
- /* -----------------------------------------------------------------------------
--- 
-2.14.3
+It is fine to me.
