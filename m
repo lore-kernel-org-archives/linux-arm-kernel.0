@@ -1,33 +1,55 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 5 Mar 2018 10:28:42 -0500
-Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
-In-Reply-To: <20180212183352.22730-4-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-4-jean-philippe.brucker@arm.com>
-Message-ID: <27a044ee-0ed7-0470-0fef-289d0d5cf5e8@codeaurora.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 05 Mar 2018 16:30:40 +0100
+Subject: [PATCH v2 1/2] ARM: dts: imx6: RDU2: Add RAVE SP device
+In-Reply-To: <20180301192007.29278-1-andrew.smirnov@gmail.com>
+References: <20180301192007.29278-1-andrew.smirnov@gmail.com>
+Message-ID: <1520263840.4095.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
-> +static void io_mm_free(struct io_mm *io_mm)
-> +{
-> +	struct mm_struct *mm;
-> +	void (*release)(struct io_mm *);
+Am Donnerstag, den 01.03.2018, 11:20 -0800 schrieb Andrey Smirnov:
+> With MFD and watchdog drivers for RAVE SP device support added by
+> 538ee27290fa ("mfd: Add driver for RAVE Supervisory Processor") and
+> c3bb33345721 ("watchdog: Add RAVE SP watchdog driver") add
+> corresponding DT node for RDU2.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
+> ---
+> ?arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 9 +++++++++
+> ?1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> index 72f52fcecee1..254e389c9511 100644
+> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> @@ -305,6 +305,15 @@
+> ?	pinctrl-names = "default";
+> ?	pinctrl-0 = <&pinctrl_uart4>;
+> ?	status = "okay";
 > +
-> +	release = io_mm->release;
-> +	mm = io_mm->mm;
+> +	rave-sp {
+> +		compatible = "zii,rave-sp-rdu2";
+> +		current-speed = <1000000>;
 > +
-> +	release(io_mm);
-
-Is there any reason why you can't call iommu->release()
-here directly? Why do you need the release local variable?
-
-> +	mmdrop(mm);
-> +}
-> +
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> +		watchdog {
+> +			compatible = "zii,rave-sp-watchdog";
+> +		};
+> +	};
+> ?};
+> ?
+> ?&ecspi1 {
