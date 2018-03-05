@@ -1,34 +1,38 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Mon, 5 Mar 2018 11:04:00 +0100
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <CAMZdPi8ab7n0B9qYyZaJAGf4qRH8eYXcUJ=B8pyvyLWyaNVX+Q@mail.gmail.com>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
- <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
- <395166283.280598.1520200683559@email.1und1.de>
- <423BE2B6-2209-4390-B420-FA7267318A09@holtmann.org>
- <1219888621.198216.1520231304685@email.1und1.de>
- <524739BF-BD94-4276-BDAB-31B4944D24C3@holtmann.org>
- <CAMZdPi8ab7n0B9qYyZaJAGf4qRH8eYXcUJ=B8pyvyLWyaNVX+Q@mail.gmail.com>
-Message-ID: <19717EF2-FC8D-4F2B-B198-4D582FD743E8@holtmann.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon,  5 Mar 2018 11:04:28 +0100
+Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
+Message-ID: <20180305100432.15009-1-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Loic,
+Hi,
 
-> > >>
-> > >> that is weird since we should be either in a probe context or in hdev->open context and both can sleep as far as I know.
-> 
-> Yes but this is an explicit warning in gpiolib based on gpio controller capabilities,
-> not on current context (WARN_ON(desc->gdev->chip->can_sleep)).
-> 
-> So, since we are always in process/thread context here, it seems safe to use the _cansleep version.
+The H3 and H5 have a CSI controller based on the one previously found
+in the A31, that is currently supported by the sun6i-csi driver.
 
-can someone whip up a patch for it and quickly test it.
+Add the compatibles to the device tree bindings and to the driver to
+make it work properly.
 
-Regards
+This obviously depends on the serie "Initial Allwinner V3s CSI
+Support" by Yong Deng.
 
-Marcel
+Let me know what you think,
+Maxime
+
+Maxime Ripard (2):
+  dt-bindings: media: sun6i: Add A31 and H3 compatibles
+  media: sun6i: Add A31 compatible
+
+Myl?ne Josserand (2):
+  ARM: dts: sun8i: Add the H3/H5 CSI controller
+  [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
+    Pi M1+
+
+ .../devicetree/bindings/media/sun6i-csi.txt        |  5 +-
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts      | 85 ++++++++++++++++++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 22 ++++++
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c |  1 +
+ 4 files changed, 112 insertions(+), 1 deletion(-)
+
+-- 
+2.14.3
