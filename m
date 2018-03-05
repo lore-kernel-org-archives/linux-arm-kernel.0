@@ -1,56 +1,99 @@
-From: yong.deng@magewell.com (Yong)
-Date: Mon, 5 Mar 2018 18:35:35 +0800
-Subject: [PATCH 0/7] media: sun6i: Various fixes and improvements
-In-Reply-To: <20180305093535.11801-1-maxime.ripard@bootlin.com>
-References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
- <20180305093535.11801-1-maxime.ripard@bootlin.com>
-Message-ID: <20180305183535.b75ec79199efc3cacefc49c2@magewell.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon,  5 Mar 2018 11:36:38 +0100
+Subject: [PATCH] KVM: arm/arm64: Reset mapped IRQs on VM reset
+Message-ID: <20180305103638.1633-1-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+We currently don't allow resetting mapped IRQs from userspace, because
+their state is controlled by the hardware.  But we do need to reset the
+state when the VM is reset, so we provide a function for the 'owner' of
+the mapped interrupt to reset the interrupt state.
 
-On Mon,  5 Mar 2018 10:35:27 +0100
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+Currently only the timer uses mapped interrupts, so we call this
+function from the timer reset logic.
 
-> Hi Yong,
-> 
-> Here are a bunch of patches I came up with after testing your last
-> (v8) version of the CSI patches.
-> 
-> There's some improvements (patches 1 and 7) and fixes for
-> regressions found in the v8 compared to the v7 (patches 2, 3, 4 and
-> 5), and one fix that we discussed for the signals polarity for the
-> parallel interface (patch 6).
-> 
-> Feel free to squash them in your serie for the v9.
+Signed-off-by: Christoffer Dall <cdall@kernel.org>
+---
+This depends on "KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls
+than KVM_RUN" from the VHE optimization series so that the reset doesn't
+get called while vtimer->loaded is true.
 
-OK. Thank you!
+ include/kvm/arm_vgic.h    |  1 +
+ virt/kvm/arm/arch_timer.c |  4 ++++
+ virt/kvm/arm/vgic/vgic.c  | 26 ++++++++++++++++++++++++++
+ 3 files changed, 31 insertions(+)
 
-I notice that your responses have not been listed in google group
-since February.
-
-> Thanks!
-> Maxime
-> 
-> Maxime Ripard (7):
->   media: sun6i: Fill dma_pfn_offset to accomodate for the RAM offset
->   media: sun6i: Reduce the error level
->   media: sun6i: Pass the sun6i_csi_dev pointer to our helpers
->   media: sun6i: Don't emit a warning when the configured format isn't
->     found
->   media: sun6i: Support the YUYV format properly
->   media: sun6i: Invert the polarities
->   media: sun6i: Expose controls on the v4l2_device
-> 
->  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 85 ++++++++++++++--------
->  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h |  2 +
->  .../media/platform/sunxi/sun6i-csi/sun6i_video.c   |  6 ++
->  3 files changed, 63 insertions(+), 30 deletions(-)
-> 
-> -- 
-> 2.14.3
-
-
-Thanks,
-Yong
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index cdbd142ca7f2..02924ae2527e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -360,6 +360,7 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu);
+ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
+ 
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 70268c0bec79..09890a5268d1 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -571,6 +571,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+ {
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+@@ -584,6 +585,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+ 	ptimer->cnt_ctl = 0;
+ 	kvm_timer_update_state(vcpu);
+ 
++	if (timer->enabled && irqchip_in_kernel(vcpu->kvm))
++		kvm_vgic_reset_mapped_irq(vcpu, vtimer->irq.irq);
++
+ 	return 0;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index c7c5ef190afa..0001858a2c23 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -495,6 +495,32 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+ 	return ret;
+ }
+ 
++/**
++ * kvm_vgic_reset_mapped_irq - Reset a mapped IRQ
++ * @vcpu: The VCPU pointer
++ * @vintid: The INTID of the interrupt
++ *
++ * Reset the active and pending states of a mapped interrupt.  Kernel
++ * subsystems injecting mapped interrupts should reset their interrupt lines
++ * when we are doing a reset of the VM.
++ */
++void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
++	unsigned long flags;
++
++	if (!irq->hw)
++		goto out;
++
++	spin_lock_irqsave(&irq->irq_lock, flags);
++	irq->active = false;
++	irq->pending_latch = false;
++	irq->line_level = false;
++	spin_unlock_irqrestore(&irq->irq_lock, flags);
++out:
++	vgic_put_irq(vcpu->kvm, irq);
++}
++
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+ 	struct vgic_irq *irq;
+-- 
+2.14.2
