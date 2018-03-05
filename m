@@ -1,46 +1,92 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 5 Mar 2018 16:47:55 +0000
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <86o9k63f7a.wl-marc.zyngier@arm.com>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
- <86o9k63f7a.wl-marc.zyngier@arm.com>
-Message-ID: <CAFEAcA8XYV=oSX81ON4CGDt0kfG1cgROqj30OC2Ov=bYhLSYig@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 5 Mar 2018 16:53:23 +0000
+Subject: [PATCH 1/2] ARM: dts: STi: Fix aliases property name for STi
+ boards
+In-Reply-To: <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
+References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
+ <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
+ <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
+Message-ID: <4bf43157-9214-c160-3f69-1e56f8cfdf98@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2018 at 11:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Fri, 02 Mar 2018 10:44:48 +0000,
-> Auger Eric wrote:
->> I understand the get/set is called as part of the migration process.
->> So my understanding is the benefit of this series is migration fails in
->> those cases:
+Hi Rob
+
+On 03/05/2018 04:28 PM, Rob Herring wrote:
+> On Mon, Mar 5, 2018 at 9:00 AM,  <patrice.chotard@st.com> wrote:
+>> From: Patrice Chotard <patrice.chotard@st.com>
 >>
->> >=0.2 source -> 0.1 destination
->> 0.1 source -> >=0.2 destination
->
-> It also fails in the case where you migrate a 1.0 guest to something
-> that cannot support it.
+>> Since dtc v1.4.6-9-gaadd0b65c987, aliases property name must
+>> be lowercase only.
+>> This allows to fix following warnings when compiling dtb
+>> with W=1 option :
+> 
+> I'm so glad to see fixes before the dtc update landed in the kernel tree!
 
-I think it would be useful if we could write out the various
-combinations of source, destination and what we expect/want to
-have happen. My gut feeling here is that we're sacrificing
-exact migration compatibility in favour of having the guest
-automatically get the variant-2 mitigations, but it's not clear
-to me exactly which migration combinations that's intended to
-happen for. Marc?
+;-)
 
-If this wasn't a mitigation issue the desired behaviour would be
-straightforward:
- * kernel should default to 0.2 on the basis that
-   that's what it did before
- * new QEMU version should enable 1.0 by default for virt-2.12
-   and 0.2 for virt-2.11 and earlier
- * PSCI version info shouldn't appear in migration stream unless
-   it's something other than 0.2
-But that would leave some setups (which?) unnecessarily without the
-mitigation, so we're not doing that. The question is, exactly
-what *are* we aiming for?
+> 
+>> arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+>> arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+>> arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+>> arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> ---
+>>   arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
+>>   arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
+>>   arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
+>>   arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
+>>   4 files changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+>> index c8ad905d0309..fa1186af6574 100644
+>> --- a/arch/arm/boot/dts/stih407-b2120.dts
+>> +++ b/arch/arm/boot/dts/stih407-b2120.dts
+>> @@ -14,7 +14,7 @@
+>>          compatible = "st,stih407-b2120", "st,stih407";
+>>
+>>          chosen {
+>> -               bootargs = "console=ttyAS0,115200 clk_ignore_unused";
+>> +               bootargs = "console=ttyas0,115200 clk_ignore_unused";
+> 
+> The kernel change for this is an ABI breakage both DT <-> kernel and
+> kernel <-> userspace.
+> 
+> Really, if you are okay with doing this, you should change it to ttySx IMO.
 
-thanks
--- PMM
+OK i will use serialN instead
+
+> 
+>>                  linux,stdout-path = &sbc_serial0;
+> 
+> And since you have this, you don't even need the console praram.
+
+Ok, i will remove stdout-path in an additional patch
+
+> 
+>>          };
+>>
+>> @@ -24,7 +24,7 @@
+>>          };
+>>
+>>          aliases {
+>> -               ttyAS0 = &sbc_serial0;
+>> +               ttyas0 = &sbc_serial0;
+> 
+> The correct fix is use "serialN" for aliases.
+
+Ok
+
+> 
+> I have a check for only known alias names which would give a better
+> warning, but David thought it was too restrictive.
+> 
+>>                  ethernet0 = &ethernet0;
+>>          };
+>>
+
+
+Thanks
+
+Patrice
