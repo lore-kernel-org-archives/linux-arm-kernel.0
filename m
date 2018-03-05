@@ -1,70 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Mar 2018 12:46:38 +0000
-Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
-In-Reply-To: <20180302165415.GB8704@kroah.com>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
- <20180301152450.GA4061@kroah.com>
- <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
- <20180302165415.GB8704@kroah.com>
-Message-ID: <20180305124638.GG8588@sirena.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 5 Mar 2018 14:52:06 +0200
+Subject: [PATCHv3] tlv320dac33: Add device tree bindings
+In-Reply-To: <20180224205704.GB5132@amd>
+References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
+ <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com> <20180205082445.GA18274@amd>
+ <20180206121122.GG5681@sirena.org.uk> <20180206134906.GA7842@amd>
+ <20180206152722.GH5681@sirena.org.uk> <20180224205704.GB5132@amd>
+Message-ID: <3edfbd7c-c8f8-f031-30d2-90b441e63688@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 05:54:15PM +0100, Greg KH wrote:
-> On Fri, Mar 02, 2018 at 05:14:50PM +0800, Alex Shi wrote:
-> > On 03/01/2018 11:24 PM, Greg KH wrote:
+Hi,
 
-> > > And why are you making this patchset up?  What is wrong with the patches
-> > > in the android-common tree for this?
+On 2018-02-24 22:57, Pavel Machek wrote:
+> On Tue 2018-02-06 15:27:22, Mark Brown wrote:
+>> On Tue, Feb 06, 2018 at 02:49:06PM +0100, Pavel Machek wrote:
+>>> On Tue 2018-02-06 12:11:22, Mark Brown wrote:
+>>
+>>>> Please submit patches using subject lines reflecting the style for the
+>>>> subsystem.  This makes it easier for people to identify relevant
+>>>> patches.  Look at what existing commits in the area you're changing are
+>>>> doing and make sure your subject lines visually resemble what they're
+>>>> doing.
+>>
+>>> AFAICT this goes to Documentation, not sound.
+>>
+>> Even if that were the case you're not following the commonly accepted
+>> practice there either.
+>>
+>>> If you have any comments on V1 of this patch, that would be nice, I'd
+>>> like to get that merged once we are finished with the bindings.
+>>
+>> It is the middle of the merge window, please be a bit more patient.
+> 
+> For the record, patch currently looks like this. If you have some
+> comments on the code, I'd like to hear them.
+> 
+> Best regards,
+> diff --git a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
+> index 8c71d2f..7302789 100644
+> --- a/sound/soc/codecs/tlv320dac33.c
+> +++ b/sound/soc/codecs/tlv320dac33.c
 
-> > We believe the LTS is the base kernel for android/lsk, so the fixing
-> > patches should get it first and then merge to other tree.
+...
 
-> But you know that android-common is already fine here, the needed
-> patches are all integrated into there, so no additional work is needed
-> for android devices.  So what devices do you expect to use this 4.9
-> backport?
+> @@ -1511,10 +1509,26 @@ static int dac33_i2c_probe(struct i2c_client *client,
+>  
+>  	i2c_set_clientdata(client, dac33);
+>  
+> -	dac33->power_gpio = pdata->power_gpio;
+> -	dac33->burst_bclkdiv = pdata->burst_bclkdiv;
+> -	dac33->keep_bclk = pdata->keep_bclk;
+> -	dac33->mode1_latency = pdata->mode1_latency;
+> +	if (pdata) {
+> +		dac33->power_gpio = pdata->power_gpio;
+> +		dac33->burst_bclkdiv = pdata->burst_bclkdiv;
+> +		dac33->keep_bclk = pdata->keep_bclk;
+> +		dac33->mode1_latency = pdata->mode1_latency;
+> +	} else if (np) {
+> +		ret = of_get_named_gpio(np, "power-gpios", 0);
+> +		if (ret >= 0)
+> +			dac33->power_gpio = ret;
+> +		else
+> +			dac33->power_gpio = -1;
 
-See below...
+the code checks for (dac33->power_gpio >= 0) in live path, I guess you
+can just skip the power_gpio = -1 in case we don't have GPIO
+Handling of EPROBE_DEFER might be something we might want for the GPIO.
 
-> What is "lsk"?
+> +
+> +		if (of_property_read_bool(np, "ti,keep-bclk"))
+> +			dac33->keep_bclk = true;
+> +
+> +		of_property_read_u32(np, "ti,burst-bclkdiv", &dac33->burst_bclkdiv);
+> +	} else {
+> +		dev_err(&client->dev, "Platform data not set\n");
+> +		return -ENODEV;
+> +	}
+>  	if (!dac33->mode1_latency)
+>  		dac33->mode1_latency = 10000; /* 10ms */
+>  	dac33->irq = client->irq;
+> @@ -1580,9 +1594,16 @@ static const struct i2c_device_id tlv320dac33_i2c_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, tlv320dac33_i2c_id);
+>  
+> +static const struct of_device_id tlv320dac33_of_match[] = {
+> +	{ .compatible = "ti,tlv320dac33", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(i2c, tlv320dac33_of_match);
+> +
+>  static struct i2c_driver tlv320dac33_i2c_driver = {
+>  	.driver = {
+>  		.name = "tlv320dac33-codec",
+> +		.of_match_table = of_match_ptr(tlv320dac33_of_match),
+>  	},
+>  	.probe		= dac33_i2c_probe,
+>  	.remove		= dac33_i2c_remove,
+> 
+> 
 
-The Linaro Stable Kernel, it's LTS plus some feature backports.
+- P?ter
 
-> But really, I don't see this need as all ARM devices that I know of that
-> are stuck on 4.9.y are already using the android-common tree.  Same for
-> 4.4.y.  Do you know of any that are not, and that can not just use
-> 4.14.y instead?
-
-There's way more to ARM than just Android systems, assuming that getting
-things into the Android kernel is enough is like assuming that x86 is
-covered since the distros have their own backports - it covers a lot of
-users but not everyone.  Off the top of my head there's things like
-routers, NASs, cameras, IoT, radio systems, industrial appliances, set
-top boxes and these days even servers.  Most of these segments are just
-as conservative about taking new kernel versions on shipping product as
-the phone vendors are, the practices that make people relucant to take
-bigger updates in production are general engineering practices common
-across industry.
-
-I mostly talk to chip vendors so I can't off the top of my head name
-specific end products with particular kernel versions.  What I can tell
-you is that many of the chip vendors care deeply about LTS because their
-customers demand it - off the top of my head at least Atmel, ST and TI
-ship vanilla LTS kernels with no Android at all into large market
-segments.  Some of these chips couldn't usefully run Android so there's
-just no Android support, some also have Android available as an
-alternative.  Some of them even have very complete upstream support
-available with barely any vendor patch required at all (none in some
-applications).
-
-Things that are functioning well will inevitably be less visible -
-that's good, that means there's less of a pain point there but it
-doesn't mean there's not still a support need.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180305/feaac11b/attachment.sig>
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
