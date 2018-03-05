@@ -1,17 +1,22 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 Mar 2018 21:25:30 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add dp83867 CLK_OUT muxing
-In-Reply-To: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
-References: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
-Message-ID: <3380975.Amu1WGHSQ5@diego>
+Date: Mon, 05 Mar 2018 21:26:23 +0100
+Subject: [PATCH] soc: rockchip: power-domain: Add a sanity check on
+ pd->num_clks
+In-Reply-To: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
+References: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
+Message-ID: <2446754.ohlkqz2d1D@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 5. M?rz 2018, 13:45:11 CET schrieb Daniel Schultz:
-> The CLK_O_SEL default is synchronous to XI input clock, which is 25 MHz.
-> Set CLK_O_SEL to channel A transmit clock so we have 125 MHz on CLK_OUT.
+Am Montag, 5. M?rz 2018, 10:17:22 CET schrieb Jeffy Chen:
+> The of_count_phandle_with_args() can fail and return error(for example,
+> rk3399 pd_vio doesn't have clocks). That would break the pd probe.
 > 
-> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
+> Add a sanity check on pd->num_clks to avoid that.
+> 
+> Fixes: 65084121d59d ("soc: rockchip: power-domain: use clk_bulk APIs")
+> Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
 applied for 4.17
 
