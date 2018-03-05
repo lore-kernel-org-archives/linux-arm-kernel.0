@@ -1,77 +1,38 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon,  5 Mar 2018 11:25:17 +0100
-Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
- external PMIC
-Message-ID: <20180305102524.5905-1-o.rempel@pengutronix.de>
+Date: Mon,  5 Mar 2018 11:25:21 +0100
+Subject: [PATCH v6 4/6] regulator: pfuze100: add fsl,
+ pmic-stby-poweroff property
+In-Reply-To: <20180305102524.5905-1-o.rempel@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+Message-ID: <20180305102524.5905-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is providing power off support for Freescale/NXP iMX6 based
-boards with external power management integrated circuit (PMIC).
-As a first step the PMIC is configured to turn off the system if the
-standby pin is asserted. On second step we assert the standby pin.
-For this reason we need to use pm_power_off_prepare.
+Document the new optional "fsl,pmic-stby-poweroff" property.
 
-Usage of stnadby pin for power off is described in official iMX6
-documentation.
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/regulator/pfuze100.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-2018.03.05:
-As this patch set touches multiple subsystems I think it would make
-sense for Shawn Guo to take the all patch set.
-The only part which didn't receive an ACK is regulator stuff. So I would
-hope that Mark Brown can ACK it.
-
-Kind regards,
-Oleksij Rempel
-
-2017.12.06:
-Adding Linus. Probably there is no maintainer for this patch set.
-No changes are made, tested on v4.15-rc1.
-
-2017.10.27:
-Last version of this patch set was send at 20 Jun 2017, this is a rebase against
-kernel v4.14-rc6. Probably this set got lost. If I forgot to address some comments,
-please point me.
-
-changes:
-v6:
- - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
- - fix "MPIC_STBY_REQ" typo in the comment.
-
-v5:
- - remove useless includes from pm-imx6.c patch
- - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
-   patch
-
-v4:
- - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
-   patch
- - add Acked-by to "ARM: imx6q: provide documentation for new ..."
-   patch
-
-v3:
- - set pm_power_off_prepare = NULL on .remove.
- - documentation and spelling fixes.
- - use %pf instead of lookup_symbol_name.
-
-
-Oleksij Rempel (6):
-  ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
-    property
-  ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
-    is set
-  kernel/reboot.c: export pm_power_off_prepare
-  regulator: pfuze100: add fsl,pmic-stby-poweroff property
-  regulator: pfuze100-regulator: provide pm_power_off_prepare handler
-  ARM: dts: imx6: RIoTboard provide standby on power off option
-
- .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
- .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
- arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
- arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
- drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
- kernel/reboot.c                                    |  1 +
- 6 files changed, 138 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/regulator/pfuze100.txt b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+index c6dd3f5e485b..91fec1a0785d 100644
+--- a/Documentation/devicetree/bindings/regulator/pfuze100.txt
++++ b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+@@ -4,6 +4,13 @@ Required properties:
+ - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
+ - reg: I2C slave address
+ 
++Optional properties:
++- fsl,pmic-stby-poweroff: if present, configure the PMIC to shutdown all
++  power rails when PMIC_STBY_REQ line is asserted during the power off sequence.
++  Use this option if the SoC should be powered off by external power
++  management IC (PMIC) on PMIC_STBY_REQ signal.
++  As opposite to PMIC_STBY_REQ boards can implement PMIC_ON_REQ signal.
++
+ Required child node:
+ - regulators: This is the list of child nodes that specify the regulator
+   initialization data for defined regulators. Please refer to below doc
 -- 
 2.16.1
