@@ -1,39 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 13:41:23 -0600
-Subject: [PATCH] arm: dts: omap3: Add missing #sound-dai-cells
-In-Reply-To: <20180301233341.GJ62820@atomide.com>
-References: <20180301202537.30571-2-robh@kernel.org>
- <20180301223243.GI62820@atomide.com>
- <CAL_Jsq+=dBEH_MFHDgZbNBb75hVzoXsyH-_qE7mKFuGtOixQsw@mail.gmail.com>
- <20180301233341.GJ62820@atomide.com>
-Message-ID: <CAL_Jsq+H2ap4R65yFt0yLUvxuuYrN2EHHjf5pFvdn623eUspdA@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 5 Mar 2018 13:54:27 -0600
+Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
+References: <1519942514-3350-1-git-send-email-fkan@apm.com>
+ <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
+Message-ID: <d24a66fa-de5c-ba02-dafb-ee554a3032a8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 5:33 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rob Herring <robh@kernel.org> [180301 23:29]:
->> On Thu, Mar 1, 2018 at 4:32 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > * Rob Herring <robh@kernel.org> [180301 12:26]:
->> >> dtc now gives the following warnings:
->> >>
->> >> arch/arm/boot/dts/omap3-gta04a3.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
->> >> arch/arm/boot/dts/omap3-gta04a4.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
->> >> arch/arm/boot/dts/omap3-gta04a5.dtb: Warning (sound_dai_property): /sound_telephony/simple-audio-card,cpu: Missing property '#sound-dai-cells' in node /ocp at 68000000/mcbsp at 49026000 or bad phandle (referred from sound-dai[0])
->> >>
->> >> Add the missing #sound-dai-cells property.
->> >
->> > Is this needed for the current -rc or is v4.17 OK?
->>
->> 4.17 is fine.
->>
->> > Somehow I'm not seeing these with current -rc or next, is
->> > there some special option (not W=2 :) that you're using?
->>
->> Upstream dtc which I'm working on syncing to for 4.17.
->
-> OK let me know if you want to queue along with your other
-> changes and I'll ack or else I'll apply it up tomorrow.
 
-Please apply it.
 
-Rob
+On 03/02/2018 03:11 AM, Rafael J. Wysocki wrote:
+> [+Greg]
+> 
+> On Thu, Mar 1, 2018 at 11:15 PM, Feng Kan <fkan@apm.com> wrote:
+>> When bridge and its endpoint is enumerated the devices are added to the
+>> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+>> This causes the bridge to be moved to the end of the dpm list when
+>> deferred probe kicks in. The order of the dpm list for bridge and
+>> endpoint is reversed.
+>>
+>> Add reordering code to move the bridge and its children and consumers to
+>> the end of the pm list so the order for suspend and resume is not altered.
+>> The code also move device and its children and consumers to the tail of
+>> device_kset list if it is registered.
+> 
+> I assume that this has been tested and works as expected.
+
+isn't it the same as https://lkml.org/lkml/2015/9/10/248? (in general)
+
+And wouldn't device links solve the issue?
+
+commit 9ed9895370aedd6032af2a9181c62c394d08223b
+Author: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Date:   Sun Oct 30 17:32:16 2016 +0100
+
+    driver core: Functional dependencies tracking support
+
+    Currently, there is a problem with taking functional dependencies
+    between devices into account.
+
+My understanding of device links is that they were introduced exactly to fix
+such kind of issues and explicitly define dependencies between devices in code.
+
+But, I could be missing smth... sry if this is the case.
+
+-- 
+regards,
+-grygorii
