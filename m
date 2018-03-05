@@ -1,30 +1,89 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 05 Mar 2018 22:50:58 +0800
-Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
-Message-ID: <1520261458.33502.10.camel@aosc.io>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 5 Mar 2018 14:53:21 +0000
+Subject: [PATCH 1/6] Docs: dt: add fsl-mc iommu-parent device-tree binding
+In-Reply-To: <1520260166-29387-2-git-send-email-nipun.gupta@nxp.com>
+References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
+ <1520260166-29387-2-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <5cdeded1-ca3c-339a-bf73-73401e7dd4ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 05/03/18 14:29, Nipun Gupta wrote:
+> The existing IOMMU bindings cannot be used to specify the relationship
+> between fsl-mc devices and IOMMUs. This patch adds a binding for
+> mapping fsl-mc devices to IOMMUs, using a new iommu-parent property.
 
-I'm trying to implement a driver for the quirky (DW) PCIe RC in the
-Allwinner H6 SoC.
+Given that allowing "msi-parent" for #msi-cells > 1 is merely a 
+backward-compatibility bodge full of hard-coded assumptions, why would 
+we want to knowingly introduce a similarly unpleasant equivalent for 
+IOMMUs? What's wrong with "iommu-map"?
 
-The quirk is that only the "dbi" space is always mapped, but at the
-same time only 64KiB of other spaces (config, downstream IO and non-
-prefetchable memory) are accessible. To access a certain address the
-high 16-bit of the address (all bus addresses in H6 SoC are 32-bit
-despite the CPU is 64-bit) needs to be written into the
-PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI space).
-So the access to these spaces cannot be processed correctly with just
-readl/writel, as the existing code does.
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> ---
+>   .../devicetree/bindings/misc/fsl,qoriq-mc.txt      | 31 ++++++++++++++++++++++
+>   1 file changed, 31 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> index 6611a7c..011c7d6 100644
+> --- a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> +++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> @@ -9,6 +9,24 @@ blocks that can be used to create functional hardware objects/devices
+>   such as network interfaces, crypto accelerator instances, L2 switches,
+>   etc.
+>   
+> +For an overview of the DPAA2 architecture and fsl-mc bus see:
+> +drivers/staging/fsl-mc/README.txt
+> +
+> +As described in the above overview, all DPAA2 objects in a DPRC share the
+> +same hardware "isolation context" and a 10-bit value called an ICID
+> +(isolation context id) is expressed by the hardware to identify
+> +the requester.
 
-Is it possible to workaround this in the PCI subsystem of Linux?
+IOW, precisely the case for which "{msi,iommu}-map" exist. Yes, I know 
+they're currently documented under bindings/pci, but they're not really 
+intended to be absolutely PCI-specific.
 
-(I have thought a workaround that only maps the current accessible
-64KiB with the MMU, and when accessing the non-accessible part, catch
-the page fault and re-setup the map to the new 64KiB page. But surely
-it will kill the performance.)
+Robin.
 
-Thanks,
-Icenowy
+> +The generic 'iommus' property is cannot be used to describe the relationship
+> +between fsl-mc and IOMMUs, so an iommu-parent property is used to define
+> +the same.
+> +
+> +For generic IOMMU bindings, see
+> +Documentation/devicetree/bindings/iommu/iommu.txt.
+> +
+> +For arm-smmu binding, see:
+> +Documentation/devicetree/bindings/iommu/arm,smmu.txt.
+> +
+>   Required properties:
+>   
+>       - compatible
+> @@ -88,14 +106,27 @@ Sub-nodes:
+>                 Value type: <phandle>
+>                 Definition: Specifies the phandle to the PHY device node associated
+>                             with the this dpmac.
+> +Optional properties:
+> +
+> +- iommu-parent: Maps the devices on fsl-mc bus to an IOMMU.
+> +  The property specifies the IOMMU behind which the devices on
+> +  fsl-mc bus are residing.
+>   
+>   Example:
+>   
+> +        smmu: iommu at 5000000 {
+> +               compatible = "arm,mmu-500";
+> +               #iommu-cells = <1>;
+> +               stream-match-mask = <0x7C00>;
+> +               ...
+> +        };
+> +
+>           fsl_mc: fsl-mc at 80c000000 {
+>                   compatible = "fsl,qoriq-mc";
+>                   reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
+>                         <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+>                   msi-parent = <&its>;
+> +                iommu-parent = <&smmu>;
+>                   #address-cells = <3>;
+>                   #size-cells = <1>;
+>   
+> 
