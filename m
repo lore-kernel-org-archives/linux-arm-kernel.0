@@ -1,98 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  5 Mar 2018 11:17:02 +0100
-Subject: [PATCH] drm/bridge: sii902x: Retry status read after DDI I2C
-Message-ID: <20180305101702.13441-1-linus.walleij@linaro.org>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 5 Mar 2018 11:22:39 +0100
+Subject: [PATCH v3 3/3] arm64: dts: rockchip: Avoid wakeup when inserting
+ the pen
+In-Reply-To: <20180302035102.10084-4-jeffy.chen@rock-chips.com>
+References: <20180302035102.10084-1-jeffy.chen@rock-chips.com>
+ <20180302035102.10084-4-jeffy.chen@rock-chips.com>
+Message-ID: <CAFqH_50YFm7EYEtt=9AoCUwvVU+Vuw51PYx=hF_u=KBgKmPTDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following happens when connection a DVI output driven
-from the SiI9022 using a DVI-to-VGA adapter plug:
+Hi Jeffy,
 
-i2c i2c-0: sendbytes: NAK bailout.
-i2c i2c-0: sendbytes: NAK bailout.
+Thanks for the patch.
 
-Then no picture. Apparently the I2C engine inside the SiI9022
-is not smart enough to try to fall back to DDC I2C. Or the
-vendor have not integrated the electronics properly. I don't
-know which one it is.
+2018-03-02 4:51 GMT+01:00 Jeffy Chen <jeffy.chen@rock-chips.com>:
+> Add wakeup event action for Pen Insert gpio key, to avoid wakeup when
+> inserting the pen.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+> Changes in v3: None
+> Changes in v2:
+> Specify wakeup event action instead of irq trigger type as Brian
+> suggested.
+>
+>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> index 191a6bcb1704..ef2de0057c5c 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> @@ -134,6 +134,8 @@
+>                 gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+>                 linux,code = <SW_PEN_INSERTED>;
+>                 linux,input-type = <EV_SW>;
+> +               /* Wakeup only when ejecting */
+> +               wakeup-event-action = <EV_ACT_DEASSERTED>;
+>                 wakeup-source;
+>         };
+>  };
+> --
+> 2.11.0
+>
+>
 
-After this, the I2C bus seems stalled and the first attempt to
-read the status register fails, and the code returns with
-negative return value, and the display fails to initialized.
+Works as expected on my Kevin
 
-Instead, retry status readout five times and continue even
-if this fails.
-
-Tested on the ARM Versatile Express with a DVI-to-VGA
-connector, it now gives picture.
-
-Introduce a helper struct device *dev variable to make
-the code more readable.
-
-Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Found the real problem instead of trying to explicitly
-  shoehorn EDID modes into the error path.
----
- drivers/gpu/drm/bridge/sii902x.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
-index b1ab4ab09532..60373d7eb220 100644
---- a/drivers/gpu/drm/bridge/sii902x.c
-+++ b/drivers/gpu/drm/bridge/sii902x.c
-@@ -137,7 +137,9 @@ static int sii902x_get_modes(struct drm_connector *connector)
- 	struct sii902x *sii902x = connector_to_sii902x(connector);
- 	struct regmap *regmap = sii902x->regmap;
- 	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
-+	struct device *dev = &sii902x->i2c->dev;
- 	unsigned long timeout;
-+	unsigned int retries;
- 	unsigned int status;
- 	struct edid *edid;
- 	int num = 0;
-@@ -159,7 +161,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
- 		 time_before(jiffies, timeout));
- 
- 	if (!(status & SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
--		dev_err(&sii902x->i2c->dev, "failed to acquire the i2c bus\n");
-+		dev_err(dev, "failed to acquire the i2c bus\n");
- 		return -ETIMEDOUT;
- 	}
- 
-@@ -179,9 +181,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
- 	if (ret)
- 		return ret;
- 
--	ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA, &status);
-+	/*
-+	 * Sometimes the I2C bus can stall after failure to use the
-+	 * EDID channel. Retry a few times to see if things clear
-+	 * up, else continue anyway.
-+	 */
-+	retries = 5;
-+	do {
-+		ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA,
-+				  &status);
-+		retries--;
-+	} while (ret && retries);
- 	if (ret)
--		return ret;
-+		dev_err(dev, "failed to read status (%d)\n", ret);
- 
- 	ret = regmap_update_bits(regmap, SII902X_SYS_CTRL_DATA,
- 				 SII902X_SYS_CTRL_DDC_BUS_REQ |
-@@ -201,7 +213,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
- 
- 	if (status & (SII902X_SYS_CTRL_DDC_BUS_REQ |
- 		      SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
--		dev_err(&sii902x->i2c->dev, "failed to release the i2c bus\n");
-+		dev_err(dev, "failed to release the i2c bus\n");
- 		return -ETIMEDOUT;
- 	}
- 
--- 
-2.14.3
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
