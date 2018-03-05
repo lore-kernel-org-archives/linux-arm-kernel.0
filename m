@@ -1,30 +1,22 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 5 Mar 2018 09:25:04 -0600
-Subject: [PATCH] arm64: dts: stratix10: enable i2c, add i2c periperals
-In-Reply-To: <20180221202541.3258-1-atull@kernel.org>
-References: <20180221202541.3258-1-atull@kernel.org>
-Message-ID: <6661d0f4-79b5-91d2-7507-e15e7004ebe5@kernel.org>
+From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
+Date: Mon, 05 Mar 2018 15:27:00 +0000
+Subject: [linux-sunxi] [PATCH v3 15/16] ARM: dts: sun8i: h3: Enable HDMI
+ output on H3 boards
+In-Reply-To: <20180301213442.16677-16-jernej.skrabec@siol.net>
+References: <20180301213442.16677-1-jernej.skrabec@siol.net>
+ <20180301213442.16677-16-jernej.skrabec@siol.net>
+Message-ID: <57afe052-9a8c-f63b-ee43-5bad8cd1d193@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Jernej Skrabec:
+> +&hdmi_out {
+> +	hdmi_out_con: endpoint {
+> +		remote-endpoint = <&hdmi_con_in>;
+> +	};
+> +};
 
-On 02/21/2018 02:25 PM, Alan Tull wrote:
-> Add clock for i2c
-> Enable i2c1
-> Set the i2c bus speed to 100KHz
-> Add the following i2c peripherals
-> * ds1339 RTC
-> * 24c32 EEPROM
-> * max1619 temperature monitor
-> * ltc2497 ADC
->   * Add a fixed regulator for the ADC's Vref.
-> 
-> This requires Dinh Nguyen's Stratix10 clock driver
-> ("clk: socfpga: stratix10: add clock driver for Stratix10 platform")
-> 
+This node is added to all the DTS files you enabled HDMI on. Is it
+something that could be instead put to the DTSI file?
 
-Thanks for the patch! I've staged this patch based on the clock driver
-patch.
-
-Dinh
+Joonas
