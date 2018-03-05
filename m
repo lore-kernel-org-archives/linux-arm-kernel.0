@@ -1,100 +1,191 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 08:10:56 -0600
-Subject: [PATCH v1 18/19] arm: dts: mt7623: add MT7623A reference boards
-In-Reply-To: <1520043343.8089.216.camel@mtkswgap22>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <ddffdff293734954ba368be8a54edd3c84a4f4e6.1519378872.git.sean.wang@mediatek.com>
- <20180302154547.xq5nkmkdk3oenbta@rob-hp-laptop>
- <1520043343.8089.216.camel@mtkswgap22>
-Message-ID: <CAL_JsqKLYVN8G28GNYVQc=Kduij+0b82ydKG1D=7hh8sPE4GYA@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 5 Mar 2018 14:11:54 +0000
+Subject: [PATCH v6 04/20] firmware: arm_scmi: add common infrastructure
+ and support for base protocol
+In-Reply-To: <1519403030-21189-5-git-send-email-sudeep.holla@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180305151154.000051c2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 8:15 PM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Fri, 2018-03-02 at 09:45 -0600, Rob Herring wrote:
->> On Fri, Feb 23, 2018 at 06:16:38PM +0800, sean.wang at mediatek.com wrote:
->> > From: Sean Wang <sean.wang@mediatek.com>
->> >
->> > Add mt7623a-rfb.dtsi where most nodes can be inherited from
->> > mt7623n-rfb.dtsi and keep these distinctions from MT7623A boards in
->> > mt7623a-rfb.dtsi for most definition can be reused among MT7623A board
->> > variants.
->> >
->> > MT7623A has its specific definition of power domain and thus we need
->> > to change related devices such as audio, ethernet, crypto, high-speed
->> > DMA, NAND, and USB controller to the power domain they specifically
->> > belong to. In addition, MT7530 exists as built-in module inside MT7623A
->> > SoC and I2C2 and UART[0-1] get being removed and UART2 have distinct pin
->> > usage. Those all differences can be totally seen in mt7623a-rfb.dtsi.
->> >
->> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> > ---
->> >  arch/arm/boot/dts/Makefile             |  2 +
->> >  arch/arm/boot/dts/mt7623a-rfb-emmc.dts | 22 +++++++++
->> >  arch/arm/boot/dts/mt7623a-rfb-nand.dts | 26 +++++++++++
->> >  arch/arm/boot/dts/mt7623a-rfb.dtsi     | 84 ++++++++++++++++++++++++++++++++++
->> >  arch/arm/boot/dts/mt7623n-rfb.dtsi     | 15 ++++++
->> >  5 files changed, 149 insertions(+)
->> >  create mode 100644 arch/arm/boot/dts/mt7623a-rfb-emmc.dts
->> >  create mode 100644 arch/arm/boot/dts/mt7623a-rfb-nand.dts
->> >  create mode 100644 arch/arm/boot/dts/mt7623a-rfb.dtsi
->> >
->> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> > index 5af6fce..818817c 100644
->> > --- a/arch/arm/boot/dts/Makefile
->> > +++ b/arch/arm/boot/dts/Makefile
->> > @@ -1122,6 +1122,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
->> >     mt6580-evbp1.dtb \
->> >     mt6589-aquaris5.dtb \
->> >     mt6592-evb.dtb \
->> > +   mt7623a-rfb-emmc.dtb \
->> > +   mt7623a-rfb-nand.dtb \
->> >     mt7623n-rfb-emmc.dtb \
->> >     mt7623n-rfb-nand.dtb \
->> >     mt7623n-bananapi-bpi-r2.dtb \
->> > diff --git a/arch/arm/boot/dts/mt7623a-rfb-emmc.dts b/arch/arm/boot/dts/mt7623a-rfb-emmc.dts
->> > new file mode 100644
->> > index 0000000..ef6398e
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/mt7623a-rfb-emmc.dts
->> > @@ -0,0 +1,22 @@
->> > +// SPDX-License-Identifier: GPL-2.0
->> > +/*
->> > + * Copyright (c) 2017-2018 MediaTek Inc.
->> > + * Author: Sean Wang <sean.wang@mediatek.com>
->> > + *
->> > + */
->> > +
->> > +/dts-v1/;
->> > +#include "mt7623a-rfb.dtsi"
->> > +
->> > +/ {
->> > +   model = "MediaTek MT7623A with eMMC reference board";
->> > +   compatible = "mediatek,mt7623a-rfb-emmc", "mediatek,mt7623";
->> > +
->> > +   chosen {
->> > +           bootargs = "console=ttyS0,115200n8 earlyprintk";
->>
->> Use stdout-path instead. earlyprintk option only works for a kernel
->> built with a debug uart at a fixed address, so drop it.
->>
->
-> thanks, I will try and have stdout-path instead.
->
-> But for earlyprintk, our kernel can support and be built with a debug
-> uart at a fixed address and it is greatly useful to know what's going
-> on when a system hang happens on certain device's initialization prior
-> to uart initialization such as PCI device.
+On Fri, 23 Feb 2018 16:23:34 +0000
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-These days, you only need earlyprintk for *really* early console like
-in the assembly boot entry code and before the DT is unflattened. For
-anything else, use earlycon instead because earlycon is a runtime
-option.
+> The base protocol describes the properties of the implementation and
+> provide generic error management. The base protocol provides commands
+> to describe protocol version, discover implementation specific
+> attributes and vendor/sub-vendor identification, list of protocols
+> implemented and the various agents are in the system including OSPM
+> and the platform. It also supports registering for notifications of
+> platform errors.
+> 
+> This protocol is mandatory. This patch adds support for the same along
+> with some basic infrastructure to add support for other protocols.
+> 
+<snip>
 
-> Thus, I consider to keep it there in special on such kinds of
-> development boards for debugging purpose.
+Minor comments inline.
 
-Then add this option when you are doing debug. But for what's
-"shipped" in mainline, you should not have this enabled.
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> index fa0e9cf31f4c..ba784b8ec170 100644
+> --- a/drivers/firmware/arm_scmi/driver.c
+> +++ b/drivers/firmware/arm_scmi/driver.c
+> @@ -105,21 +105,27 @@ struct scmi_desc {
+>   * @dev: Device pointer
+>   * @desc: SoC description for this instance
+>   * @handle: Instance of SCMI handle to send to clients
+> + * @version: SCMI revision information containing protocol version,
+> + *	implementation version and (sub-)vendor identification.
+>   * @cl: Mailbox Client
+>   * @tx_chan: Transmit mailbox channel
+>   * @tx_payload: Transmit mailbox channel payload area
+>   * @minfo: Message info
+> + * @protocols_imp: list of protocols implemented, currently maximum of
+> + *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
+If it is fixed size, is there a benefit in not just putting it in here
+as a fixed size array and simplifying the allocation?
 
-Rob
+>   * @node: list head
+>   * @users: Number of users of this instance
+>   */
+>  struct scmi_info {
+>  	struct device *dev;
+>  	const struct scmi_desc *desc;
+> +	struct scmi_revision_info version;
+>  	struct scmi_handle handle;
+>  	struct mbox_client cl;
+>  	struct mbox_chan *tx_chan;
+>  	void __iomem *tx_payload;
+>  	struct scmi_xfers_info minfo;
+> +	u8 *protocols_imp;
+>  	struct list_head node;
+>  	int users;
+>  };
+> @@ -433,6 +439,45 @@ int scmi_one_xfer_init(const struct scmi_handle *handle, u8 msg_id, u8 prot_id,
+>  }
+>  
+>  /**
+> + * scmi_version_get() - command to get the revision of the SCMI entity
+> + *
+> + * @handle: Handle to SCMI entity information
+> + *
+> + * Updates the SCMI information in the internal data structure.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +int scmi_version_get(const struct scmi_handle *handle, u8 protocol,
+> +		     u32 *version)
+> +{
+> +	int ret;
+> +	__le32 *rev_info;
+> +	struct scmi_xfer *t;
+> +
+> +	ret = scmi_one_xfer_init(handle, PROTOCOL_VERSION, protocol, 0,
+> +				 sizeof(*version), &t);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = scmi_do_xfer(handle, t);
+> +	if (!ret) {
+> +		rev_info = t->rx.buf;
+> +		*version = le32_to_cpu(*rev_info);
+> +	}
+> +
+> +	scmi_one_xfer_put(handle, t);
+blank line before all simple returns is common kernel coding style
+and does help for readability (a little bit)
+
+> +	return ret;
+> +}
+> +
+> +void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
+> +				     u8 *prot_imp)
+> +{
+> +	struct scmi_info *info = handle_to_scmi_info(handle);
+> +
+> +	info->protocols_imp = prot_imp;
+> +}
+> +
+> +/**
+>   * scmi_handle_get() - Get the  SCMI handle for a device
+>   *
+>   * @dev: pointer to device for which we want SCMI handle
+> @@ -660,11 +705,19 @@ static int scmi_probe(struct platform_device *pdev)
+>  
+>  	handle = &info->handle;
+>  	handle->dev = info->dev;
+> +	handle->version = &info->version;
+>  
+>  	ret = scmi_mbox_chan_setup(info);
+>  	if (ret)
+>  		return ret;
+>  
+> +	ret = scmi_base_protocol_init(handle);
+> +	if (ret) {
+> +		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
+> +		scmi_mbox_free_channel(info);
+> +		return ret;
+> +	}
+> +
+>  	mutex_lock(&scmi_list_mutex);
+>  	list_add_tail(&info->node, &scmi_list);
+>  	mutex_unlock(&scmi_list_mutex);
+> diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
+> index 854ed2479993..664da3d763f2 100644
+> --- a/include/linux/scmi_protocol.h
+> +++ b/include/linux/scmi_protocol.h
+> @@ -17,11 +17,48 @@
+>   */
+>  #include <linux/types.h>
+>  
+> +#define SCMI_MAX_STR_SIZE	16
+> +
+> +/**
+> + * struct scmi_revision_info - version information structure
+This isn't really just the version stuff. It's more about discovery
+of what is present.
+Perhaps the naming could make that clear if you want to keep this
+as one structure?
+
+> + *
+> + * @major_ver: Major ABI version. Change here implies risk of backward
+> + *	compatibility break.
+> + * @minor_ver: Minor ABI version. Change here implies new feature addition,
+> + *	or compatible change in ABI.
+> + * @num_protocols: Number of protocols that are implemented, excluding the
+> + *	base protocol.
+> + * @num_agents: Number of agents in the system.
+> + * @impl_ver: A vendor-specific implementation version.
+> + * @vendor_id: A vendor identifier(Null terminated ASCII string)
+> + * @sub_vendor_id: A sub-vendor identifier(Null terminated ASCII string)
+> + */
+> +struct scmi_revision_info {
+> +	u16 major_ver;
+> +	u16 minor_ver;
+> +	u8 num_protocols;
+> +	u8 num_agents;
+> +	u32 impl_ver;
+> +	char vendor_id[SCMI_MAX_STR_SIZE];
+> +	char sub_vendor_id[SCMI_MAX_STR_SIZE];
+> +};
+> +
+>  /**
+>   * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
+>   *
+>   * @dev: pointer to the SCMI device
+> + * @version: pointer to the structure containing SCMI version information
+>   */
+>  struct scmi_handle {
+>  	struct device *dev;
+> +	struct scmi_revision_info *version;
+> +};
+> +
+> +enum scmi_std_protocol {
+> +	SCMI_PROTOCOL_BASE = 0x10,
+> +	SCMI_PROTOCOL_POWER = 0x11,
+> +	SCMI_PROTOCOL_SYSTEM = 0x12,
+> +	SCMI_PROTOCOL_PERF = 0x13,
+> +	SCMI_PROTOCOL_CLOCK = 0x14,
+> +	SCMI_PROTOCOL_SENSOR = 0x15,
+>  };
