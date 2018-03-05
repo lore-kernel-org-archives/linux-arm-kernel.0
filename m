@@ -1,90 +1,174 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Mar 2018 18:01:30 +0000
-Subject: [RFC PATCH v3 3/3] arm64/kernel: enable A53 erratum #8434319
- handling at runtime
-In-Reply-To: <20180305173959.GB13385@arm.com>
-References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-4-ard.biesheuvel@linaro.org>
- <20180305172256.GC12869@arm.com>
- <CAKv+Gu-qZR57jaLUjhJFkP2u=XzEN7ewX+GsrKbPbbONwvxBww@mail.gmail.com>
- <20180305173959.GB13385@arm.com>
-Message-ID: <CAKv+Gu-aKVp_G5Fnjk9pbERG53pZQVn2LL5Yb_0E0yp3jfRRuQ@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 5 Mar 2018 12:03:33 -0600
+Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <20180305171529.GA12869@arm.com>
+References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+ <20180305155614.GG6618@arm.com>
+ <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
+ <20180305171529.GA12869@arm.com>
+Message-ID: <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2018 at 17:40, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Mar 05, 2018 at 05:29:26PM +0000, Ard Biesheuvel wrote:
->> On 5 March 2018 at 17:22, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, Feb 14, 2018 at 11:36:45AM +0000, Ard Biesheuvel wrote:
->> >> Omit patching of ADRP instruction at module load time if the current
->> >> CPUs are not susceptible to the erratum.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >> Open question: how should we handle big.LITTLE configurations where affected
->> >> Cortex-A53s may appear late.
->> >
->> > We should fail to bring them online. I think the infrastructure already
->> > exists for this and we used it for other errata already.
->> >
->>
->> I think that is what it does currently. The question is whether that
->> should be considered a regression or not.
->
-> This can only happen with maxcpus=, right? I wouldn't be too worried about
-> it in that case.
->
->>
->> >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->> >> index bb263820de13..39134c46bb13 100644
->> >> --- a/arch/arm64/include/asm/cpucaps.h
->> >> +++ b/arch/arm64/include/asm/cpucaps.h
->> >> @@ -45,7 +45,8 @@
->> >>  #define ARM64_HARDEN_BRANCH_PREDICTOR                24
->> >>  #define ARM64_HARDEN_BP_POST_GUEST_EXIT              25
->> >>  #define ARM64_HAS_RAS_EXTN                   26
->> >> +#define ARM64_WORKAROUND_843419                      27
->> >>
->> >> -#define ARM64_NCAPS                          27
->> >> +#define ARM64_NCAPS                          28
->> >>
->> >>  #endif /* __ASM_CPUCAPS_H */
->> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> >> index 07823595b7f0..c065d5649b1b 100644
->> >> --- a/arch/arm64/kernel/cpu_errata.c
->> >> +++ b/arch/arm64/kernel/cpu_errata.c
->> >> @@ -228,6 +228,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
->> >>  }
->> >>  #endif       /* CONFIG_HARDEN_BRANCH_PREDICTOR */
->> >>
->> >> +static bool __maybe_unused
->> >> +needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
->> >> +                             int scope)
->> >> +{
->> >> +     u32 cpuid = read_cpuid_id();
->> >> +
->> >> +     WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
->> >> +
->> >> +     if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
->> >> +             return false;
->> >> +     else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
->> >> +             /* erratum was fixed in some versions of r0p4 */
->> >> +             return !(read_cpuid(REVIDR_EL1) & BIT(8));
->> >
->> > The rXpY information is in the MIDR, so this is checking for something else
->> > afaict.
->> >
->>
->> No, it checks the REVIDR of r0p4 parts, of which bit 8 tells us if
->> this specific erratum has been fixed.
->
-> /me checks errata notice.
->
-> Ok, fair enough! Given that it looks like this mechanism is used for other
-> errata too, it would make sense to support it in the arm64_cpu_capabilities
-> structure alongside the midr stuff.
->
+Hi Will,
 
-Are you saying I should abstract REVIDR access for this series? I
-don't mind, but in that case, could you be a bit clearer about what
-you would like to see?
+On 03/05/2018 11:15 AM, Will Deacon wrote:
+> On Mon, Mar 05, 2018 at 10:57:58AM -0600, Shanker Donthineni wrote:
+>> Hi Will,
+>>
+>> On 03/05/2018 09:56 AM, Will Deacon wrote:
+>>> Hi Shanker,
+>>>
+>>> On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
+>>>> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
+>>>> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
+>>>> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
+>>>> of Silicon provider service ID 0xC2001700.
+>>>>
+>>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>>> ---
+>>>>  arch/arm64/include/asm/cpucaps.h |  2 +-
+>>>>  arch/arm64/include/asm/kvm_asm.h |  2 --
+>>>>  arch/arm64/kernel/bpi.S          |  8 ------
+>>>>  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
+>>>>  arch/arm64/kvm/hyp/entry.S       | 12 ---------
+>>>>  arch/arm64/kvm/hyp/switch.c      | 10 --------
+>>>>  6 files changed, 20 insertions(+), 69 deletions(-)
+>>>
+>>> I'm happy to take this via arm64 if I get an ack from Marc/Christoffer.
+>>>
+>>>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+>>>> index bb26382..6ecc249 100644
+>>>> --- a/arch/arm64/include/asm/cpucaps.h
+>>>> +++ b/arch/arm64/include/asm/cpucaps.h
+>>>> @@ -43,7 +43,7 @@
+>>>>  #define ARM64_SVE				22
+>>>>  #define ARM64_UNMAP_KERNEL_AT_EL0		23
+>>>>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>>>> -#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>>>> +/* #define ARM64_UNALLOCATED_ENTRY			25 */
+>>>>  #define ARM64_HAS_RAS_EXTN			26
+>>>>  
+>>>>  #define ARM64_NCAPS				27
+>>>
+>>> These aren't ABI, so I think you can just drop
+>>> ARM64_HARDEN_BP_POST_GUEST_EXIT and repack the others accordingly.
+>>>
+>> Sure, I'll remove it completely in v2 patch.
+>>  
+>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>>> index 24961b7..ab4d0a9 100644
+>>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>>> @@ -68,8 +68,6 @@
+>>>>  
+>>>>  extern u32 __init_stage2_translation(void);
+>>>>  
+>>>> -extern void __qcom_hyp_sanitize_btac_predictors(void);
+>>>> -
+>>>>  #endif
+>>>>  
+>>>>  #endif /* __ARM_KVM_ASM_H__ */
+>>>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>>>> index e5de335..dc4eb15 100644
+>>>> --- a/arch/arm64/kernel/bpi.S
+>>>> +++ b/arch/arm64/kernel/bpi.S
+>>>> @@ -55,14 +55,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>>>>  	.endr
+>>>>  ENTRY(__bp_harden_hyp_vecs_end)
+>>>>  
+>>>> -ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>>>> -	stp     x29, x30, [sp, #-16]!
+>>>> -	.rept	16
+>>>> -	bl	. + 4
+>>>> -	.endr
+>>>> -	ldp	x29, x30, [sp], #16
+>>>> -ENTRY(__qcom_hyp_sanitize_link_stack_end)
+>>>> -
+>>>>  .macro smccc_workaround_1 inst
+>>>>  	sub	sp, sp, #(8 * 4)
+>>>>  	stp	x2, x3, [sp, #(8 * 0)]
+>>>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>>>> index 52f15cd..d779ffd4 100644
+>>>> --- a/arch/arm64/kernel/cpu_errata.c
+>>>> +++ b/arch/arm64/kernel/cpu_errata.c
+>>>> @@ -67,8 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+>>>>  DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>>>>  
+>>>>  #ifdef CONFIG_KVM
+>>>> -extern char __qcom_hyp_sanitize_link_stack_start[];
+>>>> -extern char __qcom_hyp_sanitize_link_stack_end[];
+>>>>  extern char __smccc_workaround_1_smc_start[];
+>>>>  extern char __smccc_workaround_1_smc_end[];
+>>>>  extern char __smccc_workaround_1_hvc_start[];
+>>>> @@ -115,8 +113,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>>>  	spin_unlock(&bp_lock);
+>>>>  }
+>>>>  #else
+>>>> -#define __qcom_hyp_sanitize_link_stack_start	NULL
+>>>> -#define __qcom_hyp_sanitize_link_stack_end	NULL
+>>>>  #define __smccc_workaround_1_smc_start		NULL
+>>>>  #define __smccc_workaround_1_smc_end		NULL
+>>>>  #define __smccc_workaround_1_hvc_start		NULL
+>>>> @@ -161,12 +157,25 @@ static void call_hvc_arch_workaround_1(void)
+>>>>  	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
+>>>>  }
+>>>>  
+>>>> +static void qcom_link_stack_sanitization(void)
+>>>> +{
+>>>> +	u64 tmp;
+>>>> +
+>>>> +	asm volatile("mov	%0, x30		\n"
+>>>> +		     ".rept	16		\n"
+>>>> +		     "bl	. + 4		\n"
+>>>> +		     ".endr			\n"
+>>>> +		     "mov	x30, %0		\n"
+>>>> +		     : "=&r" (tmp));
+>>>> +}
+>>>> +
+>>>>  static int enable_smccc_arch_workaround_1(void *data)
+>>>>  {
+>>>>  	const struct arm64_cpu_capabilities *entry = data;
+>>>>  	bp_hardening_cb_t cb;
+>>>>  	void *smccc_start, *smccc_end;
+>>>>  	struct arm_smccc_res res;
+>>>> +	u32 midr = read_cpuid_id();
+>>>>  
+>>>>  	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+>>>>  		return 0;
+>>>> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
+>>>>  		return 0;
+>>>>  	}
+>>>>  
+>>>> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+>>>> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
+>>>> +		cb = qcom_link_stack_sanitization;
+>>>
+>>> Is this just a performance thing? Do you actually see an advantage over
+>>> always making the firmware call? We've seen minimal impact in our testing.
+>>>
+>>
+>> Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
+>>   - Improves the code readability.
+>>   - Avoid the unnecessary MIDR checks on each vCPU exit.
+>>   - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
+>>   - Avoids the 2nd link stack sanitization workaround in firmware.
+> 
+> What I mean is, can we drop qcom_link_stack_sanitization altogether and
+> use the SMCCC interface for everything?
+> 
+
+No, We would like to keep it qcom_link_stack_sanitization for host kernel
+since it takes a few CPU cycles instead of heavyweight SMCCC call.
+
+I posted v2 patch https://patchwork.kernel.org/patch/10259357/ to address
+cpucaps.h cleanup review comments.   
+
+> Will
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
