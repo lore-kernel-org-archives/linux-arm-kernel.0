@@ -1,36 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 5 Mar 2018 18:51:56 +0000
-Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
-In-Reply-To: <20180305183938.GB20086@lst.de>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
- <20180305150814.GA15918@lst.de>
- <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
- <20180305183938.GB20086@lst.de>
-Message-ID: <1729ae21-d08c-b413-51a3-f22c394b388d@arm.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Mon, 5 Mar 2018 20:09:37 +0100
+Subject: [RFC V2 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <1ddac3f4900267b0c9a69ef4c598be51@codeaurora.org>
+References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
+ <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+ <20180303143436.GA14563@krava>
+ <20180304171245.GB25017@tassilo.jf.intel.com>
+ <20180304181010.GA7030@krava>
+ <1ddac3f4900267b0c9a69ef4c598be51@codeaurora.org>
+Message-ID: <20180305190937.GA31349@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 18:39, Christoph Hellwig wrote:
-> On Mon, Mar 05, 2018 at 03:48:32PM +0000, Robin Murphy wrote:
->> Unfortunately for us, fsl-mc is conceptually rather like PCI in that it's
->> software-discoverable and the only thing described in DT is the bus "host",
->> thus we need the same sort of thing as for PCI to map from the child
->> devices back to the bus root in order to find the appropriate firmware
->> node. Worse than PCI, though, we wouldn't even have the option of
->> describing child devices statically in firmware at all, since it's actually
->> one of these runtime-configurable "build your own network accelerator"
->> hardware pools where userspace gets to create and destroy "devices" as it
->> likes.
+On Mon, Mar 05, 2018 at 10:08:18AM -0500, Agustin Vega-Frias wrote:
+> On 2018-03-04 13:10, Jiri Olsa wrote:
+> > On Sun, Mar 04, 2018 at 09:12:45AM -0800, Andi Kleen wrote:
+> > > > > +#include <fnmatch.h>
+> > > > >  #include <linux/compiler.h>
+> > > > >  #include <linux/list.h>
+> > > > >  #include <linux/types.h>
+> > > > > @@ -241,7 +242,7 @@ PE_NAME opt_event_config
+> > > > >  			if (!strncmp(name, "uncore_", 7) &&
+> > > > >  			    strncmp($1, "uncore_", 7))
+> > > > >  				name += 7;
+> > > > > -			if (!strncmp($1, name, strlen($1))) {
+> > > > > +			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
+> > > >
+> > > > could we now get rid of the strncmp in here and keep the
+> > > > glob matching only?
+> > > 
+> > > That would break existing command lines. Not a good idea.
+> > 
+> > I hoped that only you guys are using this and would rewrite your scripts
+> > ;-)
+> > 
+> > I had no idea there's fnmatch func before.. too bad, ok
+> > 
+> > jirka
 > 
-> I really hate the PCI special case just as much.  Maybe we just
-> need a dma_configure method on the bus, and move PCI as well as fsl-mc
-> to it.
+> An option to keep backward compatibility and consistency would be
+> to wrap the pattern/string passed in *'s, that way we can just use
+> fnmatch and have all the examples Jiri brought up work the same.
+> With that in place we can actually also drop the explicit ignoring
+> of the uncore_ prefix since the globbing would take care of that.
 
-Hmm, on reflection, 100% ack to that idea. It would neatly supersede 
-bus->force_dma *and* mean that we don't have to effectively pull pci.h 
-into everything, which I've never liked. In hindsight dma_configure() 
-does feel like it's grown into this odd choke point where we munge 
-everything in just for it to awkwardly unpick things again.
+I don't mind the strcmp as such, I wanted to get rid of the wildcard
+matching without using '*' ... but as Andi said it's been out
+there and it's been a while, so let's keep it
 
-Robin.
+but if there's a way to make it simpler, let's go for it
+
+thanks,
+jirka
