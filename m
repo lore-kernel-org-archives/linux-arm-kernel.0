@@ -1,119 +1,53 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 5 Mar 2018 16:00:24 +0100
-Subject: [PATCH 1/2] ARM: dts: STi: Fix aliases property name for STi boards
-In-Reply-To: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
-References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Mon, 05 Mar 2018 10:08:18 -0500
+Subject: [RFC V2 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <20180304181010.GA7030@krava>
+References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
+ <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+ <20180303143436.GA14563@krava> <20180304171245.GB25017@tassilo.jf.intel.com>
+ <20180304181010.GA7030@krava>
+Message-ID: <1ddac3f4900267b0c9a69ef4c598be51@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 2018-03-04 13:10, Jiri Olsa wrote:
+> On Sun, Mar 04, 2018 at 09:12:45AM -0800, Andi Kleen wrote:
+>> > > +#include <fnmatch.h>
+>> > >  #include <linux/compiler.h>
+>> > >  #include <linux/list.h>
+>> > >  #include <linux/types.h>
+>> > > @@ -241,7 +242,7 @@ PE_NAME opt_event_config
+>> > >  			if (!strncmp(name, "uncore_", 7) &&
+>> > >  			    strncmp($1, "uncore_", 7))
+>> > >  				name += 7;
+>> > > -			if (!strncmp($1, name, strlen($1))) {
+>> > > +			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
+>> >
+>> > could we now get rid of the strncmp in here and keep the
+>> > glob matching only?
+>> 
+>> That would break existing command lines. Not a good idea.
+> 
+> I hoped that only you guys are using this and would rewrite your 
+> scripts ;-)
+> 
+> I had no idea there's fnmatch func before.. too bad, ok
+> 
+> jirka
 
-Since dtc v1.4.6-9-gaadd0b65c987, aliases property name must
-be lowercase only.
-This allows to fix following warnings when compiling dtb
-with W=1 option :
+An option to keep backward compatibility and consistency would be
+to wrap the pattern/string passed in *'s, that way we can just use
+fnmatch and have all the examples Jiri brought up work the same.
+With that in place we can actually also drop the explicit ignoring
+of the uncore_ prefix since the globbing would take care of that.
 
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+Thoughts?
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
- arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
- arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
- arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+Agust?n
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index c8ad905d0309..fa1186af6574 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih407-b2120", "st,stih407";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "console=ttyas0,115200 clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-@@ -24,7 +24,7 @@
- 	};
- 
- 	aliases {
--		ttyAS0 = &sbc_serial0;
-+		ttyas0 = &sbc_serial0;
- 		ethernet0 = &ethernet0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index 9830be577433..00258212b6fb 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih410-b2120", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "console=ttyas0,115200 clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-@@ -24,7 +24,7 @@
- 	};
- 
- 	aliases {
--		ttyAS0 = &sbc_serial0;
-+		ttyas0 = &sbc_serial0;
- 		ethernet0 = &ethernet0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index c663b70c43a7..3d122c3a1ad6 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -15,7 +15,7 @@
- 	compatible = "st,stih410-b2260", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
-+		bootargs = "console=ttyas1,115200 clk_ignore_unused";
- 		linux,stdout-path = &uart1;
- 	};
- 
-@@ -25,7 +25,7 @@
- 	};
- 
- 	aliases {
--		ttyAS1 = &uart1;
-+		ttyas1 = &uart1;
- 		ethernet0 = &ethernet0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 4e6d915c85ff..8459a3766b7c 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih418-b2199", "st,stih418";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "console=ttyas0,115200 clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-@@ -24,7 +24,7 @@
- 	};
- 
- 	aliases {
--		ttyAS0 = &sbc_serial0;
-+		ttyas0 = &sbc_serial0;
- 		ethernet0 = &ethernet0;
- 	};
- 
 -- 
-1.9.1
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
