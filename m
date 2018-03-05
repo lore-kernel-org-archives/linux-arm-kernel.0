@@ -1,94 +1,184 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Mon, 5 Mar 2018 06:19:27 +0100
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <395166283.280598.1520200683559@email.1und1.de>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
- <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
- <395166283.280598.1520200683559@email.1und1.de>
-Message-ID: <423BE2B6-2209-4390-B420-FA7267318A09@holtmann.org>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Mon,  5 Mar 2018 06:52:54 +0100
+Subject: [PATCH] staging: bcm2835-audio: Release resources on module_exit()
+Message-ID: <20180305055254.29875-1-k.marinushkin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+In the current implementation, `rmmod snd_bcm2835` does not release
+resources properly. It causes an oops when trying to list sound devices.
 
->>>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
->>>>> This allows to automatically insert the bcm43438 to the bluetooth
->>>>> subsystem instead of relying on patched userspace helpers (hciattach).
->>>>> 
->>>>> In order to keep a debug UART we need to switch to uart1.
->>>>> 
->>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>>> ---
->>>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
->>>>> 1 file changed, 13 insertions(+), 1 deletion(-)
->>>>> 
->>>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>> index cf53436..b7f79f1 100644
->>>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>> @@ -131,6 +131,18 @@
->>>>> 
->>>>> &uart0 {
->>>>> 	pinctrl-names = "default";
->>>>> -	pinctrl-0 = <&uart0_gpio14>;
->>>>> +	pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
->>>>> +	status = "okay";
->>>>> +
->>>>> +	bluetooth {
->>>>> +		compatible = "brcm,bcm43438-bt";
->>>>> +		max-speed = <2000000>;
->>>>> +		shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
->>>>> +	};
->>>>> +};
->>>> 
->>>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
->>> 
->>> Yes, unload and reload works fine. 
->>> 
->>>> Meaning we are getting back to the 115200 default baud rate on the UART?
->>> 
->>> I assume that, because reload works as expected. 
->> 
->> awesome. That is good news.
->> 
->> Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
-> 
-> so here comes the bad news. hci_bcm uses gpiod_set_value() which is for interrupt context, but the gpio expander can sleep. So we will get this warning:
-> 
-> [    4.802447] ------------[ cut here ]------------
-> [    4.802485] WARNING: CPU: 3 PID: 91 at drivers/gpio/gpiolib.c:2986 gpiod_set_value+0x50/0x58
-> [    4.802489] Modules linked in: hci_uart ac97_bus btbcm snd_pcm_dmaengine bluetooth snd_pcm snd_timer ecdh_generic snd soundcore bcm2835_thermal crc32_arm_ce
-> [    4.802543] CPU: 3 PID: 91 Comm: kworker/u8:2 Not tainted 4.16.0-rc3-next-20180302-dirty #4
-> [    4.802547] Hardware name: BCM2835
-> [    4.802562] Workqueue: events_unbound async_run_entry_fn
-> [    4.802593] [<c03119a4>] (unwind_backtrace) from [<c030cc24>] (show_stack+0x10/0x14)
-> [    4.802612] [<c030cc24>] (show_stack) from [<c0d8e9dc>] (dump_stack+0x8c/0xa0)
-> [    4.802628] [<c0d8e9dc>] (dump_stack) from [<c0343a2c>] (__warn+0xe0/0xf8)
-> [    4.802640] [<c0343a2c>] (__warn) from [<c0343b5c>] (warn_slowpath_null+0x40/0x48)
-> [    4.802652] [<c0343b5c>] (warn_slowpath_null) from [<c06d0de0>] (gpiod_set_value+0x50/0x58)
-> [    4.802693] [<c06d0de0>] (gpiod_set_value) from [<bf0e2e90>] (bcm_gpio_set_shutdown+0xc/0x14 [hci_uart])
-> [    4.802757] [<bf0e2e90>] (bcm_gpio_set_shutdown [hci_uart]) from [<bf0e2a64>] (bcm_gpio_set_power+0x18/0x140 [hci_uart])
-> [    4.802806] [<bf0e2a64>] (bcm_gpio_set_power [hci_uart]) from [<bf0e2e4c>] (bcm_serdev_probe+0x64/0x9c [hci_uart])
-> [    4.802848] [<bf0e2e4c>] (bcm_serdev_probe [hci_uart]) from [<c08f2528>] (driver_probe_device+0x254/0x32c)
-> [    4.802863] [<c08f2528>] (driver_probe_device) from [<c08f26a4>] (__driver_attach+0xa4/0xa8)
-> [    4.802878] [<c08f26a4>] (__driver_attach) from [<c08f08b8>] (bus_for_each_dev+0x74/0xb4)
-> [    4.802895] [<c08f08b8>] (bus_for_each_dev) from [<c0366498>] (async_run_entry_fn+0x44/0x108)
-> [    4.802910] [<c0366498>] (async_run_entry_fn) from [<c035d594>] (process_one_work+0x200/0x4f8)
-> [    4.802923] [<c035d594>] (process_one_work) from [<c035e4a8>] (worker_thread+0x4c/0x5d4)
-> [    4.802938] [<c035e4a8>] (worker_thread) from [<c0363300>] (kthread+0x150/0x158)
-> [    4.802952] [<c0363300>] (kthread) from [<c03010e8>] (ret_from_fork+0x14/0x2c)
-> [    4.802957] Exception stack(0xed959fb0 to 0xed959ff8)
-> [    4.802966] 9fa0:                                     00000000 00000000 00000000 00000000
-> [    4.802977] 9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> [    4.802986] 9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
-> [    4.802993] ---[ end trace b947f9d4c40fa261 ]?
+This commit fixes it.
 
-that is weird since we should be either in a probe context or in hdev->open context and both can sleep as far as I know.
+Steps to reproduce:
 
-Regards
+~~~~
+$ rmmod snd_bcm2835
+$ aplay -L
+[  138.648130] Unable to handle kernel paging request at virtual address 7f1343c0
+[  138.660415] pgd = ad8f0000
+[  138.665567] [7f1343c0] *pgd=3864c811, *pte=00000000, *ppte=00000000
+[  138.674887] Internal error: Oops: 7 [#1] SMP ARM
+[  138.683571] Modules linked in: sha256_generic cfg80211 rfkill snd_pcm snd_timer
+ snd fixed uio_pdrv_genirq uio ip_tables x_tables ipv6 [last unloaded: snd_bcm2835
+]
+[  138.706594] CPU: 3 PID: 463 Comm: aplay Tainted: G        WC       4.15.0-rc1-v
+7+ #6
+[  138.719833] Hardware name: BCM2835
+[  138.726016] task: b877ac00 task.stack: aebec000
+[  138.733408] PC is at try_module_get+0x38/0x24c
+[  138.740813] LR is at snd_ctl_open+0x58/0x194 [snd]
+[  138.748485] pc : [<801c4d5c>]    lr : [<7f0e6b2c>]    psr: 20000013
+[  138.757709] sp : aebedd60  ip : aebedd88  fp : aebedd84
+[  138.765884] r10: 00000000  r9 : 00000004  r8 : 7f0ed440
+[  138.774040] r7 : b7e469b0  r6 : 7f0e6b2c  r5 : afd91900  r4 : 7f1343c0
+[  138.783571] r3 : aebec000  r2 : 00000001  r1 : b877ac00  r0 : 7f1343c0
+[  138.793084] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[  138.803300] Control: 10c5387d  Table: 2d8f006a  DAC: 00000055
+[  138.812064] Process aplay (pid: 463, stack limit = 0xaebec210)
+[  138.820868] Stack: (0xaebedd60 to 0xaebee000)
+[  138.828207] dd60: 00000000 b848d000 afd91900 00000000 b7e469b0 7f0ed440 aebedda4 aebedd88
+[  138.842371] dd80: 7f0e6b2c 801c4d30 afd91900 7f0ea4dc 00000000 b7e469b0 aebeddcc aebedda8
+[  138.856611] dda0: 7f0e250c 7f0e6ae0 7f0e2464 b8478ec0 b7e469b0 afd91900 7f0ea388 00000000
+[  138.870864] ddc0: aebeddf4 aebeddd0 802ce590 7f0e2470 8090ab64 afd91900 afd91900 b7e469b0
+[  138.885301] dde0: afd91908 802ce4e4 aebede1c aebeddf8 802c57b4 802ce4f0 afd91900 aebedea8
+[  138.900110] de00: b7fa4c00 00000000 00000000 00000004 aebede3c aebede20 802c6ba8 802c56b4
+[  138.915260] de20: aebedea8 00000000 aebedf5c 00000000 aebedea4 aebede40 802d9a68 802c6b58
+[  138.930661] de40: b874ddd0 00000000 00000000 00000001 00000041 00000000 afd91900 aebede70
+[  138.946402] de60: 00000000 00000000 00000002 b7e469b0 b8a87610 b8d6ab80 801852f8 00080000
+[  138.962314] de80: aebedf5c aebedea8 00000001 80108464 aebec000 00000000 aebedf4c aebedea8
+[  138.978414] dea0: 802dacd4 802d970c b8a87610 b8d6ab80 a7982bc6 00000009 af363019 b9231480
+[  138.994617] dec0: 00000000 b8c038a0 b7e469b0 00000101 00000002 00000238 00000000 00000000
+[  139.010823] dee0: 00000000 aebedee8 00080000 0000000f aebedf3c aebedf00 802ed7e4 80843f94
+[  139.027025] df00: 00000003 00080000 b9231490 b9231480 00000000 00080000 af363000 00000000
+[  139.043229] df20: 00000005 00000002 ffffff9c 00000000 00080000 ffffff9c af363000 00000003
+[  139.059430] df40: aebedf94 aebedf50 802c6f70 802dac70 aebec000 00000000 00000001 00000000
+[  139.075629] df60: 00020000 00000004 00000100 00000001 7ebe577c 0002e038 00000000 00000005
+[  139.091828] df80: 80108464 aebec000 aebedfa4 aebedf98 802c7060 802c6e6c 00000000 aebedfa8
+[  139.108025] dfa0: 801082c0 802c7040 7ebe577c 0002e038 7ebe577c 00080000 00000b98 e81c8400
+[  139.124222] dfc0: 7ebe577c 0002e038 00000000 00000005 7ebe57e4 00a20af8 7ebe57f0 76f87394
+[  139.140419] dfe0: 00000000 7ebe55c4 76ec88e8 76df1d9c 60000010 7ebe577c 00000000 00000000
+[  139.156715] [<801c4d5c>] (try_module_get) from [<7f0e6b2c>] (snd_ctl_open+0x58/0x194 [snd])
+[  139.173222] [<7f0e6b2c>] (snd_ctl_open [snd]) from [<7f0e250c>] (snd_open+0xa8/0x14c [snd])
+[  139.189683] [<7f0e250c>] (snd_open [snd]) from [<802ce590>] (chrdev_open+0xac/0x188)
+[  139.205465] [<802ce590>] (chrdev_open) from [<802c57b4>] (do_dentry_open+0x10c/0x314)
+[  139.221347] [<802c57b4>] (do_dentry_open) from [<802c6ba8>] (vfs_open+0x5c/0x88)
+[  139.236788] [<802c6ba8>] (vfs_open) from [<802d9a68>] (path_openat+0x368/0x944)
+[  139.248270] [<802d9a68>] (path_openat) from [<802dacd4>] (do_filp_open+0x70/0xc4)
+[  139.263731] [<802dacd4>] (do_filp_open) from [<802c6f70>] (do_sys_open+0x110/0x1d4)
+[  139.279378] [<802c6f70>] (do_sys_open) from [<802c7060>] (SyS_open+0x2c/0x30)
+[  139.290647] [<802c7060>] (SyS_open) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+[  139.306021] Code: e3c3303f e5932004 e2822001 e5832004 (e5943000)
+[  139.316265] ---[ end trace 7f3f7f6193b663ed ]---
+[  139.324956] note: aplay[463] exited with preempt_count 1
+~~~~
 
-Marcel
+Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Michael Zoran <mzoran@crowfest.net>
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devel at driverdev.osuosl.org
+Cc: linux-kernel at vger.kernel.org
+---
+ .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 37 +++++++++++-----------
+ 1 file changed, 19 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+index 8f2d508183b2..01187df7d85f 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+@@ -36,6 +36,11 @@ MODULE_PARM_DESC(enable_compat_alsa,
+ static void snd_devm_unregister_child(struct device *dev, void *res)
+ {
+ 	struct device *childdev = *(struct device **)res;
++	struct snd_card *snd_card =
++		(struct snd_card *)dev_get_drvdata(childdev);
++
++	snd_card_free(snd_card);
++	dev_set_drvdata(childdev, NULL);
+ 
+ 	device_unregister(childdev);
+ }
+@@ -61,6 +66,11 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
+ 	return 0;
+ }
+ 
++static void snd_devm_release(struct device *dev)
++{
++	/* avoid warnings when releasing the resources */
++}
++
+ static struct device *
+ snd_create_device(struct device *parent,
+ 		  struct device_driver *driver,
+@@ -76,6 +86,7 @@ snd_create_device(struct device *parent,
+ 	device_initialize(device);
+ 	device->parent = parent;
+ 	device->driver = driver;
++	device->release = &snd_devm_release;
+ 
+ 	dev_set_name(device, "%s", name);
+ 
+@@ -130,31 +141,14 @@ static int snd_bcm2835_create(struct snd_card *card,
+ 	return 0;
+ }
+ 
+-static void snd_devm_card_free(struct device *dev, void *res)
+-{
+-	struct snd_card *snd_card = *(struct snd_card **)res;
+-
+-	snd_card_free(snd_card);
+-}
+-
+ static struct snd_card *snd_devm_card_new(struct device *dev)
+ {
+-	struct snd_card **dr;
+ 	struct snd_card *card;
+ 	int ret;
+ 
+-	dr = devres_alloc(snd_devm_card_free, sizeof(*dr), GFP_KERNEL);
+-	if (!dr)
+-		return ERR_PTR(-ENOMEM);
+-
+ 	ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+-	if (ret) {
+-		devres_free(dr);
++	if (ret)
+ 		return ERR_PTR(ret);
+-	}
+-
+-	*dr = card;
+-	devres_add(dev, dr);
+ 
+ 	return card;
+ }
+@@ -414,6 +408,12 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int snd_bcm2835_alsa_remove(struct platform_device *pdev)
++{
++	/* trigger snd_devm_unregister_child() */
++	return 0;
++}
++
+ #ifdef CONFIG_PM
+ 
+ static int snd_bcm2835_alsa_suspend(struct platform_device *pdev,
+@@ -437,6 +437,7 @@ MODULE_DEVICE_TABLE(of, snd_bcm2835_of_match_table);
+ 
+ static struct platform_driver bcm2835_alsa0_driver = {
+ 	.probe = snd_bcm2835_alsa_probe_dt,
++	.remove = snd_bcm2835_alsa_remove,
+ #ifdef CONFIG_PM
+ 	.suspend = snd_bcm2835_alsa_suspend,
+ 	.resume = snd_bcm2835_alsa_resume,
+-- 
+2.13.6
