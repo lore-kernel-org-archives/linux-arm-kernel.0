@@ -1,191 +1,43 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 5 Mar 2018 14:11:54 +0000
-Subject: [PATCH v6 04/20] firmware: arm_scmi: add common infrastructure
- and support for base protocol
-In-Reply-To: <1519403030-21189-5-git-send-email-sudeep.holla@arm.com>
-References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
- <1519403030-21189-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180305151154.000051c2@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 5 Mar 2018 14:13:16 +0000
+Subject: [RESEND PATCH v6 13/14] iommu/rockchip: Add runtime PM support
+In-Reply-To: <CAAFQd5D2SY2RV9HLTeTQigfnVCkF9wDq74_+t3OV2YEb9wJtqg@mail.gmail.com>
+References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
+ <20180301101837.27969-14-jeffy.chen@rock-chips.com>
+ <CAAFQd5D2SY2RV9HLTeTQigfnVCkF9wDq74_+t3OV2YEb9wJtqg@mail.gmail.com>
+Message-ID: <0cd81b39-ffe9-eda3-1358-13afeb2ec25b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Feb 2018 16:23:34 +0000
-Sudeep Holla <sudeep.holla@arm.com> wrote:
-
-> The base protocol describes the properties of the implementation and
-> provide generic error management. The base protocol provides commands
-> to describe protocol version, discover implementation specific
-> attributes and vendor/sub-vendor identification, list of protocols
-> implemented and the various agents are in the system including OSPM
-> and the platform. It also supports registering for notifications of
-> platform errors.
+On 05/03/18 13:49, Tomasz Figa wrote:
+[...]
+>> @@ -518,7 +520,12 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>>          u32 int_status;
+>>          dma_addr_t iova;
+>>          irqreturn_t ret = IRQ_NONE;
+>> -       int i;
+>> +       int i, err, need_runtime_put;
 > 
-> This protocol is mandatory. This patch adds support for the same along
-> with some basic infrastructure to add support for other protocols.
+> nit: need_runtime_put could be a bool.
 > 
-<snip>
+>> +
+>> +       err = pm_runtime_get_if_in_use(iommu->dev);
+>> +       if (err <= 0 && err != -EINVAL)
+>> +               return ret;
+>> +       need_runtime_put = err > 0;
+> 
+> Generally something must be really wrong if we end up with err == 0
+> here, because the IOMMU must be powered on to signal an interrupt. The
+> only case this could happen would be if the IRQ signal was shared with
+> some device from another power domain. Is it possible on Rockchip
+> SoCs? If not, perhaps we should have a WARN_ON() here for such case.
 
-Minor comments inline.
+In general, there's almost certainly some time window between the 
+interrupt level being latched at the GIC and the IRQ actually being 
+taken by its target CPU, in which potentially the power could be removed 
+and/or the clocks gated - especially if there are higher-priority IRQs 
+pending at the same time and the racing PM call is on some other CPU. 
+Sure, it's probably unlikely, but I wouldn't necessarily consider it 
+completely erroneous.
 
-> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-> index fa0e9cf31f4c..ba784b8ec170 100644
-> --- a/drivers/firmware/arm_scmi/driver.c
-> +++ b/drivers/firmware/arm_scmi/driver.c
-> @@ -105,21 +105,27 @@ struct scmi_desc {
->   * @dev: Device pointer
->   * @desc: SoC description for this instance
->   * @handle: Instance of SCMI handle to send to clients
-> + * @version: SCMI revision information containing protocol version,
-> + *	implementation version and (sub-)vendor identification.
->   * @cl: Mailbox Client
->   * @tx_chan: Transmit mailbox channel
->   * @tx_payload: Transmit mailbox channel payload area
->   * @minfo: Message info
-> + * @protocols_imp: list of protocols implemented, currently maximum of
-> + *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
-If it is fixed size, is there a benefit in not just putting it in here
-as a fixed size array and simplifying the allocation?
-
->   * @node: list head
->   * @users: Number of users of this instance
->   */
->  struct scmi_info {
->  	struct device *dev;
->  	const struct scmi_desc *desc;
-> +	struct scmi_revision_info version;
->  	struct scmi_handle handle;
->  	struct mbox_client cl;
->  	struct mbox_chan *tx_chan;
->  	void __iomem *tx_payload;
->  	struct scmi_xfers_info minfo;
-> +	u8 *protocols_imp;
->  	struct list_head node;
->  	int users;
->  };
-> @@ -433,6 +439,45 @@ int scmi_one_xfer_init(const struct scmi_handle *handle, u8 msg_id, u8 prot_id,
->  }
->  
->  /**
-> + * scmi_version_get() - command to get the revision of the SCMI entity
-> + *
-> + * @handle: Handle to SCMI entity information
-> + *
-> + * Updates the SCMI information in the internal data structure.
-> + *
-> + * Return: 0 if all went fine, else return appropriate error.
-> + */
-> +int scmi_version_get(const struct scmi_handle *handle, u8 protocol,
-> +		     u32 *version)
-> +{
-> +	int ret;
-> +	__le32 *rev_info;
-> +	struct scmi_xfer *t;
-> +
-> +	ret = scmi_one_xfer_init(handle, PROTOCOL_VERSION, protocol, 0,
-> +				 sizeof(*version), &t);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = scmi_do_xfer(handle, t);
-> +	if (!ret) {
-> +		rev_info = t->rx.buf;
-> +		*version = le32_to_cpu(*rev_info);
-> +	}
-> +
-> +	scmi_one_xfer_put(handle, t);
-blank line before all simple returns is common kernel coding style
-and does help for readability (a little bit)
-
-> +	return ret;
-> +}
-> +
-> +void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
-> +				     u8 *prot_imp)
-> +{
-> +	struct scmi_info *info = handle_to_scmi_info(handle);
-> +
-> +	info->protocols_imp = prot_imp;
-> +}
-> +
-> +/**
->   * scmi_handle_get() - Get the  SCMI handle for a device
->   *
->   * @dev: pointer to device for which we want SCMI handle
-> @@ -660,11 +705,19 @@ static int scmi_probe(struct platform_device *pdev)
->  
->  	handle = &info->handle;
->  	handle->dev = info->dev;
-> +	handle->version = &info->version;
->  
->  	ret = scmi_mbox_chan_setup(info);
->  	if (ret)
->  		return ret;
->  
-> +	ret = scmi_base_protocol_init(handle);
-> +	if (ret) {
-> +		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
-> +		scmi_mbox_free_channel(info);
-> +		return ret;
-> +	}
-> +
->  	mutex_lock(&scmi_list_mutex);
->  	list_add_tail(&info->node, &scmi_list);
->  	mutex_unlock(&scmi_list_mutex);
-> diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-> index 854ed2479993..664da3d763f2 100644
-> --- a/include/linux/scmi_protocol.h
-> +++ b/include/linux/scmi_protocol.h
-> @@ -17,11 +17,48 @@
->   */
->  #include <linux/types.h>
->  
-> +#define SCMI_MAX_STR_SIZE	16
-> +
-> +/**
-> + * struct scmi_revision_info - version information structure
-This isn't really just the version stuff. It's more about discovery
-of what is present.
-Perhaps the naming could make that clear if you want to keep this
-as one structure?
-
-> + *
-> + * @major_ver: Major ABI version. Change here implies risk of backward
-> + *	compatibility break.
-> + * @minor_ver: Minor ABI version. Change here implies new feature addition,
-> + *	or compatible change in ABI.
-> + * @num_protocols: Number of protocols that are implemented, excluding the
-> + *	base protocol.
-> + * @num_agents: Number of agents in the system.
-> + * @impl_ver: A vendor-specific implementation version.
-> + * @vendor_id: A vendor identifier(Null terminated ASCII string)
-> + * @sub_vendor_id: A sub-vendor identifier(Null terminated ASCII string)
-> + */
-> +struct scmi_revision_info {
-> +	u16 major_ver;
-> +	u16 minor_ver;
-> +	u8 num_protocols;
-> +	u8 num_agents;
-> +	u32 impl_ver;
-> +	char vendor_id[SCMI_MAX_STR_SIZE];
-> +	char sub_vendor_id[SCMI_MAX_STR_SIZE];
-> +};
-> +
->  /**
->   * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
->   *
->   * @dev: pointer to the SCMI device
-> + * @version: pointer to the structure containing SCMI version information
->   */
->  struct scmi_handle {
->  	struct device *dev;
-> +	struct scmi_revision_info *version;
-> +};
-> +
-> +enum scmi_std_protocol {
-> +	SCMI_PROTOCOL_BASE = 0x10,
-> +	SCMI_PROTOCOL_POWER = 0x11,
-> +	SCMI_PROTOCOL_SYSTEM = 0x12,
-> +	SCMI_PROTOCOL_PERF = 0x13,
-> +	SCMI_PROTOCOL_CLOCK = 0x14,
-> +	SCMI_PROTOCOL_SENSOR = 0x15,
->  };
+Robin.
