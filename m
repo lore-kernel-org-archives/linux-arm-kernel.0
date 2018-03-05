@@ -1,46 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 5 Mar 2018 16:44:48 -0500
-Subject: [PATCH 07/37] iommu: Add a page fault handler
-In-Reply-To: <20180212183352.22730-8-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-8-jean-philippe.brucker@arm.com>
-Message-ID: <b2a3d2a7-7042-aef3-0def-05e64e39d046@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 5 Mar 2018 15:47:18 -0600
+Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
+In-Reply-To: <1520261458.33502.10.camel@aosc.io>
+References: <1520261458.33502.10.camel@aosc.io>
+Message-ID: <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
-> +static int iommu_queue_fault(struct iommu_domain *domain, struct device *dev,
-> +			     struct iommu_fault_event *evt)
-> +{
-> +	struct iommu_fault_group *group;
-> +	struct iommu_fault_context *fault, *next;
-> +
-> +	if (!iommu_fault_queue)
-> +		return -ENOSYS;
-> +
-> +	if (!evt->last_req) {
-> +		fault = kzalloc(sizeof(*fault), GFP_KERNEL);
-> +		if (!fault)
-> +			return -ENOMEM;
-> +
-> +		fault->evt = *evt;
-> +		fault->dev = dev;
-> +
-> +		/* Non-last request of a group. Postpone until the last one */
-> +		spin_lock(&iommu_partial_faults_lock);
-> +		list_add_tail(&fault->head, &iommu_partial_faults);
-> +		spin_unlock(&iommu_partial_faults_lock);
-> +
-> +		return IOMMU_PAGE_RESP_HANDLED;
-> +	}
-> +
-> +	group = kzalloc(sizeof(*group), GFP_KERNEL);
-> +	if (!group)
-> +		return -ENOMEM;
+On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
+> Hi everyone,
+> 
+> I'm trying to implement a driver for the quirky (DW) PCIe RC in the
+> Allwinner H6 SoC.
+> 
+> The quirk is that only the "dbi" space is always mapped, but at the
+> same time only 64KiB of other spaces (config, downstream IO and non-
+> prefetchable memory) are accessible. To access a certain address the
+> high 16-bit of the address (all bus addresses in H6 SoC are 32-bit
+> despite the CPU is 64-bit) needs to be written into the
+> PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI space).
+> So the access to these spaces cannot be processed correctly with just
+> readl/writel, as the existing code does.
+> 
+> Is it possible to workaround this in the PCI subsystem of Linux?
+> 
+> (I have thought a workaround that only maps the current accessible
+> 64KiB with the MMU, and when accessing the non-accessible part, catch
+> the page fault and re-setup the map to the new 64KiB page. But surely
+> it will kill the performance.)
 
-Release the requests in iommu_partial_faults here.
+If you only need to write to PCIE_ADDR_PAGE_CFG for *config* accesses,
+this should be easy.  All config accesses go through wrappers
+(pci_read_config_word(), etc) and several host bridge drivers have to
+update a register with parts of the config address, e.g.,
+advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O port
+accesses.  I/O port accesses do go through a wrapper (inb(), etc), so
+it might be possible in principle to intercept these, although much
+more difficult than config accesses, because the config accesses are
+already set up with per-host bridge hooks, while the I/O port
+accessors are mostly per-arch.
+
+But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
+that's really a problem because drivers are allowed to essentially
+read a memory BAR, convert that bus address to a CPU physical memory
+address, ioremap() it, then directly access the PCIe memory with loads
+and stores.
+
+Bjorn
