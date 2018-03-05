@@ -1,119 +1,46 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Mon, 5 Mar 2018 16:47:25 +0000
-Subject: [PATCH] mmc: sdhci-of-arasan: Add quirk to avoid erroneous msg
-In-Reply-To: <52191012-300a-e13d-fa54-8717eb97c2e1@rock-chips.com>
-References: <1519739731-27920-1-git-send-email-phil.edworthy@renesas.com>
- <b35a8ac6-af47-5851-95ae-371288bb5f25@rock-chips.com>
- <HK2PR0601MB1393B39958A128DCB8CA0E44F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
- <b725dcf5-2f53-dab7-1e0c-85ea138f54a9@rock-chips.com>
- <HK2PR0601MB139380F295EF5CE849288F91F5C00@HK2PR0601MB1393.apcprd06.prod.outlook.com>
- <52191012-300a-e13d-fa54-8717eb97c2e1@rock-chips.com>
-Message-ID: <HK2PR0601MB139301F701386BB74CF369E2F5DA0@HK2PR0601MB1393.apcprd06.prod.outlook.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 5 Mar 2018 16:47:55 +0000
+Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
+In-Reply-To: <86o9k63f7a.wl-marc.zyngier@arm.com>
+References: <20180215175803.6870-1-marc.zyngier@arm.com>
+ <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
+ <86o9k63f7a.wl-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA8XYV=oSX81ON4CGDt0kfG1cgROqj30OC2Ov=bYhLSYig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 2 March 2018 at 11:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Fri, 02 Mar 2018 10:44:48 +0000,
+> Auger Eric wrote:
+>> I understand the get/set is called as part of the migration process.
+>> So my understanding is the benefit of this series is migration fails in
+>> those cases:
+>>
+>> >=0.2 source -> 0.1 destination
+>> 0.1 source -> >=0.2 destination
+>
+> It also fails in the case where you migrate a 1.0 guest to something
+> that cannot support it.
 
-On 28 February 2018 01:53, Shawn Lin wrote:
-> On 2018/2/27 23:05, Phil Edworthy wrote:
-> > On 27 February 2018 14:42, Shawn Lin wrote:
-> >> On 2018/2/27 22:31, Phil Edworthy wrote:
-> >>> On 27 February 2018 14:28, Shawn Lin wrote:
-> >>>> ? 2018/2/27 21:55, Phil Edworthy ??:
-> >>>>> Since the controller does not support the end-of-busy IRQ, don't use
-> it.
-> >>>>> Otherwise, on older SD cards you will get lots of these messages:
-> >>>>> "mmc0: Got data interrupt 0x00000002 even though no data operation
-> >>>>> was
-> >>>> in progress"
-> >>>>>
-> >>>>
-> >>>> I'm afraid you have to explain which version of arasan's IP suffer
-> >>>> from this and what does the "older SD cards" mean?
-> >>> Ok, I'll try to find out the IP version...
-> >>> For "older SD cards", I can provide a list of a few cards that
-> >>> exhibit this problem and others that don't, is that enough info?
-> >>
-> >> What I meant is could you elaborate more about what kind of cards,
-> >> e.g, are them the  legacy SDSC cards or SDHC cards, or maybe they are
-> >> only running with defaut speed? or whatever, but not just with a
-> >> vague "older" cards. :)
-> > Unfortunately, I have one SDHC card that works, one that doesn't. Both
-> > cards are running with a 50MHz SD clock. All I know is this:
-> 
-> Thanks for sharing these, though it looks wired as I never remember I saw
-> this problem when extensively tested SD cards on one of arasan controllers
-> in 2014.
-Not sure what you mean by 'wired'?
+I think it would be useful if we could write out the various
+combinations of source, destination and what we expect/want to
+have happen. My gut feeling here is that we're sacrificing
+exact migration compatibility in favour of having the guest
+automatically get the variant-2 mitigations, but it's not clear
+to me exactly which migration combinations that's intended to
+happen for. Marc?
 
-Note that this is on a relatively slow device, a dual core Cortex A7 @500MHz.
-Maybe that has some effect.
+If this wasn't a mitigation issue the desired behaviour would be
+straightforward:
+ * kernel should default to 0.2 on the basis that
+   that's what it did before
+ * new QEMU version should enable 1.0 by default for virt-2.12
+   and 0.2 for virt-2.11 and earlier
+ * PSCI version info shouldn't appear in migration stream unless
+   it's something other than 0.2
+But that would leave some setups (which?) unnecessarily without the
+mitigation, so we're not doing that. The question is, exactly
+what *are* we aiming for?
 
-It's also interesting that someone posted the same fix for Xilinx a while
-back, I linked to it in the commit msg.
-
-Thanks
-Phil
-
-
-> > SD cards that report unexpected interrupts:
-> > 2GB Sandisk Extreme III                     (e624 SD02G 1.89 GiB)
-> > 8GB Sandisk (SDHC class 4)              (aaaa SU08G 7.40 GiB)
-> > 8GB Sandisk Extreme III (SDHC class 6)    (bb4e SD08G 7.61 GiB)
-> >
-> > SD cards that work ok:
-> > 16GB Samsung (microSDHC U1 class 10)          (0001 00000 14.6 GiB)
-> > 16GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL16G 14.8 GiB)
-> > 32GB Sandisk Ultra (microSDHC U1 class 10)    (aaaa SL32G 29.7 GiB)
-> >
-> > Thanks
-> > Phil
-> >
-> >>>>> This has been reported on Xilinx devices that also use the Arasan IP.
-> >>>>> See https://patchwork.kernel.org/patch/8062871/
-> >>>>>
-> >>>>> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1
-> >> SoC.
-> >>>>>
-> >>>>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> >>>>> ---
-> >>>>>     drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
-> >>>>>     1 file changed, 2 insertions(+), 1 deletion(-)
-> >>>>>
-> >>>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
-> >>>>> b/drivers/mmc/host/sdhci-of-arasan.c
-> >>>>> index c33a5f7..ab66e32 100644
-> >>>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> >>>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> >>>>> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data
-> >>>> sdhci_arasan_pdata = {
-> >>>>>     	.ops = &sdhci_arasan_ops,
-> >>>>>     	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-> >>>>>     	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-> >>>>> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
-> >>>>> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN
-> |
-> >>>>> +			SDHCI_QUIRK2_STOP_WITH_TC,
-> >>>>>     };
-> >>>>>
-> >>>>>     static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32
-> >>>>> intmask)
-> >>>>>
-> >>>>
-> >>>>
-> >>>> --
-> >>>> Best Regards
-> >>>> Shawn Lin
-> >>>
-> >>>
-> >>>
-> >>>
-> >>
-> >>
-> >> --
-> >> Best Regards
-> >> Shawn Lin
-> >
-> >
-> >
-> >
+thanks
+-- PMM
