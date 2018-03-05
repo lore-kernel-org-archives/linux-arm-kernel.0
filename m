@@ -1,66 +1,63 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 05 Mar 2018 14:42:37 +0100
-Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
-In-Reply-To: <20180305111012.0ea44d1d@xps13> (Miquel Raynal's message of "Mon,
- 5 Mar 2018 11:10:12 +0100")
-References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
- <20180227141255.177ea751@xps13>
- <3B588D51285A4A4D8D39C94212E07826271B70@SPQCMBX02.exfo.com>
- <20180305104721.311a02c2@xps13> <20180305111012.0ea44d1d@xps13>
-Message-ID: <87lgf663le.fsf@bootlin.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 5 Mar 2018 07:47:15 -0600
+Subject: [PATCH] arm: dts: stih4xx: Add missing #sound-dai-cells
+In-Reply-To: <5fca2bc1-1f8e-1760-9e6a-802661af0f7e@st.com>
+References: <20180301202537.30571-4-robh@kernel.org>
+ <5fca2bc1-1f8e-1760-9e6a-802661af0f7e@st.com>
+Message-ID: <CAL_JsqJBW4jyfG===LbQCnpMJOXGEYr9Qihs2ichmW0KQn6YGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
- 
- On lun., mars 05 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-
-> Hi Gabriel,
+On Mon, Mar 5, 2018 at 4:37 AM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
+> Hi Rob
 >
-> On Mon, 5 Mar 2018 10:47:21 +0100, Miquel Raynal
-> <miquel.raynal@bootlin.com> wrote:
+> On 03/01/2018 09:25 PM, Rob Herring wrote:
+>> dtc now gives the following warnings:
+>>
+>> arch/arm/boot/dts/stih410-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+>> arch/arm/boot/dts/stih407-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+>> arch/arm/boot/dts/stih410-b2260.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+>>
+>> Add the missing #sound-dai-cells property.
+>>
+>> Cc: Patrice Chotard <patrice.chotard@st.com>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>   arch/arm/boot/dts/stih407.dtsi | 1 +
+>>   arch/arm/boot/dts/stih410.dtsi | 1 +
+>>   2 files changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+>> index 11fdecd9312e..b592ecbe6420 100644
+>> --- a/arch/arm/boot/dts/stih407.dtsi
+>> +++ b/arch/arm/boot/dts/stih407.dtsi
+>> @@ -107,6 +107,7 @@
+>>                               compatible = "st,stih407-hdmi";
+>>                               reg = <0x8d04000 0x1000>;
+>>                               reg-names = "hdmi-reg";
+>> +                             #sound-dai-cells = <0>;
+>>                               interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>>                               interrupt-names = "irq";
+>>                               clock-names = "pix",
+>> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+>> index 68b5ff91d6a7..4bcdbbb70a31 100644
+>> --- a/arch/arm/boot/dts/stih410.dtsi
+>> +++ b/arch/arm/boot/dts/stih410.dtsi
+>> @@ -198,6 +198,7 @@
+>>                               compatible = "st,stih407-hdmi";
+>>                               reg = <0x8d04000 0x1000>;
+>>                               reg-names = "hdmi-reg";
+>> +                             #sound-dai-cells = <0>;
+>>                               interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>>                               interrupt-names = "irq";
+>>                               clock-names = "pix",
+>>
 >
->> Hi Gabriel,
->> 
->> On Tue, 27 Feb 2018 21:56:03 +0000, Gabriel Matni
->> <gabriel.matni@exfo.com> wrote:
->> 
->> > Hi Miqu?l,
->> >   
->> > > -----Original Message-----
->> > > From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
->> > > Sent: February 27, 2018 8:13 AM
->> > > To: Gabriel Matni <gabriel.matni@exfo.com>
->> > > Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
->> > > Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
->> > > <thomas.petazzoni@bootlin.com>
->> > > Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
-
-Given the review done by Miquel and the information you add, you can
-also add my
-Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-
-
+> Acked-by: Patrice Chotard <patrice.chotard@st.com>
 >
-> BTW, prefix should be "serial: mvebu-uart:".
->
-> And maybe you should CC: stable too?
+> Will you take this patch in your remotes/Rob_Herring/dtc-update branch ?
+> Or I can add this patch to my next STi pull-request.
 
-And also adding the following fixes tag:
+Please take it.
 
-Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for
-Armada-3700 serial port")
-
-
-Thanks,
-
-Gregory
-
->
-> Thanks for fixing it anyway.
-> Miqu?l
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Rob
