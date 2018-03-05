@@ -1,100 +1,169 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Mon, 5 Mar 2018 08:06:32 +0100
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <1219888621.198216.1520231304685@email.1und1.de>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
- <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
- <395166283.280598.1520200683559@email.1und1.de>
- <423BE2B6-2209-4390-B420-FA7267318A09@holtmann.org>
- <1219888621.198216.1520231304685@email.1und1.de>
-Message-ID: <524739BF-BD94-4276-BDAB-31B4944D24C3@holtmann.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 5 Mar 2018 08:25:58 +0100
+Subject: [PATCH] drm/sun4i: move rgb mode_valid from connector to encoder
+In-Reply-To: <1520159870-41286-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1520159870-41286-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180305072558.ujxojkrm5r5rican@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
 
->>>>>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
->>>>>>> This allows to automatically insert the bcm43438 to the bluetooth
->>>>>>> subsystem instead of relying on patched userspace helpers (hciattach).
->>>>>>> 
->>>>>>> In order to keep a debug UART we need to switch to uart1.
->>>>>>> 
->>>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>>>>> ---
->>>>>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
->>>>>>> 1 file changed, 13 insertions(+), 1 deletion(-)
->>>>>>> 
->>>>>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>>>> index cf53436..b7f79f1 100644
->>>>>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->>>>>>> @@ -131,6 +131,18 @@
->>>>>>> 
->>>>>>> &uart0 {
->>>>>>> 	pinctrl-names = "default";
->>>>>>> -	pinctrl-0 = <&uart0_gpio14>;
->>>>>>> +	pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
->>>>>>> +	status = "okay";
->>>>>>> +
->>>>>>> +	bluetooth {
->>>>>>> +		compatible = "brcm,bcm43438-bt";
->>>>>>> +		max-speed = <2000000>;
->>>>>>> +		shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
->>>>>>> +	};
->>>>>>> +};
->>>>>> 
->>>>>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
->>>>> 
->>>>> Yes, unload and reload works fine. 
->>>>> 
->>>>>> Meaning we are getting back to the 115200 default baud rate on the UART?
->>>>> 
->>>>> I assume that, because reload works as expected. 
->>>> 
->>>> awesome. That is good news.
->>>> 
->>>> Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
->>> 
->>> so here comes the bad news. hci_bcm uses gpiod_set_value() which is for interrupt context, but the gpio expander can sleep. So we will get this warning:
->>> 
->>> [    4.802447] ------------[ cut here ]------------
->>> [    4.802485] WARNING: CPU: 3 PID: 91 at drivers/gpio/gpiolib.c:2986 gpiod_set_value+0x50/0x58
->>> [    4.802489] Modules linked in: hci_uart ac97_bus btbcm snd_pcm_dmaengine bluetooth snd_pcm snd_timer ecdh_generic snd soundcore bcm2835_thermal crc32_arm_ce
->>> [    4.802543] CPU: 3 PID: 91 Comm: kworker/u8:2 Not tainted 4.16.0-rc3-next-20180302-dirty #4
->>> [    4.802547] Hardware name: BCM2835
->>> [    4.802562] Workqueue: events_unbound async_run_entry_fn
->>> [    4.802593] [<c03119a4>] (unwind_backtrace) from [<c030cc24>] (show_stack+0x10/0x14)
->>> [    4.802612] [<c030cc24>] (show_stack) from [<c0d8e9dc>] (dump_stack+0x8c/0xa0)
->>> [    4.802628] [<c0d8e9dc>] (dump_stack) from [<c0343a2c>] (__warn+0xe0/0xf8)
->>> [    4.802640] [<c0343a2c>] (__warn) from [<c0343b5c>] (warn_slowpath_null+0x40/0x48)
->>> [    4.802652] [<c0343b5c>] (warn_slowpath_null) from [<c06d0de0>] (gpiod_set_value+0x50/0x58)
->>> [    4.802693] [<c06d0de0>] (gpiod_set_value) from [<bf0e2e90>] (bcm_gpio_set_shutdown+0xc/0x14 [hci_uart])
->>> [    4.802757] [<bf0e2e90>] (bcm_gpio_set_shutdown [hci_uart]) from [<bf0e2a64>] (bcm_gpio_set_power+0x18/0x140 [hci_uart])
->>> [    4.802806] [<bf0e2a64>] (bcm_gpio_set_power [hci_uart]) from [<bf0e2e4c>] (bcm_serdev_probe+0x64/0x9c [hci_uart])
->>> [    4.802848] [<bf0e2e4c>] (bcm_serdev_probe [hci_uart]) from [<c08f2528>] (driver_probe_device+0x254/0x32c)
->>> [    4.802863] [<c08f2528>] (driver_probe_device) from [<c08f26a4>] (__driver_attach+0xa4/0xa8)
->>> [    4.802878] [<c08f26a4>] (__driver_attach) from [<c08f08b8>] (bus_for_each_dev+0x74/0xb4)
->>> [    4.802895] [<c08f08b8>] (bus_for_each_dev) from [<c0366498>] (async_run_entry_fn+0x44/0x108)
->>> [    4.802910] [<c0366498>] (async_run_entry_fn) from [<c035d594>] (process_one_work+0x200/0x4f8)
->>> [    4.802923] [<c035d594>] (process_one_work) from [<c035e4a8>] (worker_thread+0x4c/0x5d4)
->>> [    4.802938] [<c035e4a8>] (worker_thread) from [<c0363300>] (kthread+0x150/0x158)
->>> [    4.802952] [<c0363300>] (kthread) from [<c03010e8>] (ret_from_fork+0x14/0x2c)
->>> [    4.802957] Exception stack(0xed959fb0 to 0xed959ff8)
->>> [    4.802966] 9fa0:                                     00000000 00000000 00000000 00000000
->>> [    4.802977] 9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
->>> [    4.802986] 9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
->>> [    4.802993] ---[ end trace b947f9d4c40fa261 ]?
->> 
->> that is weird since we should be either in a probe context or in hdev->open context and both can sleep as far as I know.
+
+On Sun, Mar 04, 2018 at 11:37:50AM +0100, Giulio Benetti wrote:
+> mode_valid function must be connected to encoder, not connector.
+> Otherwise it doesn't get called by drm.
+
+That's not true, or rather, that's a big oversimplification. It
+doesn't get called by DRM if you have a bridge instead of a panel
+attached to the encoder.
+
+> Move mode_valid function pointer to encoder helper functions,
+> changing its prototype according to encoder helper function pointer.
 > 
-> okay in this case we can replace gpiod_set_value with gpiod_set_value_cansleep.
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 102 +++++++++++++++++++-------------------
+>  1 file changed, 51 insertions(+), 51 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> index b8da5a5..6539dcc 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> @@ -52,11 +52,59 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
+>  	return drm_panel_get_modes(tcon->panel);
+>  }
+>  
+> -static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+> -				struct drm_display_mode *mode)
+> +static struct drm_connector_helper_funcs sun4i_rgb_con_helper_funcs = {
+> +	.get_modes	= sun4i_rgb_get_modes,
+> +};
+> +
+> +static void
+> +sun4i_rgb_connector_destroy(struct drm_connector *connector)
+>  {
+>  	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
+>  	struct sun4i_tcon *tcon = rgb->tcon;
+> +
+> +	drm_panel_detach(tcon->panel);
+> +	drm_connector_cleanup(connector);
+> +}
+> +
+> +static const struct drm_connector_funcs sun4i_rgb_con_funcs = {
+> +	.fill_modes		= drm_helper_probe_single_connector_modes,
+> +	.destroy		= sun4i_rgb_connector_destroy,
+> +	.reset			= drm_atomic_helper_connector_reset,
+> +	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
+> +	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
+> +};
+> +
+> +static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+> +{
+> +	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> +	struct sun4i_tcon *tcon = rgb->tcon;
+> +
+> +	DRM_DEBUG_DRIVER("Enabling RGB output\n");
+> +
+> +	if (!IS_ERR(tcon->panel)) {
+> +		drm_panel_prepare(tcon->panel);
+> +		drm_panel_enable(tcon->panel);
+> +	}
+> +}
+> +
+> +static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+> +{
+> +	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> +	struct sun4i_tcon *tcon = rgb->tcon;
+> +
+> +	DRM_DEBUG_DRIVER("Disabling RGB output\n");
+> +
+> +	if (!IS_ERR(tcon->panel)) {
+> +		drm_panel_disable(tcon->panel);
+> +		drm_panel_unprepare(tcon->panel);
+> +	}
+> +}
+> +
+> +static enum drm_mode_status sun4i_rgb_encoder_mode_valid(struct drm_encoder *crtc,
+> +							 const struct drm_display_mode *mode)
+> +{
+> +	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(crtc);
+> +	struct sun4i_tcon *tcon = rgb->tcon;
+>  	u32 hsync = mode->hsync_end - mode->hsync_start;
+>  	u32 vsync = mode->vsync_end - mode->vsync_start;
+>  	unsigned long rate = mode->clock * 1000;
+> @@ -106,58 +154,10 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+>  	return MODE_OK;
+>  }
+>  
+> -static struct drm_connector_helper_funcs sun4i_rgb_con_helper_funcs = {
+> -	.get_modes	= sun4i_rgb_get_modes,
+> -	.mode_valid	= sun4i_rgb_mode_valid,
+> -};
+> -
+> -static void
+> -sun4i_rgb_connector_destroy(struct drm_connector *connector)
+> -{
+> -	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
+> -	struct sun4i_tcon *tcon = rgb->tcon;
+> -
+> -	drm_panel_detach(tcon->panel);
+> -	drm_connector_cleanup(connector);
+> -}
+> -
+> -static const struct drm_connector_funcs sun4i_rgb_con_funcs = {
+> -	.fill_modes		= drm_helper_probe_single_connector_modes,
+> -	.destroy		= sun4i_rgb_connector_destroy,
+> -	.reset			= drm_atomic_helper_connector_reset,
+> -	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
+> -	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
+> -};
+> -
+> -static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+> -{
+> -	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> -	struct sun4i_tcon *tcon = rgb->tcon;
+> -
+> -	DRM_DEBUG_DRIVER("Enabling RGB output\n");
+> -
+> -	if (!IS_ERR(tcon->panel)) {
+> -		drm_panel_prepare(tcon->panel);
+> -		drm_panel_enable(tcon->panel);
+> -	}
+> -}
+> -
+> -static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+> -{
+> -	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+> -	struct sun4i_tcon *tcon = rgb->tcon;
+> -
+> -	DRM_DEBUG_DRIVER("Disabling RGB output\n");
+> -
+> -	if (!IS_ERR(tcon->panel)) {
+> -		drm_panel_disable(tcon->panel);
+> -		drm_panel_unprepare(tcon->panel);
+> -	}
+> -}
+> -
+>  static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
+>  	.disable	= sun4i_rgb_encoder_disable,
+>  	.enable		= sun4i_rgb_encoder_enable,
+> +	.mode_valid	= sun4i_rgb_encoder_mode_valid,
 
-if you do that, does it work for you on both the RPi 3 and Zero W?
+The only thing you should be changing is that structure, the matching
+connector structure, and the function prototype. This patch is way
+bigger than it needs to be.
 
-Regards
+Thanks!
+Maxime
 
-Marcel
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180305/b2de9465/attachment.sig>
