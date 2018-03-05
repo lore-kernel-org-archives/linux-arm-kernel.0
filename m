@@ -1,20 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 5 Mar 2018 10:10:12 +0100
-Subject: [PATCH v3 0/2] Add R8A77970/Eagle I2C support
-In-Reply-To: <23c5b1f4-d92b-455f-7288-5aabd002183a@cogentembedded.com>
-References: <23c5b1f4-d92b-455f-7288-5aabd002183a@cogentembedded.com>
-Message-ID: <20180305091009.fj4f6riash7ibklw@verge.net.au>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon,  5 Mar 2018 17:17:22 +0800
+Subject: [PATCH] soc: rockchip: power-domain: Add a sanity check on
+ pd->num_clks
+Message-ID: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2018 at 10:02:41PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20180301-v4.16-rc3' tag. We're adding the R8A77970 I2C nodes
-> and then describing the PCA9654 I/O expander connected to the I2C0 bus.
-> 
-> [1/2] arm64: dts: renesas: r8a77970: add I2C support
-> [2/2] arm64: dts: renesas: eagle: add I2C0 support
+The of_count_phandle_with_args() can fail and return error(for example,
+rk3399 pd_vio doesn't have clocks). That would break the pd probe.
 
-Thanks, applied.
+Add a sanity check on pd->num_clks to avoid that.
+
+Fixes: 65084121d59d ("soc: rockchip: power-domain: use clk_bulk APIs")
+Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+
+ drivers/soc/rockchip/pm_domains.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index ad96ddeaeb78..fd58fd475950 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -402,11 +402,16 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
+ 
+ 	pd->num_clks = of_count_phandle_with_args(node, "clocks",
+ 						  "#clock-cells");
+-
+-	pd->clks = devm_kcalloc(pmu->dev, pd->num_clks, sizeof(*pd->clks),
+-				GFP_KERNEL);
+-	if (!pd->clks)
+-		return -ENOMEM;
++	if (pd->num_clks > 0) {
++		pd->clks = devm_kcalloc(pmu->dev, pd->num_clks,
++					sizeof(*pd->clks), GFP_KERNEL);
++		if (!pd->clks)
++			return -ENOMEM;
++	} else {
++		dev_dbg(pmu->dev, "%s: don't have clocks: %d\n",
++			node->name, pd->num_clks);
++		pd->num_clks = 0;
++	}
+ 
+ 	for (i = 0; i < pd->num_clks; i++) {
+ 		pd->clks[i].clk = of_clk_get(node, i);
+-- 
+2.11.0
