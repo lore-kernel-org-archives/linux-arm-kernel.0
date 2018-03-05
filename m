@@ -1,92 +1,164 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 5 Mar 2018 16:53:23 +0000
-Subject: [PATCH 1/2] ARM: dts: STi: Fix aliases property name for STi
- boards
-In-Reply-To: <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
-References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
- <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
- <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
-Message-ID: <4bf43157-9214-c160-3f69-1e56f8cfdf98@st.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 5 Mar 2018 10:57:58 -0600
+Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <20180305155614.GG6618@arm.com>
+References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+ <20180305155614.GG6618@arm.com>
+Message-ID: <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Hi Will,
 
-On 03/05/2018 04:28 PM, Rob Herring wrote:
-> On Mon, Mar 5, 2018 at 9:00 AM,  <patrice.chotard@st.com> wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> Since dtc v1.4.6-9-gaadd0b65c987, aliases property name must
->> be lowercase only.
->> This allows to fix following warnings when compiling dtb
->> with W=1 option :
+On 03/05/2018 09:56 AM, Will Deacon wrote:
+> Hi Shanker,
 > 
-> I'm so glad to see fixes before the dtc update landed in the kernel tree!
-
-;-)
-
-> 
->> arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
+>> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
+>> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
+>> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
+>> of Silicon provider service ID 0xC2001700.
 >>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 >> ---
->>   arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
->>   arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
->>   arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
->>   arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
->>   4 files changed, 8 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
->> index c8ad905d0309..fa1186af6574 100644
->> --- a/arch/arm/boot/dts/stih407-b2120.dts
->> +++ b/arch/arm/boot/dts/stih407-b2120.dts
->> @@ -14,7 +14,7 @@
->>          compatible = "st,stih407-b2120", "st,stih407";
->>
->>          chosen {
->> -               bootargs = "console=ttyAS0,115200 clk_ignore_unused";
->> +               bootargs = "console=ttyas0,115200 clk_ignore_unused";
+>>  arch/arm64/include/asm/cpucaps.h |  2 +-
+>>  arch/arm64/include/asm/kvm_asm.h |  2 --
+>>  arch/arm64/kernel/bpi.S          |  8 ------
+>>  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
+>>  arch/arm64/kvm/hyp/entry.S       | 12 ---------
+>>  arch/arm64/kvm/hyp/switch.c      | 10 --------
+>>  6 files changed, 20 insertions(+), 69 deletions(-)
 > 
-> The kernel change for this is an ABI breakage both DT <-> kernel and
-> kernel <-> userspace.
+> I'm happy to take this via arm64 if I get an ack from Marc/Christoffer.
 > 
-> Really, if you are okay with doing this, you should change it to ttySx IMO.
-
-OK i will use serialN instead
-
+>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+>> index bb26382..6ecc249 100644
+>> --- a/arch/arm64/include/asm/cpucaps.h
+>> +++ b/arch/arm64/include/asm/cpucaps.h
+>> @@ -43,7 +43,7 @@
+>>  #define ARM64_SVE				22
+>>  #define ARM64_UNMAP_KERNEL_AT_EL0		23
+>>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>> -#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>> +/* #define ARM64_UNALLOCATED_ENTRY			25 */
+>>  #define ARM64_HAS_RAS_EXTN			26
+>>  
+>>  #define ARM64_NCAPS				27
 > 
->>                  linux,stdout-path = &sbc_serial0;
+> These aren't ABI, so I think you can just drop
+> ARM64_HARDEN_BP_POST_GUEST_EXIT and repack the others accordingly.
 > 
-> And since you have this, you don't even need the console praram.
-
-Ok, i will remove stdout-path in an additional patch
-
+Sure, I'll remove it completely in v2 patch.
+ 
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>> index 24961b7..ab4d0a9 100644
+>> --- a/arch/arm64/include/asm/kvm_asm.h
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -68,8 +68,6 @@
+>>  
+>>  extern u32 __init_stage2_translation(void);
+>>  
+>> -extern void __qcom_hyp_sanitize_btac_predictors(void);
+>> -
+>>  #endif
+>>  
+>>  #endif /* __ARM_KVM_ASM_H__ */
+>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>> index e5de335..dc4eb15 100644
+>> --- a/arch/arm64/kernel/bpi.S
+>> +++ b/arch/arm64/kernel/bpi.S
+>> @@ -55,14 +55,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>>  	.endr
+>>  ENTRY(__bp_harden_hyp_vecs_end)
+>>  
+>> -ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>> -	stp     x29, x30, [sp, #-16]!
+>> -	.rept	16
+>> -	bl	. + 4
+>> -	.endr
+>> -	ldp	x29, x30, [sp], #16
+>> -ENTRY(__qcom_hyp_sanitize_link_stack_end)
+>> -
+>>  .macro smccc_workaround_1 inst
+>>  	sub	sp, sp, #(8 * 4)
+>>  	stp	x2, x3, [sp, #(8 * 0)]
+>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>> index 52f15cd..d779ffd4 100644
+>> --- a/arch/arm64/kernel/cpu_errata.c
+>> +++ b/arch/arm64/kernel/cpu_errata.c
+>> @@ -67,8 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+>>  DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>>  
+>>  #ifdef CONFIG_KVM
+>> -extern char __qcom_hyp_sanitize_link_stack_start[];
+>> -extern char __qcom_hyp_sanitize_link_stack_end[];
+>>  extern char __smccc_workaround_1_smc_start[];
+>>  extern char __smccc_workaround_1_smc_end[];
+>>  extern char __smccc_workaround_1_hvc_start[];
+>> @@ -115,8 +113,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>  	spin_unlock(&bp_lock);
+>>  }
+>>  #else
+>> -#define __qcom_hyp_sanitize_link_stack_start	NULL
+>> -#define __qcom_hyp_sanitize_link_stack_end	NULL
+>>  #define __smccc_workaround_1_smc_start		NULL
+>>  #define __smccc_workaround_1_smc_end		NULL
+>>  #define __smccc_workaround_1_hvc_start		NULL
+>> @@ -161,12 +157,25 @@ static void call_hvc_arch_workaround_1(void)
+>>  	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
+>>  }
+>>  
+>> +static void qcom_link_stack_sanitization(void)
+>> +{
+>> +	u64 tmp;
+>> +
+>> +	asm volatile("mov	%0, x30		\n"
+>> +		     ".rept	16		\n"
+>> +		     "bl	. + 4		\n"
+>> +		     ".endr			\n"
+>> +		     "mov	x30, %0		\n"
+>> +		     : "=&r" (tmp));
+>> +}
+>> +
+>>  static int enable_smccc_arch_workaround_1(void *data)
+>>  {
+>>  	const struct arm64_cpu_capabilities *entry = data;
+>>  	bp_hardening_cb_t cb;
+>>  	void *smccc_start, *smccc_end;
+>>  	struct arm_smccc_res res;
+>> +	u32 midr = read_cpuid_id();
+>>  
+>>  	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+>>  		return 0;
+>> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
+>>  		return 0;
+>>  	}
+>>  
+>> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+>> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
+>> +		cb = qcom_link_stack_sanitization;
 > 
->>          };
->>
->> @@ -24,7 +24,7 @@
->>          };
->>
->>          aliases {
->> -               ttyAS0 = &sbc_serial0;
->> +               ttyas0 = &sbc_serial0;
+> Is this just a performance thing? Do you actually see an advantage over
+> always making the firmware call? We've seen minimal impact in our testing.
 > 
-> The correct fix is use "serialN" for aliases.
 
-Ok
+Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
+  - Improves the code readability.
+  - Avoid the unnecessary MIDR checks on each vCPU exit.
+  - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
+  - Avoids the 2nd link stack sanitization workaround in firmware.
 
+  
+> Will
 > 
-> I have a check for only known alias names which would give a better
-> warning, but David thought it was too restrictive.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
->>                  ethernet0 = &ethernet0;
->>          };
->>
 
-
-Thanks
-
-Patrice
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
