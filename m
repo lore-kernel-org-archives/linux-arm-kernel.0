@@ -1,121 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:18:31 +0000
-Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
- Cortex-A53 erratum #843419
-In-Reply-To: <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+Date: Mon, 5 Mar 2018 17:22:56 +0000
+Subject: [RFC PATCH v3 3/3] arm64/kernel: enable A53 erratum #8434319
+ handling at runtime
+In-Reply-To: <20180214113645.16793-4-ard.biesheuvel@linaro.org>
 References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-3-ard.biesheuvel@linaro.org>
-Message-ID: <20180305171831.GB12869@arm.com>
+ <20180214113645.16793-4-ard.biesheuvel@linaro.org>
+Message-ID: <20180305172256.GC12869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
-> Working around Cortex-A53 erratum #843419 involves special handling of
-> ADRP instructions that end up in the last two instruction slots of a
-> 4k page, or whose output register gets overwritten without having been
-> read. (Note that the latter instruction sequence is never emitted by
-> a properly functioning compiler)
+On Wed, Feb 14, 2018 at 11:36:45AM +0000, Ard Biesheuvel wrote:
+> Omit patching of ADRP instruction at module load time if the current
+> CPUs are not susceptible to the erratum.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Open question: how should we handle big.LITTLE configurations where affected
+> Cortex-A53s may appear late.
 
-Does the workaround currently implemented in the linker also make this
-same assumption? If not, I'm a little wary that we're making an assumption
-about compiler behaviour with no way to detect whether its been violated or
-not.
+We should fail to bring them online. I think the infrastructure already
+exists for this and we used it for other errata already.
 
-> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> index ea640f92fe5a..93b808056cb4 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -41,6 +41,46 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
->  	return (u64)&plt[i];
->  }
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index bb263820de13..39134c46bb13 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -45,7 +45,8 @@
+>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>  #define ARM64_HAS_RAS_EXTN			26
+> +#define ARM64_WORKAROUND_843419			27
 >  
-> +#ifdef CONFIG_ARM64_ERRATUM_843419
-> +u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val)
+> -#define ARM64_NCAPS				27
+> +#define ARM64_NCAPS				28
+>  
+>  #endif /* __ASM_CPUCAPS_H */
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 07823595b7f0..c065d5649b1b 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -228,6 +228,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
+>  }
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+>  
+> +static bool __maybe_unused
+> +needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
+> +				int scope)
 > +{
-> +	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-> +							  &mod->arch.init;
-> +	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
-> +	int i = pltsec->plt_num_entries++;
-> +	u32 mov0, mov1, mov2, br;
-> +	int rd;
+> +	u32 cpuid = read_cpuid_id();
 > +
-> +	BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
+> +	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+> +
+> +	if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
+> +		return false;
+> +	else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
+> +		/* erratum was fixed in some versions of r0p4 */
+> +		return !(read_cpuid(REVIDR_EL1) & BIT(8));
 
-I'd prefer just to fail loading the module, but I see we already have
-a BUG_ON for the existing PLT code. Oh well.
-
-> +
-> +	/* get the destination register of the ADRP instruction */
-> +	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
-> +					  le32_to_cpup((__le32 *)loc));
-> +
-> +	/* generate the veneer instructions */
-> +	mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
-> +					 AARCH64_INSN_VARIANT_64BIT,
-> +					 AARCH64_INSN_MOVEWIDE_INVERSE);
-> +	mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
-> +					 AARCH64_INSN_VARIANT_64BIT,
-> +					 AARCH64_INSN_MOVEWIDE_KEEP);
-> +	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
-> +					 AARCH64_INSN_VARIANT_64BIT,
-> +					 AARCH64_INSN_MOVEWIDE_KEEP);
-> +	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
-> +					 AARCH64_INSN_BRANCH_NOLINK);
-> +
-> +	plt[i] = (struct plt_entry){
-> +			cpu_to_le32(mov0),
-> +			cpu_to_le32(mov1),
-> +			cpu_to_le32(mov2),
-> +			cpu_to_le32(br)
-> +		};
-> +
-> +	return (u64)&plt[i];
-> +}
-> +#endif
-> +
->  #define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
->  
->  static int cmp_rela(const void *a, const void *b)
-> @@ -68,16 +108,21 @@ static bool duplicate_rel(const Elf64_Rela *rela, int num)
->  }
->  
->  static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
-> -			       Elf64_Word dstidx)
-> +			       Elf64_Word dstidx, Elf_Shdr *dstsec)
->  {
->  	unsigned int ret = 0;
->  	Elf64_Sym *s;
->  	int i;
->  
->  	for (i = 0; i < num; i++) {
-> +		u64 min_align;
-> +
->  		switch (ELF64_R_TYPE(rela[i].r_info)) {
->  		case R_AARCH64_JUMP26:
->  		case R_AARCH64_CALL26:
-> +			if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-> +				break;
-> +
->  			/*
->  			 * We only have to consider branch targets that resolve
->  			 * to symbols that are defined in a different section.
-> @@ -109,6 +154,31 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
->  			if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
->  				ret++;
->  			break;
-> +		case R_AARCH64_ADR_PREL_PG_HI21_NC:
-> +		case R_AARCH64_ADR_PREL_PG_HI21:
-> +			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
-> +				break;
-> +
-> +			/*
-> +			 * Determine the minimal safe alignment for this ADRP
-> +			 * instruction: the section alignment at which it is
-> +			 * guaranteed not to appear at a vulnerable offset.
-> +			 */
-> +			min_align = 2 << ffz(rela[i].r_offset | 0x7);
-
-I'm struggling to decipher this, can you give me a hint please? Why 0x7? Is
-the "2" because of the two vulnerable offsets?
+The rXpY information is in the MIDR, so this is checking for something else
+afaict.
 
 Will
