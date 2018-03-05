@@ -1,41 +1,83 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon,  5 Mar 2018 10:35:33 +0100
-Subject: [PATCH 6/7] media: sun6i: Invert the polarities
+Date: Mon,  5 Mar 2018 10:35:34 +0100
+Subject: [PATCH 7/7] media: sun6i: Expose controls on the v4l2_device
 In-Reply-To: <20180305093535.11801-1-maxime.ripard@bootlin.com>
 References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
  <20180305093535.11801-1-maxime.ripard@bootlin.com>
-Message-ID: <20180305093535.11801-7-maxime.ripard@bootlin.com>
+Message-ID: <20180305093535.11801-8-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A good look at an oscilloscope and test with a camera have shown that the
-polarity of all signals are actually reversed compared to the polarity
-documented in the datasheet for the clock, HSYNC and VSYNC signals.
-
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c   | 8 ++++++++
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h   | 2 ++
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c | 6 ++++++
+ 3 files changed, 16 insertions(+)
 
 diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-index e0b39ea641aa..a93bc25ff372 100644
+index a93bc25ff372..26d57e6053df 100644
 --- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
 +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-@@ -398,12 +398,12 @@ static void sun6i_csi_setup_bus(struct sun6i_csi_dev *sdev)
- 		if (flags & V4L2_MBUS_FIELD_EVEN_LOW)
- 			cfg |= CSI_IF_CFG_FIELD_POSITIVE;
+@@ -729,7 +729,15 @@ static int sun6i_csi_v4l2_init(struct sun6i_csi *csi)
  
--		if (flags & V4L2_MBUS_VSYNC_ACTIVE_HIGH)
-+		if (flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
- 			cfg |= CSI_IF_CFG_VREF_POL_POSITIVE;
--		if (flags & V4L2_MBUS_HSYNC_ACTIVE_HIGH)
-+		if (flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
- 			cfg |= CSI_IF_CFG_HREF_POL_POSITIVE;
+ 	media_device_init(&csi->media_dev);
  
--		if (flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
-+		if (flags & V4L2_MBUS_PCLK_SAMPLE_RISING)
- 			cfg |= CSI_IF_CFG_CLK_POL_FALLING_EDGE;
- 		break;
- 	case V4L2_MBUS_BT656:
++	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
++	if (ret) {
++		dev_err(csi->dev, "V4L2 controls handler init failed (%d)\n",
++			ret);
++		goto clean_media;
++	}
++
+ 	csi->v4l2_dev.mdev = &csi->media_dev;
++	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
+ 	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
+ 	if (ret) {
+ 		dev_err(csi->dev, "V4L2 device registration failed (%d)\n",
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
+index c1a1e3aefaa8..c0e8b14073d1 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
+@@ -8,6 +8,7 @@
+ #ifndef __SUN6I_CSI_H__
+ #define __SUN6I_CSI_H__
+ 
++#include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
+ #include <media/v4l2-fwnode.h>
+ 
+@@ -33,6 +34,7 @@ struct sun6i_csi_config {
+ 
+ struct sun6i_csi {
+ 	struct device			*dev;
++	struct v4l2_ctrl_handler	ctrl_handler;
+ 	struct v4l2_device		v4l2_dev;
+ 	struct media_device		media_dev;
+ 
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
+index c74565d15014..bf7c0d1d1d47 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
+@@ -8,6 +8,7 @@
+ #include <linux/of.h>
+ 
+ #include <media/v4l2-device.h>
++#include <media/v4l2-event.h>
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-mc.h>
+ #include <media/videobuf2-dma-contig.h>
+@@ -497,6 +498,11 @@ static const struct v4l2_ioctl_ops sun6i_video_ioctl_ops = {
+ 	.vidioc_prepare_buf		= vb2_ioctl_prepare_buf,
+ 	.vidioc_streamon		= vb2_ioctl_streamon,
+ 	.vidioc_streamoff		= vb2_ioctl_streamoff,
++
++	.vidioc_log_status		= v4l2_ctrl_log_status,
++	.vidioc_subscribe_event		= v4l2_ctrl_subscribe_event,
++	.vidioc_unsubscribe_event	= v4l2_event_unsubscribe,
++
+ };
+ 
+ /* -----------------------------------------------------------------------------
 -- 
 2.14.3
