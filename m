@@ -1,34 +1,21 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 Mar 2018 22:08:14 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add dp83867 CLK_OUT muxing
-In-Reply-To: <3380975.Amu1WGHSQ5@diego>
-References: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
- <3380975.Amu1WGHSQ5@diego>
-Message-ID: <2707703.8mZIocJ1Ne@diego>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 5 Mar 2018 15:09:39 -0600
+Subject: [PATCH 5/8] dt-bindings: iommu/ipmmu-vmsa: Add R-Car M3-N
+ (R8A77965)
+In-Reply-To: <1519667836-31330-6-git-send-email-jacopo+renesas@jmondi.org>
+References: <1519667836-31330-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1519667836-31330-6-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180305210939.c74lfn7jwd3vvolm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 5. M?rz 2018, 21:25:30 CET schrieb Heiko St?bner:
-> Am Montag, 5. M?rz 2018, 13:45:11 CET schrieb Daniel Schultz:
-> > The CLK_O_SEL default is synchronous to XI input clock, which is 25 MHz.
-> > Set CLK_O_SEL to channel A transmit clock so we have 125 MHz on CLK_OUT.
-> > 
-> > Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
+On Mon, Feb 26, 2018 at 06:57:13PM +0100, Jacopo Mondi wrote:
+> Add Renesas R-Car M3-N (R8A77965) compat string to IPMMU DT bindings
+> documentation.
 > 
-> applied for 4.17
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> ---
+>  Documentation/devicetree/bindings/iommu/renesas,ipmmu-vmsa.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-had to move it to 4.18 though.
-
-The change to the dt-binding header goes through the networking
-tree and will only get merged for 4.17-rc1 .
-
-So devicetree changes in a different branch aren't available at this
-point.
-
-One commonly practiced alternative is that you provide a v2
-with the actual hex values instead of the constants for 4.17
-and a follow-up patch replacing them with the constants
-that I can apply for 4.18.
-
-
-Heiko
+Reviewed-by: Rob Herring <robh@kernel.org>
