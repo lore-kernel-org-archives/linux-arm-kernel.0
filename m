@@ -1,54 +1,112 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 5 Mar 2018 09:41:28 +0100
-Subject: [PATCH] ARM: mach-stm32: restore reboot capabilities
-In-Reply-To: <20180227143607.5583-1-benjamin.gaignard@st.com>
-References: <20180227143607.5583-1-benjamin.gaignard@st.com>
-Message-ID: <e98c78a4-e5d3-1b90-7ca5-7ab191dc8b43@st.com>
+Date: Mon, 5 Mar 2018 09:42:48 +0100
+Subject: [PATCH] ARM: dts: stm32: add SPI support on STM32H743 SoC
+In-Reply-To: <1519814190-3208-1-git-send-email-amelie.delaunay@st.com>
+References: <1519814190-3208-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <f14b8e89-6487-1a1c-7f66-a0dcd3cd705b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin
+Hi Am?lie
 
-On 02/27/2018 03:36 PM, Benjamin Gaignard wrote:
-> To be able to reboot the platform we need to use armv7m_restart for STM32
-> SoCs using ARMv7 cores.
+On 02/28/2018 11:36 AM, Amelie Delaunay wrote:
+> This patch adds all SPI instances of the STM32H743 SoC.
 > 
-> Fixes: e0644101bd2f ("ARM: mach-stm32: prepare stm32 family to welcome armv7 architecture)
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
-> NOTE: This patch should be applied only on
-> git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git stm32-next
-> until this patch: https://lkml.org/lkml/2018/2/26/386
-> find it way to mainline KBuild will complain about it.
-> 
->   arch/arm/mach-stm32/board-dt.c | 6 ++++++
->   1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-> index 06911ad60cea..011d57b488c2 100644
-> --- a/arch/arm/mach-stm32/board-dt.c
-> +++ b/arch/arm/mach-stm32/board-dt.c
-> @@ -7,6 +7,9 @@
->   
->   #include <linux/kernel.h>
->   #include <asm/mach/arch.h>
-> +#ifdef CONFIG_ARM_SINGLE_ARMV7M
-> +#include <asm/v7m.h>
-> +#endif
->   
->   static const char *const stm32_compat[] __initconst = {
->   	"st,stm32f429",
-> @@ -20,4 +23,7 @@ static const char *const stm32_compat[] __initconst = {
->   
->   DT_MACHINE_START(STM32DT, "STM32 (Device Tree Support)")
->   	.dt_compat = stm32_compat,
-> +#ifdef CONFIG_ARM_SINGLE_ARMV7M
-> +	.restart = armv7m_restart,
-> +#endif
->   MACHINE_END
 
 Applied on stm32-next.
 
 Thanks.
 Alex
+
+>   arch/arm/boot/dts/stm32h743.dtsi | 61 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 61 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+> index 3a28cd2..2bb103e 100644
+> --- a/arch/arm/boot/dts/stm32h743.dtsi
+> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+> @@ -101,6 +101,27 @@
+>   			};
+>   		};
+>   
+> +		spi2: spi at 40003800 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x40003800 0x400>;
+> +			interrupts = <36>;
+> +			clocks = <&rcc SPI2_CK>;
+> +			status = "disabled";
+> +
+> +		};
+> +
+> +		spi3: spi at 40003c00 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x40003c00 0x400>;
+> +			interrupts = <51>;
+> +			clocks = <&rcc SPI3_CK>;
+> +			status = "disabled";
+> +		};
+> +
+>   		usart2: serial at 40004400 {
+>   			compatible = "st,stm32f7-uart";
+>   			reg = <0x40004400 0x400>;
+> @@ -141,6 +162,36 @@
+>   			clocks = <&rcc USART1_CK>;
+>   		};
+>   
+> +		spi1: spi at 40013000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x40013000 0x400>;
+> +			interrupts = <35>;
+> +			clocks = <&rcc SPI1_CK>;
+> +			status = "disabled";
+> +		};
+> +
+> +		spi4: spi at 40013400 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x40013400 0x400>;
+> +			interrupts = <84>;
+> +			clocks = <&rcc SPI4_CK>;
+> +			status = "disabled";
+> +		};
+> +
+> +		spi5: spi at 40015000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x40015000 0x400>;
+> +			interrupts = <85>;
+> +			clocks = <&rcc SPI5_CK>;
+> +			status = "disabled";
+> +		};
+> +
+>   		dma1: dma at 40020000 {
+>   			compatible = "st,stm32-dma";
+>   			reg = <0x40020000 0x400>;
+> @@ -262,6 +313,16 @@
+>   			reg = <0x58000400 0x400>;
+>   		};
+>   
+> +		spi6: spi at 58001400 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32h7-spi";
+> +			reg = <0x58001400 0x400>;
+> +			interrupts = <86>;
+> +			clocks = <&rcc SPI6_CK>;
+> +			status = "disabled";
+> +		};
+> +
+>   		lptimer2: timer at 58002400 {
+>   			#address-cells = <1>;
+>   			#size-cells = <0>;
+> 
