@@ -1,75 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:42:50 +0000
-Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
- Cortex-A53 erratum #843419
-In-Reply-To: <CAKv+Gu91CfVq4nBsLhNRRkGN-0PevGeUPSRqLMf5hTWp9qa6vA@mail.gmail.com>
-References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-3-ard.biesheuvel@linaro.org>
- <20180305171831.GB12869@arm.com>
- <CAKv+Gu9cHHJN2JrxSeQCHihq0DNz1ZS5xeB4DAHEh5okufRpGw@mail.gmail.com>
- <20180305173428.GA13385@arm.com>
- <CAKv+Gu91CfVq4nBsLhNRRkGN-0PevGeUPSRqLMf5hTWp9qa6vA@mail.gmail.com>
-Message-ID: <20180305174250.GD13385@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 5 Mar 2018 11:46:46 -0600
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <d1b91c10-fe11-452e-2c68-86e95fb58266@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+ <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+ <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
+ <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
+ <CAMRc=Mdhi=byn4gPY6tVxgGjn9cgvc3smUkjV=Ku9i3euaZZtQ@mail.gmail.com>
+ <d1b91c10-fe11-452e-2c68-86e95fb58266@lechnology.com>
+Message-ID: <919e6c76-0818-b330-b0f0-71c3c3f4518d@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 05:41:17PM +0000, Ard Biesheuvel wrote:
-> On 5 March 2018 at 17:34, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Mar 05, 2018 at 05:26:35PM +0000, Ard Biesheuvel wrote:
-> >> On 5 March 2018 at 17:18, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
-> >> >> Working around Cortex-A53 erratum #843419 involves special handling of
-> >> >> ADRP instructions that end up in the last two instruction slots of a
-> >> >> 4k page, or whose output register gets overwritten without having been
-> >> >> read. (Note that the latter instruction sequence is never emitted by
-> >> >> a properly functioning compiler)
-> >> >
-> >> > Does the workaround currently implemented in the linker also make this
-> >> > same assumption? If not, I'm a little wary that we're making an assumption
-> >> > about compiler behaviour with no way to detect whether its been violated or
-> >> > not.
-> >> >
-> >>
-> >> I can check, but I don't see how a compiler would ever choose 'adrp'
-> >> when it emits what amounts to a nop instruction.
-> >
-> > Agreed, but it wouldn't be the first time we've seen compilers do weird
-> > things.
-> >
+On 03/05/2018 10:23 AM, David Lechner wrote:
+> On 03/05/2018 07:02 AM, Bartosz Golaszewski wrote:
+>> 2018-03-01 17:44 GMT+01:00 David Lechner <david@lechnology.com>:
+>>> On 03/01/2018 02:36 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>> 2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>>>
+>>>>> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> I think I found the reason for the strange crashes we were
+>>>>>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
+>>>>>> me in the right direction.
+>>>>>>
+>>>>>> The mdio driver fails to probe with v7 due to the supplied clock rate
+>>>>>> being wrong. Before failing we register the emac clock with
+>>>>>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
+>>>>>> reference count of the clock, but we never actually increased it in
+>>>>>> the first place in the line above. The core clock code then destroys
+>>>>>> the associated clk_core structure. When the next user comes around (in
+>>>>>> our case the clk debug functions) the system crashes.
+>>>>>>
+>>>>>> I believe there to be two issues: one is with v7 - we need to increase
+>>>>>> the clock reference count in davinci_psc_genpd_attach_dev().
+>>>>>>
+>>>>>> Second is the error path in the clock framework - we should remove the
+>>>>>> destroyed clk_core from the debug list, which is not being done now.
+>>>>>>
+>>>>>> Why we even need to track the refcount of clk_core is a mistery for me
+>>>>>> though. Stephen, Mike?
+>>>>>>
+>>>>>> Best regards,
+>>>>>> Bartosz Golaszewski
+>>>>>
+>>>>>
+>>>>>
+>>>>> Great find. I figured it had to be something like this, but I wasn't
+>>>>> able to reproduce the problem yet.
+>>>>>
+>>>>> I suppose it is time to spin up a v8 with some fixes.
+>>>>
+>>>>
+>>>> I still don't know why the mdio clock rate is much lower than in
+>>>> mainline though. Any ideas?
+>>>>
+>>>> Thanks,
+>>>> Bart
+>>>>
+>>>
+>>> Now that you have fixed the crash, can you answer the questions I have
+>>> asked earlier?
+>>>
+>>>> Can you post the output of this command so that I can see how your
+>>>
+>>> clocks are setup:
+>>>
+>>> cat /sys/kernel/debug/clk/clk_summary
+>>>
+>>>> Using your workaround, can you run:
+>>>
+>>>
+>>> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>>>
+>>> If you see:
+>>> ?? 1e27000.clock-controller: emac? off-0
+>>>
+>>> then genpd is not working like it is supposed to. You should see something
+>>> like this for device that are working:
+>>> ?????????? 1e27000.clock-controller: uart2? on
+>>> ???? /devices/platform/soc at 1c00000/1d0d000.serial??????? active
+>>
+>> Hi David, Sekhar,
+>>
+>> I tried booting the board today over tftp but didn't succeed. I then
+>> switched to a normal boot from SD card and the boot process froze at
+>> the same moment (right after the DHCP config, or after rtc config if I
+>> disabled DHCP in bootargs). I then realized that the emac clock can't
+>> be the culprit. After some digging I found out that the late_initcall
+>> to clk_disable_unused() disables sysclk6 - the parent of the arm
+>> clock, which of course freezes the device.
+>>
+>> If I remove the call to clk_disable_unused(), I can boot just fine.
+>>
+>> The following other clocks are disabled before pll0_sysclk6:
+>> pll1_sysclk3
+>> pll0_obsclk
+>> pll0_sysclk7
+>>
+>> davinci_lpsc_clk_enable() is never called for these clocks - in fact
+>> it's not called for any parent that's not explicitly defined in
+>> psc-da850.c - I believe this may be one of the reasons. I will get
+>> back to debugging it tomorrow.
+>>
+>> Best regards,
+>> Bartosz Golaszewski
+>>
 > 
-> I just checked ld.bfd: it only checks for sequence 1, which is the one
-> that affects ADRP instructions at offsets 0xfff8/0xfffc modulo 4 KB.
-> It actually checks more elaborately whether the sequence is in fact
-> vulnerable rather than assuming any ADRP instruction at such an offset
-> may be vulnerable, but in my testing of the current patches, I only
-> get a handful of them anyway of which the majority are resolved by
-> patching ADRP->ADR.
+> Thanks for continuing to dig into this. I think I know what needs to
+> be done now. I think I don't have the dependencies quite right where
+> the PSC clocks are being registered before the PLL clocks, in which
+> case they aren't getting the correct parent clock.
 > 
-> Sequence 2 is described as follows in the docs:
-> 
-> """
-> Sequence 2:
-> 1) An ADRP instruction, which writes to a register Rn.
-> 2) Another instruction which writes to Rn.
-> o This cannot be a branch or an ADRP.
-> o This cannot read Rn.
-> 3)
-> 4)
-> Another instruction.
-> o This cannot be a branch.
-> o This cannot write Rn.
-> o This may optionally read Rn.
-> A load or store instruction from the "Load/store register (unsigned
-> immediate)" encoding class, using Rn as the
-> base address register.
-> """
-> 
-> and ld.bfd does not check for it at all.
 
-In which case, the code you're proposing for modules is just as good as
-what we're doing for the kernel text itself. Might be worth mentioning that
-somewhere, but I think it's fine.
+Bartosz,
 
-Thanks for looking,
-
-Will
+One more thing to check: I think I had some typos in da850.dtsi where
+I wrote clock_names instead of clock-names. Please make sure this is
+fixed in your working branch.
