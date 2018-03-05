@@ -1,157 +1,121 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:15:29 +0000
-Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
- hardening
-In-Reply-To: <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
-References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
- <20180305155614.GG6618@arm.com>
- <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
-Message-ID: <20180305171529.GA12869@arm.com>
+Date: Mon, 5 Mar 2018 17:18:31 +0000
+Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
+ Cortex-A53 erratum #843419
+In-Reply-To: <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
+ <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+Message-ID: <20180305171831.GB12869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 10:57:58AM -0600, Shanker Donthineni wrote:
-> Hi Will,
-> 
-> On 03/05/2018 09:56 AM, Will Deacon wrote:
-> > Hi Shanker,
-> > 
-> > On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
-> >> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
-> >> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
-> >> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
-> >> of Silicon provider service ID 0xC2001700.
-> >>
-> >> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> >> ---
-> >>  arch/arm64/include/asm/cpucaps.h |  2 +-
-> >>  arch/arm64/include/asm/kvm_asm.h |  2 --
-> >>  arch/arm64/kernel/bpi.S          |  8 ------
-> >>  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
-> >>  arch/arm64/kvm/hyp/entry.S       | 12 ---------
-> >>  arch/arm64/kvm/hyp/switch.c      | 10 --------
-> >>  6 files changed, 20 insertions(+), 69 deletions(-)
-> > 
-> > I'm happy to take this via arm64 if I get an ack from Marc/Christoffer.
-> > 
-> >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> >> index bb26382..6ecc249 100644
-> >> --- a/arch/arm64/include/asm/cpucaps.h
-> >> +++ b/arch/arm64/include/asm/cpucaps.h
-> >> @@ -43,7 +43,7 @@
-> >>  #define ARM64_SVE				22
-> >>  #define ARM64_UNMAP_KERNEL_AT_EL0		23
-> >>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
-> >> -#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
-> >> +/* #define ARM64_UNALLOCATED_ENTRY			25 */
-> >>  #define ARM64_HAS_RAS_EXTN			26
-> >>  
-> >>  #define ARM64_NCAPS				27
-> > 
-> > These aren't ABI, so I think you can just drop
-> > ARM64_HARDEN_BP_POST_GUEST_EXIT and repack the others accordingly.
-> > 
-> Sure, I'll remove it completely in v2 patch.
->  
-> >> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> >> index 24961b7..ab4d0a9 100644
-> >> --- a/arch/arm64/include/asm/kvm_asm.h
-> >> +++ b/arch/arm64/include/asm/kvm_asm.h
-> >> @@ -68,8 +68,6 @@
-> >>  
-> >>  extern u32 __init_stage2_translation(void);
-> >>  
-> >> -extern void __qcom_hyp_sanitize_btac_predictors(void);
-> >> -
-> >>  #endif
-> >>  
-> >>  #endif /* __ARM_KVM_ASM_H__ */
-> >> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> >> index e5de335..dc4eb15 100644
-> >> --- a/arch/arm64/kernel/bpi.S
-> >> +++ b/arch/arm64/kernel/bpi.S
-> >> @@ -55,14 +55,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
-> >>  	.endr
-> >>  ENTRY(__bp_harden_hyp_vecs_end)
-> >>  
-> >> -ENTRY(__qcom_hyp_sanitize_link_stack_start)
-> >> -	stp     x29, x30, [sp, #-16]!
-> >> -	.rept	16
-> >> -	bl	. + 4
-> >> -	.endr
-> >> -	ldp	x29, x30, [sp], #16
-> >> -ENTRY(__qcom_hyp_sanitize_link_stack_end)
-> >> -
-> >>  .macro smccc_workaround_1 inst
-> >>  	sub	sp, sp, #(8 * 4)
-> >>  	stp	x2, x3, [sp, #(8 * 0)]
-> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> >> index 52f15cd..d779ffd4 100644
-> >> --- a/arch/arm64/kernel/cpu_errata.c
-> >> +++ b/arch/arm64/kernel/cpu_errata.c
-> >> @@ -67,8 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
-> >>  DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
-> >>  
-> >>  #ifdef CONFIG_KVM
-> >> -extern char __qcom_hyp_sanitize_link_stack_start[];
-> >> -extern char __qcom_hyp_sanitize_link_stack_end[];
-> >>  extern char __smccc_workaround_1_smc_start[];
-> >>  extern char __smccc_workaround_1_smc_end[];
-> >>  extern char __smccc_workaround_1_hvc_start[];
-> >> @@ -115,8 +113,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
-> >>  	spin_unlock(&bp_lock);
-> >>  }
-> >>  #else
-> >> -#define __qcom_hyp_sanitize_link_stack_start	NULL
-> >> -#define __qcom_hyp_sanitize_link_stack_end	NULL
-> >>  #define __smccc_workaround_1_smc_start		NULL
-> >>  #define __smccc_workaround_1_smc_end		NULL
-> >>  #define __smccc_workaround_1_hvc_start		NULL
-> >> @@ -161,12 +157,25 @@ static void call_hvc_arch_workaround_1(void)
-> >>  	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-> >>  }
-> >>  
-> >> +static void qcom_link_stack_sanitization(void)
-> >> +{
-> >> +	u64 tmp;
-> >> +
-> >> +	asm volatile("mov	%0, x30		\n"
-> >> +		     ".rept	16		\n"
-> >> +		     "bl	. + 4		\n"
-> >> +		     ".endr			\n"
-> >> +		     "mov	x30, %0		\n"
-> >> +		     : "=&r" (tmp));
-> >> +}
-> >> +
-> >>  static int enable_smccc_arch_workaround_1(void *data)
-> >>  {
-> >>  	const struct arm64_cpu_capabilities *entry = data;
-> >>  	bp_hardening_cb_t cb;
-> >>  	void *smccc_start, *smccc_end;
-> >>  	struct arm_smccc_res res;
-> >> +	u32 midr = read_cpuid_id();
-> >>  
-> >>  	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
-> >>  		return 0;
-> >> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
-> >>  		return 0;
-> >>  	}
-> >>  
-> >> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-> >> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
-> >> +		cb = qcom_link_stack_sanitization;
-> > 
-> > Is this just a performance thing? Do you actually see an advantage over
-> > always making the firmware call? We've seen minimal impact in our testing.
-> > 
-> 
-> Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
->   - Improves the code readability.
->   - Avoid the unnecessary MIDR checks on each vCPU exit.
->   - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
->   - Avoids the 2nd link stack sanitization workaround in firmware.
+On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
+> Working around Cortex-A53 erratum #843419 involves special handling of
+> ADRP instructions that end up in the last two instruction slots of a
+> 4k page, or whose output register gets overwritten without having been
+> read. (Note that the latter instruction sequence is never emitted by
+> a properly functioning compiler)
 
-What I mean is, can we drop qcom_link_stack_sanitization altogether and
-use the SMCCC interface for everything?
+Does the workaround currently implemented in the linker also make this
+same assumption? If not, I'm a little wary that we're making an assumption
+about compiler behaviour with no way to detect whether its been violated or
+not.
+
+> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+> index ea640f92fe5a..93b808056cb4 100644
+> --- a/arch/arm64/kernel/module-plts.c
+> +++ b/arch/arm64/kernel/module-plts.c
+> @@ -41,6 +41,46 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+>  	return (u64)&plt[i];
+>  }
+>  
+> +#ifdef CONFIG_ARM64_ERRATUM_843419
+> +u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val)
+> +{
+> +	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+> +							  &mod->arch.init;
+> +	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
+> +	int i = pltsec->plt_num_entries++;
+> +	u32 mov0, mov1, mov2, br;
+> +	int rd;
+> +
+> +	BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
+
+I'd prefer just to fail loading the module, but I see we already have
+a BUG_ON for the existing PLT code. Oh well.
+
+> +
+> +	/* get the destination register of the ADRP instruction */
+> +	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
+> +					  le32_to_cpup((__le32 *)loc));
+> +
+> +	/* generate the veneer instructions */
+> +	mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
+> +					 AARCH64_INSN_VARIANT_64BIT,
+> +					 AARCH64_INSN_MOVEWIDE_INVERSE);
+> +	mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
+> +					 AARCH64_INSN_VARIANT_64BIT,
+> +					 AARCH64_INSN_MOVEWIDE_KEEP);
+> +	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
+> +					 AARCH64_INSN_VARIANT_64BIT,
+> +					 AARCH64_INSN_MOVEWIDE_KEEP);
+> +	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
+> +					 AARCH64_INSN_BRANCH_NOLINK);
+> +
+> +	plt[i] = (struct plt_entry){
+> +			cpu_to_le32(mov0),
+> +			cpu_to_le32(mov1),
+> +			cpu_to_le32(mov2),
+> +			cpu_to_le32(br)
+> +		};
+> +
+> +	return (u64)&plt[i];
+> +}
+> +#endif
+> +
+>  #define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
+>  
+>  static int cmp_rela(const void *a, const void *b)
+> @@ -68,16 +108,21 @@ static bool duplicate_rel(const Elf64_Rela *rela, int num)
+>  }
+>  
+>  static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+> -			       Elf64_Word dstidx)
+> +			       Elf64_Word dstidx, Elf_Shdr *dstsec)
+>  {
+>  	unsigned int ret = 0;
+>  	Elf64_Sym *s;
+>  	int i;
+>  
+>  	for (i = 0; i < num; i++) {
+> +		u64 min_align;
+> +
+>  		switch (ELF64_R_TYPE(rela[i].r_info)) {
+>  		case R_AARCH64_JUMP26:
+>  		case R_AARCH64_CALL26:
+> +			if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> +				break;
+> +
+>  			/*
+>  			 * We only have to consider branch targets that resolve
+>  			 * to symbols that are defined in a different section.
+> @@ -109,6 +154,31 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>  			if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
+>  				ret++;
+>  			break;
+> +		case R_AARCH64_ADR_PREL_PG_HI21_NC:
+> +		case R_AARCH64_ADR_PREL_PG_HI21:
+> +			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
+> +				break;
+> +
+> +			/*
+> +			 * Determine the minimal safe alignment for this ADRP
+> +			 * instruction: the section alignment at which it is
+> +			 * guaranteed not to appear at a vulnerable offset.
+> +			 */
+> +			min_align = 2 << ffz(rela[i].r_offset | 0x7);
+
+I'm struggling to decipher this, can you give me a hint please? Why 0x7? Is
+the "2" because of the two vulnerable offsets?
 
 Will
