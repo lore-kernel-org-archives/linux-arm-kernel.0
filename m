@@ -1,78 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Mar 2018 10:15:29 +0000
-Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
- CONFIG_RANDOMIZE_BASE=y
-In-Reply-To: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
-References: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu_k6Dat=5oo3gYLR0E19YfDSjTFYs2vfzqBdx55rm4oFA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  5 Mar 2018 11:17:02 +0100
+Subject: [PATCH] drm/bridge: sii902x: Retry status read after DDI I2C
+Message-ID: <20180305101702.13441-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2018 at 10:08, Will Deacon <will.deacon@arm.com> wrote:
-> TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
-> memory accesses (e.g. speculative accesses from a first-fault gather load)
-> which translate via TTBR1_EL1 result in a translation fault if they
-> miss in the TLB when executed from EL0. This mitigates some timing attacks
-> against KASLR, where the kernel address space could otherwise be probed
-> efficiently using the FFR in conjunction with suppressed faults on SVE
-> loads.
->
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->
-> Sending as RFC because this doesn't make any difference if kpti is enabled,
-> which is the default with KASLR. It helps if kpti=off is being passed and
-> shouldn't have an impact on performance.
->
+The following happens when connection a DVI output driven
+from the SiI9022 using a DVI-to-VGA adapter plug:
 
-This just makes it harder/slower to probe the kernel address space
-using SVE instructions, right?
+i2c i2c-0: sendbytes: NAK bailout.
+i2c i2c-0: sendbytes: NAK bailout.
 
->  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
->  arch/arm64/mm/proc.S                   | 9 ++++++++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index cdfe3e657a9e..fd208eac9f2a 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -291,6 +291,7 @@
->  #define TCR_TBI0               (UL(1) << 37)
->  #define TCR_HA                 (UL(1) << 39)
->  #define TCR_HD                 (UL(1) << 40)
-> +#define TCR_NFD1               (UL(1) << 54)
->
->  /*
->   * TTBR.
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index c0af47617299..8f074d64b760 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -36,6 +36,12 @@
->  #define TCR_TG_FLAGS   TCR_TG0_4K | TCR_TG1_4K
->  #endif
->
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +#define TCR_KASLR_FLAGS        TCR_NFD1
-> +#else
-> +#define TCR_KASLR_FLAGS        0
-> +#endif
-> +
->  #define TCR_SMP_FLAGS  TCR_SHARED
->
->  /* PTWs cacheable, inner/outer WBWA */
-> @@ -432,7 +438,8 @@ ENTRY(__cpu_setup)
->          * both user and kernel.
->          */
->         ldr     x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
-> -                       TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
-> +                       TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
-> +                       TCR_TBI0 | TCR_A1
->         tcr_set_idmap_t0sz      x10, x9
->
->         /*
-> --
-> 2.1.4
->
+Then no picture. Apparently the I2C engine inside the SiI9022
+is not smart enough to try to fall back to DDC I2C. Or the
+vendor have not integrated the electronics properly. I don't
+know which one it is.
+
+After this, the I2C bus seems stalled and the first attempt to
+read the status register fails, and the code returns with
+negative return value, and the display fails to initialized.
+
+Instead, retry status readout five times and continue even
+if this fails.
+
+Tested on the ARM Versatile Express with a DVI-to-VGA
+connector, it now gives picture.
+
+Introduce a helper struct device *dev variable to make
+the code more readable.
+
+Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Found the real problem instead of trying to explicitly
+  shoehorn EDID modes into the error path.
+---
+ drivers/gpu/drm/bridge/sii902x.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
+index b1ab4ab09532..60373d7eb220 100644
+--- a/drivers/gpu/drm/bridge/sii902x.c
++++ b/drivers/gpu/drm/bridge/sii902x.c
+@@ -137,7 +137,9 @@ static int sii902x_get_modes(struct drm_connector *connector)
+ 	struct sii902x *sii902x = connector_to_sii902x(connector);
+ 	struct regmap *regmap = sii902x->regmap;
+ 	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
++	struct device *dev = &sii902x->i2c->dev;
+ 	unsigned long timeout;
++	unsigned int retries;
+ 	unsigned int status;
+ 	struct edid *edid;
+ 	int num = 0;
+@@ -159,7 +161,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
+ 		 time_before(jiffies, timeout));
+ 
+ 	if (!(status & SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
+-		dev_err(&sii902x->i2c->dev, "failed to acquire the i2c bus\n");
++		dev_err(dev, "failed to acquire the i2c bus\n");
+ 		return -ETIMEDOUT;
+ 	}
+ 
+@@ -179,9 +181,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA, &status);
++	/*
++	 * Sometimes the I2C bus can stall after failure to use the
++	 * EDID channel. Retry a few times to see if things clear
++	 * up, else continue anyway.
++	 */
++	retries = 5;
++	do {
++		ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA,
++				  &status);
++		retries--;
++	} while (ret && retries);
+ 	if (ret)
+-		return ret;
++		dev_err(dev, "failed to read status (%d)\n", ret);
+ 
+ 	ret = regmap_update_bits(regmap, SII902X_SYS_CTRL_DATA,
+ 				 SII902X_SYS_CTRL_DDC_BUS_REQ |
+@@ -201,7 +213,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
+ 
+ 	if (status & (SII902X_SYS_CTRL_DDC_BUS_REQ |
+ 		      SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
+-		dev_err(&sii902x->i2c->dev, "failed to release the i2c bus\n");
++		dev_err(dev, "failed to release the i2c bus\n");
+ 		return -ETIMEDOUT;
+ 	}
+ 
+-- 
+2.14.3
