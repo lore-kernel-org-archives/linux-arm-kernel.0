@@ -1,104 +1,70 @@
-From: musashino.open@gmail.com (musashino.open at gmail.com)
-Date: Mon,  5 Mar 2018 23:36:03 +0900
-Subject: [PATCH] ARM: dts: BCM5301X: add missing LEDs for Buffalo WZR-900DHP
-Message-ID: <1520260563-4167-1-git-send-email-musashino.open@gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 5 Mar 2018 22:39:04 +0800
+Subject: [PATCH] soc: rockchip: disable jtag switching for RK3128 SoCs
+In-Reply-To: <20180302122031.17426-1-heiko@sntech.de>
+References: <20180302122031.17426-1-heiko@sntech.de>
+Message-ID: <7020f92d-cc0e-745e-713b-3aa847b7e939@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: INAGAKI Hiroshi <musashino.open@gmail.com>
+On 2018/3/2 20:20, Heiko Stuebner wrote:
+> From: Xiao Yao <xiaoyao@rock-chips.com>
+> 
+> Disable IO function switching between sdmmc and jtag
+> for RK3128 SoCs.
+> 
 
-Buffalo WZR-900DHP has 8 LEDs, but there is not LED definitions in the
-dts and cannot configure these LEDs.
-I Added missing LED definitions for WZR-900DHP.
+I acked this on the vendor kernel tree, so FWIW:
 
-Signed-off-by: INAGAKI Hiroshi <musashino.open@gmail.com>
----
- arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 73 +++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-index 8bef642..fa8f917 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-@@ -35,6 +35,79 @@
- 		       0x88000000 0x08000000>;
- 	};
- 
-+	spi {
-+		compatible = "spi-gpio";
-+		num-chipselects = <1>;
-+		gpio-sck = <&chipcommon 7 0>;
-+		gpio-mosi = <&chipcommon 4 0>;
-+		cs-gpios = <&chipcommon 6 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		hc595: gpio_spi at 0 {
-+			compatible = "fairchild,74hc595";
-+			reg = <0>;
-+			registers-number = <1>;
-+			spi-max-frequency = <100000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		usb {
-+			label = "bcm53xx:green:usb";
-+			gpios = <&hc595 0 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		power0 {
-+			label = "bcm53xx:green:power";
-+			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power1 {
-+			label = "bcm53xx:red:power";
-+			gpios = <&hc595 2 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		router0 {
-+			label = "bcm53xx:green:router";
-+			gpios = <&hc595 3 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		router1 {
-+			label = "bcm53xx:amber:router";
-+			gpios = <&hc595 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan {
-+			label = "bcm53xx:green:wan";
-+			gpios = <&hc595 5 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		wireless0 {
-+			label = "bcm53xx:green:wireless";
-+			gpios = <&hc595 6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wireless1 {
-+			label = "bcm53xx:amber:wireless";
-+			gpios = <&hc595 7 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
+Hope this is one of the final patches for that, as I would
+revive IO function switching between sdmmc and jtag for newer
+SoCs after addressing the problem from HW level.
+
+
+
+> Signed-off-by: Xiao Yao <xiaoyao@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   drivers/soc/rockchip/grf.c | 14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
+> index dd81b87d79f0..96882ffde67e 100644
+> --- a/drivers/soc/rockchip/grf.c
+> +++ b/drivers/soc/rockchip/grf.c
+> @@ -43,6 +43,17 @@ static const struct rockchip_grf_info rk3036_grf __initconst = {
+>   	.num_values = ARRAY_SIZE(rk3036_defaults),
+>   };
+>   
+> +#define RK3128_GRF_SOC_CON0		0x140
+> +
+> +static const struct rockchip_grf_value rk3128_defaults[] __initconst = {
+> +	{ "jtag switching", RK3128_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 8) },
+> +};
+> +
+> +static const struct rockchip_grf_info rk3128_grf __initconst = {
+> +	.values = rk3128_defaults,
+> +	.num_values = ARRAY_SIZE(rk3128_defaults),
+> +};
+> +
+>   #define RK3228_GRF_SOC_CON6		0x418
+>   
+>   static const struct rockchip_grf_value rk3228_defaults[] __initconst = {
+> @@ -102,6 +113,9 @@ static const struct of_device_id rockchip_grf_dt_match[] __initconst = {
+>   	{
+>   		.compatible = "rockchip,rk3036-grf",
+>   		.data = (void *)&rk3036_grf,
+> +	}, {
+> +		.compatible = "rockchip,rk3128-grf",
+> +		.data = (void *)&rk3128_grf,
+>   	}, {
+>   		.compatible = "rockchip,rk3228-grf",
+>   		.data = (void *)&rk3228_grf,
+> 
+
+
 -- 
-2.7.4
+Best Regards
+Shawn Lin
