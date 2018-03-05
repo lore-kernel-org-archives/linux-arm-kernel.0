@@ -1,120 +1,97 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 5 Mar 2018 12:21:05 +0100
-Subject: [GIT PULL] STM32 DT changes for v4.17 #1
-Message-ID: <ce2aab85-1b5c-6fa0-3f5d-0e2ecea61906@st.com>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 5 Mar 2018 11:24:13 +0000
+Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
+In-Reply-To: <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+ <20180227095028.GG21033@krava>
+ <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+ <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
+ <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+ <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
+Message-ID: <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+>> I am seeing issue(log below) with this patchset on our platfrom.
+>> i have tried using your v2 branch [1]
+>>
+>> root at borg-1>perf_acme>> ./perf --version
+>> perf version 4.16.rc1.g087f7ca
+>> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
+>>
+>>  Performance counter stats for 'sleep 1':
+>>
+>>             23,099      bus_access_rd
+>>
+>>        1.000708516 seconds time elapsed
+>>
+>> root at borg-1>perf_acme>> cd -
+>> /ganapat/perf/linux-hisi/tools/perf
+>> root at borg-1>perf>> ./perf --version
+>> perf version 4.16.rc1.gcb5a74
+>> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
+>>
+>>  Performance counter stats for 'sleep 1':
+>>
+>>                  0      bus_access_rd
+>>
+>>        1.000709162 seconds time elapsed
+>>
+>> root at borg-1>perf>>
+>>
+>>
+>> [1] https://github.com/hisilicon/linux-hisi.git
+>>
+> Hi,
 
-Please consider this first round of STM32 DT updates for v4.17:
+Hi Will Cohen, Ganapatrao,
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+> I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.  For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.  That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
+>
 
-   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Thanks for this. I see the problem. At the end I missed bringing across 
+something from v1. Easily fixed.
 
-are available in the git repository at:
+> Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.  This would further reduce the amount of redundant fields between the specific implementations and the common set.
+>
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-dt-for-v4.17-1
+I did consider it and it could work. But it all depends on whether the 
+"EventName" only is always readable/descriptive enough in the JSON, 
+without requiring the "BriefDescription". The "EventName" can be rather 
+succinct for any arch. And we need to guarantee that the "EventName" is 
+unique.
 
-for you to fetch changes up to 193ca00b820c9d95955ba36e3882f4a060e2559e:
+Here's a sample:
+[
+     {
+         "ArchStdEvent": "L1D_CACHE_RD",
+     },
+     {
+         "ArchStdEvent": "L1D_CACHE_WR",
+     },
 
-   ARM: dts: stm32: Fix sdio2 rcc hard coded value (2018-03-05 09:04:25 
-+0100)
+vs.
 
-----------------------------------------------------------------
-STM32 DT updates for v4.17, round 1
+[
+     {
+         "ArchStdEvent": "0x40",
+         "BriefDescription": "L1D cache access, read"
+     },
+     {
+         "ArchStdEvent": "0x41",
+         "BriefDescription": "L1D cache access, write"
+     },
 
-Highlights:
------------
-  -Add support of STM32MP157 MPU and stm32mp157c eval board
-  -Add SD supports on F4 and F7 boards
-  -Add leds support on stm32f469 and stm32f769 disco boards
-  -Add push button support on stm32f469 and stm32f769 disco boards
-  -Add EXTI, SPI, RTC, USB HS/FS support on STM32H743 MCU
-  -Add RTC and USB OTG HS on stm32f769-disco
-  -Use dedicated files for F7 pinctrl
 
-----------------------------------------------------------------
-Alexandre Torgue (2):
-       dt-bindings: pinctrl: Add st,stm32f769-pinctrl compatible to 
-stm32-pinctrl
-       ARM: dts: stm32: use dedicated files for pinctrl on stm32f7 family
+Opinion?
 
-Amelie Delaunay (9):
-       ARM: dts: stm32: add gadget fifo sizes to usbotg_hs on stm32f746
-       ARM: dts: stm32: select otg mode for usbotg_hs on stm32746g_eval
-       ARM: dts: stm32: enable USB HS on stm32f769-disco
-       ARM: dts: stm32: enable RTC on stm32f769-disco
-       ARM: dts: stm32: add USB OTG HS and FS support for STM32H743 SoC
-       ARM: dts: stm32: enable USB OTG HS on stm32h743i-eval
-       ARM: dts: stm32: add RTC support on STM32H743
-       ARM: dts: stm32: enable RTC on stm32h743i-eval
-       ARM: dts: stm32: add SPI support on STM32H743 SoC
+John
 
-Andrea Merello (1):
-       ARM: dts: stm32: Add pin map for SDIO controller on stm32f4
+> -Will
+>
+> .
+>
 
-Benjamin Gaignard (4):
-       ARM: dts: stm32: Add leds support to stm32f469 Discovery board
-       ARM: dts: stm32: Add leds support to stm32f769 Discovery board
-       ARM: dts: stm32: Add push button to stm32f469 Discovery board
-       ARM: dts: stm32: Add push button to stm32f769 Discovery board
-
-Ludovic Barre (6):
-       ARM: dts: stm32: add exti support for stm32h743
-       ARM: dts: stm32: add system config bank node for stm32h743
-       ARM: dts: stm32: add support of exti on stm32h743 pinctrl
-       ARM: dts: stm32: add stm32mp157c initial support
-       ARM: dts: stm32: add initial support of stm32mp157c eval board
-       dt-bindings: stm32: add support of STM32MP157
-
-Mathieu Malaterre (1):
-       ARM: dts: stm32: dts: Remove leading 0x and 0s from bindings notation
-
-Patrice Chotard (11):
-       ARM: dts: stm32: Add SDIO controller for stm32f746
-       ARM: dts: stm32: Add SDIO controller for stm32f429
-       ARM: dts: stm32: Enable SDIO controller on stm32f469 disco board
-       ARM: dts: stm32: Enable SDIO controller on stm32429i-eval board
-       ARM: dts: stm32: Fix HSE clock frequency for stm32h743i-disco board
-       ARM: dts: stm32: Add sdio pins definition for stm32f7
-       ARM: dts: stm32: Enable sdio1 for stm32f746-disco
-       ARM: dts: stm32: Enable sdio1 for stm32f746-eval
-       ARM: dts: stm32: Enable sdio1 for stm32f769-disco
-       dt-bindings: mfd: Add STM32F7 SDMMC2 rcc entry
-       ARM: dts: stm32: Fix sdio2 rcc hard coded value
-
-  Documentation/devicetree/bindings/arm/stm32.txt    |   1 +
-  .../bindings/pinctrl/st,stm32-pinctrl.txt          |   1 +
-  arch/arm/boot/dts/Makefile                         |   6 +-
-  arch/arm/boot/dts/stm32429i-eval.dts               |  19 ++
-  arch/arm/boot/dts/stm32746g-eval.dts               |  20 +-
-  arch/arm/boot/dts/stm32f4-pinctrl.dtsi             |  31 +++
-  arch/arm/boot/dts/stm32f429.dtsi                   |  11 +
-  arch/arm/boot/dts/stm32f469-disco.dts              |  50 ++++
-  arch/arm/boot/dts/stm32f7-pinctrl.dtsi             | 289 
-+++++++++++++++++++++
-  arch/arm/boot/dts/stm32f746-disco.dts              |  20 ++
-  arch/arm/boot/dts/stm32f746-pinctrl.dtsi           |  11 +
-  arch/arm/boot/dts/stm32f746.dtsi                   | 242 ++---------------
-  arch/arm/boot/dts/stm32f769-disco.dts              |  65 ++++-
-  arch/arm/boot/dts/stm32f769-pinctrl.dtsi           |  11 +
-  arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  44 ++++
-  arch/arm/boot/dts/stm32h743.dtsi                   | 112 +++++++-
-  arch/arm/boot/dts/stm32h743i-disco.dts             |   2 +-
-  arch/arm/boot/dts/stm32h743i-eval.dts              |  20 ++
-  arch/arm/boot/dts/stm32mp157-pinctrl.dtsi          | 185 +++++++++++++
-  arch/arm/boot/dts/stm32mp157c-ed1.dts              |  32 +++
-  arch/arm/boot/dts/stm32mp157c-ev1.dts              |  21 ++
-  arch/arm/boot/dts/stm32mp157c.dtsi                 | 194 ++++++++++++++
-  include/dt-bindings/mfd/stm32f7-rcc.h              |   1 +
-  23 files changed, 1165 insertions(+), 223 deletions(-)
-  create mode 100644 arch/arm/boot/dts/stm32f7-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/stm32f746-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/stm32f769-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
-  create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
-  create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
+thanks,
+John
