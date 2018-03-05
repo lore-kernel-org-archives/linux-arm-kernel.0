@@ -1,46 +1,130 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 5 Mar 2018 09:43:49 +0100
-Subject: [PATCH v2 0/6] Add mmc support for STM32F7 boards
-In-Reply-To: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
-References: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <44ed2e2c-83f1-77f5-fa70-29c5525b9ee7@st.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 5 Mar 2018 09:58:41 +0100
+Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
+In-Reply-To: <20180221130757.al7i57kiptrqh4j2@flea.lan>
+References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+ <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
+ <20180216182041.GU5453@intel.com> <1841868.3gpkeNesVL@avalon>
+ <CAKMK7uH+jiKt9pV+9OoXWCUr=yBGiNVh-iv600P-LVvBYcz_rw@mail.gmail.com>
+ <20180221130757.al7i57kiptrqh4j2@flea.lan>
+Message-ID: <20180305085841.GF22212@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
+On Wed, Feb 21, 2018 at 02:07:57PM +0100, Maxime Ripard wrote:
+> On Mon, Feb 19, 2018 at 10:58:40PM +0100, Daniel Vetter wrote:
+> > On Mon, Feb 19, 2018 at 9:19 PM, Laurent Pinchart
+> > <laurent.pinchart@ideasonboard.com> wrote:
+> > > Hi Ville,
+> > >
+> > > On Friday, 16 February 2018 20:20:41 EET Ville Syrj?l? wrote:
+> > >> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
+> > >> > Some drivers duplicate the logic to create a property to store a per-plane
+> > >> > alpha.
+> > >> >
+> > >> > This is especially useful if we ever want to support extra protocols for
+> > >> > Wayland like:
+> > >> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.ht
+> > >> > ml
+> > >> >
+> > >> > Let's create a helper in order to move that to the core.
+> > >> >
+> > >> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > >> > Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> > >> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > >> > ---
+> > >> >
+> > >> >  Documentation/gpu/kms-properties.csv |  2 +-
+> > >> >  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
+> > >> >  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
+> > >> >  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
+> > >> >  include/drm/drm_blend.h              |  1 +-
+> > >> >  include/drm/drm_plane.h              |  6 +++++-
+> > >> >  6 files changed, 48 insertions(+), 1 deletion(-)
+> > >> >
+> > >> > diff --git a/Documentation/gpu/kms-properties.csv
+> > >> > b/Documentation/gpu/kms-properties.csv index 927b65e14219..25ad3503d663
+> > >> > 100644
+> > >> > --- a/Documentation/gpu/kms-properties.csv
+> > >> > +++ b/Documentation/gpu/kms-properties.csv
+> > >> > @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0,
+> > >> > Max=1",Connector,TBD>
+> > >> >  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+> > >> >  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+> > >> >  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+> > >> >
+> > >> > -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+> > >> > +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the
+> > >> > plane from transparent (0) to fully opaque (MAX). If this property is set
+> > >> > to a value different than max, and that the pixel will define an alpha
+> > >> > component, the property will have precendance and the pixel value will be
+> > >> > ignored.
+> > 
+> > Please don't document new properties in that csv file, it's an
+> > unreadable mess. Instead follow how we document standardized
+> > properties nowadays in full-blown sections. For plane blending we
+> > have:
+> > 
+> > https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#plane-composition-properties
+> 
+> Ack
+> 
+> > >> > diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
+> > >> > index 8185e3468a23..5a6f29524f12 100644
+> > >> > --- a/include/drm/drm_plane.h
+> > >> > +++ b/include/drm/drm_plane.h
+> > >> > @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
+> > >> >   * plane (in 16.16)
+> > >> >   * @src_w: width of visible portion of plane (in 16.16)
+> > >> >   * @src_h: height of visible portion of plane (in 16.16)
+> > >> > + * @alpha: opacity of the plane
+> > >> >   * @rotation: rotation of the plane
+> > >> >   * @zpos: priority of the given plane on crtc (optional)
+> > >> >   * Note that multiple active planes on the same crtc can have an
+> > >> >   identical
+> > >> > @@ -105,6 +106,9 @@ struct drm_plane_state {
+> > >> >     uint32_t src_x, src_y;
+> > >> >     uint32_t src_h, src_w;
+> > >> >
+> > >> > +   /* Plane opacity */
+> > >> > +   u8 alpha;
+> > >>
+> > >> We may want to make that u16. The general we expect 16bpc for most color
+> > >> related things, but since this is a range prop I suppose we should just
+> > >> expose the actual hardware range. But making it u16 might avoid some head
+> > >> scratching for the first person to have hardware with higher precision.
+> > >> Either that or we should make the prop creation fail if the driver asks
+> > >> for more bits than we have in the state.
+> > >
+> > > I'm tempted to go one step further and always make the alpha property 16-bits
+> > > wide for new users (we can't do so for existing users as it could break
+> > > userspace), and let drivers convert that internally to the range they need.
+> > > There could however be drawbacks I don't foresee.
+> > 
+> > I think scaling the range to match the hw is the most sensible (yes
+> > I'm flip-flopping around here). And once someone needs more than u8,
+> > we can extend the internal representation easily. The external
+> > representation in the property is an u64, that /should/ be enough for
+> > the next few years :-)
+> 
+> Just to make sure we're on the same page, you want to keep the u8, and
+> if the hardware uses say an u16, the driver for that hardware will do
+> the upscaling?
 
-On 03/01/2018 11:53 AM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> This series adds :
->   _ SDIO pins definition for STM32F7 SoCs family
->   _ add sdio1 DT entry for STM32F746 Discovery board
->   _ add sdio1 DT entry for STM32F746 Evaluation board
->   _ add sdio1 DT entry for STM32F769 Discovery board
->   _ add SDMMC2 entry in stm32f7-rcc.h
->   _ replace sdio2 hard coded value in stm32f746.dtsi
-> 
-> v2: _ rename sdio_pins / sdio_od_pins to sdio_pins_a / sdio_od_pins_a
->        and update board dts files accordingly.
-> 
-> 
-> Patrice Chotard (6):
->    ARM: dts: stm32: Add sdio pins definition for stm32f7
->    ARM: dts: stm32: Enable sdio1 for stm32f746-disco
->    ARM: dts: stm32: Enable sdio1 for stm32f746-eval
->    ARM: dts: stm32: Enable sdio1 for stm32f769-disco
->    dt-bindings: mfd: Add STM32F7 SDMMC2 rcc entry
->    ARM: dts: stm32: Fix sdio2 rcc hard coded value
-> 
->   arch/arm/boot/dts/stm32746g-eval.dts   | 17 ++++++++++
->   arch/arm/boot/dts/stm32f7-pinctrl.dtsi | 62 ++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/stm32f746-disco.dts  | 19 +++++++++++
->   arch/arm/boot/dts/stm32f746.dtsi       |  2 +-
->   arch/arm/boot/dts/stm32f769-disco.dts  | 19 +++++++++++
->   include/dt-bindings/mfd/stm32f7-rcc.h  |  1 +
->   6 files changed, 119 insertions(+), 1 deletion(-)
-> 
-Series applied on stm32-next.
+The idea is that we'd set the u16 limit in the property and so inform
+userspace that a different range applies. But that's probably going to be
+ignored.
 
-Regards
-Alex
+Could we do the property itself as u16 range, and (for now, only
+internally in drm in drm_plane_state) throw the lower u8 bits away? Or
+just let drivers do this.
+
+Sorry that I'm flip-flopping around on this, but we just have an ongoing
+discussion about a range/size mixup in the CTM uapi, I think assuming that
+all userspace will correctly scale is not realistic. So larger scale in
+the uapi (but maybe not internally) from the start seems like a good idea.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
