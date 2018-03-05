@@ -1,60 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 15:56:29 +0000
-Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
- fault on kernel VA
-In-Reply-To: <dbabd287-2f8e-f1e8-0a2b-8b901f656114@arm.com>
-References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
- <dbabd287-2f8e-f1e8-0a2b-8b901f656114@arm.com>
-Message-ID: <20180305155629.GJ6618@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 5 Mar 2018 16:05:51 +0000
+Subject: [PATCH] drm/bridge: sii902x: Retry status read after DDI I2C
+In-Reply-To: <20180305101702.13441-1-linus.walleij@linaro.org>
+References: <20180305101702.13441-1-linus.walleij@linaro.org>
+Message-ID: <20180305160551.GD16053@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 01:27:47PM +0000, Robin Murphy wrote:
-> On 05/03/18 10:31, Will Deacon wrote:
-> >User faults on kernel addresses are a good sign that the faulting task
-> >is either up to no good or is in deep trouble. In such situations,
-> >exposing the optional ESR context on the sigframe as part of the
-> >delivered signal is only useful to attackers who are using information
-> >about underlying hardware fault (e.g. translation vs permission) as a
-> >mechanism to defeat KASLR.
-> >
-> >Remove the ESR context from the sigframe for user faults on kernel
-> >addresses.
-> >
-> >Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >Cc: Dave Martin <Dave.Martin@arm.com>
-> >Signed-off-by: Will Deacon <will.deacon@arm.com>
-> >---
-> >
-> >Here's another one that doesn't make a huge amount of difference when
-> >kpti is enabled, but I think is a change worth making all the same.
-> >
-> >  arch/arm64/mm/fault.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> >index 49dfb08a6c4d..b9800395788e 100644
-> >--- a/arch/arm64/mm/fault.c
-> >+++ b/arch/arm64/mm/fault.c
-> >@@ -292,8 +292,10 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
-> >  static void __do_user_fault(struct siginfo *info, unsigned int esr)
-> >  {
-> >-	current->thread.fault_address = (unsigned long)info->si_addr;
-> >-	current->thread.fault_code = esr;
-> >+	unsigned long addr = (unsigned long)info->si_addr;
-> >+
-> >+	current->thread.fault_address = addr;
-> >+	current->thread.fault_code = addr < TASK_SIZE ? esr : 0;
+On Mon, Mar 05, 2018 at 11:17:02AM +0100, Linus Walleij wrote:
+> The following happens when connection a DVI output driven
+> from the SiI9022 using a DVI-to-VGA adapter plug:
 > 
-> Nit: there are still non-kernel addresses above TASK_SIZE which would only
-> imply a wild pointer rather than nefarious misdeeds, but I guess if you can
-> already see that the faulting address is in the hole you don't really need a
-> level 0 translation fault spelled out. More generally though, if there's a
-> chance that someone might still try to interpret fault_code as an ESR value
-> regardless of what happened, should we be setting it to ESR_ELx_IL rather
-> than 0, to be consistent with the implied "Unknown reason" EC value?
+> i2c i2c-0: sendbytes: NAK bailout.
+> i2c i2c-0: sendbytes: NAK bailout.
+> 
+> Then no picture. Apparently the I2C engine inside the SiI9022
+> is not smart enough to try to fall back to DDC I2C. Or the
+> vendor have not integrated the electronics properly. I don't
+> know which one it is.
+> 
+> After this, the I2C bus seems stalled and the first attempt to
+> read the status register fails, and the code returns with
+> negative return value, and the display fails to initialized.
+> 
+> Instead, retry status readout five times and continue even
+> if this fails.
+> 
+> Tested on the ARM Versatile Express with a DVI-to-VGA
+> connector, it now gives picture.
+> 
+> Introduce a helper struct device *dev variable to make
+> the code more readable.
+> 
+> Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
 
-0 is a magic value, which means that the ESR record gets omitted from the
-sigframe entirely (see setup_sigframe_layout).
+I don't have a suitable configuration to test this, but looks goot to me.
 
-Will
+Reviewed-by: Liviu Dudau <liviu.dudau@arm.com>
+
+BTW, Linus, could it be that your DVI-to-VGA connector doesn't wire
+correctly the EDID pin?
+
+Best regards,
+Liviu
+
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Found the real problem instead of trying to explicitly
+>   shoehorn EDID modes into the error path.
+> ---
+>  drivers/gpu/drm/bridge/sii902x.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
+> index b1ab4ab09532..60373d7eb220 100644
+> --- a/drivers/gpu/drm/bridge/sii902x.c
+> +++ b/drivers/gpu/drm/bridge/sii902x.c
+> @@ -137,7 +137,9 @@ static int sii902x_get_modes(struct drm_connector *connector)
+>  	struct sii902x *sii902x = connector_to_sii902x(connector);
+>  	struct regmap *regmap = sii902x->regmap;
+>  	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+> +	struct device *dev = &sii902x->i2c->dev;
+>  	unsigned long timeout;
+> +	unsigned int retries;
+>  	unsigned int status;
+>  	struct edid *edid;
+>  	int num = 0;
+> @@ -159,7 +161,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
+>  		 time_before(jiffies, timeout));
+>  
+>  	if (!(status & SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
+> -		dev_err(&sii902x->i2c->dev, "failed to acquire the i2c bus\n");
+> +		dev_err(dev, "failed to acquire the i2c bus\n");
+>  		return -ETIMEDOUT;
+>  	}
+>  
+> @@ -179,9 +181,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA, &status);
+> +	/*
+> +	 * Sometimes the I2C bus can stall after failure to use the
+> +	 * EDID channel. Retry a few times to see if things clear
+> +	 * up, else continue anyway.
+> +	 */
+> +	retries = 5;
+> +	do {
+> +		ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA,
+> +				  &status);
+> +		retries--;
+> +	} while (ret && retries);
+>  	if (ret)
+> -		return ret;
+> +		dev_err(dev, "failed to read status (%d)\n", ret);
+>  
+>  	ret = regmap_update_bits(regmap, SII902X_SYS_CTRL_DATA,
+>  				 SII902X_SYS_CTRL_DDC_BUS_REQ |
+> @@ -201,7 +213,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
+>  
+>  	if (status & (SII902X_SYS_CTRL_DDC_BUS_REQ |
+>  		      SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
+> -		dev_err(&sii902x->i2c->dev, "failed to release the i2c bus\n");
+> +		dev_err(dev, "failed to release the i2c bus\n");
+>  		return -ETIMEDOUT;
+>  	}
+>  
+> -- 
+> 2.14.3
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
