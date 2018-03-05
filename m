@@ -1,26 +1,83 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 5 Mar 2018 15:48:32 +0000
-Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
-In-Reply-To: <20180305150814.GA15918@lst.de>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
- <20180305150814.GA15918@lst.de>
-Message-ID: <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 05 Mar 2018 16:48:54 +0100
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: increase speed of i2c0
+ to 400kHz
+In-Reply-To: <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Tue, 27 Feb 2018 16:01:57 +0000")
+References: <20180227160135.GU9418@n2100.armlinux.org.uk>
+ <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk>
+Message-ID: <87d10i5xqx.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 15:08, Christoph Hellwig wrote:
-> We should not add any new hardocded busses here.  Please mark them in
-> OF/ACPI.
+Hi Russell,
+ 
+ On mar., f?vr. 27 2018, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 
-Unfortunately for us, fsl-mc is conceptually rather like PCI in that 
-it's software-discoverable and the only thing described in DT is the bus 
-"host", thus we need the same sort of thing as for PCI to map from the 
-child devices back to the bus root in order to find the appropriate 
-firmware node. Worse than PCI, though, we wouldn't even have the option 
-of describing child devices statically in firmware at all, since it's 
-actually one of these runtime-configurable "build your own network 
-accelerator" hardware pools where userspace gets to create and destroy 
-"devices" as it likes.
+> All the devices on I2C0 support fast mode, so increase the bus speed
+> to match.
 
-Robin.
+I agree with this part. I didn't pay attention to it in the initial
+submission but now I've checked it, and indeed according to the
+datasheet the MCP3021 support "standard (100 kHz) and Fast (400 kHz) I2C
+Compatible modes"
+
+> The Armada 388 is known to have a timing issue when in
+> standard mode, which we believe causes the ficticious device at 0x64
+> to appear.
+
+This errata "FE-8471889 I2C Repeated Start is not supported in standard
+mode (up to 100K)" was supposed to be fixed with the commit c1d15b68aab8
+("i2c: mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)"). And
+it was used on the Armada 38x SoCs since fbffee74986c ("ARM: dts: Fix I2C
+repeated start issue on Armada-38x") in 4.14.
+
+So I think that now even at 100kHz the ficticious device should not
+appear any more. If it is still the case then there might be an issue
+with the fix in the 2c driver.
+
+Gregory
+
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/boot/dts/armada-388-clearfog.dtsi | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> index 68acfc968706..0e3b1f140e6d 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> @@ -143,8 +143,7 @@
+>  };
+>  
+>  &i2c0 {
+> -	/* Is there anything on this? */
+> -	clock-frequency = <100000>;
+> +	clock-frequency = <400000>;
+>  	pinctrl-0 = <&i2c0_pins>;
+>  	pinctrl-names = "default";
+>  	status = "okay";
+> @@ -239,13 +238,11 @@
+>  		};
+>  	};
+>  
+> -	/* The MCP3021 is 100kHz clock only */
+> +	/* The MCP3021 supports standard and fast modes */
+>  	mikrobus_adc: mcp3021 at 4c {
+>  		compatible = "microchip,mcp3021";
+>  		reg = <0x4c>;
+>  	};
+> -
+> -	/* Also something at 0x64 */
+>  };
+>  
+>  &i2c1 {
+> -- 
+> 2.7.4
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
