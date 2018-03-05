@@ -1,53 +1,78 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 5 Mar 2018 09:27:45 -0600
-Subject: [PATCH] arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts
-In-Reply-To: <1519141127-22038-1-git-send-email-graham.moore@linux.intel.com>
-References: <1519141127-22038-1-git-send-email-graham.moore@linux.intel.com>
-Message-ID: <855c7ccd-d675-7d4f-f380-a2e11233d331@kernel.org>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Mon, 5 Mar 2018 08:28:18 -0700
+Subject: [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180305044221.GC23018@vireshk-i7>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+Message-ID: <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/20/2018 09:38 AM, Graham Moore wrote:
-> The Stratix10 SoCFPGA uses the PL330 DMAC.  This patch adds the PL330
-> DMAC to the Stratix10 device tree.
+On Mon, Mar 05, 2018 at 10:12:21AM +0530, Viresh Kumar wrote:
+> On 02-03-18, 14:56, Jordan Crouse wrote:
+> > Add the nodes and other bits to describe the Adreno GPU and GMU
+> > devices.
+> > 
+> > Change-Id: Ibf4dc0ebb0ac03d8b6b8e65747e142c440e70b0a
 > 
-> Signed-off-by: Graham Moore <graham.moore@linux.intel.com>
-> ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> Remove it ?
+
+* Shakes fist at Gerrit *
+
+> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> > ---
+> >  arch/arm64/boot/dts/qcom/sdm845.dtsi | 120 +++++++++++++++++++++++++++++++++++
+> >  1 file changed, 120 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> > index 7b5c16eb63b7..cc6d367ee55e 100644
+> > --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> > @@ -312,5 +312,125 @@
+> >  				status = "disabled";
+> >  			};
+> >  		};
+> > +
+> > +		adreno_smmu: arm,smmu-adreno at 5040000 {
+> > +			compatible = "qcom,msm8996-smmu-v2";
+> > +			reg = <0x5040000 0x10000>;
+> > +			#iommu-cells = <1>;
+> > +			#global-interrupts = <2>;
+> > +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
+> > +				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
+> > +				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
+> > +				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
+> > +			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
+> > +				 <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
+> > +			clock-names = "bus", "iface";
+> > +
+> > +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
+> > +		};
+> > +
+> > +		gpu_opp_table: adreno-opp-table {
+> > +			compatible = "operating-points-v2";
+> > +
+> > +			opp-710000000 {
+> > +				opp-hz = /bits/ 64 <710000000>;
+> > +				qcom,arc-level = <416>;
 > 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index aa4080d..0666c0f 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -711,6 +711,25 @@
->  			reg = <0xffe00000 0x100000>;
->  		};
->  
-> +		pdma: pdma at ffda0000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0xffda0000 0x1000>;
-> +			interrupts = <0 81 4>,
-> +				     <0 82 4>,
-> +				     <0 83 4>,
-> +				     <0 84 4>,
-> +				     <0 85 4>,
-> +				     <0 86 4>,
-> +				     <0 87 4>,
-> +				     <0 88 4>,
-> +				     <0 89 4>;
-> +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <32>;
-> +			clocks = <&l4_main_clk>;
+> I am not sure if I saw where this is defined ?
 
-This clock doesn't exist. Can you please resend this patch based on the
-clock driver patch?
+I'm glad you brought this up - I was trying to find a place in the documentation
+to put it, but since target specific nodes would be a new trick for OPP I didn't
+quite know how to go about doing it. Do we just list them as Optional: or
+should we add a target specific section to the documentation and list them out
+there instead?
 
-please base your updated patch with :
+Jordan
 
-https://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git/log/?h=socfpga_for_next_v4.17_dts
-
-Dinh
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
