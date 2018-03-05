@@ -1,22 +1,53 @@
-From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
-Date: Mon, 05 Mar 2018 15:27:00 +0000
-Subject: [linux-sunxi] [PATCH v3 15/16] ARM: dts: sun8i: h3: Enable HDMI
- output on H3 boards
-In-Reply-To: <20180301213442.16677-16-jernej.skrabec@siol.net>
-References: <20180301213442.16677-1-jernej.skrabec@siol.net>
- <20180301213442.16677-16-jernej.skrabec@siol.net>
-Message-ID: <57afe052-9a8c-f63b-ee43-5bad8cd1d193@iki.fi>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 5 Mar 2018 09:27:45 -0600
+Subject: [PATCH] arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts
+In-Reply-To: <1519141127-22038-1-git-send-email-graham.moore@linux.intel.com>
+References: <1519141127-22038-1-git-send-email-graham.moore@linux.intel.com>
+Message-ID: <855c7ccd-d675-7d4f-f380-a2e11233d331@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jernej Skrabec:
-> +&hdmi_out {
-> +	hdmi_out_con: endpoint {
-> +		remote-endpoint = <&hdmi_con_in>;
-> +	};
-> +};
 
-This node is added to all the DTS files you enabled HDMI on. Is it
-something that could be instead put to the DTSI file?
 
-Joonas
+On 02/20/2018 09:38 AM, Graham Moore wrote:
+> The Stratix10 SoCFPGA uses the PL330 DMAC.  This patch adds the PL330
+> DMAC to the Stratix10 device tree.
+> 
+> Signed-off-by: Graham Moore <graham.moore@linux.intel.com>
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index aa4080d..0666c0f 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -711,6 +711,25 @@
+>  			reg = <0xffe00000 0x100000>;
+>  		};
+>  
+> +		pdma: pdma at ffda0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0xffda0000 0x1000>;
+> +			interrupts = <0 81 4>,
+> +				     <0 82 4>,
+> +				     <0 83 4>,
+> +				     <0 84 4>,
+> +				     <0 85 4>,
+> +				     <0 86 4>,
+> +				     <0 87 4>,
+> +				     <0 88 4>,
+> +				     <0 89 4>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <8>;
+> +			#dma-requests = <32>;
+> +			clocks = <&l4_main_clk>;
+
+This clock doesn't exist. Can you please resend this patch based on the
+clock driver patch?
+
+please base your updated patch with :
+
+https://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git/log/?h=socfpga_for_next_v4.17_dts
+
+Dinh
