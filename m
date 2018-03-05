@@ -1,92 +1,26 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon,  5 Mar 2018 10:29:39 -0800
-Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume order
-Message-ID: <1520274579-30492-1-git-send-email-fkan@apm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Mon, 5 Mar 2018 19:39:38 +0100
+Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
+In-Reply-To: <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
+References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
+ <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
+ <20180305150814.GA15918@lst.de>
+ <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
+Message-ID: <20180305183938.GB20086@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bridge and its endpoint is enumerated the devices are added to the
-dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-This causes the bridge to be moved to the end of the dpm list when
-deferred probe kicks in. The order of the dpm list for bridge and
-endpoint is reversed.
+On Mon, Mar 05, 2018 at 03:48:32PM +0000, Robin Murphy wrote:
+> Unfortunately for us, fsl-mc is conceptually rather like PCI in that it's 
+> software-discoverable and the only thing described in DT is the bus "host", 
+> thus we need the same sort of thing as for PCI to map from the child 
+> devices back to the bus root in order to find the appropriate firmware 
+> node. Worse than PCI, though, we wouldn't even have the option of 
+> describing child devices statically in firmware at all, since it's actually 
+> one of these runtime-configurable "build your own network accelerator" 
+> hardware pools where userspace gets to create and destroy "devices" as it 
+> likes.
 
-Add reordering code to move the bridge and its children and consumers to
-the end of the pm list so the order for suspend and resume is not altered.
-The code also move device and its children and consumers to the tail of
-device_kset list if it is registered.
-
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Toan Le <toanle@apm.com>
----
- V3:
-	1. additional code comment changes
- V2:
-        1. change patch title from "move device and its children..."
-        2. move define based on Bjorn's comment
-        3. rename function name and comment content
-
- drivers/base/base.h |  3 +++
- drivers/base/core.c | 20 ++++++++++++++++++++
- drivers/base/dd.c   |  4 +---
- 3 files changed, 24 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/base/base.h b/drivers/base/base.h
-index d800de6..a75c302 100644
---- a/drivers/base/base.h
-+++ b/drivers/base/base.h
-@@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
- extern void device_links_no_driver(struct device *dev);
- extern bool device_links_busy(struct device *dev);
- extern void device_links_unbind_consumers(struct device *dev);
-+
-+/* device pm support */
-+void device_pm_move_to_tail(struct device *dev);
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 110230d..3b37906 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
- }
- 
- /**
-+ * device_pm_move_to_tail - Move set of devices to the end of device lists
-+ * @dev: current device pointer
-+ *
-+ * This is a device_reorder_to_tail() wrapper taking the requisite locks.
-+ *
-+ * It moves the device along with all of its children and all of its consumers
-+ * to the ends of the device_kset and dpm_list, recursively.
-+ */
-+void device_pm_move_to_tail(struct device *dev)
-+{
-+	int idx;
-+
-+	idx = device_links_read_lock();
-+	device_pm_lock();
-+	device_reorder_to_tail(dev, NULL);
-+	device_pm_unlock();
-+	device_links_read_unlock(idx);
-+}
-+
-+/**
-  * device_link_add - Create a link between two devices.
-  * @consumer: Consumer end of the link.
-  * @supplier: Supplier end of the link.
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 2c964f5..96fab29 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -123,9 +123,7 @@ static void deferred_probe_work_func(struct work_struct *work)
- 		 * the list is a good order for suspend but deferred
- 		 * probe makes that very unsafe.
- 		 */
--		device_pm_lock();
--		device_pm_move_last(dev);
--		device_pm_unlock();
-+		device_pm_move_to_tail(dev);
- 
- 		dev_dbg(dev, "Retrying from deferred list\n");
- 		if (initcall_debug && !initcalls_done)
--- 
-1.8.3.1
+I really hate the PCI special case just as much.  Maybe we just
+need a dma_configure method on the bus, and move PCI as well as fsl-mc
+to it.
