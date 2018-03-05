@@ -1,182 +1,108 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Mon, 5 Mar 2018 12:59:18 +0000
-Subject: [PATCH v5 17/40] KVM: arm64: Move userspace system registers into
- separate function
-In-Reply-To: <20180227113429.637-18-cdall@kernel.org>
-References: <20180227113429.637-1-cdall@kernel.org>
- <20180227113429.637-18-cdall@kernel.org>
-Message-ID: <af723cc8-dc68-e649-16eb-c7312330725d@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 5 Mar 2018 14:02:17 +0100
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+ <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
+ <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
+ <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
+Message-ID: <CAMRc=Mdhi=byn4gPY6tVxgGjn9cgvc3smUkjV=Ku9i3euaZZtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+2018-03-01 17:44 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 03/01/2018 02:36 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>
+>>> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>>
+>>>> I think I found the reason for the strange crashes we were
+>>>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
+>>>> me in the right direction.
+>>>>
+>>>> The mdio driver fails to probe with v7 due to the supplied clock rate
+>>>> being wrong. Before failing we register the emac clock with
+>>>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
+>>>> reference count of the clock, but we never actually increased it in
+>>>> the first place in the line above. The core clock code then destroys
+>>>> the associated clk_core structure. When the next user comes around (in
+>>>> our case the clk debug functions) the system crashes.
+>>>>
+>>>> I believe there to be two issues: one is with v7 - we need to increase
+>>>> the clock reference count in davinci_psc_genpd_attach_dev().
+>>>>
+>>>> Second is the error path in the clock framework - we should remove the
+>>>> destroyed clk_core from the debug list, which is not being done now.
+>>>>
+>>>> Why we even need to track the refcount of clk_core is a mistery for me
+>>>> though. Stephen, Mike?
+>>>>
+>>>> Best regards,
+>>>> Bartosz Golaszewski
+>>>
+>>>
+>>>
+>>> Great find. I figured it had to be something like this, but I wasn't
+>>> able to reproduce the problem yet.
+>>>
+>>> I suppose it is time to spin up a v8 with some fixes.
+>>
+>>
+>> I still don't know why the mdio clock rate is much lower than in
+>> mainline though. Any ideas?
+>>
+>> Thanks,
+>> Bart
+>>
+>
+> Now that you have fixed the crash, can you answer the questions I have
+> asked earlier?
+>
+>> Can you post the output of this command so that I can see how your
+>
+> clocks are setup:
+>
+> cat /sys/kernel/debug/clk/clk_summary
+>
+>> Using your workaround, can you run:
+>
+>
+> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>
+> If you see:
+>   1e27000.clock-controller: emac  off-0
+>
+> then genpd is not working like it is supposed to. You should see something
+> like this for device that are working:
+>           1e27000.clock-controller: uart2  on
+>     /devices/platform/soc at 1c00000/1d0d000.serial        active
 
-On 27/02/18 11:34, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> There's a semantic difference between the EL1 registers that control
-> operation of a kernel running in EL1 and EL1 registers that only control
-> userspace execution in EL0.  Since we can defer saving/restoring the
-> latter, move them into their own function.
-> 
-> The ARMv8 ARM (ARM DDI 0487C.a) Section D10.2.1 recommends that
-> ACTLR_EL1 has no effect on the processor when running the VHE host, and
-> we can therefore move this register into the EL1 state which is only
-> saved/restored on vcpu_put/load for a VHE host.
-> 
-> We also take this chance to rename the function saving/restoring the
-> remaining system register to make it clear this function deals with
-> the EL1 system registers.
-> 
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi David, Sekhar,
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+I tried booting the board today over tftp but didn't succeed. I then
+switched to a normal boot from SD card and the boot process froze at
+the same moment (right after the DHCP config, or after rtc config if I
+disabled DHCP in bootargs). I then realized that the emac clock can't
+be the culprit. After some digging I found out that the late_initcall
+to clk_disable_unused() disables sysclk6 - the parent of the arm
+clock, which of course freezes the device.
 
-Cheers,
+If I remove the call to clk_disable_unused(), I can boot just fine.
 
-> ---
-> 
-> Notes:
->      Changes since v4:
->       - Clarified rationale for deferring ACTLR_EL1 in the commit message.
->      
->      Changes since v3:
->       - Correct the comment about ACTLR_EL1 and adjust commit text.
->      
->      Changes since v2:
->       - Save restore ACTLR_EL1 as part of the EL1 registers state instead of
->         the user register state, as ACTLR_EL1 can't affect the host's execution
->         on VHE systems.
->      
->      Changes since v1:
->       - Added comment about sp_el0 to common save sysreg save/restore functions
-> 
->   arch/arm64/kvm/hyp/sysreg-sr.c | 48 ++++++++++++++++++++++++++++++------------
->   1 file changed, 35 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 99fc60516103..d5a5145b4e7c 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -28,24 +28,33 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
->   /*
->    * Non-VHE: Both host and guest must save everything.
->    *
-> - * VHE: Host must save tpidr*_el0, actlr_el1, mdscr_el1, sp_el0,
-> + * VHE: Host must save tpidr*_el0, mdscr_el1, sp_el0,
->    * and guest must save everything.
->    */
->   
->   static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
->   {
-> -	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
-> -	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-> -	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
->   	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
-> +
-> +	/*
-> +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-> +	 * therefore be saved/restored on every entry/exit to/from the guest.
-> +	 */
->   	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
->   }
->   
-> -static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-> +static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
-> +{
-> +	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-> +	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
-> +}
-> +
-> +static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
->   {
->   	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
->   	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
->   	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-> +	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
->   	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
->   	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
->   	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-> @@ -73,35 +82,46 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
->   }
->   
->   static hyp_alternate_select(__sysreg_call_save_host_state,
-> -			    __sysreg_save_state, __sysreg_do_nothing,
-> +			    __sysreg_save_el1_state, __sysreg_do_nothing,
->   			    ARM64_HAS_VIRT_HOST_EXTN);
->   
->   void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
->   {
->   	__sysreg_call_save_host_state()(ctxt);
->   	__sysreg_save_common_state(ctxt);
-> +	__sysreg_save_user_state(ctxt);
->   }
->   
->   void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
->   {
-> -	__sysreg_save_state(ctxt);
-> +	__sysreg_save_el1_state(ctxt);
->   	__sysreg_save_common_state(ctxt);
-> +	__sysreg_save_user_state(ctxt);
->   }
->   
->   static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
->   {
-> -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
-> -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
-> -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
->   	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
-> +
-> +	/*
-> +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-> +	 * therefore be saved/restored on every entry/exit to/from the guest.
-> +	 */
->   	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
->   }
->   
-> -static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-> +static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
-> +{
-> +	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
-> +	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
-> +}
-> +
-> +static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
->   {
->   	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
->   	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
->   	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
-> +	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
->   	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
->   	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
->   	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
-> @@ -129,19 +149,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
->   }
->   
->   static hyp_alternate_select(__sysreg_call_restore_host_state,
-> -			    __sysreg_restore_state, __sysreg_do_nothing,
-> +			    __sysreg_restore_el1_state, __sysreg_do_nothing,
->   			    ARM64_HAS_VIRT_HOST_EXTN);
->   
->   void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
->   {
->   	__sysreg_call_restore_host_state()(ctxt);
->   	__sysreg_restore_common_state(ctxt);
-> +	__sysreg_restore_user_state(ctxt);
->   }
->   
->   void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
->   {
-> -	__sysreg_restore_state(ctxt);
-> +	__sysreg_restore_el1_state(ctxt);
->   	__sysreg_restore_common_state(ctxt);
-> +	__sysreg_restore_user_state(ctxt);
->   }
->   
->   void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
-> 
+The following other clocks are disabled before pll0_sysclk6:
+pll1_sysclk3
+pll0_obsclk
+pll0_sysclk7
 
--- 
-Julien Grall
+davinci_lpsc_clk_enable() is never called for these clocks - in fact
+it's not called for any parent that's not explicitly defined in
+psc-da850.c - I believe this may be one of the reasons. I will get
+back to debugging it tomorrow.
+
+Best regards,
+Bartosz Golaszewski
