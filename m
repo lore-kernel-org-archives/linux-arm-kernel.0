@@ -1,53 +1,64 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 5 Mar 2018 14:25:22 +0100
-Subject: [PATCH] drm/bridge/synopsys: dsi: readl_poll_timeout return
- value clean up
-In-Reply-To: <587f8a32-b9b3-0e81-d91d-69ea256bdc29@st.com>
-References: <20180204213624.18288-1-philippe.cornu@st.com>
- <CGME20180301090106epcas2p3c47f4436b0c8a31ce71cfd3909dc77ae@epcas2p3.samsung.com>
- <172e7f68-8f4b-7e5f-3e9f-7aaf10a51dc9@st.com>
- <290c749a-70bf-2b74-1fb9-2de26708d001@samsung.com>
- <587f8a32-b9b3-0e81-d91d-69ea256bdc29@st.com>
-Message-ID: <8b47bb1d-ff1d-b85a-18ca-b53b70c1a32d@samsung.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 5 Mar 2018 13:27:47 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
+ fault on kernel VA
+In-Reply-To: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+Message-ID: <dbabd287-2f8e-f1e8-0a2b-8b901f656114@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.03.2018 14:15, Philippe CORNU wrote:
-> Hi Andrzej,
->
->
-> On 03/02/2018 11:21 AM, Andrzej Hajda wrote:
->> On 01.03.2018 10:00, Philippe CORNU wrote:
->>> Hi Archit, Andrzej & Laurent,
->>>
->>> May I ask you please your feedback on this small patch?
->>> Many thanks,
->>>
->>> Philippe :-)
->>>
->>> On 02/04/2018 10:36 PM, Philippe Cornu wrote:
->>>> The readl_poll_timeout() return value is 0 in case of success
->>>> so it is better to detect errors without taking care of the
->>>> return value sign.
->>>>
->>>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
->> The patch is of course correct. However I am not sure if necessary. For
->> sure functionally it does not change anything.
->> AFAIK kernel CodingStyle says nothing about it, so I suppose it is
->> matter of personal taste.
-> I sent this tiny patch in order to homogenize the dw mipi driver because 
-> there were both cases "if (ret)" & "if (ret < 0)" in the source code.
->
-> I did not really find a preferred way in the kernel source code so I 
-> selected what sounds the best to me ie "if (ret)" but it is not a 
-> problem to make another patch for "if (ret < 0)" everywhere :-)
->
-> In any case, the most important from my pov is to have a homogeneous 
-> source code :-)
+Hi Will,
 
-OK
+On 05/03/18 10:31, Will Deacon wrote:
+> User faults on kernel addresses are a good sign that the faulting task
+> is either up to no good or is in deep trouble. In such situations,
+> exposing the optional ESR context on the sigframe as part of the
+> delivered signal is only useful to attackers who are using information
+> about underlying hardware fault (e.g. translation vs permission) as a
+> mechanism to defeat KASLR.
+> 
+> Remove the ESR context from the sigframe for user faults on kernel
+> addresses.
+> 
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Here's another one that doesn't make a huge amount of difference when
+> kpti is enabled, but I think is a change worth making all the same.
+> 
+>   arch/arm64/mm/fault.c | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 49dfb08a6c4d..b9800395788e 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -292,8 +292,10 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+>   
+>   static void __do_user_fault(struct siginfo *info, unsigned int esr)
+>   {
+> -	current->thread.fault_address = (unsigned long)info->si_addr;
+> -	current->thread.fault_code = esr;
+> +	unsigned long addr = (unsigned long)info->si_addr;
+> +
+> +	current->thread.fault_address = addr;
+> +	current->thread.fault_code = addr < TASK_SIZE ? esr : 0;
 
-Queued to drm-misc-next.
+Nit: there are still non-kernel addresses above TASK_SIZE which would 
+only imply a wild pointer rather than nefarious misdeeds, but I guess if 
+you can already see that the faulting address is in the hole you don't 
+really need a level 0 translation fault spelled out. More generally 
+though, if there's a chance that someone might still try to interpret 
+fault_code as an ESR value regardless of what happened, should we be 
+setting it to ESR_ELx_IL rather than 0, to be consistent with the 
+implied "Unknown reason" EC value?
 
-Regards
-Andrzej
+Robin.
+
+>   	arm64_force_sig_info(info, esr_to_fault_info(esr)->name, current);
+>   }
+>   
+> 
