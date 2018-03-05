@@ -1,61 +1,41 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon,  5 Mar 2018 15:43:09 -0800
-Subject: [PATCH v2] arm64/debug: Fix registers on sleeping tasks
-Message-ID: <20180305234309.233226-1-dianders@chromium.org>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Mon, 5 Mar 2018 17:49:06 -0600
+Subject: [PATCH] pinctrl: mediatek: mtk-common: use true and false for
+ boolean values
+Message-ID: <20180305234906.GA32058@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
-registers on sleeping tasks") but for arm64.  Nuff said.
+Assign true or false to boolean variables instead of an integer value.
 
-...well, perhaps I could also add that task_pt_regs are userspace
-registers and that's not what kgdb is supposed to be reporting.  We're
-supposed to be reporting kernel registers.
+This issue was detected with the help of Coccinelle.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 ---
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes in v2:
-- Init cpu_context in one line
-- Explain that task_pt_regs are userspace
-
- arch/arm64/kernel/kgdb.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 2122cd187f19..a20de58061a8 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -138,14 +138,25 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
- void
- sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
- {
--	struct pt_regs *thread_regs;
-+	struct cpu_context *cpu_context = &task->thread.cpu_context;
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 3cf384f..e161561 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -501,7 +501,7 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 	int num_pins, num_funcs, maps_per_pin;
+ 	unsigned long *configs;
+ 	unsigned int num_configs;
+-	bool has_config = 0;
++	bool has_config = false;
+ 	int i, err;
+ 	unsigned reserve = 0;
+ 	struct mtk_pinctrl_group *grp;
+@@ -520,7 +520,7 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 		return err;
  
- 	/* Initialize to zero */
- 	memset((char *)gdb_regs, 0, NUMREGBYTES);
--	thread_regs = task_pt_regs(task);
--	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
--	/* Special case for PSTATE (check comments in asm/kgdb.h for details) */
--	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
-+
-+	gdb_regs[19] = cpu_context->x19;
-+	gdb_regs[20] = cpu_context->x20;
-+	gdb_regs[21] = cpu_context->x21;
-+	gdb_regs[22] = cpu_context->x22;
-+	gdb_regs[23] = cpu_context->x23;
-+	gdb_regs[24] = cpu_context->x24;
-+	gdb_regs[25] = cpu_context->x25;
-+	gdb_regs[26] = cpu_context->x26;
-+	gdb_regs[27] = cpu_context->x27;
-+	gdb_regs[28] = cpu_context->x28;
-+	gdb_regs[29] = cpu_context->fp;
-+
-+	gdb_regs[31] = cpu_context->sp;
-+	gdb_regs[32] = cpu_context->pc;
- }
+ 	if (num_configs)
+-		has_config = 1;
++		has_config = true;
  
- void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
+ 	num_pins = pins->length / sizeof(u32);
+ 	num_funcs = num_pins;
 -- 
-2.16.2.395.g2e18187dfd-goog
+2.7.4
