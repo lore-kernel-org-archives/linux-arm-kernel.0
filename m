@@ -1,63 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:22:56 +0000
-Subject: [RFC PATCH v3 3/3] arm64/kernel: enable A53 erratum #8434319
- handling at runtime
-In-Reply-To: <20180214113645.16793-4-ard.biesheuvel@linaro.org>
-References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-4-ard.biesheuvel@linaro.org>
-Message-ID: <20180305172256.GC12869@arm.com>
+Date: Mon, 5 Mar 2018 17:24:19 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
+ fault on kernel VA
+In-Reply-To: <20180305140506.GJ32331@e103592.cambridge.arm.com>
+References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+ <20180305140506.GJ32331@e103592.cambridge.arm.com>
+Message-ID: <20180305172418.GD12869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:36:45AM +0000, Ard Biesheuvel wrote:
-> Omit patching of ADRP instruction at module load time if the current
-> CPUs are not susceptible to the erratum.
+On Mon, Mar 05, 2018 at 02:05:06PM +0000, Dave Martin wrote:
+> On Mon, Mar 05, 2018 at 10:31:15AM +0000, Will Deacon wrote:
+> > User faults on kernel addresses are a good sign that the faulting task
+> > is either up to no good or is in deep trouble. In such situations,
+> > exposing the optional ESR context on the sigframe as part of the
+> > delivered signal is only useful to attackers who are using information
+> > about underlying hardware fault (e.g. translation vs permission) as a
+> > mechanism to defeat KASLR.
+> > 
+> > Remove the ESR context from the sigframe for user faults on kernel
+> > addresses.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Open question: how should we handle big.LITTLE configurations where affected
-> Cortex-A53s may appear late.
+> As this wording suggests, this change causes esr_context to disappear
+> entirely from the signal frame.  Previously, I think user code could
+> have relied on its being present for certain signals.
+> 
+> Does Debian's codesearch throw up any nontrivial users of esr_context?
 
-We should fail to bring them online. I think the infrastructure already
-exists for this and we used it for other errata already.
+The main one seems to be ASAN, which uses the RnW bit to report "READ",
+"WRITE" or "UNKNOWN". So with this change, the access will be treated as
+UNKNOWN for kernel addresses.
 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index bb263820de13..39134c46bb13 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -45,7 +45,8 @@
->  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
->  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
->  #define ARM64_HAS_RAS_EXTN			26
-> +#define ARM64_WORKAROUND_843419			27
->  
-> -#define ARM64_NCAPS				27
-> +#define ARM64_NCAPS				28
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 07823595b7f0..c065d5649b1b 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -228,6 +228,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
->  }
->  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
->  
-> +static bool __maybe_unused
-> +needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
-> +				int scope)
-> +{
-> +	u32 cpuid = read_cpuid_id();
-> +
-> +	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-> +
-> +	if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
-> +		return false;
-> +	else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
-> +		/* erratum was fixed in some versions of r0p4 */
-> +		return !(read_cpuid(REVIDR_EL1) & BIT(8));
-
-The rXpY information is in the MIDR, so this is checking for something else
-afaict.
+Whilst I can see how that might cause a testsuite regression, I'm struggling
+to see how it could sensible impact ASAN given that userspace never has
+permission to access these addresses and so the fault should be treated as
+fatal regardless of whether or not it's a read or a write.
 
 Will
