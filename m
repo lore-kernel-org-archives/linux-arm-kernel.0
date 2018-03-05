@@ -1,37 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 05 Mar 2018 15:42:11 +0100
-Subject: [PATCH] soc: rockchip: disable jtag switching for RK3128 SoCs
-In-Reply-To: <7020f92d-cc0e-745e-713b-3aa847b7e939@rock-chips.com>
-References: <20180302122031.17426-1-heiko@sntech.de>
- <7020f92d-cc0e-745e-713b-3aa847b7e939@rock-chips.com>
-Message-ID: <1633972.b4bkohDpDd@phil>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 5 Mar 2018 14:43:52 +0000
+Subject: [PATCH v6 13/20] firmware: arm_scmi: refactor in preparation to
+ support per-protocol channels
+In-Reply-To: <20180305153549.00000f39@huawei.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-14-git-send-email-sudeep.holla@arm.com>
+ <20180305153549.00000f39@huawei.com>
+Message-ID: <1e824524-5ed3-dfbc-b2fb-6a15631b44cd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
 
-Am Montag, 5. M?rz 2018, 15:39:04 CET schrieb Shawn Lin:
-> On 2018/3/2 20:20, Heiko Stuebner wrote:
-> > From: Xiao Yao <xiaoyao@rock-chips.com>
-> > 
-> > Disable IO function switching between sdmmc and jtag
-> > for RK3128 SoCs.
-> > 
+
+On 05/03/18 14:35, Jonathan Cameron wrote:
+> On Fri, 23 Feb 2018 16:23:43 +0000
+> Sudeep Holla <sudeep.holla@arm.com> wrote:
 > 
-> I acked this on the vendor kernel tree, so FWIW:
+>> In order to support per-protocol channels if available, we need to
+>> factor out all the mailbox channel information(Tx/Rx payload and
+>> channel handle) out of the main SCMI instance information structure.
+>>
+>> This patch refactors the existing channel information into a separate
+>> chan_info structure.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> A little odd to present a series to mainline that does a fairly important
+> refactor mid way through.  Why not push this down to the start and always support
+> the separate chan_info structure?
 > 
-> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
-> 
-> Hope this is one of the final patches for that, as I would
-> revive IO function switching between sdmmc and jtag for newer
-> SoCs after addressing the problem from HW level.
 
-the main problem we had with that was that the  mmc-subsystem
-somehow definitly didn't like it when the controller pins where pulled
-out from under it on card eject.
+Since the development started long back and this was added later, I
+preferred to keep functionality working and didn't want to push change
+down in the stack.
 
-But of course, if you can get this solved by hw somehow, that
-would be pretty cool :-)
-
-
-Heiko
+-- 
+Regards,
+Sudeep
