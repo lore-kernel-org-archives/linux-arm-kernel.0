@@ -1,119 +1,44 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Mon, 5 Mar 2018 20:29:26 +0800
-Subject: [PATCH 35/37] iommu/arm-smmu-v3: Add support for PRI
-In-Reply-To: <20180212183352.22730-36-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-36-jean-philippe.brucker@arm.com>
-Message-ID: <6f55afcf-04b0-0dc4-6c75-064b70e6851c@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Mar 2018 12:43:27 +0000
+Subject: [PATCH] scripts/kallsyms: filter arm64's __efistub_ symbols
+In-Reply-To: <20180301171901.1134-1-ard.biesheuvel@linaro.org>
+References: <20180301171901.1134-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180305124327.GE8571@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> +static int arm_smmu_enable_pri(struct arm_smmu_master_data *master)
-> +{
-> +	int ret, pos;
-> +	struct pci_dev *pdev;
-> +	/*
-> +	 * TODO: find a good inflight PPR number. We should divide the PRI queue
-> +	 * by the number of PRI-capable devices, but it's impossible to know
-> +	 * about current and future (hotplugged) devices. So we're at risk of
-> +	 * dropping PPRs (and leaking pending requests in the FQ).
-> +	 */
-> +	size_t max_inflight_pprs = 16;
-> +	struct arm_smmu_device *smmu = master->smmu;
-> +
-> +	if (!(smmu->features & ARM_SMMU_FEAT_PRI) || !dev_is_pci(master->dev))
-> +		return -ENOSYS;
-> +
-> +	pdev = to_pci_dev(master->dev);
-> +
- From here
-> +	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
-> +	if (!pos)
-> +		return -ENOSYS;
-to here, seems this code is not needed as it is already done in
-pci_reset_pri().
+On Thu, Mar 01, 2018 at 05:19:01PM +0000, Ard Biesheuvel wrote:
+> On arm64, the EFI stub and the kernel proper are essentially the same
+> binary, although the EFI stub executes at a different virtual address
+> as the kernel. For this reason, the EFI stub is restricted in the
+> symbols it can link to, which is ensured by prefixing all EFI stub
+> symbols with __efistub_ (and emitting __efistub_ prefixed aliases for
+> routines that may be shared between the core kernel and the stub)
+> 
+> These symbols are leaking into kallsyms, polluting the namespace, so
+> let's filter them explicitly.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  scripts/kallsyms.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Thanks,
-Dongdong
-> +
-> +	ret = pci_reset_pri(pdev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = pci_enable_pri(pdev, max_inflight_pprs);
-> +	if (ret) {
-> +		dev_err(master->dev, "cannot enable PRI: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	master->can_fault = true;
-> +	master->ste.prg_resp_needs_ssid = pci_prg_resp_requires_prefix(pdev);
-> +
-> +	dev_dbg(master->dev, "enabled PRI");
-> +
-> +	return 0;
-> +}
-> +
->  static void arm_smmu_disable_ats(struct arm_smmu_master_data *master)
->  {
->  	struct pci_dev *pdev;
-> @@ -2548,6 +2592,22 @@ static void arm_smmu_disable_ats(struct arm_smmu_master_data *master)
->  	pci_disable_ats(pdev);
->  }
->
-> +static void arm_smmu_disable_pri(struct arm_smmu_master_data *master)
-> +{
-> +	struct pci_dev *pdev;
-> +
-> +	if (!dev_is_pci(master->dev))
-> +		return;
-> +
-> +	pdev = to_pci_dev(master->dev);
-> +
-> +	if (!pdev->pri_enabled)
-> +		return;
-> +
-> +	pci_disable_pri(pdev);
-> +	master->can_fault = false;
-> +}
-> +
->  static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
->  				  struct arm_smmu_master_data *master)
->  {
-> @@ -2668,12 +2728,13 @@ static int arm_smmu_add_device(struct device *dev)
->  		master->ste.can_stall = true;
->  	}
->
-> -	arm_smmu_enable_ats(master);
-> +	if (!arm_smmu_enable_ats(master))
-> +		arm_smmu_enable_pri(master);
->
->  	group = iommu_group_get_for_dev(dev);
->  	if (IS_ERR(group)) {
->  		ret = PTR_ERR(group);
-> -		goto err_disable_ats;
-> +		goto err_disable_pri;
->  	}
->
->  	iommu_group_put(group);
-> @@ -2682,7 +2743,8 @@ static int arm_smmu_add_device(struct device *dev)
->
->  	return 0;
->
-> -err_disable_ats:
-> +err_disable_pri:
-> +	arm_smmu_disable_pri(master);
->  	arm_smmu_disable_ats(master);
->
->  	return ret;
-> @@ -2702,6 +2764,8 @@ static void arm_smmu_remove_device(struct device *dev)
->  	if (master && master->ste.assigned)
->  		arm_smmu_detach_dev(dev);
->  	arm_smmu_remove_master(smmu, master);
-> +
-> +	arm_smmu_disable_pri(master);
->  	arm_smmu_disable_ats(master);
->
->  	iommu_group_remove_device(dev);
->
+Thanks, I'll take this via arm64.
+
+Will
+
+> diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+> index 9ee9bf7fd1a2..1dd24c5b9b47 100644
+> --- a/scripts/kallsyms.c
+> +++ b/scripts/kallsyms.c
+> @@ -221,6 +221,7 @@ static int symbol_valid(struct sym_entry *s)
+>  
+>  	static char *special_prefixes[] = {
+>  		"__crc_",		/* modversions */
+> +		"__efistub_",		/* arm64 EFI stub namespace */
+>  		NULL };
+>  
+>  	static char *special_suffixes[] = {
+> -- 
+> 2.11.0
+> 
