@@ -1,29 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Mar 2018 11:38:42 +0100
-Subject: [PATCH 2/5] arm64: dts: renesas: r8a7796: Add multi-cluster
- definition
-In-Reply-To: <1519697995-6061-3-git-send-email-gaku.inami.xh@renesas.com>
-References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
- <1519697995-6061-3-git-send-email-gaku.inami.xh@renesas.com>
-Message-ID: <CAMuHMdVdK5-NgO2o2aiwk8YrdXoY63L7h2jzA7-WpKqvmgE21g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  5 Mar 2018 10:31:15 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user fault
+ on kernel VA
+Message-ID: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 3:19 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
-> This patch adds the "cpu-map" for multi-cluster into r8a7796
-> device-tree. This definition is used to parse the cpu topology.
->
-> Signed-off-by: Gaku Inami <gaku.inami.xh@renesas.com>
+User faults on kernel addresses are a good sign that the faulting task
+is either up to no good or is in deep trouble. In such situations,
+exposing the optional ESR context on the sigframe as part of the
+delivered signal is only useful to attackers who are using information
+about underlying hardware fault (e.g. translation vs permission) as a
+mechanism to defeat KASLR.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Remove the ESR context from the sigframe for user faults on kernel
+addresses.
 
-Gr{oetje,eeting}s,
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-                        Geert
+Here's another one that doesn't make a huge amount of difference when
+kpti is enabled, but I think is a change worth making all the same.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ arch/arm64/mm/fault.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 49dfb08a6c4d..b9800395788e 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -292,8 +292,10 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 
+ static void __do_user_fault(struct siginfo *info, unsigned int esr)
+ {
+-	current->thread.fault_address = (unsigned long)info->si_addr;
+-	current->thread.fault_code = esr;
++	unsigned long addr = (unsigned long)info->si_addr;
++
++	current->thread.fault_address = addr;
++	current->thread.fault_code = addr < TASK_SIZE ? esr : 0;
+ 	arm64_force_sig_info(info, esr_to_fault_info(esr)->name, current);
+ }
+ 
+-- 
+2.1.4
