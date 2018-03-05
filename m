@@ -1,78 +1,71 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Mon, 5 Mar 2018 08:28:18 -0700
-Subject: [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <20180305044221.GC23018@vireshk-i7>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
- <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
-Message-ID: <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 5 Mar 2018 09:28:08 -0600
+Subject: [PATCH 1/2] ARM: dts: STi: Fix aliases property name for STi
+ boards
+In-Reply-To: <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
+References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
+ <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 10:12:21AM +0530, Viresh Kumar wrote:
-> On 02-03-18, 14:56, Jordan Crouse wrote:
-> > Add the nodes and other bits to describe the Adreno GPU and GMU
-> > devices.
-> > 
-> > Change-Id: Ibf4dc0ebb0ac03d8b6b8e65747e142c440e70b0a
-> 
-> Remove it ?
+On Mon, Mar 5, 2018 at 9:00 AM,  <patrice.chotard@st.com> wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> Since dtc v1.4.6-9-gaadd0b65c987, aliases property name must
+> be lowercase only.
+> This allows to fix following warnings when compiling dtb
+> with W=1 option :
 
-* Shakes fist at Gerrit *
+I'm so glad to see fixes before the dtc update landed in the kernel tree!
 
-> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> > ---
-> >  arch/arm64/boot/dts/qcom/sdm845.dtsi | 120 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 120 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > index 7b5c16eb63b7..cc6d367ee55e 100644
-> > --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > @@ -312,5 +312,125 @@
-> >  				status = "disabled";
-> >  			};
-> >  		};
-> > +
-> > +		adreno_smmu: arm,smmu-adreno at 5040000 {
-> > +			compatible = "qcom,msm8996-smmu-v2";
-> > +			reg = <0x5040000 0x10000>;
-> > +			#iommu-cells = <1>;
-> > +			#global-interrupts = <2>;
-> > +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-> > +				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-> > +			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
-> > +				 <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
-> > +			clock-names = "bus", "iface";
-> > +
-> > +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
-> > +		};
-> > +
-> > +		gpu_opp_table: adreno-opp-table {
-> > +			compatible = "operating-points-v2";
-> > +
-> > +			opp-710000000 {
-> > +				opp-hz = /bits/ 64 <710000000>;
-> > +				qcom,arc-level = <416>;
-> 
-> I am not sure if I saw where this is defined ?
+> arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>  arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
+>  arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
+>  arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
+>  arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
+>  4 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+> index c8ad905d0309..fa1186af6574 100644
+> --- a/arch/arm/boot/dts/stih407-b2120.dts
+> +++ b/arch/arm/boot/dts/stih407-b2120.dts
+> @@ -14,7 +14,7 @@
+>         compatible = "st,stih407-b2120", "st,stih407";
+>
+>         chosen {
+> -               bootargs = "console=ttyAS0,115200 clk_ignore_unused";
+> +               bootargs = "console=ttyas0,115200 clk_ignore_unused";
 
-I'm glad you brought this up - I was trying to find a place in the documentation
-to put it, but since target specific nodes would be a new trick for OPP I didn't
-quite know how to go about doing it. Do we just list them as Optional: or
-should we add a target specific section to the documentation and list them out
-there instead?
+The kernel change for this is an ABI breakage both DT <-> kernel and
+kernel <-> userspace.
 
-Jordan
+Really, if you are okay with doing this, you should change it to ttySx IMO.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>                 linux,stdout-path = &sbc_serial0;
+
+And since you have this, you don't even need the console praram.
+
+>         };
+>
+> @@ -24,7 +24,7 @@
+>         };
+>
+>         aliases {
+> -               ttyAS0 = &sbc_serial0;
+> +               ttyas0 = &sbc_serial0;
+
+The correct fix is use "serialN" for aliases.
+
+I have a check for only known alias names which would give a better
+warning, but David thought it was too restrictive.
+
+>                 ethernet0 = &ethernet0;
+>         };
+>
