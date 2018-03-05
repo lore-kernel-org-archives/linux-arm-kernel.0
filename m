@@ -1,116 +1,144 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 5 Mar 2018 10:23:55 -0600
-Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <CAMRc=Mdhi=byn4gPY6tVxgGjn9cgvc3smUkjV=Ku9i3euaZZtQ@mail.gmail.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <1519071723-31790-11-git-send-email-david@lechnology.com>
- <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
- <93696fc8-bb93-aa20-3506-3d7216c17cd2@lechnology.com>
- <CAMpxmJVpMgikNfB4HgNCs+ep+EOHqH5bthiW82LsnDqzLfE5mg@mail.gmail.com>
- <6bbe9bf3-24c1-acd9-200d-513520d34558@lechnology.com>
- <CAMRc=Mdhi=byn4gPY6tVxgGjn9cgvc3smUkjV=Ku9i3euaZZtQ@mail.gmail.com>
-Message-ID: <d1b91c10-fe11-452e-2c68-86e95fb58266@lechnology.com>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 5 Mar 2018 16:28:39 +0000
+Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
+In-Reply-To: <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+ <20180227095028.GG21033@krava>
+ <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+ <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
+ <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+ <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
+ <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
+ <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
+Message-ID: <39385b47-b8f2-7673-ea17-8550787663e8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2018 07:02 AM, Bartosz Golaszewski wrote:
-> 2018-03-01 17:44 GMT+01:00 David Lechner <david@lechnology.com>:
->> On 03/01/2018 02:36 AM, Bartosz Golaszewski wrote:
->>>
->>> 2018-02-28 22:40 GMT+01:00 David Lechner <david@lechnology.com>:
+On 05/03/2018 15:39, William Cohen wrote:
+> On 03/05/2018 06:24 AM, John Garry wrote:
+>>>> I am seeing issue(log below) with this patchset on our platfrom.
+>>>> i have tried using your v2 branch [1]
 >>>>
->>>> On 02/28/2018 06:38 AM, Bartosz Golaszewski wrote:
->>>>>
->>>>>
->>>>>
->>>>> I think I found the reason for the strange crashes we were
->>>>> experiencing (emac core->name being NULL) thanks to Sekhar who pointed
->>>>> me in the right direction.
->>>>>
->>>>> The mdio driver fails to probe with v7 due to the supplied clock rate
->>>>> being wrong. Before failing we register the emac clock with
->>>>> pm_clk_add_clk(). When clock_ops puts the clock, it decreases the
->>>>> reference count of the clock, but we never actually increased it in
->>>>> the first place in the line above. The core clock code then destroys
->>>>> the associated clk_core structure. When the next user comes around (in
->>>>> our case the clk debug functions) the system crashes.
->>>>>
->>>>> I believe there to be two issues: one is with v7 - we need to increase
->>>>> the clock reference count in davinci_psc_genpd_attach_dev().
->>>>>
->>>>> Second is the error path in the clock framework - we should remove the
->>>>> destroyed clk_core from the debug list, which is not being done now.
->>>>>
->>>>> Why we even need to track the refcount of clk_core is a mistery for me
->>>>> though. Stephen, Mike?
->>>>>
->>>>> Best regards,
->>>>> Bartosz Golaszewski
+>>>> root at borg-1>perf_acme>> ./perf --version
+>>>> perf version 4.16.rc1.g087f7ca
+>>>> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
+>>>>
+>>>>  Performance counter stats for 'sleep 1':
+>>>>
+>>>>             23,099      bus_access_rd
+>>>>
+>>>>        1.000708516 seconds time elapsed
+>>>>
+>>>> root at borg-1>perf_acme>> cd -
+>>>> /ganapat/perf/linux-hisi/tools/perf
+>>>> root at borg-1>perf>> ./perf --version
+>>>> perf version 4.16.rc1.gcb5a74
+>>>> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
+>>>>
+>>>>  Performance counter stats for 'sleep 1':
+>>>>
+>>>>                  0      bus_access_rd
+>>>>
+>>>>        1.000709162 seconds time elapsed
+>>>>
+>>>> root at borg-1>perf>>
 >>>>
 >>>>
+>>>> [1] https://github.com/hisilicon/linux-hisi.git
 >>>>
->>>> Great find. I figured it had to be something like this, but I wasn't
->>>> able to reproduce the problem yet.
->>>>
->>>> I suppose it is time to spin up a v8 with some fixes.
+>>> Hi,
+>>
+>> Hi Will Cohen, Ganapatrao,
+>>
 >>>
->>>
->>> I still don't know why the mdio clock rate is much lower than in
->>> mainline though. Any ideas?
->>>
->>> Thanks,
->>> Bart
+>>> I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.  For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.  That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
 >>>
 >>
->> Now that you have fixed the crash, can you answer the questions I have
->> asked earlier?
+>> Thanks for this. I see the problem. At the end I missed bringing across something from v1. Easily fixed.
 >>
->>> Can you post the output of this command so that I can see how your
+>>> Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.  This would further reduce the amount of redundant fields between the specific implementations and the common set.
+>>>
 >>
->> clocks are setup:
+>> I did consider it and it could work. But it all depends on whether the "EventName" only is always readable/descriptive enough in the JSON, without requiring the "BriefDescription". The "EventName" can be rather succinct for any arch. And we need to guarantee that the "EventName" is unique.
 >>
->> cat /sys/kernel/debug/clk/clk_summary
+>> Here's a sample:
+>> [
+>>     {
+>>         "ArchStdEvent": "L1D_CACHE_RD",
+>>     },
+>>     {
+>>         "ArchStdEvent": "L1D_CACHE_WR",
+>>     },
 >>
->>> Using your workaround, can you run:
+>> vs.
+>>
+>> [
+>>     {
+>>         "ArchStdEvent": "0x40",
+>>         "BriefDescription": "L1D cache access, read"
+>>     },
+>>     {
+>>         "ArchStdEvent": "0x41",
+>>         "BriefDescription": "L1D cache access, write"
+>>     },
 >>
 >>
->> cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->>
->> If you see:
->>    1e27000.clock-controller: emac  off-0
->>
->> then genpd is not working like it is supposed to. You should see something
->> like this for device that are working:
->>            1e27000.clock-controller: uart2  on
->>      /devices/platform/soc at 1c00000/1d0d000.serial        active
-> 
-> Hi David, Sekhar,
-> 
-> I tried booting the board today over tftp but didn't succeed. I then
-> switched to a normal boot from SD card and the boot process froze at
-> the same moment (right after the DHCP config, or after rtc config if I
-> disabled DHCP in bootargs). I then realized that the emac clock can't
-> be the culprit. After some digging I found out that the late_initcall
-> to clk_disable_unused() disables sysclk6 - the parent of the arm
-> clock, which of course freezes the device.
-> 
-> If I remove the call to clk_disable_unused(), I can boot just fine.
-> 
-> The following other clocks are disabled before pll0_sysclk6:
-> pll1_sysclk3
-> pll0_obsclk
-> pll0_sysclk7
-> 
-> davinci_lpsc_clk_enable() is never called for these clocks - in fact
-> it's not called for any parent that's not explicitly defined in
-> psc-da850.c - I believe this may be one of the reasons. I will get
-> back to debugging it tomorrow.
-> 
-> Best regards,
-> Bartosz Golaszewski
-> 
+>> Opinion?
+>
 
-Thanks for continuing to dig into this. I think I know what needs to
-be done now. I think I don't have the dependencies quite right where
-the PSC clocks are being registered before the PLL clocks, in which
-case they aren't getting the correct parent clock.
+Hi Will,
+
+> Hi John,
+>
+> The "ArchStdEvent" version is more concise by avoiding the duplication
+> of "BriefDescription" field and possible differences in
+> "BriefDescription" due to typos.  Would it make easier for people coding
+> up descriptions for specific processors?  It would depend on how the
+> documentation is written up.  For the armv8 documentation in "D5.10.3
+> Common event numbers" list the event mnemonic in "Table D5-8 PMU common
+> architectural and microarchitectural event numbers" so just using the
+> event names seems like it would be pretty clear.
+
+Fine. ***If anyone disagrees on this then please say so.***
+
+For different Intel
+> ia64 microarchitecture implementations there are different event coding
+> to implement the same event name.  Not sure how would handle the
+> universe of different families of ia64 processor implementations.
+
+I think for this example, if we were to use the "EventName" as the 
+matching field, then it may be still possible to support by overriding 
+the "EventCode" in the platform JSON.
+
+The support in this patchset allows fields to be overriden; the 
+following is a sample of how it would look:
+{
+     "ArchStdEvent": "L1D_CACHE_RD", // Arch EventCode 0x40
+     "EventCode": "0x123456"   // override the eventcode
+},
+
+>
+> Is the armv8-common.json being used as a template that fills out the
+> fields of the json elements that match up an entry in the
+> armv8-common.json? Or does it only use the information from the
+> armv8-common.json.  If the code treated the armv8-common.json as default
+> values, then if something differs in the architecture specific entry it
+> could overwrite the default value from the template.
+
+Yes, this is supported. By default, the values in template 
+armv8-common.json are used (I called it armv8-recommended.json); 
+however, any fields defined in the platform JSON for a matching event 
+are prioritized, as above.
+
+>
+> -Will Cohen
+
+Thanks,
+John
+
+>
+>
+> .
+>
+> .
+>
