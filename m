@@ -1,81 +1,66 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 5 Mar 2018 10:36:07 +0800
-Subject: [PATCH 0/7] kexec_file: refactoring for other architecutres
-In-Reply-To: <20180302055609.GA15422@dhcp-128-65.nay.redhat.com>
-References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
- <20180302055609.GA15422@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180305023607.GA4185@dhcp-128-65.nay.redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 5 Mar 2018 10:12:21 +0530
+Subject: [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180302215638.6145-3-jcrouse@codeaurora.org>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+Message-ID: <20180305044221.GC23018@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/18 at 01:56pm, Dave Young wrote:
-> Hi AKASHI,
-> On 02/27/18 at 01:48pm, AKASHI Takahiro wrote:
-> > subject: 
-> > 
-> > This is a preparatory patch set for adding kexec_file support on arm64.
-> > 
-> > It was originally included in a arm64 patch set[1], but Philipp is also
-> > working on their kexec_file support on s390[2] and some changes are now
-> > conflicting.
-> > 
-> > So these common part was extracted and put into a separate patch set for
-> > better integration. What's more, my original patch#4 was split into a few
-> > small chunks for easier review after Dave's comment.
-> > 
-> > As such, the resulting code is basically identical with my original, and
-> > the only difference is that kexec_file_loaders[] is now declared in kexec.h
-> > after Phillipp's comment[3]. Other than that, this patch set doesn't
-> > require any changes on the rest of my original patch set(#1, #6 to #13).
-> > 
-> > Patch#1 allows making a use of purgatory optional, particularly useful
-> > for arm64.
-> > Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
-> > verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
-> > Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
-> > exclude_mem_range(), to be made best re-use of.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
-> > [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
-> > [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/562041.html
-> > 
-> > AKASHI Takahiro (7):
-> >   kexec_file: make an use of purgatory optional
-> >   kexec_file,x86,powerpc: factor out kexec_file_ops functions
-> >   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
-> >   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
-> >   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
-> >   x86: kexec_file: clean up prepare_elf64_headers()
-> >   kexec_file, x86: move re-factored code to generic side
-> > 
-> >  arch/powerpc/Kconfig                        |   3 +
-> >  arch/powerpc/include/asm/kexec.h            |   2 +-
-> >  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
-> >  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
-> >  arch/x86/Kconfig                            |   3 +
-> >  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
-> >  arch/x86/kernel/crash.c                     | 332 +++++-----------------------
-> >  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
-> >  arch/x86/kernel/machine_kexec_64.c          |  45 +---
-> >  include/linux/kexec.h                       |  36 ++-
-> >  kernel/kexec_file.c                         | 236 +++++++++++++++++++-
-> >  11 files changed, 336 insertions(+), 366 deletions(-)
-> > 
-> > -- 
-> > 2.16.2
-> > 
+On 02-03-18, 14:56, Jordan Crouse wrote:
+> Add the nodes and other bits to describe the Adreno GPU and GMU
+> devices.
 > 
-> Reviewed them with eyes and provided some comments, but since it changed
-> the elf header code, I would like to do some basic vmcore related test
-> with crash tools.  Will response later.
+> Change-Id: Ibf4dc0ebb0ac03d8b6b8e65747e142c440e70b0a
 
-Followup: I did some basic testing, did not find problems.
+Remove it ?
 
+> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 120 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 120 insertions(+)
 > 
-> Overall the cleanups looks good, thank you a lot for the cleanups!
-> 
-> Thanks
-> Dave
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 7b5c16eb63b7..cc6d367ee55e 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -312,5 +312,125 @@
+>  				status = "disabled";
+>  			};
+>  		};
+> +
+> +		adreno_smmu: arm,smmu-adreno at 5040000 {
+> +			compatible = "qcom,msm8996-smmu-v2";
+> +			reg = <0x5040000 0x10000>;
+> +			#iommu-cells = <1>;
+> +			#global-interrupts = <2>;
+> +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
+> +			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
+> +				 <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
+> +			clock-names = "bus", "iface";
+> +
+> +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
+> +		};
+> +
+> +		gpu_opp_table: adreno-opp-table {
+> +			compatible = "operating-points-v2";
+> +
+> +			opp-710000000 {
+> +				opp-hz = /bits/ 64 <710000000>;
+> +				qcom,arc-level = <416>;
 
-Thanks
-Dave
+I am not sure if I saw where this is defined ?
+
+
+-- 
+viresh
