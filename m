@@ -1,25 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 Mar 2018 21:26:23 +0100
-Subject: [PATCH] soc: rockchip: power-domain: Add a sanity check on
- pd->num_clks
-In-Reply-To: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
-References: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
-Message-ID: <2446754.ohlkqz2d1D@diego>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon,  5 Mar 2018 12:28:05 -0800
+Subject: [PATCH 4/5] ARM: dts: bcm2835: Add VCHI node to the Raspberry Pi
+ boards.
+In-Reply-To: <20180305202806.21219-1-eric@anholt.net>
+References: <20180305202806.21219-1-eric@anholt.net>
+Message-ID: <20180305202806.21219-5-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 5. M?rz 2018, 10:17:22 CET schrieb Jeffy Chen:
-> The of_count_phandle_with_args() can fail and return error(for example,
-> rk3399 pd_vio doesn't have clocks). That would break the pd probe.
-> 
-> Add a sanity check on pd->num_clks to avoid that.
-> 
-> Fixes: 65084121d59d ("soc: rockchip: power-domain: use clk_bulk APIs")
-> Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+The VCHI firmware communication channel operates in parallel with our
+other mailbox-based channel.  This is the communication channel that
+exposes the firmware's media decode/encode and ISP interfaces.
 
-applied for 4.17
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-
-Thanks
-Heiko
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index e36c392a2b8f..c128bc6a1435 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -27,6 +27,13 @@
+ 			firmware = <&firmware>;
+ 			#power-domain-cells = <1>;
+ 		};
++
++		vchi at 7e00b840 {
++			compatible = "brcm,bcm2835-vchiq";
++			reg = <0x7e00b840 0xf>;
++			interrupts = <0 2>;
++			firmware = <&firmware>;
++		};
+ 	};
+ };
+ 
+-- 
+2.16.2
