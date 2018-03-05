@@ -1,67 +1,122 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 05 Mar 2018 14:10:03 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
- <5A972A7D.9020301@codeaurora.org>
- <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
- <5A986425.9080007@codeaurora.org>
- <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
- <5A99A3DC.9020400@codeaurora.org>
- <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
-Message-ID: <5A9DC03B.8020201@codeaurora.org>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon,  5 Mar 2018 23:12:35 +0100
+Subject: [PATCH v4 00/38] DRM Rockchip rk3399 (Kevin)
+Message-ID: <20180305221313.3751-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2018 02:59 AM, Mark Rutland wrote:
-> On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
->> On 03/02/2018 02:42 AM, Mark Rutland wrote:
->>> It's important to note that the DSU PMU's event_init() ensures events
->>> are affine to a single CPU, and the perf core code serializes operations
->>> on those events via the context lock.
->>
->> Ah, I see that now. Thanks!
->>
->>> Therefore, two CPUs *won't* try to access the registers simultaneously.
->>
->> Right, and this driver seems to be going through a lot of work to make sure
->> all events are read in one CPU.
->>
->> Do you even have an upstream target where there are multiple DSU's in a
->> system?
->
-> I have no idea, though I do beleive that it's possible for a system to
-> have multiple DSUs.
->
->> If not, we can simplify a ton of this code (no hotplug notifiers, no
->> migrating PMUs, no SMP calls, etc) by just adding a spinlock and letting any
->> CPU read these DSU counters.
->
-> Regardless of whether we allow arbitrary CPUs to read the counters,
-> other logic still needs to be CPU affine, and we'll still need hotplug
-> notifiers and event migration.
+Hi,
 
-If you have to support multiple DSUs in a system, then the need is 
-obvious. But if you don't have to support multiple DSU, it's not obvious 
-to me on why you still need CPU affining or hotplug notifiers. Could you 
-please provide me pointers for general understanding?
+This patchset includes cleanups, improvements, and bug fixes for
+Rockchip DRM driver and PSR support.
+
+This new version is the same as before but rebased on top of
+drm-misc-next plus the Marek patches that fixes Chromebook2 Peach-Pit [1]
+and the latest series of Rockchip rk3399 eDP support [2].
+
+[1] https://www.spinics.net/lists/dri-devel/msg167804.html
+[2] https://www.spinics.net/lists/dri-devel/msg167770.html
+
+Regards,
+ Enric
+
+Changes in v4:
+- Rebased all on top of drm-misc-next
+- Removed the following patches as are already applied.
+  [PATCH v3 01/43] drm/rockchip: Get rid of unnecessary struct fields
+  [PATCH v3 02/43] drm/rockchip: support prime import sg table
+  [PATCH v3 03/43] drm/rockchip: Respect page offset for PRIME mmap
+  calls
+- Removed the following patches as now are part of another patchset
+  [PATCH v3 05/43] drm/bridge: analogix_dp: Don't power bridge in
+  analogix_dp_bind
+  [PATCH v3 33/43] drm/panel: simple: Change mode for Sharp lq123p1jx31
+
+Changes in v3:
+- Addressed some of the comments from Sean on the v2
+
+Changes in v2:
+- A few patches have been replaced by newer and cleaner versions from
+  the ChromeOS kernel gerrit, especially about disallowing PSR for the
+  whole atomic commit.
 
 
-> I am not necessarily opposed to allowing read() calls from associated
-> CPUs, but as before, I'll leave that to Suzuki.
+Douglas Anderson (4):
+  drm/bridge: analogix_dp: Reorder plat_data->power_off to happen sooner
+  drm/bridge: analogix_dp: Properly log AUX CH errors
+  drm/bridge: analogix_dp: Properly disable aux chan retries on rockchip
+  drm/bridge: analogix_dp: Split the platform-specific poweron in two
+    parts
 
-Can you make sure this thread is on Suzuki's radar?
+Kristian H. Kristensen (1):
+  drm/rockchip: Disable PSR on input events
 
-Suzuki,
+Lin Huang (6):
+  drm/bridge: analogix_dp: Move enable video into config_video()
+  drm/bridge: analogix_dp: Check AUX_EN status when doing AUX transfer
+  drm/bridge: analogix_dp: Ensure edp is disabled when shutting down the
+    panel
+  drm/bridge: analogix_dp: Extend hpd check time to 100ms
+  drm/bridge: analogix_dp: Check dpcd write/read status
+  drm/bridge: analogix_dp: Reset aux channel if an error occurred
 
-Could please respond? IPI for DSUs are definitely a pain for us.
+Mark Yao (1):
+  drm/rockchip: pre dither down when output bpc is 8bit
 
-Thanks,
-Saravana
+Sean Paul (2):
+  drm/rockchip: Don't use atomic constructs for psr
+  drm/rockchip: Remove analogix psr worker
+
+Tomasz Figa (7):
+  drm/rockchip: analogix_dp: Do not call Analogix code before bind
+  drm/rockchip: Cancel PSR enable work before changing the state
+  drm/rockchip: psr: Avoid redundant calls to .set() callback
+  drm/rockchip: psr: Sanitize semantics of allow/disallow API
+  drm/rockchip: Disable PSR from reboot notifier
+  drm/rockchip: Disallow PSR for the whole atomic commit
+  drm/rockchip: psr: Remove flush by CRTC
+
+Yakir Yang (1):
+  drm/bridge: analogix_dp: detect Sink PSR state after configuring the
+    PSR
+
+zain wang (16):
+  drm/bridge: analogix_dp: set psr activate/deactivate when
+    enable/disable bridge
+  drm/bridge: analogix_dp: Don't change psr while bridge is disabled
+  drm/rockchip: add mutex vop lock
+  drm/bridge: analogix_dp: add fast link train for eDP
+  drm/rockchip: Only wait for panel ACK on PSR entry
+  drm/bridge: analogix_dp: Don't use fast link training when panel just
+    powered up
+  drm/bridge: analogix_dp: Retry bridge enable when it failed
+  drm/bridge: analogix_dp: Wait for HPD signal before configuring link
+  drm/bridge: analogix_dp: Set PD_INC_BG first when powering up edp phy
+  drm/bridge: analogix_dp: Fix incorrect usage of enhanced mode
+  drm/bridge: analogix_dp: Fix AUX_PD bit for Rockchip
+  drm/rockchip: Restore psr->state when enable/disable psr failed
+  drm/bridge: analogix_dp: Don't use ANALOGIX_DP_PLL_CTL to control pll
+  drm/bridge: analogix_dp: Fix timeout of video streamclk config
+  drm/bridge: analogix_dp: Fix incorrect operations with register
+    ANALOGIX_DP_FUNC_EN_1
+  drm/bridge: analogix_dp: Move fast link training detect to set_bridge
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 452 ++++++++++++++++-----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  14 +-
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 274 ++++++++-----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h  |   7 +
+ drivers/gpu/drm/exynos/exynos_dp.c                 |   2 +-
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  73 ++--
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   3 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c         |  61 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c        | 361 ++++++++++------
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.h        |   7 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  47 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   1 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   1 +
+ include/drm/bridge/analogix_dp.h                   |   5 +-
+ 15 files changed, 915 insertions(+), 395 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.16.1
