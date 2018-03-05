@@ -1,84 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Mar 2018 10:52:16 +0100
-Subject: [PATCH 2/2] arm: rzn1: Add basic support for RZN1D-DB Board
-In-Reply-To: <1519647518-15579-3-git-send-email-michel.pollet@bp.renesas.com>
-References: <1519647518-15579-1-git-send-email-michel.pollet@bp.renesas.com>
- <1519647518-15579-3-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdVdXh428vfLW5has3THUWq5x6iA-6CLL+uQudOGOJfTrA@mail.gmail.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Mon, 5 Mar 2018 11:04:00 +0100
+Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
+ slave
+In-Reply-To: <CAMZdPi8ab7n0B9qYyZaJAGf4qRH8eYXcUJ=B8pyvyLWyaNVX+Q@mail.gmail.com>
+References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
+ <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
+ <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
+ <648118289.71086.1519593373795@email.1und1.de>
+ <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
+ <395166283.280598.1520200683559@email.1und1.de>
+ <423BE2B6-2209-4390-B420-FA7267318A09@holtmann.org>
+ <1219888621.198216.1520231304685@email.1und1.de>
+ <524739BF-BD94-4276-BDAB-31B4944D24C3@holtmann.org>
+ <CAMZdPi8ab7n0B9qYyZaJAGf4qRH8eYXcUJ=B8pyvyLWyaNVX+Q@mail.gmail.com>
+Message-ID: <19717EF2-FC8D-4F2B-B198-4D582FD743E8@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+Hi Loic,
 
-On Mon, Feb 26, 2018 at 1:18 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> Only enables the uart0 for now, and also relies on the bootloader
-> for setting up the clocks and pinctrl.
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> > >>
+> > >> that is weird since we should be either in a probe context or in hdev->open context and both can sleep as far as I know.
+> 
+> Yes but this is an explicit warning in gpiolib based on gpio controller capabilities,
+> not on current context (WARN_ON(desc->gdev->chip->can_sleep)).
+> 
+> So, since we are always in process/thread context here, it seems safe to use the _cansleep version.
 
-Thanks for your patch!
+can someone whip up a patch for it and quickly test it.
 
-This should be split in two parts:
+Regards
 
->  Documentation/devicetree/bindings/arm/shmobile.txt |  2 ++
-
-1. DT bindings
-
->  arch/arm/boot/dts/rzn1d400-db.dts                  | 25 ++++++++++++++++++++++
-
-2. Board DTS + (missing) arch/arm/boot/dts/Makefile update.
-
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rzn1d400-db.dts
-
-Why the 400? 400-pin package?
-
-Please follow <SoC>-<board>.dts naming convention, i.e.
-r9a06g032-rzn1d-db.dts
-
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Device Tree Source for the RZN1D-DB Board
-> + *
-> + * Copyright (C) 2018 Renesas Electronics Europe Limited
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "rzn1.dtsi"
-> +
-> +/ {
-> +       model = "RZN1D-DB Board";
-> +       compatible = "renesas,rzn1d-db", "renesas,r9a06g032";
-> +
-> +       chosen {
-> +               bootargs = "console=ttyS0,115200";
-
-"console=" is not needed, as it is handled by stdout-path these days,
-so you can remove bootargs for now.
-
-> +               stdout-path = &uart0;
-
-stdout-path = "serial0:115200n8";
-
-Please move the serial0 alias definition to the board DTS, as labeling
-of serial ports
-is board-specific.
-
-> +               linux,stdout-path = &uart0;
-
-linux,stdout-path is deprecated, please remove it.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Marcel
