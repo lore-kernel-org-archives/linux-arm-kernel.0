@@ -1,51 +1,133 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 5 Mar 2018 15:47:18 -0600
-Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
-In-Reply-To: <1520261458.33502.10.camel@aosc.io>
-References: <1520261458.33502.10.camel@aosc.io>
-Message-ID: <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Mon, 5 Mar 2018 22:51:18 +0100
+Subject: [RFC V2 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <94ecc9b1337d15fe4634da56cb428738@codeaurora.org>
+References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
+ <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+ <20180303143436.GA14563@krava>
+ <20180304171245.GB25017@tassilo.jf.intel.com>
+ <20180304181010.GA7030@krava>
+ <1ddac3f4900267b0c9a69ef4c598be51@codeaurora.org>
+ <20180305190937.GA31349@krava>
+ <94ecc9b1337d15fe4634da56cb428738@codeaurora.org>
+Message-ID: <20180305215118.GB31349@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
-> Hi everyone,
+On Mon, Mar 05, 2018 at 03:10:43PM -0500, Agustin Vega-Frias wrote:
+> On 2018-03-05 14:09, Jiri Olsa wrote:
+> > On Mon, Mar 05, 2018 at 10:08:18AM -0500, Agustin Vega-Frias wrote:
+> > > On 2018-03-04 13:10, Jiri Olsa wrote:
+> > > > On Sun, Mar 04, 2018 at 09:12:45AM -0800, Andi Kleen wrote:
+> > > > > > > +#include <fnmatch.h>
+> > > > > > >  #include <linux/compiler.h>
+> > > > > > >  #include <linux/list.h>
+> > > > > > >  #include <linux/types.h>
+> > > > > > > @@ -241,7 +242,7 @@ PE_NAME opt_event_config
+> > > > > > >  			if (!strncmp(name, "uncore_", 7) &&
+> > > > > > >  			    strncmp($1, "uncore_", 7))
+> > > > > > >  				name += 7;
+> > > > > > > -			if (!strncmp($1, name, strlen($1))) {
+> > > > > > > +			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
+> > > > > >
+> > > > > > could we now get rid of the strncmp in here and keep the
+> > > > > > glob matching only?
+> > > > >
+> > > > > That would break existing command lines. Not a good idea.
+> > > >
+> > > > I hoped that only you guys are using this and would rewrite your scripts
+> > > > ;-)
+> > > >
+> > > > I had no idea there's fnmatch func before.. too bad, ok
+> > > >
+> > > > jirka
+> > > 
+> > > An option to keep backward compatibility and consistency would be
+> > > to wrap the pattern/string passed in *'s, that way we can just use
+> > > fnmatch and have all the examples Jiri brought up work the same.
+> > > With that in place we can actually also drop the explicit ignoring
+> > > of the uncore_ prefix since the globbing would take care of that.
+> > 
+> > I don't mind the strcmp as such, I wanted to get rid of the wildcard
+> > matching without using '*' ... but as Andi said it's been out
+> > there and it's been a while, so let's keep it
+> > 
+> > but if there's a way to make it simpler, let's go for it
+> > 
+> > thanks,
+> > jirka
 > 
-> I'm trying to implement a driver for the quirky (DW) PCIe RC in the
-> Allwinner H6 SoC.
+> Sounds good. I have a new version ready (see sample output below).
+> But I wanted to ping about the other two patches before submitting.
+> Any feedback on those?
+
+the rest looks ok to me, so does the output below
+
+thanks,
+jirka
+
 > 
-> The quirk is that only the "dbi" space is always mapped, but at the
-> same time only 64KiB of other spaces (config, downstream IO and non-
-> prefetchable memory) are accessible. To access a certain address the
-> high 16-bit of the address (all bus addresses in H6 SoC are 32-bit
-> despite the CPU is 64-bit) needs to be written into the
-> PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI space).
-> So the access to these spaces cannot be processed correctly with just
-> readl/writel, as the existing code does.
+> Thanks,
+> Agust?n
 > 
-> Is it possible to workaround this in the PCI subsystem of Linux?
+> PS:
+> Sample output:
 > 
-> (I have thought a workaround that only maps the current accessible
-> 64KiB with the MMU, and when accessing the non-accessible part, catch
-> the page fault and re-setup the map to the new 64KiB page. But surely
-> it will kill the performance.)
-
-If you only need to write to PCIE_ADDR_PAGE_CFG for *config* accesses,
-this should be easy.  All config accesses go through wrappers
-(pci_read_config_word(), etc) and several host bridge drivers have to
-update a register with parts of the config address, e.g.,
-advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
-
-It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O port
-accesses.  I/O port accesses do go through a wrapper (inb(), etc), so
-it might be possible in principle to intercept these, although much
-more difficult than config accesses, because the config accesses are
-already set up with per-host bridge hooks, while the I/O port
-accessors are mostly per-arch.
-
-But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
-that's really a problem because drivers are allowed to essentially
-read a memory BAR, convert that bus address to a CPU physical memory
-address, ioremap() it, then directly access the PCIe memory with loads
-and stores.
-
-Bjorn
+> $ ./perf stat -a -e imc/umask=0x3,event=0x4/ --no-merge ls -l > /dev/null
+> 
+>  Performance counter stats for 'system wide':
+> 
+>              2,613      uncore_imc_0/umask=0x3,event=0x4/
+>              2,736      uncore_imc_1/umask=0x3,event=0x4/
+>              2,671      uncore_imc_2/umask=0x3,event=0x4/
+>              2,508      uncore_imc_3/umask=0x3,event=0x4/
+>              2,439      uncore_imc_4/umask=0x3,event=0x4/
+>              2,465      uncore_imc_5/umask=0x3,event=0x4/
+> 
+>        0.004159243 seconds time elapsed
+> 
+> $ ./perf stat -a -e *imc/umask=0x3,event=0x4/ --no-merge ls -l > /dev/null
+> 
+>  Performance counter stats for 'system wide':
+> 
+>              2,704      uncore_imc_0/umask=0x3,event=0x4/
+>              2,601      uncore_imc_1/umask=0x3,event=0x4/
+>              2,625      uncore_imc_2/umask=0x3,event=0x4/
+>              2,370      uncore_imc_3/umask=0x3,event=0x4/
+>              2,485      uncore_imc_4/umask=0x3,event=0x4/
+>              2,431      uncore_imc_5/umask=0x3,event=0x4/
+> 
+>        0.002716763 seconds time elapsed
+> 
+> $ ./perf stat -a -e imc*/umask=0x3,event=0x4/ --no-merge ls -l > /dev/null
+> 
+>  Performance counter stats for 'system wide':
+> 
+>              1,294      uncore_imc_0/umask=0x3,event=0x4/
+>              1,303      uncore_imc_1/umask=0x3,event=0x4/
+>              1,242      uncore_imc_2/umask=0x3,event=0x4/
+>              1,125      uncore_imc_3/umask=0x3,event=0x4/
+>              1,137      uncore_imc_4/umask=0x3,event=0x4/
+>              1,159      uncore_imc_5/umask=0x3,event=0x4/
+> 
+>        0.002790441 seconds time elapsed
+> 
+> $ ./perf stat -a -e *imc*/umask=0x3,event=0x4/ --no-merge ls -l > /dev/null
+> 
+>  Performance counter stats for 'system wide':
+> 
+>              1,524      uncore_imc_0/umask=0x3,event=0x4/
+>              1,508      uncore_imc_1/umask=0x3,event=0x4/
+>              1,501      uncore_imc_2/umask=0x3,event=0x4/
+>              1,405      uncore_imc_3/umask=0x3,event=0x4/
+>              1,427      uncore_imc_4/umask=0x3,event=0x4/
+>              1,450      uncore_imc_5/umask=0x3,event=0x4/
+> 
+>        0.002720907 seconds time elapsed
+> 
+> -- 
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm
+> Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+> Foundation Collaborative Project.
