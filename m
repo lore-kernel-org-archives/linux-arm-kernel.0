@@ -1,92 +1,43 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Mon, 5 Mar 2018 20:17:45 +0900
-Subject: [PATCH v2 1/2] arm: mm: Define vdso_start, vdso_end as array
-Message-ID: <20180305111745.GA4193@pjb1027-Latitude-E5410>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 5 Mar 2018 12:18:16 +0100
+Subject: [GIT PULL] STM32 defconfig changes for v4.17 #1
+Message-ID: <04188a3b-6432-3e2e-8e4a-fb5522a1c8aa@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define vdso_start, vdso_end as array to avoid compile-time analysis error
-for the case of built with CONFIG_FORTIFY_SOURCE.
+Hi Olof, Arnd and Kevin,
 
-and, since vdso_start, vdso_end are used in vdso.c only,
-move extern-declaration from vdso.h to vdso.c.
+Please consider this first round of STM32 defconfig updates for v4.17:
 
-If kernel is built with CONFIG_FORTIFY_SOURCE,
-compile-time error happens at this code.
-- if (memcmp(&vdso_start, "\177ELF", 4))
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-The size of "&vdso_start" is recognized as 1 byte, but n is 4,
-So that compile-time error is reported.
+   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Acked-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
-v2: No changes
----
- arch/arm/include/asm/vdso.h |  2 --
- arch/arm/kernel/vdso.c      | 12 +++++++-----
- 2 files changed, 7 insertions(+), 7 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
-index 9c99e81..5b85889 100644
---- a/arch/arm/include/asm/vdso.h
-+++ b/arch/arm/include/asm/vdso.h
-@@ -12,8 +12,6 @@
- 
- void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
- 
--extern char vdso_start, vdso_end;
--
- extern unsigned int vdso_total_pages;
- 
- #else /* CONFIG_VDSO */
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index a4d6dc0..f4dd7f9 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -39,6 +39,8 @@
- 
- static struct page **vdso_text_pagelist;
- 
-+extern char vdso_start[], vdso_end[];
-+
- /* Total number of pages needed for the data and text portions of the VDSO. */
- unsigned int vdso_total_pages __ro_after_init;
- 
-@@ -197,13 +199,13 @@ static int __init vdso_init(void)
- 	unsigned int text_pages;
- 	int i;
- 
--	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+	if (memcmp(vdso_start, "\177ELF", 4)) {
- 		pr_err("VDSO is not a valid ELF object!\n");
- 		return -ENOEXEC;
- 	}
- 
--	text_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
--	pr_debug("vdso: %i text pages at base %p\n", text_pages, &vdso_start);
-+	text_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-+	pr_debug("vdso: %i text pages at base %p\n", text_pages, vdso_start);
- 
- 	/* Allocate the VDSO text pagelist */
- 	vdso_text_pagelist = kcalloc(text_pages, sizeof(struct page *),
-@@ -218,7 +220,7 @@ static int __init vdso_init(void)
- 	for (i = 0; i < text_pages; i++) {
- 		struct page *page;
- 
--		page = virt_to_page(&vdso_start + i * PAGE_SIZE);
-+		page = virt_to_page(vdso_start + i * PAGE_SIZE);
- 		vdso_text_pagelist[i] = page;
- 	}
- 
-@@ -229,7 +231,7 @@ static int __init vdso_init(void)
- 
- 	cntvct_ok = cntvct_functional();
- 
--	patch_vdso(&vdso_start);
-+	patch_vdso(vdso_start);
- 
- 	return 0;
- }
--- 
-1.9.1
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-defconfig-for-v4.17-1
+
+for you to fetch changes up to 1c92d4a0edcfff0fee78ade27eb41ce3fc0d071a:
+
+   ARM: configs: stm32: Enable MMC_ARMMMCI and EXT3_FS support 
+(2018-02-27 11:00:49 +0100)
+
+----------------------------------------------------------------
+STM32 defconfig updates for v4.17, round 1
+
+Highlights:
+----------
+  -Add STM32 support (for MPU) to multi-v7-defconfig
+  -Enable MMCI and EXT3_FS support
+
+----------------------------------------------------------------
+Ludovic Barre (1):
+       ARM: configs: multi_v7: add stm32 support
+
+Patrice Chotard (1):
+       ARM: configs: stm32: Enable MMC_ARMMMCI and EXT3_FS support
+
+  arch/arm/configs/multi_v7_defconfig | 3 +++
+  arch/arm/configs/stm32_defconfig    | 3 +++
+  2 files changed, 6 insertions(+)
