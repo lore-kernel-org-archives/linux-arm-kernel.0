@@ -1,29 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Mar 2018 11:37:41 +0100
-Subject: [PATCH 1/5] arm64: dts: renesas: r8a7795: Add multi-cluster
- definition
-In-Reply-To: <1519697995-6061-2-git-send-email-gaku.inami.xh@renesas.com>
-References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
- <1519697995-6061-2-git-send-email-gaku.inami.xh@renesas.com>
-Message-ID: <CAMuHMdUHbYCD-9yF4=_xe1_Fk_oMS6Shxjqkw-D+Pwfzb5q93A@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 5 Mar 2018 16:13:35 +0530
+Subject: [PATCH v5 4/4] arm64: dts: sdm845: Add serial console support
+In-Reply-To: <20180304195930.GQ93895@bjorns-mbp-2.lan>
+References: <20180222061208.2031-1-rnayak@codeaurora.org>
+ <20180222061208.2031-5-rnayak@codeaurora.org>
+ <20180304195930.GQ93895@bjorns-mbp-2.lan>
+Message-ID: <9d24e89f-38be-59e4-6f76-c273dd4d4e79@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 3:19 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
-> This patch adds the "cpu-map" for multi-cluster into r8a7795
-> device-tree. This definition is used to parse the cpu topology.
->
-> Signed-off-by: Gaku Inami <gaku.inami.xh@renesas.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Gr{oetje,eeting}s,
+On 03/05/2018 01:29 AM, Bjorn Andersson wrote:
+> On Wed 21 Feb 22:12 PST 2018, Rajendra Nayak wrote:
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> [..]
+>> +			qup_uart2: serial at a84000 {
+>> +				compatible = "qcom,geni-debug-uart";
+>> +				reg = <0xa84000 0x4000>;
+>> +				reg-names = "se-phys";
+>> +				clock-names = "se-clk";
+> 
+> This was changed to "se" in v3 of the GENI patchset, with that this
+> boots nicely again.
 
-                        Geert
+Thanks Bjorn for testing.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Karthik, it would be good if you could include just this patch from this series as part
+of your GENI series for the next (and subsequent) repost, with updates as needed based on
+binding changes?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
