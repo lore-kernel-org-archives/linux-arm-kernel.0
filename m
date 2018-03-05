@@ -1,99 +1,63 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  5 Mar 2018 11:36:38 +0100
-Subject: [PATCH] KVM: arm/arm64: Reset mapped IRQs on VM reset
-Message-ID: <20180305103638.1633-1-cdall@kernel.org>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 5 Mar 2018 10:37:17 +0000
+Subject: [PATCH] arm: dts: stih4xx: Add missing #sound-dai-cells
+In-Reply-To: <20180301202537.30571-4-robh@kernel.org>
+References: <20180301202537.30571-4-robh@kernel.org>
+Message-ID: <5fca2bc1-1f8e-1760-9e6a-802661af0f7e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently don't allow resetting mapped IRQs from userspace, because
-their state is controlled by the hardware.  But we do need to reset the
-state when the VM is reset, so we provide a function for the 'owner' of
-the mapped interrupt to reset the interrupt state.
+Hi Rob
 
-Currently only the timer uses mapped interrupts, so we call this
-function from the timer reset logic.
+On 03/01/2018 09:25 PM, Rob Herring wrote:
+> dtc now gives the following warnings:
+> 
+> arch/arm/boot/dts/stih410-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+> arch/arm/boot/dts/stih407-b2120.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+> arch/arm/boot/dts/stih410-b2260.dtb: Warning (sound_dai_property): /soc/sound/simple-audio-card,dai-link at 0/codec: Missing property '#sound-dai-cells' in node /soc/sti-display-subsystem/sti-hdmi at 8d04000 or bad phandle (referred from sound-dai[0])
+> 
+> Add the missing #sound-dai-cells property.
+> 
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>   arch/arm/boot/dts/stih407.dtsi | 1 +
+>   arch/arm/boot/dts/stih410.dtsi | 1 +
+>   2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+> index 11fdecd9312e..b592ecbe6420 100644
+> --- a/arch/arm/boot/dts/stih407.dtsi
+> +++ b/arch/arm/boot/dts/stih407.dtsi
+> @@ -107,6 +107,7 @@
+>   				compatible = "st,stih407-hdmi";
+>   				reg = <0x8d04000 0x1000>;
+>   				reg-names = "hdmi-reg";
+> +				#sound-dai-cells = <0>;
+>   				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>   				interrupt-names	= "irq";
+>   				clock-names = "pix",
+> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+> index 68b5ff91d6a7..4bcdbbb70a31 100644
+> --- a/arch/arm/boot/dts/stih410.dtsi
+> +++ b/arch/arm/boot/dts/stih410.dtsi
+> @@ -198,6 +198,7 @@
+>   				compatible = "st,stih407-hdmi";
+>   				reg = <0x8d04000 0x1000>;
+>   				reg-names = "hdmi-reg";
+> +				#sound-dai-cells = <0>;
+>   				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+>   				interrupt-names	= "irq";
+>   				clock-names = "pix",
+> 
 
-Signed-off-by: Christoffer Dall <cdall@kernel.org>
----
-This depends on "KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls
-than KVM_RUN" from the VHE optimization series so that the reset doesn't
-get called while vtimer->loaded is true.
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
- include/kvm/arm_vgic.h    |  1 +
- virt/kvm/arm/arch_timer.c |  4 ++++
- virt/kvm/arm/vgic/vgic.c  | 26 ++++++++++++++++++++++++++
- 3 files changed, 31 insertions(+)
+Will you take this patch in your remotes/Rob_Herring/dtc-update branch ?
+Or I can add this patch to my next STi pull-request.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index cdbd142ca7f2..02924ae2527e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -360,6 +360,7 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu);
- bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
- 
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 70268c0bec79..09890a5268d1 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -571,6 +571,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- 
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
- {
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
-@@ -584,6 +585,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
- 	ptimer->cnt_ctl = 0;
- 	kvm_timer_update_state(vcpu);
- 
-+	if (timer->enabled && irqchip_in_kernel(vcpu->kvm))
-+		kvm_vgic_reset_mapped_irq(vcpu, vtimer->irq.irq);
-+
- 	return 0;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index c7c5ef190afa..0001858a2c23 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -495,6 +495,32 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
- 	return ret;
- }
- 
-+/**
-+ * kvm_vgic_reset_mapped_irq - Reset a mapped IRQ
-+ * @vcpu: The VCPU pointer
-+ * @vintid: The INTID of the interrupt
-+ *
-+ * Reset the active and pending states of a mapped interrupt.  Kernel
-+ * subsystems injecting mapped interrupts should reset their interrupt lines
-+ * when we are doing a reset of the VM.
-+ */
-+void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
-+	unsigned long flags;
-+
-+	if (!irq->hw)
-+		goto out;
-+
-+	spin_lock_irqsave(&irq->irq_lock, flags);
-+	irq->active = false;
-+	irq->pending_latch = false;
-+	irq->line_level = false;
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
-+out:
-+	vgic_put_irq(vcpu->kvm, irq);
-+}
-+
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
- {
- 	struct vgic_irq *irq;
--- 
-2.14.2
+Let me know.
+
+Thanks
+
+Patrice
