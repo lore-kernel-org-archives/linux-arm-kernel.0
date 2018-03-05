@@ -1,68 +1,227 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 Mar 2018 18:04:48 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add dp83867 CLK_OUT muxing
-In-Reply-To: <cecf3c08-d43d-c340-c5ff-30e41e338469@phytec.de>
-References: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
- <3530074.WSbKf9j6h0@phil> <cecf3c08-d43d-c340-c5ff-30e41e338469@phytec.de>
-Message-ID: <8543411.nbQLj7Vctj@diego>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  5 Mar 2018 11:06:43 -0600
+Subject: [PATCH v2] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+Message-ID: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
+V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
+the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
+of Silicon provider service ID 0xC2001700.
 
-Am Montag, 5. M?rz 2018, 16:57:13 CET schrieb Daniel Schultz:
-> On 03/05/2018 03:15 PM, Heiko Stuebner wrote:
-> > Am Montag, 5. M?rz 2018, 13:45:11 CET schrieb Daniel Schultz:
-> >> The CLK_O_SEL default is synchronous to XI input clock, which is 25 MHz.
-> >> Set CLK_O_SEL to channel A transmit clock so we have 125 MHz on CLK_OUT.
-> >> 
-> >> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
-> >> ---
-> >> 
-> >> The binding will be added with the next merge of net-next:
-> >> https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit
-> >> /?id=9708fb630d19ee51ae3aeb3a533e3010da0e8570
-> https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/log/Docum
-> entation/devicetree/bindings/net/ti,dp83867.txt
-> 
-> If I search in the master branch, I get the patch. Did I searched wrong?
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Chnages since v1:
+  - Trivial change in cpucaps.h (refresh after removing ARM64_HARDEN_BP_POST_GUEST_EXIT)
 
-no ... seems I was just blind :-)
+ arch/arm64/include/asm/cpucaps.h |  5 ++--
+ arch/arm64/include/asm/kvm_asm.h |  2 --
+ arch/arm64/kernel/bpi.S          |  8 ------
+ arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
+ arch/arm64/kvm/hyp/entry.S       | 12 ---------
+ arch/arm64/kvm/hyp/switch.c      | 10 --------
+ 6 files changed, 21 insertions(+), 71 deletions(-)
 
-Heiko
-
-
-> > I did find the commit, but no related change of the dp83867 dt binding
-> > document [0], including a review by dt-maintainers.
-> > 
-> > While your property does not look overly complicated, the binding
-> > should be updated nontheless.
-> > 
-> > 
-> > Heiko
-> > 
-> > [0]
-> > https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/log/Do
-> > cumentation/devicetree/bindings/net/ti,dp83867.txt?id=9708fb630d19ee51ae3a
-> > eb3a533e3010da0e8570> 
-> >>   arch/arm/boot/dts/rk3288-phycore-som.dtsi | 1 +
-> >>   1 file changed, 1 insertion(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/rk3288-phycore-som.dtsi
-> >> b/arch/arm/boot/dts/rk3288-phycore-som.dtsi index bdd80aa..e60535d
-> >> 100644
-> >> --- a/arch/arm/boot/dts/rk3288-phycore-som.dtsi
-> >> +++ b/arch/arm/boot/dts/rk3288-phycore-som.dtsi
-> >> @@ -141,6 +141,7 @@
-> >> 
-> >>   			ti,tx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
-> >>   			ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
-> >>   			enet-phy-lane-no-swap;
-> >> 
-> >> +			ti,clk-output-sel = <DP83867_CLK_O_SEL_CHN_A_TCLK>;
-> >> 
-> >>   		};
-> >>   	
-> >>   	};
-> >>   
-> >>   };
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bb26382..324c85e 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -43,9 +43,8 @@
+ #define ARM64_SVE				22
+ #define ARM64_UNMAP_KERNEL_AT_EL0		23
+ #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+-#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+-#define ARM64_HAS_RAS_EXTN			26
++#define ARM64_HAS_RAS_EXTN			25
+ 
+-#define ARM64_NCAPS				27
++#define ARM64_NCAPS				26
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 24961b7..ab4d0a9 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -68,8 +68,6 @@
+ 
+ extern u32 __init_stage2_translation(void);
+ 
+-extern void __qcom_hyp_sanitize_btac_predictors(void);
+-
+ #endif
+ 
+ #endif /* __ARM_KVM_ASM_H__ */
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index e5de335..dc4eb15 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -55,14 +55,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+ 
+-ENTRY(__qcom_hyp_sanitize_link_stack_start)
+-	stp     x29, x30, [sp, #-16]!
+-	.rept	16
+-	bl	. + 4
+-	.endr
+-	ldp	x29, x30, [sp], #16
+-ENTRY(__qcom_hyp_sanitize_link_stack_end)
+-
+ .macro smccc_workaround_1 inst
+ 	sub	sp, sp, #(8 * 4)
+ 	stp	x2, x3, [sp, #(8 * 0)]
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 52f15cd..d779ffd4 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -67,8 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+ 
+ #ifdef CONFIG_KVM
+-extern char __qcom_hyp_sanitize_link_stack_start[];
+-extern char __qcom_hyp_sanitize_link_stack_end[];
+ extern char __smccc_workaround_1_smc_start[];
+ extern char __smccc_workaround_1_smc_end[];
+ extern char __smccc_workaround_1_hvc_start[];
+@@ -115,8 +113,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	spin_unlock(&bp_lock);
+ }
+ #else
+-#define __qcom_hyp_sanitize_link_stack_start	NULL
+-#define __qcom_hyp_sanitize_link_stack_end	NULL
+ #define __smccc_workaround_1_smc_start		NULL
+ #define __smccc_workaround_1_smc_end		NULL
+ #define __smccc_workaround_1_hvc_start		NULL
+@@ -161,12 +157,25 @@ static void call_hvc_arch_workaround_1(void)
+ 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
+ }
+ 
++static void qcom_link_stack_sanitization(void)
++{
++	u64 tmp;
++
++	asm volatile("mov	%0, x30		\n"
++		     ".rept	16		\n"
++		     "bl	. + 4		\n"
++		     ".endr			\n"
++		     "mov	x30, %0		\n"
++		     : "=&r" (tmp));
++}
++
+ static int enable_smccc_arch_workaround_1(void *data)
+ {
+ 	const struct arm64_cpu_capabilities *entry = data;
+ 	bp_hardening_cb_t cb;
+ 	void *smccc_start, *smccc_end;
+ 	struct arm_smccc_res res;
++	u32 midr = read_cpuid_id();
+ 
+ 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+ 		return 0;
+@@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
+ 		return 0;
+ 	}
+ 
++	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
++	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
++		cb = qcom_link_stack_sanitization;
++
+ 	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
+ 
+ 	return 0;
+ }
+ 
+-static void qcom_link_stack_sanitization(void)
+-{
+-	u64 tmp;
+-
+-	asm volatile("mov	%0, x30		\n"
+-		     ".rept	16		\n"
+-		     "bl	. + 4		\n"
+-		     ".endr			\n"
+-		     "mov	x30, %0		\n"
+-		     : "=&r" (tmp));
+-}
+-
+-static int qcom_enable_link_stack_sanitization(void *data)
+-{
+-	const struct arm64_cpu_capabilities *entry = data;
+-
+-	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
+-				__qcom_hyp_sanitize_link_stack_start,
+-				__qcom_hyp_sanitize_link_stack_end);
+-
+-	return 0;
+-}
+ #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ 
+ #define MIDR_RANGE(model, min, max) \
+@@ -400,20 +391,12 @@ static int qcom_enable_link_stack_sanitization(void *data)
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+-		.enable = qcom_enable_link_stack_sanitization,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+-		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+-		.enable = qcom_enable_link_stack_sanitization,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+-		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index fdd1068..56fc2bb 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -213,15 +213,3 @@ alternative_endif
+ 
+ 	eret
+ ENDPROC(__fpsimd_guest_restore)
+-
+-ENTRY(__qcom_hyp_sanitize_btac_predictors)
+-	/**
+-	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
+-	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
+-	 * b15-b0: contains SiP functionID
+-	 */
+-	movz    x0, #0x1700
+-	movk    x0, #0xc200, lsl #16
+-	smc     #0
+-	ret
+-ENDPROC(__qcom_hyp_sanitize_btac_predictors)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 870f4b1..d4a336e 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -403,16 +403,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 		/* 0 falls through to be handled out of EL2 */
+ 	}
+ 
+-	if (cpus_have_const_cap(ARM64_HARDEN_BP_POST_GUEST_EXIT)) {
+-		u32 midr = read_cpuid_id();
+-
+-		/* Apply BTAC predictors mitigation to all Falkor chips */
+-		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+-		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
+-			__qcom_hyp_sanitize_btac_predictors();
+-		}
+-	}
+-
+ 	fp_enabled = __fpsimd_enabled();
+ 
+ 	__sysreg_save_guest_state(guest_ctxt);
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
