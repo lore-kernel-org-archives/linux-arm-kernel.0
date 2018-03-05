@@ -1,32 +1,185 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 17:40:58 +0000
-Subject: [RFC PATCH v3 0/3] arm64/kernel: get rid of GCC large model code
-In-Reply-To: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Mar 2018 17:41:17 +0000
+Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
+ Cortex-A53 erratum #843419
+In-Reply-To: <20180305173428.GA13385@arm.com>
 References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180305174057.GC13385@arm.com>
+ <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+ <20180305171831.GB12869@arm.com>
+ <CAKv+Gu9cHHJN2JrxSeQCHihq0DNz1ZS5xeB4DAHEh5okufRpGw@mail.gmail.com>
+ <20180305173428.GA13385@arm.com>
+Message-ID: <CAKv+Gu91CfVq4nBsLhNRRkGN-0PevGeUPSRqLMf5hTWp9qa6vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:36:42AM +0000, Ard Biesheuvel wrote:
-> I am resending this as an RFC, because I'd like to understand whether
-> anyone else shares my concern, or whether I am being overly paranoid.
-> 
-> v2 blurb:
-> 
-> GCC's large model uses literal pools to emit cross object symbol
-> references rather than movz/movk sequences, resulting in data items
-> mixed in the with executable code in modules' .text segments, reducing
-> cache utilization, but also potentially resulting in the creation of
-> code gadgets that are exploitable under speculative execution.
-> 
-> We are using GCC's large model for two separate reasons, both of which can
-> be worked around rather easily:
-> - KASLR uses it to move modules and the kernel very far apart, which is
->   not really needed,
-> - the Cortex-A53 erratum code uses it to avoid ADRP instruction altogether,
->   which can be replaced by selective patching of only the ADRP instructions
->   that are affected by the erratum
+On 5 March 2018 at 17:34, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Mar 05, 2018 at 05:26:35PM +0000, Ard Biesheuvel wrote:
+>> On 5 March 2018 at 17:18, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
+>> >> Working around Cortex-A53 erratum #843419 involves special handling of
+>> >> ADRP instructions that end up in the last two instruction slots of a
+>> >> 4k page, or whose output register gets overwritten without having been
+>> >> read. (Note that the latter instruction sequence is never emitted by
+>> >> a properly functioning compiler)
+>> >
+>> > Does the workaround currently implemented in the linker also make this
+>> > same assumption? If not, I'm a little wary that we're making an assumption
+>> > about compiler behaviour with no way to detect whether its been violated or
+>> > not.
+>> >
+>>
+>> I can check, but I don't see how a compiler would ever choose 'adrp'
+>> when it emits what amounts to a nop instruction.
+>
+> Agreed, but it wouldn't be the first time we've seen compilers do weird
+> things.
+>
 
-I think this is a sensible thing to do, cheers.
+I just checked ld.bfd: it only checks for sequence 1, which is the one
+that affects ADRP instructions at offsets 0xfff8/0xfffc modulo 4 KB.
+It actually checks more elaborately whether the sequence is in fact
+vulnerable rather than assuming any ADRP instruction at such an offset
+may be vulnerable, but in my testing of the current patches, I only
+get a handful of them anyway of which the majority are resolved by
+patching ADRP->ADR.
 
-Will
+Sequence 2 is described as follows in the docs:
+
+"""
+Sequence 2:
+1) An ADRP instruction, which writes to a register Rn.
+2) Another instruction which writes to Rn.
+o This cannot be a branch or an ADRP.
+o This cannot read Rn.
+3)
+4)
+Another instruction.
+o This cannot be a branch.
+o This cannot write Rn.
+o This may optionally read Rn.
+A load or store instruction from the "Load/store register (unsigned
+immediate)" encoding class, using Rn as the
+base address register.
+"""
+
+and ld.bfd does not check for it at all.
+
+
+
+>> >> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+>> >> index ea640f92fe5a..93b808056cb4 100644
+>> >> --- a/arch/arm64/kernel/module-plts.c
+>> >> +++ b/arch/arm64/kernel/module-plts.c
+>> >> @@ -41,6 +41,46 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+>> >>       return (u64)&plt[i];
+>> >>  }
+>> >>
+>> >> +#ifdef CONFIG_ARM64_ERRATUM_843419
+>> >> +u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val)
+>> >> +{
+>> >> +     struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>> >> +                                                       &mod->arch.init;
+>> >> +     struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
+>> >> +     int i = pltsec->plt_num_entries++;
+>> >> +     u32 mov0, mov1, mov2, br;
+>> >> +     int rd;
+>> >> +
+>> >> +     BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
+>> >
+>> > I'd prefer just to fail loading the module, but I see we already have
+>> > a BUG_ON for the existing PLT code. Oh well.
+>> >
+>>
+>> I can fix that in a followup patch
+>
+> Thanks.
+>
+>> >> +
+>> >> +     /* get the destination register of the ADRP instruction */
+>> >> +     rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
+>> >> +                                       le32_to_cpup((__le32 *)loc));
+>> >> +
+>> >> +     /* generate the veneer instructions */
+>> >> +     mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
+>> >> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> >> +                                      AARCH64_INSN_MOVEWIDE_INVERSE);
+>> >> +     mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
+>> >> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> >> +                                      AARCH64_INSN_MOVEWIDE_KEEP);
+>> >> +     mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
+>> >> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> >> +                                      AARCH64_INSN_MOVEWIDE_KEEP);
+>> >> +     br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
+>> >> +                                      AARCH64_INSN_BRANCH_NOLINK);
+>> >> +
+>> >> +     plt[i] = (struct plt_entry){
+>> >> +                     cpu_to_le32(mov0),
+>> >> +                     cpu_to_le32(mov1),
+>> >> +                     cpu_to_le32(mov2),
+>> >> +                     cpu_to_le32(br)
+>> >> +             };
+>> >> +
+>> >> +     return (u64)&plt[i];
+>> >> +}
+>> >> +#endif
+>> >> +
+>> >>  #define cmp_3way(a,b)        ((a) < (b) ? -1 : (a) > (b))
+>> >>
+>> >>  static int cmp_rela(const void *a, const void *b)
+>> >> @@ -68,16 +108,21 @@ static bool duplicate_rel(const Elf64_Rela *rela, int num)
+>> >>  }
+>> >>
+>> >>  static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>> >> -                            Elf64_Word dstidx)
+>> >> +                            Elf64_Word dstidx, Elf_Shdr *dstsec)
+>> >>  {
+>> >>       unsigned int ret = 0;
+>> >>       Elf64_Sym *s;
+>> >>       int i;
+>> >>
+>> >>       for (i = 0; i < num; i++) {
+>> >> +             u64 min_align;
+>> >> +
+>> >>               switch (ELF64_R_TYPE(rela[i].r_info)) {
+>> >>               case R_AARCH64_JUMP26:
+>> >>               case R_AARCH64_CALL26:
+>> >> +                     if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>> >> +                             break;
+>> >> +
+>> >>                       /*
+>> >>                        * We only have to consider branch targets that resolve
+>> >>                        * to symbols that are defined in a different section.
+>> >> @@ -109,6 +154,31 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>> >>                       if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
+>> >>                               ret++;
+>> >>                       break;
+>> >> +             case R_AARCH64_ADR_PREL_PG_HI21_NC:
+>> >> +             case R_AARCH64_ADR_PREL_PG_HI21:
+>> >> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
+>> >> +                             break;
+>> >> +
+>> >> +                     /*
+>> >> +                      * Determine the minimal safe alignment for this ADRP
+>> >> +                      * instruction: the section alignment at which it is
+>> >> +                      * guaranteed not to appear at a vulnerable offset.
+>> >> +                      */
+>> >> +                     min_align = 2 << ffz(rela[i].r_offset | 0x7);
+>> >
+>> > I'm struggling to decipher this, can you give me a hint please? Why 0x7? Is
+>> > the "2" because of the two vulnerable offsets?
+>> >
+>>
+>> What it basically does is preserve 0 bits in the address of the instruction.
+>>
+>> Given that ADRP instructions at addresses ending in fff8 or fffc may
+>> be vulnerable, if any of the bits [11:3] are zero, we can increase the
+>> alignment of this section to ensure it remains zero, guaranteeing that
+>> the resulting address won't end in fff8 or fffc
+>>
+>> Bits 0 .. 2 don't count, hence the 0x7. If bit 3 is zero, we can align
+>> to '1 << (3 + 1)' == '2 << 3', and bit 3 will remain zero.
+>
+> Please put this in a comment ;)
+>
+
+OK
