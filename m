@@ -1,71 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 09:28:08 -0600
-Subject: [PATCH 1/2] ARM: dts: STi: Fix aliases property name for STi
- boards
-In-Reply-To: <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
-References: <1520262025-21088-1-git-send-email-patrice.chotard@st.com>
- <1520262025-21088-2-git-send-email-patrice.chotard@st.com>
-Message-ID: <CABGGiszEcvKHGE54vOXPBUJeReAKbgmrxRyRxNfQQoL6D54GCw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 5 Mar 2018 10:28:42 -0500
+Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
+In-Reply-To: <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+Message-ID: <27a044ee-0ed7-0470-0fef-289d0d5cf5e8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 9:00 AM,  <patrice.chotard@st.com> wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> Since dtc v1.4.6-9-gaadd0b65c987, aliases property name must
-> be lowercase only.
-> This allows to fix following warnings when compiling dtb
-> with W=1 option :
+On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
+> +static void io_mm_free(struct io_mm *io_mm)
+> +{
+> +	struct mm_struct *mm;
+> +	void (*release)(struct io_mm *);
+> +
+> +	release = io_mm->release;
+> +	mm = io_mm->mm;
+> +
+> +	release(io_mm);
 
-I'm so glad to see fixes before the dtc update landed in the kernel tree!
+Is there any reason why you can't call iommu->release()
+here directly? Why do you need the release local variable?
 
-> arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-> arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-> arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->  arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
->  arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
->  arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
->  arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
->  4 files changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-> index c8ad905d0309..fa1186af6574 100644
-> --- a/arch/arm/boot/dts/stih407-b2120.dts
-> +++ b/arch/arm/boot/dts/stih407-b2120.dts
-> @@ -14,7 +14,7 @@
->         compatible = "st,stih407-b2120", "st,stih407";
->
->         chosen {
-> -               bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-> +               bootargs = "console=ttyas0,115200 clk_ignore_unused";
+> +	mmdrop(mm);
+> +}
+> +
 
-The kernel change for this is an ABI breakage both DT <-> kernel and
-kernel <-> userspace.
 
-Really, if you are okay with doing this, you should change it to ttySx IMO.
-
->                 linux,stdout-path = &sbc_serial0;
-
-And since you have this, you don't even need the console praram.
-
->         };
->
-> @@ -24,7 +24,7 @@
->         };
->
->         aliases {
-> -               ttyAS0 = &sbc_serial0;
-> +               ttyas0 = &sbc_serial0;
-
-The correct fix is use "serialN" for aliases.
-
-I have a check for only known alias names which would give a better
-warning, but David thought it was too restrictive.
-
->                 ethernet0 = &ethernet0;
->         };
->
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
