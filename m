@@ -1,79 +1,49 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Mar 2018 11:46:03 +0100
-Subject: [PATCH 5/5] soc: renesas: rcar-topology: Add support to be aware
- cpu capacity
-In-Reply-To: <1519697995-6061-6-git-send-email-gaku.inami.xh@renesas.com>
-References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
- <1519697995-6061-6-git-send-email-gaku.inami.xh@renesas.com>
-Message-ID: <CAMuHMdVZzCOqatGA4PH0Gr+noTEhQ8RAW=pK5K1e7KrAM8VS-A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 5 Mar 2018 10:59:26 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5A99A3DC.9020400@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org>
+ <20180225143653.peb4quk3ha5h3t5x@salmiak>
+ <5A972A7D.9020301@codeaurora.org>
+ <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
+ <5A986425.9080007@codeaurora.org>
+ <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+ <5A99A3DC.9020400@codeaurora.org>
+Message-ID: <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Inami-san,
+On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
+> On 03/02/2018 02:42 AM, Mark Rutland wrote:
+> > It's important to note that the DSU PMU's event_init() ensures events
+> > are affine to a single CPU, and the perf core code serializes operations
+> > on those events via the context lock.
+> 
+> Ah, I see that now. Thanks!
+> 
+> > Therefore, two CPUs *won't* try to access the registers simultaneously.
+> 
+> Right, and this driver seems to be going through a lot of work to make sure
+> all events are read in one CPU.
+> 
+> Do you even have an upstream target where there are multiple DSU's in a
+> system? 
 
-On Tue, Feb 27, 2018 at 3:19 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
-> Some R-Car SoCs support big LITTLE architecture produced by ARM, that
-> have different power/performance characteristics between each CPUs.
-> In order to aware such as difference, this patch changes the sched
-> domain flags that the tasks can be scheduled with capacity awareness.
-> If you use big LITTLE without this patch, the scheduler may make
-> unintended behaviors.
->
-> Signed-off-by: Gaku Inami <gaku.inami.xh@renesas.com>
+I have no idea, though I do beleive that it's possible for a system to
+have multiple DSUs.
 
-Thanks for your patch!
+> If not, we can simplify a ton of this code (no hotplug notifiers, no
+> migrating PMUs, no SMP calls, etc) by just adding a spinlock and letting any
+> CPU read these DSU counters.
 
-> --- /dev/null
-> +++ b/drivers/soc/renesas/rcar-topology.c
-> @@ -0,0 +1,36 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + *  R-Car CPU topology for ARM big.LITTLE platforms
-> + *
-> + * Copyright (C) 2018 Renesas Electronics Corporation.
-> + *
-> + */
-> +
-> +#include <linux/cpuset.h>
-> +#include <linux/init.h>
-> +#include <linux/of.h>
-> +#include <linux/sched/topology.h>
-> +#include <linux/topology.h>
-> +
-> +static int rcar_cpu_cpu_flags(void)
-> +{
-> +       return SD_ASYM_CPUCAPACITY;
-> +}
-> +
-> +static struct sched_domain_topology_level rcar_topology[] = {
-> +#ifdef CONFIG_SCHED_MC
-> +       { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
-> +#endif
-> +       { cpu_cpu_mask, rcar_cpu_cpu_flags, SD_INIT_NAME(DIE) },
-> +       { NULL, }
-> +};
-> +
-> +static int __init rcar_topology_init(void)
-> +{
-> +       if (of_machine_is_compatible("renesas,r8a7795") ||
-> +           of_machine_is_compatible("renesas,r8a7796"))
-> +               set_sched_topology(rcar_topology);
-> +
-> +       return 0;
-> +}
-> +early_initcall(rcar_topology_init);
+Regardless of whether we allow arbitrary CPUs to read the counters,
+other logic still needs to be CPU affine, and we'll still need hotplug
+notifiers and event migration.
 
-None of the above seems R-Car specific to me. So please explain why this
-can't just be added to arch/arm64/kernel/topology.c instead, and enabled
-unconditionally.
+I am not necessarily opposed to allowing read() calls from associated
+CPUs, but as before, I'll leave that to Suzuki.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Mark.
