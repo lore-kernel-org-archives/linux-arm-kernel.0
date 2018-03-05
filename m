@@ -1,133 +1,37 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon,  5 Mar 2018 11:04:32 +0100
-Subject: [PATCH 4/4] [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module
- to the Nano Pi M1+
+Date: Mon,  5 Mar 2018 11:04:29 +0100
+Subject: [PATCH 1/4] dt-bindings: media: sun6i: Add A31 and H3 compatibles
 In-Reply-To: <20180305100432.15009-1-maxime.ripard@bootlin.com>
 References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
-Message-ID: <20180305100432.15009-5-maxime.ripard@bootlin.com>
+Message-ID: <20180305100432.15009-2-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Myl?ne Josserand <mylene.josserand@bootlin.com>
+The H3 has a slightly different CSI controller (no BT656, no CCI) which
+looks a lot like the original A31 controller. Add a compatible for the A31,
+and more specific compatible the for the H3 to be used in combination for
+the A31.
 
-The Nano Pi M1+ comes with an optional sensor based on the ov5640 from
-Omnivision. Enable the support for it in the DT.
-
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 85 +++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+ Documentation/devicetree/bindings/media/sun6i-csi.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index d7b6e1ac541a..a2d1c6bb8406 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -52,6 +52,37 @@
- 		ethernet1 = &sdio_wifi;
- 	};
+diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+index 2ff47a9507a6..18a5b3068b25 100644
+--- a/Documentation/devicetree/bindings/media/sun6i-csi.txt
++++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+@@ -5,7 +5,10 @@ Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+ interface and CSI1 is used for parallel interface.
  
-+	cam_xclk: cam-xclk {
-+                #clock-cells = <0>;
-+                compatible = "fixed-clock";
-+                clock-frequency = <24000000>;
-+                clock-output-names = "cam-xclk";
-+        };
-+
-+        reg_cam_avdd: cam-avdd {
-+                compatible = "regulator-fixed";
-+                regulator-name = "cam500b-avdd";
-+                regulator-min-microvolt = <2800000>;
-+                regulator-max-microvolt = <2800000>;
-+                vin-supply = <&reg_vcc3v3>;
-+        };
-+
-+        reg_cam_dovdd: cam-dovdd {
-+                compatible = "regulator-fixed";
-+                regulator-name = "cam500b-dovdd";
-+                regulator-min-microvolt = <1800000>;
-+                regulator-max-microvolt = <1800000>;
-+                vin-supply = <&reg_vcc3v3>;
-+        };
-+
-+        reg_cam_dvdd: cam-dvdd {
-+                compatible = "regulator-fixed";
-+                regulator-name = "cam500b-dvdd";
-+                regulator-min-microvolt = <1500000>;
-+                regulator-max-microvolt = <1500000>;
-+                vin-supply = <&reg_vcc3v3>;
-+        };
-+
- 	reg_gmac_3v3: gmac-3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "gmac-3v3";
-@@ -69,6 +100,26 @@
- 	};
- };
- 
-+&csi {
-+        status = "okay";
-+
-+        port {
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+
-+                /* Parallel bus endpoint */
-+                csi_from_ov5640: endpoint {
-+                        remote-endpoint = <&ov5640_to_csi>;
-+                        bus-width = <8>;
-+                        data-shift = <2>;
-+                        hsync-active = <1>; /* Active high */
-+                        vsync-active = <0>; /* Active low */
-+                        data-active = <1>;  /* Active high */
-+                        pclk-sample = <1>;  /* Rising */
-+                };
-+        };
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -94,6 +145,40 @@
- 	};
- };
- 
-+&i2c2 {
-+	status = "okay";
-+
-+	ov5640: camera at 3c {
-+                compatible = "ovti,ov5640";
-+                reg = <0x3c>;
-+                clocks = <&cam_xclk>;
-+                clock-names = "xclk";
-+
-+                reset-gpios = <&pio 4 14 GPIO_ACTIVE_LOW>;
-+                powerdown-gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>;
-+                AVDD-supply = <&reg_cam_avdd>;
-+                DOVDD-supply = <&reg_cam_dovdd>;
-+                DVDD-supply = <&reg_cam_dvdd>;
-+
-+                port {
-+                        ov5640_to_csi: endpoint {
-+                                remote-endpoint = <&csi_from_ov5640>;
-+                                bus-width = <8>;
-+                                data-shift = <2>;
-+                                hsync-active = <1>; /* Active high */
-+                                vsync-active = <0>; /* Active low */
-+                                data-active = <1>;  /* Active high */
-+                                pclk-sample = <1>;  /* Rising */
-+                        };
-+                };
-+        };
-+
-+};
-+
-+&i2c2_pins {
-+	bias-pull-up;
-+};
-+
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
+ Required properties:
+-  - compatible: value must be "allwinner,sun8i-v3s-csi"
++  - compatible: value must be one of:
++    * "allwinner,sun6i-a31-csi", along with, optionally:
++      + "allwinner,sun8i-h3-csi"
++    * "allwinner,sun8i-v3s-csi"
+   - reg: base address and size of the memory-mapped region.
+   - interrupts: interrupt associated to this IP
+   - clocks: phandles to the clocks feeding the CSI
 -- 
 2.14.3
