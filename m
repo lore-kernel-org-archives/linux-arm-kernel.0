@@ -1,9 +1,9 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 5 Mar 2018 15:35:01 +0800
-Subject: [PATCH] mmc: dw_mmc-rockchip: correct property names in debug
-In-Reply-To: <20180301103625.7285-1-john@metanate.com>
-References: <20180301103625.7285-1-john@metanate.com>
-Message-ID: <38edd01c-c25e-6833-2c32-5be1fee2d385@rock-chips.com>
+Date: Mon, 5 Mar 2018 15:45:38 +0800
+Subject: [PATCH] dt-bindings: rockchip-dw-mshc: use consistent clock names
+In-Reply-To: <20180301103447.7059-1-john@metanate.com>
+References: <20180301103447.7059-1-john@metanate.com>
+Message-ID: <d4a6c91e-9304-8b4f-5089-b7d7541ac98f@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
