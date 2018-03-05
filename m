@@ -1,241 +1,83 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 5 Mar 2018 22:49:12 +0900
-Subject: [RESEND PATCH v6 13/14] iommu/rockchip: Add runtime PM support
-In-Reply-To: <20180301101837.27969-14-jeffy.chen@rock-chips.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
- <20180301101837.27969-14-jeffy.chen@rock-chips.com>
-Message-ID: <CAAFQd5D2SY2RV9HLTeTQigfnVCkF9wDq74_+t3OV2YEb9wJtqg@mail.gmail.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Mon, 5 Mar 2018 14:51:10 +0100
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180305083114.dwqfdqlziwptfnxq@flea.lan>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <CAGb2v67SuK9Xr7_dVb7RVGXUJwYRKnTiJwDrOJ-Su5CXmm7HXA@mail.gmail.com>
+ <20180226101252.ozdsxjvawgkemz2c@flea.lan>
+ <CAGb2v64SaBR-_nL9S20eXe57r_kJTiqSg-di=_mZrv3Yx2-2JA@mail.gmail.com>
+ <20180305085148.1de2a99c@dell-desktop.home>
+ <20180305083114.dwqfdqlziwptfnxq@flea.lan>
+Message-ID: <20180305145110.2f43802a@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+Hello,
 
-On Thu, Mar 1, 2018 at 7:18 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> When the power domain is powered off, the IOMMU cannot be accessed and
-> register programming must be deferred until the power domain becomes
-> enabled.
->
-> Add runtime PM support, and use runtime PM device link from IOMMU to
-> master to startup and shutdown IOMMU.
->
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
->
-> Changes in v6: None
-> Changes in v5:
-> Avoid race about pm_runtime_get_if_in_use() and pm_runtime_enabled().
->
-> Changes in v4: None
-> Changes in v3:
-> Only call startup() and shutdown() when iommu attached.
-> Remove pm_mutex.
-> Check runtime PM disabled.
-> Check pm_runtime in rk_iommu_irq().
->
-> Changes in v2: None
->
->  drivers/iommu/rockchip-iommu.c | 181 +++++++++++++++++++++++++++++++----------
->  1 file changed, 140 insertions(+), 41 deletions(-)
->
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 2448a0528e39..0e0a42f41818 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_iommu.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
->
-> @@ -106,6 +107,7 @@ struct rk_iommu {
->  };
->
->  struct rk_iommudata {
-> +       struct device_link *link; /* runtime PM link from IOMMU to master */
+On Mon, 5 Mar 2018 09:31:14 +0100
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-Kerneldoc comment for the struct could be added instead.
+> On Mon, Mar 05, 2018 at 08:51:48AM +0100, Myl?ne Josserand wrote:
+> > > >> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > > >> > index 5e9602ce1573..4bb041492b54 100644
+> > > >> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > > >> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > > >> > @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
+> > > >> >  };
+> > > >> >
+> > > >> >  extern void __init sun6i_reset_init(void);
+> > > >> > +extern void sunxi_init_cntvoff(void);
+> > > >> > +
+> > > >> >  static void __init sun6i_timer_init(void)
+> > > >> >  {
+> > > >> > +       sunxi_init_cntvoff();    
+> > > >>
+> > > >> You should check the enable-method to see if PSCI is set or not,
+> > > >> as an indicator whether the kernel is booted secure or non-secure.    
+> > > >
+> > > > It's an indicator, but it's not really a perfect one. You could very
+> > > > well have your kernel booted in non-secure, without PSCI. Or even with
+> > > > PSCI, but without the SMP ops.
+> > > >
+> > > > We have a quite big number of these cases already, where, depending on
+> > > > the configuration, we might not have access to the device we write to,
+> > > > the number of hacks to just enable that device for non-secure is a
+> > > > good example of that.    
+> > > 
+> > > I wouldn't consider them hacks though. The hardware gives the option
+> > > to have control of many devices delegated solely to secure-only, or
+> > > secure/non-secure. Our present model is to support everything we can
+> > > in Linux directly, instead of through some firmware interface to a
+> > > non-existent firmware.  
+> > 
+> > I am not sure to understand what is the conclusion about it.
+> > Should I use "psci"/enable-method or should I use another mechanism to
+> > detect we are in secure/non-secure (if it exists)?
+> > 
+> > Otherwise, for the moment, I can use machine-compatible on sun8i-a83t
+> > and we will see later how we can handle it in a better way.  
+> 
+> Can't we have another approach here?
+> 
+> If we use an enable-method (and we should), instead of having it tied
+> to the machine compatible, the SMP setup code will run only if our
+> enable-method is the one we set up. If PSCI is in use, the
+> enable-method is not going to be the one defined here, and the code
+> will not run.
+> 
+> So why not just move that call to the SMP ops setup function, just
+> like renesas does?
+> 
+> Maxime
+> 
 
->         struct rk_iommu *iommu;
->  };
->
-> @@ -518,7 +520,12 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
->         u32 int_status;
->         dma_addr_t iova;
->         irqreturn_t ret = IRQ_NONE;
-> -       int i;
-> +       int i, err, need_runtime_put;
-
-nit: need_runtime_put could be a bool.
-
-> +
-> +       err = pm_runtime_get_if_in_use(iommu->dev);
-> +       if (err <= 0 && err != -EINVAL)
-> +               return ret;
-> +       need_runtime_put = err > 0;
-
-Generally something must be really wrong if we end up with err == 0
-here, because the IOMMU must be powered on to signal an interrupt. The
-only case this could happen would be if the IRQ signal was shared with
-some device from another power domain. Is it possible on Rockchip
-SoCs? If not, perhaps we should have a WARN_ON() here for such case.
-
->
->         WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
->
-> @@ -570,6 +577,9 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
->
->         clk_bulk_disable(iommu->num_clocks, iommu->clocks);
->
-> +       if (need_runtime_put)
-> +               pm_runtime_put(iommu->dev);
-> +
->         return ret;
->  }
->
-> @@ -611,10 +621,20 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
->         spin_lock_irqsave(&rk_domain->iommus_lock, flags);
->         list_for_each(pos, &rk_domain->iommus) {
->                 struct rk_iommu *iommu;
-> +               int ret;
-> +
->                 iommu = list_entry(pos, struct rk_iommu, node);
-> -               WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
-> -               rk_iommu_zap_lines(iommu, iova, size);
-> -               clk_bulk_disable(iommu->num_clocks, iommu->clocks);
-> +
-> +               /* Only zap TLBs of IOMMUs that are powered on. */
-> +               ret = pm_runtime_get_if_in_use(iommu->dev);
-> +               if (ret > 0 || ret == -EINVAL) {
-> +                       WARN_ON(clk_bulk_enable(iommu->num_clocks,
-> +                                               iommu->clocks));
-> +                       rk_iommu_zap_lines(iommu, iova, size);
-> +                       clk_bulk_disable(iommu->num_clocks, iommu->clocks);
-> +               }
-> +               if (ret > 0)
-> +                       pm_runtime_put(iommu->dev);
->         }
->         spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
->  }
-> @@ -817,22 +837,30 @@ static struct rk_iommu *rk_iommu_from_dev(struct device *dev)
->         return data ? data->iommu : NULL;
->  }
->
-> -static int rk_iommu_attach_device(struct iommu_domain *domain,
-> -                                 struct device *dev)
-> +/* Must be called with iommu powered on and attached */
-> +static void rk_iommu_shutdown(struct rk_iommu *iommu)
->  {
-> -       struct rk_iommu *iommu;
-> +       int i;
-> +
-> +       /* Ignore error while disabling, just keep going */
-> +       WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
-> +       rk_iommu_enable_stall(iommu);
-> +       rk_iommu_disable_paging(iommu);
-> +       for (i = 0; i < iommu->num_mmu; i++) {
-> +               rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, 0);
-> +               rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
-> +       }
-> +       rk_iommu_disable_stall(iommu);
-> +       clk_bulk_disable(iommu->num_clocks, iommu->clocks);
-> +}
-> +
-> +/* Must be called with iommu powered on and attached */
-> +static int rk_iommu_startup(struct rk_iommu *iommu)
-> +{
-> +       struct iommu_domain *domain = iommu->domain;
->         struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
-> -       unsigned long flags;
->         int ret, i;
->
-> -       /*
-> -        * Allow 'virtual devices' (e.g., drm) to attach to domain.
-> -        * Such a device does not belong to an iommu group.
-> -        */
-> -       iommu = rk_iommu_from_dev(dev);
-> -       if (!iommu)
-> -               return 0;
-> -
->         ret = clk_bulk_enable(iommu->num_clocks, iommu->clocks);
->         if (ret)
->                 return ret;
-> @@ -845,8 +873,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->         if (ret)
->                 goto out_disable_stall;
->
-> -       iommu->domain = domain;
-> -
->         for (i = 0; i < iommu->num_mmu; i++) {
->                 rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
->                                rk_domain->dt_dma);
-> @@ -855,14 +881,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->         }
->
->         ret = rk_iommu_enable_paging(iommu);
-> -       if (ret)
-> -               goto out_disable_stall;
-> -
-> -       spin_lock_irqsave(&rk_domain->iommus_lock, flags);
-> -       list_add_tail(&iommu->node, &rk_domain->iommus);
-> -       spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
-> -
-> -       dev_dbg(dev, "Attached to iommu domain\n");
->
->  out_disable_stall:
->         rk_iommu_disable_stall(iommu);
-> @@ -877,31 +895,76 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
->         struct rk_iommu *iommu;
->         struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
->         unsigned long flags;
-> -       int i;
-> +       int ret;
->
->         /* Allow 'virtual devices' (eg drm) to detach from domain */
->         iommu = rk_iommu_from_dev(dev);
->         if (!iommu)
->                 return;
->
-> +       dev_dbg(dev, "Detaching from iommu domain\n");
-> +
-> +       /* iommu already detached */
-> +       if (iommu->domain != domain)
-> +               return;
-> +
-> +       iommu->domain = NULL;
-> +
->         spin_lock_irqsave(&rk_domain->iommus_lock, flags);
->         list_del_init(&iommu->node);
->         spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
->
-> -       /* Ignore error while disabling, just keep going */
-> -       WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
-> -       rk_iommu_enable_stall(iommu);
-> -       rk_iommu_disable_paging(iommu);
-> -       for (i = 0; i < iommu->num_mmu; i++) {
-> -               rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, 0);
-> -               rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
-> -       }
-> -       rk_iommu_disable_stall(iommu);
-> -       clk_bulk_disable(iommu->num_clocks, iommu->clocks);
-> +       ret = pm_runtime_get_if_in_use(iommu->dev);
-> +       if (ret > 0 || ret == -EINVAL)
-> +               rk_iommu_shutdown(iommu);
-> +       if (ret > 0)
-> +               pm_runtime_put(iommu->dev);
-> +}
->
-> -       iommu->domain = NULL;
-> +static int rk_iommu_attach_device(struct iommu_domain *domain,
-> +               struct device *dev)
-> +{
-> +       struct rk_iommu *iommu;
-> +       struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
-> +       unsigned long flags;
-> +       int ret, need_runtime_put;
-
-nit: need_runtime_put could be bool
+Okay, I will update my series and handle the differences using
+enable-method instead of machine-compatible.
 
 Best regards,
-Tomasz
+
+-- 
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
