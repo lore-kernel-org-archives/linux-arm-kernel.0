@@ -1,70 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Mar 2018 10:08:48 +0000
-Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
- CONFIG_RANDOMIZE_BASE=y
-Message-ID: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 5 Mar 2018 11:10:12 +0100
+Subject: [PATCH] serial: mvebu_uart: fix tx lost characters
+In-Reply-To: <20180305104721.311a02c2@xps13>
+References: <3B588D51285A4A4D8D39C94212E0782627008E@SPQCMBX02.exfo.com>
+ <20180227141255.177ea751@xps13>
+ <3B588D51285A4A4D8D39C94212E07826271B70@SPQCMBX02.exfo.com>
+ <20180305104721.311a02c2@xps13>
+Message-ID: <20180305111012.0ea44d1d@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
-memory accesses (e.g. speculative accesses from a first-fault gather load)
-which translate via TTBR1_EL1 result in a translation fault if they
-miss in the TLB when executed from EL0. This mitigates some timing attacks
-against KASLR, where the kernel address space could otherwise be probed
-efficiently using the FFR in conjunction with suppressed faults on SVE
-loads.
+Hi Gabriel,
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+On Mon, 5 Mar 2018 10:47:21 +0100, Miquel Raynal
+<miquel.raynal@bootlin.com> wrote:
 
-Sending as RFC because this doesn't make any difference if kpti is enabled,
-which is the default with KASLR. It helps if kpti=off is being passed and
-shouldn't have an impact on performance.
+> Hi Gabriel,
+> 
+> On Tue, 27 Feb 2018 21:56:03 +0000, Gabriel Matni
+> <gabriel.matni@exfo.com> wrote:
+> 
+> > Hi Miqu?l,
+> >   
+> > > -----Original Message-----
+> > > From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
+> > > Sent: February 27, 2018 8:13 AM
+> > > To: Gabriel Matni <gabriel.matni@exfo.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
+> > > Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
+> > > <thomas.petazzoni@bootlin.com>
+> > > Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
 
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/mm/proc.S                   | 9 ++++++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+BTW, prefix should be "serial: mvebu-uart:".
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index cdfe3e657a9e..fd208eac9f2a 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -291,6 +291,7 @@
- #define TCR_TBI0		(UL(1) << 37)
- #define TCR_HA			(UL(1) << 39)
- #define TCR_HD			(UL(1) << 40)
-+#define TCR_NFD1		(UL(1) << 54)
- 
- /*
-  * TTBR.
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index c0af47617299..8f074d64b760 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -36,6 +36,12 @@
- #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
- #endif
- 
-+#ifdef CONFIG_RANDOMIZE_BASE
-+#define TCR_KASLR_FLAGS	TCR_NFD1
-+#else
-+#define TCR_KASLR_FLAGS	0
-+#endif
-+
- #define TCR_SMP_FLAGS	TCR_SHARED
- 
- /* PTWs cacheable, inner/outer WBWA */
-@@ -432,7 +438,8 @@ ENTRY(__cpu_setup)
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
--			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
-+			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
-+			TCR_TBI0 | TCR_A1
- 	tcr_set_idmap_t0sz	x10, x9
- 
- 	/*
--- 
-2.1.4
+And maybe you should CC: stable too?
+
+Thanks for fixing it anyway.
+Miqu?l
