@@ -1,43 +1,60 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon,  5 Mar 2018 12:28:06 -0800
-Subject: [PATCH 5/5] staging: vc04_services: Mark the "DT bindings" job done.
-In-Reply-To: <20180305202806.21219-1-eric@anholt.net>
-References: <20180305202806.21219-1-eric@anholt.net>
-Message-ID: <20180305202806.21219-6-eric@anholt.net>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 5 Mar 2018 21:37:08 +0100
+Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
+In-Reply-To: <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
+References: <20180215175803.6870-1-marc.zyngier@arm.com>
+ <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
+ <86o9k63f7a.wl-marc.zyngier@arm.com>
+ <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
+ <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
+Message-ID: <a1579f14-a5fe-11bc-a831-f729cead25ba@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we just need to get the other drivers merged and finish the style
-cleanups/garbage collecting so we can get out of staging.
+Hi Peter,
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/staging/vc04_services/interface/vchi/TODO | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+On 05/03/18 17:31, Peter Maydell wrote:
+> On 2 March 2018 at 12:26, Auger Eric <eric.auger@redhat.com> wrote:
+>> Hi Marc,
+>> On 02/03/18 12:11, Marc Zyngier wrote:
+>>> On Fri, 02 Mar 2018 10:44:48 +0000,
+>>> Auger Eric wrote:
+>>>> I understand the get/set is called as part of the migration process.
+>>>> So my understanding is the benefit of this series is migration fails in
+>>>> those cases:
+>>>>
+>>>>> =0.2 source -> 0.1 destination
+>>>> 0.1 source -> >=0.2 destination
+>>>
+>>> It also fails in the case where you migrate a 1.0 guest to something
+>>> that cannot support it.
+>>
+>> That's because on the destination, the number of regs is less than on
+>> source, right?
+> 
+> I think it fails because the KVM_REG_ARM_PSCI_VERSION register will be
+> in the migration state but not in the destination's list of registers:
+> the code in QEMU's target/arm/machine.c:cpu_post_load() function that
+> checks "register in their list but not ours: fail migration" will
+> catch this.
 
-diff --git a/drivers/staging/vc04_services/interface/vchi/TODO b/drivers/staging/vc04_services/interface/vchi/TODO
-index df93154b1aa6..46b20a1961a2 100644
---- a/drivers/staging/vc04_services/interface/vchi/TODO
-+++ b/drivers/staging/vc04_services/interface/vchi/TODO
-@@ -1,9 +1,4 @@
--1) Write a DT binding doc and get the corresponding DT node merged to
--   bcm2835.
--
--This will let the driver probe when enabled.
--
--2) Import drivers using VCHI.
-+1) Import drivers using VCHI.
- 
- VCHI is just a tool to let drivers talk to the firmware.  Here are
- some of the ones we want:
-@@ -26,7 +21,7 @@ some of the ones we want:
-   to manage these buffers as dmabufs so that we can zero-copy import
-   camera images into vc4 for rendering/display.
- 
--3) Garbage-collect unused code
-+2) Garbage-collect unused code
- 
- One of the reasons this driver wasn't upstreamed previously was that
- there's a lot code that got built that's probably unnecessary these
--- 
-2.16.2
+Thank you for the pointer. Yes at the time I reviewed the patch and just
+focusing on the kernel code, this was not immediate to me.
+
+> 
+> That also means that we will fail migration from a new kernel where
+> we've specifically asked for PSCI 0.2 to an old PSCI-0.2-only kernel
+> (because the KVM_REG_ARM_PSCI_VERSION reg will appear in the migration
+> stream even if its value is the one value that matches the old kernel
+> behaviour). I don't know if we care about that.
+
+Do you know when are we likely to force PSCI 0.2 on a new kernel? At
+which layer is the decision supposed to be made and on which criteria?
+
+Thanks
+
+Eric
+> 
+> thanks
+> -- PMM
+> 
