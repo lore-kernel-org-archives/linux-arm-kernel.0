@@ -1,46 +1,139 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  5 Mar 2018 18:24:55 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a77970: sort subnodes of root node
- alphabetically
-Message-ID: <1520270695-18161-1-git-send-email-geert+renesas@glider.be>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Mar 2018 17:26:35 +0000
+Subject: [RFC PATCH v3 2/3] arm64/kernel: don't ban ADRP to work around
+ Cortex-A53 erratum #843419
+In-Reply-To: <20180305171831.GB12869@arm.com>
+References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
+ <20180214113645.16793-3-ard.biesheuvel@linaro.org>
+ <20180305171831.GB12869@arm.com>
+Message-ID: <CAKv+Gu9cHHJN2JrxSeQCHihq0DNz1ZS5xeB4DAHEh5okufRpGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort root sub-nodes alphabetically for allow for easier maintenance of
-this file.
+On 5 March 2018 at 17:18, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Feb 14, 2018 at 11:36:44AM +0000, Ard Biesheuvel wrote:
+>> Working around Cortex-A53 erratum #843419 involves special handling of
+>> ADRP instructions that end up in the last two instruction slots of a
+>> 4k page, or whose output register gets overwritten without having been
+>> read. (Note that the latter instruction sequence is never emitted by
+>> a properly functioning compiler)
+>
+> Does the workaround currently implemented in the linker also make this
+> same assumption? If not, I'm a little wary that we're making an assumption
+> about compiler behaviour with no way to detect whether its been violated or
+> not.
+>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I can check, but I don't see how a compiler would ever choose 'adrp'
+when it emits what amounts to a nop instruction.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index e44281cc1047a7af..c6db8ea4390624c4 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -27,11 +27,6 @@
- 		i2c4 = &i2c4;
- 	};
- 
--	psci {
--		compatible = "arm,psci-1.0", "arm,psci-0.2";
--		method = "smc";
--	};
--
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -68,6 +63,11 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
- 	/* External SCIF clock - to be overridden by boards that provide it */
- 	scif_clk: scif {
- 		compatible = "fixed-clock";
--- 
-2.7.4
+>> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+>> index ea640f92fe5a..93b808056cb4 100644
+>> --- a/arch/arm64/kernel/module-plts.c
+>> +++ b/arch/arm64/kernel/module-plts.c
+>> @@ -41,6 +41,46 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+>>       return (u64)&plt[i];
+>>  }
+>>
+>> +#ifdef CONFIG_ARM64_ERRATUM_843419
+>> +u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val)
+>> +{
+>> +     struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>> +                                                       &mod->arch.init;
+>> +     struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
+>> +     int i = pltsec->plt_num_entries++;
+>> +     u32 mov0, mov1, mov2, br;
+>> +     int rd;
+>> +
+>> +     BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
+>
+> I'd prefer just to fail loading the module, but I see we already have
+> a BUG_ON for the existing PLT code. Oh well.
+>
+
+I can fix that in a followup patch
+
+>> +
+>> +     /* get the destination register of the ADRP instruction */
+>> +     rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
+>> +                                       le32_to_cpup((__le32 *)loc));
+>> +
+>> +     /* generate the veneer instructions */
+>> +     mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
+>> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> +                                      AARCH64_INSN_MOVEWIDE_INVERSE);
+>> +     mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
+>> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> +                                      AARCH64_INSN_MOVEWIDE_KEEP);
+>> +     mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
+>> +                                      AARCH64_INSN_VARIANT_64BIT,
+>> +                                      AARCH64_INSN_MOVEWIDE_KEEP);
+>> +     br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
+>> +                                      AARCH64_INSN_BRANCH_NOLINK);
+>> +
+>> +     plt[i] = (struct plt_entry){
+>> +                     cpu_to_le32(mov0),
+>> +                     cpu_to_le32(mov1),
+>> +                     cpu_to_le32(mov2),
+>> +                     cpu_to_le32(br)
+>> +             };
+>> +
+>> +     return (u64)&plt[i];
+>> +}
+>> +#endif
+>> +
+>>  #define cmp_3way(a,b)        ((a) < (b) ? -1 : (a) > (b))
+>>
+>>  static int cmp_rela(const void *a, const void *b)
+>> @@ -68,16 +108,21 @@ static bool duplicate_rel(const Elf64_Rela *rela, int num)
+>>  }
+>>
+>>  static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>> -                            Elf64_Word dstidx)
+>> +                            Elf64_Word dstidx, Elf_Shdr *dstsec)
+>>  {
+>>       unsigned int ret = 0;
+>>       Elf64_Sym *s;
+>>       int i;
+>>
+>>       for (i = 0; i < num; i++) {
+>> +             u64 min_align;
+>> +
+>>               switch (ELF64_R_TYPE(rela[i].r_info)) {
+>>               case R_AARCH64_JUMP26:
+>>               case R_AARCH64_CALL26:
+>> +                     if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>> +                             break;
+>> +
+>>                       /*
+>>                        * We only have to consider branch targets that resolve
+>>                        * to symbols that are defined in a different section.
+>> @@ -109,6 +154,31 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>>                       if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
+>>                               ret++;
+>>                       break;
+>> +             case R_AARCH64_ADR_PREL_PG_HI21_NC:
+>> +             case R_AARCH64_ADR_PREL_PG_HI21:
+>> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
+>> +                             break;
+>> +
+>> +                     /*
+>> +                      * Determine the minimal safe alignment for this ADRP
+>> +                      * instruction: the section alignment at which it is
+>> +                      * guaranteed not to appear at a vulnerable offset.
+>> +                      */
+>> +                     min_align = 2 << ffz(rela[i].r_offset | 0x7);
+>
+> I'm struggling to decipher this, can you give me a hint please? Why 0x7? Is
+> the "2" because of the two vulnerable offsets?
+>
+
+What it basically does is preserve 0 bits in the address of the instruction.
+
+Given that ADRP instructions at addresses ending in fff8 or fffc may
+be vulnerable, if any of the bits [11:3] are zero, we can increase the
+alignment of this section to ensure it remains zero, guaranteeing that
+the resulting address won't end in fff8 or fffc
+
+Bits 0 .. 2 don't count, hence the 0x7. If bit 3 is zero, we can align
+to '1 << (3 + 1)' == '2 << 3', and bit 3 will remain zero.
