@@ -1,54 +1,34 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 14:51:25 -0600
-Subject: [PATCH 3/5] dt-bindings: soc: Add a binding for the Broadcom VCHI
- services.
-In-Reply-To: <20180305202806.21219-4-eric@anholt.net>
-References: <20180305202806.21219-1-eric@anholt.net>
- <20180305202806.21219-4-eric@anholt.net>
-Message-ID: <CAL_Jsq+rEbghtLib4B-eQSLRtdODqeKVdXFJrPjb-JJbJgdpiA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 05 Mar 2018 22:08:14 +0100
+Subject: [PATCH] ARM: dts: rockchip: Add dp83867 CLK_OUT muxing
+In-Reply-To: <3380975.Amu1WGHSQ5@diego>
+References: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
+ <3380975.Amu1WGHSQ5@diego>
+Message-ID: <2707703.8mZIocJ1Ne@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 2:28 PM, Eric Anholt <eric@anholt.net> wrote:
-> The VCHI communication channel can be provided by BCM283x and Capri
+Am Montag, 5. M?rz 2018, 21:25:30 CET schrieb Heiko St?bner:
+> Am Montag, 5. M?rz 2018, 13:45:11 CET schrieb Daniel Schultz:
+> > The CLK_O_SEL default is synchronous to XI input clock, which is 25 MHz.
+> > Set CLK_O_SEL to channel A transmit clock so we have 125 MHz on CLK_OUT.
+> > 
+> > Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
+> 
+> applied for 4.17
 
-VCHI or VCHIQ?
+had to move it to 4.18 though.
 
-> SoCs, to communicate with the VPU-side OS services.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->
-> diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
-> new file mode 100644
-> index 000000000000..4055a8977f3e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
-> @@ -0,0 +1,18 @@
-> +Broadcom VCHIQ firmware services
-> +
-> +Required properties:
-> +
-> +- compatible:  Should be "brcm,bcm2835-vchiq"
-> +- reg:         Physical base address and length of the doorbell register pair
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +- firmware:    Reference to the RPi firmware device node
+The change to the dt-binding header goes through the networking
+tree and will only get merged for 4.17-rc1 .
 
-There's only one, just get it by compatible or path.
+So devicetree changes in a different branch aren't available at this
+point.
 
-> +
-> +Example:
-> +
-> +vchi at 7e00b840 {
-> +       compatible = "brcm,bcm2835-vchiq";
-> +       reg = <0x7e00b840 0xf>;
-> +       interrupts = <0 2>;
-> +       firmware = <&firmware>;
-> +};
-> --
-> 2.16.2
->
+One commonly practiced alternative is that you provide a v2
+with the actual hex values instead of the constants for 4.17
+and a follow-up patch replacing them with the constants
+that I can apply for 4.18.
+
+
+Heiko
