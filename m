@@ -1,71 +1,105 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 5 Mar 2018 17:23:45 +0800
-Subject: [SPAM]Re: [PATCH v3 4/5] dt-bindings: clock: mediatek: update
- audsys documentation to adapt MFD device
-In-Reply-To: <CAL_Jsq+NK-sUY-qOZ2Xv1ZfWVm-vG0tyAgN_auKeaQxMq58vkw@mail.gmail.com>
-References: <cover.1518424204.git.ryder.lee@mediatek.com>
- <61928ad523a7aeffb8f16d4caad56836b65ae407.1518424204.git.ryder.lee@mediatek.com>
- <CAL_JsqJgo0pKJjrs2fdw+q=DJYwht0X5L3Bomz8gf98mEN7hkg@mail.gmail.com>
- <1519193048.18794.42.camel@mtkswgap22>
- <CAL_JsqLjcMpS=bLzAV0arLJY143O1XefjSR0djM73E8uC4oJHg@mail.gmail.com>
- <1519272878.1907.87.camel@mtkswgap22>
- <CAL_Jsq+NK-sUY-qOZ2Xv1ZfWVm-vG0tyAgN_auKeaQxMq58vkw@mail.gmail.com>
-Message-ID: <1520241825.2798.36.camel@mtkswgap22>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 5 Mar 2018 15:00:52 +0530
+Subject: [PATCH v2 09/16] mmc: sdhci: Add quirk to disable HW timeout
+In-Reply-To: <cda22332-ed17-9309-4989-19765744879b@intel.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+ <20180205125029.21570-10-kishon@ti.com>
+ <cda22332-ed17-9309-4989-19765744879b@intel.com>
+Message-ID: <a7ba98cd-7a3c-00f9-bfaa-a982126c9185@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-28 at 09:13 -0600, Rob Herring wrote:
-> >> There are several problems you need to fix. First,
-> >> "mediatek,mt2701-audsys" is not documented. It is only used in the
-> >> example. Second, bindings/arm/mediatek/mediatek,audsys.txt should move
-> >> to bindings/sound/ if it is only audio related functions. Or perhaps
-> >> just combine the 2 documents because it is all inconsistent currently.
-> >
-> > Because the series crossed subsystems but didn't apply at the same time.
-> >
-> >> The 2 documents are inconsistent as to what is the relationship of
-> >> -audsys and -audio (afe) nodes. mt2701-afe-pcm.txt shows that the AFE
-> >> is already a child of -audsys. The -audsys node should have
-> >> #clock-cells. It should also not be a simple-mfd (another
-> >> inconsistency in the binding) because it needs to probe first to
-> >> provide clocks to child nodes, and then trigger probing the child
-> >> nodes.
-> >
-> > This is the 1st version I sent before, and the clock parts still under
-> > review :( .  But yes, the 2 inconsistent documents should be fixed -
-> > this may depend on what we end up doing with the DT appearance.
-> >
-> > IMHO, apart from overlapping regions with other functions I didn't see
-> > any difference between audsys and other clock drivers (providers).
-> >
-> > For the sake of uniformity, I make the 2 sub-devices parallel and move
-> > "simple-mfd" to the top, and the sequences should actually be handled
-> > through "probe deferral mechanism" - that would make this kind of
-> > situations much easier to manage.
+Hi Adrian,
+
+On Monday 19 February 2018 02:21 PM, Adrian Hunter wrote:
+> On 05/02/18 14:50, Kishon Vijay Abraham I wrote:
+>> Add quirk to disable HW timeout if the requested timeout is more than
+>> the maximum obtainable timeout.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/mmc/host/sdhci.c | 12 ++++++++++++
+>>  drivers/mmc/host/sdhci.h |  7 +++++++
+>>  2 files changed, 19 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index 070aff9c108f..1aa74b4682f3 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -735,6 +735,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>>  		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+>>  		    count, cmd->opcode);
+>>  		count = 0xE;
+>> +		if (host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
+>> +			host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+>> +			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>> +			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>> +			host->hw_timeout_disabled = true;
+>> +		}
 > 
-> If a child node has a dependency on the parent, probe deferral is not
-> the correct solution. The parent should probe first and control
-> probing of the chlidren. "simple-mfd" is intended for cases where
-> there is no dependency on the parent node.
-
-In my opinion, they are just the provider-consumer relationship not the
-parent-child relationship, and we leverage this mechanism for most CCF
-users.  Please correct me if I'm wrong.  
-
-That's why I sent the a new one to separate them (but I forgot to modify
-mt2701-afe-pcm.txt).
-
-> > BTW, I could make the AFE driver be instantiated/probed from the clock
-> > driver but this seems superfluous to me.  Just make sure is this what
-> > you want?
+> sdhci_calc_timeout() is really for calculations so please do this in
+> sdhci_set_timeout() instead (i.e. change sdhci_calc_timeout() to return
+> whether the timeout is too big).  Note that you need to cater for the "/*
+> Unspecified timeout, assume max */" case and the
+> SDHCI_QUIRK_BROKEN_TIMEOUT_VAL case.
 > 
-> I would think it would be the other way around. The AFE driver creates
-> some clocks. Whether that's a separate driver or a single driver is a
-> kernel issue that has nothing to do with the binding. IIRC, there's
-> several examples in display controllers and camera interfaces where
-> those drivers are also clock providers.
+> Also if SDHCI_INT_DATA_TIMEOUT is not being disabled, check here to
+> re-enable it and leave sdhci_request_done() alone. i.e.
+> 
+> 	else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
+> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+> 		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+> 		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+> 	}
+> 
+> Maybe make a separate subroutine for the update:
+> 
+> void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
+> {
+> 	if (enable)
+> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+> 	else
+> 		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+> 	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+> 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+> }
+> 
+> 
+>>  	}
+>>  
+>>  	return count;
+>> @@ -2349,6 +2355,12 @@ static bool sdhci_request_done(struct sdhci_host *host)
+>>  	}
+>>  
+>>  	sdhci_del_timer(host, mrq);
+>> +	if (sdhci_data_line_cmd(mrq->cmd) && host->hw_timeout_disabled) {
+>> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>> +		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>> +		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>> +		host->hw_timeout_disabled = false;
+>> +	}
+>>  
+>>  	/*
+>>  	 * Always unmap the data buffers if they were mapped by
+>> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+>> index afab26fd70e6..3a967a56fcc3 100644
+>> --- a/drivers/mmc/host/sdhci.h
+>> +++ b/drivers/mmc/host/sdhci.h
+>> @@ -437,6 +437,11 @@ struct sdhci_host {
+>>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+>>  /* Controller has CRC in 136 bit Command Response */
+>>  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+>> +/*
+>> + * Disable HW timeout if the requested timeout is more than the maximum
+>> + * obtainable timeout
+>> + */
+>> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
 
-I've look at some display drivers, but couldn't find a good case. The
-different is, that the driver I saw provides clocks to other submodules,
-while the AFE is just a user. So it's odd if we register AFE itself as a
-clock provider (and use the clocks it generates).
+Are you okay with the definition of this quirk? i.e this quirk is applied only
+when the requested timeout is "more" than the maximum obtainable timeout.
+
+By this way platforms can continue to use hardware timeout for smaller timeout
+value.
+
+Thanks
+Kishon
