@@ -1,39 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Mar 2018 10:26:56 +0000
-Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
- CONFIG_RANDOMIZE_BASE=y
-In-Reply-To: <CAKv+Gu_k6Dat=5oo3gYLR0E19YfDSjTFYs2vfzqBdx55rm4oFA@mail.gmail.com>
-References: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu_k6Dat=5oo3gYLR0E19YfDSjTFYs2vfzqBdx55rm4oFA@mail.gmail.com>
-Message-ID: <20180305102656.GC8571@arm.com>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 5 Mar 2018 18:35:35 +0800
+Subject: [PATCH 0/7] media: sun6i: Various fixes and improvements
+In-Reply-To: <20180305093535.11801-1-maxime.ripard@bootlin.com>
+References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
+ <20180305093535.11801-1-maxime.ripard@bootlin.com>
+Message-ID: <20180305183535.b75ec79199efc3cacefc49c2@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 10:15:29AM +0000, Ard Biesheuvel wrote:
-> On 5 March 2018 at 10:08, Will Deacon <will.deacon@arm.com> wrote:
-> > TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
-> > memory accesses (e.g. speculative accesses from a first-fault gather load)
-> > which translate via TTBR1_EL1 result in a translation fault if they
-> > miss in the TLB when executed from EL0. This mitigates some timing attacks
-> > against KASLR, where the kernel address space could otherwise be probed
-> > efficiently using the FFR in conjunction with suppressed faults on SVE
-> > loads.
-> >
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Dave Martin <Dave.Martin@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >
-> > Sending as RFC because this doesn't make any difference if kpti is enabled,
-> > which is the default with KASLR. It helps if kpti=off is being passed and
-> > shouldn't have an impact on performance.
-> >
+Hi Maxime,
+
+On Mon,  5 Mar 2018 10:35:27 +0100
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+
+> Hi Yong,
 > 
-> This just makes it harder/slower to probe the kernel address space
-> using SVE instructions, right?
+> Here are a bunch of patches I came up with after testing your last
+> (v8) version of the CSI patches.
+> 
+> There's some improvements (patches 1 and 7) and fixes for
+> regressions found in the v8 compared to the v7 (patches 2, 3, 4 and
+> 5), and one fix that we discussed for the signals polarity for the
+> parallel interface (patch 6).
+> 
+> Feel free to squash them in your serie for the v9.
 
-Yeah, basically, but given that kpti should make any walks via ttbr1 from
-EL0 timing invariant, it doesn't make a whole lot of difference in
-conjunction with that.
+OK. Thank you!
 
-Will
+I notice that your responses have not been listed in google group
+since February.
+
+> Thanks!
+> Maxime
+> 
+> Maxime Ripard (7):
+>   media: sun6i: Fill dma_pfn_offset to accomodate for the RAM offset
+>   media: sun6i: Reduce the error level
+>   media: sun6i: Pass the sun6i_csi_dev pointer to our helpers
+>   media: sun6i: Don't emit a warning when the configured format isn't
+>     found
+>   media: sun6i: Support the YUYV format properly
+>   media: sun6i: Invert the polarities
+>   media: sun6i: Expose controls on the v4l2_device
+> 
+>  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 85 ++++++++++++++--------
+>  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h |  2 +
+>  .../media/platform/sunxi/sun6i-csi/sun6i_video.c   |  6 ++
+>  3 files changed, 63 insertions(+), 30 deletions(-)
+> 
+> -- 
+> 2.14.3
+
+
+Thanks,
+Yong
