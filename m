@@ -1,122 +1,182 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 5 Mar 2018 13:53:25 +0100
-Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
-In-Reply-To: <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
- <8f328063-610f-a2e8-5f29-d3f0019384f2@st.com>
- <CAPDyKFqFWcZnWoUdnfRtj9WA1+ooNCXKfZ94Ddq4j849CH2QOQ@mail.gmail.com>
- <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
-Message-ID: <CAPDyKFopp6aSXO0vguWah44vBqfvuRvFHUSNbynjFE8NFPnNRA@mail.gmail.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 5 Mar 2018 12:59:18 +0000
+Subject: [PATCH v5 17/40] KVM: arm64: Move userspace system registers into
+ separate function
+In-Reply-To: <20180227113429.637-18-cdall@kernel.org>
+References: <20180227113429.637-1-cdall@kernel.org>
+ <20180227113429.637-18-cdall@kernel.org>
+Message-ID: <af723cc8-dc68-e649-16eb-c7312330725d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2018 at 09:51, Ludovic BARRE <ludovic.barre@st.com> wrote:
->
->
-> On 03/01/2018 11:44 AM, Ulf Hansson wrote:
->>
->> On 1 March 2018 at 10:57, Ludovic BARRE <ludovic.barre@st.com> wrote:
->>>
->>> Hi Ulf
->>>
->>> On 03/01/2018 10:06 AM, Ulf Hansson wrote:
->>>>
->>>>
->>>> Hi Ludovic,
->>>>
->>>> On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com>
->>>> wrote:
->>>>>
->>>>>
->>>>> From: Ludovic Barre <ludovic.barre@st.com>
->>>>>
->>>>> This patch serie adds support of stm32 SDMMC controller.
->>>>> stm32h7 is the first SoC to use stm32 SDMMC controller
->>>>> (previous SoC had pl180 controller).
->>>>
->>>>
->>>>
->>>> I am a not convinced this isn't a new improved variant of the pl180.
->>>> According to register layout and the code you submitted in patch2,
->>>> there are great similarities to pl180 and the mmci driver.
->>>
->>>
->>>
->>> In fact, ST designers which created stm32-sdmmc hardware block from
->>> scratch
->>> are the same which have done the modifications on pl180 variant (stm32
->>> legacy f4, f7).
->>> So some registers or bits name seem identical (or strongly inspirited)
->>> but
->>> the engine and features are different.
->>
->>
->> Well, in that case, I assume the driver would also need work
->> differently, but when looking at the code in patch2 this doesn't seem
->> to be the case.
->>
->
-> I understand why you push to avoid drivers multiplication. But I'm
-> scared to squash 2 different hardware block which are their own roadmap
-> in the same drivers. I fear that it complicates the features management and
-> maintenance of this driver.
+Hi Christoffer,
 
-It may require more work for you to upstream the code you need. You
-may even have to re-factor existing code in mmci before you can add
-your specific parts on top.
+On 27/02/18 11:34, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> There's a semantic difference between the EL1 registers that control
+> operation of a kernel running in EL1 and EL1 registers that only control
+> userspace execution in EL0.  Since we can defer saving/restoring the
+> latter, move them into their own function.
+> 
+> The ARMv8 ARM (ARM DDI 0487C.a) Section D10.2.1 recommends that
+> ACTLR_EL1 has no effect on the processor when running the VHE host, and
+> we can therefore move this register into the EL1 state which is only
+> saved/restored on vcpu_put/load for a VHE host.
+> 
+> We also take this chance to rename the function saving/restoring the
+> remaining system register to make it clear this function deals with
+> the EL1 system registers.
+> 
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-However, whether it gets complicated or not, I think much depends on
-the quality of the code changes we make. Both sdhci and dw_mmc gives
-an idea of how we can deal with variant differences, in particular
-when variant changes are a bit bigger.
+Reviewed-by: Julien Grall <julien.grall@arm.com>
 
-In the mmci case, so far the controller that differs the most, is the
-qcom variant, which also has the built-in DMA support, similar to your
-new ST variant. Perhaps there is some code we can re-use around that.
+Cheers,
 
->
-> there are some difference:
-> -the stm32-sdmmc use an internal dma (stm32-sdmmc is master on the bus),
-> -idma alignment constraint.
-> -idma transfer mode single buffer, double buffer... (future evolution)
-> -need a command to stop transmission for data state machine
-> -same bit naming could have offset, mask width or set in different register.
-> => I will try to synthesis register difference in a document
-> -voltage switch sequence
-> -delay block: calibration, tunning (sdr104)
-> -reset line required
-> -the same feature have not the same impact, example ddr mode
-> stm32:no bypass clk, activated in clk register
-> pl180: clkreg_neg_edge_enable, activated in datactrl register,
+> ---
+> 
+> Notes:
+>      Changes since v4:
+>       - Clarified rationale for deferring ACTLR_EL1 in the commit message.
+>      
+>      Changes since v3:
+>       - Correct the comment about ACTLR_EL1 and adjust commit text.
+>      
+>      Changes since v2:
+>       - Save restore ACTLR_EL1 as part of the EL1 registers state instead of
+>         the user register state, as ACTLR_EL1 can't affect the host's execution
+>         on VHE systems.
+>      
+>      Changes since v1:
+>       - Added comment about sp_el0 to common save sysreg save/restore functions
+> 
+>   arch/arm64/kvm/hyp/sysreg-sr.c | 48 ++++++++++++++++++++++++++++++------------
+>   1 file changed, 35 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 99fc60516103..d5a5145b4e7c 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -28,24 +28,33 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+>   /*
+>    * Non-VHE: Both host and guest must save everything.
+>    *
+> - * VHE: Host must save tpidr*_el0, actlr_el1, mdscr_el1, sp_el0,
+> + * VHE: Host must save tpidr*_el0, mdscr_el1, sp_el0,
+>    * and guest must save everything.
+>    */
+>   
+>   static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+>   {
+> -	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+> -	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+> -	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+>   	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+> +
+> +	/*
+> +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
+> +	 * therefore be saved/restored on every entry/exit to/from the guest.
+> +	 */
+>   	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+>   }
+>   
+> -static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+> +static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
+> +{
+> +	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+> +	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+> +}
+> +
+> +static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+>   {
+>   	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+>   	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+>   	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
+> +	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+>   	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
+>   	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
+>   	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
+> @@ -73,35 +82,46 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>   }
+>   
+>   static hyp_alternate_select(__sysreg_call_save_host_state,
+> -			    __sysreg_save_state, __sysreg_do_nothing,
+> +			    __sysreg_save_el1_state, __sysreg_do_nothing,
+>   			    ARM64_HAS_VIRT_HOST_EXTN);
+>   
+>   void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+>   {
+>   	__sysreg_call_save_host_state()(ctxt);
+>   	__sysreg_save_common_state(ctxt);
+> +	__sysreg_save_user_state(ctxt);
+>   }
+>   
+>   void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
+>   {
+> -	__sysreg_save_state(ctxt);
+> +	__sysreg_save_el1_state(ctxt);
+>   	__sysreg_save_common_state(ctxt);
+> +	__sysreg_save_user_state(ctxt);
+>   }
+>   
+>   static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+>   {
+> -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
+> -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+> -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+>   	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+> +
+> +	/*
+> +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
+> +	 * therefore be saved/restored on every entry/exit to/from the guest.
+> +	 */
+>   	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+>   }
+>   
+> -static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+> +static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
+> +{
+> +	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
+> +	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
+> +}
+> +
+> +static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+>   {
+>   	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
+>   	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
+>   	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
+> +	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
+>   	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
+>   	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
+>   	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
+> @@ -129,19 +149,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>   }
+>   
+>   static hyp_alternate_select(__sysreg_call_restore_host_state,
+> -			    __sysreg_restore_state, __sysreg_do_nothing,
+> +			    __sysreg_restore_el1_state, __sysreg_do_nothing,
+>   			    ARM64_HAS_VIRT_HOST_EXTN);
+>   
+>   void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+>   {
+>   	__sysreg_call_restore_host_state()(ctxt);
+>   	__sysreg_restore_common_state(ctxt);
+> +	__sysreg_restore_user_state(ctxt);
+>   }
+>   
+>   void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
+>   {
+> -	__sysreg_restore_state(ctxt);
+> +	__sysreg_restore_el1_state(ctxt);
+>   	__sysreg_restore_common_state(ctxt);
+> +	__sysreg_restore_user_state(ctxt);
+>   }
+>   
+>   void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+> 
 
-Doesn't sound like this couldn't be done, yes there are differences
-but not that much.
-
-Sure we may need re-work the core driver mmci code, maybe convert it
-to set of library function instead and invent a couple mmci specific
-callbacks. As I said, sdhci and dw_mmc already does it, so I am sure
-it can be done.
-
-> ...
->
-> stm32-sdmmc is just at begining of its life cycle. Each revision of this
-> block increases the difference with pl180. Today, I've just push the minimal
-
-That's fine, this happens all the time to sdhci and dw_mmc variants.
-Again, if it works for them, it should work for mmci.
-
-> driver to start a request, but I've not yet send all features of this
-> revision like sdio, sdr104 support. After this revision there already are 2
-> other revisions in the pipe (at short term).
->
-> I am Out of Office with limited access to my e-mail till 2018 march 12th
-> I'll try to think about it on ski slope. euh, in fact no just ski and enjoy
-> ;-)
-
-Enjoy you skiing and let's talk more when you get back!
-
-[...]
-
-Kind regards
-Uffe
+-- 
+Julien Grall
