@@ -1,63 +1,63 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon,  5 Mar 2018 10:35:29 +0100
-Subject: [PATCH 2/7] media: sun6i: Reduce the error level
+Date: Mon,  5 Mar 2018 10:35:31 +0100
+Subject: [PATCH 4/7] media: sun6i: Don't emit a warning when the configured
+ format isn't found
 In-Reply-To: <20180305093535.11801-1-maxime.ripard@bootlin.com>
 References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
  <20180305093535.11801-1-maxime.ripard@bootlin.com>
-Message-ID: <20180305093535.11801-3-maxime.ripard@bootlin.com>
+Message-ID: <20180305093535.11801-5-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The is_format_support function can be called in the standard format
-negociation path with a sensor, where it's expected to have not exactly the
-same set of formats available.
+Currently the driver will call WARN when a format isn't available,
+resulting in a kernel backtrace in our logs. This makes it look much more
+serious than it should be.
 
-Reduce the error logging level when we find a format not supported to not
-have a lot of spurious messages.
+Replace the call to the WARN macro to a dev_warn, which will still allow us
+to log what happened without making it too dramatic.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-index 2ec33fb04632..b0ac8a188f92 100644
+index f10c3bc2a6c5..9a25aad8b6b1 100644
 --- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
 +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-@@ -111,15 +111,14 @@ bool sun6i_csi_is_format_support(struct sun6i_csi *csi,
- 			case MEDIA_BUS_FMT_YVYU8_1X16:
- 				return true;
- 			default:
--				dev_warn(sdev->dev,
--					 "Unsupported mbus code: 0x%x\n",
--					 mbus_code);
-+				dev_dbg(sdev->dev, "Unsupported mbus code: 0x%x\n",
-+					mbus_code);
- 				break;
- 			}
- 			break;
+@@ -299,7 +299,7 @@ static enum csi_output_fmt get_csi_output_format(struct sun6i_csi_dev *sdev,
+ 		return buf_interlaced ? CSI_FRAME_PLANAR_YUV422 :
+ 					CSI_FIELD_PLANAR_YUV422;
+ 	default:
+-		WARN(1, "Unsupported pixformat: 0x%x\n", pixformat);
++		dev_warn(sdev->dev, "Unsupported pixformat: 0x%x\n", pixformat);
+ 		break;
+ 	}
+ 
+@@ -330,7 +330,8 @@ static enum csi_input_seq get_csi_input_seq(struct sun6i_csi_dev *sdev,
+ 		case MEDIA_BUS_FMT_YVYU8_2X8:
+ 			return CSI_INPUT_SEQ_YVYU;
  		default:
--			dev_warn(sdev->dev, "Unsupported pixformat: 0x%x\n",
--				 pixformat);
-+			dev_dbg(sdev->dev, "Unsupported pixformat: 0x%x\n",
-+				pixformat);
+-			WARN(1, "Unsupported mbus code: 0x%x\n", mbus_code);
++			dev_warn(sdev->dev, "Unsupported mbus code: 0x%x\n",
++				 mbus_code);
  			break;
  		}
- 		return false;
-@@ -175,13 +174,13 @@ bool sun6i_csi_is_format_support(struct sun6i_csi *csi,
+ 		break;
+@@ -351,12 +352,14 @@ static enum csi_input_seq get_csi_input_seq(struct sun6i_csi_dev *sdev,
  		case MEDIA_BUS_FMT_YVYU8_2X8:
- 			return true;
+ 			return CSI_INPUT_SEQ_YUYV;
  		default:
--			dev_warn(sdev->dev, "Unsupported mbus code: 0x%x\n",
--				 mbus_code);
-+			dev_dbg(sdev->dev, "Unsupported mbus code: 0x%x\n",
-+				mbus_code);
+-			WARN(1, "Unsupported mbus code: 0x%x\n", mbus_code);
++			dev_warn(sdev->dev, "Unsupported mbus code: 0x%x\n",
++				 mbus_code);
  			break;
  		}
  		break;
  	default:
--		dev_warn(sdev->dev, "Unsupported pixformat: 0x%x\n", pixformat);
-+		dev_dbg(sdev->dev, "Unsupported pixformat: 0x%x\n", pixformat);
+-		WARN(1, "Unsupported pixformat: 0x%x\n", pixformat);
++		dev_warn(sdev->dev, "Unsupported pixformat: 0x%x, defaulting to YUYV\n",
++			 pixformat);
  		break;
  	}
  
