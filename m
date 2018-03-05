@@ -1,60 +1,24 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 5 Mar 2018 21:37:08 +0100
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
- <86o9k63f7a.wl-marc.zyngier@arm.com>
- <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
- <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
-Message-ID: <a1579f14-a5fe-11bc-a831-f729cead25ba@redhat.com>
+From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
+Date: Mon, 05 Mar 2018 20:43:00 +0000
+Subject: [linux-sunxi] [PATCH v3 15/16] ARM: dts: sun8i: h3: Enable HDMI
+ output on H3 boards
+In-Reply-To: <24923386.1anQU1Bm90@jernej-laptop>
+References: <20180301213442.16677-1-jernej.skrabec@siol.net>
+ <20180301213442.16677-16-jernej.skrabec@siol.net>
+ <57afe052-9a8c-f63b-ee43-5bad8cd1d193@iki.fi>
+ <24923386.1anQU1Bm90@jernej-laptop>
+Message-ID: <7f34f281-fa61-44b4-60a0-fa4843bc27c1@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Jernej ?krabec:
+> I guess that would mean also including connector node (hdmi_con_in) in DTSI, 
+> since it is referenced inside. However, not all boards have HDMI connector, so 
+> I didn't include it in DTSI.
 
-On 05/03/18 17:31, Peter Maydell wrote:
-> On 2 March 2018 at 12:26, Auger Eric <eric.auger@redhat.com> wrote:
->> Hi Marc,
->> On 02/03/18 12:11, Marc Zyngier wrote:
->>> On Fri, 02 Mar 2018 10:44:48 +0000,
->>> Auger Eric wrote:
->>>> I understand the get/set is called as part of the migration process.
->>>> So my understanding is the benefit of this series is migration fails in
->>>> those cases:
->>>>
->>>>> =0.2 source -> 0.1 destination
->>>> 0.1 source -> >=0.2 destination
->>>
->>> It also fails in the case where you migrate a 1.0 guest to something
->>> that cannot support it.
->>
->> That's because on the destination, the number of regs is less than on
->> source, right?
-> 
-> I think it fails because the KVM_REG_ARM_PSCI_VERSION register will be
-> in the migration state but not in the destination's list of registers:
-> the code in QEMU's target/arm/machine.c:cpu_post_load() function that
-> checks "register in their list but not ours: fail migration" will
-> catch this.
+You're absolutely right on this. I wish there was someway to get rid of
+this duplication but that's a whole different problem to discuss.
 
-Thank you for the pointer. Yes at the time I reviewed the patch and just
-focusing on the kernel code, this was not immediate to me.
+Great work by the way!
 
-> 
-> That also means that we will fail migration from a new kernel where
-> we've specifically asked for PSCI 0.2 to an old PSCI-0.2-only kernel
-> (because the KVM_REG_ARM_PSCI_VERSION reg will appear in the migration
-> stream even if its value is the one value that matches the old kernel
-> behaviour). I don't know if we care about that.
-
-Do you know when are we likely to force PSCI 0.2 on a new kernel? At
-which layer is the decision supposed to be made and on which criteria?
-
-Thanks
-
-Eric
-> 
-> thanks
-> -- PMM
-> 
+Joonas
