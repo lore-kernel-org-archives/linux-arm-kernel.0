@@ -1,49 +1,37 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon,  5 Mar 2018 17:17:22 +0800
-Subject: [PATCH] soc: rockchip: power-domain: Add a sanity check on
- pd->num_clks
-Message-ID: <20180305091722.22246-1-jeffy.chen@rock-chips.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Mon, 5 Mar 2018 10:18:56 +0100
+Subject: [PATCH v2 2/2] ARM: ftrace: Add MODULE_PLTS support
+In-Reply-To: <20180302120026.52f34ad2@vmware.local.home>
+References: <20180301164343.5794-1-alexander.sverdlin@nokia.com>
+ <20180301164343.5794-3-alexander.sverdlin@nokia.com>
+ <20180302120026.52f34ad2@vmware.local.home>
+Message-ID: <8aa72633-5323-7f85-d326-6b7231b12aeb@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_count_phandle_with_args() can fail and return error(for example,
-rk3399 pd_vio doesn't have clocks). That would break the pd probe.
+Hello Steven!
 
-Add a sanity check on pd->num_clks to avoid that.
+On 02/03/18 18:00, Steven Rostedt wrote:
+>> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+>> index 9e842ff..3e663f9 100644
+>> --- a/arch/arm/include/asm/ftrace.h
+>> +++ b/arch/arm/include/asm/ftrace.h
+>> @@ -19,6 +19,7 @@ struct dyn_arch_ftrace {
+>>  #ifdef CONFIG_OLD_MCOUNT
+>>  	bool	old_mcount;
+>>  #endif
+> I think you want to add:
+> 
+> #ifdef CONFIG_ARM_MODULE_PLTS
+>> +	struct module *mod;
+> #endif
+> 
+> This will add more memory overhead, and we don't want to add that if it
+> is not needed.
 
-Fixes: 65084121d59d ("soc: rockchip: power-domain: use clk_bulk APIs")
-Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Will include it into the next version.
+Thanks for the review!
 
- drivers/soc/rockchip/pm_domains.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index ad96ddeaeb78..fd58fd475950 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -402,11 +402,16 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
- 
- 	pd->num_clks = of_count_phandle_with_args(node, "clocks",
- 						  "#clock-cells");
--
--	pd->clks = devm_kcalloc(pmu->dev, pd->num_clks, sizeof(*pd->clks),
--				GFP_KERNEL);
--	if (!pd->clks)
--		return -ENOMEM;
-+	if (pd->num_clks > 0) {
-+		pd->clks = devm_kcalloc(pmu->dev, pd->num_clks,
-+					sizeof(*pd->clks), GFP_KERNEL);
-+		if (!pd->clks)
-+			return -ENOMEM;
-+	} else {
-+		dev_dbg(pmu->dev, "%s: don't have clocks: %d\n",
-+			node->name, pd->num_clks);
-+		pd->num_clks = 0;
-+	}
- 
- 	for (i = 0; i < pd->num_clks; i++) {
- 		pd->clks[i].clk = of_clk_get(node, i);
 -- 
-2.11.0
+Best regards,
+Alexander Sverdlin.
