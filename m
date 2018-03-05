@@ -1,44 +1,52 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 05 Mar 2018 14:02:12 -0800
-Subject: [PATCH v2] perf/core: Add support for PMUs that can be read from
- more than 1 CPU
-In-Reply-To: <20180305122140.wwwu4hvhssouuzcp@lakrids.cambridge.arm.com>
-References: <1520039693-30914-1-git-send-email-skannan@codeaurora.org>
- <20180305121702.l64rzrckog6d7jop@lakrids.cambridge.arm.com>
- <20180305122140.wwwu4hvhssouuzcp@lakrids.cambridge.arm.com>
-Message-ID: <5A9DBE64.3060209@codeaurora.org>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon,  5 Mar 2018 14:02:37 -0800
+Subject: [PATCH v2 0/4] Add support for the Gateworks System Controller
+Message-ID: <1520287361-12569-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2018 04:21 AM, Mark Rutland wrote:
-> On Mon, Mar 05, 2018 at 12:17:02PM +0000, Mark Rutland wrote:
->> On Fri, Mar 02, 2018 at 05:14:53PM -0800, Saravana Kannan wrote:
->
->>> @@ -629,6 +629,7 @@ struct perf_event {
->>>
->>>   	int				oncpu;
->>>   	int				cpu;
->>> +	cpumask_t			readable_on_cpus;
->>
->> For most PMUs, this will be emptry, and it's potentially *very* large
->> (e.g. on systems where NR_CPUS is 4096). Please use a poitner to a mask,
->> as I suggested in [1], e.g.
->
->> [1] https://lkml.kernel.org/r/20171128124534.3jvuala525wvn64r at wfg-t540p.sh.intel.com
->
-> Whoops, that should've been:
->
-> [1] https://lkml.kernel.org/r/20180225143802.denbkubqjg2dc7af at salmiak
->
+This series adds support for the Gateworks System Controller used on Gateworks
+Laguna, Ventana, and Newport product families.
 
-I didn't notice you mentioned the use of pointers, but I was planning on 
-doing that anyway. But then I realize people will complain about 
-cacheline bouncing across 4096 CPUs if I use a cpu mask pointer.
+The GSC is an MSP430 I2C slave controller whose firmware embeds the following
+features:
+ - I/O expander (16 GPIO's emulating a PCA955x)
+ - EEPROM (enumating AT24)
+ - RTC (enumating DS1672)
+ - HWMON
+ - Interrupt controller with tamper detect, user pushbotton
+ - Watchdog controller capable of full board power-cycle
+ - Power Control capable of full board power-cycle
 
-Thanks,
-Saravana
+see http://trac.gateworks.com/wiki/gsc for more details
+
+Tim Harvey (4):
+  dt-bindings: mfd: Add Gateworks System Controller bindings
+  mfd: add Gateworks System Controller core driver
+  hwmon: add Gateworks System Controller support
+  input: misc: Add Gateworks System Controller support
+
+ Documentation/devicetree/bindings/mfd/gsc.txt | 159 +++++++++++++
+ drivers/hwmon/Kconfig                         |   9 +
+ drivers/hwmon/Makefile                        |   1 +
+ drivers/hwmon/gsc-hwmon.c                     | 330 ++++++++++++++++++++++++++
+ drivers/input/misc/Kconfig                    |   9 +
+ drivers/input/misc/Makefile                   |   1 +
+ drivers/input/misc/gsc-input.c                | 180 ++++++++++++++
+ drivers/mfd/Kconfig                           |  13 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/gsc.c                             | 330 ++++++++++++++++++++++++++
+ include/linux/mfd/gsc.h                       |  82 +++++++
+ include/linux/platform_data/gsc_hwmon.h       |  34 +++
+ include/linux/platform_data/gsc_input.h       |  30 +++
+ 13 files changed, 1179 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/gsc.txt
+ create mode 100644 drivers/hwmon/gsc-hwmon.c
+ create mode 100644 drivers/input/misc/gsc-input.c
+ create mode 100644 drivers/mfd/gsc.c
+ create mode 100644 include/linux/mfd/gsc.h
+ create mode 100644 include/linux/platform_data/gsc_hwmon.h
+ create mode 100644 include/linux/platform_data/gsc_input.h
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
