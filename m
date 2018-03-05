@@ -1,106 +1,122 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 5 Mar 2018 14:52:06 +0200
-Subject: [PATCHv3] tlv320dac33: Add device tree bindings
-In-Reply-To: <20180224205704.GB5132@amd>
-References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
- <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com> <20180205082445.GA18274@amd>
- <20180206121122.GG5681@sirena.org.uk> <20180206134906.GA7842@amd>
- <20180206152722.GH5681@sirena.org.uk> <20180224205704.GB5132@amd>
-Message-ID: <3edfbd7c-c8f8-f031-30d2-90b441e63688@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 5 Mar 2018 13:53:25 +0100
+Subject: [PATCH V2 0/5] mmc: add stm32 sdmmc controller
+In-Reply-To: <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
+References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpfPAaLRZLqpyi6RwC1-=7Ao=u+OmEfHaYBABzd_-BKAw@mail.gmail.com>
+ <8f328063-610f-a2e8-5f29-d3f0019384f2@st.com>
+ <CAPDyKFqFWcZnWoUdnfRtj9WA1+ooNCXKfZ94Ddq4j849CH2QOQ@mail.gmail.com>
+ <cbdd31d8-dbea-4ea3-01ba-443daeb51775@st.com>
+Message-ID: <CAPDyKFopp6aSXO0vguWah44vBqfvuRvFHUSNbynjFE8NFPnNRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2018-02-24 22:57, Pavel Machek wrote:
-> On Tue 2018-02-06 15:27:22, Mark Brown wrote:
->> On Tue, Feb 06, 2018 at 02:49:06PM +0100, Pavel Machek wrote:
->>> On Tue 2018-02-06 12:11:22, Mark Brown wrote:
+On 2 March 2018 at 09:51, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>
+>
+> On 03/01/2018 11:44 AM, Ulf Hansson wrote:
 >>
->>>> Please submit patches using subject lines reflecting the style for the
->>>> subsystem.  This makes it easier for people to identify relevant
->>>> patches.  Look at what existing commits in the area you're changing are
->>>> doing and make sure your subject lines visually resemble what they're
->>>> doing.
+>> On 1 March 2018 at 10:57, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>>>
+>>> Hi Ulf
+>>>
+>>> On 03/01/2018 10:06 AM, Ulf Hansson wrote:
+>>>>
+>>>>
+>>>> Hi Ludovic,
+>>>>
+>>>> On 28 February 2018 at 16:47, Ludovic Barre <ludovic.Barre@st.com>
+>>>> wrote:
+>>>>>
+>>>>>
+>>>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>>>
+>>>>> This patch serie adds support of stm32 SDMMC controller.
+>>>>> stm32h7 is the first SoC to use stm32 SDMMC controller
+>>>>> (previous SoC had pl180 controller).
+>>>>
+>>>>
+>>>>
+>>>> I am a not convinced this isn't a new improved variant of the pl180.
+>>>> According to register layout and the code you submitted in patch2,
+>>>> there are great similarities to pl180 and the mmci driver.
+>>>
+>>>
+>>>
+>>> In fact, ST designers which created stm32-sdmmc hardware block from
+>>> scratch
+>>> are the same which have done the modifications on pl180 variant (stm32
+>>> legacy f4, f7).
+>>> So some registers or bits name seem identical (or strongly inspirited)
+>>> but
+>>> the engine and features are different.
 >>
->>> AFAICT this goes to Documentation, not sound.
 >>
->> Even if that were the case you're not following the commonly accepted
->> practice there either.
+>> Well, in that case, I assume the driver would also need work
+>> differently, but when looking at the code in patch2 this doesn't seem
+>> to be the case.
 >>
->>> If you have any comments on V1 of this patch, that would be nice, I'd
->>> like to get that merged once we are finished with the bindings.
->>
->> It is the middle of the merge window, please be a bit more patient.
-> 
-> For the record, patch currently looks like this. If you have some
-> comments on the code, I'd like to hear them.
-> 
-> Best regards,
-> diff --git a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
-> index 8c71d2f..7302789 100644
-> --- a/sound/soc/codecs/tlv320dac33.c
-> +++ b/sound/soc/codecs/tlv320dac33.c
+>
+> I understand why you push to avoid drivers multiplication. But I'm
+> scared to squash 2 different hardware block which are their own roadmap
+> in the same drivers. I fear that it complicates the features management and
+> maintenance of this driver.
 
-...
+It may require more work for you to upstream the code you need. You
+may even have to re-factor existing code in mmci before you can add
+your specific parts on top.
 
-> @@ -1511,10 +1509,26 @@ static int dac33_i2c_probe(struct i2c_client *client,
->  
->  	i2c_set_clientdata(client, dac33);
->  
-> -	dac33->power_gpio = pdata->power_gpio;
-> -	dac33->burst_bclkdiv = pdata->burst_bclkdiv;
-> -	dac33->keep_bclk = pdata->keep_bclk;
-> -	dac33->mode1_latency = pdata->mode1_latency;
-> +	if (pdata) {
-> +		dac33->power_gpio = pdata->power_gpio;
-> +		dac33->burst_bclkdiv = pdata->burst_bclkdiv;
-> +		dac33->keep_bclk = pdata->keep_bclk;
-> +		dac33->mode1_latency = pdata->mode1_latency;
-> +	} else if (np) {
-> +		ret = of_get_named_gpio(np, "power-gpios", 0);
-> +		if (ret >= 0)
-> +			dac33->power_gpio = ret;
-> +		else
-> +			dac33->power_gpio = -1;
+However, whether it gets complicated or not, I think much depends on
+the quality of the code changes we make. Both sdhci and dw_mmc gives
+an idea of how we can deal with variant differences, in particular
+when variant changes are a bit bigger.
 
-the code checks for (dac33->power_gpio >= 0) in live path, I guess you
-can just skip the power_gpio = -1 in case we don't have GPIO
-Handling of EPROBE_DEFER might be something we might want for the GPIO.
+In the mmci case, so far the controller that differs the most, is the
+qcom variant, which also has the built-in DMA support, similar to your
+new ST variant. Perhaps there is some code we can re-use around that.
 
-> +
-> +		if (of_property_read_bool(np, "ti,keep-bclk"))
-> +			dac33->keep_bclk = true;
-> +
-> +		of_property_read_u32(np, "ti,burst-bclkdiv", &dac33->burst_bclkdiv);
-> +	} else {
-> +		dev_err(&client->dev, "Platform data not set\n");
-> +		return -ENODEV;
-> +	}
->  	if (!dac33->mode1_latency)
->  		dac33->mode1_latency = 10000; /* 10ms */
->  	dac33->irq = client->irq;
-> @@ -1580,9 +1594,16 @@ static const struct i2c_device_id tlv320dac33_i2c_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, tlv320dac33_i2c_id);
->  
-> +static const struct of_device_id tlv320dac33_of_match[] = {
-> +	{ .compatible = "ti,tlv320dac33", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(i2c, tlv320dac33_of_match);
-> +
->  static struct i2c_driver tlv320dac33_i2c_driver = {
->  	.driver = {
->  		.name = "tlv320dac33-codec",
-> +		.of_match_table = of_match_ptr(tlv320dac33_of_match),
->  	},
->  	.probe		= dac33_i2c_probe,
->  	.remove		= dac33_i2c_remove,
-> 
-> 
+>
+> there are some difference:
+> -the stm32-sdmmc use an internal dma (stm32-sdmmc is master on the bus),
+> -idma alignment constraint.
+> -idma transfer mode single buffer, double buffer... (future evolution)
+> -need a command to stop transmission for data state machine
+> -same bit naming could have offset, mask width or set in different register.
+> => I will try to synthesis register difference in a document
+> -voltage switch sequence
+> -delay block: calibration, tunning (sdr104)
+> -reset line required
+> -the same feature have not the same impact, example ddr mode
+> stm32:no bypass clk, activated in clk register
+> pl180: clkreg_neg_edge_enable, activated in datactrl register,
 
-- P?ter
+Doesn't sound like this couldn't be done, yes there are differences
+but not that much.
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Sure we may need re-work the core driver mmci code, maybe convert it
+to set of library function instead and invent a couple mmci specific
+callbacks. As I said, sdhci and dw_mmc already does it, so I am sure
+it can be done.
+
+> ...
+>
+> stm32-sdmmc is just at begining of its life cycle. Each revision of this
+> block increases the difference with pl180. Today, I've just push the minimal
+
+That's fine, this happens all the time to sdhci and dw_mmc variants.
+Again, if it works for them, it should work for mmci.
+
+> driver to start a request, but I've not yet send all features of this
+> revision like sdio, sdr104 support. After this revision there already are 2
+> other revisions in the pipe (at short term).
+>
+> I am Out of Office with limited access to my e-mail till 2018 march 12th
+> I'll try to think about it on ski slope. euh, in fact no just ski and enjoy
+> ;-)
+
+Enjoy you skiing and let's talk more when you get back!
+
+[...]
+
+Kind regards
+Uffe
