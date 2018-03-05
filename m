@@ -1,92 +1,258 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Mon, 5 Mar 2018 10:39:33 -0500
-Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
-In-Reply-To: <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
-References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
- <20180227095028.GG21033@krava>
- <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
- <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
- <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
- <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
- <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
-Message-ID: <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 5 Mar 2018 14:35:49 +0000
+Subject: [PATCH v6 13/20] firmware: arm_scmi: refactor in preparation to
+ support per-protocol channels
+In-Reply-To: <1519403030-21189-14-git-send-email-sudeep.holla@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-14-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180305153549.00000f39@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2018 06:24 AM, John Garry wrote:
->>> I am seeing issue(log below) with this patchset on our platfrom.
->>> i have tried using your v2 branch [1]
->>>
->>> root at borg-1>perf_acme>> ./perf --version
->>> perf version 4.16.rc1.g087f7ca
->>> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
->>>
->>> ?Performance counter stats for 'sleep 1':
->>>
->>> ??????????? 23,099????? bus_access_rd
->>>
->>> ?????? 1.000708516 seconds time elapsed
->>>
->>> root at borg-1>perf_acme>> cd -
->>> /ganapat/perf/linux-hisi/tools/perf
->>> root at borg-1>perf>> ./perf --version
->>> perf version 4.16.rc1.gcb5a74
->>> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
->>>
->>> ?Performance counter stats for 'sleep 1':
->>>
->>> ???????????????? 0????? bus_access_rd
->>>
->>> ?????? 1.000709162 seconds time elapsed
->>>
->>> root at borg-1>perf>>
->>>
->>>
->>> [1] https://github.com/hisilicon/linux-hisi.git
->>>
->> Hi,
-> 
-> Hi Will Cohen, Ganapatrao,
-> 
->>
->> I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.? For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.? That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
->>
-> 
-> Thanks for this. I see the problem. At the end I missed bringing across something from v1. Easily fixed.
-> 
->> Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.? This would further reduce the amount of redundant fields between the specific implementations and the common set.
->>
-> 
-> I did consider it and it could work. But it all depends on whether the "EventName" only is always readable/descriptive enough in the JSON, without requiring the "BriefDescription". The "EventName" can be rather succinct for any arch. And we need to guarantee that the "EventName" is unique.
-> 
-> Here's a sample:
-> [
-> ??? {
-> ??????? "ArchStdEvent": "L1D_CACHE_RD",
-> ??? },
-> ??? {
-> ??????? "ArchStdEvent": "L1D_CACHE_WR",
-> ??? },
-> 
-> vs.
-> 
-> [
-> ??? {
-> ??????? "ArchStdEvent": "0x40",
-> ??????? "BriefDescription": "L1D cache access, read"
-> ??? },
-> ??? {
-> ??????? "ArchStdEvent": "0x41",
-> ??????? "BriefDescription": "L1D cache access, write"
-> ??? },
-> 
-> 
-> Opinion?
+On Fri, 23 Feb 2018 16:23:43 +0000
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Hi John,
+> In order to support per-protocol channels if available, we need to
+> factor out all the mailbox channel information(Tx/Rx payload and
+> channel handle) out of the main SCMI instance information structure.
+> 
+> This patch refactors the existing channel information into a separate
+> chan_info structure.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+A little odd to present a series to mainline that does a fairly important
+refactor mid way through.  Why not push this down to the start and always support
+the separate chan_info structure?
 
-The "ArchStdEvent" version is more concise by avoiding the duplication of "BriefDescription" field and possible differences in "BriefDescription" due to typos.  Would it make easier for people coding up descriptions for specific processors?  It would depend on how the documentation is written up.  For the armv8 documentation in "D5.10.3 Common event numbers" list the event mnemonic in "Table D5-8 PMU common architectural and microarchitectural event numbers" so just using the event names seems like it would be pretty clear.  For different Intel ia64 microarchitecture implementations there are different event coding to implement the same event name.  Not sure how would handle the universe of different families of ia64 processor implementations.
-
-Is the armv8-common.json being used as a template that fills out the fields of the json elements that match up an entry in the armv8-common.json? Or does it only use the information from the armv8-common.json.  If the code treated the armv8-common.json as default values, then if something differs in the architecture specific entry it could overwrite the default value from the template.
-
--Will Cohen
+> ---
+>  drivers/firmware/arm_scmi/driver.c | 90 ++++++++++++++++++++++++--------------
+>  1 file changed, 56 insertions(+), 34 deletions(-)
+> 
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> index e6698629e15a..a9e3f4c46b78 100644
+> --- a/drivers/firmware/arm_scmi/driver.c
+> +++ b/drivers/firmware/arm_scmi/driver.c
+> @@ -102,6 +102,22 @@ struct scmi_desc {
+>  };
+>  
+>  /**
+> + * struct scmi_chan_info - Structure representing a SCMI channel informfation
+> + *
+> + * @cl: Mailbox Client
+> + * @chan: Transmit/Receive mailbox channel
+> + * @payload: Transmit/Receive mailbox channel payload area
+> + * @dev: Reference to device in the SCMI hierarchy corresponding to this
+> + *	 channel
+> + */
+> +struct scmi_chan_info {
+> +	struct mbox_client cl;
+> +	struct mbox_chan *chan;
+> +	void __iomem *payload;
+> +	struct device *dev;
+> +};
+> +
+> +/**
+>   * struct scmi_info - Structure representing a  SCMI instance
+>   *
+>   * @dev: Device pointer
+> @@ -109,10 +125,8 @@ struct scmi_desc {
+>   * @handle: Instance of SCMI handle to send to clients
+>   * @version: SCMI revision information containing protocol version,
+>   *	implementation version and (sub-)vendor identification.
+> - * @cl: Mailbox Client
+> - * @tx_chan: Transmit mailbox channel
+> - * @tx_payload: Transmit mailbox channel payload area
+>   * @minfo: Message info
+> + * @tx_cinfo: Reference to SCMI channel information
+>   * @protocols_imp: list of protocols implemented, currently maximum of
+>   *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
+>   * @node: list head
+> @@ -123,16 +137,14 @@ struct scmi_info {
+>  	const struct scmi_desc *desc;
+>  	struct scmi_revision_info version;
+>  	struct scmi_handle handle;
+> -	struct mbox_client cl;
+> -	struct mbox_chan *tx_chan;
+> -	void __iomem *tx_payload;
+>  	struct scmi_xfers_info minfo;
+> +	struct scmi_chan_info *tx_cinfo;
+>  	u8 *protocols_imp;
+>  	struct list_head node;
+>  	int users;
+>  };
+>  
+> -#define client_to_scmi_info(c)	container_of(c, struct scmi_info, cl)
+> +#define client_to_scmi_chan_info(c) container_of(c, struct scmi_chan_info, cl)
+>  #define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
+>  
+>  /*
+> @@ -215,10 +227,11 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
+>  {
+>  	u16 xfer_id;
+>  	struct scmi_xfer *xfer;
+> -	struct scmi_info *info = client_to_scmi_info(cl);
+> +	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
+> +	struct device *dev = cinfo->dev;
+> +	struct scmi_info *info = dev_get_drvdata(dev);
+>  	struct scmi_xfers_info *minfo = &info->minfo;
+> -	struct device *dev = info->dev;
+> -	struct scmi_shared_mem __iomem *mem = info->tx_payload;
+> +	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+>  
+>  	xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
+>  
+> @@ -269,8 +282,8 @@ static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
+>  static void scmi_tx_prepare(struct mbox_client *cl, void *m)
+>  {
+>  	struct scmi_xfer *t = m;
+> -	struct scmi_info *info = client_to_scmi_info(cl);
+> -	struct scmi_shared_mem __iomem *mem = info->tx_payload;
+> +	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
+> +	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+>  
+>  	/* Mark channel busy + clear error */
+>  	iowrite32(0x0, &mem->channel_status);
+> @@ -349,27 +362,27 @@ void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>  }
+>  
+>  static bool
+> -scmi_xfer_poll_done(const struct scmi_info *info, struct scmi_xfer *xfer)
+> +scmi_xfer_poll_done(const struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
+>  {
+> -	struct scmi_shared_mem *mem = info->tx_payload;
+> -	u16 xfer_id = MSG_XTRACT_TOKEN(le32_to_cpu(mem->msg_header));
+> +	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+> +	u16 xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
+>  
+>  	if (xfer->hdr.seq != xfer_id)
+>  		return false;
+>  
+> -	return le32_to_cpu(mem->channel_status) &
+> +	return ioread32(&mem->channel_status) &
+>  		(SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR |
+>  		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
+>  }
+>  
+>  #define SCMI_MAX_POLL_TO_NS	(100 * NSEC_PER_USEC)
+>  
+> -static bool scmi_xfer_done_no_timeout(const struct scmi_info *info,
+> +static bool scmi_xfer_done_no_timeout(const struct scmi_chan_info *cinfo,
+>  				      struct scmi_xfer *xfer, ktime_t stop)
+>  {
+>  	ktime_t __cur = ktime_get();
+>  
+> -	return scmi_xfer_poll_done(info, xfer) || ktime_after(__cur, stop);
+> +	return scmi_xfer_poll_done(cinfo, xfer) || ktime_after(__cur, stop);
+>  }
+>  
+>  /**
+> @@ -388,8 +401,9 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>  	int timeout;
+>  	struct scmi_info *info = handle_to_scmi_info(handle);
+>  	struct device *dev = info->dev;
+> +	struct scmi_chan_info *cinfo = info->tx_cinfo;
+>  
+> -	ret = mbox_send_message(info->tx_chan, xfer);
+> +	ret = mbox_send_message(cinfo->chan, xfer);
+>  	if (ret < 0) {
+>  		dev_dbg(dev, "mbox send fail %d\n", ret);
+>  		return ret;
+> @@ -401,10 +415,10 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>  	if (xfer->hdr.poll_completion) {
+>  		ktime_t stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLL_TO_NS);
+>  
+> -		spin_until_cond(scmi_xfer_done_no_timeout(info, xfer, stop));
+> +		spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer, stop));
+>  
+>  		if (ktime_before(ktime_get(), stop))
+> -			scmi_fetch_response(xfer, info->tx_payload);
+> +			scmi_fetch_response(xfer, cinfo->payload);
+>  		else
+>  			ret = -ETIMEDOUT;
+>  	} else {
+> @@ -426,7 +440,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>  	 * Unfortunately, we have to kick the mailbox framework after we have
+>  	 * received our message.
+>  	 */
+> -	mbox_client_txdone(info->tx_chan, ret);
+> +	mbox_client_txdone(cinfo->chan, ret);
+>  
+>  	return ret;
+>  }
+> @@ -654,11 +668,11 @@ static int scmi_mailbox_check(struct device_node *np)
+>  	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
+>  }
+>  
+> -static int scmi_mbox_free_channel(struct scmi_info *info)
+> +static int scmi_mbox_free_channel(struct scmi_chan_info *cinfo)
+>  {
+> -	if (!IS_ERR_OR_NULL(info->tx_chan)) {
+> -		mbox_free_channel(info->tx_chan);
+> -		info->tx_chan = NULL;
+> +	if (!IS_ERR_OR_NULL(cinfo->chan)) {
+> +		mbox_free_channel(cinfo->chan);
+> +		cinfo->chan = NULL;
+>  	}
+>  
+>  	return 0;
+> @@ -678,7 +692,7 @@ static int scmi_remove(struct platform_device *pdev)
+>  
+>  	if (!ret)
+>  		/* Safe to free channels since no more users */
+> -		return scmi_mbox_free_channel(info);
+> +		return scmi_mbox_free_channel(info->tx_cinfo);
+>  
+>  	return ret;
+>  }
+> @@ -690,9 +704,17 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
+>  	resource_size_t size;
+>  	struct device *dev = info->dev;
+>  	struct device_node *shmem, *np = dev->of_node;
+> +	struct scmi_chan_info *cinfo;
+>  	struct mbox_client *cl;
+>  
+> -	cl = &info->cl;
+> +	cinfo = devm_kzalloc(info->dev, sizeof(*cinfo), GFP_KERNEL);
+> +	if (!cinfo)
+> +		return -ENOMEM;
+> +
+> +	info->tx_cinfo = cinfo;
+> +	cinfo->dev = dev;
+> +
+> +	cl = &cinfo->cl;
+>  	cl->dev = dev;
+>  	cl->rx_callback = scmi_rx_callback;
+>  	cl->tx_prepare = scmi_tx_prepare;
+> @@ -708,16 +730,16 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
+>  	}
+>  
+>  	size = resource_size(&res);
+> -	info->tx_payload = devm_ioremap(dev, res.start, size);
+> -	if (!info->tx_payload) {
+> +	cinfo->payload = devm_ioremap(info->dev, res.start, size);
+> +	if (!cinfo->payload) {
+>  		dev_err(dev, "failed to ioremap SCMI Tx payload\n");
+>  		return -EADDRNOTAVAIL;
+>  	}
+>  
+>  	/* Transmit channel is first entry i.e. index 0 */
+> -	info->tx_chan = mbox_request_channel(cl, 0);
+> -	if (IS_ERR(info->tx_chan)) {
+> -		ret = PTR_ERR(info->tx_chan);
+> +	cinfo->chan = mbox_request_channel(cl, 0);
+> +	if (IS_ERR(cinfo->chan)) {
+> +		ret = PTR_ERR(cinfo->chan);
+>  		if (ret != -EPROBE_DEFER)
+>  			dev_err(dev, "failed to request SCMI Tx mailbox\n");
+>  		return ret;
+> @@ -785,7 +807,7 @@ static int scmi_probe(struct platform_device *pdev)
+>  	ret = scmi_base_protocol_init(handle);
+>  	if (ret) {
+>  		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
+> -		scmi_mbox_free_channel(info);
+> +		scmi_mbox_free_channel(info->tx_cinfo);
+>  		return ret;
+>  	}
+>  
