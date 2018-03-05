@@ -1,68 +1,92 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 5 Mar 2018 15:37:29 +0000
-Subject: [PATCH 1/6] Docs: dt: add fsl-mc iommu-parent device-tree binding
-In-Reply-To: <HE1PR0401MB24254CBDB8B6F537D08B925DE6DA0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1520260166-29387-2-git-send-email-nipun.gupta@nxp.com>
- <5cdeded1-ca3c-339a-bf73-73401e7dd4ed@arm.com>
- <HE1PR0401MB24254CBDB8B6F537D08B925DE6DA0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
-Message-ID: <f382e92a-8ab5-7c93-1f39-fe6797e5c876@arm.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Mon, 5 Mar 2018 10:39:33 -0500
+Subject: [PATCH v2 00/11] perf events patches for improved ARM64 support
+In-Reply-To: <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
+References: <1519401932-205051-1-git-send-email-john.garry@huawei.com>
+ <20180227095028.GG21033@krava>
+ <6250a69e-71ab-5119-cc3f-7e2661aa8c0b@huawei.com>
+ <cafdb160-3072-389b-8c31-93f09eff84a8@redhat.com>
+ <CAKTKpr5FfPWhQsTFjih+dfGXdKqL9-+PMoAPs_d9j5hje7OjVg@mail.gmail.com>
+ <8f72afe5-8620-bdd3-3a54-87a22f77c3d4@redhat.com>
+ <599637d9-0b78-9edb-d459-515f76aca9fe@huawei.com>
+Message-ID: <6564ebca-b87d-f307-72ce-e1c541800e42@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 15:00, Nipun Gupta wrote:
+On 03/05/2018 06:24 AM, John Garry wrote:
+>>> I am seeing issue(log below) with this patchset on our platfrom.
+>>> i have tried using your v2 branch [1]
+>>>
+>>> root at borg-1>perf_acme>> ./perf --version
+>>> perf version 4.16.rc1.g087f7ca
+>>> root at borg-1>perf_acme>> ./perf stat -e bus_access_rd sleep 1
+>>>
+>>> ?Performance counter stats for 'sleep 1':
+>>>
+>>> ??????????? 23,099????? bus_access_rd
+>>>
+>>> ?????? 1.000708516 seconds time elapsed
+>>>
+>>> root at borg-1>perf_acme>> cd -
+>>> /ganapat/perf/linux-hisi/tools/perf
+>>> root at borg-1>perf>> ./perf --version
+>>> perf version 4.16.rc1.gcb5a74
+>>> root at borg-1>perf>> ./perf stat -e bus_access_rd sleep 1
+>>>
+>>> ?Performance counter stats for 'sleep 1':
+>>>
+>>> ???????????????? 0????? bus_access_rd
+>>>
+>>> ?????? 1.000709162 seconds time elapsed
+>>>
+>>> root at borg-1>perf>>
+>>>
+>>>
+>>> [1] https://github.com/hisilicon/linux-hisi.git
+>>>
+>> Hi,
 > 
+> Hi Will Cohen, Ganapatrao,
 > 
->> -----Original Message-----
->> From: Robin Murphy [mailto:robin.murphy at arm.com]
->> Sent: Monday, March 05, 2018 20:23
->> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com;
->> mark.rutland at arm.com; catalin.marinas at arm.com
->> Cc: iommu at lists.linux-foundation.org; robh+dt at kernel.org; hch at lst.de;
->> m.szyprowski at samsung.com; gregkh at linuxfoundation.org; joro at 8bytes.org;
->> Leo Li <leoyang.li@nxp.com>; shawnguo at kernel.org; linux-
->> kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; Bharat Bhushan
->> <bharat.bhushan@nxp.com>; stuyoder at gmail.com; Laurentiu Tudor
->> <laurentiu.tudor@nxp.com>
->> Subject: Re: [PATCH 1/6] Docs: dt: add fsl-mc iommu-parent device-tree binding
 >>
->> On 05/03/18 14:29, Nipun Gupta wrote:
->>> The existing IOMMU bindings cannot be used to specify the relationship
->>> between fsl-mc devices and IOMMUs. This patch adds a binding for
->>> mapping fsl-mc devices to IOMMUs, using a new iommu-parent property.
+>> I took a slightly different tack and compared the output of "perf list --details" to see if the event numbers numbers were the same.? For the common events borrowed from the armv8-recommended.json all the events are 0 for the cortex a53.? That would explain why the bus_access_rd above were counts were different if it was counting the SW_INCR event instead of bus_access_rd.
 >>
->> Given that allowing "msi-parent" for #msi-cells > 1 is merely a
->> backward-compatibility bodge full of hard-coded assumptions, why would
->> we want to knowingly introduce a similarly unpleasant equivalent for
->> IOMMUs? What's wrong with "iommu-map"?
 > 
-> Hi Robin,
+> Thanks for this. I see the problem. At the end I missed bringing across something from v1. Easily fixed.
 > 
-> With 'msi-parent' the property is fixed up to have msi-map. In this case there is
-> no fixup required and simple 'iommu-parent' property can be used, with MC bus
-> itself providing the stream-id's (in the code execution via FW).
+>> Why not key the matching of common events off the "EventName" rather than "EventCode"? The EventName would be more descriptive. Then the json files could eliminate the "BriefDescription" and just have the EventName with nothing else for each event.? This would further reduce the amount of redundant fields between the specific implementations and the common set.
+>>
 > 
-> We can also use the iommu-map property similar to PCI, which will require u-boot
-> fixup. But then it leads to little bit complications of u-boot - kernel compatibility.
+> I did consider it and it could work. But it all depends on whether the "EventName" only is always readable/descriptive enough in the JSON, without requiring the "BriefDescription". The "EventName" can be rather succinct for any arch. And we need to guarantee that the "EventName" is unique.
+> 
+> Here's a sample:
+> [
+> ??? {
+> ??????? "ArchStdEvent": "L1D_CACHE_RD",
+> ??? },
+> ??? {
+> ??????? "ArchStdEvent": "L1D_CACHE_WR",
+> ??? },
+> 
+> vs.
+> 
+> [
+> ??? {
+> ??????? "ArchStdEvent": "0x40",
+> ??????? "BriefDescription": "L1D cache access, read"
+> ??? },
+> ??? {
+> ??????? "ArchStdEvent": "0x41",
+> ??????? "BriefDescription": "L1D cache access, write"
+> ??? },
+> 
+> 
+> Opinion?
 
-What needs fixing up? With a stream-map-mask in place to ignore the 
-upper Stream ID bits, you just need:
+Hi John,
 
-	iommu-map = <0 &smmu 0 0x80>;
+The "ArchStdEvent" version is more concise by avoiding the duplication of "BriefDescription" field and possible differences in "BriefDescription" due to typos.  Would it make easier for people coding up descriptions for specific processors?  It would depend on how the documentation is written up.  For the armv8 documentation in "D5.10.3 Common event numbers" list the event mnemonic in "Table D5-8 PMU common architectural and microarchitectural event numbers" so just using the event names seems like it would be pretty clear.  For different Intel ia64 microarchitecture implementations there are different event coding to implement the same event name.  Not sure how would handle the universe of different families of ia64 processor implementations.
 
-to say that the lower bits of the ICID value map directly to the lower 
-bits of the Stream ID value - that's the same fixed property of the 
-hardware that you're wanting to assume in iommu-parent.
+Is the armv8-common.json being used as a template that fills out the fields of the json elements that match up an entry in the armv8-common.json? Or does it only use the information from the armv8-common.json.  If the code treated the armv8-common.json as default values, then if something differs in the architecture specific entry it could overwrite the default value from the template.
 
-> If you suggest we can re-use the iommu-map property. What is your opinion?
-
-I think it makes a lot more sense to directly use the property which 
-already exists, than to introduce a new one to merely assume one 
-hard-coded value of the existing one. Extending msi-parent to msi-map 
-was a case of "oops, it turns out we need more flexibility here"; for 
-the case of iommu-map I can't imagine any justification for saying 
-"oops, we need less flexibility here" (saving 9 whole bytes in the DT 
-really is irrelevant).
-
-Robin.
+-Will Cohen
