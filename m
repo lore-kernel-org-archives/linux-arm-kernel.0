@@ -1,51 +1,128 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 5 Mar 2018 13:54:27 -0600
-Subject: [PATCH V2] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
-References: <1519942514-3350-1-git-send-email-fkan@apm.com>
- <CAJZ5v0gncVMpQCc=kvuSdyy-+zPrdYOiA=pA54d538zTDz6rEA@mail.gmail.com>
-Message-ID: <d24a66fa-de5c-ba02-dafb-ee554a3032a8@ti.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Mon, 05 Mar 2018 15:10:43 -0500
+Subject: [RFC V2 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <20180305190937.GA31349@krava>
+References: <1520034092-35275-1-git-send-email-agustinv@codeaurora.org>
+ <1520034092-35275-2-git-send-email-agustinv@codeaurora.org>
+ <20180303143436.GA14563@krava> <20180304171245.GB25017@tassilo.jf.intel.com>
+ <20180304181010.GA7030@krava>
+ <1ddac3f4900267b0c9a69ef4c598be51@codeaurora.org>
+ <20180305190937.GA31349@krava>
+Message-ID: <94ecc9b1337d15fe4634da56cb428738@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/02/2018 03:11 AM, Rafael J. Wysocki wrote:
-> [+Greg]
+On 2018-03-05 14:09, Jiri Olsa wrote:
+> On Mon, Mar 05, 2018 at 10:08:18AM -0500, Agustin Vega-Frias wrote:
+>> On 2018-03-04 13:10, Jiri Olsa wrote:
+>> > On Sun, Mar 04, 2018 at 09:12:45AM -0800, Andi Kleen wrote:
+>> > > > > +#include <fnmatch.h>
+>> > > > >  #include <linux/compiler.h>
+>> > > > >  #include <linux/list.h>
+>> > > > >  #include <linux/types.h>
+>> > > > > @@ -241,7 +242,7 @@ PE_NAME opt_event_config
+>> > > > >  			if (!strncmp(name, "uncore_", 7) &&
+>> > > > >  			    strncmp($1, "uncore_", 7))
+>> > > > >  				name += 7;
+>> > > > > -			if (!strncmp($1, name, strlen($1))) {
+>> > > > > +			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
+>> > > >
+>> > > > could we now get rid of the strncmp in here and keep the
+>> > > > glob matching only?
+>> > >
+>> > > That would break existing command lines. Not a good idea.
+>> >
+>> > I hoped that only you guys are using this and would rewrite your scripts
+>> > ;-)
+>> >
+>> > I had no idea there's fnmatch func before.. too bad, ok
+>> >
+>> > jirka
+>> 
+>> An option to keep backward compatibility and consistency would be
+>> to wrap the pattern/string passed in *'s, that way we can just use
+>> fnmatch and have all the examples Jiri brought up work the same.
+>> With that in place we can actually also drop the explicit ignoring
+>> of the uncore_ prefix since the globbing would take care of that.
 > 
-> On Thu, Mar 1, 2018 at 11:15 PM, Feng Kan <fkan@apm.com> wrote:
->> When bridge and its endpoint is enumerated the devices are added to the
->> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
->> This causes the bridge to be moved to the end of the dpm list when
->> deferred probe kicks in. The order of the dpm list for bridge and
->> endpoint is reversed.
->>
->> Add reordering code to move the bridge and its children and consumers to
->> the end of the pm list so the order for suspend and resume is not altered.
->> The code also move device and its children and consumers to the tail of
->> device_kset list if it is registered.
+> I don't mind the strcmp as such, I wanted to get rid of the wildcard
+> matching without using '*' ... but as Andi said it's been out
+> there and it's been a while, so let's keep it
 > 
-> I assume that this has been tested and works as expected.
+> but if there's a way to make it simpler, let's go for it
+> 
+> thanks,
+> jirka
 
-isn't it the same as https://lkml.org/lkml/2015/9/10/248? (in general)
+Sounds good. I have a new version ready (see sample output below).
+But I wanted to ping about the other two patches before submitting.
+Any feedback on those?
 
-And wouldn't device links solve the issue?
+Thanks,
+Agust?n
 
-commit 9ed9895370aedd6032af2a9181c62c394d08223b
-Author: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Date:   Sun Oct 30 17:32:16 2016 +0100
+PS:
+Sample output:
 
-    driver core: Functional dependencies tracking support
+$ ./perf stat -a -e imc/umask=0x3,event=0x4/ --no-merge ls -l > 
+/dev/null
 
-    Currently, there is a problem with taking functional dependencies
-    between devices into account.
+  Performance counter stats for 'system wide':
 
-My understanding of device links is that they were introduced exactly to fix
-such kind of issues and explicitly define dependencies between devices in code.
+              2,613      uncore_imc_0/umask=0x3,event=0x4/
+              2,736      uncore_imc_1/umask=0x3,event=0x4/
+              2,671      uncore_imc_2/umask=0x3,event=0x4/
+              2,508      uncore_imc_3/umask=0x3,event=0x4/
+              2,439      uncore_imc_4/umask=0x3,event=0x4/
+              2,465      uncore_imc_5/umask=0x3,event=0x4/
 
-But, I could be missing smth... sry if this is the case.
+        0.004159243 seconds time elapsed
+
+$ ./perf stat -a -e *imc/umask=0x3,event=0x4/ --no-merge ls -l > 
+/dev/null
+
+  Performance counter stats for 'system wide':
+
+              2,704      uncore_imc_0/umask=0x3,event=0x4/
+              2,601      uncore_imc_1/umask=0x3,event=0x4/
+              2,625      uncore_imc_2/umask=0x3,event=0x4/
+              2,370      uncore_imc_3/umask=0x3,event=0x4/
+              2,485      uncore_imc_4/umask=0x3,event=0x4/
+              2,431      uncore_imc_5/umask=0x3,event=0x4/
+
+        0.002716763 seconds time elapsed
+
+$ ./perf stat -a -e imc*/umask=0x3,event=0x4/ --no-merge ls -l > 
+/dev/null
+
+  Performance counter stats for 'system wide':
+
+              1,294      uncore_imc_0/umask=0x3,event=0x4/
+              1,303      uncore_imc_1/umask=0x3,event=0x4/
+              1,242      uncore_imc_2/umask=0x3,event=0x4/
+              1,125      uncore_imc_3/umask=0x3,event=0x4/
+              1,137      uncore_imc_4/umask=0x3,event=0x4/
+              1,159      uncore_imc_5/umask=0x3,event=0x4/
+
+        0.002790441 seconds time elapsed
+
+$ ./perf stat -a -e *imc*/umask=0x3,event=0x4/ --no-merge ls -l > 
+/dev/null
+
+  Performance counter stats for 'system wide':
+
+              1,524      uncore_imc_0/umask=0x3,event=0x4/
+              1,508      uncore_imc_1/umask=0x3,event=0x4/
+              1,501      uncore_imc_2/umask=0x3,event=0x4/
+              1,405      uncore_imc_3/umask=0x3,event=0x4/
+              1,427      uncore_imc_4/umask=0x3,event=0x4/
+              1,450      uncore_imc_5/umask=0x3,event=0x4/
+
+        0.002720907 seconds time elapsed
 
 -- 
-regards,
--grygorii
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
