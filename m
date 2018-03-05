@@ -1,72 +1,39 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon,  5 Mar 2018 11:25:19 +0100
-Subject: [PATCH v6 2/6] ARM: imx6: register pm_power_off handler if "fsl,
- pmic-stby-poweroff" is set
-In-Reply-To: <20180305102524.5905-1-o.rempel@pengutronix.de>
-References: <20180305102524.5905-1-o.rempel@pengutronix.de>
-Message-ID: <20180305102524.5905-3-o.rempel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Mar 2018 10:26:56 +0000
+Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
+ CONFIG_RANDOMIZE_BASE=y
+In-Reply-To: <CAKv+Gu_k6Dat=5oo3gYLR0E19YfDSjTFYs2vfzqBdx55rm4oFA@mail.gmail.com>
+References: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu_k6Dat=5oo3gYLR0E19YfDSjTFYs2vfzqBdx55rm4oFA@mail.gmail.com>
+Message-ID: <20180305102656.GC8571@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the Freescale recommended sequences for power off with external
-PMIC is the following:
-...
-3.  SoC is programming PMIC for power off when standby is asserted.
-4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
+On Mon, Mar 05, 2018 at 10:15:29AM +0000, Ard Biesheuvel wrote:
+> On 5 March 2018 at 10:08, Will Deacon <will.deacon@arm.com> wrote:
+> > TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
+> > memory accesses (e.g. speculative accesses from a first-fault gather load)
+> > which translate via TTBR1_EL1 result in a translation fault if they
+> > miss in the TLB when executed from EL0. This mitigates some timing attacks
+> > against KASLR, where the kernel address space could otherwise be probed
+> > efficiently using the FFR in conjunction with suppressed faults on SVE
+> > loads.
+> >
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Dave Martin <Dave.Martin@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >
+> > Sending as RFC because this doesn't make any difference if kpti is enabled,
+> > which is the default with KASLR. It helps if kpti=off is being passed and
+> > shouldn't have an impact on performance.
+> >
+> 
+> This just makes it harder/slower to probe the kernel address space
+> using SVE instructions, right?
 
-See:
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-page 5083
+Yeah, basically, but given that kpti should make any walks via ttbr1 from
+EL0 timing invariant, it doesn't make a whole lot of difference in
+conjunction with that.
 
-This patch implements step 4. of this sequence.
-
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index ecdf071653d4..24689260a2a5 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -604,6 +604,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
- 				   IMX6Q_GPR1_GINT);
- }
- 
-+static void imx6_pm_stby_poweroff(void)
-+{
-+	imx6_set_lpm(STOP_POWER_OFF);
-+	cpu_suspend(0, imx6q_suspend_finish);
-+
-+	mdelay(1000);
-+
-+	pr_emerg("Unable to poweroff system\n");
-+}
-+
-+static int imx6_pm_stby_poweroff_probe(void)
-+{
-+	if (pm_power_off) {
-+		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
-+			__func__, pm_power_off, pm_power_off);
-+		return -EBUSY;
-+	}
-+
-+	pm_power_off = imx6_pm_stby_poweroff;
-+	return 0;
-+}
-+
- void __init imx6_pm_ccm_init(const char *ccm_compat)
- {
- 	struct device_node *np;
-@@ -620,6 +642,9 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
- 	val = readl_relaxed(ccm_base + CLPCR);
- 	val &= ~BM_CLPCR_LPM;
- 	writel_relaxed(val, ccm_base + CLPCR);
-+
-+	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
-+		imx6_pm_stby_poweroff_probe();
- }
- 
- void __init imx6q_pm_init(void)
--- 
-2.16.1
+Will
