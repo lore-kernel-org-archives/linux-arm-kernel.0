@@ -1,137 +1,81 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Mon, 5 Mar 2018 09:23:08 +0800
-Subject: [PATCH v2 4/4] pintcrl: support bias-disable of generic and
- special pins simultaneously
-In-Reply-To: <1519890183.8089.114.camel@mtkswgap22>
-References: <1519634042-12063-1-git-send-email-zhiyong.tao@mediatek.com>
- <1519634042-12063-5-git-send-email-zhiyong.tao@mediatek.com>
- <1519803217.8089.31.camel@mtkswgap22> <1519804157.23198.9.camel@mhfsdcap03>
- <1519876072.23198.17.camel@mhfsdcap03>
- <1519890183.8089.114.camel@mtkswgap22>
-Message-ID: <1520212988.23198.22.camel@mhfsdcap03>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 5 Mar 2018 10:36:07 +0800
+Subject: [PATCH 0/7] kexec_file: refactoring for other architecutres
+In-Reply-To: <20180302055609.GA15422@dhcp-128-65.nay.redhat.com>
+References: <20180227044814.24808-1-takahiro.akashi@linaro.org>
+ <20180302055609.GA15422@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180305023607.GA4185@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-03-01 at 15:43 +0800, Sean Wang wrote:
-> On Thu, 2018-03-01 at 11:47 +0800, Zhiyong Tao wrote:
-> > On Wed, 2018-02-28 at 15:49 +0800, Zhiyong Tao wrote:
-> > > On Wed, 2018-02-28 at 15:33 +0800, Sean Wang wrote:
-> > > > On Mon, 2018-02-26 at 16:34 +0800, Zhiyong Tao wrote:
-> > > > > For generic pins, parameter "arg" is 0 or 1.
-> > > > > For special pins, bias-disable is set by R0R1,
-> > > > > so we need transmited "00" to set bias-disable
-> > > > > When we set "bias-disable" as high-z property,
-> > > > > the parameter should be "MTK_PUPD_SET_R1R0_00".
-> > > > > 
-> > > > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > > > > ---
-> > > > >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 13 +++++++++++--
-> > > > >  1 file changed, 11 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > > > index 3cf384f..e88ba04 100644
-> > > > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > > > > @@ -301,8 +301,17 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
-> > > > >  	 * resistor bit, so we need this special handle.
-> > > > >  	 */
-> > > > >  	if (pctl->devdata->spec_pull_set) {
-> > > > > -		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> > > > > -			pin, pctl->devdata->port_align, isup, arg);
-> > > > > +		if (enable) {
-> > > > > +			ret = pctl->devdata->spec_pull_set(
-> > > > > +				mtk_get_regmap(pctl, pin), pin,
-> > > > > +				pctl->devdata->port_align, isup,
-> > > > > +				arg);
-> > > > > +		} else {
-> > > > > +			ret = pctl->devdata->spec_pull_set(
-> > > > > +				mtk_get_regmap(pctl, pin), pin,
-> > > > > +				pctl->devdata->port_align, isup,
-> > > > > +				MTK_PUPD_SET_R1R0_00);
-> > > > > +		}
-> > > > 
-> > > > 
-> > > > it looks like you can use as following snippet with reusing original
-> > > > logic and less effort on maintaining these common code (?)
-> > > ==> Thanks for your suggestion very much. It seems better.
-> > > I will change it in v3.
+On 03/02/18 at 01:56pm, Dave Young wrote:
+> Hi AKASHI,
+> On 02/27/18 at 01:48pm, AKASHI Takahiro wrote:
+> > subject: 
 > > 
-> > ==>
-> >  Hi sean,
+> > This is a preparatory patch set for adding kexec_file support on arm64.
 > > 
-> > we try it in our site. we can't change like this.
-> > Because we will check "arg" after setting "arg = MTK_PUPD_SET_R1R0_00;".
-> > following snippet which check "arg" value is o or 1. If it not, which
-> > will print error. so we can't change like this.
-> > /* For generic pull config, default arg value should be 0 or 1. */
-> > if (arg != 0 && arg != 1) {
-> > 	dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n", arg,
-> > pin);
-> > 	return -EINVAL;
-> > }
+> > It was originally included in a arm64 patch set[1], but Philipp is also
+> > working on their kexec_file support on s390[2] and some changes are now
+> > conflicting.
 > > 
-> > Thanks.
+> > So these common part was extracted and put into a separate patch set for
+> > better integration. What's more, my original patch#4 was split into a few
+> > small chunks for easier review after Dave's comment.
+> > 
+> > As such, the resulting code is basically identical with my original, and
+> > the only difference is that kexec_file_loaders[] is now declared in kexec.h
+> > after Phillipp's comment[3]. Other than that, this patch set doesn't
+> > require any changes on the rest of my original patch set(#1, #6 to #13).
+> > 
+> > Patch#1 allows making a use of purgatory optional, particularly useful
+> > for arm64.
+> > Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
+> > verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
+> > Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
+> > exclude_mem_range(), to be made best re-use of.
+> > 
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
+> > [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
+> > [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/562041.html
+> > 
+> > AKASHI Takahiro (7):
+> >   kexec_file: make an use of purgatory optional
+> >   kexec_file,x86,powerpc: factor out kexec_file_ops functions
+> >   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
+> >   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
+> >   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
+> >   x86: kexec_file: clean up prepare_elf64_headers()
+> >   kexec_file, x86: move re-factored code to generic side
+> > 
+> >  arch/powerpc/Kconfig                        |   3 +
+> >  arch/powerpc/include/asm/kexec.h            |   2 +-
+> >  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
+> >  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
+> >  arch/x86/Kconfig                            |   3 +
+> >  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
+> >  arch/x86/kernel/crash.c                     | 332 +++++-----------------------
+> >  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
+> >  arch/x86/kernel/machine_kexec_64.c          |  45 +---
+> >  include/linux/kexec.h                       |  36 ++-
+> >  kernel/kexec_file.c                         | 236 +++++++++++++++++++-
+> >  11 files changed, 336 insertions(+), 366 deletions(-)
+> > 
+> > -- 
+> > 2.16.2
+> > 
 > 
-> why not rewrite it with
+> Reviewed them with eyes and provided some comments, but since it changed
+> the elf header code, I would like to do some basic vmcore related test
+> with crash tools.  Will response later.
 
-==> Hi sean,
-Thanks for your comments, we will try to do it. If it is ok, we will
-modify it in v3.
-> 
-> @@ -301,8 +301,10 @@ static int mtk_pconf_set_pull_select(struct
-> mtk_pinctrl *pctl,
->          * resistor bit, so we need this special handle.
->          */
->         if (pctl->devdata->spec_pull_set) {
-> +               unsigned int r1r0 = enable ? arg : MTK_PUPD_SET_R1R0_00;
-> +
->                 ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl,
-> pin),
-> -                       pin, pctl->devdata->port_align, isup, arg);
-> +                       pin, pctl->devdata->port_align, isup, r1r0);
->                 if (!ret)
->                         return 0;
->         }
-> 
-> and also I appeared to find another bug in the original code when I had
-> a close look at the code path, but it's not related to the patch: 
-> 
-> a special pin would still go through the code path to handle
-> generic pin when the special pin uses an invalid argument.
-> 
-> It looks like err-code from pctl->devdata->spec_pull_set cannot be
-> used directly to judge its pin type. It's also possible to use it as an
-> indication of the real failure during special pin is being set up.
-> 
-==>Hi sean,
+Followup: I did some basic testing, did not find problems.
 
-The function seems ok. it is not related to the patch. We will think
-about your comment. If there is better idea to modify the code flow. We
-will change it in another patch.
+> 
+> Overall the cleanups looks good, thank you a lot for the cleanups!
+> 
+> Thanks
+> Dave
 
-Thanks.
-> > > > 
-> > > > 
-> > > > if (pctl->devdata->spec_pull_set) {
-> > > > 	+ if (!enable)
-> > > > 	+ 	arg = MTK_PUPD_SET_R1R0_00;
-> > > > 
-> > > > 	ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> > > > 		pin, pctl->devdata->port_align, isup, arg);
-> > > > 
-> > > > 
-> > > > Also, it's better to add more comments to such kind of special path for
-> > > > allowing future SoCs to follow and extend more easily.
-> > > 
-> > > ==> Thanks for your suggestion very much. I will add more comments here.
-> > > > 
-> > > > >  		if (!ret)
-> > > > >  			return 0;
-> > > > >  	}
-> > > > 
-> > > > 
-> > > 
-> > 
-> > 
-> 
-> 
+Thanks
+Dave
