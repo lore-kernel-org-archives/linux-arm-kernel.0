@@ -1,43 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 5 Mar 2018 12:18:16 +0100
-Subject: [GIT PULL] STM32 defconfig changes for v4.17 #1
-Message-ID: <04188a3b-6432-3e2e-8e4a-fb5522a1c8aa@st.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Mon, 5 Mar 2018 20:18:24 +0900
+Subject: [PATCH v2 2/2] arm: Kconfig: Add ARCH_HAS_FORTIFY_SOURCE
+Message-ID: <20180305111824.GA4216@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+CONFIG_FORTIFY_SOURCE detects various overflows at compile-time.
+(6974f0c4555e ("include/linux/string.h:
+add the option of fortified string.h functions)
 
-Please consider this first round of STM32 defconfig updates for v4.17:
+ARCH_HAS_FORTIFY_SOURCE means that the architecture can be built and
+run with CONFIG_FORTIFY_SOURCE.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+Since ARM can be built and run with that flag like other architectures,
+select ARCH_HAS_FORTIFY_SOURCE as default.
 
-   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Acked-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+v2: Add fortify_panic() in arch/arm/boot/compressed/misc.c,
+    Because there will be a build error if without that function.
+---
+ arch/arm/Kconfig                | 1 +
+ arch/arm/boot/compressed/misc.c | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-defconfig-for-v4.17-1
-
-for you to fetch changes up to 1c92d4a0edcfff0fee78ade27eb41ce3fc0d071a:
-
-   ARM: configs: stm32: Enable MMC_ARMMMCI and EXT3_FS support 
-(2018-02-27 11:00:49 +0100)
-
-----------------------------------------------------------------
-STM32 defconfig updates for v4.17, round 1
-
-Highlights:
-----------
-  -Add STM32 support (for MPU) to multi-v7-defconfig
-  -Enable MMCI and EXT3_FS support
-
-----------------------------------------------------------------
-Ludovic Barre (1):
-       ARM: configs: multi_v7: add stm32 support
-
-Patrice Chotard (1):
-       ARM: configs: stm32: Enable MMC_ARMMMCI and EXT3_FS support
-
-  arch/arm/configs/multi_v7_defconfig | 3 +++
-  arch/arm/configs/stm32_defconfig    | 3 +++
-  2 files changed, 6 insertions(+)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e3d535..3765336 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -7,6 +7,7 @@ config ARM
+ 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
++	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 16a8a80..4a247ac 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -167,3 +167,8 @@ void __stack_chk_fail(void)
+ 	else
+ 		putstr(" done, booting the kernel.\n");
+ }
++
++void fortify_panic(const char *name)
++{
++	error("detected buffer overflow");
++}
+-- 
+1.9.1
