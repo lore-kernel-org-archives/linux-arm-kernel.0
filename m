@@ -1,140 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 05 Mar 2018 12:08:12 +0200
-Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
-In-Reply-To: <20180305085841.GF22212@phenom.ffwll.local>
-References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
- <20180221130757.al7i57kiptrqh4j2@flea.lan>
- <20180305085841.GF22212@phenom.ffwll.local>
-Message-ID: <16735594.PliY9Ubb24@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  5 Mar 2018 10:08:48 +0000
+Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
+ CONFIG_RANDOMIZE_BASE=y
+Message-ID: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
+memory accesses (e.g. speculative accesses from a first-fault gather load)
+which translate via TTBR1_EL1 result in a translation fault if they
+miss in the TLB when executed from EL0. This mitigates some timing attacks
+against KASLR, where the kernel address space could otherwise be probed
+efficiently using the FFR in conjunction with suppressed faults on SVE
+loads.
 
-On Monday, 5 March 2018 10:58:41 EET Daniel Vetter wrote:
-> On Wed, Feb 21, 2018 at 02:07:57PM +0100, Maxime Ripard wrote:
-> > On Mon, Feb 19, 2018 at 10:58:40PM +0100, Daniel Vetter wrote:
-> >> On Mon, Feb 19, 2018 at 9:19 PM, Laurent Pinchart wrote:
-> >>> On Friday, 16 February 2018 20:20:41 EET Ville Syrj?l? wrote:
-> >>>> On Fri, Feb 16, 2018 at 06:39:29PM +0100, Maxime Ripard wrote:
-> >>>>> Some drivers duplicate the logic to create a property to store a
-> >>>>> per-plane alpha.
-> >>>>> 
-> >>>>> This is especially useful if we ever want to support extra
-> >>>>> protocols for Wayland like:
-> >>>>> https://lists.freedesktop.org/archives/wayland-devel/2017-August/03
-> >>>>> 4741.html
-> >>>>> 
-> >>>>> Let's create a helper in order to move that to the core.
-> >>>>> 
-> >>>>> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >>>>> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> >>>>> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> >>>>> ---
-> >>>>> 
-> >>>>>  Documentation/gpu/kms-properties.csv |  2 +-
-> >>>>>  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
-> >>>>>  drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
-> >>>>>  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++-
-> >>>>>  include/drm/drm_blend.h              |  1 +-
-> >>>>>  include/drm/drm_plane.h              |  6 +++++-
-> >>>>>  6 files changed, 48 insertions(+), 1 deletion(-)
-> >>>>> 
-> >>>>> diff --git a/Documentation/gpu/kms-properties.csv
-> >>>>> b/Documentation/gpu/kms-properties.csv index
-> >>>>> 927b65e14219..25ad3503d663
-> >>>>> 100644
-> >>>>> --- a/Documentation/gpu/kms-properties.csv
-> >>>>> +++ b/Documentation/gpu/kms-properties.csv
-> >>>>> @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0,
-> >>>>> Max=1",Connector,TBD>
-> >>>>> 
-> >>>>>  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
-> >>>>>  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
-> >>>>>  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
-> >>>>> 
-> >>>>> -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
-> >>>>> +,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of
-> >>>>> the plane from transparent (0) to fully opaque (MAX). If this
-> >>>>> property is set to a value different than max, and that the pixel
-> >>>>> will define an alpha component, the property will have precendance
-> >>>>> and the pixel value will be ignored.
-> >> 
-> >> Please don't document new properties in that csv file, it's an
-> >> unreadable mess. Instead follow how we document standardized
-> >> properties nowadays in full-blown sections. For plane blending we
-> >> have:
-> >> 
-> >> https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#plane-composition-> >> properties
-> > 
-> > Ack
-> > 
-> >>>>> diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
-> >>>>> index 8185e3468a23..5a6f29524f12 100644
-> >>>>> --- a/include/drm/drm_plane.h
-> >>>>> +++ b/include/drm/drm_plane.h
-> >>>>> @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
-> >>>>>   * plane (in 16.16)
-> >>>>>   * @src_w: width of visible portion of plane (in 16.16)
-> >>>>>   * @src_h: height of visible portion of plane (in 16.16)
-> >>>>> + * @alpha: opacity of the plane
-> >>>>>   * @rotation: rotation of the plane
-> >>>>>   * @zpos: priority of the given plane on crtc (optional)
-> >>>>>   * Note that multiple active planes on the same crtc can have an
-> >>>>>   identical
-> >>>>> @@ -105,6 +106,9 @@ struct drm_plane_state {
-> >>>>>     uint32_t src_x, src_y;
-> >>>>>     uint32_t src_h, src_w;
-> >>>>> 
-> >>>>> +   /* Plane opacity */
-> >>>>> +   u8 alpha;
-> >>>> 
-> >>>> We may want to make that u16. The general we expect 16bpc for most
-> >>>> color related things, but since this is a range prop I suppose we
-> >>>> should just expose the actual hardware range. But making it u16 might
-> >>>> avoid some head scratching for the first person to have hardware with
-> >>>> higher precision. Either that or we should make the prop creation
-> >>>> fail if the driver asks for more bits than we have in the state.
-> >>> 
-> >>> I'm tempted to go one step further and always make the alpha property
-> >>> 16-bits wide for new users (we can't do so for existing users as it
-> >>> could break userspace), and let drivers convert that internally to
-> >>> the range they need. There could however be drawbacks I don't
-> >>> foresee.
-> >> 
-> >> I think scaling the range to match the hw is the most sensible (yes
-> >> I'm flip-flopping around here). And once someone needs more than u8,
-> >> we can extend the internal representation easily. The external
-> >> representation in the property is an u64, that /should/ be enough for
-> >> the next few years :-)
-> > 
-> > Just to make sure we're on the same page, you want to keep the u8, and
-> > if the hardware uses say an u16, the driver for that hardware will do
-> > the upscaling?
-> 
-> The idea is that we'd set the u16 limit in the property and so inform
-> userspace that a different range applies. But that's probably going to be
-> ignored.
-> 
-> Could we do the property itself as u16 range, and (for now, only
-> internally in drm in drm_plane_state) throw the lower u8 bits away? Or
-> just let drivers do this.
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-I'm fine with this except for the drivers that currently implement the alpha 
-property with a different range. The rcar-du driver for instances has the 
-alpha range set to 0x00 to 0xff, so we can't change it without risk of 
-breaking userspace. I don't know whether there's any userspace using the 
-property, and whether that userspace has any hardcoded assumption.
+Sending as RFC because this doesn't make any difference if kpti is enabled,
+which is the default with KASLR. It helps if kpti=off is being passed and
+shouldn't have an impact on performance.
 
-> Sorry that I'm flip-flopping around on this, but we just have an ongoing
-> discussion about a range/size mixup in the CTM uapi, I think assuming that
-> all userspace will correctly scale is not realistic. So larger scale in
-> the uapi (but maybe not internally) from the start seems like a good idea.
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ arch/arm64/mm/proc.S                   | 9 ++++++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Can we make the range randomly chosen at every boot then ? :-) That would 
-force userspace to be generic.
-
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index cdfe3e657a9e..fd208eac9f2a 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -291,6 +291,7 @@
+ #define TCR_TBI0		(UL(1) << 37)
+ #define TCR_HA			(UL(1) << 39)
+ #define TCR_HD			(UL(1) << 40)
++#define TCR_NFD1		(UL(1) << 54)
+ 
+ /*
+  * TTBR.
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c0af47617299..8f074d64b760 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -36,6 +36,12 @@
+ #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
+ #endif
+ 
++#ifdef CONFIG_RANDOMIZE_BASE
++#define TCR_KASLR_FLAGS	TCR_NFD1
++#else
++#define TCR_KASLR_FLAGS	0
++#endif
++
+ #define TCR_SMP_FLAGS	TCR_SHARED
+ 
+ /* PTWs cacheable, inner/outer WBWA */
+@@ -432,7 +438,8 @@ ENTRY(__cpu_setup)
+ 	 * both user and kernel.
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+-			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
++			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
++			TCR_TBI0 | TCR_A1
+ 	tcr_set_idmap_t0sz	x10, x9
+ 
+ 	/*
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.4
