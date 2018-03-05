@@ -1,123 +1,94 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 5 Mar 2018 16:05:51 +0000
-Subject: [PATCH] drm/bridge: sii902x: Retry status read after DDI I2C
-In-Reply-To: <20180305101702.13441-1-linus.walleij@linaro.org>
-References: <20180305101702.13441-1-linus.walleij@linaro.org>
-Message-ID: <20180305160551.GD16053@e110455-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Mar 2018 16:09:30 +0000
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: increase speed of i2c0
+ to 400kHz
+In-Reply-To: <87d10i5xqx.fsf@bootlin.com>
+References: <20180227160135.GU9418@n2100.armlinux.org.uk>
+ <E1eqhhV-0004ku-Nd@rmk-PC.armlinux.org.uk>
+ <87d10i5xqx.fsf@bootlin.com>
+Message-ID: <20180305160929.GG9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 11:17:02AM +0100, Linus Walleij wrote:
-> The following happens when connection a DVI output driven
-> from the SiI9022 using a DVI-to-VGA adapter plug:
+On Mon, Mar 05, 2018 at 04:48:54PM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+>  
+>  On mar., f?vr. 27 2018, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 > 
-> i2c i2c-0: sendbytes: NAK bailout.
-> i2c i2c-0: sendbytes: NAK bailout.
+> > All the devices on I2C0 support fast mode, so increase the bus speed
+> > to match.
 > 
-> Then no picture. Apparently the I2C engine inside the SiI9022
-> is not smart enough to try to fall back to DDC I2C. Or the
-> vendor have not integrated the electronics properly. I don't
-> know which one it is.
+> I agree with this part. I didn't pay attention to it in the initial
+> submission but now I've checked it, and indeed according to the
+> datasheet the MCP3021 support "standard (100 kHz) and Fast (400 kHz) I2C
+> Compatible modes"
 > 
-> After this, the I2C bus seems stalled and the first attempt to
-> read the status register fails, and the code returns with
-> negative return value, and the display fails to initialized.
+> > The Armada 388 is known to have a timing issue when in
+> > standard mode, which we believe causes the ficticious device at 0x64
+> > to appear.
 > 
-> Instead, retry status readout five times and continue even
-> if this fails.
-> 
-> Tested on the ARM Versatile Express with a DVI-to-VGA
-> connector, it now gives picture.
-> 
-> Introduce a helper struct device *dev variable to make
-> the code more readable.
-> 
-> Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> This errata "FE-8471889 I2C Repeated Start is not supported in standard
+> mode (up to 100K)" was supposed to be fixed with the commit c1d15b68aab8
+> ("i2c: mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)"). And
+> it was used on the Armada 38x SoCs since fbffee74986c ("ARM: dts: Fix I2C
+> repeated start issue on Armada-38x") in 4.14.
 
-I don't have a suitable configuration to test this, but looks goot to me.
+The commit pre-dates 4.14, and the commit message was correct at the time
+it was committed (Nov 29 2016).  I don't know whether its still the case
+that the ficticious device still appears, but increasing the bus speed is
+still a sensible thing to do if the devices all support it.
 
-Reviewed-by: Liviu Dudau <liviu.dudau@arm.com>
-
-BTW, Linus, could it be that your DVI-to-VGA connector doesn't wire
-correctly the EDID pin?
-
-Best regards,
-Liviu
-
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Found the real problem instead of trying to explicitly
->   shoehorn EDID modes into the error path.
-> ---
->  drivers/gpu/drm/bridge/sii902x.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+> So I think that now even at 100kHz the ficticious device should not
+> appear any more. If it is still the case then there might be an issue
+> with the fix in the 2c driver.
 > 
-> diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
-> index b1ab4ab09532..60373d7eb220 100644
-> --- a/drivers/gpu/drm/bridge/sii902x.c
-> +++ b/drivers/gpu/drm/bridge/sii902x.c
-> @@ -137,7 +137,9 @@ static int sii902x_get_modes(struct drm_connector *connector)
->  	struct sii902x *sii902x = connector_to_sii902x(connector);
->  	struct regmap *regmap = sii902x->regmap;
->  	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
-> +	struct device *dev = &sii902x->i2c->dev;
->  	unsigned long timeout;
-> +	unsigned int retries;
->  	unsigned int status;
->  	struct edid *edid;
->  	int num = 0;
-> @@ -159,7 +161,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
->  		 time_before(jiffies, timeout));
->  
->  	if (!(status & SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
-> -		dev_err(&sii902x->i2c->dev, "failed to acquire the i2c bus\n");
-> +		dev_err(dev, "failed to acquire the i2c bus\n");
->  		return -ETIMEDOUT;
->  	}
->  
-> @@ -179,9 +181,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
->  	if (ret)
->  		return ret;
->  
-> -	ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA, &status);
-> +	/*
-> +	 * Sometimes the I2C bus can stall after failure to use the
-> +	 * EDID channel. Retry a few times to see if things clear
-> +	 * up, else continue anyway.
-> +	 */
-> +	retries = 5;
-> +	do {
-> +		ret = regmap_read(regmap, SII902X_SYS_CTRL_DATA,
-> +				  &status);
-> +		retries--;
-> +	} while (ret && retries);
->  	if (ret)
-> -		return ret;
-> +		dev_err(dev, "failed to read status (%d)\n", ret);
->  
->  	ret = regmap_update_bits(regmap, SII902X_SYS_CTRL_DATA,
->  				 SII902X_SYS_CTRL_DDC_BUS_REQ |
-> @@ -201,7 +213,7 @@ static int sii902x_get_modes(struct drm_connector *connector)
->  
->  	if (status & (SII902X_SYS_CTRL_DDC_BUS_REQ |
->  		      SII902X_SYS_CTRL_DDC_BUS_GRTD)) {
-> -		dev_err(&sii902x->i2c->dev, "failed to release the i2c bus\n");
-> +		dev_err(dev, "failed to release the i2c bus\n");
->  		return -ETIMEDOUT;
->  	}
->  
+> Gregory
+> 
+> >
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  arch/arm/boot/dts/armada-388-clearfog.dtsi | 7 ++-----
+> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> > index 68acfc968706..0e3b1f140e6d 100644
+> > --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> > +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> > @@ -143,8 +143,7 @@
+> >  };
+> >  
+> >  &i2c0 {
+> > -	/* Is there anything on this? */
+> > -	clock-frequency = <100000>;
+> > +	clock-frequency = <400000>;
+> >  	pinctrl-0 = <&i2c0_pins>;
+> >  	pinctrl-names = "default";
+> >  	status = "okay";
+> > @@ -239,13 +238,11 @@
+> >  		};
+> >  	};
+> >  
+> > -	/* The MCP3021 is 100kHz clock only */
+> > +	/* The MCP3021 supports standard and fast modes */
+> >  	mikrobus_adc: mcp3021 at 4c {
+> >  		compatible = "microchip,mcp3021";
+> >  		reg = <0x4c>;
+> >  	};
+> > -
+> > -	/* Also something at 0x64 */
+> >  };
+> >  
+> >  &i2c1 {
+> > -- 
+> > 2.7.4
+> >
+> 
 > -- 
-> 2.14.3
-> 
+> Gregory Clement, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
