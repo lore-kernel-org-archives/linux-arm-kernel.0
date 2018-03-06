@@ -1,34 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Mar 2018 14:49:06 +0000
-Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
- fault on kernel VA
-In-Reply-To: <20180305140506.GJ32331@e103592.cambridge.arm.com>
-References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
- <20180305140506.GJ32331@e103592.cambridge.arm.com>
-Message-ID: <20180306144905.ze6efe564ip2c6j3@armageddon.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 06 Mar 2018 15:43:52 +0100
+Subject: [PATCH 09/12] thermal: exynos: remove separate exynos_tmu.h header
+ file
+In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20180306144507epcas2p2bcff1b5d29b84d248fcb153e4af63c16@epcas2p2.samsung.com>
+Message-ID: <1520347435-22970-10-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 02:05:06PM +0000, Dave P Martin wrote:
-> On Mon, Mar 05, 2018 at 10:31:15AM +0000, Will Deacon wrote:
-> > User faults on kernel addresses are a good sign that the faulting task
-> > is either up to no good or is in deep trouble. In such situations,
-> > exposing the optional ESR context on the sigframe as part of the
-> > delivered signal is only useful to attackers who are using information
-> > about underlying hardware fault (e.g. translation vs permission) as a
-> > mechanism to defeat KASLR.
-> > 
-> > Remove the ESR context from the sigframe for user faults on kernel
-> > addresses.
-> 
-> As this wording suggests, this change causes esr_context to disappear
-> entirely from the signal frame.  Previously, I think user code could
-> have relied on its being present for certain signals.
-> 
-> Does Debian's codesearch throw up any nontrivial users of esr_context?
+exynos_tmu.h is used only by exynos_tmu.c so there is no need
+for a separate include file.
 
-The request for ESR context came from the qemu people. Cc'ing Peter
-Maydell (and bouncing the rest of the thread to him separately).
+There should be no functional changes caused by this patch.
 
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 18 +++++++++++++++-
+ drivers/thermal/samsung/exynos_tmu.h | 41 ------------------------------------
+ 2 files changed, 17 insertions(+), 42 deletions(-)
+ delete mode 100644 drivers/thermal/samsung/exynos_tmu.h
+
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index ab5062b..d8b9c3e 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -34,8 +34,10 @@
+ #include <linux/of_irq.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/cpu_cooling.h>
++
++#include <dt-bindings/thermal/thermal_exynos.h>
+ 
+-#include "exynos_tmu.h"
+ #include "../thermal_core.h"
+ 
+ /* Exynos generic registers */
+@@ -173,6 +175,20 @@
+ #define EXYNOS_NOISE_CANCEL_MODE		4
+ 
+ #define MCELSIUS	1000
++
++enum soc_type {
++	SOC_ARCH_EXYNOS3250 = 1,
++	SOC_ARCH_EXYNOS4210,
++	SOC_ARCH_EXYNOS4412,
++	SOC_ARCH_EXYNOS5250,
++	SOC_ARCH_EXYNOS5260,
++	SOC_ARCH_EXYNOS5420,
++	SOC_ARCH_EXYNOS5420_TRIMINFO,
++	SOC_ARCH_EXYNOS5433,
++	SOC_ARCH_EXYNOS5440,
++	SOC_ARCH_EXYNOS7,
++};
++
+ /**
+  * struct exynos_tmu_data : A structure to hold the private data of the TMU
+ 	driver
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+deleted file mode 100644
+index 8f56f86..0000000
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/*
+- * exynos_tmu.h - Samsung EXYNOS TMU (Thermal Management Unit)
+- *
+- *  Copyright (C) 2011 Samsung Electronics
+- *  Donggeun Kim <dg77.kim@samsung.com>
+- *  Amit Daniel Kachhap <amit.daniel@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef _EXYNOS_TMU_H
+-#define _EXYNOS_TMU_H
+-#include <linux/cpu_cooling.h>
+-#include <dt-bindings/thermal/thermal_exynos.h>
+-
+-enum soc_type {
+-	SOC_ARCH_EXYNOS3250 = 1,
+-	SOC_ARCH_EXYNOS4210,
+-	SOC_ARCH_EXYNOS4412,
+-	SOC_ARCH_EXYNOS5250,
+-	SOC_ARCH_EXYNOS5260,
+-	SOC_ARCH_EXYNOS5420,
+-	SOC_ARCH_EXYNOS5420_TRIMINFO,
+-	SOC_ARCH_EXYNOS5433,
+-	SOC_ARCH_EXYNOS5440,
+-	SOC_ARCH_EXYNOS7,
+-};
+-
+-#endif /* _EXYNOS_TMU_H */
 -- 
-Catalin
+1.9.1
