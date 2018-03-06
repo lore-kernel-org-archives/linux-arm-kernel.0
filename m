@@ -1,50 +1,76 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue,  6 Mar 2018 14:56:01 +0100
-Subject: [PATCH v3 4/7] dt-bindings: panel: Add the Ilitek ILI9881c panel
- documentation
+Date: Tue,  6 Mar 2018 14:55:58 +0100
+Subject: [PATCH v3 1/7] drm/sun4i: tcon: Add TRI finish interrupt for vblank
 In-Reply-To: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
 References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
-Message-ID: <98f6b4c0746a0d244d009263e8b3e20f40ac280f.1520344489.git-series.maxime.ripard@bootlin.com>
+Message-ID: <1903b01ae43dafc43a8d3cfb325ac1db6aed60f4.1520344489.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The LHR050H41 from BananaPi is a 1280x700 4-lanes DSI panel based on the
-ILI9881c from Ilitek.
+The "CPU" (or Intel 8080) interface uses a different interrupt called
+TRI_FINISH (most likely TRI being for trigger) to notify the end of frames,
+and hence the VBLANK period.
 
-Acked-by: Rob Herring <robh@kernel.org>
+And that interrupt to the possible VBLANK interrupts source.
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+ drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
-new file mode 100644
-index 000000000000..df05e8bb4851
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
-@@ -0,0 +1,20 @@
-+Ilitek ILI9881c based MIPI-DSI panels
-+
-+Required properties:
-+  - compatible: must be "ilitek,ili9881c" and one of:
-+    * "bananapi,lhr050h41"
-+  - reg: DSI virtual channel used by that screen
-+  - power-gpios: a GPIO phandle for the power pin
-+  - reset-gpios: a GPIO phandle for the reset pin
-+
-+Optional properties:
-+  - backlight: phandle to the backlight used
-+
-+Example:
-+panel at 0 {
-+	compatible = "bananapi,lhr050h41", "ilitek,ili9881c";
-+	reg = <0>;
-+	power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
-+	reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
-+	backlight = <&pwm_bl>;
-+};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index b3960118deb9..7e5134bfb028 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -196,7 +196,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ 	DRM_DEBUG_DRIVER("%sabling VBLANK interrupt\n", enable ? "En" : "Dis");
+ 
+ 	mask = SUN4I_TCON_GINT0_VBLANK_ENABLE(0) |
+-	       SUN4I_TCON_GINT0_VBLANK_ENABLE(1);
++		SUN4I_TCON_GINT0_VBLANK_ENABLE(1) |
++		SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE;
+ 
+ 	if (enable)
+ 		val = mask;
+@@ -548,7 +549,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
+ 
+ 	if (!(status & (SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			SUN4I_TCON_GINT0_VBLANK_INT(1))))
++			SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT)))
+ 		return IRQ_NONE;
+ 
+ 	drm_crtc_handle_vblank(&scrtc->crtc);
+@@ -557,7 +559,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ 	/* Acknowledge the interrupt */
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON_GINT0_REG,
+ 			   SUN4I_TCON_GINT0_VBLANK_INT(0) |
+-			   SUN4I_TCON_GINT0_VBLANK_INT(1),
++			   SUN4I_TCON_GINT0_VBLANK_INT(1) |
++			   SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT,
+ 			   0);
+ 
+ 	return IRQ_HANDLED;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index b761c7b823c5..067183076807 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -28,7 +28,11 @@
+ 
+ #define SUN4I_TCON_GINT0_REG			0x4
+ #define SUN4I_TCON_GINT0_VBLANK_ENABLE(pipe)		BIT(31 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE	BIT(27)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_ENABLE	BIT(26)
+ #define SUN4I_TCON_GINT0_VBLANK_INT(pipe)		BIT(15 - (pipe))
++#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT		BIT(11)
++#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_INT		BIT(10)
+ 
+ #define SUN4I_TCON_GINT1_REG			0x8
+ #define SUN4I_TCON_FRM_CTL_REG			0x10
 -- 
 git-series 0.9.1
