@@ -1,163 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  6 Mar 2018 17:15:32 +0000
-Subject: [PATCH v4 2/5] arm64/kernel: kaslr: reduce module randomization range
- to 4 GB
+Date: Tue,  6 Mar 2018 17:15:34 +0000
+Subject: [PATCH v4 4/5] arm64/errata: add REVIDR handling to framework
 In-Reply-To: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
 References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180306171535.25681-3-ard.biesheuvel@linaro.org>
+Message-ID: <20180306171535.25681-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have to rely on the GCC large code model for KASLR for
-two distinct but related reasons:
-- if we enable full randomization, modules will be loaded very far away
-  from the core kernel, where they are out of range for ADRP instructions,
-- even without full randomization, the fact that the 128 MB module region
-  is now no longer fully reserved for kernel modules means that there is
-  a very low likelihood that the normal bottom-up allocation of other
-  vmalloc regions may collide, and use up the range for other things.
+In some cases, core variants that are affected by a certain erratum
+also exist in versions that have the erratum fixed, and this fact is
+recorded in a dedicated bit in system register REVIDR_EL1.
 
-Large model code is suboptimal, given that each symbol reference involves
-a literal load that goes through the D-cache, reducing cache utilization.
-But more importantly, literals are not instructions but part of .text
-nonetheless, and hence mapped with executable permissions.
+Since the architecture does not require that a certain bit retains
+its meaning across different variants of the same model, each such
+REVIDR bit is tightly coupled to a certain revision/variant value,
+and so we need a list of revidr_mask/midr pairs to carry this
+information.
 
-So let's get rid of our dependency on the large model for KASLR, by:
-- reducing the full randomization range to 4 GB, thereby ensuring that
-  ADRP references between modules and the kernel are always in range,
-- reduce the spillover range to 4 GB as well, so that we fallback to a
-  region that is still guaranteed to be in range
-- move the randomization window of the core kernel to the middle of the
-  VMALLOC space
-
-Note that KASAN always uses the module region outside of the vmalloc space,
-so keep the kernel close to that if KASAN is enabled.
+So add the struct member and the associated macros and handling to
+allow REVIDR fixes to be taken into account.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig         |  7 +++----
- arch/arm64/kernel/kaslr.c  | 20 ++++++++++++--------
- arch/arm64/kernel/module.c |  7 ++++---
- include/linux/sizes.h      |  4 ++++
- 4 files changed, 23 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  4 ++++
+ arch/arm64/kernel/cpu_errata.c      | 21 +++++++++++++++++---
+ 2 files changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb7ef8e..ae7d3d4c0bbe 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1109,7 +1109,6 @@ config ARM64_MODULE_CMODEL_LARGE
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 060e3a4008ab..fbf0aab94d67 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -105,6 +105,10 @@ struct arm64_cpu_capabilities {
+ 		struct {	/* To be used for erratum handling only */
+ 			u32 midr_model;
+ 			u32 midr_range_min, midr_range_max;
++			const struct arm64_midr_revidr {
++				u32 midr_rv;		/* revision/variant */
++				u32 revidr_mask;
++			} * const fixed_revs;
+ 		};
  
- config ARM64_MODULE_PLTS
- 	bool
--	select ARM64_MODULE_CMODEL_LARGE
- 	select HAVE_MOD_ARCH_SPECIFIC
- 
- config RELOCATABLE
-@@ -1143,12 +1142,12 @@ config RANDOMIZE_BASE
- 	  If unsure, say N.
- 
- config RANDOMIZE_MODULE_REGION_FULL
--	bool "Randomize the module region independently from the core kernel"
-+	bool "Randomize the module region over a 4 GB range"
- 	depends on RANDOMIZE_BASE
- 	default y
- 	help
--	  Randomizes the location of the module region without considering the
--	  location of the core kernel. This way, it is impossible for modules
-+	  Randomizes the location of the module region inside a 4 GB window
-+	  covering the core kernel. This way, it is less likely for modules
- 	  to leak information about the location of core kernel data structures
- 	  but it does imply that function calls between modules and the core
- 	  kernel will need to be resolved via veneers in the module PLT.
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index 47080c49cc7e..17dbdb055314 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -117,13 +117,15 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 	/*
- 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
- 	 * kernel image offset from the seed. Let's place the kernel in the
--	 * lower half of the VMALLOC area (VA_BITS - 2).
-+	 * middle half of the VMALLOC area (VA_BITS - 2), and stay clear of
-+	 * the lower and upper quarters to avoid colliding with other
-+	 * allocations.
- 	 * Even if we could randomize at page granularity for 16k and 64k pages,
- 	 * let's always round to 2 MB so we don't interfere with the ability to
- 	 * map using contiguous PTEs
- 	 */
- 	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
--	offset = seed & mask;
-+	offset = BIT(VA_BITS - 3) + (seed & mask);
- 
- 	/* use the top 16 bits to randomize the linear region */
- 	memstart_offset_seed = seed >> 48;
-@@ -149,21 +151,23 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 		 * vmalloc region, since shadow memory is allocated for each
- 		 * module at load time, whereas the vmalloc region is shadowed
- 		 * by KASAN zero pages. So keep modules out of the vmalloc
--		 * region if KASAN is enabled.
-+		 * region if KASAN is enabled, and put the kernel well within
-+		 * 4 GB of the module region.
- 		 */
--		return offset;
-+		return offset % SZ_2G;
- 
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_MODULE_REGION_FULL)) {
- 		/*
--		 * Randomize the module region independently from the core
--		 * kernel. This prevents modules from leaking any information
-+		 * Randomize the module region over a 4 GB window covering the
-+		 * kernel. This reduces the risk of modules leaking information
- 		 * about the address of the kernel itself, but results in
- 		 * branches between modules and the core kernel that are
- 		 * resolved via PLTs. (Branches between modules will be
- 		 * resolved normally.)
- 		 */
--		module_range = VMALLOC_END - VMALLOC_START - MODULES_VSIZE;
--		module_alloc_base = VMALLOC_START;
-+		module_range = SZ_4G - (u64)(_end - _stext);
-+		module_alloc_base = max((u64)_end + offset - SZ_4G,
-+					(u64)MODULES_VADDR);
- 	} else {
- 		/*
- 		 * Randomize the module region by setting module_alloc_base to
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index c8c6c2828b79..70c3e5518e95 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -55,9 +55,10 @@ void *module_alloc(unsigned long size)
- 		 * less likely that the module region gets exhausted, so we
- 		 * can simply omit this fallback in that case.
- 		 */
--		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
--				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
--				NUMA_NO_NODE, __builtin_return_address(0));
-+		p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
-+				module_alloc_base + SZ_4G, GFP_KERNEL,
-+				PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
-+				__builtin_return_address(0));
- 
- 	if (p && (kasan_module_alloc(p, size) < 0)) {
- 		vfree(p);
-diff --git a/include/linux/sizes.h b/include/linux/sizes.h
-index ce3e8150c174..fbde0bc7e882 100644
---- a/include/linux/sizes.h
-+++ b/include/linux/sizes.h
-@@ -8,6 +8,8 @@
- #ifndef __LINUX_SIZES_H__
- #define __LINUX_SIZES_H__
- 
-+#include <linux/const.h>
+ 		struct {	/* Feature register checking */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 52f15cd896e1..b161abdd6e27 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -24,10 +24,22 @@
+ static bool __maybe_unused
+ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
+ {
++	const struct arm64_midr_revidr *fix;
++	u32 midr = read_cpuid_id(), revidr;
 +
- #define SZ_1				0x00000001
- #define SZ_2				0x00000002
- #define SZ_4				0x00000004
-@@ -44,4 +46,6 @@
- #define SZ_1G				0x40000000
- #define SZ_2G				0x80000000
- 
-+#define SZ_4G				_AC(0x100000000, ULL)
+ 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+-	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
+-				       entry->midr_range_min,
+-				       entry->midr_range_max);
++	if (!MIDR_IS_CPU_MODEL_RANGE(midr, entry->midr_model,
++				     entry->midr_range_min,
++				     entry->midr_range_max))
++		return false;
 +
- #endif /* __LINUX_SIZES_H__ */
++	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
++	revidr = read_cpuid(REVIDR_EL1);
++	for (fix = entry->fixed_revs; fix && fix->revidr_mask; fix++)
++		if (midr == fix->midr_rv && (revidr & fix->revidr_mask))
++			return false;
++
++	return true;
+ }
+ 
+ static bool __maybe_unused
+@@ -242,6 +254,9 @@ static int qcom_enable_link_stack_sanitization(void *data)
+ 	.midr_range_min = 0, \
+ 	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+ 
++#define MIDR_FIXED(rev, revidr_mask) \
++	.fixed_revs = (struct arm64_midr_revidr[]){{ (rev), (revidr_mask) }, {}}
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
 -- 
 2.11.0
