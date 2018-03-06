@@ -1,61 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Mar 2018 09:50:08 +0000
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <a1579f14-a5fe-11bc-a831-f729cead25ba@redhat.com>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
- <86o9k63f7a.wl-marc.zyngier@arm.com>
- <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
- <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
- <a1579f14-a5fe-11bc-a831-f729cead25ba@redhat.com>
-Message-ID: <81f8b489-883b-58c8-851b-c624ca72c28d@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 6 Mar 2018 10:54:39 +0100
+Subject: [PATCH 1/2] dt-bindings: mailbox: add STMicroelectronics STM32
+ IPCC binding
+In-Reply-To: <20180306005729.odhf4g5br7tfrq35@rob-hp-laptop>
+References: <1519824270-7134-1-git-send-email-fabien.dessenne@st.com>
+ <1519824270-7134-2-git-send-email-fabien.dessenne@st.com>
+ <20180306005729.odhf4g5br7tfrq35@rob-hp-laptop>
+Message-ID: <CA+M3ks51PxJ_MBFcwKoLhVvBR0j8d_sY6uVkxjNEvP3Atvj4qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 20:37, Auger Eric wrote:
-> Hi Peter,
-> 
-> On 05/03/18 17:31, Peter Maydell wrote:
->> On 2 March 2018 at 12:26, Auger Eric <eric.auger@redhat.com> wrote:
->>> Hi Marc,
->>> On 02/03/18 12:11, Marc Zyngier wrote:
->>>> On Fri, 02 Mar 2018 10:44:48 +0000,
->>>> Auger Eric wrote:
->>>>> I understand the get/set is called as part of the migration process.
->>>>> So my understanding is the benefit of this series is migration fails in
->>>>> those cases:
->>>>>
->>>>>> =0.2 source -> 0.1 destination
->>>>> 0.1 source -> >=0.2 destination
->>>>
->>>> It also fails in the case where you migrate a 1.0 guest to something
->>>> that cannot support it.
->>>
->>> That's because on the destination, the number of regs is less than on
->>> source, right?
+2018-03-06 1:57 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Wed, Feb 28, 2018 at 02:24:29PM +0100, Fabien Dessenne wrote:
+>> Add a binding for the STMicroelectronics STM32 IPCC block exposing a
+>> mailbox mechanism between two processors.
 >>
->> I think it fails because the KVM_REG_ARM_PSCI_VERSION register will be
->> in the migration state but not in the destination's list of registers:
->> the code in QEMU's target/arm/machine.c:cpu_post_load() function that
->> checks "register in their list but not ours: fail migration" will
->> catch this.
-> 
-> Thank you for the pointer. Yes at the time I reviewed the patch and just
-> focusing on the kernel code, this was not immediate to me.
-> 
+>> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> ---
+>>  .../devicetree/bindings/mailbox/stm32-ipcc.txt     | 48 ++++++++++++++++++++++
+>>  1 file changed, 48 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
 >>
->> That also means that we will fail migration from a new kernel where
->> we've specifically asked for PSCI 0.2 to an old PSCI-0.2-only kernel
->> (because the KVM_REG_ARM_PSCI_VERSION reg will appear in the migration
->> stream even if its value is the one value that matches the old kernel
->> behaviour). I don't know if we care about that.
-> 
-> Do you know when are we likely to force PSCI 0.2 on a new kernel? At
-> which layer is the decision supposed to be made and on which criteria?
+>> diff --git a/Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt b/Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
+>> new file mode 100644
+>> index 0000000..2321689
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
+>> @@ -0,0 +1,48 @@
+>> +* STMicroelectronics STM32 IPCC (Inter-Processor Communication Controller)
+>> +
+>> +The IPCC block provides a non blocking signaling mechanism to post and
+>> +retrieve messages in an atomic way between two processors.
+>> +It provides the signaling for N bidirectionnal channels. The number of channels
+>> +(N) can be read from a dedicated register.
+>> +
+>> +Required properties:
+>> +- compatible:   Must be "st,stm32-ipcc"
+>
+> Kind of generic. There's only 1 version of h/w across all stm32 parts?
+>
 
-No decent SW should need this. But if you've written a guest that cannot
-work if it doesn't get "2" as response to PSCI_VERSION, you can override it.
+We can check the version in one of the hardware block register.
+I guess in this case we can have this kind of generic compatible, right ?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Benjamin
+
+>> +- reg:          Register address range (base address and length)
+>> +- st,proc_id:   Processor id using the mailbox (0 or 1)
+>
+> s/_/-/
+>
+>
+>> +- clocks:       Input clock
+>> +- interrupt-names: List of names for the interrupts described by the interrupt
+>> +                   property. Must contain the following entries:
+>> +                   - "rx"
+>> +                   - "tx"
+>> +- interrupts:   Interrupt specifiers for "rx channel occupied" and "tx channel
+>> +                free"
+>> +- #mbox-cells:  Number of cells required for the mailbox specifier. Must be 1.
+>> +                The data contained in the mbox specifier of the "mboxes"
+>> +                property in the client node is the mailbox channel index.
+>> +
+>> +Optional properties:
+>> +- wakeup-source: Flag to indicate whether this device can wake up the system
+>
+>> +- interrupts:    Wakeup interrupt used to wake up the system.
+>> +- interrupt-names: "wakeup" for the wakeup interrupt.
+>
+> Make these required. "wakeup-source" alone determines if you use it.
+>
+>> +
+>> +
+>> +
+>> +Example:
+>> +     ipcc: mailbox at 4c001000 {
+>> +             compatible = "st,stm32-ipcc";
+>> +             #mbox-cells = <1>;
+>> +             reg = <0x4c001000 0x400>;
+>> +             st,proc_id = <0>;
+>> +             interrupts-extended = <&intc GIC_SPI 100 IRQ_TYPE_NONE>,
+>> +                                   <&intc GIC_SPI 101 IRQ_TYPE_NONE>,
+>> +                                   <&aiec 62 1>;
+>> +             interrupt-names = "rx", "tx", "wakeup";
+>> +             clocks = <&rcc_clk IPCC>;
+>> +             wakeup-source;
+>> +     }
+>> +
+>> +Client:
+>> +     mbox_test {
+>> +             ...
+>> +             mboxes = <&ipcc 0>, <&ipcc 1>;
+>> +     };
+>> --
+>> 2.7.4
+>>
