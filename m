@@ -1,120 +1,154 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue,  6 Mar 2018 19:01:22 +0100
-Subject: [GIT PULL 3/4] ARM: dts: exynos: DTS for v4.17
-In-Reply-To: <20180306180124.8987-1-krzk@kernel.org>
-References: <20180306180124.8987-1-krzk@kernel.org>
-Message-ID: <20180306180124.8987-3-krzk@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Mar 2018 18:15:18 +0000
+Subject: [PATCH] arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs,
+ wifi reset)
+In-Reply-To: <CAD=FV=Wr6_U9c1qFRgx3=JhMg8US20_oMEmEfCdpVyGKek_8gQ@mail.gmail.com>
+References: <20180227204711.29357-1-dianders@chromium.org>
+ <3831527.HjPPvuL6zK@diego> <d0aac677-ed2e-c059-0cba-79f88de194b4@arm.com>
+ <CAD=FV=Wr6_U9c1qFRgx3=JhMg8US20_oMEmEfCdpVyGKek_8gQ@mail.gmail.com>
+Message-ID: <16f41a01-2ac2-c4c0-6989-990612b467d1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Doug,
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On 06/03/18 18:00, Doug Anderson wrote:
+> Hi,
+> 
+> On Tue, Mar 6, 2018 at 3:58 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi all,
+>>
+>> On 01/03/18 08:43, Heiko St?bner wrote:
+>>> Am Dienstag, 27. Februar 2018, 21:47:11 CET schrieb Douglas Anderson:
+>>>> Back in the early days when gru devices were still under development
+>>>> we found an issue where the WiFi reset line needed to be configured as
+>>>> early as possible during the boot process to avoid the WiFi module
+>>>> being in a bad state.
+>>>>
+>>>> We found that the way to get the kernel to do this in the earliest
+>>>> possible place was to configure this line in the pinctrl hogs, so
+>>>> that's what we did.  For some history here you can see
+>>>> <http://crosreview.com/368770>.  After the time that change landed in
+>>>> the kernel, we landed a firmware change to configure this line even
+>>>> earlier.  See <http://crosreview.com/399919>.  However, even after the
+>>>> firmware change landed we kept the kernel change to deal with the fact
+>>>> that some people working on devices might take a little while to
+>>>> update their firmware.
+>>>>
+>>>> At this there are definitely zero devices out in the wild that have
+>>>> firmware without the fix in it.  Specifically looking in the firmware
+>>>> branch several critically important fixes for memory stability landed
+>>>> after the patch in coreboot and I know we didn't ship without those.
+>>>> Thus, by now, everyone should have the new firmware and it's safe to
+>>>> not have the kernel set this up in a pinctrl hog.
+>>>>
+>>>> Historically, even though it wasn't needed to have this in a pinctrl
+>>>> hog, we still kept it since it didn't hurt.  Pinctrl would apply the
+>>>> default hog at bootup and then would never touch things again.  That
+>>>> all changed with commit 981ed1bfbc6c ("pinctrl: Really force states
+>>>> during suspend/resume").  After that commit then we'll re-apply the
+>>>> default hog at resume time and that can screw up the reset state of
+>>>> WiFi.  ...and on rk3399 if you touch a device on PCIe in the wrong way
+>>>> then the whole system can go haywire.  That's what was happening.
+>>>> Specifically you'd resume a rk3399-gru-* device and it would mostly
+>>>> resume, then would crash with some crazy weird crash.
+>>>>
+>>>> One could say, perhaps, that the recent pinctrl change was at fault
+>>>> (and should be fixed) since it changed behavior.  ...but that's not
+>>>> really true.  The device tree for rk3399-gru is really to blame.
+>>>> Specifically since the pinctrl is defined in the hog and not in the
+>>>> "wlan-pd-n" node then the actual user of this pin doesn't have a
+>>>> pinctrl entry for it.  That's bad.
+>>>>
+>>>> Let's fix our problems by just moving the control of
+>>>> "wlan_module_reset_l pinctrl" out of the hog and put them in the
+>>>> proper place.
+>>>>
+>>>> NOTE: in theory, I think it should actually be possible to have a pin
+>>>> controlled _both_ by the hog and by an actual device.  Once the device
+>>>> claims the pin I think the hog is supposed to let go.  I'm not 100%
+>>>> sure that this works and in any case this solution would be more
+>>>> complex than is necessary.
+>>>>
+>>>> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Fixes: 48f4d9796d99 ("arm64: dts: rockchip: add Gru/Kevin DTS")
+>>>> Fixes: 981ed1bfbc6c ("pinctrl: Really force states during suspend/resume")
+>>>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>>>
+>>> applied as fix for 4.16 with the 2 Tested-tags
+>> Sorry to rain on everyone's parade, but further testing shows that this
+>> patch may not be enough to restore a reliable s2r. My initial testing
+>> did show that we were resuming without the VOP errors, but there seem to
+>> be further issues (I'm loosing the keyboard and the trackpad after
+>> resume on Kevin).
+>>
+>> Applying my initial hack makes it work again. I suspect that there are
+>> more hog pins that need tweaking, but I'm a bit out of my depth here.
+> 
+> Are you positive you weren't just wearing your lucky hat when you
+> tested your patch and then took it off when you tested mine?  As far
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+So far, I seem to have a 100% success rate in resuming with my silly
+hack, whist your DT patch alone only gives me a 50% rate at best.
 
-are available in the git repository at:
+> as I can see the only hogs left on kevin are:
+> 
+>   &ap_pwroff      /* AP will auto-assert this when in S3 */
+>   &clk_32k        /* This pin is always 32k on gru boards */
+> 
+> Those map to:
+> 
+>   ap_pwroff: ap-pwroff {
+>      rockchip,pins = <1 5 RK_FUNC_1 &pcfg_pull_none>;
+>   };
+> 
+>   clk_32k: clk-32k {
+>     rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
+>   };
+> 
+> So I added some printouts at suspend/resume time.  Specifically I set
+> a boolean to "true" for the duration rockchip_pinctrl_suspend() and
+> rockchip_pinctrl_resume() and this turned on a printout in
+> rockchip_set_mux().  My printout looked like this (yeah, I know it's a
+> whitespace-damaged patch just to show what I'm doing):
+> 
+> +       regmap_read(regmap, reg, &before);
+>         data = (mask << (bit + 16));
+>         rmask = data | (data >> 16);
+>         data |= (mux & mask) << bit;
+>         ret = regmap_update_bits(regmap, reg, rmask, data);
+> 
+> +       regmap_read(regmap, reg, &after);
+> +
+> +       if (DOUG) {
+> +               dev_info(info->dev,
+> +                        "setting mux of GPIO%d-%d to %d; %#010x=>%#010x\n",
+> +                        bank->bank_num, pin, mux, reg, before, after);
+> +       }
+> 
+> ...and a similar one in rockchip_set_pull().  That showed this at resume time:
+> 
+> [   62.284427] rockchip-pinctrl pinctrl: setting mux of GPIO1-5 to 1;
+> 0x00009400=>0x00009400
+> [   62.294423] rockchip-pinctrl pinctrl: setting pull of GPIO1-5;
+> 0x000041aa=>0x000041aa
+> [   62.303343] rockchip-pinctrl pinctrl: setting mux of GPIO0-0 to 2;
+> 0x00005002=>0x00005002
+> [   62.313240] rockchip-pinctrl pinctrl: setting pull of GPIO0-0;
+> 0x00000ddc=>0x00000ddc
+> [
+> 
+> Said another way: pinmux and pull isn't actually changing due to the
+> hogs.  We can see if something else could be changing, but I'd really
+> want to be sure you're certain that the hogs are causing you
+> problems...
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.17
+I cannot say for sure that the hogs are the issue. But I thought that
+they were the only pins affected by 981ed1bfbc6c... If this patch can
+affect other pins, then I'm probably barking up the wrong tree.
 
-for you to fetch changes up to 6f4870753f29edf7dc39444246f9e39987b8b158:
+Thanks,
 
-  ARM: dts: exynos: Fix IOMMU support for GScaler devices on Exynos5250 (2018-03-05 19:11:40 +0100)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.17
-
-1. Add WiFi to Artik 5 board.
-2. Remove unused samsung_k3pe0e000b memory DTSI.
-3. Add few remaining SPDX license identifiers.
-4. Refactor Exynos4 by using labels for overriding/extending nodes and
-   moving respective nodes under the 'soc' node.
-5. Add three new Exynos4412-based boards: GT-I9300 (Samsung Galaxy S3),
-   GT-I9305 (Samsung Galaxy S3 LTE) and GT-N7100/N7105 (Samsung Note 2).
-   They are based heavily on existing Trats2 board.
-6. Fix PMIC interrupts on Trats board.
-7. Fix IOMMU for GScaler devices on Exynos5250.
-8. Minor fixes in unit addresses pointed by DTC.
-9. Minor cleanups from unused properties and duplicated code.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (6):
-      ARM: dts: samsung: Remove unused samsung_k3pe0e000b
-      ARM: dts: exynos: Add SPDX license identifiers
-      ARM: dts: exynos: Remove duplicated inclusion of syscon restart nodes on Exynos5410
-      ARM: dts: exynos: Fix address of PPMU ACP on Exynos4210
-      ARM: dts: exynos: Fix unit addresses of PDMA nodes in Exynos5410
-      ARM: dts: exynos: Remove unused bypass-smu property from Xyref5260
-
-Maciej Purski (14):
-      ARM: dts: exynos: Use pinctrl labels in exynos4210-pinctrl
-      ARM: dts: exynos: Use pinctrl labels in exynos4412-pinctrl
-      ARM: dts: exynos: Use labels instead of full paths in exynos4210
-      ARM: dts: exynos: Use labels instead of full paths in exynos4210-trats
-      ARM: dts: exynos: Use labels instead of full paths in exynos4210-universal_c210
-      ARM: dts: exynos: Use label instead of full path in exynos4412
-      ARM: dts: exynos: Use label instead of full path in exynos4412-odroid-common
-      ARM: dts: exynos: Use labels instead of full paths in exynos4412-trats2
-      ARM: dts: exynos: Use label instead of full path in exynos4412-itop-elite
-      ARM: dts: exynos: Use pmu label in exynos4412
-      ARM: dts: exynos: Add soc node to exynos5440
-      ARM: dts: exynos: Add soc node to exynos4
-      ARM: dts: exynos: Add soc node to exynos4210
-      ARM: dts: exynos: Add soc node to exynos4412
-
-Marek Szyprowski (3):
-      ARM: dts: exynos: Cleanup power domain nodes in exynos3250.dtsi
-      ARM: dts: exynos: Add missing interrupts property to PMIC on Trats board
-      ARM: dts: exynos: Fix IOMMU support for GScaler devices on Exynos5250
-
-Michael Lyle (1):
-      ARM: dts: exynos: Add support for wlan to Artik 5
-
-Simon Shields (4):
-      dt-bindings: samsung: Document bindings for Midas family boards
-      ARM: dts: exynos: Split Trats2 DTS in preparation for Midas boards
-      ARM: dts: exynos: Add Samsung's Exynos4412-based Midas boards
-      ARM: dts: exynos: Add touchscreen node to Exynos4412 N710x
-
-Viresh Kumar (1):
-      ARM: dts: exynos: Remove "cooling-{min|max}-level" for CPU nodes
-
- .../bindings/arm/samsung/samsung-boards.txt        |    4 +
- MAINTAINERS                                        |    1 -
- arch/arm/boot/dts/Makefile                         |    3 +
- arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi  |    5 +-
- arch/arm/boot/dts/exynos-syscon-restart.dtsi       |    5 +-
- arch/arm/boot/dts/exynos3250-artik5.dtsi           |   36 +
- arch/arm/boot/dts/exynos3250.dtsi                  |   15 +-
- arch/arm/boot/dts/exynos4.dtsi                     | 1719 +++++++++---------
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi          | 1680 +++++++++--------
- arch/arm/boot/dts/exynos4210-trats.dts             |   74 +-
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |  115 +-
- arch/arm/boot/dts/exynos4210.dtsi                  |  610 +++----
- arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi        |  140 ++
- arch/arm/boot/dts/exynos4412-i9300.dts             |   22 +
- arch/arm/boot/dts/exynos4412-i9305.dts             |   20 +
- arch/arm/boot/dts/exynos4412-itop-elite.dts        |   16 +-
- arch/arm/boot/dts/exynos4412-midas.dtsi            | 1308 +++++++++++++
- arch/arm/boot/dts/exynos4412-n710x.dts             |   77 +
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   12 +-
- arch/arm/boot/dts/exynos4412-pinctrl.dtsi          | 1914 ++++++++++----------
- arch/arm/boot/dts/exynos4412-tiny4412.dts          |    7 +-
- arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi  |    6 +-
- arch/arm/boot/dts/exynos4412-trats2.dts            | 1396 +-------------
- arch/arm/boot/dts/exynos4412.dtsi                  |  868 ++++-----
- arch/arm/boot/dts/exynos5250.dtsi                  |   10 +-
- arch/arm/boot/dts/exynos5260-xyref5260.dts         |    1 -
- arch/arm/boot/dts/exynos5410.dtsi                  |    9 +-
- arch/arm/boot/dts/exynos5420-cpus.dtsi             |   16 -
- arch/arm/boot/dts/exynos5422-cpus.dtsi             |   16 -
- arch/arm/boot/dts/exynos5440.dtsi                  |  514 +++---
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |    5 +-
- arch/arm/boot/dts/exynos5800.dtsi                  |    5 +-
- arch/arm/boot/dts/samsung_k3pe0e000b.dtsi          |   68 -
- 33 files changed, 5416 insertions(+), 5281 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
- create mode 100644 arch/arm/boot/dts/exynos4412-i9300.dts
- create mode 100644 arch/arm/boot/dts/exynos4412-i9305.dts
- create mode 100644 arch/arm/boot/dts/exynos4412-midas.dtsi
- create mode 100644 arch/arm/boot/dts/exynos4412-n710x.dts
- delete mode 100644 arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
+	M.
+-- 
+Jazz is not dead. It just smells funny...
