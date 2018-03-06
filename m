@@ -1,83 +1,172 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Tue, 6 Mar 2018 06:02:08 +0000
-Subject: [PATCH 2/2][v5] driver: mtd: update struct map_info's swap as per
- map requirement
-In-Reply-To: <20180228073335.1758-2-prabhakar.kushwaha@nxp.com>
-References: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
- <20180228073335.1758-2-prabhakar.kushwaha@nxp.com>
-Message-ID: <HE1PR04MB1241B7EE0E3905E20214C2A797D90@HE1PR04MB1241.eurprd04.prod.outlook.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Tue, 6 Mar 2018 15:06:59 +0800
+Subject: [RFC PATCH] irqchip/gic-v3-its: handle wrapped case in
+ its_wait_for_range_completion()
+In-Reply-To: <866073z7pr.wl-marc.zyngier@arm.com>
+References: <1518320521-12536-1-git-send-email-yangyingliang@huawei.com>
+ <866073z7pr.wl-marc.zyngier@arm.com>
+Message-ID: <5A9E3E13.6060207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Boris,
+From: Yang Yingliang <yangyingliang@huawei.com>
 
-> -----Original Message-----
-> From: Prabhakar Kushwaha
-> Sent: Wednesday, February 28, 2018 1:04 PM
-> To: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
-> robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; boris.brezillon at free-
-> electrons.com; cyrille.pitchen at wedev4u.fr; computersforpeace at gmail.com;
-> oss at buserror.net; Leo Li <leoyang.li@nxp.com>; Prabhakar Kushwaha
-> <prabhakar.kushwaha@nxp.com>; Jagdish Gediya
-> <jagdish.gediya@nxp.com>
-> Subject: [PATCH 2/2][v5] driver: mtd: update struct map_info's swap as per
-> map requirement
-> 
-> It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-> Maps device can be Big endian or little endian.
-> 
-> Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-> CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
-> 
-> Now update struct map_info's swap field based on device characteristics
-> defined in device tree.
-> 
-> Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> ---
-> Changes for v2: Incorporated review comments from Boris Brezillon
-> http://patchwork.ozlabs.org/patch/758381/
-> Changes for v3: None
-> Changes for v4: Updated code as per new defined binding of physmap.txt
-> Changes for v5: Avoid map.swap set in case of endiannes not defined in dts
-> file
-> 
->  drivers/mtd/maps/physmap_of_core.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/mtd/maps/physmap_of_core.c
-> b/drivers/mtd/maps/physmap_of_core.c
-> index b1bd4faecfb2..527b1682381f 100644
-> --- a/drivers/mtd/maps/physmap_of_core.c
-> +++ b/drivers/mtd/maps/physmap_of_core.c
-> @@ -20,6 +20,7 @@
->  #include <linux/mtd/map.h>
->  #include <linux/mtd/partitions.h>
->  #include <linux/mtd/concat.h>
-> +#include <linux/mtd/cfi_endian.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
-> @@ -233,6 +234,11 @@ static int of_flash_probe(struct platform_device
-> *dev)
->  		info->list[i].map.bankwidth = be32_to_cpup(width);
->  		info->list[i].map.device_node = dp;
-> 
-> +		if (of_property_read_bool(dp, "big-endian"))
-> +			info->list[i].map.swap = CFI_BIG_ENDIAN;
-> +		else if (of_property_read_bool(dp, "little-endian"))
-> +			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-> +
->  		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
->  		if (err)
->  			goto err_out;
-> --
-> 2.14.1
+While cpus posting a bunch of ITS commands, the cmd_queue and rd_idx will
+be wrapped easily. And current way of handling wrapped case is not quite
+right.
+Such as, in direct case, rd_idx will wrap if other cpus post commands
+that make rd_idx increase. When rd_idx wrapped, the driver prints
+timeout messages but in fact the command is finished.
 
-Is this patch correct with respect to device binding (http://patchwork.ozlabs.org/patch/878974/)
-May I go ahead and send device tree patches for other NXP platforms
+This patch adds two variables to count wrapped times of ITS commands and
+read index. With these two variables, the driver can handle wrapped case
+correctly.
 
-will http://patchwork.ozlabs.org/patch/878974/  along with this patch be send via linux-mtd repo?
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+  drivers/irqchip/irq-gic-v3-its.c | 72 
++++++++++++++++++++++++++++++++++-------
+  1 file changed, 60 insertions(+), 12 deletions(-)
 
---pk
+diff --git a/drivers/irqchip/irq-gic-v3-its.c 
+b/drivers/irqchip/irq-gic-v3-its.c
+index 1d3056f..a03e18e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -111,6 +111,9 @@ struct its_node {
+  	u32			pre_its_base; /* for Socionext Synquacer */
+  	bool			is_v4;
+  	int			vlpi_redist_offset;
++	int 			last_rd;
++	u64			cmd_wrapped_cnt;
++	u64			rd_wrapped_cnt;
+  };
+
+  #define ITS_ITT_ALIGN		SZ_256
+@@ -662,6 +665,7 @@ static int its_queue_full(struct its_node *its)
+
+  static struct its_cmd_block *its_allocate_entry(struct its_node *its)
+  {
++	u32 rd;
+  	struct its_cmd_block *cmd;
+  	u32 count = 1000000;	/* 1s! */
+
+@@ -675,11 +679,24 @@ static struct its_cmd_block 
+*its_allocate_entry(struct its_node *its)
+  		udelay(1);
+  	}
+
++	/*
++	 * Here is protected by its->lock and driver cannot allocate
++	 * ITS commands, if ITS command queue is full, so the read
++	 * won't wrap twice between this rd_idx and last rd_idx.
++	 * Count rd wrapped times here is safe.
++	 */
++	rd = readl_relaxed(its->base + GITS_CREADR);
++	if (rd < its->last_rd)
++		its->rd_wrapped_cnt++;
++	its->last_rd = rd;
++
+  	cmd = its->cmd_write++;
+
+  	/* Handle queue wrapping */
+-	if (its->cmd_write == (its->cmd_base + ITS_CMD_QUEUE_NR_ENTRIES))
++	if (its->cmd_write == (its->cmd_base + ITS_CMD_QUEUE_NR_ENTRIES)) {
+  		its->cmd_write = its->cmd_base;
++		its->cmd_wrapped_cnt++;
++	}
+
+  	/* Clear command  */
+  	cmd->raw_cmd[0] = 0;
+@@ -713,29 +730,57 @@ static void its_flush_cmd(struct its_node *its, 
+struct its_cmd_block *cmd)
+
+  static int its_wait_for_range_completion(struct its_node *its,
+  					 struct its_cmd_block *from,
+-					 struct its_cmd_block *to)
++					 struct its_cmd_block *to,
++					 u64 last_cmd_wrapped_cnt)
+  {
+-	u64 rd_idx, from_idx, to_idx;
++	unsigned long flags;
++	u64 rd_idx, from_idx, to_idx, rd_wrapped_cnt;
+  	u32 count = 1000000;	/* 1s! */
+
+  	from_idx = its_cmd_ptr_to_offset(its, from);
+  	to_idx = its_cmd_ptr_to_offset(its, to);
+
+  	while (1) {
++		raw_spin_lock_irqsave(&its->lock, flags);
+  		rd_idx = readl_relaxed(its->base + GITS_CREADR);
++		if (rd_idx < its->last_rd)
++			its->rd_wrapped_cnt++;
++		its->last_rd = rd_idx;
++		rd_wrapped_cnt = its->rd_wrapped_cnt;
++		raw_spin_unlock_irqrestore(&its->lock, flags);
+
+-		/* Direct case */
+-		if (from_idx < to_idx && rd_idx >= to_idx)
+-			break;
+-
+-		/* Wrapped case */
+-		if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
++		/*
++		 * If rd_wrapped_cnt > last_cmd_wrapped_cnt:
++		 * there are a lot of ITS commands posted by
++		 * other cpus and ITS is fast.
++		 *
++		 * If rd_wrapped_cnt < last_cmd_wrapped_cnt:
++		 * ITS is slow, there are some ITS commands
++		 * not finished.
++		 *
++		 * If rd_wrapped_cnt == last_cmd_wrapped_cnt:
++		 * it's common case.
++		 */
++		if (rd_wrapped_cnt > last_cmd_wrapped_cnt) {
++			/*
++			 * There is a lot of ITS commands posted by other cpus,
++			 * it make rd_idx move foward fast and wrap.
++			 */
+  			break;
++		} else if (rd_wrapped_cnt == last_cmd_wrapped_cnt) {
++			/* Direct case */
++			if (from_idx < to_idx && rd_idx >= to_idx)
++				break;
++
++			/* Wrapped case */
++			if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
++				break;
++		}
+
+  		count--;
+  		if (!count) {
+-			pr_err_ratelimited("ITS queue timeout (%llu %llu %llu)\n",
+-					   from_idx, to_idx, rd_idx);
++			pr_err_ratelimited("ITS queue timeout (%llu %llu %llu) %llu %llu\n",
++					   from_idx, to_idx, rd_idx, rd_wrapped_cnt, last_cmd_wrapped_cnt);
+  			return -1;
+  		}
+  		cpu_relax();
+@@ -754,6 +799,7 @@ void name(struct its_node *its,						\
+  	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
+  	synctype *sync_obj;						\
+  	unsigned long flags;						\
++	u64 cmd_wrapped_cnt;						\
+  									\
+  	raw_spin_lock_irqsave(&its->lock, flags);			\
+  									\
+@@ -776,9 +822,11 @@ void name(struct its_node *its,						\
+  									\
+  post:									\
+  	next_cmd = its_post_commands(its);				\
++	cmd_wrapped_cnt = its->cmd_wrapped_cnt;				\
+  	raw_spin_unlock_irqrestore(&its->lock, flags);			\
+  									\
+-	if (its_wait_for_range_completion(its, cmd, next_cmd))		\
++	if (its_wait_for_range_completion(its, cmd, next_cmd, 		\
++					  cmd_wrapped_cnt))		\
+  		pr_err_ratelimited("ITS cmd %ps failed\n", builder);	\
+  }
+
+-- 
+1.8.3
