@@ -1,67 +1,53 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  6 Mar 2018 20:18:49 +0900
-Subject: [PATCH] phy: add 'depends on HAS_IOMEM' to fix unmet dependency
-Message-ID: <1520335129-11101-1-git-send-email-yamada.masahiro@socionext.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Tue, 6 Mar 2018 12:22:24 +0100
+Subject: [GIT PULL] tee driver misc for v4.17
+Message-ID: <CAHUa44HqoQ2yxBzJsQQxb35h=S4suDB7qpoQXwsBhx_OXHyBMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These configs select MFD_SYSCON, but do not depend on HAS_IOMEM.
+Hello arm-soc maintainers,
 
-Compile testing on architecture without HAS_IOMEM causes "unmet
-direct dependencies" in Kconfig phase.
+Please pull these tee driver changes. This fixes a a problem with
+determining the max device id value for the privileged device. This is
+only a problem if there's more than 16 tee devices registered. There's
+also added support to report OP-TEE revision information.
 
-Detected by "make ARCH=score allyesconfig".
+The bugfix isn't urgent so I'm aiming for the next merge window.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Thanks,
+Jens
 
-Arnd Bergmann and I discussed how to fix unmet dependency of MFD_SYSCON.
-https://lkml.org/lkml/2018/2/27/284
+The following changes since commit 661e50bc853209e41a5c14a290ca4decc43cbfd1:
 
-We agreed to add 'depends on HAS_IOMEM' to drivers causing
-unmet dependency.
+  Linux 4.16-rc4 (2018-03-04 14:54:11 -0800)
 
+are available in the git repository at:
 
- drivers/phy/hisilicon/Kconfig | 1 +
- drivers/phy/ralink/Kconfig    | 1 +
- drivers/phy/rockchip/Kconfig  | 1 +
- 3 files changed, 3 insertions(+)
+  https://git.linaro.org:/people/jens.wiklander/linux-tee.git
+tags/tee-drv-misc-for-v4.17
 
-diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
-index 6164c4c..1131ba6 100644
---- a/drivers/phy/hisilicon/Kconfig
-+++ b/drivers/phy/hisilicon/Kconfig
-@@ -4,6 +4,7 @@
- config PHY_HI6220_USB
- 	tristate "hi6220 USB PHY support"
- 	depends on (ARCH_HISI && ARM64) || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	select GENERIC_PHY
- 	select MFD_SYSCON
- 	help
-diff --git a/drivers/phy/ralink/Kconfig b/drivers/phy/ralink/Kconfig
-index b17635b..14fd219 100644
---- a/drivers/phy/ralink/Kconfig
-+++ b/drivers/phy/ralink/Kconfig
-@@ -4,6 +4,7 @@
- config PHY_RALINK_USB
- 	tristate "Ralink USB PHY driver"
- 	depends on RALINK || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	select GENERIC_PHY
- 	select MFD_SYSCON
- 	help
-diff --git a/drivers/phy/rockchip/Kconfig b/drivers/phy/rockchip/Kconfig
-index f5325b2..0e15119 100644
---- a/drivers/phy/rockchip/Kconfig
-+++ b/drivers/phy/rockchip/Kconfig
-@@ -29,6 +29,7 @@ config PHY_ROCKCHIP_INNO_USB2
- config PHY_ROCKCHIP_PCIE
- 	tristate "Rockchip PCIe PHY Driver"
- 	depends on (ARCH_ROCKCHIP && OF) || COMPILE_TEST
-+	depends on HAS_IOMEM
- 	select GENERIC_PHY
- 	select MFD_SYSCON
- 	help
--- 
-2.7.4
+for you to fetch changes up to 5c5f80307ab27c53b56569245a0b12f4e3b577de:
+
+  tee: optee: report OP-TEE revision information (2018-03-06 11:03:55 +0100)
+
+----------------------------------------------------------------
+Small fix and report OP-TEE revision information
+
+* Adds one small fix correct max value of privileged device id allocation,
+  this is only needed if there's more than TEE_NUM_DEVICES / 2 (16) tee
+  drivers registered. One or two is a normal value.
+* Reports OP-TEE revision information (major, minro version and build id
+  if available)
+
+----------------------------------------------------------------
+J?r?me Forissier (2):
+      tee: optee: GET_OS_REVISION: document a2 as a build identifier
+      tee: optee: report OP-TEE revision information
+
+Peng Fan (1):
+      tee: correct max value for id allocation
+
+ drivers/tee/optee/core.c      | 23 +++++++++++++++++++++++
+ drivers/tee/optee/optee_smc.h | 10 +++++++++-
+ drivers/tee/tee_core.c        | 14 +++++++++-----
+ 3 files changed, 41 insertions(+), 6 deletions(-)
