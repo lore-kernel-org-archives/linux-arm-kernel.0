@@ -1,126 +1,103 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 06 Mar 2018 11:02:04 -0800
-Subject: [PATCH 2/5] staging: vc04_services: Remove cache-line-size
- property.
-In-Reply-To: <a8f369f5-691c-c05f-4c7c-2eadcf4c48c8@i2se.com>
-References: <20180305202806.21219-1-eric@anholt.net>
- <20180305202806.21219-3-eric@anholt.net>
- <a8f369f5-691c-c05f-4c7c-2eadcf4c48c8@i2se.com>
-Message-ID: <87muzl9ger.fsf@anholt.net>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 6 Mar 2018 11:05:36 -0800
+Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
+ document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
+In-Reply-To: <20180306124002.GA13950@amd>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+ <20180306124002.GA13950@amd>
+Message-ID: <33bf6563-b220-7ff9-8b04-84e9bd781b3f@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Hi Pavel,
 
-> Hi Eric,
->
->
-> Am 05.03.2018 um 21:28 schrieb Eric Anholt:
->> This was just a way for the DT-passed value to get out of sync with
->> what Linux has configured the ARM for.
->>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
+Thanks for sharing your time on reviewing it. Please see my answers inline.
+
+-Jae
+
+On 3/6/2018 4:40 AM, Pavel Machek wrote:
+> Hi!
+> 
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 >> ---
->>   .../interface/vchiq_arm/vchiq_2835_arm.c           | 25 +++++++---------------
->>   .../interface/vchiq_arm/vchiq_pagelist.h           |  1 -
->>   2 files changed, 8 insertions(+), 18 deletions(-)
+>>   .../devicetree/bindings/peci/peci-aspeed.txt       | 73 ++++++++++++++++++++++
+>>   1 file changed, 73 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
 >>
->> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> index b59ef14890aa..e0e01c812036 100644
->> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> @@ -77,7 +77,6 @@ struct vchiq_pagelist_info {
->>   };
->>   
->>   static void __iomem *g_regs;
->> -static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
->>   static unsigned int g_fragments_size;
->>   static char *g_fragments_base;
->>   static char *g_free_fragments;
->> @@ -117,15 +116,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
->>   	if (err < 0)
->>   		return err;
->>   
->> -	err = of_property_read_u32(dev->of_node, "cache-line-size",
->> -				   &g_cache_line_size);
->> -
->> -	if (err) {
->> -		dev_err(dev, "Missing cache-line-size property\n");
->> -		return -ENODEV;
->> -	}
->> -
->> -	g_fragments_size = 2 * g_cache_line_size;
->> +	g_fragments_size = 2 * cache_line_size();
->>   
->>   	/* Allocate space for the channels in coherent memory */
->>   	slot_mem_size = PAGE_ALIGN(TOTAL_SLOTS * VCHIQ_SLOT_SIZE);
->> @@ -548,9 +539,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type)
->>   
->>   	/* Partial cache lines (fragments) require special measures */
->>   	if ((type == PAGELIST_READ) &&
->> -		((pagelist->offset & (g_cache_line_size - 1)) ||
->> +		((pagelist->offset & (cache_line_size() - 1)) ||
->>   		((pagelist->offset + pagelist->length) &
->> -		(g_cache_line_size - 1)))) {
->> +		 (cache_line_size() - 1)))) {
->>   		char *fragments;
->>   
->>   		if (down_interruptible(&g_free_fragments_sema) != 0) {
->> @@ -598,10 +589,10 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
->>   			g_fragments_size;
->>   		int head_bytes, tail_bytes;
->>   
->> -		head_bytes = (g_cache_line_size - pagelist->offset) &
->> -			(g_cache_line_size - 1);
->> +		head_bytes = (cache_line_size() - pagelist->offset) &
->> +			(cache_line_size() - 1);
->>   		tail_bytes = (pagelist->offset + actual) &
->> -			(g_cache_line_size - 1);
->> +			(cache_line_size() - 1);
->
-> should it be so easy? Back in 2016 we said that cache_line_size() won't 
-> work. I always thought that we need the cache line size of L2 not of the 
-> L1 one.
->
-> Did you already test the behavior for these combinations?
-> BCM2835 ARM32, expected cache line size = 32
-> BCM2836 ARM32, expected cache line size = 64
-> BCM2837 ARM32, expected cache line size = 64
-> BCM2837 ARM64, expected cache line size = 64
+>> diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
+>> new file mode 100644
+>> index 000000000000..8a86f346d550
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
+>> @@ -0,0 +1,73 @@
+>> +Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
+> 
+> Are these SoCs x86-based?
+> 
 
-I didn't explicitly test, but was going by:
+Yes, these are ARM SoCs. Please see Andrew's answer as well.
 
-config ARM_L1_CACHE_SHIFT_6
-	bool
-	default y if CPU_V7
-	help
-	  Setting ARM L1 cache line size to 64 Bytes.
+>> +Required properties:
+>> +- compatible
+>> +	"aspeed,ast2400-peci" or "aspeed,ast2500-peci"
+>> +	- aspeed,ast2400-peci: Aspeed AST2400 family PECI controller
+>> +	- aspeed,ast2500-peci: Aspeed AST2500 family PECI controller
+>> +
+>> +- reg
+>> +	Should contain PECI registers location and length.
+> 
+> Other dts documents put it on one line, reg: Should contain ...
+> 
+>> +- clock_frequency
+>> +	Should contain the operation frequency of PECI hardware module.
+>> +	187500 ~ 24000000
+> 
+> specify this is Hz?
+> 
 
-config ARM_L1_CACHE_SHIFT_7
-	bool
-	help
-	  Setting ARM L1 cache line size to 128 Bytes.
+I'll add a description. Thanks!
 
-config ARM_L1_CACHE_SHIFT
-	int
-	default 7 if ARM_L1_CACHE_SHIFT_7
-	default 6 if ARM_L1_CACHE_SHIFT_6
-	default 5
+>> +- rd-sampling-point
+>> +	Read sampling point selection. The whole period of a bit time will be
+>> +	divided into 16 time frames. This value will determine which time frame
+>> +	this controller will sample PECI signal for data read back. Usually in
+>> +	the middle of a bit time is the best.
+> 
+> English? "This value will determine when this controller"?
+> 
 
-and only L1_CACHE_SHIFT_7 gets selected by UNIPHIER and neither one is
-accessible by menus.
+Could I change it like below?:
 
-I think you're technically correct that it's the size of L2 that matters
-(or, specifically, the hardcoded value that the firmware is using on its
-side for the fragments list handling.  It overrides a cache-line-size DT
-property with that number if present).  However, I think L1==L2 cache
-line size this should be a safe assumption for us.
+"This value will determine in which time frame this controller samples 
+PECI signal for data read back"
 
-Phil, any opinion?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/cb86fa60/attachment.sig>
+>> +	0 ~ 15 (default: 8)
+>> +
+>> +- cmd_timeout_ms
+>> +	Command timeout in units of ms.
+>> +	1 ~ 60000 (default: 1000)
+>> +
+>> +Example:
+>> +	peci: peci at 1e78b000 {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges = <0x0 0x1e78b000 0x60>;
+>> +
+>> +		peci0: peci-bus at 0 {
+>> +			compatible = "aspeed,ast2500-peci";
+>> +			reg = <0x0 0x60>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <15>;
+>> +			clocks = <&clk_clkin>;
+>> +			clock-frequency = <24000000>;
+>> +			msg-timing-nego = <1>;
+>> +			addr-timing-nego = <1>;
+>> +			rd-sampling-point = <8>;
+>> +			cmd-timeout-ms = <1000>;
+>> +		};
+>> +	};
+>> \ No newline at end of file
+> 
