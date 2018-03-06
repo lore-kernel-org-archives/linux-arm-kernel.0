@@ -1,67 +1,74 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Tue, 6 Mar 2018 16:59:09 +0800
-Subject: [PATCH v5 1/3] USB3/DWC3: Add definition for global soc bus
- configuration register
-Message-ID: <20180306085911.5930-1-ran.wang_1@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue,  6 Mar 2018 14:55:57 +0100
+Subject: [PATCH v3 0/7] drm/sun4i: Allwinner MIPI-DSI support
+Message-ID: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changming Huang <jerry.huang@nxp.com>
+Hi,
 
-Add the macro definition for global soc bus configuration register 0/1
+Here is an preliminary version of the MIPI-DSI support for the Allwinner
+SoCs.
 
-Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
-Changes in v5:
-  - no change
-Changes in v4:
-  - no change
-Changes in v3:
-  - no change
-Changes in v2:
-  - split the patch
-  - add more macro definition for soc bus configuration register
+This controller can be found on a number of recent SoCs, such as the
+A31, A33 or the A64.
 
- drivers/usb/dwc3/core.h |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+Given the sparse documentation, there's a number of obscure areas, but
+the current implementation has been tested with a 4-lanes DSI panel on
+an A33.
 
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index 860d2bc..8f97f61 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -153,6 +153,32 @@
- 
- /* Bit fields */
- 
-+/* Global SoC Bus Configuration Register 0 */
-+#define AXI3_CACHE_TYPE_AW		0x8 /* write allocate */
-+#define AXI3_CACHE_TYPE_AR		0x4 /* read allocate */
-+#define AXI3_CACHE_TYPE_SNP		0x2 /* cacheable */
-+#define AXI3_CACHE_TYPE_BUF		0x1 /* bufferable */
-+#define DWC3_GSBUSCFG0_DATARD_SHIFT	28
-+#define DWC3_GSBUSCFG0_DESCRD_SHIFT	24
-+#define DWC3_GSBUSCFG0_DATAWR_SHIFT	20
-+#define DWC3_GSBUSCFG0_DESCWR_SHIFT	16
-+#define DWC3_GSBUSCFG0_SNP_MASK		0xffff0000
-+#define DWC3_GSBUSCFG0_DATABIGEND	(1 << 11)
-+#define DWC3_GSBUSCFG0_DESCBIGEND	(1 << 10)
-+#define DWC3_GSBUSCFG0_INCR256BRSTENA	(1 << 7) /* INCR256 burst */
-+#define DWC3_GSBUSCFG0_INCR128BRSTENA	(1 << 6) /* INCR128 burst */
-+#define DWC3_GSBUSCFG0_INCR64BRSTENA	(1 << 5) /* INCR64 burst */
-+#define DWC3_GSBUSCFG0_INCR32BRSTENA	(1 << 4) /* INCR32 burst */
-+#define DWC3_GSBUSCFG0_INCR16BRSTENA	(1 << 3) /* INCR16 burst */
-+#define DWC3_GSBUSCFG0_INCR8BRSTENA	(1 << 2) /* INCR8 burst */
-+#define DWC3_GSBUSCFG0_INCR4BRSTENA	(1 << 1) /* INCR4 burst */
-+#define DWC3_GSBUSCFG0_INCRBRSTENA	(1 << 0) /* undefined length enable */
-+#define DWC3_GSBUSCFG0_INCRBRST_MASK	0xff
-+
-+/* Global SoC Bus Configuration Register 1 */
-+#define DWC3_GSBUSCFG1_1KPAGEENA	(1 << 12) /* 1K page boundary enable */
-+#define DWC3_GSBUSCFG1_PTRANSLIMIT_MASK	0xf00
-+
- /* Global Debug Queue/FIFO Space Available Register */
- #define DWC3_GDBGFIFOSPACE_NUM(n)	((n) & 0x1f)
- #define DWC3_GDBGFIFOSPACE_TYPE(n)	(((n) << 5) & 0x1e0)
+The support is a bit rough around the edges at the time, and some artifacts
+are still shown on the screen for some reasons. Wider testing with
+different display will hopefully nail those down.
+
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Added a ports node under the DSI node
+  - Changed the huarui panel driver to an ili9881c driver
+  - Changed the panel vendor to bananapi
+  - Made the init table static in the panel driver
+  - Dropped the huarui vendor patch for the DT doc.
+
+Changes from v1:
+  - Rebased on 4.16-rc1
+  - Constified a few function arguments and structures
+  - Reworked the DT binding example a bit
+  - Reworked the panel driver to check for DSI return codes, and use DCS
+    helpers when possible
+
+Maxime Ripard (7):
+  drm/sun4i: tcon: Add TRI finish interrupt for vblank
+  dt-bindings: display: Add Allwinner MIPI-DSI bindings
+  drm/sun4i: Add Allwinner A31 MIPI-DSI controller support
+  dt-bindings: panel: Add the Ilitek ILI9881c panel documentation
+  drm/panel: Add Ilitek ILI9881c panel driver
+  arm: dts: sun8i: a33: Add the DSI-related nodes
+  [DO NOT MERGE] arm: dts: sun8i: bpi-m2m: Add DSI display
+
+ Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt |   20 +-
+ Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt       |   93 ++++++-
+ arch/arm/boot/dts/sun8i-a33.dtsi                                    |   44 +++-
+ arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts                        |   39 +++-
+ drivers/gpu/drm/panel/Kconfig                                       |    9 +-
+ drivers/gpu/drm/panel/Makefile                                      |    1 +-
+ drivers/gpu/drm/panel/panel-ilitek-ili9881c.c                       |  506 +++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/Kconfig                                       |   10 +-
+ drivers/gpu/drm/sun4i/Makefile                                      |    4 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                                  |  111 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                                  |   46 +++-
+ drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c                             |  297 +++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c                              | 1111 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h                              |   67 ++++-
+ 14 files changed, 2355 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+ create mode 100644 drivers/gpu/drm/panel/panel-ilitek-ili9881c.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+
+base-commit: 37746b935fb2b75cd3aa014e08f959e0321bde59
 -- 
-1.7.1
+git-series 0.9.1
