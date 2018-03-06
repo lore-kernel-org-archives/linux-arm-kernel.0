@@ -1,66 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Mar 2018 16:43:25 +0000
-Subject: [PATCH] KVM: arm: reserve bit in KVM_REG_ARM encoding for
- secure/nonsecure
-In-Reply-To: <20180306162646.7646-1-peter.maydell@linaro.org>
-References: <20180306162646.7646-1-peter.maydell@linaro.org>
-Message-ID: <4dbad5e5-8e62-4729-16f3-59ce1cfdd550@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 6 Mar 2018 16:43:55 +0000
+Subject: [PATCH v7 02/13] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <20180228220619.6992-3-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-3-jeremy.linton@arm.com>
+Message-ID: <67bdb642-292c-598a-496f-9d186c8a6705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
 
-A couple of comments:
 
-On 06/03/18 16:26, Peter Maydell wrote:
-> We have a KVM_REG_ARM encoding that we use to expose KVM guest registers
-> to userspace. Define that bit 28 in this encoding indicates secure vs
-> nonsecure, so we can distinguish the secure and nonsecure banked versions
-> of a banked AArch32 register.
+On 28/02/18 22:06, Jeremy Linton wrote:
+> The original intent in cacheinfo was that an architecture
+> specific populate_cache_leaves() would probe the hardware
+> and then cache_shared_cpu_map_setup() and
+> cache_override_properties() would provide firmware help to
+> extend/expand upon what was probed. Arm64 was really
+> the only architecture that was working this way, and
+> with the removal of most of the hardware probing logic it
+> became clear that it was possible to simplify the logic a bit.
 > 
-> For KVM currently, all guest registers are nonsecure, but defining
-> the bit is useful for userspace. In particular, QEMU uses this
-> encoding as part of its on-the-wire migration format, and needs to be
-> able to describe secure-bank registers when it is migrating (fully
-> emulated) EL3-enabled CPUs.
-> 
-> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
-> ---
->  arch/arm/include/uapi/asm/kvm.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 6edd177bb1c7..e0d742c36cb1 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -135,6 +135,11 @@ struct kvm_arch_memory_slot {
->  #define KVM_REG_ARM_CRM_SHIFT		7
->  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
->  #define KVM_REG_ARM_32_CRN_SHIFT	11
-> +/* For KVM currently all guest registers are nonsecure, but we reserve a bit
-> + * in the encoding to distinguish secure from nonsecure for banked registers.
-> + */
-
-Nit:
-
-/*
- * This is the canonical comment style.
- */
-
-It might be worth pointing out in the comment that this only applies to
-AArch32 system registers that are banked by security.
-
-> +#define KVM_REG_ARM_SECURE_MASK	0x0000000010000000
-> +#define KVM_REG_ARM_SECURE_SHIFT	28
->  
->  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
->  	(((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
+> This patch combines the walk of the DT nodes with the
+> code updating the cache size/line_size and nr_sets.
+> cache_override_properties() (which was DT specific) is
+> then removed. The result is that cacheinfo.of_node is
+> no longer used as a temporary place to hold DT references
+> for future calls that update cache properties. That change
+> helps to clarify its one remaining use (matching
+> cacheinfo nodes that represent shared caches) which
+> will be used by the ACPI/PPTT code in the following patches.
 > 
 
-Don't you also need to define it on the arm64 side?
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Regards,
+Sudeep
