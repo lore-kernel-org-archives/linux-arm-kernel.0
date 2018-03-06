@@ -1,66 +1,29 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 06 Mar 2018 11:57:03 +0800
-Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
-In-Reply-To: <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
-References: <1520261458.33502.10.camel@aosc.io>
- <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1520308623.33502.13.camel@aosc.io>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 6 Mar 2018 09:56:56 +0530
+Subject: [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+Message-ID: <20180306042656.GJ23018@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-03-05?? 15:47 -0600?Bjorn Helgaas???
-> On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
-> > Hi everyone,
-> > 
-> > I'm trying to implement a driver for the quirky (DW) PCIe RC in the
-> > Allwinner H6 SoC.
-> > 
-> > The quirk is that only the "dbi" space is always mapped, but at the
-> > same time only 64KiB of other spaces (config, downstream IO and
-> > non-
-> > prefetchable memory) are accessible. To access a certain address
-> > the
-> > high 16-bit of the address (all bus addresses in H6 SoC are 32-bit
-> > despite the CPU is 64-bit) needs to be written into the
-> > PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI
-> > space).
-> > So the access to these spaces cannot be processed correctly with
-> > just
-> > readl/writel, as the existing code does.
-> > 
-> > Is it possible to workaround this in the PCI subsystem of Linux?
-> > 
-> > (I have thought a workaround that only maps the current accessible
-> > 64KiB with the MMU, and when accessing the non-accessible part,
-> > catch
-> > the page fault and re-setup the map to the new 64KiB page. But
-> > surely
-> > it will kill the performance.)
-> 
-> If you only need to write to PCIE_ADDR_PAGE_CFG for *config*
-> accesses,
-> this should be easy.  All config accesses go through wrappers
-> (pci_read_config_word(), etc) and several host bridge drivers have to
-> update a register with parts of the config address, e.g.,
-> advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
-> 
-> It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O
-> port
-> accesses.  I/O port accesses do go through a wrapper (inb(), etc), so
-> it might be possible in principle to intercept these, although much
-> more difficult than config accesses, because the config accesses are
-> already set up with per-host bridge hooks, while the I/O port
-> accessors are mostly per-arch.
-> 
-> But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
-> that's really a problem because drivers are allowed to essentially
-> read a memory BAR, convert that bus address to a CPU physical memory
-> address, ioremap() it, then directly access the PCIe memory with
-> loads
-> and stores.
+On 05-03-18, 08:28, Jordan Crouse wrote:
+> I'm glad you brought this up - I was trying to find a place in the documentation
+> to put it, but since target specific nodes would be a new trick for OPP I didn't
+> quite know how to go about doing it. Do we just list them as Optional: or
+> should we add a target specific section to the documentation and list them out
+> there instead?
 
-Unfortunately this is the case. All above (config, IO, memory) needs
-PCIE_ADDR_PAGE_CFG update.
+Something like this and you need to have your own compatible string as
+well:
 
-> 
-> Bjorn
+Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
+
+But first, what's the purpose of this field? Just to check if it can
+be handled by current bindings.
+
+-- 
+viresh
