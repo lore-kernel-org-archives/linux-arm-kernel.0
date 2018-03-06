@@ -1,116 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 6 Mar 2018 11:30:27 +0100
-Subject: [PATCH 2/5] staging: vc04_services: Remove cache-line-size
- property.
-In-Reply-To: <20180305202806.21219-3-eric@anholt.net>
-References: <20180305202806.21219-1-eric@anholt.net>
- <20180305202806.21219-3-eric@anholt.net>
-Message-ID: <a8f369f5-691c-c05f-4c7c-2eadcf4c48c8@i2se.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 06 Mar 2018 10:32:13 +0000
+Subject: [PATCH v2] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
+References: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <861sgx5wb6.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-
-Am 05.03.2018 um 21:28 schrieb Eric Anholt:
-> This was just a way for the DT-passed value to get out of sync with
-> what Linux has configured the ARM for.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+On Mon, 05 Mar 2018 17:06:43 +0000,
+Shanker Donthineni wrote:
+> 
+> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
+> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
+> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
+> of Silicon provider service ID 0xC2001700.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 > ---
->   .../interface/vchiq_arm/vchiq_2835_arm.c           | 25 +++++++---------------
->   .../interface/vchiq_arm/vchiq_pagelist.h           |  1 -
->   2 files changed, 8 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> index b59ef14890aa..e0e01c812036 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> @@ -77,7 +77,6 @@ struct vchiq_pagelist_info {
->   };
->   
->   static void __iomem *g_regs;
-> -static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
->   static unsigned int g_fragments_size;
->   static char *g_fragments_base;
->   static char *g_free_fragments;
-> @@ -117,15 +116,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
->   	if (err < 0)
->   		return err;
->   
-> -	err = of_property_read_u32(dev->of_node, "cache-line-size",
-> -				   &g_cache_line_size);
-> -
-> -	if (err) {
-> -		dev_err(dev, "Missing cache-line-size property\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	g_fragments_size = 2 * g_cache_line_size;
-> +	g_fragments_size = 2 * cache_line_size();
->   
->   	/* Allocate space for the channels in coherent memory */
->   	slot_mem_size = PAGE_ALIGN(TOTAL_SLOTS * VCHIQ_SLOT_SIZE);
-> @@ -548,9 +539,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type)
->   
->   	/* Partial cache lines (fragments) require special measures */
->   	if ((type == PAGELIST_READ) &&
-> -		((pagelist->offset & (g_cache_line_size - 1)) ||
-> +		((pagelist->offset & (cache_line_size() - 1)) ||
->   		((pagelist->offset + pagelist->length) &
-> -		(g_cache_line_size - 1)))) {
-> +		 (cache_line_size() - 1)))) {
->   		char *fragments;
->   
->   		if (down_interruptible(&g_free_fragments_sema) != 0) {
-> @@ -598,10 +589,10 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
->   			g_fragments_size;
->   		int head_bytes, tail_bytes;
->   
-> -		head_bytes = (g_cache_line_size - pagelist->offset) &
-> -			(g_cache_line_size - 1);
-> +		head_bytes = (cache_line_size() - pagelist->offset) &
-> +			(cache_line_size() - 1);
->   		tail_bytes = (pagelist->offset + actual) &
-> -			(g_cache_line_size - 1);
-> +			(cache_line_size() - 1);
+> Chnages since v1:
+>   - Trivial change in cpucaps.h (refresh after removing ARM64_HARDEN_BP_POST_GUEST_EXIT)
+> 
+>  arch/arm64/include/asm/cpucaps.h |  5 ++--
+>  arch/arm64/include/asm/kvm_asm.h |  2 --
+>  arch/arm64/kernel/bpi.S          |  8 ------
+>  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
+>  arch/arm64/kvm/hyp/entry.S       | 12 ---------
+>  arch/arm64/kvm/hyp/switch.c      | 10 --------
+>  6 files changed, 21 insertions(+), 71 deletions(-)
 
-should it be so easy? Back in 2016 we said that cache_line_size() won't 
-work. I always thought that we need the cache line size of L2 not of the 
-L1 one.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Did you already test the behavior for these combinations?
-BCM2835 ARM32, expected cache line size = 32
-BCM2836 ARM32, expected cache line size = 64
-BCM2837 ARM32, expected cache line size = 64
-BCM2837 ARM64, expected cache line size = 64
+Will/Catalin, if you want to take it via the arm64 tree, that's fine
+by me.
 
-Regards
-Stefan
+Thanks,
 
->   
->   		if ((actual >= 0) && (head_bytes != 0)) {
->   			if (head_bytes > actual)
-> @@ -617,8 +608,8 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
->   			(tail_bytes != 0)) {
->   			memcpy((char *)kmap(pages[num_pages - 1]) +
->   				((pagelist->offset + actual) &
-> -				(PAGE_SIZE - 1) & ~(g_cache_line_size - 1)),
-> -				fragments + g_cache_line_size,
-> +				(PAGE_SIZE - 1) & ~(cache_line_size() - 1)),
-> +				fragments + cache_line_size(),
->   				tail_bytes);
->   			kunmap(pages[num_pages - 1]);
->   		}
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-> index a6c5f7cc78f0..bec411061554 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-> @@ -34,7 +34,6 @@
->   #ifndef VCHIQ_PAGELIST_H
->   #define VCHIQ_PAGELIST_H
->   
-> -#define CACHE_LINE_SIZE 32
->   #define PAGELIST_WRITE 0
->   #define PAGELIST_READ 1
->   #define PAGELIST_READ_WITH_FRAGMENTS 2
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
