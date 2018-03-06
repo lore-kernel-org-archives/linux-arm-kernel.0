@@ -1,37 +1,38 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon,  5 Mar 2018 16:41:13 -0800
-Subject: [GIT PULL 2/2] SOC: Couple of drivers changes for v4.17
-In-Reply-To: <1520296873-12982-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1520296873-12982-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <1520296873-12982-2-git-send-email-santosh.shilimkar@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 5 Mar 2018 18:50:31 -0600
+Subject: [PATCH 2/2] serial: stm32: update interrupt initialization
+In-Reply-To: <1519815044-22669-3-git-send-email-bich.hemon@st.com>
+References: <1519815044-22669-1-git-send-email-bich.hemon@st.com>
+ <1519815044-22669-3-git-send-email-bich.hemon@st.com>
+Message-ID: <20180306005031.fqwlwd2yodly4i7k@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 91ab883eb21325ad80f3473633f794c78ac87f51:
+On Wed, Feb 28, 2018 at 10:51:17AM +0000, Bich HEMON wrote:
+> For each port, get each IRQ using its specific name instead of its index.
+> 
+> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+> ---
+>  drivers/tty/serial/stm32-usart.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+> index 0fa735b..5c85cbc 100644
+> --- a/drivers/tty/serial/stm32-usart.c
+> +++ b/drivers/tty/serial/stm32-usart.c
+> @@ -680,8 +680,8 @@ static int stm32_init_port(struct stm32_port *stm32port,
+>  	port->flags	= UPF_BOOT_AUTOCONF;
+>  	port->ops	= &stm32_uart_ops;
+>  	port->dev	= &pdev->dev;
+> -	port->irq	= platform_get_irq(pdev, 0);
+> -	stm32port->wakeirq = platform_get_irq(pdev, 1);
+> +	port->irq	= platform_get_irq_byname(pdev, "event");
+> +	stm32port->wakeirq = platform_get_irq_byname(pdev, "wakeup");
 
-  Linux 4.16-rc2 (2018-02-18 17:29:42 -0800)
+This change is not necessary. The interrupts should be at fixed indices.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.17
-
-for you to fetch changes up to a817e5d82a2dc5daaa0a8a66cfab268fdf2f6bb6:
-
-  memory: ti-emif-sram: remove redundant dev_err call in ti_emif_probe() (2018-03-05 16:21:31 -0800)
-
-----------------------------------------------------------------
-SOC driver changes for v4.17
-
- - Remove deundant dev_err from probe in ti-emif-srma driver
- - Make use of seq_putc in emif reg show
-
-----------------------------------------------------------------
-SF Markus Elfring (1):
-      memory-EMIF: Use seq_putc() in emif_regdump_show()
-
-Wei Yongjun (1):
-      memory: ti-emif-sram: remove redundant dev_err call in ti_emif_probe()
-
- drivers/memory/emif.c       | 2 +-
- drivers/memory/ti-emif-pm.c | 1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
+>  	stm32port->fifoen = stm32port->info->cfg.has_fifo;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -- 
+> 1.9.1
