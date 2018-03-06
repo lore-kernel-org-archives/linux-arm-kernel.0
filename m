@@ -1,27 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 17:13:46 +0000
-Subject: [PATCH v7 04/13] arm64/acpi: Create arch specific cpu to acpi id
- helper
-In-Reply-To: <20180228220619.6992-5-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-5-jeremy.linton@arm.com>
-Message-ID: <6763fdb6-92ac-c9cd-0cbc-e641e785b2d9@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  6 Mar 2018 17:15:31 +0000
+Subject: [PATCH v4 1/5] arm64: module: don't BUG when exceeding preallocated
+ PLT count
+In-Reply-To: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180306171535.25681-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When PLTs are emitted at relocation time, we really should not exceed
+the number that we counted when parsing the relocation tables, and so
+currently, we BUG() on this condition. However, even though this is a
+clear bug in this particular piece of code, we can easily recover by
+failing to load the module.
 
+So instead, return 0 from module_emit_plt_entry() if this condition
+occurs, which is not a valid kernel address, and can hence serve as
+a flag value that makes the relocation routine bail out.
 
-On 28/02/18 22:06, Jeremy Linton wrote:
-> Its helpful to be able to lookup the acpi_processor_id associated
-> with a logical cpu. Provide an arm64 helper to do this.
-> 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/module-plts.c | 3 ++-
+ arch/arm64/kernel/module.c      | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-This patch on it's own is good, but it's quite generic and made to look
-at it again. Sorry for missing this earlier.
-
-Can we use "per_cpu(processors, cpu)->acpi_id" at call sites instead ?
-Or you can make that a generic helper using above expression ?
-
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index ea640f92fe5a..6bf07c602bd4 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -36,7 +36,8 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ 		return (u64)&plt[i - 1];
+ 
+ 	pltsec->plt_num_entries++;
+-	BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
++	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
++		return 0;
+ 
+ 	return (u64)&plt[i];
+ }
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index f469e0435903..c8c6c2828b79 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -386,6 +386,8 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
+ 			    ovf == -ERANGE) {
+ 				val = module_emit_plt_entry(me, loc, &rel[i], sym);
++				if (!val)
++					return -ENOEXEC;
+ 				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
+ 						     26, AARCH64_INSN_IMM_26);
+ 			}
 -- 
-Regards,
-Sudeep
+2.11.0
