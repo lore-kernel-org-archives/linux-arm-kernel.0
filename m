@@ -1,50 +1,51 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 6 Mar 2018 08:43:51 -0600
-Subject: [PATCH 1/3] arm64: dts: msm8916: Add cpu cooling maps
-In-Reply-To: <9f7199f0027ef2382e5ccc61a5118d0a00fa2e63.1520340931.git.amit.kucheria@linaro.org>
-References: <cover.1520340931.git.amit.kucheria@linaro.org>
- <9f7199f0027ef2382e5ccc61a5118d0a00fa2e63.1520340931.git.amit.kucheria@linaro.org>
-Message-ID: <CAL_Jsq+QRTi6MnsnZeDVzUXsj5ya0OBROp8HeZ1cX+F=EGtoCA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue,  6 Mar 2018 20:09:05 +0530
+Subject: [PATCH v9 12/15] dt-bindings: clock: Document qcom,krait-cc
+In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1520347148-27852-13-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Viresh
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-On Tue, Mar 6, 2018 at 7:05 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> From: Rajendra Nayak <rnayak@codeaurora.org>
->
-> Add cpu cooling maps for cpu passive trip points. The cpu cooling
-> device states are mapped to cpufreq based scaling frequencies.
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index e468277..acac9e3 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -15,6 +15,7 @@
->  #include <dt-bindings/clock/qcom,gcc-msm8916.h>
->  #include <dt-bindings/reset/qcom,gcc-msm8916.h>
->  #include <dt-bindings/clock/qcom,rpmcc.h>
-> +#include <dt-bindings/thermal/thermal.h>
->
->  / {
->         model = "Qualcomm Technologies, Inc. MSM8916";
-> @@ -115,6 +116,10 @@
->                         cpu-idle-states = <&CPU_SPC>;
->                         clocks = <&apcs 0>;
->                         operating-points-v2 = <&cpu_opp_table>;
-> +                       /* cooling options */
-> +                       cooling-min-level = <0>;
-> +                       cooling-max-level = <7>;
+The Krait clock controller controls the krait CPU and the L2 clocks
+consisting a primary mux and secondary mux. Add document for that.
 
-Viresh is working on removing these from the binding...
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ .../devicetree/bindings/clock/qcom,krait-cc.txt    | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
 
-> +                       #cooling-cells = <2>;
->                 };
->
->                 CPU1: cpu at 1 {
+diff --git a/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt b/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
+new file mode 100644
+index 0000000..874138f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
+@@ -0,0 +1,22 @@
++Krait Clock Controller
++
++PROPERTIES
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++			"qcom,krait-cc-v1"
++			"qcom,krait-cc-v2"
++
++- #clock-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 1
++
++Example:
++
++	kraitcc: clock-controller {
++		compatible = "qcom,krait-cc-v1";
++		#clock-cells = <1>;
++	};
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
