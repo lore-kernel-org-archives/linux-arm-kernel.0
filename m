@@ -1,70 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Mar 2018 15:25:45 +0000
-Subject: [RFC PATCH v3 3/3] arm64/kernel: enable A53 erratum #8434319
- handling at runtime
-In-Reply-To: <CAKv+Gu-aKVp_G5Fnjk9pbERG53pZQVn2LL5Yb_0E0yp3jfRRuQ@mail.gmail.com>
-References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
- <20180214113645.16793-4-ard.biesheuvel@linaro.org>
- <20180305172256.GC12869@arm.com>
- <CAKv+Gu-qZR57jaLUjhJFkP2u=XzEN7ewX+GsrKbPbbONwvxBww@mail.gmail.com>
- <20180305173959.GB13385@arm.com>
- <CAKv+Gu-aKVp_G5Fnjk9pbERG53pZQVn2LL5Yb_0E0yp3jfRRuQ@mail.gmail.com>
-Message-ID: <20180306152545.GD18477@arm.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Tue, 6 Mar 2018 08:37:57 -0700
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180306042656.GJ23018@vireshk-i7>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+Message-ID: <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 06:01:30PM +0000, Ard Biesheuvel wrote:
-> On 5 March 2018 at 17:40, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Mar 05, 2018 at 05:29:26PM +0000, Ard Biesheuvel wrote:
-> >> On 5 March 2018 at 17:22, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Wed, Feb 14, 2018 at 11:36:45AM +0000, Ard Biesheuvel wrote:
-> >> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> >> >> index 07823595b7f0..c065d5649b1b 100644
-> >> >> --- a/arch/arm64/kernel/cpu_errata.c
-> >> >> +++ b/arch/arm64/kernel/cpu_errata.c
-> >> >> @@ -228,6 +228,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
-> >> >>  }
-> >> >>  #endif       /* CONFIG_HARDEN_BRANCH_PREDICTOR */
-> >> >>
-> >> >> +static bool __maybe_unused
-> >> >> +needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
-> >> >> +                             int scope)
-> >> >> +{
-> >> >> +     u32 cpuid = read_cpuid_id();
-> >> >> +
-> >> >> +     WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-> >> >> +
-> >> >> +     if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
-> >> >> +             return false;
-> >> >> +     else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
-> >> >> +             /* erratum was fixed in some versions of r0p4 */
-> >> >> +             return !(read_cpuid(REVIDR_EL1) & BIT(8));
-> >> >
-> >> > The rXpY information is in the MIDR, so this is checking for something else
-> >> > afaict.
-> >> >
-> >>
-> >> No, it checks the REVIDR of r0p4 parts, of which bit 8 tells us if
-> >> this specific erratum has been fixed.
-> >
-> > /me checks errata notice.
-> >
-> > Ok, fair enough! Given that it looks like this mechanism is used for other
-> > errata too, it would make sense to support it in the arm64_cpu_capabilities
-> > structure alongside the midr stuff.
-> >
+On Tue, Mar 06, 2018 at 09:56:56AM +0530, Viresh Kumar wrote:
+> On 05-03-18, 08:28, Jordan Crouse wrote:
+> > I'm glad you brought this up - I was trying to find a place in the documentation
+> > to put it, but since target specific nodes would be a new trick for OPP I didn't
+> > quite know how to go about doing it. Do we just list them as Optional: or
+> > should we add a target specific section to the documentation and list them out
+> > there instead?
 > 
-> Are you saying I should abstract REVIDR access for this series? I
-> don't mind, but in that case, could you be a bit clearer about what
-> you would like to see?
+> Something like this and you need to have your own compatible string as
+> well:
+> 
+> Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
+> 
+> But first, what's the purpose of this field? Just to check if it can
+> be handled by current bindings.
 
-Sorry, yes. I was thinking about having a revidr mask/value pair field in
-the arm64_cpu_capabilities structure which, if set to a non-zero value by
-the errata entry, is then used as a secondary check if the MIDR match
-indicates that the CPU is affected by the erratum. A quick look at some of
-our errata notices suggests that this can then be used for some other Cortex
-cores as well.
+I'll try to explain but I might need Stephen or some of the other folks to jump
+in and save me.
 
-Feel free to do it as a follow-up patch if it's easier.
+On sdm845 there are shared power resources controlled by the RPMh which is
+programed by a series of commands from the regulator driver; but in the case
+of the GPU the votes are passed to the GMU (graphics management unit) which
+communicates with the RPMh on behalf of the GPU.
 
-Will
+In order to construct the RPMh vote we need first need a voltage level that we
+can look up in a database. qcom,arc-level is the voltage level associated with
+a specific OPP.
+
+I had previously been abusing this with opp-microvolt but that was wrong for
+obvious reasons and then Stephen pointed out that this would be a better way.
+
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
