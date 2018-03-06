@@ -1,31 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Mar 2018 17:45:30 +0100
-Subject: [PATCH v2 0/8] ARTPEC-6 ARM SoC device tree updates
-In-Reply-To: <20180221090000.18091-1-niklas.cassel@axis.com>
-References: <20180221090000.18091-1-niklas.cassel@axis.com>
-Message-ID: <CAK8P3a0ykwsO40w49TL9xgVKv3wrvx7KXz1o6XD5+qXQ6n8YUA@mail.gmail.com>
+Date: Tue, 6 Mar 2018 17:48:09 +0100
+Subject: [GIT PULL] Reset controller changes for v4.17
+In-Reply-To: <1519300351.7447.8.camel@pengutronix.de>
+References: <1519300351.7447.8.camel@pengutronix.de>
+Message-ID: <CAK8P3a1J8_26+30_KhubMppfXThbpg8psV8KQhRne08mJFPufA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 9:59 AM, Niklas Cassel <niklas.cassel@axis.com> wrote:
-> Hello,
+On Thu, Feb 22, 2018 at 12:52 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Dear arm-soc maintainers,
 >
-> Here comes some ARTPEC-6 ARM SoC device tree updates.
+> Please consider merging this tag for v4.17. It contains level reset
+> support for Meson8b SoCs, which was already implemented for the newer
+> Meson GX, removing the distinction between the two families in the
+> meson-reset driver. Also the ASPEED LPC reset controller is enabled for
+> AST2400 and AST2500 SoCs by extending the compatibles list in the
+> simple-reset driver.
 >
-> Niklas Cassel (8):
->   ARM: dts: artpec: disable Accelerator Coherency Port
->   ARM: dts: artpec: use 1 GiB RAM
->   ARM: dts: artpec: remove 0x prefix from clkctrl unit address
->   ARM: dts: artpec: migrate ethernet to stmmac binding
->   ARM: dts: artpec: add and utilize artpec6 pin controller
->   ARM: dts: artpec: add and utilize nbpfaxi DMA controllers
->   ARM: dts: artpec: add disabled node for PCIe endpoint mode
->   ARM: dts: artpec: add node for hardware crypto accelerator
 
-For a series eight patches, a pull request would save me some work, but
-I applied it anyway.
+Pulled into next/drivers, thanks!
 
-Are you sure that the first three patches shouldn't be applied to stable
-backports?
 
-     Arnd
+> ----------------------------------------------------------------
+> Reset controller changes for v4.17
+>
+> This enables level resets on Meson8b SoCs. Level resets have been
+> previously implemented for the newer Meson GX SoCs, so this removes
+> the distinction between the two families in the meson-reset driver.
+>
+> Also enables the ASPEED LPC reset controller on ASPEED AST2400 and
+> AST2500 SoCs, by adding compatibles to the simple-reset driver.
+
+You seem to be saying the same thing here and above in different words,
+No need for that when you have a proper tag description.
+
+       Arnd
