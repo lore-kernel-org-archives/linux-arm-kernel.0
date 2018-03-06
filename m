@@ -1,35 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Mar 2018 21:33:50 +0000
-Subject: Regulator regression in next-20180305
-In-Reply-To: <CAOMZO5BfEfXN6OgxXswm8qFDbxDJKdUJmhDZGr_DBOh8fbtodA@mail.gmail.com>
-References: <20180305231246.GB5799@atomide.com>
- <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
- <20180306163035.GE13586@sirena.org.uk>
- <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
- <20180306191218.GF13586@sirena.org.uk>
- <CAOMZO5BfEfXN6OgxXswm8qFDbxDJKdUJmhDZGr_DBOh8fbtodA@mail.gmail.com>
-Message-ID: <20180306213350.GH13586@sirena.org.uk>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Tue,  6 Mar 2018 22:58:19 +0100
+Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
+Message-ID: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 05:06:48PM -0300, Fabio Estevam wrote:
-> On Tue, Mar 6, 2018 at 4:12 PM, Mark Brown <broonie@kernel.org> wrote:
+According to the i.MX25 reference manuals, each SSI has four FIFOs. All
+of those FIFOs can store up to 15 entries.
 
-> > Yeah, that's what I expected.  What we really need to figure out I think
-> > is what exactly is taking the lock that we end up colliding with, I
-> > don't seem to be able to reproduce so I'm having to just go on staring
-> > at the code here.
+The fsl_ssi driver's internal default for the FIFO depth in 8. Set our
+non-default FIFO depth explicitly in the Device Tree.
 
-> Any debug options I should turn on in order to help us to understand
-> more on the lock issue?
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+ arch/arm/boot/dts/imx25.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-No, unfortunately, apart from the generic kernel ones (like lockdep).
-I'll try to have a poke at adding some tomorrow, though I'm also
-considering just dropping the series for now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/591e2d86/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 9725705..cf70df2 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -269,6 +269,7 @@
+ 				dmas = <&sdma 24 1 0>,
+ 				       <&sdma 25 1 0>;
+ 				dma-names = "rx", "tx";
++				fsl,fifo-depth = <15>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -329,6 +330,7 @@
+ 				dmas = <&sdma 28 1 0>,
+ 				       <&sdma 29 1 0>;
+ 				dma-names = "rx", "tx";
++				fsl,fifo-depth = <15>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.1.4
