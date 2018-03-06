@@ -1,140 +1,37 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 6 Mar 2018 10:00:32 -0800
-Subject: [PATCH] arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs,
- wifi reset)
-In-Reply-To: <d0aac677-ed2e-c059-0cba-79f88de194b4@arm.com>
-References: <20180227204711.29357-1-dianders@chromium.org>
- <3831527.HjPPvuL6zK@diego>
- <d0aac677-ed2e-c059-0cba-79f88de194b4@arm.com>
-Message-ID: <CAD=FV=Wr6_U9c1qFRgx3=JhMg8US20_oMEmEfCdpVyGKek_8gQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 06 Mar 2018 17:59:06 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
+ fault on kernel VA
+In-Reply-To: <20180306160553.GN32331@e103592.cambridge.arm.com>
+References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+ <20180305140506.GJ32331@e103592.cambridge.arm.com>
+ <20180305172418.GD12869@arm.com>
+ <CAFEAcA9e1swOcYx5YCokSmb_37pyaJYJZTudt57babkngicutw@mail.gmail.com>
+ <20180306160553.GN32331@e103592.cambridge.arm.com>
+Message-ID: <5A9ED6EA.3040700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dave, Peter,
 
-On Tue, Mar 6, 2018 at 3:58 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi all,
->
-> On 01/03/18 08:43, Heiko St?bner wrote:
->> Am Dienstag, 27. Februar 2018, 21:47:11 CET schrieb Douglas Anderson:
->>> Back in the early days when gru devices were still under development
->>> we found an issue where the WiFi reset line needed to be configured as
->>> early as possible during the boot process to avoid the WiFi module
->>> being in a bad state.
->>>
->>> We found that the way to get the kernel to do this in the earliest
->>> possible place was to configure this line in the pinctrl hogs, so
->>> that's what we did.  For some history here you can see
->>> <http://crosreview.com/368770>.  After the time that change landed in
->>> the kernel, we landed a firmware change to configure this line even
->>> earlier.  See <http://crosreview.com/399919>.  However, even after the
->>> firmware change landed we kept the kernel change to deal with the fact
->>> that some people working on devices might take a little while to
->>> update their firmware.
->>>
->>> At this there are definitely zero devices out in the wild that have
->>> firmware without the fix in it.  Specifically looking in the firmware
->>> branch several critically important fixes for memory stability landed
->>> after the patch in coreboot and I know we didn't ship without those.
->>> Thus, by now, everyone should have the new firmware and it's safe to
->>> not have the kernel set this up in a pinctrl hog.
->>>
->>> Historically, even though it wasn't needed to have this in a pinctrl
->>> hog, we still kept it since it didn't hurt.  Pinctrl would apply the
->>> default hog at bootup and then would never touch things again.  That
->>> all changed with commit 981ed1bfbc6c ("pinctrl: Really force states
->>> during suspend/resume").  After that commit then we'll re-apply the
->>> default hog at resume time and that can screw up the reset state of
->>> WiFi.  ...and on rk3399 if you touch a device on PCIe in the wrong way
->>> then the whole system can go haywire.  That's what was happening.
->>> Specifically you'd resume a rk3399-gru-* device and it would mostly
->>> resume, then would crash with some crazy weird crash.
->>>
->>> One could say, perhaps, that the recent pinctrl change was at fault
->>> (and should be fixed) since it changed behavior.  ...but that's not
->>> really true.  The device tree for rk3399-gru is really to blame.
->>> Specifically since the pinctrl is defined in the hog and not in the
->>> "wlan-pd-n" node then the actual user of this pin doesn't have a
->>> pinctrl entry for it.  That's bad.
->>>
->>> Let's fix our problems by just moving the control of
->>> "wlan_module_reset_l pinctrl" out of the hog and put them in the
->>> proper place.
->>>
->>> NOTE: in theory, I think it should actually be possible to have a pin
->>> controlled _both_ by the hog and by an actual device.  Once the device
->>> claims the pin I think the hog is supposed to let go.  I'm not 100%
->>> sure that this works and in any case this solution would be more
->>> complex than is necessary.
->>>
->>> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Fixes: 48f4d9796d99 ("arm64: dts: rockchip: add Gru/Kevin DTS")
->>> Fixes: 981ed1bfbc6c ("pinctrl: Really force states during suspend/resume")
->>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->>
->> applied as fix for 4.16 with the 2 Tested-tags
-> Sorry to rain on everyone's parade, but further testing shows that this
-> patch may not be enough to restore a reliable s2r. My initial testing
-> did show that we were resuming without the VOP errors, but there seem to
-> be further issues (I'm loosing the keyboard and the trackpad after
-> resume on Kevin).
->
-> Applying my initial hack makes it work again. I suspect that there are
-> more hog pins that need tweaking, but I'm a bit out of my depth here.
+On 06/03/18 16:05, Dave Martin wrote:
+> On Tue, Mar 06, 2018 at 03:59:59PM +0000, Peter Maydell wrote:
+>> AFAIK the major thing that consumers actually are after here
+>> is the WnR information, so preserving that and sanitizing
+>> the rest of the ESR if necessary would be a less risky fix IMHO.
+> 
+> If there is a way of squashing the syndrome information so that it
+> reports a fixed syndrome except for information about what userspace
+> attempted to do (i.e., WnR -- I dunno if there's anything else), that
+> seems reasonable.
 
-Are you positive you weren't just wearing your lucky hat when you
-tested your patch and then took it off when you tested mine?  As far
-as I can see the only hogs left on kevin are:
+Anything else? For the RAS stuff I planned to use this to indicate whether a
+SIBGUS due to hwpoison was due to an instruction or data abort, so a
+sanitised-EC field would be good.
 
-  &ap_pwroff      /* AP will auto-assert this when in S3 */
-  &clk_32k        /* This pin is always 32k on gru boards */
-
-Those map to:
-
-  ap_pwroff: ap-pwroff {
-     rockchip,pins = <1 5 RK_FUNC_1 &pcfg_pull_none>;
-  };
-
-  clk_32k: clk-32k {
-    rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-  };
-
-So I added some printouts at suspend/resume time.  Specifically I set
-a boolean to "true" for the duration rockchip_pinctrl_suspend() and
-rockchip_pinctrl_resume() and this turned on a printout in
-rockchip_set_mux().  My printout looked like this (yeah, I know it's a
-whitespace-damaged patch just to show what I'm doing):
-
-+       regmap_read(regmap, reg, &before);
-        data = (mask << (bit + 16));
-        rmask = data | (data >> 16);
-        data |= (mux & mask) << bit;
-        ret = regmap_update_bits(regmap, reg, rmask, data);
-
-+       regmap_read(regmap, reg, &after);
-+
-+       if (DOUG) {
-+               dev_info(info->dev,
-+                        "setting mux of GPIO%d-%d to %d; %#010x=>%#010x\n",
-+                        bank->bank_num, pin, mux, reg, before, after);
-+       }
-
-...and a similar one in rockchip_set_pull().  That showed this at resume time:
-
-[   62.284427] rockchip-pinctrl pinctrl: setting mux of GPIO1-5 to 1;
-0x00009400=>0x00009400
-[   62.294423] rockchip-pinctrl pinctrl: setting pull of GPIO1-5;
-0x000041aa=>0x000041aa
-[   62.303343] rockchip-pinctrl pinctrl: setting mux of GPIO0-0 to 2;
-0x00005002=>0x00005002
-[   62.313240] rockchip-pinctrl pinctrl: setting pull of GPIO0-0;
-0x00000ddc=>0x00000ddc
-[
-
-Said another way: pinmux and pull isn't actually changing due to the
-hogs.  We can see if something else could be changing, but I'd really
-want to be sure you're certain that the hogs are causing you
-problems...
+(this lets KVMs user-space inject the correct flavour of external-abort)
 
 
--Doug
+Thanks,
+
+James
