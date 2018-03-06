@@ -1,22 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 16:55:11 +0000
-Subject: [PATCH v7 06/13] ACPI: Enable PPTT support on ARM64
-In-Reply-To: <20180228220619.6992-7-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-7-jeremy.linton@arm.com>
-Message-ID: <776784b6-01ce-1385-0d02-ca5fd1ece61f@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 Mar 2018 13:56:42 -0300
+Subject: Regulator regression in next-20180305
+In-Reply-To: <20180306163035.GE13586@sirena.org.uk>
+References: <20180305231246.GB5799@atomide.com>
+ <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
+ <20180306163035.GE13586@sirena.org.uk>
+Message-ID: <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
+On Tue, Mar 6, 2018 at 1:30 PM, Mark Brown <broonie@kernel.org> wrote:
 
-On 28/02/18 22:06, Jeremy Linton wrote:
-> Now that we have a PPTT parser, in preparation for its use
-> on arm64, lets build it.
-> 
+> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> index e685f8b94acf..2c5b20a97f51 100644
+> --- a/drivers/regulator/core.c
+> +++ b/drivers/regulator/core.c
+> @@ -159,7 +159,7 @@ static void regulator_lock_supply(struct regulator_dev *rdev)
+>  {
+>         int i;
+>
+> -       for (i = 0; rdev; rdev = rdev_get_supply(rdev), i++)
+> +       for (i = 1000; rdev; rdev = rdev_get_supply(rdev), i++)
+>                 mutex_lock_nested(&rdev->mutex, i);
 
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
+With this change the log is a bit different, but still get a kernel hang:
+https://pastebin.com/eF08TnuT
 
--- 
-Regards,
-Sudeep
+Thanks
