@@ -1,55 +1,51 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  6 Mar 2018 17:15:31 +0000
-Subject: [PATCH v4 1/5] arm64: module: don't BUG when exceeding preallocated
- PLT count
-In-Reply-To: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
-References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180306171535.25681-2-ard.biesheuvel@linaro.org>
+Date: Tue,  6 Mar 2018 17:15:30 +0000
+Subject: [PATCH v4 0/5] arm64/kernel: get rid of GCC large model code
+Message-ID: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When PLTs are emitted at relocation time, we really should not exceed
-the number that we counted when parsing the relocation tables, and so
-currently, we BUG() on this condition. However, even though this is a
-clear bug in this particular piece of code, we can easily recover by
-failing to load the module.
+GCC's large model uses literal pools to emit cross object symbol
+references rather than movz/movk sequences, resulting in data items
+mixed in the with executable code in modules' .text segments, reducing
+cache utilization, but also potentially resulting in the creation of
+code gadgets that are exploitable under speculative execution.
 
-So instead, return 0 from module_emit_plt_entry() if this condition
-occurs, which is not a valid kernel address, and can hence serve as
-a flag value that makes the relocation routine bail out.
+We are using GCC's large model for two separate reasons, both of which can
+be worked around rather easily:
+- KASLR uses it to move modules and the kernel very far apart, which is
+  not really needed,
+- the Cortex-A53 erratum code uses it to avoid ADRP instruction altogether,
+  which can be replaced by selective patching of only the ADRP instructions
+  that are affected by the erratum
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/module-plts.c | 3 ++-
- arch/arm64/kernel/module.c      | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+v4:
+- dropped RFC prefix
+- added patch #1 and #4
+- use _AC() for new SIZE_4G constant with ULL prefix (#2)
+- improve comments, get rid of BUG() when running out of PLT entries (#3)
+- rely on new REVIDR checking code (#5)
 
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index ea640f92fe5a..6bf07c602bd4 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -36,7 +36,8 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
- 		return (u64)&plt[i - 1];
- 
- 	pltsec->plt_num_entries++;
--	BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
-+	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
-+		return 0;
- 
- 	return (u64)&plt[i];
- }
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f469e0435903..c8c6c2828b79 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -386,6 +386,8 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
- 			    ovf == -ERANGE) {
- 				val = module_emit_plt_entry(me, loc, &rel[i], sym);
-+				if (!val)
-+					return -ENOEXEC;
- 				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
- 						     26, AARCH64_INSN_IMM_26);
- 			}
+Ard Biesheuvel (5):
+  arm64: module: don't BUG when exceeding preallocated PLT count
+  arm64/kernel: kaslr: reduce module randomization range to 4 GB
+  arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419
+  arm64/errata: add REVIDR handling to framework
+  arm64/kernel: enable A53 erratum #8434319 handling at runtime
+
+ arch/arm64/Kconfig                  | 18 ++--
+ arch/arm64/Makefile                 |  5 --
+ arch/arm64/include/asm/cpucaps.h    |  3 +-
+ arch/arm64/include/asm/cpufeature.h |  4 +
+ arch/arm64/include/asm/module.h     |  2 +
+ arch/arm64/kernel/cpu_errata.c      | 31 ++++++-
+ arch/arm64/kernel/kaslr.c           | 20 +++--
+ arch/arm64/kernel/module-plts.c     | 90 +++++++++++++++++++-
+ arch/arm64/kernel/module.c          | 42 +++++++--
+ arch/arm64/kernel/reloc_test_core.c |  4 +-
+ arch/arm64/kernel/reloc_test_syms.S | 12 ++-
+ include/linux/sizes.h               |  4 +
+ 12 files changed, 191 insertions(+), 44 deletions(-)
+
 -- 
 2.11.0
