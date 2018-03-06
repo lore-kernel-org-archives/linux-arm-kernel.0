@@ -1,57 +1,48 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 6 Mar 2018 17:06:34 +0800
-Subject: [PATCH v4 0/6] Fix the overlapping registers issue for the MediTek
- audio system
-Message-ID: <cover.1520326090.git.ryder.lee@mediatek.com>
+Date: Tue, 6 Mar 2018 17:09:26 +0800
+Subject: [PATCH v4 1/6] clk: mediatek: update missing clock data for MT7622
+ audsys
+In-Reply-To: <cover.1520327262.git.ryder.lee@mediatek.com>
+References: <cover.1520327262.git.ryder.lee@mediatek.com>
+Message-ID: <d768a69e47bef843ae324801dca22a66289c959f.1520327262.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add missing clock data 'CLK_AUDIO_AFE_CONN' for MT7622 audsys.
 
-This is the new round of the audsys. I add devm_of_platform_populate() in the clock driver
-to populate the child devices (AFE) so that we can handle the dependency for all functions. 
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/clk/mediatek/clk-mt7622-aud.c  | 1 +
+ include/dt-bindings/clock/mt7622-clk.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-changes since v4:
- - remove "simple-mfd" from mediatek,audsys.txt.
- - switch to use devm_of_platform_populate() to populate the child devices.
+diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+index fad7d9f..13f752d 100644
+--- a/drivers/clk/mediatek/clk-mt7622-aud.c
++++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+@@ -106,6 +106,7 @@
+ 	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
+ 	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
+ 	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
++	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
+ 	/* AUDIO2 */
+ 	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
+ 	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
+diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
+index 3e514ed..e9d77f0 100644
+--- a/include/dt-bindings/clock/mt7622-clk.h
++++ b/include/dt-bindings/clock/mt7622-clk.h
+@@ -235,7 +235,8 @@
+ #define CLK_AUDIO_MEM_ASRC3		43
+ #define CLK_AUDIO_MEM_ASRC4		44
+ #define CLK_AUDIO_MEM_ASRC5		45
+-#define CLK_AUDIO_NR_CLK		46
++#define CLK_AUDIO_AFE_CONN		46
++#define CLK_AUDIO_NR_CLK		47
  
-changes since v3:
- - Rebase to v4.16.
- - Modify clock driver for the sake of the backward compatibility.
- - Rewrite commit message of patch 4/5 to make it more specific.
-
-changes since v2:
- - Drop useless changes in clk-mt7622-aud.c.
- - Revise binding text: 
-        - Add more information about audio subsystem.
-        - Separate clock node and AFE node.
- - Update license header.
-
-changes since v1:
- - To avoid writing an MFD driver, we add "simple-mfd" in the audsys binding.
- - Move three top clocks to audio driver [1] as we remove mfd/mtk-audsys.c in 
-v1.
-
-Ryder Lee (6):
-  clk: mediatek: update missing clock data for MT7622 audsys
-  clk: mediatek: add devm_of_platform_populate() for MT7622 audsys
-  clk: mediatek: add audsys support for MT2701
-  dt-bindings: clock: mediatek: update audsys documentation to adapt MFD
-    device
-  dt-bindings: clock: mediatek: add audsys support for MT2701
-  arm: dts: mediatek: modify audio related nodes for both MT2701 and
-    MT7623
-
- .../bindings/arm/mediatek/mediatek,audsys.txt      |  20 ++-
- arch/arm/boot/dts/mt2701.dtsi                      | 188 ++++++++++----------
- arch/arm/boot/dts/mt7623.dtsi                      | 190 ++++++++++-----------
- drivers/clk/mediatek/Kconfig                       |   6 +
- drivers/clk/mediatek/Makefile                      |   1 +
- drivers/clk/mediatek/clk-mt2701-aud.c              | 177 +++++++++++++++++++
- drivers/clk/mediatek/clk-mt7622-aud.c              |   9 +-
- include/dt-bindings/clock/mt7622-clk.h             |   3 +-
- 8 files changed, 390 insertions(+), 204 deletions(-)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
-
+ /* SSUSBSYS */
+ 
 -- 
 1.9.1
