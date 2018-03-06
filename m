@@ -1,52 +1,70 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Mar 2018 15:25:41 +0000
-Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
- hardening
-In-Reply-To: <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
-References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
- <20180305155614.GG6618@arm.com>
- <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
- <20180305171529.GA12869@arm.com>
- <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
-Message-ID: <20180306152540.GC18477@arm.com>
+Date: Tue, 6 Mar 2018 15:25:45 +0000
+Subject: [RFC PATCH v3 3/3] arm64/kernel: enable A53 erratum #8434319
+ handling at runtime
+In-Reply-To: <CAKv+Gu-aKVp_G5Fnjk9pbERG53pZQVn2LL5Yb_0E0yp3jfRRuQ@mail.gmail.com>
+References: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
+ <20180214113645.16793-4-ard.biesheuvel@linaro.org>
+ <20180305172256.GC12869@arm.com>
+ <CAKv+Gu-qZR57jaLUjhJFkP2u=XzEN7ewX+GsrKbPbbONwvxBww@mail.gmail.com>
+ <20180305173959.GB13385@arm.com>
+ <CAKv+Gu-aKVp_G5Fnjk9pbERG53pZQVn2LL5Yb_0E0yp3jfRRuQ@mail.gmail.com>
+Message-ID: <20180306152545.GD18477@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 12:03:33PM -0600, Shanker Donthineni wrote:
-> On 03/05/2018 11:15 AM, Will Deacon wrote:
-> > On Mon, Mar 05, 2018 at 10:57:58AM -0600, Shanker Donthineni wrote:
-> >> On 03/05/2018 09:56 AM, Will Deacon wrote:
-> >>> On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
-> >>>> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
-> >>>>  		return 0;
-> >>>>  	}
-> >>>>  
-> >>>> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-> >>>> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
-> >>>> +		cb = qcom_link_stack_sanitization;
-> >>>
-> >>> Is this just a performance thing? Do you actually see an advantage over
-> >>> always making the firmware call? We've seen minimal impact in our testing.
-> >>>
+On Mon, Mar 05, 2018 at 06:01:30PM +0000, Ard Biesheuvel wrote:
+> On 5 March 2018 at 17:40, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Mar 05, 2018 at 05:29:26PM +0000, Ard Biesheuvel wrote:
+> >> On 5 March 2018 at 17:22, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Wed, Feb 14, 2018 at 11:36:45AM +0000, Ard Biesheuvel wrote:
+> >> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> >> >> index 07823595b7f0..c065d5649b1b 100644
+> >> >> --- a/arch/arm64/kernel/cpu_errata.c
+> >> >> +++ b/arch/arm64/kernel/cpu_errata.c
+> >> >> @@ -228,6 +228,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
+> >> >>  }
+> >> >>  #endif       /* CONFIG_HARDEN_BRANCH_PREDICTOR */
+> >> >>
+> >> >> +static bool __maybe_unused
+> >> >> +needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
+> >> >> +                             int scope)
+> >> >> +{
+> >> >> +     u32 cpuid = read_cpuid_id();
+> >> >> +
+> >> >> +     WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+> >> >> +
+> >> >> +     if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
+> >> >> +             return false;
+> >> >> +     else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
+> >> >> +             /* erratum was fixed in some versions of r0p4 */
+> >> >> +             return !(read_cpuid(REVIDR_EL1) & BIT(8));
+> >> >
+> >> > The rXpY information is in the MIDR, so this is checking for something else
+> >> > afaict.
+> >> >
 > >>
-> >> Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
-> >>   - Improves the code readability.
-> >>   - Avoid the unnecessary MIDR checks on each vCPU exit.
-> >>   - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
-> >>   - Avoids the 2nd link stack sanitization workaround in firmware.
-> > 
-> > What I mean is, can we drop qcom_link_stack_sanitization altogether and
-> > use the SMCCC interface for everything?
-> > 
+> >> No, it checks the REVIDR of r0p4 parts, of which bit 8 tells us if
+> >> this specific erratum has been fixed.
+> >
+> > /me checks errata notice.
+> >
+> > Ok, fair enough! Given that it looks like this mechanism is used for other
+> > errata too, it would make sense to support it in the arm64_cpu_capabilities
+> > structure alongside the midr stuff.
+> >
 > 
-> No, We would like to keep it qcom_link_stack_sanitization for host kernel
-> since it takes a few CPU cycles instead of heavyweight SMCCC call.
+> Are you saying I should abstract REVIDR access for this series? I
+> don't mind, but in that case, could you be a bit clearer about what
+> you would like to see?
 
-Is that something that you can actually measure in the workloads and
-benchmarks that you care about? If so, fine, but that doesn't seem to be the
-case for the Cortex cores we've looked at internally and it would be nice to
-avoid having different workarounds in the kernel just because the SMCCC
-interface wasn't baked in time, rather than because there's a meaningful
-performance difference.
+Sorry, yes. I was thinking about having a revidr mask/value pair field in
+the arm64_cpu_capabilities structure which, if set to a non-zero value by
+the errata entry, is then used as a secondary check if the MIDR match
+indicates that the CPU is affected by the erratum. A quick look at some of
+our errata notices suggests that this can then be used for some other Cortex
+cores as well.
+
+Feel free to do it as a follow-up patch if it's easier.
 
 Will
