@@ -1,44 +1,22 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Mar 2018 16:52:09 +0000
-Subject: [PATCH v2 0/6] Arm interconnect PMU driver tidyup
-In-Reply-To: <CAK8P3a1fSYaAQHoESQc8y3Xn+5bAg6dFtjnz1nayfhrpns+ZGg@mail.gmail.com>
-References: <cover.1518717258.git.robin.murphy@arm.com>
- <CAK8P3a1fSYaAQHoESQc8y3Xn+5bAg6dFtjnz1nayfhrpns+ZGg@mail.gmail.com>
-Message-ID: <793b9205-1d81-ce05-bdab-6bf0c0db59ba@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 6 Mar 2018 16:55:11 +0000
+Subject: [PATCH v7 06/13] ACPI: Enable PPTT support on ARM64
+In-Reply-To: <20180228220619.6992-7-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-7-jeremy.linton@arm.com>
+Message-ID: <776784b6-01ce-1385-0d02-ca5fd1ece61f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On 06/03/18 16:38, Arnd Bergmann wrote:
-> On Thu, Feb 15, 2018 at 7:51 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> Hi arm-soc folks,
->>
->> PLease consider this series tidying up the Arm interconnect code
->> in drivers/bus to separate the PMU parts out into drivers/perf
->> where Will and Mark can handle future maintenance more easily.
->>
->> FWIW, the patches are also available on a branch here:
->>
->>    git://linux-arm.org/linux-rm.git perf
+
+On 28/02/18 22:06, Jeremy Linton wrote:
+> Now that we have a PPTT parser, in preparation for its use
+> on arm64, lets build it.
 > 
-> This is not a signed tag, so I applied the patches manually to the drivers
 
-Yes, that was merely a convenience branch for reviewers; I see actual 
-pull requests as being for maintainers, whereas I'm just some oik ;)
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 
-> branch. To add to the bike-shedding, I would have preferred a different
-> approach over the auxdata array, either exporting a function based
-> interface, or calling ioremap() on the physical address multiple times,
-> but each of those has other downsides, so your version seems good
-> enough.
-
-Yeah, all of the options were pretty horrible, but this one was about 
-the most concise and didn't need to introduce any new infrastructure. We 
-have this "PMU as a child of some other device" issue coming up on 
-various other IP blocks as well; the resource claiming conflicts seem to 
-get in the way the most.
-
-Thanks for applying!
-
-Robin.
+-- 
+Regards,
+Sudeep
