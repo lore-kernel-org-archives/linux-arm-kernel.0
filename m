@@ -1,71 +1,132 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Mar 2018 11:31:44 -0800
-Subject: [PATCH 02/10] ARM: omap2plus_defconfig: Add SERIAL_DEV for
- bluetooth
-In-Reply-To: <20180301221704.104530-3-tony@atomide.com>
-References: <20180301221704.104530-1-tony@atomide.com>
- <20180301221704.104530-3-tony@atomide.com>
-Message-ID: <20180306193144.GD5799@atomide.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 6 Mar 2018 13:33:00 -0600
+Subject: [PATCH v6] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <cbdce6fd-a1db-4f12-ccea-adfe9fe7c057@codeaurora.org>
+References: <1519877640-11944-1-git-send-email-shankerd@codeaurora.org>
+ <20180306134405.GB18080@arm.com>
+ <d6182273-c23a-c4fa-ce40-c87055bfb338@codeaurora.org>
+ <20180306152318.GE17454@arm.com>
+ <cbdce6fd-a1db-4f12-ccea-adfe9fe7c057@codeaurora.org>
+Message-ID: <dbc6e162-d245-a685-8bfe-f506d18e19e3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180301 22:18]:
-> We now have SERIAL_DEV that at least TI WLAN devices can use.
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -248,6 +250,7 @@ CONFIG_SERIAL_8250_RSA=y
->  CONFIG_SERIAL_OF_PLATFORM=y
->  CONFIG_SERIAL_OMAP=y
->  CONFIG_SERIAL_OMAP_CONSOLE=y
-> +CONFIG_SERIAL_DEV_BUS=m
->  CONFIG_I2C_CHARDEV=y
->  CONFIG_SPI=y
->  CONFIG_SPI_OMAP24XX=y
+Hi Will,
 
-This we actually want to have built-in, otherwise we don't
-get SERIAL_DEV_CTRL_TTYPORT. Updated patch below.
+On 03/06/2018 12:48 PM, Shanker Donthineni wrote:
+> Hi Will,
+> 
+> On 03/06/2018 09:23 AM, Will Deacon wrote:
+>> Hi Shanker,
+>>
+>> On Tue, Mar 06, 2018 at 08:47:27AM -0600, Shanker Donthineni wrote:
+>>> On 03/06/2018 07:44 AM, Will Deacon wrote:
+>>>> I think this is a slight asymmetry with the code for the I-side. On the
+>>>> I-side, you hook into invalidate_icache_by_line, whereas on the D-side you
+>>>> hook into the callers of dcache_by_line_op. Why is that?
+>>>>
+>>>
+>>> There is no particular reason other than complexity of the macro with another 
+>>> alternative. I tried to avoid this change by updating __clean_dcache_area_pou().
+>>> I can change if you're interested to see both I-Side and D-Side changes are
+>>> symmetric some thing like this...
+>>>
+>>>  .macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+>>>   
+>>>   .if	(\op == cvau)
+>>>   alternative_if ARM64_HAS_CACHE_IDC
+>>>         dsb	ishst
+>>>         b       9997f
+>>>   alternative_else_nop_endif
+>>>   .endif
+>>>
+>>> 	dcache_line_size \tmp1, \tmp2
+>>> 	add	\size, \kaddr, \size
+>>> 	sub	\tmp2, \tmp1, #1
+>>> 	bic	\kaddr, \kaddr, \tmp2
+>>>  9998:
+>>> 	.if	(\op == cvau || \op == cvac)
+>>>  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+>>> 	dc	\op, \kaddr
+>>>  alternative_else
+>>> 	dc	civac, \kaddr
+>>>  alternative_endif
+>>> 	.elseif	(\op == cvap)
+>>>  alternative_if ARM64_HAS_DCPOP
+>>> 	sys 3, c7, c12, 1, \kaddr	// dc cvap
+>>>  alternative_else
+>>> 	dc	cvac, \kaddr
+>>>  alternative_endif
+>>> 	.else
+>>> 	dc	\op, \kaddr
+>>> 	.endif
+>>> 	add	\kaddr, \kaddr, \tmp1
+>>> 	cmp	\kaddr, \size
+>>> 	b.lo	9998b
+>>> 	dsb	\domain
+>>> 9997:
+>>> 	.endm
+>>
+>> I think it would be cleaner the other way round, actually -- move the check
+>> out of invalidate_icache_by_line and into its two callers.
+>>
+> 
+> Sure, I'll send out the next patch with your suggestions.
+> 
+>>>> I notice that the only user other than
+>>>> flush_icache_range/__flush_cache_user_range or invalidate_icache_by_line
+>>>> is in KVM, via invalidate_icache_range. If you want to hook in there, why
+>>>> aren't you also patching __flush_icache_all? If so, I'd rather have the
+>>>> I-side code consistent with the D-side code and do this in the handful of
+>>>> callers. We might even be able to elide a branch or two that way.
+>>>>
+>>>
+>>> Agree with you, it saves function calls overhead. I'll do this change...
+>>>
+>>> static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+>>> {
+>>> 	if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC)
+>>> 	    __invalidate_icache_guest_page(pfn, size);
+>>> }
+>>>
+>>>
+>>>> I'm going to assume that I-cache aliases are all coherent if DIC=1, so it's
+>>>> safe to elide our alias sync code.
+>>>>
+>>>
+>>> I'm not sure about I-cache whether aliases are all coherent if DIC=1 ot not.
+>>> Unfortunately I don't have any hardware to test DIC=1. I've verified IDC=1.
+>>
+>> I checked with our architects and aliases don't pose a problem here, so you
+>> can ignore me :)
+>>
+> 
+> I also confirmed with Thomas Speier, we can skip __flush_icache_all() if DIC=1.
+> 
+>  
+Planning to patch __flush_icache_all() itself instead of changing the callers. This
+way we can avoid "ic ialluis" completely. Is this okay for you? 
 
-Regards,
+static inline void __flush_icache_all(void)
+{
+       /* Instruction cache invalidation is not required for I/D coherence? */
+      if (!cpus_have_const_cap(ARM64_HAS_CACHE_DIC)) {
+               asm("ic ialluis");
+               dsb(ish);
+       }
+}
 
-Tony
+>> Will
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
 
-8< -------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 1 Mar 2018 10:47:35 -0800
-Subject: [PATCH] ARM: omap2plus_defconfig: Add SERIAL_DEV for bluetooth
-
-We now have SERIAL_DEV that at least TI WLAN devices can use.
-We want SERIAL_DEV built-in, so we can also enable the option
-for SERIAL_DEV_CTRL_TTYPORT.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -104,9 +104,11 @@ CONFIG_BT_HIDP=m
- CONFIG_BT_HCIBTUSB=m
- CONFIG_BT_HCIBTSDIO=m
- CONFIG_BT_HCIUART=m
-+CONFIG_BT_HCIUART_NOKIA=m
- CONFIG_BT_HCIUART_BCSP=y
- CONFIG_BT_HCIUART_LL=y
- CONFIG_BT_HCIUART_3WIRE=y
-+CONFIG_BT_HCIUART_BCM=y
- CONFIG_BT_HCIBCM203X=m
- CONFIG_BT_HCIBPA10X=m
- CONFIG_BT_HCIBFUSB=m
-@@ -248,6 +250,7 @@ CONFIG_SERIAL_8250_RSA=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_OMAP=y
- CONFIG_SERIAL_OMAP_CONSOLE=y
-+CONFIG_SERIAL_DEV_BUS=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
 -- 
-2.16.2
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
