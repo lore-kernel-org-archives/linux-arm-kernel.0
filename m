@@ -1,107 +1,57 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 6 Mar 2018 09:14:11 +0100
-Subject: [PATCH 2/2][v5] driver: mtd: update struct map_info's swap as
- per map requirement
-In-Reply-To: <HE1PR04MB1241B7EE0E3905E20214C2A797D90@HE1PR04MB1241.eurprd04.prod.outlook.com>
-References: <20180228073335.1758-1-prabhakar.kushwaha@nxp.com>
- <20180228073335.1758-2-prabhakar.kushwaha@nxp.com>
- <HE1PR04MB1241B7EE0E3905E20214C2A797D90@HE1PR04MB1241.eurprd04.prod.outlook.com>
-Message-ID: <20180306091411.64023af1@bbrezillon>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 6 Mar 2018 17:06:34 +0800
+Subject: [PATCH v4 0/6] Fix the overlapping registers issue for the MediTek
+ audio system
+Message-ID: <cover.1520326090.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi,
 
-On Tue, 6 Mar 2018 06:02:08 +0000
-Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
+This is the new round of the audsys. I add devm_of_platform_populate() in the clock driver
+to populate the child devices (AFE) so that we can handle the dependency for all functions. 
 
-> Dear Boris,
-> 
-> > -----Original Message-----
-> > From: Prabhakar Kushwaha
-> > Sent: Wednesday, February 28, 2018 1:04 PM
-> > To: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
-> > robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org; boris.brezillon at free-
-> > electrons.com; cyrille.pitchen at wedev4u.fr; computersforpeace at gmail.com;
-> > oss at buserror.net; Leo Li <leoyang.li@nxp.com>; Prabhakar Kushwaha
-> > <prabhakar.kushwaha@nxp.com>; Jagdish Gediya
-> > <jagdish.gediya@nxp.com>
-> > Subject: [PATCH 2/2][v5] driver: mtd: update struct map_info's swap as per
-> > map requirement
-> > 
-> > It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-> > Maps device can be Big endian or little endian.
-> > 
-> > Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-> > CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
-> > 
-> > Now update struct map_info's swap field based on device characteristics
-> > defined in device tree.
-> > 
-> > Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-> > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> > ---
-> > Changes for v2: Incorporated review comments from Boris Brezillon
-> > http://patchwork.ozlabs.org/patch/758381/
-> > Changes for v3: None
-> > Changes for v4: Updated code as per new defined binding of physmap.txt
-> > Changes for v5: Avoid map.swap set in case of endiannes not defined in dts
-> > file
-> > 
-> >  drivers/mtd/maps/physmap_of_core.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/maps/physmap_of_core.c
-> > b/drivers/mtd/maps/physmap_of_core.c
-> > index b1bd4faecfb2..527b1682381f 100644
-> > --- a/drivers/mtd/maps/physmap_of_core.c
-> > +++ b/drivers/mtd/maps/physmap_of_core.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/mtd/map.h>
-> >  #include <linux/mtd/partitions.h>
-> >  #include <linux/mtd/concat.h>
-> > +#include <linux/mtd/cfi_endian.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_address.h>
-> >  #include <linux/of_platform.h>
-> > @@ -233,6 +234,11 @@ static int of_flash_probe(struct platform_device
-> > *dev)
-> >  		info->list[i].map.bankwidth = be32_to_cpup(width);
-> >  		info->list[i].map.device_node = dp;
-> > 
-> > +		if (of_property_read_bool(dp, "big-endian"))
-> > +			info->list[i].map.swap = CFI_BIG_ENDIAN;
-> > +		else if (of_property_read_bool(dp, "little-endian"))
-> > +			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-> > +
-> >  		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
-> >  		if (err)
-> >  			goto err_out;
-> > --
-> > 2.14.1  
-> 
-> Is this patch correct with respect to device binding (http://patchwork.ozlabs.org/patch/878974/)
+changes since v4:
+ - remove "simple-mfd" from mediatek,audsys.txt.
+ - switch to use devm_of_platform_populate() to populate the child devices.
+ 
+changes since v3:
+ - Rebase to v4.16.
+ - Modify clock driver for the sake of the backward compatibility.
+ - Rewrite commit message of patch 4/5 to make it more specific.
 
-This patch looks good, but patch 1 is not describing what really
-happens when the xxx-endian props are missing.
+changes since v2:
+ - Drop useless changes in clk-mt7622-aud.c.
+ - Revise binding text: 
+        - Add more information about audio subsystem.
+        - Separate clock node and AFE node.
+ - Update license header.
 
-> May I go ahead and send device tree patches for other NXP platforms
+changes since v1:
+ - To avoid writing an MFD driver, we add "simple-mfd" in the audsys binding.
+ - Move three top clocks to audio driver [1] as we remove mfd/mtk-audsys.c in 
+v1.
 
-Nope, please wait till we sorted out the last issues I pointed on patch
-1.
+Ryder Lee (6):
+  clk: mediatek: update missing clock data for MT7622 audsys
+  clk: mediatek: add devm_of_platform_populate() for MT7622 audsys
+  clk: mediatek: add audsys support for MT2701
+  dt-bindings: clock: mediatek: update audsys documentation to adapt MFD
+    device
+  dt-bindings: clock: mediatek: add audsys support for MT2701
+  arm: dts: mediatek: modify audio related nodes for both MT2701 and
+    MT7623
 
-> 
-> will http://patchwork.ozlabs.org/patch/878974/  along with this patch be send via linux-mtd repo?
-
-Yes, once you've fixed the description or explained why you think the
-current description is valid.
-
-Regards,
-
-Boris
+ .../bindings/arm/mediatek/mediatek,audsys.txt      |  20 ++-
+ arch/arm/boot/dts/mt2701.dtsi                      | 188 ++++++++++----------
+ arch/arm/boot/dts/mt7623.dtsi                      | 190 ++++++++++-----------
+ drivers/clk/mediatek/Kconfig                       |   6 +
+ drivers/clk/mediatek/Makefile                      |   1 +
+ drivers/clk/mediatek/clk-mt2701-aud.c              | 177 +++++++++++++++++++
+ drivers/clk/mediatek/clk-mt7622-aud.c              |   9 +-
+ include/dt-bindings/clock/mt7622-clk.h             |   3 +-
+ 8 files changed, 390 insertions(+), 204 deletions(-)
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
 
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+1.9.1
