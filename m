@@ -1,45 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 17:39:24 +0000
-Subject: [PATCH v7 05/13] ACPI/PPTT: Add Processor Properties Topology
- Table parsing
-In-Reply-To: <20180228220619.6992-6-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-6-jeremy.linton@arm.com>
-Message-ID: <56b96eaa-4c9d-7661-1ed0-df34c9c1e636@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Mar 2018 09:18:19 -0800
+Subject: Regulator regression in next-20180305
+In-Reply-To: <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
+References: <20180305231246.GB5799@atomide.com>
+ <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
+ <20180306163035.GE13586@sirena.org.uk>
+ <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
+Message-ID: <20180306171819.GF5796@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28/02/18 22:06, Jeremy Linton wrote:
-> ACPI 6.2 adds a new table, which describes how processing units
-> are related to each other in tree like fashion. Caches are
-> also sprinkled throughout the tree and describe the properties
-> of the caches in relation to other caches and processing units.
+* Fabio Estevam <festevam@gmail.com> [180306 16:57]:
+> Hi Mark,
 > 
-> Add the code to parse the cache hierarchy and report the total
-> number of levels of cache for a given core using
-> acpi_find_last_cache_level() as well as fill out the individual
-> cores cache information with cache_setup_acpi() once the
-> cpu_cacheinfo structure has been populated by the arch specific
-> code.
+> On Tue, Mar 6, 2018 at 1:30 PM, Mark Brown <broonie@kernel.org> wrote:
 > 
-> An additional patch later in the set adds the ability to report
-> peers in the topology using find_acpi_cpu_topology()
-> to report a unique ID for each processing unit at a given level
-> in the tree. These unique id's can then be used to match related
-> processing units which exist as threads, COD (clusters
-> on die), within a given package, etc.
+> > diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> > index e685f8b94acf..2c5b20a97f51 100644
+> > --- a/drivers/regulator/core.c
+> > +++ b/drivers/regulator/core.c
+> > @@ -159,7 +159,7 @@ static void regulator_lock_supply(struct regulator_dev *rdev)
+> >  {
+> >         int i;
+> >
+> > -       for (i = 0; rdev; rdev = rdev_get_supply(rdev), i++)
+> > +       for (i = 1000; rdev; rdev = rdev_get_supply(rdev), i++)
+> >                 mutex_lock_nested(&rdev->mutex, i);
 > 
-> 
-The more I look at the ACPI table parsing code, I get more questions
-every time :). So I just skimmed through it this time. Not sure why
-ACPI_PTR_* is not used elsewhere in drivers/acpi/tables.c
+> With this change the log is a bit different, but still get a kernel hang:
+> https://pastebin.com/eF08TnuT
 
-Anyways for cacheinfo part of this file:
+That patch does not seem to change anything for me. The errors
+I posted yesterday for mmc0 only happen on duovero, other omap
+variants just fail silently with no cards showing.
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
 Regards,
-Sudeep
+
+Tony
