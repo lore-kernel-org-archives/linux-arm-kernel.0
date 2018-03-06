@@ -1,48 +1,134 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 06 Mar 2018 10:52:15 +0000
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <CAFEAcA9-gVb-f25D4Ve9xvNUjuvd9iyL59MvNB9gqg8TK14JrA@mail.gmail.com>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
- <86o9k63f7a.wl-marc.zyngier@arm.com>
- <40c74835-da24-485f-14bb-a0c357c7e79b@redhat.com>
- <CAFEAcA9=YpNngKqeOXiO7QDvL=1ZaQEW8fh3XHjwD+i8qQm9wg@mail.gmail.com>
- <a1579f14-a5fe-11bc-a831-f729cead25ba@redhat.com>
- <81f8b489-883b-58c8-851b-c624ca72c28d@arm.com>
- <CAFEAcA9-gVb-f25D4Ve9xvNUjuvd9iyL59MvNB9gqg8TK14JrA@mail.gmail.com>
-Message-ID: <86woyp4gtc.wl-marc.zyngier@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 06 Mar 2018 12:04:41 +0100
+Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
+ register clock
+In-Reply-To: <20180301183520.4251439a@bbrezillon> (Boris Brezillon's message
+ of "Thu, 1 Mar 2018 18:35:20 +0100")
+References: <20180228143553.12485-1-gregory.clement@bootlin.com>
+ <20180301183520.4251439a@bbrezillon>
+Message-ID: <874llt5ut2.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Mar 2018 10:12:42 +0000,
-peter maydell wrote:
-> 
-> On 6 March 2018 at 09:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 05/03/18 20:37, Auger Eric wrote:
-> >> On 05/03/18 17:31, Peter Maydell wrote:
-> >>> That also means that we will fail migration from a new kernel where
-> >>> we've specifically asked for PSCI 0.2 to an old PSCI-0.2-only kernel
-> >>> (because the KVM_REG_ARM_PSCI_VERSION reg will appear in the migration
-> >>> stream even if its value is the one value that matches the old kernel
-> >>> behaviour). I don't know if we care about that.
-> >>
-> >> Do you know when are we likely to force PSCI 0.2 on a new kernel? At
-> >> which layer is the decision supposed to be made and on which criteria?
-> >
-> > No decent SW should need this. But if you've written a guest that cannot
-> > work if it doesn't get "2" as response to PSCI_VERSION, you can override it.
-> 
-> ...but if you want to be able to migrate back from a new kernel to
-> an old one, then you need to ask the new kernel for 0.2 so it
-> behaves the same way as the old one. As it stands this code wouldn't
-> let you do that migration even if you did specifically ask for 0.2.
-> (As I said, I don't know if we care about that.)
+Hi Boris,
+ 
+ On jeu., mars 01 2018, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-Absolutely. The moment we introduce a new sysreg, we create a
-migration barrier. I'm not sure how the kernel can help in this
-respect.
+> Hi Greg,
+>
+> On Wed, 28 Feb 2018 15:35:53 +0100
+> Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+>
+>> On Armada 7K/8K we need to explicitly enable the register clock. This
+>> clock is optional because not all the SoCs using this IP need it but at
+>> least for Armada 7K/8K it is actually mandatory.
+>> 
+>> The binding documentation is updated accordingly.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> ---
+>>  Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
+>>  drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
+>>  2 files changed, 19 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+>> index c08fb477b3c6..4ee9813bf88f 100644
+>> --- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+>> @@ -14,7 +14,11 @@ Required properties:
+>>  - #address-cells: shall be set to 1. Encode the NAND CS.
+>>  - #size-cells: shall be set to 0.
+>>  - interrupts: shall define the NAND controller interrupt.
+>> -- clocks: shall reference the NAND controller clock.
+>> +- clocks: shall reference the NAND controller clocks, the second one is
+>> +  optional but needed for the Armada 7K/8K SoCs
+>> +- clock-names: mandatory if there is a second clock, in this case the
+>> +   name must be "core" for the first clock and "reg" for the second
+>> +   one
+>
+> Hm, not sure this is a good idea to impose a specific order. I know you
 
-	M.
+It would be a problem if the use of this clock would be at dts level
+for each board. But here we only setup this property in the dtsi at SoC
+level. So enforcing the order is not a problem as the dtsi are all well
+reviewed and remains pretty rare.
 
--- 
-Jazz is not dead, it just smell funny.
+> do that to avoid changing the code requesting the core clk, but I'd
+> prefer to have a solution where we first search for a clock named
+> "core" (devm_clk_get(&pdev->dev, "core")), and if it's missing,
+> fall back to devm_clk_get(&pdev->dev, NULL).
+
+I really wanted to avoid adding more code only for legacy reason.
+
+>
+>>  - marvell,system-controller: Set to retrieve the syscon node that handles
+>>    NAND controller related registers (only required with the
+>>    "marvell,armada-8k-nand[-controller]" compatibles).
+>> diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
+>> index 2196f2a233d6..be874c636b5f 100644
+>> --- a/drivers/mtd/nand/marvell_nand.c
+>> +++ b/drivers/mtd/nand/marvell_nand.c
+>> @@ -321,6 +321,7 @@ struct marvell_nfc {
+>>  	struct device *dev;
+>>  	void __iomem *regs;
+>>  	struct clk *ecc_clk;
+>> +	struct clk *reg_clk;
+>>  	struct completion complete;
+>>  	unsigned long assigned_cs;
+>>  	struct list_head chips;
+>> @@ -2747,6 +2748,17 @@ static int marvell_nfc_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> +	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
+>
+> Can we move that before the "core" clock (which for some unknown reason
+> is called ecc_clk in the driver) is prepared, so that you don't have to
+> call clk_disable_unprepare() here.
+>
+>> +	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) == -EPROBE_DEFER) {
+>> +		clk_disable_unprepare(nfc->ecc_clk);
+>> +		return -EPROBE_DEFER;
+>> +	}
+>
+> Why not:
+>
+> 	if (IS_ERR(nfc->reg_clk) && PTR_ERR(nfc->reg_clk) != -ENOENT)
+> 		return PTR_ERR(nfc->reg_clk);
+>
+> ?
+>
+> AFAIR, if the clk is not defined, ENOENT is returned, and you want to
+> propagate all error codes, not only EPROBE_DEFER otherwise.
+
+
+Indeed it makes sens.
+
+>
+> Another solution would be to retrieve the reg clk only on platforms
+> that need it (based on the compatible). This way you won't have to test
+> for -ENOENT and could simply propagate the error to the upper layer.
+
+We can't do this because we need to be bacwkard compatible.
+
+>
+>> +	if (!IS_ERR(nfc->reg_clk)) {
+>> +		ret = clk_prepare_enable(nfc->reg_clk);
+>> +		if (ret)
+>> +			goto unprepare_clk;
+>
+> This is wrong: you've put a clk_disable_unprepare(nfc->reg_clk) call in
+> the unprepare_clk path, which means you'll disable/unprepare a clk that
+> has not been successfully prepared/enabled => unbalanced refcounting.
+>
+> Please define a new label and rename the old one.
+
+
+OK
+
+Thanks,
+
+Gregory-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
