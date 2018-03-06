@@ -1,30 +1,41 @@
-From: gaku.inami.xh@renesas.com (Gaku Inami)
-Date: Tue, 6 Mar 2018 05:11:33 +0000
-Subject: [PATCH 5/5] soc: renesas: rcar-topology: Add support to be aware
- cpu capacity
-In-Reply-To: <CAMuHMdVZzCOqatGA4PH0Gr+noTEhQ8RAW=pK5K1e7KrAM8VS-A@mail.gmail.com>
-References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
- <1519697995-6061-6-git-send-email-gaku.inami.xh@renesas.com>
- <CAMuHMdVZzCOqatGA4PH0Gr+noTEhQ8RAW=pK5K1e7KrAM8VS-A@mail.gmail.com>
-Message-ID: <OSBPR01MB180009CEB4121AD9859EE36AA2D90@OSBPR01MB1800.jpnprd01.prod.outlook.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 6 Mar 2018 10:45:04 +0530
+Subject: [PATCH v8 15/15] dt-bindings: cpufreq: Document
+ operating-points-v2-krait-cpu
+In-Reply-To: <20180305221936.yu2mlcjodlcumedx@rob-hp-laptop>
+References: <1519740422-3835-1-git-send-email-sricharan@codeaurora.org>
+ <1519740422-3835-16-git-send-email-sricharan@codeaurora.org>
+ <20180305221936.yu2mlcjodlcumedx@rob-hp-laptop>
+Message-ID: <a8d40af2-8a9e-8868-93fa-dbdec20a437e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert-san,
 
-> -----Original Message-----
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
 
-[snip]
+On 3/6/2018 3:49 AM, Rob Herring wrote:
+> On Tue, Feb 27, 2018 at 07:37:02PM +0530, Sricharan R wrote:
+>> In Certain QCOM SoCs like ipq8064, apq8064, msm8960, msm8974
+>> that has KRAIT processors the voltage/current value of each OPP
+>> varies based on the silicon variant in use.
+>> operating-points-v2-krait-cpu specifies the phandle to nvmem efuse cells
+>> and the operating-points-v2 table for each opp. The qcom-cpufreq driver
+>> reads the efuse value from the SoC to provide the required information
+>> that is used to determine the voltage and current value for each OPP of
+>> operating-points-v2 table when it is parsed by the OPP framework.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/cpufreq/krait-cpufreq.txt  | 363 +++++++++++++++++++++
+>>  1 file changed, 363 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-> None of the above seems R-Car specific to me. So please explain why this
-> can't just be added to arch/arm64/kernel/topology.c instead, and enabled
-> unconditionally.
-
-Thanks for your feedback.
-
-As you said, this code should not be R-Car specific. I will consider again
-that it enables SD_ASYM_CPUCAPACITY unconditionally.
+Thanks Rob !!
+Will post with all tags and the Makefile corrected.
 
 Regards,
-Inami
+ Sricharan
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
