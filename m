@@ -1,53 +1,27 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 6 Mar 2018 16:56:46 +0000
-Subject: [PATCH] KVM: arm: reserve bit in KVM_REG_ARM encoding for
- secure/nonsecure
-In-Reply-To: <4dbad5e5-8e62-4729-16f3-59ce1cfdd550@arm.com>
-References: <20180306162646.7646-1-peter.maydell@linaro.org>
- <4dbad5e5-8e62-4729-16f3-59ce1cfdd550@arm.com>
-Message-ID: <CAFEAcA9KYxtUzH+DtUR-zVXeFYeVA1orh-Y7+FkufxNZ6o8ivw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 6 Mar 2018 17:13:46 +0000
+Subject: [PATCH v7 04/13] arm64/acpi: Create arch specific cpu to acpi id
+ helper
+In-Reply-To: <20180228220619.6992-5-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-5-jeremy.linton@arm.com>
+Message-ID: <6763fdb6-92ac-c9cd-0cbc-e641e785b2d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2018 at 16:43, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 06/03/18 16:26, Peter Maydell wrote:
->> +/* For KVM currently all guest registers are nonsecure, but we reserve a bit
->> + * in the encoding to distinguish secure from nonsecure for banked registers.
->> + */
->
-> Nit:
->
-> /*
->  * This is the canonical comment style.
->  */
->
-> It might be worth pointing out in the comment that this only applies to
-> AArch32 system registers that are banked by security.
 
-Sure. How about
 
-/*
- * For KVM currently all guest registers are nonsecure, but we reserve a bit
- * in the encoding to distinguish secure from nonsecure for AArch32 system
- * registers that are banked by security. This is 1 for the secure banked
- * register, and 0 for the nonsecure banked register or if the register is
- * not banked by security.
- */
+On 28/02/18 22:06, Jeremy Linton wrote:
+> Its helpful to be able to lookup the acpi_processor_id associated
+> with a logical cpu. Provide an arm64 helper to do this.
+> 
 
-?
+This patch on it's own is good, but it's quite generic and made to look
+at it again. Sorry for missing this earlier.
 
->> +#define KVM_REG_ARM_SECURE_MASK      0x0000000010000000
->> +#define KVM_REG_ARM_SECURE_SHIFT     28
->>
->>  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
->>       (((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
->>
->
-> Don't you also need to define it on the arm64 side?
+Can we use "per_cpu(processors, cpu)->acpi_id" at call sites instead ?
+Or you can make that a generic helper using above expression ?
 
-I don't think so, because AArch64 registers aren't security banked
-(except for some GICv3 ones, which aren't set via GET/SET_ONE_REG.)
-Or is there a case I'm missing?
-
-thanks
--- PMM
+-- 
+Regards,
+Sudeep
