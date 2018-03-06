@@ -1,118 +1,125 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 17:50:15 +0000
-Subject: [PATCH v7 07/13] drivers: base cacheinfo: Add support for ACPI
- based firmware tables
-In-Reply-To: <20180228220619.6992-8-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-8-jeremy.linton@arm.com>
-Message-ID: <eb07e64d-ec91-6952-717e-d8a62ec0e8b0@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Mar 2018 17:54:15 +0000
+Subject: [PATCH v2 2/4] iommu/io-pgtable-arm: Support 52-bit physical
+ address
+In-Reply-To: <52ff8cd6-64ec-d7d4-2135-0b17becc4251@arm.com>
+References: <cover.1512038236.git.robin.murphy@arm.com>
+ <fde583dacee8099ed4e952dbf1c4dfb42070e9c5.1512038236.git.robin.murphy@arm.com>
+ <20180226180501.GC26147@arm.com>
+ <52ff8cd6-64ec-d7d4-2135-0b17becc4251@arm.com>
+Message-ID: <20180306175415.GC19134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hey Robin,
 
-
-On 28/02/18 22:06, Jeremy Linton wrote:
-> Call ACPI cache parsing routines from base cacheinfo code if ACPI
-> is enable. Also stub out cache_setup_acpi() so that individual
-> architectures can enable ACPI topology parsing.
+On Tue, Feb 27, 2018 at 01:49:14PM +0000, Robin Murphy wrote:
+> On 26/02/18 18:05, Will Deacon wrote:
+> >On Thu, Dec 14, 2017 at 04:58:51PM +0000, Robin Murphy wrote:
+> >>Bring io-pgtable-arm in line with the ARMv8.2-LPA feature allowing
+> >>52-bit physical addresses when using the 64KB translation granule.
+> >>This will be supported by SMMUv3.1.
+> >>
+> >>Tested-by: Nate Watterson <nwatters@codeaurora.org>
+> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >>---
+> >>
+> >>v2: Fix TCR_PS/TCR_IPS copy-paste error
+> >>
+> >>  drivers/iommu/io-pgtable-arm.c | 65 ++++++++++++++++++++++++++++++------------
+> >>  1 file changed, 47 insertions(+), 18 deletions(-)
+> >
+> >[...]
+> >
+> >>@@ -203,6 +199,25 @@ struct arm_lpae_io_pgtable {
+> >>  typedef u64 arm_lpae_iopte;
+> >>+static arm_lpae_iopte paddr_to_iopte(phys_addr_t paddr,
+> >>+				     struct arm_lpae_io_pgtable *data)
+> >>+{
+> >>+	arm_lpae_iopte pte = paddr;
+> >>+
+> >>+	/* Of the bits which overlap, either 51:48 or 15:12 are always RES0 */
+> >>+	return (pte | (pte >> 36)) & ARM_LPAE_PTE_ADDR_MASK;
+> >>+}
+> >
+> >I don't particularly like relying on properties of the paddr for correct
+> >construction of the pte here. The existing macro doesn't have this
+> >limitation. I suspect it's all fine at the moment because we only use TTBR0,
+> >but I'd rather not bake that in if we can avoid it.
 > 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/acpi/pptt.c       |  1 +
->  drivers/base/cacheinfo.c  | 14 ++++++++++----
->  include/linux/cacheinfo.h |  9 +++++++++
->  3 files changed, 20 insertions(+), 4 deletions(-)
+> What's the relevance of TTBR0 to physical addresses? :/
+
+Good point! I clearly got confused here.
+
+> Note that by this point paddr has been validated against cfg->oas by
+> arm_lpae_map(), and validated to be granule-aligned by iommu_map(), so it
+> really can't be wrong under reasonable conditions.
+
+Fair enough, but I still think this would be a bit more readable written
+along the lines of:
+
+	arm_lpae_iopte pte_hi, pte_lo = 0;
+
+	pte_hi = paddr & GENMASK(47, data->pg_shift);
+	if (data->pg_shift == 16) {
+		pte_lo = paddr & GENMASK(ARM_LPAE_MAX_ADDR_BITS - 1, 48);
+		pte_lo >>= (48 - 12);
+	}
+
+	return pte_hi | pte_lo;
+
+Ok, we don't squeeze every last cycle out of it, but I find it much more
+readable. Is it just me? The magic numbers could be #defined and/or
+derived if necessary.
+
+> >>+static phys_addr_t iopte_to_paddr(arm_lpae_iopte pte,
+> >>+				  struct arm_lpae_io_pgtable *data)
+> >>+{
+> >>+	phys_addr_t paddr = pte & ARM_LPAE_PTE_ADDR_MASK;
+> >>+	phys_addr_t paddr_hi = paddr & (ARM_LPAE_GRANULE(data) - 1);
+> >>+
+> >>+	/* paddr_hi spans nothing for 4K granule, and only RES0 bits for 16K */
+> >>+	return (paddr ^ paddr_hi) | (paddr_hi << 36);
+> >
+> >Why do we need xor here?
 > 
-> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-> index 883e4318c6cd..c98f94ebd272 100644
-> --- a/drivers/acpi/pptt.c
-> +++ b/drivers/acpi/pptt.c
-> @@ -343,6 +343,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
->  {
->  	int valid_flags = 0;
->  
-> +	this_leaf->fw_token = cpu_node;
+> Because "(paddr ^ paddr_hi)" is more concise than "(paddr &
+> ~(phys_addr_t)(ARM_LPAE_GRANULE(data) - 1)" or variants thereof. It's
+> potentially a teeny bit more efficient too, I think, but it's mostly about
+> the readability.
 
+I don't think the bit-twiddling is super readable, to be honest. Again,
+something like:
 
-Any reason why this can't part of 05/13 ?
+	phys_addr_t paddr_lo, paddr_hi = 0;
 
->  	if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
->  		this_leaf->size = found_cache->size;
->  		valid_flags++;
-> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-> index 597aacb233fc..2880e2ab01f5 100644
-> --- a/drivers/base/cacheinfo.c
-> +++ b/drivers/base/cacheinfo.c
-> @@ -206,7 +206,7 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
->  					   struct cacheinfo *sib_leaf)
->  {
->  	/*
-> -	 * For non-DT systems, assume unique level 1 cache, system-wide
-> +	 * For non-DT/ACPI systems, assume unique level 1 caches, system-wide
->  	 * shared caches for all other levels. This will be used only if
->  	 * arch specific code has not populated shared_cpu_map
->  	 */
-> @@ -214,6 +214,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
->  }
->  #endif
->  
-> +int __weak cache_setup_acpi(unsigned int cpu)
-> +{
-> +	return -ENOTSUPP;
-> +}
-> +
->  static int cache_shared_cpu_map_setup(unsigned int cpu)
->  {
->  	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-> @@ -227,8 +232,8 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
->  	if (of_have_populated_dt())
->  		ret = cache_setup_of_node(cpu);
->  	else if (!acpi_disabled)
-> -		/* No cache property/hierarchy support yet in ACPI */
-> -		ret = -ENOTSUPP;
-> +		ret = cache_setup_acpi(cpu);
-> +
->  	if (ret)
->  		return ret;
->  
-> @@ -279,7 +284,8 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
->  			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
->  			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
->  		}
-> -		of_node_put(this_leaf->fw_token);
-> +		if (of_have_populated_dt())
-> +			of_node_put(this_leaf->fw_token);
->  	}
->  }
->  
-> diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
-> index 0c6f658054d2..1446d3f053a2 100644
-> --- a/include/linux/cacheinfo.h
-> +++ b/include/linux/cacheinfo.h
-> @@ -97,6 +97,15 @@ int func(unsigned int cpu)					\
->  struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
->  int init_cache_level(unsigned int cpu);
->  int populate_cache_leaves(unsigned int cpu);
-> +int cache_setup_acpi(unsigned int cpu);
-> +int acpi_find_last_cache_level(unsigned int cpu);
-> +#ifndef CONFIG_ACPI
-> +int acpi_find_last_cache_level(unsigned int cpu)
+	paddr_lo = pte & GENMASK(47, data->pg_shift);
+	if (data->pg_shift == 16) {
+		paddr_hi = pte & GENMASK(15, 12);
+		paddr_hi <<= (48 - 12);
+	}
 
-The above 3 lines looks weird, can't it be:
+	return paddr_hi | paddr_lo;
 
-#ifdef CONFIG_ACPI
-int acpi_find_last_cache_level(unsigned int cpu);
-#else
-int acpi_find_last_cache_level(unsigned int cpu)
-{
-	/* ACPI kernels should be built with PPTT support */
-	return 0;
-}
+but I've not even compiled this stuff...
 
-Also I think it should be CONFIG_ACPI_PPTT, otherwise it might cause
-issue on platforms which define CONFIG_ACPI but CONFIG_ACPI_PPTT is not.
-I can only relate this to the s390 error reported by kbuild robot.
+> >>+	cfg->pgsize_bitmap &= page_sizes;
+> >>+	cfg->ias = min(cfg->ias, max_addr_bits);
+> >>+	cfg->oas = min(cfg->oas, max_addr_bits);
+> >
+> >I don't think we should be writing to the ias/oas fields here, at least
+> >now without auditing the drivers and updating the comments about the
+> >io-pgtable API. For example, the SMMUv3 driver uses its own ias local
+> >variable to initialise the domain geometry, and won't pick up any changes
+> >made here.
+> 
+> As you've discovered, the driver thing is indeed true. More generally,
+> though, we've always adjusted cfg->pgsize_bitmap here, so I don't see why
+> other fields should be treated differently - I've always assumed the cfg
+> which the driver passes in here just represents its total maximum
+> capabilities, from which it's io-pgtable's job to pick an appropriate
+> configuration.
 
--- 
-Regards,
-Sudeep
+Can you update the the header file with a comment to that effect, please?
+
+Will
