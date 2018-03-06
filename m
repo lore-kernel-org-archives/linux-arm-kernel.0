@@ -1,37 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Mar 2018 17:48:09 +0100
-Subject: [GIT PULL] Reset controller changes for v4.17
-In-Reply-To: <1519300351.7447.8.camel@pengutronix.de>
-References: <1519300351.7447.8.camel@pengutronix.de>
-Message-ID: <CAK8P3a1J8_26+30_KhubMppfXThbpg8psV8KQhRne08mJFPufA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 6 Mar 2018 17:49:24 +0100
+Subject: [PATCH v5 3/6] arm64: dts: exynos: add micro-USB connector node
+ to TM2 platforms
+In-Reply-To: <20180227071134.28063-4-a.hajda@samsung.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071139eucas1p1d28b39a6636a7e6625aeb3a16091f81a@eucas1p1.samsung.com>
+ <20180227071134.28063-4-a.hajda@samsung.com>
+Message-ID: <20180306164924.fvwx72pmobn67h7z@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 22, 2018 at 12:52 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Dear arm-soc maintainers,
->
-> Please consider merging this tag for v4.17. It contains level reset
-> support for Meson8b SoCs, which was already implemented for the newer
-> Meson GX, removing the distinction between the two families in the
-> meson-reset driver. Also the ASPEED LPC reset controller is enabled for
-> AST2400 and AST2500 SoCs by extending the compatibles list in the
-> simple-reset driver.
->
+On Tue, Feb 27, 2018 at 08:11:31AM +0100, Andrzej Hajda wrote:
+> Since USB connector bindings are available we can describe it on TM2(e).
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
 
-Pulled into next/drivers, thanks!
+Thanks, applied.
 
-
-> ----------------------------------------------------------------
-> Reset controller changes for v4.17
->
-> This enables level resets on Meson8b SoCs. Level resets have been
-> previously implemented for the newer Meson GX SoCs, so this removes
-> the distinction between the two families in the meson-reset driver.
->
-> Also enables the ASPEED LPC reset controller on ASPEED AST2400 and
-> AST2500 SoCs, by adding compatibles to the simple-reset driver.
-
-You seem to be saying the same thing here and above in different words,
-No need for that when you have a proper tag description.
-
-       Arnd
+Best regards,
+Krzysztof
