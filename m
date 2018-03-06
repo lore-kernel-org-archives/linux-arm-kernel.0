@@ -1,44 +1,73 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Mar 2018 19:23:11 -0300
-Subject: [PATCH] clk: imx25: set correct parents for ssi ipg clocks
-In-Reply-To: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
-References: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
-Message-ID: <CAOMZO5A7W4rbPbZB8ERs518obrg+6F6mDeojkwJaGComFAJB0A@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 6 Mar 2018 17:38:32 -0600
+Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
+In-Reply-To: <1520308623.33502.13.camel@aosc.io>
+References: <1520261458.33502.10.camel@aosc.io>
+ <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
+ <1520308623.33502.13.camel@aosc.io>
+Message-ID: <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+[+cc Marc]
 
-On Tue, Mar 6, 2018 at 7:02 PM, Martin Kaiser <martin@kaiser.cx> wrote:
-> The ssi1_ipg clock depends on ssi1_ipg_per. Set ssi1_ipg_per as parent
-> clock of ssi1_ipg. Without this link, the fsl_ssi driver does not
-> activate the ssi1_ipg clock correctly and ssi1 is unable to transfer
-> audio data.
->
-> Fix the parent clock of ssi2 as well, it shows the same behaviour.
->
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> Dear all,
->
-> could you have a look at this patch? This makes SSI1 and 2 work for me.
+On Tue, Mar 06, 2018 at 11:57:03AM +0800, Icenowy Zheng wrote:
+> ? 2018-03-05?? 15:47 -0600?Bjorn Helgaas???
+> > On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
+> > > Hi everyone,
+> > > 
+> > > I'm trying to implement a driver for the quirky (DW) PCIe RC in the
+> > > Allwinner H6 SoC.
+> > > 
+> > > The quirk is that only the "dbi" space is always mapped, but at the
+> > > same time only 64KiB of other spaces (config, downstream IO and
+> > > non-
+> > > prefetchable memory) are accessible. To access a certain address
+> > > the
+> > > high 16-bit of the address (all bus addresses in H6 SoC are 32-bit
+> > > despite the CPU is 64-bit) needs to be written into the
+> > > PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI
+> > > space).
+> > > So the access to these spaces cannot be processed correctly with
+> > > just
+> > > readl/writel, as the existing code does.
+> > > 
+> > > Is it possible to workaround this in the PCI subsystem of Linux?
+> > > 
+> > > (I have thought a workaround that only maps the current accessible
+> > > 64KiB with the MMU, and when accessing the non-accessible part,
+> > > catch
+> > > the page fault and re-setup the map to the new 64KiB page. But
+> > > surely
+> > > it will kill the performance.)
+> > 
+> > If you only need to write to PCIE_ADDR_PAGE_CFG for *config*
+> > accesses,
+> > this should be easy.  All config accesses go through wrappers
+> > (pci_read_config_word(), etc) and several host bridge drivers have to
+> > update a register with parts of the config address, e.g.,
+> > advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
+> > 
+> > It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O
+> > port
+> > accesses.  I/O port accesses do go through a wrapper (inb(), etc), so
+> > it might be possible in principle to intercept these, although much
+> > more difficult than config accesses, because the config accesses are
+> > already set up with per-host bridge hooks, while the I/O port
+> > accessors are mostly per-arch.
+> > 
+> > But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
+> > that's really a problem because drivers are allowed to essentially
+> > read a memory BAR, convert that bus address to a CPU physical memory
+> > address, ioremap() it, then directly access the PCIe memory with
+> > loads
+> > and stores.
+> 
+> Unfortunately this is the case. All above (config, IO, memory) needs
+> PCIE_ADDR_PAGE_CFG update.
 
-I get audio working from SSI1, but I guess this is due to the fact
-that the bootloader enables the SSI clock:
+tango_pcie_probe() has a similar issue.  We don't have a good solution
+there, so we just live with the fact that the platform will be
+unreliable.
 
-I have the following in U-Boot:
-
-/* Enable the clocks */
-DATA 4 0x53f8000c 0x1fffffff
-DATA 4 0x53f80010 0xffffffff
-DATA 4 0x53f80014 0xfdfff
-
-I will try tomorrow to disable the SSI1 clock from U-Boot and apply your patch.
-
-Will let you know how my testing goes.
-
-> With the default "ipg" parent clocks, I get no ipg clocks on the SSIs.
-> However, I was wondering why we don't need anything similar e.g. for the
-> UARTs...
-
-Maybe your bootloader is already turning on the UART clocks?
+Bjorn
