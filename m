@@ -1,52 +1,63 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Mar 2018 14:05:51 +0100
-Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
- document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <20180306125416.GD26143@lunn.ch>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
- <20180306124002.GA13950@amd> <20180306125416.GD26143@lunn.ch>
-Message-ID: <20180306130551.GA16061@amd>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 6 Mar 2018 14:08:24 +0100
+Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
+References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
+ <20180227071134.28063-1-a.hajda@samsung.com>
+ <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
+Message-ID: <CAJKOXPdne8ETZWg2Grv81E19Hsxt3bCHLpbsTdfKafwy0XNsyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-03-06 13:54:16, Andrew Lunn wrote:
-> On Tue, Mar 06, 2018 at 01:40:02PM +0100, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> > > ---
-> > >  .../devicetree/bindings/peci/peci-aspeed.txt       | 73 ++++++++++++++++++++++
-> > >  1 file changed, 73 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > > new file mode 100644
-> > > index 000000000000..8a86f346d550
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > > @@ -0,0 +1,73 @@
-> > > +Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
-> > 
-> > Are these SoCs x86-based?
-> 
-> ARM, as far as i can tell. If i get the architecture correct, these
-> are BMC, Board Management Controllers, looking after the main x86 CPU,
-> stopping it overheating, controlling the power supplies, remote
-> management, etc.
+On Tue, Mar 6, 2018 at 1:53 PM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+> Hi Rob, Chanwoo, Krzysztof,
+>
+>
+> On 27.02.2018 08:11, Andrzej Hajda wrote:
+>> Hi,
+>>
+>> Thanks for reviews of previous iterations.
+>>
+>> This patchset introduces USB physical connector bindings, together with
+>> working example.
+>> I have removed RFC prefix - the patchset seems to be heading
+>> to a happy end :)
+>>
+>> v5: fixed extra parenthesis in dts, renamed extcon function.
+>> v4: improved binding descriptions, added missing reg in dts.
+>> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
+>>     example.
+>> v2: I have addressed comments by Rob and Laurent, thanks
+>>
+>> Changes in datail are described in the patches.
+>>
+>> Regards
+>> Andrzej
+>>
+>>
+>> Andrzej Hajda (5):
+>>   dt-bindings: add bindings for USB physical connector
+>>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
+>>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
+>>   arm64: dts: exynos: add OF graph between MHL and USB connector
+>>   extcon: add possibility to get extcon device by OF node
+>>
+>> Maciej Purski (1):
+>>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
+>
+> It looks like all patches received R-B or acks (I forgot add Krzysztof's
+> acks for dts part).
+> Now I have a question how to merge them.
+> The only functional dependency is between bridge and extcon, and from
+> the formal PoV bindings should be merged 1st.
+> I can merge it:
+> 1. All patches via drm-misc tree.
+> 2. All patches except dts via drm-misc, and Krzysztof will merge dts via
+> samsung-soc tree.
 
-Ok, so with x86 machine, I get arm-based one for free. I get it. Is
-user able to run his own kernel on the arm system, or is it locked
-down, TiVo style?
+2) option please. The DTS should always go through arm-soc because it
+is independent of driver code. I'll take the DTS today.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/e5be042a/attachment.sig>
+Best regards,
+Krzysztof
