@@ -1,37 +1,115 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 06 Mar 2018 18:16:22 +0000
-Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
- fault on kernel VA
-In-Reply-To: <5A9ED6EA.3040700@arm.com>
-References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
- <20180305140506.GJ32331@e103592.cambridge.arm.com>
- <20180305172418.GD12869@arm.com>
- <CAFEAcA9e1swOcYx5YCokSmb_37pyaJYJZTudt57babkngicutw@mail.gmail.com>
- <20180306160553.GN32331@e103592.cambridge.arm.com> <5A9ED6EA.3040700@arm.com>
-Message-ID: <5A9EDAF6.3010901@arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 6 Mar 2018 12:48:49 -0600
+Subject: [PATCH v6] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <20180306152318.GE17454@arm.com>
+References: <1519877640-11944-1-git-send-email-shankerd@codeaurora.org>
+ <20180306134405.GB18080@arm.com>
+ <d6182273-c23a-c4fa-ce40-c87055bfb338@codeaurora.org>
+ <20180306152318.GE17454@arm.com>
+Message-ID: <cbdce6fd-a1db-4f12-ccea-adfe9fe7c057@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/18 17:59, James Morse wrote:
-> On 06/03/18 16:05, Dave Martin wrote:
->> On Tue, Mar 06, 2018 at 03:59:59PM +0000, Peter Maydell wrote:
->>> AFAIK the major thing that consumers actually are after here
->>> is the WnR information, so preserving that and sanitizing
->>> the rest of the ESR if necessary would be a less risky fix IMHO.
->>
->> If there is a way of squashing the syndrome information so that it
->> reports a fixed syndrome except for information about what userspace
->> attempted to do (i.e., WnR -- I dunno if there's anything else), that
->> seems reasonable.
+Hi Will,
+
+On 03/06/2018 09:23 AM, Will Deacon wrote:
+> Hi Shanker,
 > 
-> Anything else? For the RAS stuff I planned to use this to indicate whether a
-> SIBGUS due to hwpoison was due to an instruction or data abort, so a
-> sanitised-EC field would be good.
+> On Tue, Mar 06, 2018 at 08:47:27AM -0600, Shanker Donthineni wrote:
+>> On 03/06/2018 07:44 AM, Will Deacon wrote:
+>>> I think this is a slight asymmetry with the code for the I-side. On the
+>>> I-side, you hook into invalidate_icache_by_line, whereas on the D-side you
+>>> hook into the callers of dcache_by_line_op. Why is that?
+>>>
+>>
+>> There is no particular reason other than complexity of the macro with another 
+>> alternative. I tried to avoid this change by updating __clean_dcache_area_pou().
+>> I can change if you're interested to see both I-Side and D-Side changes are
+>> symmetric some thing like this...
+>>
+>>  .macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+>>   
+>>   .if	(\op == cvau)
+>>   alternative_if ARM64_HAS_CACHE_IDC
+>>         dsb	ishst
+>>         b       9997f
+>>   alternative_else_nop_endif
+>>   .endif
+>>
+>> 	dcache_line_size \tmp1, \tmp2
+>> 	add	\size, \kaddr, \size
+>> 	sub	\tmp2, \tmp1, #1
+>> 	bic	\kaddr, \kaddr, \tmp2
+>>  9998:
+>> 	.if	(\op == cvau || \op == cvac)
+>>  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+>> 	dc	\op, \kaddr
+>>  alternative_else
+>> 	dc	civac, \kaddr
+>>  alternative_endif
+>> 	.elseif	(\op == cvap)
+>>  alternative_if ARM64_HAS_DCPOP
+>> 	sys 3, c7, c12, 1, \kaddr	// dc cvap
+>>  alternative_else
+>> 	dc	cvac, \kaddr
+>>  alternative_endif
+>> 	.else
+>> 	dc	\op, \kaddr
+>> 	.endif
+>> 	add	\kaddr, \kaddr, \tmp1
+>> 	cmp	\kaddr, \size
+>> 	b.lo	9998b
+>> 	dsb	\domain
+>> 9997:
+>> 	.endm
+> 
+> I think it would be cleaner the other way round, actually -- move the check
+> out of invalidate_icache_by_line and into its two callers.
+> 
 
-I misread this as always sanitising the ESR field, Will was only talking about
-sanitising the ESR for faults on kernel addresses.
+Sure, I'll send out the next patch with your suggestions.
 
+>>> I notice that the only user other than
+>>> flush_icache_range/__flush_cache_user_range or invalidate_icache_by_line
+>>> is in KVM, via invalidate_icache_range. If you want to hook in there, why
+>>> aren't you also patching __flush_icache_all? If so, I'd rather have the
+>>> I-side code consistent with the D-side code and do this in the handful of
+>>> callers. We might even be able to elide a branch or two that way.
+>>>
+>>
+>> Agree with you, it saves function calls overhead. I'll do this change...
+>>
+>> static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+>> {
+>> 	if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC)
+>> 	    __invalidate_icache_guest_page(pfn, size);
+>> }
+>>
+>>
+>>> I'm going to assume that I-cache aliases are all coherent if DIC=1, so it's
+>>> safe to elide our alias sync code.
+>>>
+>>
+>> I'm not sure about I-cache whether aliases are all coherent if DIC=1 ot not.
+>> Unfortunately I don't have any hardware to test DIC=1. I've verified IDC=1.
+> 
+> I checked with our architects and aliases don't pose a problem here, so you
+> can ignore me :)
+> 
 
-Sorry for the noise!,
+I also confirmed with Thomas Speier, we can skip __flush_icache_all() if DIC=1.
 
-James
+ 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
