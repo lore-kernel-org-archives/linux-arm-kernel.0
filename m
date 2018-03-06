@@ -1,55 +1,60 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 6 Mar 2018 09:26:42 +0000
-Subject: [PATCH v3 07/25] ASoC: qcom: qdsp6: Add support to Q6ADM
-In-Reply-To: <20180301212402.GT12864@sirena.org.uk>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-8-srinivas.kandagatla@linaro.org>
- <20180301212402.GT12864@sirena.org.uk>
-Message-ID: <bb87bd34-ab81-e297-3bd4-3e52f6859e34@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  6 Mar 2018 10:34:30 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a7795: Add IPMMU-PV1 device node
+Message-ID: <20180306093430.12486-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review,
+Add r8a7795 IPMMU-PV1 and keep it disabled by default.
 
-On 01/03/18 21:24, Mark Brown wrote:
-> On Tue, Feb 13, 2018 at 04:58:19PM +0000, srinivas.kandagatla at linaro.org wrote:
-> 
->> +static struct copp *adm_find_copp(struct q6adm *adm, int port_idx,
->> +				  int copp_idx)
->> +{
->> +	struct copp *c;
->> +
->> +	spin_lock(&adm->copps_list_lock);
->> +	list_for_each_entry(c, &adm->copps_list, node) {
->> +		if ((port_idx == c->afe_port) && (copp_idx == c->copp_idx)) {
->> +			spin_unlock(&adm->copps_list_lock);
->> +			return c;
->> +		}
->> +	}
->> +
->> +	spin_unlock(&adm->copps_list_lock);
-> 
-> We've again got this use of spinlocks here but no IRQ safety - what
-> exactly is going on with the locking?  In general all of the locking in
-> this stuff is raising very serious alarm bells with me, I don't
-> understand what is being protected against what and there's some very
-> obvious bugs.  We could probably use some documentation about what the
-> locking is supposed to be doing.
-> 
-I agree, there are locking issues here, Am revisiting them all before I 
-send a next version.
+This device is not present in r8a7795 ES1.x and
+is removed from the DT of those SoCs.
 
->> +	case ADM_CMDRSP_DEVICE_OPEN_V5: {
-> 
->> +		copp->id = open->copp_id;
->> +		wake_up(&copp->wait);
->> +	}
->> +	break;
->> +	default:
-> 
-> This indentation is confusing.
-> 
-I agree, will fix such instances in next version.
+This corrects an omission in
+3b7e7848f0e8 ("arm64: dts: renesas: r8a7795: Add IPMMU device nodes")
 
-thanks,
-srini
+This does not have any runtime effect.
+
+Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 1 +
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 9 +++++++++
+ 2 files changed, 10 insertions(+)
+
+Based on renesas-devel-20180305-v4.16-rc4
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+index f1d5e90503d5..f9acd125d687 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+@@ -23,6 +23,7 @@
+ 
+ 	/delete-node/ mmu at febe0000;
+ 	/delete-node/ mmu at fe980000;
++	/delete-node/ mmu at fd950000;
+ 	/delete-node/ mmu at fd960000;
+ 	/delete-node/ mmu at fd970000;
+ 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 09953cda3a55..0648fe451d09 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -545,6 +545,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		ipmmu_pv1: mmu at fd950000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfd950000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 7>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
+ 		ipmmu_pv2: mmu at fd960000 {
+ 			compatible = "renesas,ipmmu-r8a7795";
+ 			reg = <0 0xfd960000 0 0x1000>;
+-- 
+2.11.0
