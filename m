@@ -1,138 +1,82 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Mar 2018 15:43:49 +0100
-Subject: [PATCH 06/12] thermal: exynos: remove parsing of
- samsung,tmu_reference_voltage property
+Date: Tue, 06 Mar 2018 15:43:55 +0100
+Subject: [PATCH 12/12] thermal: exynos: remove separate thermal_exynos.h
+ header file
 In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20180306144453epcas2p2d440c954c21c800e21f121418d7e5ec8@epcas2p2.samsung.com>
-Message-ID: <1520347435-22970-7-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20180306144520epcas2p4950ac2762036882ccd097fd2bf629bbc@epcas2p4.samsung.com>
+Message-ID: <1520347435-22970-13-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since pdata reference_voltage values are SoC (not platform) specific
-just move it from platform data to struct exynos_tmu_data instance.
-Then remove parsing of samsung,tmu_reference_voltage property.
+thermal_exynos.h is used only by exynos_tmu.c so there is no need
+for a separate include file. Also while it remove unused defines.
 
 There should be no functional changes caused by this patch.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/thermal/samsung/exynos_tmu.c | 18 +++++++++++++++---
- drivers/thermal/samsung/exynos_tmu.h |  4 ----
- 2 files changed, 15 insertions(+), 7 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c         |  5 +++--
+ include/dt-bindings/thermal/thermal_exynos.h | 28 ----------------------------
+ 2 files changed, 3 insertions(+), 30 deletions(-)
+ delete mode 100644 include/dt-bindings/thermal/thermal_exynos.h
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 02d34cf..12bbf79 100644
+index d8b9c3e..a16c37d 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -123,6 +123,8 @@
+@@ -36,8 +36,6 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/cpu_cooling.h>
  
- #define EXYNOS5433_PD_DET_EN			1
+-#include <dt-bindings/thermal/thermal_exynos.h>
+-
+ #include "../thermal_core.h"
  
-+#define EXYNOS5433_G3D_BASE			0x10070000
+ /* Exynos generic registers */
+@@ -169,6 +167,9 @@
+ #define EXYNOS7_EMUL_DATA_SHIFT			7
+ #define EXYNOS7_EMUL_DATA_MASK			0x1ff
+ 
++#define TYPE_ONE_POINT_TRIMMING			0
++#define TYPE_TWO_POINT_TRIMMING			1
 +
- /*exynos5440 specific registers*/
- #define EXYNOS5440_TMU_S0_7_TRIM		0x000
- #define EXYNOS5440_TMU_S0_7_CTRL		0x020
-@@ -190,6 +192,9 @@
-  * @max_efuse_value: maximum valid trimming data
-  * @temp_error1: fused value of the first point trim.
-  * @temp_error2: fused value of the second point trim.
-+ * @reference_voltage: reference voltage of amplifier
-+ *	in the positive-TC generator block
-+ *	0 < reference_voltage <= 31
-  * @regulator: pointer to the TMU regulator structure.
-  * @reg_conf: pointer to structure to register with core thermal.
-  * @ntrip: number of supported trip points.
-@@ -213,6 +218,7 @@ struct exynos_tmu_data {
- 	u32 min_efuse_value;
- 	u32 max_efuse_value;
- 	u16 temp_error1, temp_error2;
-+	u8 reference_voltage;
- 	struct regulator *regulator;
- 	struct thermal_zone_device *tzd;
- 	unsigned int ntrip;
-@@ -387,7 +393,7 @@ static u32 get_con_reg(struct exynos_tmu_data *data, u32 con)
- 		con |= (EXYNOS4412_MUX_ADDR_VALUE << EXYNOS4412_MUX_ADDR_SHIFT);
+ #define EXYNOS_FIRST_POINT_TRIM			25
+ #define EXYNOS_SECOND_POINT_TRIM		85
  
- 	con &= ~(EXYNOS_TMU_REF_VOLTAGE_MASK << EXYNOS_TMU_REF_VOLTAGE_SHIFT);
--	con |= pdata->reference_voltage << EXYNOS_TMU_REF_VOLTAGE_SHIFT;
-+	con |= data->reference_voltage << EXYNOS_TMU_REF_VOLTAGE_SHIFT;
- 
- 	con &= ~(EXYNOS_TMU_BUF_SLOPE_SEL_MASK << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
- 	con |= (pdata->gain << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
-@@ -1154,8 +1160,6 @@ static int exynos_of_sensor_conf(struct device_node *np,
- 
- 	ret = of_property_read_u32(np, "samsung,tmu_gain", &value);
- 	pdata->gain = (u8)value;
--	of_property_read_u32(np, "samsung,tmu_reference_voltage", &value);
--	pdata->reference_voltage = (u8)value;
- 
- 	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
- 
-@@ -1210,6 +1214,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_read = exynos4210_tmu_read;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->reference_voltage = 7;
- 		data->efuse_value = 55;
- 		data->min_efuse_value = 40;
- 		data->max_efuse_value = 100;
-@@ -1226,6 +1231,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->reference_voltage = 16;
- 		data->efuse_value = 55;
- 		if (data->soc != SOC_ARCH_EXYNOS5420 &&
- 		    data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO)
-@@ -1241,6 +1247,10 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 8;
-+		if (res.start == EXYNOS5433_G3D_BASE)
-+			data->reference_voltage = 23;
-+		else
-+			data->reference_voltage = 16;
- 		data->efuse_value = 75;
- 		data->min_efuse_value = 40;
- 		data->max_efuse_value = 150;
-@@ -1252,6 +1262,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->reference_voltage = 16;
- 		data->efuse_value = 0x5d2d;
- 		data->min_efuse_value = 16;
- 		data->max_efuse_value = 76;
-@@ -1263,6 +1274,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 8;
-+		data->reference_voltage = 17;
- 		data->efuse_value = 75;
- 		data->min_efuse_value = 15;
- 		data->max_efuse_value = 100;
-diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-index 4c49312..9f4318c 100644
---- a/drivers/thermal/samsung/exynos_tmu.h
-+++ b/drivers/thermal/samsung/exynos_tmu.h
-@@ -42,16 +42,12 @@ enum soc_type {
-  * struct exynos_tmu_platform_data
-  * @gain: gain of amplifier in the positive-TC generator block
-  *	0 < gain <= 15
-- * @reference_voltage: reference voltage of amplifier
-- *	in the positive-TC generator block
-- *	0 < reference_voltage <= 31
-  * @cal_type: calibration type for temperature
-  *
-  * This structure is required for configuration of exynos_tmu driver.
-  */
- struct exynos_tmu_platform_data {
- 	u8 gain;
--	u8 reference_voltage;
- 
- 	u32 cal_type;
- };
+diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
+deleted file mode 100644
+index 0646500..0000000
+--- a/include/dt-bindings/thermal/thermal_exynos.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * thermal_exynos.h - Samsung EXYNOS TMU device tree definitions
+- *
+- *  Copyright (C) 2014 Samsung Electronics
+- *  Lukasz Majewski <l.majewski@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef _EXYNOS_THERMAL_TMU_DT_H
+-#define _EXYNOS_THERMAL_TMU_DT_H
+-
+-#define TYPE_ONE_POINT_TRIMMING 0
+-#define TYPE_ONE_POINT_TRIMMING_25 1
+-#define TYPE_ONE_POINT_TRIMMING_85 2
+-#define TYPE_TWO_POINT_TRIMMING 3
+-#define TYPE_NONE 4
+-
+-#endif /* _EXYNOS_THERMAL_TMU_DT_H */
 -- 
 1.9.1
