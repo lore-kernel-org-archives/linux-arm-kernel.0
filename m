@@ -1,162 +1,154 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Mar 2018 20:09:06 +0530
-Subject: [PATCH v9 13/15] clk: qcom: Add safe switch hook for krait mux clocks
+Date: Tue,  6 Mar 2018 20:08:57 +0530
+Subject: [PATCH v9 04/15] clk: qcom: Add HFPLL driver
 In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
 References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1520347148-27852-14-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1520347148-27852-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the Hfplls are reprogrammed during the rate change,
-the primary muxes which are sourced from the same hfpll
-for higher frequencies, needs to be switched to the 'safe
-secondary mux' as the parent for that small window. This
-is done by registering a clk notifier for the muxes and
-switching to the safe parent in the PRE_RATE_CHANGE notifier
-and back to the original parent in the POST_RATE_CHANGE notifier.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+On some devices (MSM8974 for example), the HFPLLs are
+instantiated within the Krait processor subsystem as separate
+register regions. Add a driver for these PLLs so that we can
+provide HFPLL clocks for use by the system.
+
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/clk-krait.c |  2 ++
- drivers/clk/qcom/clk-krait.h |  3 +++
- drivers/clk/qcom/krait-cc.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 61 insertions(+)
+ drivers/clk/qcom/Kconfig  |  8 ++++
+ drivers/clk/qcom/Makefile |  1 +
+ drivers/clk/qcom/hfpll.c  | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 105 insertions(+)
+ create mode 100644 drivers/clk/qcom/hfpll.c
 
-diff --git a/drivers/clk/qcom/clk-krait.c b/drivers/clk/qcom/clk-krait.c
-index 2e41767..ac2e020 100644
---- a/drivers/clk/qcom/clk-krait.c
-+++ b/drivers/clk/qcom/clk-krait.c
-@@ -50,6 +50,8 @@ static int krait_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (__clk_is_enabled(hw->clk))
- 		__krait_mux_set_sel(mux, sel);
- 
-+	mux->reparent = true;
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index fbf4532..d9ae51e 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -226,3 +226,11 @@ config SPMI_PMIC_CLKDIV
+ 	  Technologies, Inc. SPMI PMIC. It configures the frequency of
+ 	  clkdiv outputs of the PMIC. These clocks are typically wired
+ 	  through alternate functions on GPIO pins.
 +
- 	return 0;
- }
- 
-diff --git a/drivers/clk/qcom/clk-krait.h b/drivers/clk/qcom/clk-krait.h
-index 71890bc..986f356 100644
---- a/drivers/clk/qcom/clk-krait.h
-+++ b/drivers/clk/qcom/clk-krait.h
-@@ -13,6 +13,9 @@ struct krait_mux_clk {
- 	u32		shift;
- 	u32		en_mask;
- 	bool		lpl;
-+	u8		safe_sel;
-+	u8		old_index;
-+	bool		reparent;
- 
- 	struct clk_hw	hw;
- 	struct notifier_block   clk_nb;
-diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
-index 7c9dfb0..4d4b657 100644
---- a/drivers/clk/qcom/krait-cc.c
-+++ b/drivers/clk/qcom/krait-cc.c
-@@ -26,6 +26,49 @@
- 	0,
- };
- 
-+/*
-+ * Notifier function for switching the muxes to safe parent
-+ * while the hfpll is getting reprogrammed.
-+ */
-+static int krait_notifier_cb(struct notifier_block *nb,
-+			     unsigned long event,
-+			     void *data)
++config QCOM_HFPLL
++	tristate "High-Frequency PLL (HFPLL) Clock Controller"
++	depends on COMMON_CLK_QCOM
++	help
++	  Support for the high-frequency PLLs present on Qualcomm devices.
++	  Say Y if you want to support CPU frequency scaling on devices
++	  such as MSM8974, APQ8084, etc.
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index a2b7888..c57b808 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -39,3 +39,4 @@ obj-$(CONFIG_QCOM_CLK_APCS_MSM8916) += apcs-msm8916.o
+ obj-$(CONFIG_QCOM_CLK_RPM) += clk-rpm.o
+ obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
+ obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
++obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
+diff --git a/drivers/clk/qcom/hfpll.c b/drivers/clk/qcom/hfpll.c
+new file mode 100644
+index 0000000..a6de7101
+--- /dev/null
++++ b/drivers/clk/qcom/hfpll.c
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include "clk-regmap.h"
++#include "clk-hfpll.h"
++
++static const struct hfpll_data hdata = {
++	.mode_reg = 0x00,
++	.l_reg = 0x04,
++	.m_reg = 0x08,
++	.n_reg = 0x0c,
++	.user_reg = 0x10,
++	.config_reg = 0x14,
++	.config_val = 0x430405d,
++	.status_reg = 0x1c,
++	.lock_bit = 16,
++
++	.user_val = 0x8,
++	.user_vco_mask = 0x100000,
++	.low_vco_max_rate = 1248000000,
++	.min_rate = 537600000UL,
++	.max_rate = 2900000000UL,
++};
++
++static const struct of_device_id qcom_hfpll_match_table[] = {
++	{ .compatible = "qcom,hfpll" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, qcom_hfpll_match_table);
++
++static const struct regmap_config hfpll_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= 0x30,
++	.fast_io	= true,
++};
++
++static int qcom_hfpll_probe(struct platform_device *pdev)
 +{
-+	int ret = 0;
-+	struct krait_mux_clk *mux = container_of(nb, struct krait_mux_clk,
-+						 clk_nb);
-+	/* Switch to safe parent */
-+	if (event == PRE_RATE_CHANGE) {
-+		mux->old_index = krait_mux_clk_ops.get_parent(&mux->hw);
-+		ret = krait_mux_clk_ops.set_parent(&mux->hw, mux->safe_sel);
-+		mux->reparent = false;
-+	/*
-+	 * By the time POST_RATE_CHANGE notifier is called,
-+	 * clk framework itself would have changed the parent for the new rate.
-+	 * Only otherwise, put back to the old parent.
-+	 */
-+	} else if (event == POST_RATE_CHANGE) {
-+		if (!mux->reparent)
-+			ret = krait_mux_clk_ops.set_parent(&mux->hw,
-+							   mux->old_index);
-+	}
++	struct resource *res;
++	struct device *dev = &pdev->dev;
++	void __iomem *base;
++	struct regmap *regmap;
++	struct clk_hfpll *h;
++	struct clk_init_data init = {
++		.parent_names = (const char *[]){ "xo" },
++		.num_parents = 1,
++		.ops = &clk_ops_hfpll,
++	};
 +
-+	return notifier_from_errno(ret);
++	h = devm_kzalloc(dev, sizeof(*h), GFP_KERNEL);
++	if (!h)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	regmap = devm_regmap_init_mmio(&pdev->dev, base, &hfpll_regmap_config);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
++	if (of_property_read_string_index(dev->of_node, "clock-output-names",
++					  0, &init.name))
++		return -ENODEV;
++
++	h->d = &hdata;
++	h->clkr.hw.init = &init;
++	spin_lock_init(&h->lock);
++
++	return devm_clk_register_regmap(&pdev->dev, &h->clkr);
 +}
 +
-+static int krait_notifier_register(struct device *dev, struct clk *clk,
-+				   struct krait_mux_clk *mux)
-+{
-+	int ret = 0;
++static struct platform_driver qcom_hfpll_driver = {
++	.probe		= qcom_hfpll_probe,
++	.driver		= {
++		.name	= "qcom-hfpll",
++		.of_match_table = qcom_hfpll_match_table,
++	},
++};
++module_platform_driver(qcom_hfpll_driver);
 +
-+	mux->clk_nb.notifier_call = krait_notifier_cb;
-+	ret = clk_notifier_register(clk, &mux->clk_nb);
-+	if (ret)
-+		dev_err(dev, "failed to register clock notifier: %d\n", ret);
-+
-+	return ret;
-+}
-+
- static int
- krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
- {
-@@ -70,6 +113,7 @@
- krait_add_sec_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset, bool unique_aux)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	static const char *sec_mux_list[] = {
- 		"acpu_aux",
-@@ -93,6 +137,7 @@
- 	mux->shift = 2;
- 	mux->parent_map = sec_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 0;
- 
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
- 	if (!init.name)
-@@ -108,6 +153,11 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto unique_aux;
-+
-+unique_aux:
- 	if (unique_aux)
- 		kfree(sec_mux_list[0]);
- err_aux:
-@@ -119,6 +169,7 @@
- krait_add_pri_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	const char *p_names[3];
- 	struct clk_init_data init = {
-@@ -139,6 +190,7 @@
- 	mux->lpl = id >= 0;
- 	mux->parent_map = pri_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 2;
- 
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
- 	if (!init.name)
-@@ -164,6 +216,10 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto err_p3;
-+err_p3:
- 	kfree(p_names[2]);
- err_p2:
- 	kfree(p_names[1]);
++MODULE_DESCRIPTION("QCOM HFPLL Clock Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:qcom-hfpll");
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
