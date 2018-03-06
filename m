@@ -1,81 +1,162 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Mar 2018 15:43:43 +0100
-Subject: [PATCH 00/12] thermal: exynos: sanitize DeviceTree support
-References: <CGME20180306144427epcas1p3bd260e382c61ab5176a50aa95084b542@epcas1p3.samsung.com>
-Message-ID: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue,  6 Mar 2018 20:09:06 +0530
+Subject: [PATCH v9 13/15] clk: qcom: Add safe switch hook for krait mux clocks
+In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1520347148-27852-14-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When the Hfplls are reprogrammed during the rate change,
+the primary muxes which are sourced from the same hfpll
+for higher frequencies, needs to be switched to the 'safe
+secondary mux' as the parent for that small window. This
+is done by registering a clk notifier for the muxes and
+switching to the safe parent in the PRE_RATE_CHANGE notifier
+and back to the original parent in the POST_RATE_CHANGE notifier.
 
-Values passed through DT properties specific to Exynos thermal
-driver ("samsung,*") are SoC (not platform) specific so just
-define them in struct exynos_tmu_data instance (or just use
-constants where values are identical for all SoCs) and remove
-"samsung," DT properties altogether.
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/clk/qcom/clk-krait.c |  2 ++
+ drivers/clk/qcom/clk-krait.h |  3 +++
+ drivers/clk/qcom/krait-cc.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
 
-The patchset should not cause any functionality changes.  This
-means that unless there are some bugs in the patches itself there
-should be no behavior changes for the driver (this also includes
-lack of changes in the way hardware is accessed by the driver).
-
-Tested on Exynos5422 based Odroid-XU3 Lite board.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-Bartlomiej Zolnierkiewicz (12):
-  thermal: exynos: remove unused type field from struct
-    exynos_tmu_platform_data
-  thermal: exynos: remove parsing of samsung,tmu_default_temp_offset
-    property
-  thermal: exynos: remove parsing of
-    samsung,tmu_[first,second]_point_trim properties
-  thermal: exynos: remove parsing of samsung,tmu_noise_cancel_mode
-    property
-  thermal: exynos: remove parsing of samsung,tmu[_min,_max]_efuse_value
-    properties
-  thermal: exynos: remove parsing of samsung,tmu_reference_voltage
-    property
-  thermal: exynos: remove parsing of samsung,tmu_gain property
-  thermal: exynos: remove parsing of samsung,tmu_cal_type property
-  thermal: exynos: remove separate exynos_tmu.h header file
-  ARM: dts: remove no longer needed samsung thermal properties
-  dt-bindings: thermal: remove no longer needed samsung thermal
-    properties
-  thermal: exynos: remove separate thermal_exynos.h header file
-
- .../devicetree/bindings/thermal/exynos-thermal.txt |  23 +--
- arch/arm/boot/dts/exynos3250.dtsi                  |   2 +-
- arch/arm/boot/dts/exynos4.dtsi                     |   2 +-
- arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi  |  20 ---
- arch/arm/boot/dts/exynos5250.dtsi                  |   2 +-
- arch/arm/boot/dts/exynos5410.dtsi                  |   8 +-
- arch/arm/boot/dts/exynos5420-tmu-sensor-conf.dtsi  |  21 ---
- arch/arm/boot/dts/exynos5420.dtsi                  |  10 +-
- arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi  |  20 ---
- arch/arm/boot/dts/exynos5440.dtsi                  |   6 +-
- .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |  20 ---
- .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  19 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  10 +-
- .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |  21 ---
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |   2 +-
- drivers/thermal/samsung/exynos_tmu.c               | 181 +++++++++++----------
- drivers/thermal/samsung/exynos_tmu.h               |  75 ---------
- include/dt-bindings/thermal/thermal_exynos.h       |  28 ----
- 18 files changed, 124 insertions(+), 346 deletions(-)
- delete mode 100644 arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
- delete mode 100644 arch/arm/boot/dts/exynos5420-tmu-sensor-conf.dtsi
- delete mode 100644 arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi
- delete mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
- delete mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
- delete mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
- delete mode 100644 drivers/thermal/samsung/exynos_tmu.h
- delete mode 100644 include/dt-bindings/thermal/thermal_exynos.h
-
+diff --git a/drivers/clk/qcom/clk-krait.c b/drivers/clk/qcom/clk-krait.c
+index 2e41767..ac2e020 100644
+--- a/drivers/clk/qcom/clk-krait.c
++++ b/drivers/clk/qcom/clk-krait.c
+@@ -50,6 +50,8 @@ static int krait_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (__clk_is_enabled(hw->clk))
+ 		__krait_mux_set_sel(mux, sel);
+ 
++	mux->reparent = true;
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/clk/qcom/clk-krait.h b/drivers/clk/qcom/clk-krait.h
+index 71890bc..986f356 100644
+--- a/drivers/clk/qcom/clk-krait.h
++++ b/drivers/clk/qcom/clk-krait.h
+@@ -13,6 +13,9 @@ struct krait_mux_clk {
+ 	u32		shift;
+ 	u32		en_mask;
+ 	bool		lpl;
++	u8		safe_sel;
++	u8		old_index;
++	bool		reparent;
+ 
+ 	struct clk_hw	hw;
+ 	struct notifier_block   clk_nb;
+diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
+index 7c9dfb0..4d4b657 100644
+--- a/drivers/clk/qcom/krait-cc.c
++++ b/drivers/clk/qcom/krait-cc.c
+@@ -26,6 +26,49 @@
+ 	0,
+ };
+ 
++/*
++ * Notifier function for switching the muxes to safe parent
++ * while the hfpll is getting reprogrammed.
++ */
++static int krait_notifier_cb(struct notifier_block *nb,
++			     unsigned long event,
++			     void *data)
++{
++	int ret = 0;
++	struct krait_mux_clk *mux = container_of(nb, struct krait_mux_clk,
++						 clk_nb);
++	/* Switch to safe parent */
++	if (event == PRE_RATE_CHANGE) {
++		mux->old_index = krait_mux_clk_ops.get_parent(&mux->hw);
++		ret = krait_mux_clk_ops.set_parent(&mux->hw, mux->safe_sel);
++		mux->reparent = false;
++	/*
++	 * By the time POST_RATE_CHANGE notifier is called,
++	 * clk framework itself would have changed the parent for the new rate.
++	 * Only otherwise, put back to the old parent.
++	 */
++	} else if (event == POST_RATE_CHANGE) {
++		if (!mux->reparent)
++			ret = krait_mux_clk_ops.set_parent(&mux->hw,
++							   mux->old_index);
++	}
++
++	return notifier_from_errno(ret);
++}
++
++static int krait_notifier_register(struct device *dev, struct clk *clk,
++				   struct krait_mux_clk *mux)
++{
++	int ret = 0;
++
++	mux->clk_nb.notifier_call = krait_notifier_cb;
++	ret = clk_notifier_register(clk, &mux->clk_nb);
++	if (ret)
++		dev_err(dev, "failed to register clock notifier: %d\n", ret);
++
++	return ret;
++}
++
+ static int
+ krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
+ {
+@@ -70,6 +113,7 @@
+ krait_add_sec_mux(struct device *dev, int id, const char *s,
+ 		  unsigned int offset, bool unique_aux)
+ {
++	int ret;
+ 	struct krait_mux_clk *mux;
+ 	static const char *sec_mux_list[] = {
+ 		"acpu_aux",
+@@ -93,6 +137,7 @@
+ 	mux->shift = 2;
+ 	mux->parent_map = sec_mux_map;
+ 	mux->hw.init = &init;
++	mux->safe_sel = 0;
+ 
+ 	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
+ 	if (!init.name)
+@@ -108,6 +153,11 @@
+ 
+ 	clk = devm_clk_register(dev, &mux->hw);
+ 
++	ret = krait_notifier_register(dev, clk, mux);
++	if (ret)
++		goto unique_aux;
++
++unique_aux:
+ 	if (unique_aux)
+ 		kfree(sec_mux_list[0]);
+ err_aux:
+@@ -119,6 +169,7 @@
+ krait_add_pri_mux(struct device *dev, int id, const char *s,
+ 		  unsigned int offset)
+ {
++	int ret;
+ 	struct krait_mux_clk *mux;
+ 	const char *p_names[3];
+ 	struct clk_init_data init = {
+@@ -139,6 +190,7 @@
+ 	mux->lpl = id >= 0;
+ 	mux->parent_map = pri_mux_map;
+ 	mux->hw.init = &init;
++	mux->safe_sel = 2;
+ 
+ 	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
+ 	if (!init.name)
+@@ -164,6 +216,10 @@
+ 
+ 	clk = devm_clk_register(dev, &mux->hw);
+ 
++	ret = krait_notifier_register(dev, clk, mux);
++	if (ret)
++		goto err_p3;
++err_p3:
+ 	kfree(p_names[2]);
+ err_p2:
+ 	kfree(p_names[1]);
 -- 
-1.9.1
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
