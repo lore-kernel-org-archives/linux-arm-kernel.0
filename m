@@ -1,40 +1,30 @@
-From: d.schultz@phytec.de (Daniel Schultz)
-Date: Tue, 6 Mar 2018 10:59:54 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add dp83867 CLK_OUT muxing
-In-Reply-To: <2707703.8mZIocJ1Ne@diego>
-References: <1520253911-46218-1-git-send-email-d.schultz@phytec.de>
- <3380975.Amu1WGHSQ5@diego> <2707703.8mZIocJ1Ne@diego>
-Message-ID: <fe1d445e-e9ac-452f-e990-d4bc17bd3355@phytec.de>
+From: bich.hemon@st.com (Bich HEMON)
+Date: Tue, 6 Mar 2018 09:58:38 +0000
+Subject: [PATCH 0/2] Update interrupt names
+In-Reply-To: <1519815044-22669-1-git-send-email-bich.hemon@st.com>
+References: <1519815044-22669-1-git-send-email-bich.hemon@st.com>
+Message-ID: <d855b529-be9b-13d9-8834-c2d0b7a16884@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
+On 02/28/2018 11:51 AM, Bich HEMON wrote:
+> This patchset updates existing stm32 usart driver by updating interrupt
+> initialization by name.
+> 
+> Bich Hemon (2):
+>    dt-bindings: serial: stm32: add wakeup option using note
+>    serial: stm32: update interrupt initialization
+> 
+>   Documentation/devicetree/bindings/serial/st,stm32-usart.txt | 4 ++++
+>   drivers/tty/serial/stm32-usart.c                            | 4 ++--
+>   2 files changed, 6 insertions(+), 2 deletions(-)
+> 
 
-On 03/05/2018 10:08 PM, Heiko St?bner wrote:
-> Am Montag, 5. M?rz 2018, 21:25:30 CET schrieb Heiko St?bner:
->> Am Montag, 5. M?rz 2018, 13:45:11 CET schrieb Daniel Schultz:
->>> The CLK_O_SEL default is synchronous to XI input clock, which is 25 MHz.
->>> Set CLK_O_SEL to channel A transmit clock so we have 125 MHz on CLK_OUT.
->>>
->>> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
->> applied for 4.17
-> had to move it to 4.18 though.
->
-> The change to the dt-binding header goes through the networking
-> tree and will only get merged for 4.17-rc1 .
->
-> So devicetree changes in a different branch aren't available at this
-> point.
->
-> One commonly practiced alternative is that you provide a v2
-> with the actual hex values instead of the constants for 4.17
-> and a follow-up patch replacing them with the constants
-> that I can apply for 4.18.
-It's not so urgent because the RK818 PMIC currently does not boot and 
-the patch for this problem is also pending.
+Please note that this patch set is abandoned. As Rob pointed that out, 
+the interrupt indices are fixed, so there is no need to keep these patches.
 
--- 
-Mit freundlichen Gr??en,
-With best regards,
-   Daniel Schultz
+Best regards,
+
+Bich
