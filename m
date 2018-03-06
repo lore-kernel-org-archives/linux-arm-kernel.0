@@ -1,33 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Mar 2018 19:12:18 +0000
-Subject: Regulator regression in next-20180305
-In-Reply-To: <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
-References: <20180305231246.GB5799@atomide.com>
- <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
- <20180306163035.GE13586@sirena.org.uk>
- <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
-Message-ID: <20180306191218.GF13586@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Mar 2018 19:14:08 +0000
+Subject: [PATCH] KVM: arm: reserve bit in KVM_REG_ARM encoding for
+ secure/nonsecure
+In-Reply-To: <CAFEAcA_KtKd9cE2GwDe64CCCaGehMgN++3A=YgLEL+udQbxWVw@mail.gmail.com>
+References: <20180306162646.7646-1-peter.maydell@linaro.org>
+ <4dbad5e5-8e62-4729-16f3-59ce1cfdd550@arm.com>
+ <CAFEAcA9KYxtUzH+DtUR-zVXeFYeVA1orh-Y7+FkufxNZ6o8ivw@mail.gmail.com>
+ <90ed4785-bf17-02b6-7941-d9524c4642f6@arm.com>
+ <CAFEAcA_KtKd9cE2GwDe64CCCaGehMgN++3A=YgLEL+udQbxWVw@mail.gmail.com>
+Message-ID: <2b26805e-103d-d76d-e1f1-6ba7ca964ecf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 01:56:42PM -0300, Fabio Estevam wrote:
-> On Tue, Mar 6, 2018 at 1:30 PM, Mark Brown <broonie@kernel.org> wrote:
+On 06/03/18 18:51, Peter Maydell wrote:
+> On 6 March 2018 at 17:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 06/03/18 16:56, Peter Maydell wrote:
+>>> On 6 March 2018 at 16:43, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 06/03/18 16:26, Peter Maydell wrote:
+>>>>> +#define KVM_REG_ARM_SECURE_MASK      0x0000000010000000
+>>>>> +#define KVM_REG_ARM_SECURE_SHIFT     28
+>>>>>
+>>>>>  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
+>>>>>       (((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
+>>>>>
+>>>>
+>>>> Don't you also need to define it on the arm64 side?
+>>>
+>>> I don't think so, because AArch64 registers aren't security banked
+>>> (except for some GICv3 ones, which aren't set via GET/SET_ONE_REG.)
+>>> Or is there a case I'm missing?
+>>
+>> There is still the case of AArch32 guests on arm64, for which you'd need
+>> to replicate the change to arch/arm64/include/uapi/asm/kvm.h. The two
+>> architectures have different userspace APIs.
+> 
+> I thought that AArch32 guests on arm64 hosts still used the
+> arm64 GET/SET_ONE_REG registers to set the guest's environment?
+> The guest's r0-r7 are in what KVM considers X0..X7, etc, and
+> cp15 registers are accessed by reading/writing their architecturally
+> mapped AArch64 EL1 counterparts.
 
-> > -       for (i = 0; rdev; rdev = rdev_get_supply(rdev), i++)
-> > +       for (i = 1000; rdev; rdev = rdev_get_supply(rdev), i++)
-> >                 mutex_lock_nested(&rdev->mutex, i);
+You're right, there is no banked state at all on arm64. Ignore me.
 
-> With this change the log is a bit different, but still get a kernel hang:
-> https://pastebin.com/eF08TnuT
+Can you please respin this patch with the updated comment? I'll queue it
+for 4.17.
 
-Yeah, that's what I expected.  What we really need to figure out I think
-is what exactly is taking the lock that we end up colliding with, I
-don't seem to be able to reproduce so I'm having to just go on staring
-at the code here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/7015dd76/attachment.sig>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
