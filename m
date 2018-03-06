@@ -1,51 +1,163 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  6 Mar 2018 17:15:30 +0000
-Subject: [PATCH v4 0/5] arm64/kernel: get rid of GCC large model code
-Message-ID: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+Date: Tue,  6 Mar 2018 17:15:32 +0000
+Subject: [PATCH v4 2/5] arm64/kernel: kaslr: reduce module randomization range
+ to 4 GB
+In-Reply-To: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180306171535.25681-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GCC's large model uses literal pools to emit cross object symbol
-references rather than movz/movk sequences, resulting in data items
-mixed in the with executable code in modules' .text segments, reducing
-cache utilization, but also potentially resulting in the creation of
-code gadgets that are exploitable under speculative execution.
+We currently have to rely on the GCC large code model for KASLR for
+two distinct but related reasons:
+- if we enable full randomization, modules will be loaded very far away
+  from the core kernel, where they are out of range for ADRP instructions,
+- even without full randomization, the fact that the 128 MB module region
+  is now no longer fully reserved for kernel modules means that there is
+  a very low likelihood that the normal bottom-up allocation of other
+  vmalloc regions may collide, and use up the range for other things.
 
-We are using GCC's large model for two separate reasons, both of which can
-be worked around rather easily:
-- KASLR uses it to move modules and the kernel very far apart, which is
-  not really needed,
-- the Cortex-A53 erratum code uses it to avoid ADRP instruction altogether,
-  which can be replaced by selective patching of only the ADRP instructions
-  that are affected by the erratum
+Large model code is suboptimal, given that each symbol reference involves
+a literal load that goes through the D-cache, reducing cache utilization.
+But more importantly, literals are not instructions but part of .text
+nonetheless, and hence mapped with executable permissions.
 
-v4:
-- dropped RFC prefix
-- added patch #1 and #4
-- use _AC() for new SIZE_4G constant with ULL prefix (#2)
-- improve comments, get rid of BUG() when running out of PLT entries (#3)
-- rely on new REVIDR checking code (#5)
+So let's get rid of our dependency on the large model for KASLR, by:
+- reducing the full randomization range to 4 GB, thereby ensuring that
+  ADRP references between modules and the kernel are always in range,
+- reduce the spillover range to 4 GB as well, so that we fallback to a
+  region that is still guaranteed to be in range
+- move the randomization window of the core kernel to the middle of the
+  VMALLOC space
 
-Ard Biesheuvel (5):
-  arm64: module: don't BUG when exceeding preallocated PLT count
-  arm64/kernel: kaslr: reduce module randomization range to 4 GB
-  arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419
-  arm64/errata: add REVIDR handling to framework
-  arm64/kernel: enable A53 erratum #8434319 handling at runtime
+Note that KASAN always uses the module region outside of the vmalloc space,
+so keep the kernel close to that if KASAN is enabled.
 
- arch/arm64/Kconfig                  | 18 ++--
- arch/arm64/Makefile                 |  5 --
- arch/arm64/include/asm/cpucaps.h    |  3 +-
- arch/arm64/include/asm/cpufeature.h |  4 +
- arch/arm64/include/asm/module.h     |  2 +
- arch/arm64/kernel/cpu_errata.c      | 31 ++++++-
- arch/arm64/kernel/kaslr.c           | 20 +++--
- arch/arm64/kernel/module-plts.c     | 90 +++++++++++++++++++-
- arch/arm64/kernel/module.c          | 42 +++++++--
- arch/arm64/kernel/reloc_test_core.c |  4 +-
- arch/arm64/kernel/reloc_test_syms.S | 12 ++-
- include/linux/sizes.h               |  4 +
- 12 files changed, 191 insertions(+), 44 deletions(-)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/Kconfig         |  7 +++----
+ arch/arm64/kernel/kaslr.c  | 20 ++++++++++++--------
+ arch/arm64/kernel/module.c |  7 ++++---
+ include/linux/sizes.h      |  4 ++++
+ 4 files changed, 23 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb7ef8e..ae7d3d4c0bbe 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1109,7 +1109,6 @@ config ARM64_MODULE_CMODEL_LARGE
+ 
+ config ARM64_MODULE_PLTS
+ 	bool
+-	select ARM64_MODULE_CMODEL_LARGE
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 
+ config RELOCATABLE
+@@ -1143,12 +1142,12 @@ config RANDOMIZE_BASE
+ 	  If unsure, say N.
+ 
+ config RANDOMIZE_MODULE_REGION_FULL
+-	bool "Randomize the module region independently from the core kernel"
++	bool "Randomize the module region over a 4 GB range"
+ 	depends on RANDOMIZE_BASE
+ 	default y
+ 	help
+-	  Randomizes the location of the module region without considering the
+-	  location of the core kernel. This way, it is impossible for modules
++	  Randomizes the location of the module region inside a 4 GB window
++	  covering the core kernel. This way, it is less likely for modules
+ 	  to leak information about the location of core kernel data structures
+ 	  but it does imply that function calls between modules and the core
+ 	  kernel will need to be resolved via veneers in the module PLT.
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index 47080c49cc7e..17dbdb055314 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -117,13 +117,15 @@ u64 __init kaslr_early_init(u64 dt_phys)
+ 	/*
+ 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
+ 	 * kernel image offset from the seed. Let's place the kernel in the
+-	 * lower half of the VMALLOC area (VA_BITS - 2).
++	 * middle half of the VMALLOC area (VA_BITS - 2), and stay clear of
++	 * the lower and upper quarters to avoid colliding with other
++	 * allocations.
+ 	 * Even if we could randomize at page granularity for 16k and 64k pages,
+ 	 * let's always round to 2 MB so we don't interfere with the ability to
+ 	 * map using contiguous PTEs
+ 	 */
+ 	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
+-	offset = seed & mask;
++	offset = BIT(VA_BITS - 3) + (seed & mask);
+ 
+ 	/* use the top 16 bits to randomize the linear region */
+ 	memstart_offset_seed = seed >> 48;
+@@ -149,21 +151,23 @@ u64 __init kaslr_early_init(u64 dt_phys)
+ 		 * vmalloc region, since shadow memory is allocated for each
+ 		 * module at load time, whereas the vmalloc region is shadowed
+ 		 * by KASAN zero pages. So keep modules out of the vmalloc
+-		 * region if KASAN is enabled.
++		 * region if KASAN is enabled, and put the kernel well within
++		 * 4 GB of the module region.
+ 		 */
+-		return offset;
++		return offset % SZ_2G;
+ 
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_MODULE_REGION_FULL)) {
+ 		/*
+-		 * Randomize the module region independently from the core
+-		 * kernel. This prevents modules from leaking any information
++		 * Randomize the module region over a 4 GB window covering the
++		 * kernel. This reduces the risk of modules leaking information
+ 		 * about the address of the kernel itself, but results in
+ 		 * branches between modules and the core kernel that are
+ 		 * resolved via PLTs. (Branches between modules will be
+ 		 * resolved normally.)
+ 		 */
+-		module_range = VMALLOC_END - VMALLOC_START - MODULES_VSIZE;
+-		module_alloc_base = VMALLOC_START;
++		module_range = SZ_4G - (u64)(_end - _stext);
++		module_alloc_base = max((u64)_end + offset - SZ_4G,
++					(u64)MODULES_VADDR);
+ 	} else {
+ 		/*
+ 		 * Randomize the module region by setting module_alloc_base to
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index c8c6c2828b79..70c3e5518e95 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -55,9 +55,10 @@ void *module_alloc(unsigned long size)
+ 		 * less likely that the module region gets exhausted, so we
+ 		 * can simply omit this fallback in that case.
+ 		 */
+-		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
+-				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+-				NUMA_NO_NODE, __builtin_return_address(0));
++		p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
++				module_alloc_base + SZ_4G, GFP_KERNEL,
++				PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
++				__builtin_return_address(0));
+ 
+ 	if (p && (kasan_module_alloc(p, size) < 0)) {
+ 		vfree(p);
+diff --git a/include/linux/sizes.h b/include/linux/sizes.h
+index ce3e8150c174..fbde0bc7e882 100644
+--- a/include/linux/sizes.h
++++ b/include/linux/sizes.h
+@@ -8,6 +8,8 @@
+ #ifndef __LINUX_SIZES_H__
+ #define __LINUX_SIZES_H__
+ 
++#include <linux/const.h>
++
+ #define SZ_1				0x00000001
+ #define SZ_2				0x00000002
+ #define SZ_4				0x00000004
+@@ -44,4 +46,6 @@
+ #define SZ_1G				0x40000000
+ #define SZ_2G				0x80000000
+ 
++#define SZ_4G				_AC(0x100000000, ULL)
++
+ #endif /* __LINUX_SIZES_H__ */
 -- 
 2.11.0
