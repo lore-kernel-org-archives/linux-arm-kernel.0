@@ -1,245 +1,339 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Mar 2018 20:08:59 +0530
-Subject: [PATCH v9 06/15] clk: qcom: Add MSM8960/APQ8064's HFPLLs
-In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1520347148-27852-7-git-send-email-sricharan@codeaurora.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 6 Mar 2018 08:47:27 -0600
+Subject: [PATCH v6] arm64: Add support for new control bits CTR_EL0.DIC
+ and CTR_EL0.IDC
+In-Reply-To: <20180306134405.GB18080@arm.com>
+References: <1519877640-11944-1-git-send-email-shankerd@codeaurora.org>
+ <20180306134405.GB18080@arm.com>
+Message-ID: <d6182273-c23a-c4fa-ce40-c87055bfb338@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Hi Will
 
-Describe the HFPLLs present on MSM8960 and APQ8064 devices.
+On 03/06/2018 07:44 AM, Will Deacon wrote:
+> Hi Shanker,
+> 
+> On Wed, Feb 28, 2018 at 10:14:00PM -0600, Shanker Donthineni wrote:
+>> The DCache clean & ICache invalidation requirements for instructions
+>> to be data coherence are discoverable through new fields in CTR_EL0.
+>> The following two control bits DIC and IDC were defined for this
+>> purpose. No need to perform point of unification cache maintenance
+>> operations from software on systems where CPU caches are transparent.
+>>
+>> This patch optimize the three functions __flush_cache_user_range(),
+>> clean_dcache_area_pou() and invalidate_icache_range() if the hardware
+>> reports CTR_EL0.IDC and/or CTR_EL0.IDC. Basically it skips the two
+>> instructions 'DC CVAU' and 'IC IVAU', and the associated loop logic
+>> in order to avoid the unnecessary overhead.
+>>
+>> CTR_EL0.DIC: Instruction cache invalidation requirements for
+>>  instruction to data coherence. The meaning of this bit[29].
+>>   0: Instruction cache invalidation to the point of unification
+>>      is required for instruction to data coherence.
+>>   1: Instruction cache cleaning to the point of unification is
+>>       not required for instruction to data coherence.
+>>
+>> CTR_EL0.IDC: Data cache clean requirements for instruction to data
+>>  coherence. The meaning of this bit[28].
+>>   0: Data cache clean to the point of unification is required for
+>>      instruction to data coherence, unless CLIDR_EL1.LoC == 0b000
+>>      or (CLIDR_EL1.LoUIS == 0b000 && CLIDR_EL1.LoUU == 0b000).
+>>   1: Data cache clean to the point of unification is not required
+>>      for instruction to data coherence.
+>>
+>> Co-authored-by: Philip Elcan <pelcan@codeaurora.org>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> Changes since v5:
+>>   -Addressed Mark's review comments.
+> 
+> This mostly looks good now. Just a few comments inline.
+> 
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 7381eeb..41af850 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -1091,6 +1091,18 @@ config ARM64_RAS_EXTN
+>>  	  and access the new registers if the system supports the extension.
+>>  	  Platform RAS features may additionally depend on firmware support.
+>>  
+>> +config ARM64_SKIP_CACHE_POU
+>> +	bool "Enable support to skip cache PoU operations"
+>> +	default y
+>> +	help
+>> +	  Explicit point of unification cache operations can be eliminated
+>> +	  in software if the hardware handles transparently. The new bits in
+>> +	  CTR_EL0, CTR_EL0.DIC and CTR_EL0.IDC indicates the hardware
+>> +	  capabilities of ICache and DCache PoU requirements.
+>> +
+>> +	  Selecting this feature will allow the kernel to optimize cache
+>> +	  maintenance to the PoU.
+>> +
+>>  endmenu
+> 
+> Let's not bother with a Kconfig option. I think the extra couple of NOPs
+> this introduces for CPUs that don't implement the new features isn't going
+> to hurt anybody.
+> 
 
-Acked-by: Rob Herring <robh@kernel.org> (bindings)
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
- 2 files changed, 174 insertions(+)
+Okay, I'll get rid of Kconfig option.
 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index eb551c7..809f16a 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -30,6 +30,7 @@
- #include "clk-pll.h"
- #include "clk-rcg.h"
- #include "clk-branch.h"
-+#include "clk-hfpll.h"
- #include "reset.h"
- 
- static struct clk_pll pll3 = {
-@@ -86,6 +87,164 @@
- 	},
- };
- 
-+static struct hfpll_data hfpll0_data = {
-+	.mode_reg = 0x3200,
-+	.l_reg = 0x3208,
-+	.m_reg = 0x320c,
-+	.n_reg = 0x3210,
-+	.config_reg = 0x3204,
-+	.status_reg = 0x321c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3214,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll0 = {
-+	.d = &hfpll0_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll0",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll0.lock),
-+};
-+
-+static struct hfpll_data hfpll1_8064_data = {
-+	.mode_reg = 0x3240,
-+	.l_reg = 0x3248,
-+	.m_reg = 0x324c,
-+	.n_reg = 0x3250,
-+	.config_reg = 0x3244,
-+	.status_reg = 0x325c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3254,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct hfpll_data hfpll1_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll1 = {
-+	.d = &hfpll1_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll1",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll1.lock),
-+};
-+
-+static struct hfpll_data hfpll2_data = {
-+	.mode_reg = 0x3280,
-+	.l_reg = 0x3288,
-+	.m_reg = 0x328c,
-+	.n_reg = 0x3290,
-+	.config_reg = 0x3284,
-+	.status_reg = 0x329c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3294,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll2 = {
-+	.d = &hfpll2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll2.lock),
-+};
-+
-+static struct hfpll_data hfpll3_data = {
-+	.mode_reg = 0x32c0,
-+	.l_reg = 0x32c8,
-+	.m_reg = 0x32cc,
-+	.n_reg = 0x32d0,
-+	.config_reg = 0x32c4,
-+	.status_reg = 0x32dc,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x32d4,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll3 = {
-+	.d = &hfpll3_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll3",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll3.lock),
-+};
-+
-+static struct hfpll_data hfpll_l2_8064_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct hfpll_data hfpll_l2_data = {
-+	.mode_reg = 0x3400,
-+	.l_reg = 0x3408,
-+	.m_reg = 0x340c,
-+	.n_reg = 0x3410,
-+	.config_reg = 0x3404,
-+	.status_reg = 0x341c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3414,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll_l2 = {
-+	.d = &hfpll_l2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll_l2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll_l2.lock),
-+};
-+
- static struct clk_pll pll14 = {
- 	.l_reg = 0x31c4,
- 	.m_reg = 0x31c8,
-@@ -3112,6 +3271,9 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
- };
- 
- static const struct qcom_reset_map gcc_msm8960_resets[] = {
-@@ -3323,6 +3485,11 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
-+	[PLL16] = &hfpll2.clkr,
-+	[PLL17] = &hfpll3.clkr,
- };
- 
- static const struct qcom_reset_map gcc_apq8064_resets[] = {
-@@ -3482,6 +3649,11 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	if (match->data == &gcc_apq8064_desc) {
-+		hfpll1.d = &hfpll1_8064_data;
-+		hfpll_l2.d = &hfpll_l2_8064_data;
-+	}
-+
- 	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
- 					      NULL, 0);
- 	if (IS_ERR(tsens))
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8960.h b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-index 7d20eed..e02742f 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8960.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-@@ -319,5 +319,7 @@
- #define CE3_SRC					303
- #define CE3_CORE_CLK				304
- #define CE3_H_CLK				305
-+#define PLL16					306
-+#define PLL17					307
- 
- #endif
+>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>> index 3c78835..39f2274 100644
+>> --- a/arch/arm64/include/asm/assembler.h
+>> +++ b/arch/arm64/include/asm/assembler.h
+>> @@ -444,6 +444,11 @@
+>>   * 	Corrupts:	tmp1, tmp2
+>>   */
+>>  	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +alternative_if ARM64_HAS_CACHE_DIC
+>> +	b	9996f
+>> +alternative_else_nop_endif
+>> +#endif
+>>  	icache_line_size \tmp1, \tmp2
+>>  	sub	\tmp2, \tmp1, #1
+>>  	bic	\tmp2, \start, \tmp2
+>> @@ -453,6 +458,7 @@
+>>  	cmp	\tmp2, \end
+>>  	b.lo	9997b
+>>  	dsb	ish
+>> +9996:
+>>  	isb
+>>  	.endm
+>>  
+>> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+>> index ea9bb4e..d460e9f 100644
+>> --- a/arch/arm64/include/asm/cache.h
+>> +++ b/arch/arm64/include/asm/cache.h
+>> @@ -20,8 +20,12 @@
+>>  
+>>  #define CTR_L1IP_SHIFT		14
+>>  #define CTR_L1IP_MASK		3
+>> +#define CTR_DMLINE_SHIFT	16
+> 
+> This should be "CTR_DMINLINE_SHIFT"
+> 
+
+I'll change it.
+
+>> +#define CTR_ERG_SHIFT		20
+>>  #define CTR_CWG_SHIFT		24
+>>  #define CTR_CWG_MASK		15
+>> +#define CTR_IDC_SHIFT		28
+>> +#define CTR_DIC_SHIFT		29
+>>  
+>>  #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
+>>  
+>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+>> index bb26382..8dd42ae 100644
+>> --- a/arch/arm64/include/asm/cpucaps.h
+>> +++ b/arch/arm64/include/asm/cpucaps.h
+>> @@ -45,7 +45,9 @@
+>>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>>  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>>  #define ARM64_HAS_RAS_EXTN			26
+>> +#define ARM64_HAS_CACHE_IDC			27
+>> +#define ARM64_HAS_CACHE_DIC			28
+>>  
+>> -#define ARM64_NCAPS				27
+>> +#define ARM64_NCAPS				29
+>>  
+>>  #endif /* __ASM_CPUCAPS_H */
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 2985a06..0b64b55 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -199,12 +199,12 @@ static int __init register_cpu_hwcaps_dumper(void)
+>>  };
+>>  
+>>  static const struct arm64_ftr_bits ftr_ctr[] = {
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),		/* RES1 */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 29, 1, 1),	/* DIC */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 28, 1, 1),	/* IDC */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, 20, 4, 0),	/* ERG */
+>> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1),                    /* RES1 */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),    /* DIC */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IDC_SHIFT, 1, 1),    /* IDC */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_CWG_SHIFT, 4, 0),   /* CWG */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_HIGHER_SAFE, CTR_ERG_SHIFT, 4, 0),   /* ERG */
+>> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DMLINE_SHIFT, 4, 1), /* DminLine */
+>>  	/*
+>>  	 * Linux can handle differing I-cache policies. Userspace JITs will
+>>  	 * make use of *minLine.
+>> @@ -852,6 +852,20 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+>>  					ID_AA64PFR0_FP_SHIFT) < 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_IDC_SHIFT);
+>> +}
+>> +
+>> +static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+>> +			  int __unused)
+>> +{
+>> +	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
+>> +}
+>> +#endif
+>> +
+>>  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+>>  static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>>  
+>> @@ -1088,6 +1102,20 @@ static int cpu_copy_el2regs(void *__unused)
+>>  		.enable = cpu_clear_disr,
+>>  	},
+>>  #endif /* CONFIG_ARM64_RAS_EXTN */
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +	{
+>> +		.desc = "Skip D-Cache maintenance 'DC CVAU' (CTR_EL0.IDC=1)",
+> 
+> Can we stick a bit closer to the architectural text here, please? How about:
+> 
+> "Data cache clean to the PoU not required for I/D coherence"
+> 
+
+I'll take your suggestion.
+
+>> +		.capability = ARM64_HAS_CACHE_IDC,
+>> +		.def_scope = SCOPE_SYSTEM,
+>> +		.matches = has_cache_idc,
+>> +	},
+>> +	{
+>> +		.desc = "Skip I-Cache maintenance 'IC IVAU' (CTR_EL0.DIC=1)",
+> 
+> "Instruction cache invalidation not required for I/D coherence"
+> 
+
+Same here.
+
+>> +		.capability = ARM64_HAS_CACHE_DIC,
+>> +		.def_scope = SCOPE_SYSTEM,
+>> +		.matches = has_cache_dic,
+>> +	},
+>> +#endif /* CONFIG_ARM64_SKIP_CACHE_POU */
+>>  	{},
+>>  };
+>>  
+>> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+>> index 758bde7..d8d7a32 100644
+>> --- a/arch/arm64/mm/cache.S
+>> +++ b/arch/arm64/mm/cache.S
+>> @@ -50,6 +50,12 @@ ENTRY(flush_icache_range)
+>>   */
+>>  ENTRY(__flush_cache_user_range)
+>>  	uaccess_ttbr0_enable x2, x3, x4
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +alternative_if ARM64_HAS_CACHE_IDC
+>> +	dsb	ishst
+>> +	b	8f
+>> +alternative_else_nop_endif
+>> +#endif
+>>  	dcache_line_size x2, x3
+>>  	sub	x3, x2, #1
+>>  	bic	x4, x0, x3
+>> @@ -60,6 +66,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+>>  	b.lo	1b
+>>  	dsb	ish
+>>  
+>> +8:
+>>  	invalidate_icache_by_line x0, x1, x2, x3, 9f
+>>  	mov	x0, #0
+>>  1:
+>> @@ -116,6 +123,12 @@ ENDPIPROC(__flush_dcache_area)
+>>   *	- size    - size in question
+>>   */
+>>  ENTRY(__clean_dcache_area_pou)
+>> +#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+>> +alternative_if ARM64_HAS_CACHE_IDC
+>> +	dsb	ishst
+>> +	ret
+>> +alternative_else_nop_endif
+> 
+> I think this is a slight asymmetry with the code for the I-side. On the
+> I-side, you hook into invalidate_icache_by_line, whereas on the D-side you
+> hook into the callers of dcache_by_line_op. Why is that?
+> 
+
+There is no particular reason other than complexity of the macro with another 
+alternative. I tried to avoid this change by updating __clean_dcache_area_pou().
+I can change if you're interested to see both I-Side and D-Side changes are
+symmetric some this like this...
+
+ .macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+  
+  .if	(\op == cvau)
+  alternative_if ARM64_HAS_CACHE_IDC
+        dsb	ishst
+        b       9997f
+  alternative_else_nop_endif
+  .endif
+
+	dcache_line_size \tmp1, \tmp2
+	add	\size, \kaddr, \size
+	sub	\tmp2, \tmp1, #1
+	bic	\kaddr, \kaddr, \tmp2
+ 9998:
+	.if	(\op == cvau || \op == cvac)
+ alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+	dc	\op, \kaddr
+ alternative_else
+	dc	civac, \kaddr
+ alternative_endif
+	.elseif	(\op == cvap)
+ alternative_if ARM64_HAS_DCPOP
+	sys 3, c7, c12, 1, \kaddr	// dc cvap
+ alternative_else
+	dc	cvac, \kaddr
+ alternative_endif
+	.else
+	dc	\op, \kaddr
+	.endif
+	add	\kaddr, \kaddr, \tmp1
+	cmp	\kaddr, \size
+	b.lo	9998b
+	dsb	\domain
+9997:
+	.endm
+
+> I notice that the only user other than
+> flush_icache_range/__flush_cache_user_range or invalidate_icache_by_line
+> is in KVM, via invalidate_icache_range. If you want to hook in there, why
+> aren't you also patching __flush_icache_all? If so, I'd rather have the
+> I-side code consistent with the D-side code and do this in the handful of
+> callers. We might even be able to elide a branch or two that way.
+> 
+
+Agree with you, it saves function calls overhead. I'll do this change...
+
+static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+{
+	if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC)
+	    __invalidate_icache_guest_page(pfn, size);
+}
+
+
+> I'm going to assume that I-cache aliases are all coherent if DIC=1, so it's
+> safe to elide our alias sync code.
+> 
+
+I'm not sure about I-cache whether aliases are all coherent if DIC=1 ot nor.
+Unfortunately I don't have any hardware to test DIC=1. I've verified IDC=1.
+
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
