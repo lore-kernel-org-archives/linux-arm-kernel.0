@@ -1,42 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 06 Mar 2018 10:32:13 +0000
-Subject: [PATCH v2] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
- hardening
-In-Reply-To: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
-References: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <861sgx5wb6.wl-marc.zyngier@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 6 Mar 2018 10:37:10 +0000
+Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
+In-Reply-To: <27a044ee-0ed7-0470-0fef-289d0d5cf5e8@codeaurora.org>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+ <27a044ee-0ed7-0470-0fef-289d0d5cf5e8@codeaurora.org>
+Message-ID: <83f46f73-baa7-c3d5-86f0-cf0af05ab359@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 Mar 2018 17:06:43 +0000,
-Shanker Donthineni wrote:
+On 05/03/18 15:28, Sinan Kaya wrote:
+> On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
+>> +static void io_mm_free(struct io_mm *io_mm)
+>> +{
+>> +	struct mm_struct *mm;
+>> +	void (*release)(struct io_mm *);
+>> +
+>> +	release = io_mm->release;
+>> +	mm = io_mm->mm;
+>> +
+>> +	release(io_mm);
 > 
-> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
-> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
-> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
-> of Silicon provider service ID 0xC2001700.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> Chnages since v1:
->   - Trivial change in cpucaps.h (refresh after removing ARM64_HARDEN_BP_POST_GUEST_EXIT)
-> 
->  arch/arm64/include/asm/cpucaps.h |  5 ++--
->  arch/arm64/include/asm/kvm_asm.h |  2 --
->  arch/arm64/kernel/bpi.S          |  8 ------
->  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
->  arch/arm64/kvm/hyp/entry.S       | 12 ---------
->  arch/arm64/kvm/hyp/switch.c      | 10 --------
->  6 files changed, 21 insertions(+), 71 deletions(-)
+> Is there any reason why you can't call iommu->release()
+> here directly? Why do you need the release local variable?
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Will/Catalin, if you want to take it via the arm64 tree, that's fine
-by me.
+I think I can remove the local variable
 
 Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+Jean
