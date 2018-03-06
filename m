@@ -1,51 +1,86 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 6 Mar 2018 11:04:48 +0900
-Subject: [RESEND PATCH v6 13/14] iommu/rockchip: Add runtime PM support
-In-Reply-To: <5A9DF59E.60900@rock-chips.com>
-References: <20180301101837.27969-1-jeffy.chen@rock-chips.com>
- <20180301101837.27969-14-jeffy.chen@rock-chips.com>
- <CAAFQd5D2SY2RV9HLTeTQigfnVCkF9wDq74_+t3OV2YEb9wJtqg@mail.gmail.com>
- <5A9DF59E.60900@rock-chips.com>
-Message-ID: <CAAFQd5DCGgFWvpfFgkP-L+4WC9HRyqtCHiTUGRpA5PGx-QgpLg@mail.gmail.com>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Tue,  6 Mar 2018 10:13:45 +0800
+Subject: [PATCH v9 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
+ Interface (CSI)
+Message-ID: <1520302425-1499-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+Add binding documentation for Allwinner V3s CSI.
 
-On Tue, Mar 6, 2018 at 10:57 AM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> Hi Tomasz,
->
-> Thanks for your reply.
->
-> On 03/05/2018 09:49 PM, Tomasz Figa wrote:
->>>
->>> >  struct rk_iommudata {
->>> >+       struct device_link *link; /* runtime PM link from IOMMU to
->>> > master */
->>
->> Kerneldoc comment for the struct could be added instead.
->
-> i saw this in the kerneldoc:
->
-> * An MMU device exists alongside a busmaster device, both are in the same
->   power domain.  The MMU implements DMA address translation for the
-> busmaster
->   device and shall be runtime resumed and kept active whenever and as long
->   as the busmaster device is active.  The busmaster device's driver shall
->   not bind before the MMU is bound.  To achieve this, a device link with
->   runtime PM integration is added from the busmaster device (consumer)
->   to the MMU device (supplier).  The effect with regards to runtime PM
->   is the same as if the MMU was the parent of the master device.
->
->
-> maybe we can use something like:
-> device link with runtime PM integration from the master (consumer) to the
-> IOMMU (supplier).
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Yong Deng <yong.deng@magewell.com>
+---
+ .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
 
-Sorry, I meant that kerneldoc comment style could be used to document
-this struct.
-
-https://www.kernel.org/doc/html/v4.15/doc-guide/kernel-doc.html#writing-kernel-doc-comments
-
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+new file mode 100644
+index 000000000000..2ff47a9507a6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+@@ -0,0 +1,59 @@
++Allwinner V3s Camera Sensor Interface
++-------------------------------------
++
++Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
++interface and CSI1 is used for parallel interface.
++
++Required properties:
++  - compatible: value must be "allwinner,sun8i-v3s-csi"
++  - reg: base address and size of the memory-mapped region.
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the CSI
++    * bus: the CSI interface clock
++    * mod: the CSI module clock
++    * ram: the CSI DRAM clock
++  - clock-names: the clock names mentioned above
++  - resets: phandles to the reset line driving the CSI
++
++Each CSI node should contain one 'port' child node with one child 'endpoint'
++node, according to the bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
++above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
++Bt656 for CSI1.
++
++Endpoint node properties for CSI1
++---------------------------------
++
++- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
++			   node
++- bus-width:		: (required) must be 8, 10, 12 or 16
++- pclk-sample		: (optional) (default: sample on falling edge)
++- hsync-active		: (only required for parallel)
++- vsync-active		: (only required for parallel)
++
++Example:
++
++csi1: csi at 1cb4000 {
++	compatible = "allwinner,sun8i-v3s-csi";
++	reg = <0x01cb4000 0x1000>;
++	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&ccu CLK_BUS_CSI>,
++		 <&ccu CLK_CSI1_SCLK>,
++		 <&ccu CLK_DRAM_CSI>;
++	clock-names = "bus", "mod", "ram";
++	resets = <&ccu RST_BUS_CSI>;
++
++	port {
++		/* Parallel bus endpoint */
++		csi1_ep: endpoint {
++			remote-endpoint = <&adv7611_ep>;
++			bus-width = <16>;
++
++			/* If hsync-active/vsync-active are missing,
++			   embedded BT.656 sync is used */
++			hsync-active = <0>; /* Active low */
++			vsync-active = <0>; /* Active low */
++			pclk-sample = <1>;  /* Rising */
++		};
++	};
++};
+-- 
+1.8.3.1
