@@ -1,85 +1,58 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Mar 2018 20:09:03 +0530
-Subject: [PATCH v9 10/15] dt-bindings: arm: Document qcom,kpss-gcc
-In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1520347148-27852-11-git-send-email-sricharan@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 6 Mar 2018 08:40:48 -0600
+Subject: [PATCH v4 1/2] dt-bindings: usb: ehci: add optional external vbus
+ supply property
+In-Reply-To: <ae4c741e-d5aa-4a8c-4029-1dff6bef2cdd@arm.com>
+References: <1519897899-8577-1-git-send-email-amelie.delaunay@st.com>
+ <1519897899-8577-2-git-send-email-amelie.delaunay@st.com>
+ <20180306015743.uazy4e5quil2ijy2@rob-hp-laptop>
+ <ae4c741e-d5aa-4a8c-4029-1dff6bef2cdd@arm.com>
+Message-ID: <CAL_Jsq+iPZN-RV61+AFcRg-eKORQDQ9-4s4-vaFOrCqWBK8PDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On Tue, Mar 6, 2018 at 8:09 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 06/03/18 01:57, Rob Herring wrote:
+>>
+>> On Thu, Mar 01, 2018 at 10:51:38AM +0100, Amelie Delaunay wrote:
+>>>
+>>> On some boards, especially when vbus supply requires large current,
+>>> and the charge pump on the PHY isn't enough, an external vbus power
+>>> switch
+>>> per port may be used.
+>>> Add portN_vbus-supply property to usb-ehci bindings. As the number of
+>>> ports
+>>> depends on the ehci controller, and the port on which an external vbus
+>>> supply depends on the platform, <portN> is used to make it generic.
+>>>
+>>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/usb/usb-ehci.txt | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>>> b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>>> index 3efde12..cd576db 100644
+>>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>>> @@ -19,6 +19,7 @@ Optional properties:
+>>>    - phys : phandle + phy specifier pair
+>>>    - phy-names : "usb"
+>>>    - resets : phandle + reset specifier pair
+>>> + - portN_vbus-supply : phandle of regulator supplying vbus for port N
+>>
+>>
+>> Just make this an array with the index being the port (and drop
+>> "portN_").
+>
+>
+> Does that still work if there is an external supply for port 1 but none for
+> port 0? I believe that was brought up as a possibility before.
 
-The ACC and GCC regions present in KPSSv1 contain registers to
-control clocks and power to each Krait CPU and L2. Documenting
-the bindings here.
+Yes, if you use 0 or -1 to skip over an index.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  7 +++++
- .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  | 32 ++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+Really, this should go in the connector node instead because Vbus is
+supplied to the connector, not the host controller. The connector
+binding is on its way into mainline.
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
-index 1333db9..382a574 100644
---- a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
-@@ -21,10 +21,17 @@ PROPERTIES
- 		    the register region. An optional second element specifies
- 		    the base address and size of the alias register region.
- 
-+- clock-output-names:
-+	Usage: optional
-+	Value type: <string>
-+	Definition: Name of the output clock. Typically acpuX_aux where X is a
-+		    CPU number starting at 0.
-+
- Example:
- 
- 	clock-controller at 2088000 {
- 		compatible = "qcom,kpss-acc-v2";
- 		reg = <0x02088000 0x1000>,
- 		      <0x02008000 0x1000>;
-+		clock-output-names = "acpu0_aux";
- 	};
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
-new file mode 100644
-index 0000000..37fc0a4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
-@@ -0,0 +1,32 @@
-+Krait Processor Sub-system (KPSS) Global Clock Controller (GCC)
-+
-+PROPERTIES
-+
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: should be one of the following. The generic compatible
-+			"qcom,kpss-gcc" should also be included.
-+			"qcom,kpss-gcc-ipq8064", "qcom,kpss-gcc"
-+			"qcom,kpss-gcc-apq8064", "qcom,kpss-gcc"
-+			"qcom,kpss-gcc-msm8974", "qcom,kpss-gcc"
-+			"qcom,kpss-gcc-msm8960", "qcom,kpss-gcc"
-+
-+- reg:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: base address and size of the register region
-+
-+- clock-output-names:
-+	Usage: required
-+	Value type: <string>
-+	Definition: Name of the output clock. Typically acpu_l2_aux indicating
-+		    an L2 cache auxiliary clock.
-+
-+Example:
-+
-+	l2cc: clock-controller at 2011000 {
-+		compatible = "qcom,kpss-gcc-ipq8064", "qcom,kpss-gcc";
-+		reg = <0x2011000 0x1000>;
-+		clock-output-names = "acpu_l2_aux";
-+	};
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Rob
