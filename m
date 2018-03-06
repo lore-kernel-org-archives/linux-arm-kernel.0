@@ -1,149 +1,140 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Mar 2018 20:09:02 +0530
-Subject: [PATCH v9 09/15] clk: qcom: Add KPSS ACC/GCC driver
-In-Reply-To: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1520347148-27852-10-git-send-email-sricharan@codeaurora.org>
+From: gabriel.matni@exfo.com (Gabriel Matni)
+Date: Tue, 6 Mar 2018 15:47:03 +0000
+Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
+Message-ID: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+From: Gabriel Matni <gabriel.matni@exfo.com>
 
-The ACC and GCC regions present in KPSSv1 contain registers to
-control clocks and power to each Krait CPU and L2. For CPUfreq
-purposes probe these devices and expose a mux clock that chooses
-between PXO and PLL8.
+Fixes missing characters on kernel console at low baud rates (i.e.9600).
+The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
+that the transmitter holding register (THR) is ready to receive a new byte.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+TX_EMP tells us when it is possible to send a break sequence via
+SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+empty, it does not guarantee that a new byte can be written just yet.
+
+Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
+Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
+Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
+Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
 ---
- drivers/clk/qcom/Kconfig    |  8 +++++
- drivers/clk/qcom/Makefile   |  1 +
- drivers/clk/qcom/kpss-xcc.c | 87 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+)
- create mode 100644 drivers/clk/qcom/kpss-xcc.c
+drivers/tty/serial/mvebu-uart.c | 2 +-
+1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index bf14f56..8fca65d 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -235,6 +235,14 @@ config QCOM_HFPLL
- 	  Say Y if you want to support CPU frequency scaling on devices
- 	  such as MSM8974, APQ8084, etc.
- 
-+config KPSS_XCC
-+	tristate "KPSS Clock Controller"
-+	depends on COMMON_CLK_QCOM
-+	help
-+	  Support for the Krait ACC and GCC clock controllers. Say Y
-+	  if you want to support CPU frequency scaling on devices such
-+	  as MSM8960, APQ8064, etc.
-+
- config KRAIT_CLOCKS
- 	bool
- 	select KRAIT_L2_ACCESSORS
-diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index e1e96f6..24e598a 100644
---- a/drivers/clk/qcom/Makefile
-+++ b/drivers/clk/qcom/Makefile
-@@ -40,4 +40,5 @@ obj-$(CONFIG_QCOM_CLK_APCS_MSM8916) += apcs-msm8916.o
- obj-$(CONFIG_QCOM_CLK_RPM) += clk-rpm.o
- obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
- obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
-+obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
- obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
-diff --git a/drivers/clk/qcom/kpss-xcc.c b/drivers/clk/qcom/kpss-xcc.c
-new file mode 100644
-index 0000000..8590b5e
---- /dev/null
-+++ b/drivers/clk/qcom/kpss-xcc.c
-@@ -0,0 +1,87 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+
-+static const char *aux_parents[] = {
-+	"pll8_vote",
-+	"pxo",
-+};
-+
-+static unsigned int aux_parent_map[] = {
-+	3,
-+	0,
-+};
-+
-+static const struct of_device_id kpss_xcc_match_table[] = {
-+	{ .compatible = "qcom,kpss-acc-v1", .data = (void *)1UL },
-+	{ .compatible = "qcom,kpss-gcc" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, kpss_xcc_match_table);
-+
-+static int kpss_xcc_driver_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *id;
-+	struct clk *clk;
-+	struct resource *res;
-+	void __iomem *base;
-+	const char *name;
-+
-+	id = of_match_device(kpss_xcc_match_table, &pdev->dev);
-+	if (!id)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (id->data) {
-+		if (of_property_read_string_index(pdev->dev.of_node,
-+						  "clock-output-names",
-+						  0, &name))
-+			return -ENODEV;
-+		base += 0x14;
-+	} else {
-+		name = "acpu_l2_aux";
-+		base += 0x28;
-+	}
-+
-+	clk = clk_register_mux_table(&pdev->dev, name, aux_parents,
-+				     ARRAY_SIZE(aux_parents), 0, base, 0, 0x3,
-+				     0, aux_parent_map, NULL);
-+
-+	platform_set_drvdata(pdev, clk);
-+
-+	return PTR_ERR_OR_ZERO(clk);
-+}
-+
-+static int kpss_xcc_driver_remove(struct platform_device *pdev)
-+{
-+	clk_unregister_mux(platform_get_drvdata(pdev));
-+	return 0;
-+}
-+
-+static struct platform_driver kpss_xcc_driver = {
-+	.probe = kpss_xcc_driver_probe,
-+	.remove = kpss_xcc_driver_remove,
-+	.driver = {
-+		.name = "kpss-xcc",
-+		.of_match_table = kpss_xcc_match_table,
-+	},
-+};
-+module_platform_driver(kpss_xcc_driver);
-+
-+MODULE_DESCRIPTION("Krait Processor Sub System (KPSS) Clock Driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:kpss-xcc");
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index a100e98259d7..f0df0640208e 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+   u32 val;
+
+   readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+-             (val & STAT_TX_EMP), 1, 10000);
++             (val & STAT_TX_RDY(port)), 1, 10000);
+}
+
+static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+--
+2.7.4
+
+> -----Original Message-----
+> From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
+> Sent: March 5, 2018 4:47 AM
+> To: Gabriel Matni <gabriel.matni@exfo.com>
+> Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
+> Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
+> <thomas.petazzoni@bootlin.com>
+> Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
+> 
+> Hi Gabriel,
+> 
+> On Tue, 27 Feb 2018 21:56:03 +0000, Gabriel Matni
+> <gabriel.matni@exfo.com> wrote:
+> 
+> > Hi Miqu?l,
+> >
+> > > -----Original Message-----
+> > > From: Miquel Raynal [mailto:miquel.raynal at bootlin.com]
+> > > Sent: February 27, 2018 8:13 AM
+> > > To: Gabriel Matni <gabriel.matni@exfo.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
+> > > Gr?gory Clement <gregory.clement@bootlin.com>; Thomas Petazzoni
+> > > <thomas.petazzoni@bootlin.com>
+> > > Subject: Re: [PATCH] serial: mvebu_uart: fix tx lost characters
+> > >
+> > > Hi Gabriel,
+> > >
+> > > On Thu, 22 Feb 2018 20:30:56 +0000, Gabriel Matni
+> > > <gabriel.matni@exfo.com> wrote:
+> > >
+> > > > From: Gabriel Matni <gabriel.matni@exfo.com>
+> > > >
+> > > > Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> > > > The driver should poll TX_RDY instead of TX_EMPTY to ensure that the
+> > > > transmitter holding is ready to receive a new byte. Polling TX_EMPTY
+> > > > isn't enough as the hardware buffer can become empty but not yet
+> ready
+> > > > for CPU to write the next byte.
+> > >
+> > > I am kind of sceptic with the explanation. My understanding is that:
+> > > - TX_EMPTY means the FIFO is empty
+> 
+> I had a deeper look into the spec : TX_EMPTY != TX_FIFO_EMPTY. I was
+> referring to TX_FIFO_EMPTY here so my understanding of your solution was
+> wrong.
+> 
+> > > - TX_RDY means the FIFO is not full, neither empty, it is a "half
+> > >   loaded" state.
+> > > Polling TX_RDY instead of TX_EMPTY should work too, but I don't see why
+> it
+> > > would fix the loss of character by filling the FIFO when there are bytes in
+> it
+> > > rather than when it is fully empty.
+> >
+> > TX_READY is set whenever the UART Transmitter Holding register is ready
+> to
+> > receive a new byte. It gets cleared as soon as a new byte is written to the
+> > register. If the FIFO is empty or still has room, the ready will be set.
+> >
+> > TX_EMPTY tells us when it is possible to send a break sequence via
+> > SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+> > empty, it does not guarantee that a new byte can be written just yet.
+> 
+> I do agree with this statement. You are right that polling on TX_EMPTY
+> looks wrong and we should definitively poll on TX_READY instead.
+> 
+> > I am
+> > unsure about the FIFO status in this case as I can encounter
+> TX_FIFO_EMP=0
+> > while TX_EMP=1, which suggests that the FIFO isn't necessarily empty
+> when
+> > TX_EMP is set.
+> 
+> That is weird but maybe the TX_FIFO_EMPTY is asserted only when all
+> bits have been shifted, which is a 10-bit period after TSR is
+> cleared, while TX_EMPTY would not wait for these bits to be actually
+> shifted out and would be asserted a bit earlier, as soon as TSR is
+> cleared. That is just and idea.
+> 
+> >
+> > Therefore, the driver can either poll TX_FIFO_EMP or TX_READY to know
+> > whether it can output a new byte. I personally like TX_READY as it takes
+> > advantage of the FIFO.
+> 
+> True.
+> 
+> >
+> > > >
+> > > > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
+> 
+> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> 
+> Thanks,
+> Miqu?l
+> 
+> --
+> Miquel Raynal, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
