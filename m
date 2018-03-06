@@ -1,25 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 16:16:14 +0000
-Subject: [PATCH v7 01/13] drivers: base: cacheinfo: move
- cache_setup_of_node()
-In-Reply-To: <20180228220619.6992-2-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-2-jeremy.linton@arm.com>
-Message-ID: <f74da924-31ba-22a9-1386-0c9b0cc41e61@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2018 17:16:45 +0100
+Subject: [PATCH 1/2] arm64: defconfig: add newly added accelerated crypto
+ modules
+In-Reply-To: <20180214092637.14047-1-ard.biesheuvel@linaro.org>
+References: <20180214092637.14047-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAK8P3a37ZiZeYJE_i0nkA2__YmHmrmqbVeHvWwDB5gwuWSckoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 14, 2018 at 10:26 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> New crypto drivers have been introduced in v4.16 that implement the
+> SHA-512, SHA3 and SM3 secure hash algorithms using ARMv8.2 optional
+> instructions. Add these drivers to arm64's defconfig as modules.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 
+Applied to next/soc, thanks!
 
-On 28/02/18 22:06, Jeremy Linton wrote:
-> In preparation for the next patch, and to aid in
-> review of that patch, lets move cache_setup_of_node
-> further down in the module without any changes.
-> 
-I don't think this is change since v6 so my ack stands.
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
-Regards,
-Sudeep
+      Arnd
