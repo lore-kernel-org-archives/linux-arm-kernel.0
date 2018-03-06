@@ -1,74 +1,82 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 6 Mar 2018 09:03:13 +0100
-Subject: [PATCH] drm: simple_kms_helper: Fix .mode_valid() documentation
-In-Reply-To: <20180227101109.6088-1-linus.walleij@linaro.org>
-References: <20180227101109.6088-1-linus.walleij@linaro.org>
-Message-ID: <20180306080313.GB22212@phenom.ffwll.local>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 06 Mar 2018 09:06:24 +0100
+Subject: [PATCH 1/2] dt-bindings: power: Add ZynqMP power domain bindings
+In-Reply-To: <CAMuHMdVpWciek2xow1Y1W7jga6BEbAZ7OhnyviRsXK39vYGyXw@mail.gmail.com>
+References: <1519775750-21297-1-git-send-email-jollys@xilinx.com>
+ <1519775750-21297-2-git-send-email-jollys@xilinx.com>
+ <20180305223905.65nnunv63fyg7bye@rob-hp-laptop>
+ <CGME20180306075954epcas5p2bbfb21f146ab879b60d004b73187a5e5@epcas5p2.samsung.com>
+ <CAMuHMdVpWciek2xow1Y1W7jga6BEbAZ7OhnyviRsXK39vYGyXw@mail.gmail.com>
+Message-ID: <d47ed37f-057f-b510-de70-1140dad1b7ad@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 11:11:09AM +0100, Linus Walleij wrote:
-> This fixes up the .mode_valid() vtable entry documentation
-> by copyediting the documentation from the .mode_valid()
-> documentation in the drm_modeset_helper_vtables.h file.
-> 
-> Fixes: 40275dc4edb4 ("drm: simple_kms_helper: Add mode_valid() callback support")
-> Suggested-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi All,
 
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+On 2018-03-06 08:59, Geert Uytterhoeven wrote:
+> Hi Rob, Jolly,
+>
+> On Mon, Mar 5, 2018 at 11:39 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Tue, Feb 27, 2018 at 03:55:49PM -0800, Jolly Shah wrote:
+>>> Add documentation to describe ZynqMP power domain bindings.
+>>>
+>>> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+>>> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+>>> ---
+>>>   .../devicetree/bindings/power/zynqmp-genpd.txt     | 46 ++++++++++++++++++++++
+>>>   1 file changed, 46 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/power/zynqmp-genpd.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/zynqmp-genpd.txt b/Documentation/devicetree/bindings/power/zynqmp-genpd.txt
+>>> new file mode 100644
+>>> index 0000000..25f9711
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/zynqmp-genpd.txt
+>>> +This node contains a number of subnodes, each representing a single PM domain
+>>> +that PM domain consumer devices reference.
+>>> +
+>>> +== PM Domain Nodes ==
+>>> +
+>>> +Required properties:
+>>> + - #power-domain-cells: Number of cells in a PM domain specifier. Must be 0.
+>>> + - pd-id: List of domain identifiers of as defined by platform firmware. These
+>>> +       identifiers are passed to the PM firmware.
+>>> +
+>>> +Example:
+>>> +     zynqmp-genpd {
+>>> +             compatible = "xlnx,zynqmp-genpd";
+>> What's the control interface for controlling the domains?
+>>> +
+>>> +             pd_usb0: pd-usb0 {
+>>> +                     pd-id = <22>;
+>>> +                     #power-domain-cells = <0>;
+>> There's no need for all these sub nodes. Make #power-domain-cells 1 and
+>> put the id in the cell value.
+> That was my first reaction, too...
+>>> +             };
+>>> +
+>>> +             pd_sata: pd-sata {
+>>> +                     pd-id = <28>;
+>>> +                     #power-domain-cells = <0>;
+>>> +             };
+>>> +
+>>> +             pd_gpu: pd-gpu {
+>>> +                     pd-id = <58 20 21>;
+> ... until I saw the above.
+> Controlling the GPU power area requires controlling 3 physical areas?
+>
+> However, doing it this way may bite you in the future, if a need arises to
+> control a subset. And what about power up/down order?
 
-> ---
->  include/drm/drm_simple_kms_helper.h | 27 ++++++++++++++++++++++++---
->  1 file changed, 24 insertions(+), 3 deletions(-)
-> 
-> diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
-> index d9e4c3c3f009..0d700a869cc8 100644
-> --- a/include/drm/drm_simple_kms_helper.h
-> +++ b/include/drm/drm_simple_kms_helper.h
-> @@ -24,9 +24,30 @@ struct drm_simple_display_pipe_funcs {
->  	/**
->  	 * @mode_valid:
->  	 *
-> -	 * This function is called to filter out valid modes from the
-> -	 * suggestions suggested by the bridge or display. This optional
-> -	 * hook is passed in when initializing the pipeline.
-> +	 * This callback is used to check if a specific mode is valid in the
-> +	 * crtc used in this simple display pipe. This should be implemented
-> +	 * if the display pipe has some sort of restriction in the modes
-> +	 * it can display. For example, a given display pipe may be responsible
-> +	 * to set a clock value. If the clock can not produce all the values
-> +	 * for the available modes then this callback can be used to restrict
-> +	 * the number of modes to only the ones that can be displayed. Another
-> +	 * reason can be bandwidth mitigation: the memory port on the display
-> +	 * controller can have bandwidth limitations not allowing pixel data
-> +	 * to be fetched at any rate.
-> +	 *
-> +	 * This hook is used by the probe helpers to filter the mode list in
-> +	 * drm_helper_probe_single_connector_modes(), and it is used by the
-> +	 * atomic helpers to validate modes supplied by userspace in
-> +	 * drm_atomic_helper_check_modeset().
-> +	 *
-> +	 * This function is optional.
-> +	 *
-> +	 * NOTE:
-> +	 *
-> +	 * Since this function is both called from the check phase of an atomic
-> +	 * commit, and the mode validation in the probe paths it is not allowed
-> +	 * to look at anything else but the passed-in mode, and validate it
-> +	 * against configuration-invariant hardware constraints.
->  	 *
->  	 * RETURNS:
->  	 *
-> -- 
-> 2.14.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+What about defining 3 separate domains and arranging them in parent-child
+relationship? generic power domains already supports that and this allows
+to nicely define the power on/off order.
 
+>>> +                     #power-domain-cells = <0x0>;
+>>> +             };
+>>> +     };
+
+Best regards
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
