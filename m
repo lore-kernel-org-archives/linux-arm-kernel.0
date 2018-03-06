@@ -1,60 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  6 Mar 2018 10:34:30 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: Add IPMMU-PV1 device node
-Message-ID: <20180306093430.12486-1-horms+renesas@verge.net.au>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 6 Mar 2018 10:34:37 +0100
+Subject: [PATCH 0/7] media: sun6i: Various fixes and improvements
+In-Reply-To: <20180305183535.b75ec79199efc3cacefc49c2@magewell.com>
+References: <1519697113-32202-1-git-send-email-yong.deng@magewell.com>
+ <20180305093535.11801-1-maxime.ripard@bootlin.com>
+ <20180305183535.b75ec79199efc3cacefc49c2@magewell.com>
+Message-ID: <20180306093437.5etrtg63bvzey3ue@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add r8a7795 IPMMU-PV1 and keep it disabled by default.
+On Mon, Mar 05, 2018 at 06:35:35PM +0800, Yong wrote:
+> > Hi Yong,
+> > 
+> > Here are a bunch of patches I came up with after testing your last
+> > (v8) version of the CSI patches.
+> > 
+> > There's some improvements (patches 1 and 7) and fixes for
+> > regressions found in the v8 compared to the v7 (patches 2, 3, 4 and
+> > 5), and one fix that we discussed for the signals polarity for the
+> > parallel interface (patch 6).
+> > 
+> > Feel free to squash them in your serie for the v9.
+> 
+> OK. Thank you!
+> 
+> I notice that your responses have not been listed in google group
+> since February.
 
-This device is not present in r8a7795 ES1.x and
-is removed from the DT of those SoCs.
+Yeah, I know, apparently I can't change my email address in google
+groups, or unsubscribe, so I'm not subscribed with my new mail, which
+means I can't post either.
 
-This corrects an omission in
-3b7e7848f0e8 ("arm64: dts: renesas: r8a7795: Add IPMMU device nodes")
+Maxime
 
-This does not have any runtime effect.
-
-Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 1 +
- arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 9 +++++++++
- 2 files changed, 10 insertions(+)
-
-Based on renesas-devel-20180305-v4.16-rc4
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index f1d5e90503d5..f9acd125d687 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -23,6 +23,7 @@
- 
- 	/delete-node/ mmu at febe0000;
- 	/delete-node/ mmu at fe980000;
-+	/delete-node/ mmu at fd950000;
- 	/delete-node/ mmu at fd960000;
- 	/delete-node/ mmu at fd970000;
- 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 09953cda3a55..0648fe451d09 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -545,6 +545,15 @@
- 			status = "disabled";
- 		};
- 
-+		ipmmu_pv1: mmu at fd950000 {
-+			compatible = "renesas,ipmmu-r8a7795";
-+			reg = <0 0xfd950000 0 0x1000>;
-+			renesas,ipmmu-main = <&ipmmu_mm 7>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			#iommu-cells = <1>;
-+			status = "disabled";
-+		};
-+
- 		ipmmu_pv2: mmu at fd960000 {
- 			compatible = "renesas,ipmmu-r8a7795";
- 			reg = <0 0xfd960000 0 0x1000>;
 -- 
-2.11.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/2f0660be/attachment.sig>
