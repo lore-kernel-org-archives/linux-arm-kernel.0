@@ -1,100 +1,81 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Mar 2018 15:43:46 +0100
-Subject: [PATCH 03/12] thermal: exynos: remove parsing of
- samsung,tmu_[first,second]_point_trim properties
+Date: Tue, 06 Mar 2018 15:43:47 +0100
+Subject: [PATCH 04/12] thermal: exynos: remove parsing of
+ samsung,tmu_noise_cancel_mode property
 In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20180306144440epcas2p30fd2531c12454051bfe6ae0cf0d35b2e@epcas2p3.samsung.com>
-Message-ID: <1520347435-22970-4-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20180306144445epcas1p1b2dee15107098f5974e3c41403594ffc@epcas1p1.samsung.com>
+Message-ID: <1520347435-22970-5-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SoCs use the same values (25, 85) for trim points (except
-Exynos5440 which currently specifices value 70 for the second trim
-point -> it seems to be a mistake because documentation uses value
-85 and two points based trimming has never been used by the driver
-for this SoC anyway) so just make it explicit and remove parsing of
-samsung,tmu_[first,second]_point_trim properties.
+All SoCs use the same value (4) for the noise cancel mode so just
+make it explicit and remove parsing of samsung,tmu_noise_cancel_mode
+property.
 
 There should be no functional changes caused by this patch.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/thermal/samsung/exynos_tmu.c | 20 +++++++++-----------
- drivers/thermal/samsung/exynos_tmu.h |  2 --
- 2 files changed, 9 insertions(+), 13 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c | 10 ++++------
+ drivers/thermal/samsung/exynos_tmu.h |  3 ---
+ 2 files changed, 4 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index e42a08b..5877dd4 100644
+index 5877dd4..adfd9ef 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -165,6 +165,9 @@
- #define EXYNOS7_EMUL_DATA_SHIFT			7
- #define EXYNOS7_EMUL_DATA_MASK			0x1ff
+@@ -168,6 +168,8 @@
+ #define EXYNOS_FIRST_POINT_TRIM			25
+ #define EXYNOS_SECOND_POINT_TRIM		85
  
-+#define EXYNOS_FIRST_POINT_TRIM			25
-+#define EXYNOS_SECOND_POINT_TRIM		85
++#define EXYNOS_NOISE_CANCEL_MODE		4
 +
  #define MCELSIUS	1000
  /**
   * struct exynos_tmu_data : A structure to hold the private data of the TMU
-@@ -251,13 +254,13 @@ static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
+@@ -386,10 +388,8 @@ static u32 get_con_reg(struct exynos_tmu_data *data, u32 con)
+ 	con &= ~(EXYNOS_TMU_BUF_SLOPE_SEL_MASK << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
+ 	con |= (pdata->gain << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
  
- 	switch (pdata->cal_type) {
- 	case TYPE_TWO_POINT_TRIMMING:
--		temp_code = (temp - pdata->first_point_trim) *
-+		temp_code = (temp - EXYNOS_FIRST_POINT_TRIM) *
- 			(data->temp_error2 - data->temp_error1) /
--			(pdata->second_point_trim - pdata->first_point_trim) +
-+			(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) +
- 			data->temp_error1;
- 		break;
- 	case TYPE_ONE_POINT_TRIMMING:
--		temp_code = temp + data->temp_error1 - pdata->first_point_trim;
-+		temp_code = temp + data->temp_error1 - EXYNOS_FIRST_POINT_TRIM;
- 		break;
- 	default:
- 		WARN_ON(1);
-@@ -279,12 +282,12 @@ static int code_to_temp(struct exynos_tmu_data *data, u16 temp_code)
- 	switch (pdata->cal_type) {
- 	case TYPE_TWO_POINT_TRIMMING:
- 		temp = (temp_code - data->temp_error1) *
--			(pdata->second_point_trim - pdata->first_point_trim) /
-+			(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) /
- 			(data->temp_error2 - data->temp_error1) +
--			pdata->first_point_trim;
-+			EXYNOS_FIRST_POINT_TRIM;
- 		break;
- 	case TYPE_ONE_POINT_TRIMMING:
--		temp = temp_code - data->temp_error1 + pdata->first_point_trim;
-+		temp = temp_code - data->temp_error1 + EXYNOS_FIRST_POINT_TRIM;
- 		break;
- 	default:
- 		WARN_ON(1);
-@@ -1160,11 +1163,6 @@ static int exynos_of_sensor_conf(struct device_node *np,
- 	of_property_read_u32(np, "samsung,tmu_max_efuse_value",
- 			     &pdata->max_efuse_value);
+-	if (pdata->noise_cancel_mode) {
+-		con &= ~(EXYNOS_TMU_TRIP_MODE_MASK << EXYNOS_TMU_TRIP_MODE_SHIFT);
+-		con |= (pdata->noise_cancel_mode << EXYNOS_TMU_TRIP_MODE_SHIFT);
+-	}
++	con &= ~(EXYNOS_TMU_TRIP_MODE_MASK << EXYNOS_TMU_TRIP_MODE_SHIFT);
++	con |= (EXYNOS_NOISE_CANCEL_MODE << EXYNOS_TMU_TRIP_MODE_SHIFT);
  
--	of_property_read_u32(np, "samsung,tmu_first_point_trim", &value);
--	pdata->first_point_trim = (u8)value;
--	of_property_read_u32(np, "samsung,tmu_second_point_trim", &value);
--	pdata->second_point_trim = (u8)value;
--
- 	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
+ 	return con;
+ }
+@@ -1153,8 +1153,6 @@ static int exynos_of_sensor_conf(struct device_node *np,
+ 	pdata->gain = (u8)value;
+ 	of_property_read_u32(np, "samsung,tmu_reference_voltage", &value);
+ 	pdata->reference_voltage = (u8)value;
+-	of_property_read_u32(np, "samsung,tmu_noise_cancel_mode", &value);
+-	pdata->noise_cancel_mode = (u8)value;
  
- 	of_node_put(np);
+ 	of_property_read_u32(np, "samsung,tmu_efuse_value",
+ 			     &pdata->efuse_value);
 diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-index a7e81b4..a5d8c9c 100644
+index a5d8c9c..b111a01 100644
 --- a/drivers/thermal/samsung/exynos_tmu.h
 +++ b/drivers/thermal/samsung/exynos_tmu.h
-@@ -62,8 +62,6 @@ struct exynos_tmu_platform_data {
+@@ -45,8 +45,6 @@ enum soc_type {
+  * @reference_voltage: reference voltage of amplifier
+  *	in the positive-TC generator block
+  *	0 < reference_voltage <= 31
+- * @noise_cancel_mode: noise cancellation mode
+- *	000, 100, 101, 110 and 111 can be different modes
+  * @efuse_value: platform defined fuse value
+  * @min_efuse_value: minimum valid trimming data
+  * @max_efuse_value: maximum valid trimming data
+@@ -57,7 +55,6 @@ enum soc_type {
+ struct exynos_tmu_platform_data {
+ 	u8 gain;
+ 	u8 reference_voltage;
+-	u8 noise_cancel_mode;
+ 
  	u32 efuse_value;
  	u32 min_efuse_value;
- 	u32 max_efuse_value;
--	u8 first_point_trim;
--	u8 second_point_trim;
- 
- 	u32 cal_type;
- };
 -- 
 1.9.1
