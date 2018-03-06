@@ -1,37 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 Mar 2018 13:54:16 +0100
-Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
- document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <20180306124002.GA13950@amd>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
- <20180306124002.GA13950@amd>
-Message-ID: <20180306125416.GD26143@lunn.ch>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue,  6 Mar 2018 18:35:00 +0530
+Subject: [PATCH 0/3] Enable thermal management on MSM8916
+Message-ID: <cover.1520340931.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 01:40:02PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> > ---
-> >  .../devicetree/bindings/peci/peci-aspeed.txt       | 73 ++++++++++++++++++++++
-> >  1 file changed, 73 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > new file mode 100644
-> > index 000000000000..8a86f346d550
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> > @@ -0,0 +1,73 @@
-> > +Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
-> 
-> Are these SoCs x86-based?
+Add DT entries to create cooling devices on MSM8916, enable the thermal
+sensor on the platform and turn on other cpufreq governors to make it easy
+for developers.
 
-ARM, as far as i can tell. If i get the architecture correct, these
-are BMC, Board Management Controllers, looking after the main x86 CPU,
-stopping it overheating, controlling the power supplies, remote
-management, etc.
+This patchset requires
+http://patchwork.kernel.org/bundle/amitkucheria/8016-cpufreq-dts/ to be
+applied first to enable thermal functionality by cpu frequency throttling.
 
-    Andrew
+Amit Kucheria (2):
+  arm64: defconfig: enable thermal sensor on QCOM platforms
+  arm64: defconfig: enable more cpufreq governors
+
+Rajendra Nayak (1):
+  arm64: dts: msm8916: Add cpu cooling maps
+
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 31 +++++++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig          | 10 ++++++++++
+ 2 files changed, 41 insertions(+)
+
+-- 
+2.7.4
