@@ -1,26 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 6 Mar 2018 16:45:03 +0000
-Subject: [PATCH v7 03/13] cacheinfo: rename of_node to fw_token
-In-Reply-To: <20180228220619.6992-4-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-4-jeremy.linton@arm.com>
-Message-ID: <4864c763-0d11-9e09-ff02-87e94b410da6@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2018 17:45:30 +0100
+Subject: [PATCH v2 0/8] ARTPEC-6 ARM SoC device tree updates
+In-Reply-To: <20180221090000.18091-1-niklas.cassel@axis.com>
+References: <20180221090000.18091-1-niklas.cassel@axis.com>
+Message-ID: <CAK8P3a0ykwsO40w49TL9xgVKv3wrvx7KXz1o6XD5+qXQ6n8YUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 21, 2018 at 9:59 AM, Niklas Cassel <niklas.cassel@axis.com> wrote:
+> Hello,
+>
+> Here comes some ARTPEC-6 ARM SoC device tree updates.
+>
+> Niklas Cassel (8):
+>   ARM: dts: artpec: disable Accelerator Coherency Port
+>   ARM: dts: artpec: use 1 GiB RAM
+>   ARM: dts: artpec: remove 0x prefix from clkctrl unit address
+>   ARM: dts: artpec: migrate ethernet to stmmac binding
+>   ARM: dts: artpec: add and utilize artpec6 pin controller
+>   ARM: dts: artpec: add and utilize nbpfaxi DMA controllers
+>   ARM: dts: artpec: add disabled node for PCIe endpoint mode
+>   ARM: dts: artpec: add node for hardware crypto accelerator
 
+For a series eight patches, a pull request would save me some work, but
+I applied it anyway.
 
-On 28/02/18 22:06, Jeremy Linton wrote:
-> Rename and change the type of of_node to indicate
-> it is a generic pointer which is generally only used
-> for comparison purposes. In a later patch we will put
-> an ACPI/PPTT token pointer in fw_token so that
-> the code which builds the shared cpu masks can be reused.
-> 
-Thanks for renaming :)
+Are you sure that the first three patches shouldn't be applied to stable
+backports?
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
-Regards,
-Sudeep
+     Arnd
