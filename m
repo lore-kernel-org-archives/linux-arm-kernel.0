@@ -1,125 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Mar 2018 17:54:15 +0000
-Subject: [PATCH v2 2/4] iommu/io-pgtable-arm: Support 52-bit physical
- address
-In-Reply-To: <52ff8cd6-64ec-d7d4-2135-0b17becc4251@arm.com>
-References: <cover.1512038236.git.robin.murphy@arm.com>
- <fde583dacee8099ed4e952dbf1c4dfb42070e9c5.1512038236.git.robin.murphy@arm.com>
- <20180226180501.GC26147@arm.com>
- <52ff8cd6-64ec-d7d4-2135-0b17becc4251@arm.com>
-Message-ID: <20180306175415.GC19134@arm.com>
+Date: Tue, 6 Mar 2018 17:54:46 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
+ fault on kernel VA
+In-Reply-To: <20180306160553.GN32331@e103592.cambridge.arm.com>
+References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+ <20180305140506.GJ32331@e103592.cambridge.arm.com>
+ <20180305172418.GD12869@arm.com>
+ <CAFEAcA9e1swOcYx5YCokSmb_37pyaJYJZTudt57babkngicutw@mail.gmail.com>
+ <20180306160553.GN32331@e103592.cambridge.arm.com>
+Message-ID: <20180306175446.GD19134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Robin,
-
-On Tue, Feb 27, 2018 at 01:49:14PM +0000, Robin Murphy wrote:
-> On 26/02/18 18:05, Will Deacon wrote:
-> >On Thu, Dec 14, 2017 at 04:58:51PM +0000, Robin Murphy wrote:
-> >>Bring io-pgtable-arm in line with the ARMv8.2-LPA feature allowing
-> >>52-bit physical addresses when using the 64KB translation granule.
-> >>This will be supported by SMMUv3.1.
-> >>
-> >>Tested-by: Nate Watterson <nwatters@codeaurora.org>
-> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >>---
-> >>
-> >>v2: Fix TCR_PS/TCR_IPS copy-paste error
-> >>
-> >>  drivers/iommu/io-pgtable-arm.c | 65 ++++++++++++++++++++++++++++++------------
-> >>  1 file changed, 47 insertions(+), 18 deletions(-)
-> >
-> >[...]
-> >
-> >>@@ -203,6 +199,25 @@ struct arm_lpae_io_pgtable {
-> >>  typedef u64 arm_lpae_iopte;
-> >>+static arm_lpae_iopte paddr_to_iopte(phys_addr_t paddr,
-> >>+				     struct arm_lpae_io_pgtable *data)
-> >>+{
-> >>+	arm_lpae_iopte pte = paddr;
-> >>+
-> >>+	/* Of the bits which overlap, either 51:48 or 15:12 are always RES0 */
-> >>+	return (pte | (pte >> 36)) & ARM_LPAE_PTE_ADDR_MASK;
-> >>+}
-> >
-> >I don't particularly like relying on properties of the paddr for correct
-> >construction of the pte here. The existing macro doesn't have this
-> >limitation. I suspect it's all fine at the moment because we only use TTBR0,
-> >but I'd rather not bake that in if we can avoid it.
+On Tue, Mar 06, 2018 at 04:05:53PM +0000, Dave Martin wrote:
+> On Tue, Mar 06, 2018 at 03:59:59PM +0000, Peter Maydell wrote:
+> > On 5 March 2018 at 17:24, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Mon, Mar 05, 2018 at 02:05:06PM +0000, Dave Martin wrote:
+> > >> Does Debian's codesearch throw up any nontrivial users of esr_context?
+> > >
+> > > The main one seems to be ASAN, which uses the RnW bit to report "READ",
+> > > "WRITE" or "UNKNOWN". So with this change, the access will be treated as
+> > > UNKNOWN for kernel addresses.
+> > >
+> > > Whilst I can see how that might cause a testsuite regression, I'm struggling
+> > > to see how it could sensible impact ASAN given that userspace never has
+> > > permission to access these addresses and so the fault should be treated as
+> > > fatal regardless of whether or not it's a read or a write.
+> > 
+> > Right, but the read/write/unknown classification also affects the
+> > severity of that warning level ('scariness' in the asan code),
+> > and it's not immediately clear how much might then in turn be relying
+> > on that.
+> > 
+> > I think that if you have widely deployed code that is using this
+> > ESR value, then it's kernel ABI that people are relying on, and
+> > the safest thing to do is to make the minimal change that will
+> > fix the problem you have, not to yank the whole thing entirely
+> > and hope that the users will cope.
+> > 
+> > QEMU is not currently using the ESR value, but it would be nice to
+> > in future, and it would certainly be irritating not to have the
+> > WnR information just because the faulting address happens to be in
+> > the top half of memory.
+> > 
+> > AFAIK the major thing that consumers actually are after here
+> > is the WnR information, so preserving that and sanitizing
+> > the rest of the ESR if necessary would be a less risky fix IMHO.
 > 
-> What's the relevance of TTBR0 to physical addresses? :/
+> If there is a way of squashing the syndrome information so that it
+> reports a fixed syndrome except for information about what userspace
+> attempted to do (i.e., WnR -- I dunno if there's anything else), that
+> seems reasonable.
 
-Good point! I clearly got confused here.
+I don't know how we can do that, and I'm deeply sceptical of claims that
+the WnR bit matters at all for kernel addresses. Any change we make here
+will be user visible but I don't think that means we shouldn't consider
+changes for cases that are highly unlikely to cause problems. We'll
+obviously revert anything that does causes issues, but that shouldn't
+be the goal.
 
-> Note that by this point paddr has been validated against cfg->oas by
-> arm_lpae_map(), and validated to be granule-aligned by iommu_map(), so it
-> really can't be wrong under reasonable conditions.
+I'll try to reach out to the ASAN people to get their feedback on this.
 
-Fair enough, but I still think this would be a bit more readable written
-along the lines of:
-
-	arm_lpae_iopte pte_hi, pte_lo = 0;
-
-	pte_hi = paddr & GENMASK(47, data->pg_shift);
-	if (data->pg_shift == 16) {
-		pte_lo = paddr & GENMASK(ARM_LPAE_MAX_ADDR_BITS - 1, 48);
-		pte_lo >>= (48 - 12);
-	}
-
-	return pte_hi | pte_lo;
-
-Ok, we don't squeeze every last cycle out of it, but I find it much more
-readable. Is it just me? The magic numbers could be #defined and/or
-derived if necessary.
-
-> >>+static phys_addr_t iopte_to_paddr(arm_lpae_iopte pte,
-> >>+				  struct arm_lpae_io_pgtable *data)
-> >>+{
-> >>+	phys_addr_t paddr = pte & ARM_LPAE_PTE_ADDR_MASK;
-> >>+	phys_addr_t paddr_hi = paddr & (ARM_LPAE_GRANULE(data) - 1);
-> >>+
-> >>+	/* paddr_hi spans nothing for 4K granule, and only RES0 bits for 16K */
-> >>+	return (paddr ^ paddr_hi) | (paddr_hi << 36);
-> >
-> >Why do we need xor here?
-> 
-> Because "(paddr ^ paddr_hi)" is more concise than "(paddr &
-> ~(phys_addr_t)(ARM_LPAE_GRANULE(data) - 1)" or variants thereof. It's
-> potentially a teeny bit more efficient too, I think, but it's mostly about
-> the readability.
-
-I don't think the bit-twiddling is super readable, to be honest. Again,
-something like:
-
-	phys_addr_t paddr_lo, paddr_hi = 0;
-
-	paddr_lo = pte & GENMASK(47, data->pg_shift);
-	if (data->pg_shift == 16) {
-		paddr_hi = pte & GENMASK(15, 12);
-		paddr_hi <<= (48 - 12);
-	}
-
-	return paddr_hi | paddr_lo;
-
-but I've not even compiled this stuff...
-
-> >>+	cfg->pgsize_bitmap &= page_sizes;
-> >>+	cfg->ias = min(cfg->ias, max_addr_bits);
-> >>+	cfg->oas = min(cfg->oas, max_addr_bits);
-> >
-> >I don't think we should be writing to the ias/oas fields here, at least
-> >now without auditing the drivers and updating the comments about the
-> >io-pgtable API. For example, the SMMUv3 driver uses its own ias local
-> >variable to initialise the domain geometry, and won't pick up any changes
-> >made here.
-> 
-> As you've discovered, the driver thing is indeed true. More generally,
-> though, we've always adjusted cfg->pgsize_bitmap here, so I don't see why
-> other fields should be treated differently - I've always assumed the cfg
-> which the driver passes in here just represents its total maximum
-> capabilities, from which it's io-pgtable's job to pick an appropriate
-> configuration.
-
-Can you update the the header file with a comment to that effect, please?
+If we do want to use a sanitised ESR value, then we need to do this within
+the constraints of the architecture because Linux advertises this as the
+ESR when it is provided. What encoding would you suggest? Should we report
+all faults on kernel addresses as Translation fault level 0?
 
 Will
