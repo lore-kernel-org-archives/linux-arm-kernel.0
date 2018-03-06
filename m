@@ -1,139 +1,177 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Mar 2018 15:43:50 +0100
-Subject: [PATCH 07/12] thermal: exynos: remove parsing of samsung,tmu_gain
- property
+Date: Tue, 06 Mar 2018 15:43:51 +0100
+Subject: [PATCH 08/12] thermal: exynos: remove parsing of
+ samsung,tmu_cal_type property
 In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20180306144458epcas2p1102a06fa3e58b88cad914be624e0c1db@epcas2p1.samsung.com>
-Message-ID: <1520347435-22970-8-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20180306144502epcas2p2818ee9c6d378d91fbff666549fb01931@epcas2p2.samsung.com>
+Message-ID: <1520347435-22970-9-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since pdata gain values are SoC (not platform) specific just move
-it from platform data to struct exynos_tmu_data instance. Then
-remove parsing of samsung,tmu_gain property.
+Since calibration type for temperature is SoC (not platform) specific
+just move it from platform data to struct exynos_tmu_data instance.
+Then remove parsing of samsung,tmu_cal_type property. Also remove no
+longer needed platform data structure.
 
 There should be no functional changes caused by this patch.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/thermal/samsung/exynos_tmu.c | 18 +++++++++---------
- drivers/thermal/samsung/exynos_tmu.h |  4 ----
- 2 files changed, 9 insertions(+), 13 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c | 41 ++++++++----------------------------
+ drivers/thermal/samsung/exynos_tmu.h | 10 ---------
+ 2 files changed, 9 insertions(+), 42 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 12bbf79..262ab41 100644
+index 262ab41..ab5062b 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -192,6 +192,8 @@
+@@ -177,7 +177,6 @@
+  * struct exynos_tmu_data : A structure to hold the private data of the TMU
+ 	driver
+  * @id: identifier of the one instance of the TMU controller.
+- * @pdata: pointer to the tmu platform/configuration data
+  * @base: base address of the single instance of the TMU controller.
+  * @base_second: base address of the common registers of the TMU controller.
+  * @irq: irq number of the TMU controller.
+@@ -187,6 +186,7 @@
+  * @clk: pointer to the clock structure.
+  * @clk_sec: pointer to the clock structure for accessing the base_second.
+  * @sclk: pointer to the clock structure for accessing the tmu special clk.
++ * @cal_type: calibration type for temperature
+  * @efuse_value: SoC defined fuse value
+  * @min_efuse_value: minimum valid trimming data
   * @max_efuse_value: maximum valid trimming data
-  * @temp_error1: fused value of the first point trim.
-  * @temp_error2: fused value of the second point trim.
-+ * @gain: gain of amplifier in the positive-TC generator block
-+ *	0 < gain <= 15
-  * @reference_voltage: reference voltage of amplifier
-  *	in the positive-TC generator block
-  *	0 < reference_voltage <= 31
-@@ -218,6 +220,7 @@ struct exynos_tmu_data {
+@@ -208,7 +208,6 @@
+  */
+ struct exynos_tmu_data {
+ 	int id;
+-	struct exynos_tmu_platform_data *pdata;
+ 	void __iomem *base;
+ 	void __iomem *base_second;
+ 	int irq;
+@@ -216,6 +215,7 @@ struct exynos_tmu_data {
+ 	struct work_struct irq_work;
+ 	struct mutex lock;
+ 	struct clk *clk, *clk_sec, *sclk;
++	u32 cal_type;
+ 	u32 efuse_value;
  	u32 min_efuse_value;
  	u32 max_efuse_value;
- 	u16 temp_error1, temp_error2;
-+	u8 gain;
- 	u8 reference_voltage;
- 	struct regulator *regulator;
- 	struct thermal_zone_device *tzd;
-@@ -386,8 +389,6 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
- 
- static u32 get_con_reg(struct exynos_tmu_data *data, u32 con)
+@@ -266,10 +266,9 @@ static void exynos_report_trigger(struct exynos_tmu_data *p)
+  */
+ static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
  {
 -	struct exynos_tmu_platform_data *pdata = data->pdata;
--
- 	if (data->soc == SOC_ARCH_EXYNOS4412 ||
- 	    data->soc == SOC_ARCH_EXYNOS3250)
- 		con |= (EXYNOS4412_MUX_ADDR_VALUE << EXYNOS4412_MUX_ADDR_SHIFT);
-@@ -396,7 +397,7 @@ static u32 get_con_reg(struct exynos_tmu_data *data, u32 con)
- 	con |= data->reference_voltage << EXYNOS_TMU_REF_VOLTAGE_SHIFT;
+ 	int temp_code;
  
- 	con &= ~(EXYNOS_TMU_BUF_SLOPE_SEL_MASK << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
--	con |= (pdata->gain << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
-+	con |= (data->gain << EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT);
- 
- 	con &= ~(EXYNOS_TMU_TRIP_MODE_MASK << EXYNOS_TMU_TRIP_MODE_SHIFT);
- 	con |= (EXYNOS_NOISE_CANCEL_MODE << EXYNOS_TMU_TRIP_MODE_SHIFT);
-@@ -1153,14 +1154,8 @@ static int exynos_of_get_soc_type(struct device_node *np)
- static int exynos_of_sensor_conf(struct device_node *np,
- 				 struct exynos_tmu_platform_data *pdata)
+-	switch (pdata->cal_type) {
++	switch (data->cal_type) {
+ 	case TYPE_TWO_POINT_TRIMMING:
+ 		temp_code = (temp - EXYNOS_FIRST_POINT_TRIM) *
+ 			(data->temp_error2 - data->temp_error1) /
+@@ -293,10 +292,9 @@ static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
+  */
+ static int code_to_temp(struct exynos_tmu_data *data, u16 temp_code)
  {
--	u32 value;
--	int ret;
--
- 	of_node_get(np);
+-	struct exynos_tmu_platform_data *pdata = data->pdata;
+ 	int temp;
  
--	ret = of_property_read_u32(np, "samsung,tmu_gain", &value);
--	pdata->gain = (u8)value;
--
- 	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
+-	switch (pdata->cal_type) {
++	switch (data->cal_type) {
+ 	case TYPE_TWO_POINT_TRIMMING:
+ 		temp = (temp_code - data->temp_error1) *
+ 			(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) /
+@@ -536,7 +534,6 @@ static int exynos4412_tmu_initialize(struct platform_device *pdev)
+ static int exynos5433_tmu_initialize(struct platform_device *pdev)
+ {
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+-	struct exynos_tmu_platform_data *pdata = data->pdata;
+ 	struct thermal_zone_device *tz = data->tzd;
+ 	unsigned int status, trim_info;
+ 	unsigned int rising_threshold = 0, falling_threshold = 0;
+@@ -563,14 +560,12 @@ static int exynos5433_tmu_initialize(struct platform_device *pdev)
+ 				>> EXYNOS5433_TRIMINFO_CALIB_SEL_SHIFT;
  
- 	of_node_put(np);
-@@ -1214,6 +1209,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_read = exynos4210_tmu_read;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->gain = 15;
- 		data->reference_voltage = 7;
- 		data->efuse_value = 55;
- 		data->min_efuse_value = 40;
-@@ -1231,6 +1227,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->gain = 8;
- 		data->reference_voltage = 16;
- 		data->efuse_value = 55;
- 		if (data->soc != SOC_ARCH_EXYNOS5420 &&
-@@ -1247,6 +1244,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 8;
-+		data->gain = 8;
- 		if (res.start == EXYNOS5433_G3D_BASE)
- 			data->reference_voltage = 23;
- 		else
-@@ -1262,6 +1260,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
- 		data->ntrip = 4;
-+		data->gain = 5;
- 		data->reference_voltage = 16;
- 		data->efuse_value = 0x5d2d;
- 		data->min_efuse_value = 16;
-@@ -1274,6 +1273,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
- 		data->ntrip = 8;
-+		data->gain = 9;
- 		data->reference_voltage = 17;
- 		data->efuse_value = 75;
- 		data->min_efuse_value = 15;
+ 	switch (cal_type) {
+-	case EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING:
+-		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
+-		break;
+ 	case EXYNOS5433_TRIMINFO_TWO_POINT_TRIMMING:
+-		pdata->cal_type = TYPE_TWO_POINT_TRIMMING;
++		data->cal_type = TYPE_TWO_POINT_TRIMMING;
+ 		break;
++	case EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING:
+ 	default:
+-		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
++		data->cal_type = TYPE_ONE_POINT_TRIMMING;
+ 		break;
+ 	}
+ 
+@@ -1151,21 +1146,9 @@ static int exynos_of_get_soc_type(struct device_node *np)
+ 	return -EINVAL;
+ }
+ 
+-static int exynos_of_sensor_conf(struct device_node *np,
+-				 struct exynos_tmu_platform_data *pdata)
+-{
+-	of_node_get(np);
+-
+-	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
+-
+-	of_node_put(np);
+-	return 0;
+-}
+-
+ static int exynos_map_dt_data(struct platform_device *pdev)
+ {
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+-	struct exynos_tmu_platform_data *pdata;
+ 	struct resource res;
+ 
+ 	if (!data || !pdev->dev.of_node)
+@@ -1192,14 +1175,6 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 		return -EADDRNOTAVAIL;
+ 	}
+ 
+-	pdata = devm_kzalloc(&pdev->dev,
+-			     sizeof(struct exynos_tmu_platform_data),
+-			     GFP_KERNEL);
+-	if (!pdata)
+-		return -ENOMEM;
+-
+-	exynos_of_sensor_conf(pdev->dev.of_node, pdata);
+-	data->pdata = pdata;
+ 	data->soc = exynos_of_get_soc_type(pdev->dev.of_node);
+ 
+ 	switch (data->soc) {
+@@ -1284,6 +1259,8 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	data->cal_type = TYPE_ONE_POINT_TRIMMING;
++
+ 	/*
+ 	 * Check if the TMU shares some registers and then try to map the
+ 	 * memory of common registers.
 diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-index 9f4318c..689453d 100644
+index 689453d..8f56f86 100644
 --- a/drivers/thermal/samsung/exynos_tmu.h
 +++ b/drivers/thermal/samsung/exynos_tmu.h
-@@ -40,15 +40,11 @@ enum soc_type {
- 
- /**
-  * struct exynos_tmu_platform_data
-- * @gain: gain of amplifier in the positive-TC generator block
-- *	0 < gain <= 15
-  * @cal_type: calibration type for temperature
-  *
-  * This structure is required for configuration of exynos_tmu driver.
-  */
- struct exynos_tmu_platform_data {
--	u8 gain;
--
- 	u32 cal_type;
+@@ -38,14 +38,4 @@ enum soc_type {
+ 	SOC_ARCH_EXYNOS7,
  };
  
+-/**
+- * struct exynos_tmu_platform_data
+- * @cal_type: calibration type for temperature
+- *
+- * This structure is required for configuration of exynos_tmu driver.
+- */
+-struct exynos_tmu_platform_data {
+-	u32 cal_type;
+-};
+-
+ #endif /* _EXYNOS_TMU_H */
 -- 
 1.9.1
