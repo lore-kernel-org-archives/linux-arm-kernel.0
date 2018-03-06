@@ -1,51 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 6 Mar 2018 16:23:47 +0100
-Subject: [PATCH 10/12] ARM: dts: remove no longer needed samsung thermal
- properties
-In-Reply-To: <1520347435-22970-11-git-send-email-b.zolnierkie@samsung.com>
-References: <CGME20180306144511epcas2p1c1c00d0bdea1e329d2d3d5583f135437@epcas2p1.samsung.com>
- <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
- <1520347435-22970-11-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CAJKOXPfdQo=wCixbREyOriEUZPRGOT35sT3ojcoeXRt0UsBwqQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Mar 2018 15:25:41 +0000
+Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
+References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+ <20180305155614.GG6618@arm.com>
+ <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
+ <20180305171529.GA12869@arm.com>
+ <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
+Message-ID: <20180306152540.GC18477@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2018 at 3:43 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Remove no longer needed samsung thermal properties.
->
-> There should be no functional changes caused by this patch.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250.dtsi                   |  2 +-
->  arch/arm/boot/dts/exynos4.dtsi                      |  2 +-
->  arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi   | 20 --------------------
->  arch/arm/boot/dts/exynos5250.dtsi                   |  2 +-
->  arch/arm/boot/dts/exynos5410.dtsi                   |  8 ++++----
->  arch/arm/boot/dts/exynos5420-tmu-sensor-conf.dtsi   | 21 ---------------------
->  arch/arm/boot/dts/exynos5420.dtsi                   | 10 +++++-----
->  arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi   | 20 --------------------
->  arch/arm/boot/dts/exynos5440.dtsi                   |  6 +++---
->  .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi  | 20 --------------------
->  .../boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi | 19 -------------------
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi          | 10 +++++-----
->  .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi    | 21 ---------------------
->  arch/arm64/boot/dts/exynos/exynos7.dtsi             |  2 +-
->  14 files changed, 21 insertions(+), 142 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
->  delete mode 100644 arch/arm/boot/dts/exynos5420-tmu-sensor-conf.dtsi
->  delete mode 100644 arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi
->  delete mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
->  delete mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
->  delete mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+On Mon, Mar 05, 2018 at 12:03:33PM -0600, Shanker Donthineni wrote:
+> On 03/05/2018 11:15 AM, Will Deacon wrote:
+> > On Mon, Mar 05, 2018 at 10:57:58AM -0600, Shanker Donthineni wrote:
+> >> On 03/05/2018 09:56 AM, Will Deacon wrote:
+> >>> On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
+> >>>> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
+> >>>>  		return 0;
+> >>>>  	}
+> >>>>  
+> >>>> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+> >>>> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
+> >>>> +		cb = qcom_link_stack_sanitization;
+> >>>
+> >>> Is this just a performance thing? Do you actually see an advantage over
+> >>> always making the firmware call? We've seen minimal impact in our testing.
+> >>>
+> >>
+> >> Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
+> >>   - Improves the code readability.
+> >>   - Avoid the unnecessary MIDR checks on each vCPU exit.
+> >>   - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
+> >>   - Avoids the 2nd link stack sanitization workaround in firmware.
+> > 
+> > What I mean is, can we drop qcom_link_stack_sanitization altogether and
+> > use the SMCCC interface for everything?
+> > 
+> 
+> No, We would like to keep it qcom_link_stack_sanitization for host kernel
+> since it takes a few CPU cycles instead of heavyweight SMCCC call.
 
-Hi,
+Is that something that you can actually measure in the workloads and
+benchmarks that you care about? If so, fine, but that doesn't seem to be the
+case for the Cortex cores we've looked at internally and it would be nice to
+avoid having different workarounds in the kernel just because the SMCCC
+interface wasn't baked in time, rather than because there's a meaningful
+performance difference.
 
-Please split the arm64 to separate patchset.
-
-It is a cleanup patch and it depends on your driver changes so it will
-have to wait till your driver patches hit mainline.
-
-Best regards,
-Krzysztof
+Will
