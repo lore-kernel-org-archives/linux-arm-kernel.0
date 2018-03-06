@@ -1,44 +1,76 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 6 Mar 2018 09:07:27 +0100
-Subject: [PATCH v2 0/3] Fix STi aliases property name
-Message-ID: <1520323650-11030-1-git-send-email-patrice.chotard@st.com>
+Date: Tue, 6 Mar 2018 09:07:29 +0100
+Subject: [PATCH v2 2/3] ARM: dts: STi: Remove useless stdout-path for STi
+ boards
+In-Reply-To: <1520323650-11030-1-git-send-email-patrice.chotard@st.com>
+References: <1520323650-11030-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1520323650-11030-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Since dtc v1.4.6-9-gaadd0b65c987, when compiling dtb with W=1 option,
-the following warnings are triggered :
-    
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+As serial interface is already specified into bootargs,
+stdout-path can be removed.
 
-_ Patch 1, convert the aliases property name in lowercase in 
-  all STi board dts files.
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
 
-_ Patch 2, remove useless stdout-path property
+v2: _ none
 
-_ Patch 3, rework the tty driver st-asc accordingly, as aliases id is retrieved 
-  using of_alias_get_id() with a defined string with is not lowercase only.
+ arch/arm/boot/dts/stih407-b2120.dts | 1 -
+ arch/arm/boot/dts/stih410-b2120.dts | 1 -
+ arch/arm/boot/dts/stih410-b2260.dts | 1 -
+ arch/arm/boot/dts/stih418-b2199.dts | 1 -
+ 4 files changed, 4 deletions(-)
 
-v2: Fix Rob Herring's remarks :
-  	  _ use serialN instead of ttyasN aliases to not break ABI
-	  _ remove useless stdout-path property
-	  _ update st-asc driver with "serial" alias prefix
-
-Patrice Chotard (2):
-  ARM: dts: STi: Fix aliases property name for STi boards
-  ARM: dts: STi: Remove useless stdout-path for STi boards
-  tty: st-asc: Update tty alias
-
- arch/arm/boot/dts/stih407-b2120.dts | 5 ++---
- arch/arm/boot/dts/stih410-b2120.dts | 5 ++---
- arch/arm/boot/dts/stih410-b2260.dts | 5 ++---
- arch/arm/boot/dts/stih418-b2199.dts | 5 ++---
- drivers/tty/serial/st-asc.c         | 2 +-
- 5 files changed, 9 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+index 2c4d6033b448..074b4cd0ca89 100644
+--- a/arch/arm/boot/dts/stih407-b2120.dts
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -15,7 +15,6 @@
+ 
+ 	chosen {
+ 		bootargs = "console=serial0,115200 clk_ignore_unused";
+-		stdout-path = &sbc_serial0;
+ 	};
+ 
+ 	memory at 40000000 {
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 5422850641e8..eae3050984d0 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -15,7 +15,6 @@
+ 
+ 	chosen {
+ 		bootargs = "console=serial0,115200 clk_ignore_unused";
+-		stdout-path = &sbc_serial0;
+ 	};
+ 
+ 	memory at 40000000 {
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+index ca347160e35d..c26e388bd1a4 100644
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -16,7 +16,6 @@
+ 
+ 	chosen {
+ 		bootargs = "console=serial1,115200 clk_ignore_unused";
+-		stdout-path = &uart1;
+ 	};
+ 
+ 	memory at 40000000 {
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
+index dbf7bb704a1a..d948f774fee7 100644
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -15,7 +15,6 @@
+ 
+ 	chosen {
+ 		bootargs = "console=serial0,115200 clk_ignore_unused";
+-		stdout-path = &sbc_serial0;
+ 	};
+ 
+ 	memory at 40000000 {
 -- 
 1.9.1
