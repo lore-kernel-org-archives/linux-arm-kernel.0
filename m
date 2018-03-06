@@ -1,49 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Mar 2018 11:28:02 +0000
-Subject: [PATCH] arm: mm: Kconfig: Disable KUSER_HELPERS in ARMv6 or
- later as default
-In-Reply-To: <20180306112241.GA5938@pjb1027-Latitude-E5410>
-References: <20180306112241.GA5938@pjb1027-Latitude-E5410>
-Message-ID: <20180306112802.GI9418@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Mar 2018 11:41:01 +0000
+Subject: [RFC 1/5] dt-bindings: iommu: Add reserved-dma-region for IOMMU
+ device
+In-Reply-To: <1520312368-7068-2-git-send-email-jitendra.bhivare@broadcom.com>
+References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
+ <1520312368-7068-2-git-send-email-jitendra.bhivare@broadcom.com>
+Message-ID: <23f7c879-2dfe-dbdf-f259-dcc44f045c96@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 08:22:41PM +0900, Jinbum Park wrote:
-> Codes for KUSER_HELPERS can be abused as ROP gadaget,
-> So that It's better to disable that as if possible.
+On 06/03/18 04:59, Jitendra Bhivare wrote:
+> Certain regions in IO virtual address space may need to be reserved to be
+> not used for devices configured behind IOMMU.
 > 
-> Since over ARMv6 has ldrex/strex at user-space,
-> NEED_KUSER_HELPERS is not selected for over ARMv6.
-> 
-> But, Even though NEED_KUSER_HELPERS is not selected,
-> current configuration enable KUSER_HELPERS as default.
-> 
-> * as-is
-> 
-> - Enable KUSER_HELPERS as default even though over ARMv6.
-> - User can disable KUSER_HELPERS.
-> 
-> * to-be
-> 
-> - Disable KUSER_HELPERS in ARMv6 or later as default.
-> - User can enable KUSER_HELPERS for compatibility.
-> 
-> This change removes the unnecessary configuration that has security-risk.
+> Add documentation of the property to allow such regions to be specified in
+> DT to be reserved using IOMMU_RESV_RESERVED type.
 
-NAK.
+That sounds like software policy; DT is for describing hardware.
 
-It is not this trivial or easy to make this change - you are assuming
-that userspace does not use these, which is in incorrect assumption -
-there are armhf distros out there that make use of the kuser helpers,
-which means we can't disable it by default without causing userspace
-regressions.
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
+> ---
+>   Documentation/devicetree/bindings/iommu/iommu.txt | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+> index 5a8b462..5a58ef2 100644
+> --- a/Documentation/devicetree/bindings/iommu/iommu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+> @@ -98,6 +98,20 @@ requirements of that use-case haven't been fully determined yet. Implementing
+>   this is therefore not recommended without further discussion and extension of
+>   this binding.
+>   
+> +Optional properties:
+> +--------------------
+> +- reserved-dma-region: This specifies DMA region to be reserved with specific
+> +  prot in IOVA space. It is in tuples of (busno,prot,bus_addr,size).
 
-Therefore, it defaults to being enabled, unless someone decides to
-disable it and knows for certain that their userspace does not depend
-on this - it's a choice that distros have to make when building their
-kernels with the knowledge of how their distro userspace is configured.
+What do busno and prot actually mean, and what are valid values for them?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Robin.
+
+> +- #region-address-cells: specifies number of cells needed to encode bus_addr
+> +
+> +- #region-size-cells: specifies number of cells needed to encode size
+> +
+> +Notes:
+> +======
+> +This can be applied to IOMMU master node or to children (such as PCI host
+> +bridges) on the bus behind IOMMU.
+> +
+>   
+>   Examples:
+>   =========
+> @@ -173,6 +187,9 @@ Multiple-master IOMMU with configurable DMA window:
+>   			 * master (i.e. the I/O virtual address space).
+>   			 */
+>   			#iommu-cells = <4>;
+> +			#region-address-cells = <2>;
+> +			#region-size-cells = <2>;
+> +			reserved-dma-region = <0x0 0x0 0x04 0x0 0x04 0x0>;
+>   		};
+>   
+>   		master {
+> 
