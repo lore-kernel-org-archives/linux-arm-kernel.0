@@ -1,98 +1,95 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Mar 2018 13:40:14 +0100
-Subject: [PATCH v2 0/8] PECI device driver introduction
-In-Reply-To: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180306124014.GB13950@amd>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 6 Mar 2018 13:43:11 +0100
+Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
+ register clock
+In-Reply-To: <874llt5ut2.fsf@bootlin.com>
+References: <20180228143553.12485-1-gregory.clement@bootlin.com>
+ <20180301183520.4251439a@bbrezillon> <874llt5ut2.fsf@bootlin.com>
+Message-ID: <20180306134311.7bbf8ce7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Greg,
 
-> Introduction of the Platform Environment Control Interface (PECI) bus
-> device driver. PECI is a one-wire bus interface that provides a
-> communication channel between Intel processor and chipset components to
-> external monitoring or control devices. PECI is designed to support the
-> following sideband functions:
-> 
-> * Processor and DRAM thermal management
->   - Processor fan speed control is managed by comparing Digital Thermal
->     Sensor (DTS) thermal readings acquired via PECI against the
->     processor-specific fan speed control reference point, or TCONTROL.
->     Both TCONTROL and DTS thermal readings are accessible via the processor
->     PECI client. These variables are referenced to a common temperature,
->     the TCC activation point, and are both defined as negative offsets from
->     that reference.
->   - PECI based access to the processor package configuration space provides
->     a means for Baseboard Management Controllers (BMC) or other platform
->     management devices to actively manage the processor and memory power
->     and thermal features.
-> 
-> * Platform Manageability
->   - Platform manageability functions including thermal, power, and error
->     monitoring. Note that platform 'power' management includes monitoring
->     and control for both the processor and DRAM subsystem to assist with
->     data center power limiting.
->   - PECI allows read access to certain error registers in the processor MSR
->     space and status monitoring registers in the PCI configuration space
->     within the processor and downstream devices.
->   - PECI permits writes to certain registers in the processor PCI
->     configuration space.
-> 
-> * Processor Interface Tuning and Diagnostics
->   - Processor interface tuning and diagnostics capabilities
->     (Intel(c) Interconnect BIST). The processors Intel(c) Interconnect
->     Built In Self Test (Intel(c) IBIST) allows for infield diagnostic
->     capabilities in the Intel UPI and memory controller interfaces. PECI
->     provides a port to execute these diagnostics via its PCI Configuration
->     read and write capabilities.
-> 
-> * Failure Analysis
->   - Output the state of the processor after a failure for analysis via
->     Crashdump.
-> 
-> PECI uses a single wire for self-clocking and data transfer. The bus
-> requires no additional control lines. The physical layer is a self-clocked
-> one-wire bus that begins each bit with a driven, rising edge from an idle
-> level near zero volts. The duration of the signal driven high depends on
-> whether the bit value is a logic '0' or logic '1'. PECI also includes
-> variable data transfer rate established with every message. In this way,
-> it is highly flexible even though underlying logic is simple.
-> 
-> The interface design was optimized for interfacing to Intel processor and
-> chipset components in both single processor and multiple processor
-> environments. The single wire interface provides low board routing
-> overhead for the multiple load connections in the congested routing area
-> near the processor and chipset components. Bus speed, error checking, and
-> low protocol overhead provides adequate link bandwidth and reliability to
-> transfer critical device operating conditions and configuration
-> information.
-> 
-> This implementation provides the basic framework to add PECI extensions
-> to the Linux bus and device models. A hardware specific 'Adapter' driver
-> can be attached to the PECI bus to provide sideband functions described
-> above. It is also possible to access all devices on an adapter from
-> userspace through the /dev interface. A device specific 'Client' driver
-> also can be attached to the PECI bus so each processor client's features
-> can be supported by the 'Client' driver through an adapter connection in
-> the bus. This patch set includes Aspeed 24xx/25xx PECI driver and a generic
-> PECI hwmon driver as the first implementation for both adapter and client
-> drivers on the PECI bus framework.
+On Tue, 06 Mar 2018 12:04:41 +0100
+Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-Ok, how does this interact with ACPI/SMM BIOS/Secure mode code? Does
-Linux _need_ to control the fan? Or is SMM BIOS capable of doing all
-the work itself and Linux has just read-only access for monitoring
-purposes?
+> Hi Boris,
+>  
+>  On jeu., mars 01 2018, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> 
+> > Hi Greg,
+> >
+> > On Wed, 28 Feb 2018 15:35:53 +0100
+> > Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+> >  
+> >> On Armada 7K/8K we need to explicitly enable the register clock. This
+> >> clock is optional because not all the SoCs using this IP need it but at
+> >> least for Armada 7K/8K it is actually mandatory.
+> >> 
+> >> The binding documentation is updated accordingly.
+> >> 
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/mtd/marvell-nand.txt |  6 +++++-
+> >>  drivers/mtd/nand/marvell_nand.c                        | 14 ++++++++++++++
+> >>  2 files changed, 19 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> >> index c08fb477b3c6..4ee9813bf88f 100644
+> >> --- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> >> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+> >> @@ -14,7 +14,11 @@ Required properties:
+> >>  - #address-cells: shall be set to 1. Encode the NAND CS.
+> >>  - #size-cells: shall be set to 0.
+> >>  - interrupts: shall define the NAND controller interrupt.
+> >> -- clocks: shall reference the NAND controller clock.
+> >> +- clocks: shall reference the NAND controller clocks, the second one is
+> >> +  optional but needed for the Armada 7K/8K SoCs
+> >> +- clock-names: mandatory if there is a second clock, in this case the
+> >> +   name must be "core" for the first clock and "reg" for the second
+> >> +   one  
+> >
+> > Hm, not sure this is a good idea to impose a specific order. I know you  
+> 
+> It would be a problem if the use of this clock would be at dts level
+> for each board. But here we only setup this property in the dtsi at SoC
+> level. So enforcing the order is not a problem as the dtsi are all well
+> reviewed and remains pretty rare.
 
-Pavel
+I'm still not convinced this is a good idea, but okay.
 
--- (english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures)
-http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180306/438a28ae/attachment.sig>
+> 
+> > do that to avoid changing the code requesting the core clk, but I'd
+> > prefer to have a solution where we first search for a clock named
+> > "core" (devm_clk_get(&pdev->dev, "core")), and if it's missing,
+> > fall back to devm_clk_get(&pdev->dev, NULL).  
+> 
+> I really wanted to avoid adding more code only for legacy reason.
+
+It's adding only 2 lines:
+
+	reg_clk = devm_clk_get(&pdev->dev, "core");
+	if (IS_ERR(reg_clk) && PTR_ERR(reg_clk) == -ENOENT)
+		reg_clk = devm_clk_get(&pdev->dev, NULL);
+
+> 
+> >
+> > Another solution would be to retrieve the reg clk only on platforms
+> > that need it (based on the compatible). This way you won't have to test
+> > for -ENOENT and could simply propagate the error to the upper layer.  
+> 
+> We can't do this because we need to be bacwkard compatible.
+
+I don't get it. If the clock is missing in the DT, the NAND is
+already not working on these platforms, right? How could we break
+something that is already broken?
+
+Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
