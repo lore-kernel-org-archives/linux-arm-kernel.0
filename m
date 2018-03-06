@@ -1,24 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Mar 2018 17:06:48 -0300
-Subject: Regulator regression in next-20180305
-In-Reply-To: <20180306191218.GF13586@sirena.org.uk>
-References: <20180305231246.GB5799@atomide.com>
- <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
- <20180306163035.GE13586@sirena.org.uk>
- <CAOMZO5DL_a8DOKgyZ4j2-bcPZLeUtQ9ekc74yVwtKYofbpOafg@mail.gmail.com>
- <20180306191218.GF13586@sirena.org.uk>
-Message-ID: <CAOMZO5BfEfXN6OgxXswm8qFDbxDJKdUJmhDZGr_DBOh8fbtodA@mail.gmail.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 6 Mar 2018 12:28:15 -0800
+Subject: [PATCH v2 6/8] [PATCH 6/8] Documentation: hwmon: Add a document
+ for PECI hwmon client driver
+In-Reply-To: <20180221161606.32247-7-jae.hyun.yoo@linux.intel.com>
+References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-7-jae.hyun.yoo@linux.intel.com>
+Message-ID: <0e3750a0-d45b-368d-f5cb-d2cca6797ecb@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi,
 
-On Tue, Mar 6, 2018 at 4:12 PM, Mark Brown <broonie@kernel.org> wrote:
+On 02/21/2018 08:16 AM, Jae Hyun Yoo wrote:
 
-> Yeah, that's what I expected.  What we really need to figure out I think
-> is what exactly is taking the lock that we end up colliding with, I
-> don't seem to be able to reproduce so I'm having to just go on staring
-> at the code here.
+> +temp<n>_label		Provides DDR DIMM temperature if this label indicates
+> +			'DIMM #'.
+> +temp<n>_input		Provides current temperature of the DDR DIMM.
+> +
+> +Note:
+> +	DIMM temperature group will be appeared when the client CPU's BIOS
 
-Any debug options I should turn on in order to help us to understand
-more on the lock issue?
+	                       will appear when
+
+> +	completes memory training and testing.
+> 
+
+
+-- 
+~Randy
