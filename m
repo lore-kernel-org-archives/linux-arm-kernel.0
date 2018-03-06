@@ -1,39 +1,73 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Tue, 06 Mar 2018 07:52:37 -0500
-Subject: [PATCH 07/37] iommu: Add a page fault handler
-In-Reply-To: <430e9754-4cf7-0aa8-7899-fc13e6a2e079@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-8-jean-philippe.brucker@arm.com>
- <77afa195-4842-a112-eba5-409b861b5315@codeaurora.org>
- <430e9754-4cf7-0aa8-7899-fc13e6a2e079@arm.com>
-Message-ID: <93dc46c9f4c9f5f6f9dc50c26333398b@codeaurora.org>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 6 Mar 2018 13:53:34 +0100
+Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <20180227071134.28063-1-a.hajda@samsung.com>
+References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
+ <20180227071134.28063-1-a.hajda@samsung.com>
+Message-ID: <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-06 05:46, Jean-Philippe Brucker wrote:
-> On 05/03/18 21:53, Sinan Kaya wrote:
->> On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
->>> +static struct workqueue_struct *iommu_fault_queue;
->> 
->> Is there anyway we can make this fault queue per struct device?
->> Since this is common code, I think it needs some care.
-> 
-> I don't think it's better, the workqueue struct seems large. Maybe 
-> having
-> one wq per IOMMU is a good compromise?
-
-Yes, one per iommu sounds reasonable.
+Hi Rob, Chanwoo, Krzysztof,
 
 
-As said in my other reply for this
-> patch, doing so isn't completely straightforward. I'll consider adding 
-> an
-> iommu pointer to the iommu_param struct attached to each device.
-> 
-> Thanks,
-> Jean
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" 
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On 27.02.2018 08:11, Andrzej Hajda wrote:
+> Hi,
+>
+> Thanks for reviews of previous iterations.
+>
+> This patchset introduces USB physical connector bindings, together with
+> working example.
+> I have removed RFC prefix - the patchset seems to be heading
+> to a happy end :)
+>
+> v5: fixed extra parenthesis in dts, renamed extcon function.
+> v4: improved binding descriptions, added missing reg in dts.
+> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
+>     example.
+> v2: I have addressed comments by Rob and Laurent, thanks 
+>
+> Changes in datail are described in the patches.
+>
+> Regards
+> Andrzej
+>
+>
+> Andrzej Hajda (5):
+>   dt-bindings: add bindings for USB physical connector
+>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
+>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
+>   arm64: dts: exynos: add OF graph between MHL and USB connector
+>   extcon: add possibility to get extcon device by OF node
+>
+> Maciej Purski (1):
+>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
+
+It looks like all patches received R-B or acks (I forgot add Krzysztof's
+acks for dts part).
+Now I have a question how to merge them.
+The only functional dependency is between bridge and extcon, and from
+the formal PoV bindings should be merged 1st.
+I can merge it:
+1. All patches via drm-misc tree.
+2. All patches except dts via drm-misc, and Krzysztof will merge dts via
+samsung-soc tree.
+
+Is it OK, for all? Better ideas?
+
+Regards
+Andrzej
+
+
+>
+>  .../connector/samsung,usb-connector-11pin.txt      | 49 +++++++++++
+>  .../bindings/connector/usb-connector.txt           | 75 +++++++++++++++++
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 38 ++++++++-
+>  drivers/extcon/extcon.c                            | 44 +++++++---
+>  drivers/gpu/drm/bridge/sil-sii8620.c               | 97 +++++++++++++++++++++-
+>  include/linux/extcon.h                             |  6 ++
+>  6 files changed, 293 insertions(+), 16 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/connector/samsung,usb-connector-11pin.txt
+>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+>
