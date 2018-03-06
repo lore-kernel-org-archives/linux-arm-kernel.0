@@ -1,83 +1,50 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue,  6 Mar 2018 14:56:03 +0100
-Subject: [PATCH v3 6/7] arm: dts: sun8i: a33: Add the DSI-related nodes
+Date: Tue,  6 Mar 2018 14:56:01 +0100
+Subject: [PATCH v3 4/7] dt-bindings: panel: Add the Ilitek ILI9881c panel
+ documentation
 In-Reply-To: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
 References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
-Message-ID: <fbb4d14a83ed80e9740c042cd9df58b8132b4c91.1520344489.git-series.maxime.ripard@bootlin.com>
+Message-ID: <98f6b4c0746a0d244d009263e8b3e20f40ac280f.1520344489.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The A33 has a MIPI-DSI block, along with its D-PHY. Let's add it in order
-to use it in the relevant boards.
+The LHR050H41 from BananaPi is a 1280x700 4-lanes DSI panel based on the
+ILI9881c from Ilitek.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 44 +++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+)
+ Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 50eb84fa246a..94cfa7b1bbfa 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -236,6 +236,11 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
+diff --git a/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+new file mode 100644
+index 000000000000..df05e8bb4851
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+@@ -0,0 +1,20 @@
++Ilitek ILI9881c based MIPI-DSI panels
 +
-+					tcon0_out_dsi0: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&dsi0_in_tcon0>;
-+					};
- 				};
- 			};
- 		};
-@@ -280,6 +285,45 @@
- 			#io-channel-cells = <0>;
- 		};
- 
-+		dsi0: dsi at 1ca0000 {
-+			compatible = "allwinner,sun6i-a31-mipi-dsi";
-+			reg = <0x01ca0000 0x1000>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_MIPI_DSI>,
-+				 <&ccu CLK_DSI_SCLK>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_MIPI_DSI>;
-+			phys = <&dphy0>;
-+			phy-names = "dphy";
-+			status = "disabled";
++Required properties:
++  - compatible: must be "ilitek,ili9881c" and one of:
++    * "bananapi,lhr050h41"
++  - reg: DSI virtual channel used by that screen
++  - power-gpios: a GPIO phandle for the power pin
++  - reset-gpios: a GPIO phandle for the reset pin
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++Optional properties:
++  - backlight: phandle to the backlight used
 +
-+				port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					dsi0_in_tcon0: endpoint {
-+						remote-endpoint = <&tcon0_out_dsi0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		dphy0: d-phy at 1ca1000 {
-+			compatible = "allwinner,sun6i-a31-mipi-dphy";
-+			reg = <0x01ca1000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MIPI_DSI>,
-+				 <&ccu CLK_DSI_DPHY>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_MIPI_DSI>;
-+			status = "disabled";
-+			#phy-cells = <0>;
-+		};
-+
- 		fe0: display-frontend at 1e00000 {
- 			compatible = "allwinner,sun8i-a33-display-frontend";
- 			reg = <0x01e00000 0x20000>;
++Example:
++panel at 0 {
++	compatible = "bananapi,lhr050h41", "ilitek,ili9881c";
++	reg = <0>;
++	power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
++	reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
++	backlight = <&pwm_bl>;
++};
 -- 
 git-series 0.9.1
