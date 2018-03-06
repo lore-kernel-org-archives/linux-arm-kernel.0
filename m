@@ -1,89 +1,42 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Mar 2018 15:43:54 +0100
-Subject: [PATCH 11/12] dt-bindings: thermal: remove no longer needed samsung
- thermal properties
+Date: Tue, 06 Mar 2018 15:43:44 +0100
+Subject: [PATCH 01/12] thermal: exynos: remove unused "type" field from
+ struct exynos_tmu_platform_data
 In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20180306144516epcas1p3e951e15e666779c870ad091d65041409@epcas1p3.samsung.com>
-Message-ID: <1520347435-22970-12-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20180306144431epcas2p1fef7b2d8130decb08e023b4ff329e9ff@epcas2p1.samsung.com>
+Message-ID: <1520347435-22970-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove documentation for longer needed samsung thermal properties.
+Remove unused "type" field from struct exynos_tmu_platform_data.
+
+There should be no functional changes caused by this patch.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- .../devicetree/bindings/thermal/exynos-thermal.txt | 23 +++++-----------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-index 1b596fd..b957acf 100644
---- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-@@ -49,19 +49,6 @@ on the SoC (only first trip points defined in DT will be configured):
-  - samsung,exynos5433-tmu: 8
-  - samsung,exynos7-tmu: 8
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+index 5149c2a..8c468b6 100644
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ b/drivers/thermal/samsung/exynos_tmu.h
+@@ -47,7 +47,6 @@ enum soc_type {
+  *	0 < reference_voltage <= 31
+  * @noise_cancel_mode: noise cancellation mode
+  *	000, 100, 101, 110 and 111 can be different modes
+- * @type: determines the type of SOC
+  * @efuse_value: platform defined fuse value
+  * @min_efuse_value: minimum valid trimming data
+  * @max_efuse_value: maximum valid trimming data
+@@ -68,7 +67,6 @@ struct exynos_tmu_platform_data {
+ 	u8 second_point_trim;
+ 	u8 default_temp_offset;
  
--Following properties are mandatory (depending on SoC):
--- samsung,tmu_gain: Gain value for internal TMU operation.
--- samsung,tmu_reference_voltage: Value of TMU IP block's reference voltage
--- samsung,tmu_noise_cancel_mode: Mode for noise cancellation
--- samsung,tmu_efuse_value: Default level of temperature - it is needed when
--			   in factory fusing produced wrong value
--- samsung,tmu_min_efuse_value: Minimum temperature fused value
--- samsung,tmu_max_efuse_value: Maximum temperature fused value
--- samsung,tmu_first_point_trim: First point trimming value
--- samsung,tmu_second_point_trim: Second point trimming value
--- samsung,tmu_default_temp_offset: Default temperature offset
--- samsung,tmu_cal_type: Callibration type
--
- ** Optional properties:
+-	enum soc_type type;
+ 	u32 cal_type;
+ };
  
- - vtmu-supply: This entry is optional and provides the regulator node supplying
-@@ -78,7 +65,7 @@ Example 1):
- 		clocks = <&clock 383>;
- 		clock-names = "tmu_apbif";
- 		vtmu-supply = <&tmu_regulator_node>;
--		#include "exynos4412-tmu-sensor-conf.dtsi"
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- Example 2):
-@@ -89,7 +76,7 @@ Example 2):
- 		interrupts = <0 58 0>;
- 		clocks = <&clock 21>;
- 		clock-names = "tmu_apbif";
--		#include "exynos5440-tmu-sensor-conf.dtsi"
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
-@@ -99,7 +86,7 @@ Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
- 		interrupts = <0 184 0>;
- 		clocks = <&clock 318>, <&clock 318>;
- 		clock-names = "tmu_apbif", "tmu_triminfo_apbif";
--		#include "exynos4412-tmu-sensor-conf.dtsi"
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- 	tmu_cpu3: tmu at 1006c000 {
-@@ -108,7 +95,7 @@ Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
- 		interrupts = <0 185 0>;
- 		clocks = <&clock 318>, <&clock 319>;
- 		clock-names = "tmu_apbif", "tmu_triminfo_apbif";
--		#include "exynos4412-tmu-sensor-conf.dtsi"
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- 	tmu_gpu: tmu at 100a0000 {
-@@ -117,7 +104,7 @@ Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
- 		interrupts = <0 215 0>;
- 		clocks = <&clock 319>, <&clock 318>;
- 		clock-names = "tmu_apbif", "tmu_triminfo_apbif";
--		#include "exynos4412-tmu-sensor-conf.dtsi"
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- Note: For multi-instance tmu each instance should have an alias correctly
 -- 
 1.9.1
