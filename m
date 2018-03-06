@@ -1,53 +1,49 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Tue, 6 Mar 2018 12:22:24 +0100
-Subject: [GIT PULL] tee driver misc for v4.17
-Message-ID: <CAHUa44HqoQ2yxBzJsQQxb35h=S4suDB7qpoQXwsBhx_OXHyBMw@mail.gmail.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Tue, 6 Mar 2018 20:22:41 +0900
+Subject: [PATCH] arm: mm: Kconfig: Disable KUSER_HELPERS in ARMv6 or later as
+ default
+Message-ID: <20180306112241.GA5938@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello arm-soc maintainers,
+Codes for KUSER_HELPERS can be abused as ROP gadaget,
+So that It's better to disable that as if possible.
 
-Please pull these tee driver changes. This fixes a a problem with
-determining the max device id value for the privileged device. This is
-only a problem if there's more than 16 tee devices registered. There's
-also added support to report OP-TEE revision information.
+Since over ARMv6 has ldrex/strex at user-space,
+NEED_KUSER_HELPERS is not selected for over ARMv6.
 
-The bugfix isn't urgent so I'm aiming for the next merge window.
+But, Even though NEED_KUSER_HELPERS is not selected,
+current configuration enable KUSER_HELPERS as default.
 
-Thanks,
-Jens
+* as-is
 
-The following changes since commit 661e50bc853209e41a5c14a290ca4decc43cbfd1:
+- Enable KUSER_HELPERS as default even though over ARMv6.
+- User can disable KUSER_HELPERS.
 
-  Linux 4.16-rc4 (2018-03-04 14:54:11 -0800)
+* to-be
 
-are available in the git repository at:
+- Disable KUSER_HELPERS in ARMv6 or later as default.
+- User can enable KUSER_HELPERS for compatibility.
 
-  https://git.linaro.org:/people/jens.wiklander/linux-tee.git
-tags/tee-drv-misc-for-v4.17
+This change removes the unnecessary configuration that has security-risk.
 
-for you to fetch changes up to 5c5f80307ab27c53b56569245a0b12f4e3b577de:
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  tee: optee: report OP-TEE revision information (2018-03-06 11:03:55 +0100)
-
-----------------------------------------------------------------
-Small fix and report OP-TEE revision information
-
-* Adds one small fix correct max value of privileged device id allocation,
-  this is only needed if there's more than TEE_NUM_DEVICES / 2 (16) tee
-  drivers registered. One or two is a normal value.
-* Reports OP-TEE revision information (major, minro version and build id
-  if available)
-
-----------------------------------------------------------------
-J?r?me Forissier (2):
-      tee: optee: GET_OS_REVISION: document a2 as a build identifier
-      tee: optee: report OP-TEE revision information
-
-Peng Fan (1):
-      tee: correct max value for id allocation
-
- drivers/tee/optee/core.c      | 23 +++++++++++++++++++++++
- drivers/tee/optee/optee_smc.h | 10 +++++++++-
- drivers/tee/tee_core.c        | 14 +++++++++-----
- 3 files changed, 41 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 7f14acf..40e5fe5 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -840,7 +840,7 @@ config NEED_KUSER_HELPERS
+ config KUSER_HELPERS
+ 	bool "Enable kuser helpers in vector page" if !NEED_KUSER_HELPERS
+ 	depends on MMU
+-	default y
++	default y if NEED_KUSER_HELPERS
+ 	help
+ 	  Warning: disabling this option may break user programs.
+ 
+-- 
+1.9.1
