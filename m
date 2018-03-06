@@ -1,85 +1,133 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Mar 2018 11:58:33 +0000
-Subject: [PATCH] arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs,
- wifi reset)
-In-Reply-To: <3831527.HjPPvuL6zK@diego>
-References: <20180227204711.29357-1-dianders@chromium.org>
- <3831527.HjPPvuL6zK@diego>
-Message-ID: <d0aac677-ed2e-c059-0cba-79f88de194b4@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 6 Mar 2018 04:14:41 -0800
+Subject: [PATCH] staging: bcm2835-audio: Release resources on module_exit()
+In-Reply-To: <20180305055254.29875-1-k.marinushkin@gmail.com>
+References: <20180305055254.29875-1-k.marinushkin@gmail.com>
+Message-ID: <20180306121441.GA7177@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On 01/03/18 08:43, Heiko St?bner wrote:
-> Am Dienstag, 27. Februar 2018, 21:47:11 CET schrieb Douglas Anderson:
->> Back in the early days when gru devices were still under development
->> we found an issue where the WiFi reset line needed to be configured as
->> early as possible during the boot process to avoid the WiFi module
->> being in a bad state.
->>
->> We found that the way to get the kernel to do this in the earliest
->> possible place was to configure this line in the pinctrl hogs, so
->> that's what we did.  For some history here you can see
->> <http://crosreview.com/368770>.  After the time that change landed in
->> the kernel, we landed a firmware change to configure this line even
->> earlier.  See <http://crosreview.com/399919>.  However, even after the
->> firmware change landed we kept the kernel change to deal with the fact
->> that some people working on devices might take a little while to
->> update their firmware.
->>
->> At this there are definitely zero devices out in the wild that have
->> firmware without the fix in it.  Specifically looking in the firmware
->> branch several critically important fixes for memory stability landed
->> after the patch in coreboot and I know we didn't ship without those.
->> Thus, by now, everyone should have the new firmware and it's safe to
->> not have the kernel set this up in a pinctrl hog.
->>
->> Historically, even though it wasn't needed to have this in a pinctrl
->> hog, we still kept it since it didn't hurt.  Pinctrl would apply the
->> default hog at bootup and then would never touch things again.  That
->> all changed with commit 981ed1bfbc6c ("pinctrl: Really force states
->> during suspend/resume").  After that commit then we'll re-apply the
->> default hog at resume time and that can screw up the reset state of
->> WiFi.  ...and on rk3399 if you touch a device on PCIe in the wrong way
->> then the whole system can go haywire.  That's what was happening.
->> Specifically you'd resume a rk3399-gru-* device and it would mostly
->> resume, then would crash with some crazy weird crash.
->>
->> One could say, perhaps, that the recent pinctrl change was at fault
->> (and should be fixed) since it changed behavior.  ...but that's not
->> really true.  The device tree for rk3399-gru is really to blame.
->> Specifically since the pinctrl is defined in the hog and not in the
->> "wlan-pd-n" node then the actual user of this pin doesn't have a
->> pinctrl entry for it.  That's bad.
->>
->> Let's fix our problems by just moving the control of
->> "wlan_module_reset_l pinctrl" out of the hog and put them in the
->> proper place.
->>
->> NOTE: in theory, I think it should actually be possible to have a pin
->> controlled _both_ by the hog and by an actual device.  Once the device
->> claims the pin I think the hog is supposed to let go.  I'm not 100%
->> sure that this works and in any case this solution would be more
->> complex than is necessary.
->>
->> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
->> Fixes: 48f4d9796d99 ("arm64: dts: rockchip: add Gru/Kevin DTS")
->> Fixes: 981ed1bfbc6c ("pinctrl: Really force states during suspend/resume")
->> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+On Mon, Mar 05, 2018 at 06:52:54AM +0100, Kirill Marinushkin wrote:
+> In the current implementation, `rmmod snd_bcm2835` does not release
+> resources properly. It causes an oops when trying to list sound devices.
 > 
-> applied as fix for 4.16 with the 2 Tested-tags
-Sorry to rain on everyone's parade, but further testing shows that this
-patch may not be enough to restore a reliable s2r. My initial testing
-did show that we were resuming without the VOP errors, but there seem to
-be further issues (I'm loosing the keyboard and the trackpad after
-resume on Kevin).
+> This commit fixes it.
+> 
+> Steps to reproduce:
+> 
+> ~~~~
+> $ rmmod snd_bcm2835
+> $ aplay -L
+> [  138.648130] Unable to handle kernel paging request at virtual address 7f1343c0
+> [  138.660415] pgd = ad8f0000
+> [  138.665567] [7f1343c0] *pgd=3864c811, *pte=00000000, *ppte=00000000
+> [  138.674887] Internal error: Oops: 7 [#1] SMP ARM
+> [  138.683571] Modules linked in: sha256_generic cfg80211 rfkill snd_pcm snd_timer
+>  snd fixed uio_pdrv_genirq uio ip_tables x_tables ipv6 [last unloaded: snd_bcm2835
+> ]
+> [  138.706594] CPU: 3 PID: 463 Comm: aplay Tainted: G        WC       4.15.0-rc1-v
+> 7+ #6
+> [  138.719833] Hardware name: BCM2835
+> [  138.726016] task: b877ac00 task.stack: aebec000
+> [  138.733408] PC is at try_module_get+0x38/0x24c
+> [  138.740813] LR is at snd_ctl_open+0x58/0x194 [snd]
+> [  138.748485] pc : [<801c4d5c>]    lr : [<7f0e6b2c>]    psr: 20000013
+> [  138.757709] sp : aebedd60  ip : aebedd88  fp : aebedd84
+> [  138.765884] r10: 00000000  r9 : 00000004  r8 : 7f0ed440
+> [  138.774040] r7 : b7e469b0  r6 : 7f0e6b2c  r5 : afd91900  r4 : 7f1343c0
+> [  138.783571] r3 : aebec000  r2 : 00000001  r1 : b877ac00  r0 : 7f1343c0
+> [  138.793084] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [  138.803300] Control: 10c5387d  Table: 2d8f006a  DAC: 00000055
+> [  138.812064] Process aplay (pid: 463, stack limit = 0xaebec210)
+> [  138.820868] Stack: (0xaebedd60 to 0xaebee000)
+> [  138.828207] dd60: 00000000 b848d000 afd91900 00000000 b7e469b0 7f0ed440 aebedda4 aebedd88
+> [  138.842371] dd80: 7f0e6b2c 801c4d30 afd91900 7f0ea4dc 00000000 b7e469b0 aebeddcc aebedda8
+> [  138.856611] dda0: 7f0e250c 7f0e6ae0 7f0e2464 b8478ec0 b7e469b0 afd91900 7f0ea388 00000000
+> [  138.870864] ddc0: aebeddf4 aebeddd0 802ce590 7f0e2470 8090ab64 afd91900 afd91900 b7e469b0
+> [  138.885301] dde0: afd91908 802ce4e4 aebede1c aebeddf8 802c57b4 802ce4f0 afd91900 aebedea8
+> [  138.900110] de00: b7fa4c00 00000000 00000000 00000004 aebede3c aebede20 802c6ba8 802c56b4
+> [  138.915260] de20: aebedea8 00000000 aebedf5c 00000000 aebedea4 aebede40 802d9a68 802c6b58
+> [  138.930661] de40: b874ddd0 00000000 00000000 00000001 00000041 00000000 afd91900 aebede70
+> [  138.946402] de60: 00000000 00000000 00000002 b7e469b0 b8a87610 b8d6ab80 801852f8 00080000
+> [  138.962314] de80: aebedf5c aebedea8 00000001 80108464 aebec000 00000000 aebedf4c aebedea8
+> [  138.978414] dea0: 802dacd4 802d970c b8a87610 b8d6ab80 a7982bc6 00000009 af363019 b9231480
+> [  138.994617] dec0: 00000000 b8c038a0 b7e469b0 00000101 00000002 00000238 00000000 00000000
+> [  139.010823] dee0: 00000000 aebedee8 00080000 0000000f aebedf3c aebedf00 802ed7e4 80843f94
+> [  139.027025] df00: 00000003 00080000 b9231490 b9231480 00000000 00080000 af363000 00000000
+> [  139.043229] df20: 00000005 00000002 ffffff9c 00000000 00080000 ffffff9c af363000 00000003
+> [  139.059430] df40: aebedf94 aebedf50 802c6f70 802dac70 aebec000 00000000 00000001 00000000
+> [  139.075629] df60: 00020000 00000004 00000100 00000001 7ebe577c 0002e038 00000000 00000005
+> [  139.091828] df80: 80108464 aebec000 aebedfa4 aebedf98 802c7060 802c6e6c 00000000 aebedfa8
+> [  139.108025] dfa0: 801082c0 802c7040 7ebe577c 0002e038 7ebe577c 00080000 00000b98 e81c8400
+> [  139.124222] dfc0: 7ebe577c 0002e038 00000000 00000005 7ebe57e4 00a20af8 7ebe57f0 76f87394
+> [  139.140419] dfe0: 00000000 7ebe55c4 76ec88e8 76df1d9c 60000010 7ebe577c 00000000 00000000
+> [  139.156715] [<801c4d5c>] (try_module_get) from [<7f0e6b2c>] (snd_ctl_open+0x58/0x194 [snd])
+> [  139.173222] [<7f0e6b2c>] (snd_ctl_open [snd]) from [<7f0e250c>] (snd_open+0xa8/0x14c [snd])
+> [  139.189683] [<7f0e250c>] (snd_open [snd]) from [<802ce590>] (chrdev_open+0xac/0x188)
+> [  139.205465] [<802ce590>] (chrdev_open) from [<802c57b4>] (do_dentry_open+0x10c/0x314)
+> [  139.221347] [<802c57b4>] (do_dentry_open) from [<802c6ba8>] (vfs_open+0x5c/0x88)
+> [  139.236788] [<802c6ba8>] (vfs_open) from [<802d9a68>] (path_openat+0x368/0x944)
+> [  139.248270] [<802d9a68>] (path_openat) from [<802dacd4>] (do_filp_open+0x70/0xc4)
+> [  139.263731] [<802dacd4>] (do_filp_open) from [<802c6f70>] (do_sys_open+0x110/0x1d4)
+> [  139.279378] [<802c6f70>] (do_sys_open) from [<802c7060>] (SyS_open+0x2c/0x30)
+> [  139.290647] [<802c7060>] (SyS_open) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+> [  139.306021] Code: e3c3303f e5932004 e2822001 e5832004 (e5943000)
+> [  139.316265] ---[ end trace 7f3f7f6193b663ed ]---
+> [  139.324956] note: aplay[463] exited with preempt_count 1
+> ~~~~
+> 
+> Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Michael Zoran <mzoran@crowfest.net>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devel at driverdev.osuosl.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 37 +++++++++++-----------
+>  1 file changed, 19 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+> index 8f2d508183b2..01187df7d85f 100644
+> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+> @@ -36,6 +36,11 @@ MODULE_PARM_DESC(enable_compat_alsa,
+>  static void snd_devm_unregister_child(struct device *dev, void *res)
+>  {
+>  	struct device *childdev = *(struct device **)res;
+> +	struct snd_card *snd_card =
+> +		(struct snd_card *)dev_get_drvdata(childdev);
+> +
+> +	snd_card_free(snd_card);
+> +	dev_set_drvdata(childdev, NULL);
+>  
+>  	device_unregister(childdev);
+>  }
+> @@ -61,6 +66,11 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
+>  	return 0;
+>  }
+>  
+> +static void snd_devm_release(struct device *dev)
+> +{
+> +	/* avoid warnings when releasing the resources */
+> +}
 
-Applying my initial hack makes it work again. I suspect that there are
-more hog pins that need tweaking, but I'm a bit out of my depth here.
+As per the in-kernel documentation, I get to make fun of you for trying
+to "fool" the kernel here :(
 
-Thanks,
+Please please please do not do stuff like this.  There is a good reason
+the kernel is warning you that you need to do something "real" here.  I
+didn't put that logic in the kernel for no good reason, so don't try to
+"shut it up" by being sneaky and trying to fool it.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Properly clean up your memory here, that is what is needed.
+
+thanks,
+
+greg k-h
