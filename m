@@ -1,22 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 19:31:17 -0600
-Subject: [PATCH V2 1/5] dt-bindings: mmc: document the stm32 sdmmc bindings
-In-Reply-To: <1519832844-28068-2-git-send-email-ludovic.Barre@st.com>
-References: <1519832844-28068-1-git-send-email-ludovic.Barre@st.com>
- <1519832844-28068-2-git-send-email-ludovic.Barre@st.com>
-Message-ID: <20180306013117.lemo4fvugmrd3ji2@rob-hp-laptop>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 6 Mar 2018 10:33:45 +0900
+Subject: [PATCH] arm64: dts: uniphier: add fixed regulators for audio codec
+In-Reply-To: <20180228093247.29648-1-suzuki.katsuhiro@socionext.com>
+References: <20180228093247.29648-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAK7LNASTRCy=MOVVAJhobnZ4SLvdWoy+wR=tovb-bLJLRhxs9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 04:47:20PM +0100, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> Document the binding for stm32 sdmmc controller.
-> 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  .../devicetree/bindings/mmc/st,stm32-sdmmc.txt     | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/st,stm32-sdmmc.txt
+2018-02-28 18:32 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> This patch adds regulators that have fixed voltage for audio codec
+> on UniPhier LD11/20 Global boards. This patch fixes warnings about
+> TAS57xx audio codec such as "tas571x 0-001b: 0-001b supply AVDD
+> not found, using dummy regulator".
+>
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Applied to linux-uniphier.  Thanks!
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
