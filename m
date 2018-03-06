@@ -1,8 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  6 Mar 2018 20:15:56 +0900
-Subject: [PATCH] pinctrl: stm32: add 'depends on HAS_IOMEM' to fix unmet
- dependency
-Message-ID: <1520334956-9900-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue,  6 Mar 2018 20:18:49 +0900
+Subject: [PATCH] phy: add 'depends on HAS_IOMEM' to fix unmet dependency
+Message-ID: <1520335129-11101-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,56 +22,46 @@ We agreed to add 'depends on HAS_IOMEM' to drivers causing
 unmet dependency.
 
 
- drivers/pinctrl/stm32/Kconfig | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/phy/hisilicon/Kconfig | 1 +
+ drivers/phy/ralink/Kconfig    | 1 +
+ drivers/phy/rockchip/Kconfig  | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
-index 1c4e00b2..cd3936e 100644
---- a/drivers/pinctrl/stm32/Kconfig
-+++ b/drivers/pinctrl/stm32/Kconfig
-@@ -11,37 +11,37 @@ config PINCTRL_STM32
- 
- config PINCTRL_STM32F429
- 	bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32F429
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32F469
- 	bool "STMicroelectronics STM32F469 pin control" if COMPILE_TEST && !MACH_STM32F469
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32F469
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32F746
- 	bool "STMicroelectronics STM32F746 pin control" if COMPILE_TEST && !MACH_STM32F746
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32F746
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32F769
- 	bool "STMicroelectronics STM32F769 pin control" if COMPILE_TEST && !MACH_STM32F769
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32F769
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32H743
- 	bool "STMicroelectronics STM32H743 pin control" if COMPILE_TEST && !MACH_STM32H743
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32H743
- 	select PINCTRL_STM32
- 
- config PINCTRL_STM32MP157
- 	bool "STMicroelectronics STM32MP157 pin control" if COMPILE_TEST && !MACH_STM32MP157
--	depends on OF
-+	depends on OF && HAS_IOMEM
- 	default MACH_STM32MP157
- 	select PINCTRL_STM32
- endif
+diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
+index 6164c4c..1131ba6 100644
+--- a/drivers/phy/hisilicon/Kconfig
++++ b/drivers/phy/hisilicon/Kconfig
+@@ -4,6 +4,7 @@
+ config PHY_HI6220_USB
+ 	tristate "hi6220 USB PHY support"
+ 	depends on (ARCH_HISI && ARM64) || COMPILE_TEST
++	depends on HAS_IOMEM
+ 	select GENERIC_PHY
+ 	select MFD_SYSCON
+ 	help
+diff --git a/drivers/phy/ralink/Kconfig b/drivers/phy/ralink/Kconfig
+index b17635b..14fd219 100644
+--- a/drivers/phy/ralink/Kconfig
++++ b/drivers/phy/ralink/Kconfig
+@@ -4,6 +4,7 @@
+ config PHY_RALINK_USB
+ 	tristate "Ralink USB PHY driver"
+ 	depends on RALINK || COMPILE_TEST
++	depends on HAS_IOMEM
+ 	select GENERIC_PHY
+ 	select MFD_SYSCON
+ 	help
+diff --git a/drivers/phy/rockchip/Kconfig b/drivers/phy/rockchip/Kconfig
+index f5325b2..0e15119 100644
+--- a/drivers/phy/rockchip/Kconfig
++++ b/drivers/phy/rockchip/Kconfig
+@@ -29,6 +29,7 @@ config PHY_ROCKCHIP_INNO_USB2
+ config PHY_ROCKCHIP_PCIE
+ 	tristate "Rockchip PCIe PHY Driver"
+ 	depends on (ARCH_ROCKCHIP && OF) || COMPILE_TEST
++	depends on HAS_IOMEM
+ 	select GENERIC_PHY
+ 	select MFD_SYSCON
+ 	help
 -- 
 2.7.4
