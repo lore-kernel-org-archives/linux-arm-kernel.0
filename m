@@ -1,65 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Mar 2018 17:16:43 +0000
-Subject: [PATCH] KVM: arm: reserve bit in KVM_REG_ARM encoding for
- secure/nonsecure
-In-Reply-To: <CAFEAcA9KYxtUzH+DtUR-zVXeFYeVA1orh-Y7+FkufxNZ6o8ivw@mail.gmail.com>
-References: <20180306162646.7646-1-peter.maydell@linaro.org>
- <4dbad5e5-8e62-4729-16f3-59ce1cfdd550@arm.com>
- <CAFEAcA9KYxtUzH+DtUR-zVXeFYeVA1orh-Y7+FkufxNZ6o8ivw@mail.gmail.com>
-Message-ID: <90ed4785-bf17-02b6-7941-d9524c4642f6@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 6 Mar 2018 17:23:28 +0000
+Subject: [PATCH v7 08/13] arm64: Add support for ACPI based firmware tables
+In-Reply-To: <20180228220619.6992-9-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-9-jeremy.linton@arm.com>
+Message-ID: <362fcf8a-44f8-7eb5-0f17-a7763f6236e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/18 16:56, Peter Maydell wrote:
-> On 6 March 2018 at 16:43, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 06/03/18 16:26, Peter Maydell wrote:
->>> +/* For KVM currently all guest registers are nonsecure, but we reserve a bit
->>> + * in the encoding to distinguish secure from nonsecure for banked registers.
->>> + */
->>
->> Nit:
->>
->> /*
->>  * This is the canonical comment style.
->>  */
->>
->> It might be worth pointing out in the comment that this only applies to
->> AArch32 system registers that are banked by security.
-> 
-> Sure. How about
-> 
-> /*
->  * For KVM currently all guest registers are nonsecure, but we reserve a bit
->  * in the encoding to distinguish secure from nonsecure for AArch32 system
->  * registers that are banked by security. This is 1 for the secure banked
->  * register, and 0 for the nonsecure banked register or if the register is
->  * not banked by security.
->  */
-> 
-> ?
 
-Looks good to me.
 
+On 28/02/18 22:06, Jeremy Linton wrote:
+> The /sys cache entries should support ACPI/PPTT generated cache
+> topology information. Lets detect ACPI systems and call
+> an arch specific cache_setup_acpi() routine to update the hardware
+> probed cache topology.
 > 
->>> +#define KVM_REG_ARM_SECURE_MASK      0x0000000010000000
->>> +#define KVM_REG_ARM_SECURE_SHIFT     28
->>>
->>>  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
->>>       (((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
->>>
->>
->> Don't you also need to define it on the arm64 side?
+> For arm64, if ACPI is enabled, determine the max number of cache
+> levels and populate them using the PPTT table if one is available.
 > 
-> I don't think so, because AArch64 registers aren't security banked
-> (except for some GICv3 ones, which aren't set via GET/SET_ONE_REG.)
-> Or is there a case I'm missing?
 
-There is still the case of AArch32 guests on arm64, for which you'd need
-to replicate the change to arch/arm64/include/uapi/asm/kvm.h. The two
-architectures have different userspace APIs.
+I fail to understand the kbuild failure report association with this
+patch(most likely the previous patch could be culprit, I am looking at
+it in detail now), but for this patch
 
-Thanks,
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
