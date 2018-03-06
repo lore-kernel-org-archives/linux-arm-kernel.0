@@ -1,58 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  6 Mar 2018 15:51:32 +0000
-Subject: [PATCH] irqchip: gic-v3-its: ensure nr_ites >= nr_lpis
-Message-ID: <20180306155132.8757-1-ard.biesheuvel@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 6 Mar 2018 15:59:59 +0000
+Subject: [RFC PATCH] arm64: fault: Don't populate ESR context for user
+ fault on kernel VA
+In-Reply-To: <20180305172418.GD12869@arm.com>
+References: <1520245875-32527-1-git-send-email-will.deacon@arm.com>
+ <20180305140506.GJ32331@e103592.cambridge.arm.com>
+ <20180305172418.GD12869@arm.com>
+Message-ID: <CAFEAcA9e1swOcYx5YCokSmb_37pyaJYJZTudt57babkngicutw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When struct its_device instances are created, the nr_ites member
-will be set to a power of 2 that equals or exceeds the requested
-number of MSIs passed to the msi_prepare() callback. At the same
-time, the LPI map is allocated to be some multiple of 32 in size,
-where the allocated size may be less than the requested size
-depending on whether a contiguous range of sufficient size is
-available in the global LPI bitmap.
+On 5 March 2018 at 17:24, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Mar 05, 2018 at 02:05:06PM +0000, Dave Martin wrote:
+>> Does Debian's codesearch throw up any nontrivial users of esr_context?
+>
+> The main one seems to be ASAN, which uses the RnW bit to report "READ",
+> "WRITE" or "UNKNOWN". So with this change, the access will be treated as
+> UNKNOWN for kernel addresses.
+>
+> Whilst I can see how that might cause a testsuite regression, I'm struggling
+> to see how it could sensible impact ASAN given that userspace never has
+> permission to access these addresses and so the fault should be treated as
+> fatal regardless of whether or not it's a read or a write.
 
-This may result in the situation where the nr_ites < nr_lpis, and
-since nr_ites is what we program into the hardware when we map the
-device, the additional LPIs will be non-functional.
+Right, but the read/write/unknown classification also affects the
+severity of that warning level ('scariness' in the asan code),
+and it's not immediately clear how much might then in turn be relying
+on that.
 
-For bog standard hardware, this does not really matter. However,
-in cases where ITS device IDs are shared between different PCIe
-devices, we may end up allocating these additional LPIs without
-taking into account that they don't actually work.
+I think that if you have widely deployed code that is using this
+ESR value, then it's kernel ABI that people are relying on, and
+the safest thing to do is to make the minimal change that will
+fix the problem you have, not to yank the whole thing entirely
+and hope that the users will cope.
 
-So let's make nr_ites at least 32. This ensures that all allocated
-LPIs are 'live', and that its_alloc_device_irq() will fail when
-attempts are made to allocate MSIs beyond what was allocated in
-the first place.
+QEMU is not currently using the ESR value, but it would be nice to
+in future, and it would certainly be irritating not to have the
+WnR information just because the faulting address happens to be in
+the top half of memory.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/irqchip/irq-gic-v3-its.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+AFAIK the major thing that consumers actually are after here
+is the WnR information, so preserving that and sanitizing
+the rest of the ESR if necessary would be a less risky fix IMHO.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 1d3056f53747..ee488c468400 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1412,7 +1412,7 @@ static struct irq_chip its_irq_chip = {
-  * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
-  */
- #define IRQS_PER_CHUNK_SHIFT	5
--#define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
-+#define IRQS_PER_CHUNK		(1UL << IRQS_PER_CHUNK_SHIFT)
- #define ITS_MAX_LPI_NRBITS	16 /* 64K LPIs */
- 
- static unsigned long *lpi_bitmap;
-@@ -2123,7 +2123,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	 * of two entries. No, the architecture doesn't let you
- 	 * express an ITT with a single entry.
- 	 */
--	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
-+	nr_ites = max(IRQS_PER_CHUNK, roundup_pow_of_two(nvecs));
- 	sz = nr_ites * its->ite_size;
- 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
- 	itt = kzalloc(sz, GFP_KERNEL);
--- 
-2.11.0
+thanks
+-- PMM
