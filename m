@@ -1,9 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue,  6 Mar 2018 19:01:23 +0100
-Subject: [GIT PULL 4/4] arm64: dts: exynos: DTS for v4.17
+Date: Tue,  6 Mar 2018 19:01:21 +0100
+Subject: [GIT PULL 1/4] soc: samsung: Driver changes for v4.17
 In-Reply-To: <20180306180124.8987-1-krzk@kernel.org>
 References: <20180306180124.8987-1-krzk@kernel.org>
-Message-ID: <20180306180124.8987-4-krzk@kernel.org>
+Message-ID: <20180306180124.8987-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,28 +14,31 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.17
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.17
 
-for you to fetch changes up to 6ca620371ab2dab89a7645fc363453d2e26c992e:
+for you to fetch changes up to 7353c54620732797dcc3b4b1fc6f3cc0c0d9b6ef:
 
-  arm64: dts: exynos: add OF graph between MHL and USB connector (2018-03-06 17:48:07 +0100)
-
-----------------------------------------------------------------
-Samsung DTS ARM64 changes for v4.17
-
-1. Add support for HDMI audio on Exynos 5433 TM2/TM2E boards.
-2. Add support for USB-MHL connector on Exynos 5433 TM2/TM2E boards.
+  soc: samsung: pmu: Populate children syscon nodes (2018-02-13 18:47:25 +0100)
 
 ----------------------------------------------------------------
-Andrzej Hajda (2):
-      arm64: dts: exynos: add micro-USB connector node to TM2 platforms
-      arm64: dts: exynos: add OF graph between MHL and USB connector
+Samsung soc drivers changes for v4.17
 
-Sylwester Nawrocki (3):
-      ARM: dts: exynos: Add I2S1 device node to exynos5433
-      ARM: dts: exynos: Update I2S0 device node in exynos5433
-      ARM: dts: exynos: Add support for HDMI audio on Exynos 5433 TM2 board
+1. Add SPDX license identifiers.
+2. Populate children syscon nodes in PMU driver to properly model HW in
+   DeviceTree.
 
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 90 ++++++++++++++++++++--
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 24 +++++-
- 2 files changed, 106 insertions(+), 8 deletions(-)
+----------------------------------------------------------------
+Krzysztof Kozlowski (3):
+      memory: samsung: Add SPDX license identifiers
+      soc: samsung: Add SPDX license identifiers to headers
+      soc: samsung: pmu: Populate children syscon nodes
+
+ Documentation/devicetree/bindings/arm/samsung/pmu.txt |  6 ++++++
+ drivers/memory/samsung/Kconfig                        |  1 +
+ drivers/memory/samsung/Makefile                       |  1 +
+ drivers/memory/samsung/exynos-srom.c                  | 18 +++++++-----------
+ drivers/memory/samsung/exynos-srom.h                  |  7 ++-----
+ drivers/soc/samsung/exynos-pmu.c                      |  7 +++++++
+ include/linux/soc/samsung/exynos-pmu.h                |  5 +----
+ include/linux/soc/samsung/exynos-regs-pmu.h           |  6 +-----
+ 8 files changed, 26 insertions(+), 25 deletions(-)
