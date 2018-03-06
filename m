@@ -1,29 +1,16 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Mar 2018 18:00:17 -0600
-Subject: [PATCH v2] arm: dts: zynq: Add Digilent Zybo Z7 board
-In-Reply-To: <20180228022552.9088-1-nobuhiro.iwamatsu@cybertrust.co.jp>
-References: <20180228022552.9088-1-nobuhiro.iwamatsu@cybertrust.co.jp>
-Message-ID: <20180306000017.y444gu3aie2f3c2k@rob-hp-laptop>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Mon, 5 Mar 2018 16:08:43 -0800
+Subject: [PATCH 0/2] ARM: dts: amx3xx: add emif interrupt info
+In-Reply-To: <1519657500-15490-1-git-send-email-t-kristo@ti.com>
+References: <1519657500-15490-1-git-send-email-t-kristo@ti.com>
+Message-ID: <23a93c87-d065-b2c1-9883-0ba82b7826f1@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 11:25:52AM +0900, Nobuhiro Iwamatsu wrote:
-> This add a DTS for the Digilent Zybo Z7 board.
-> This board is the successor board of Zybo, these are almost the same except
-> for ps-clk-frequency specifications.
+On 2/26/18 7:04 AM, Tero Kristo wrote:
+> Hi,
 > 
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu@cybertrust.co.jp>
-> ---
->  v2:
->    - Fix SPDX format
->    - Rebase linux-xlnx/tree/zynq/dt
->    - Add digilent,zynq-zybo-z7 compatible string
->    - Fix memory node.
-> 
->  Documentation/devicetree/bindings/arm/xilinx.txt |  3 ++
->  arch/arm/boot/dts/Makefile                       |  3 +-
->  arch/arm/boot/dts/zynq-zybo-z7.dts               | 58 ++++++++++++++++++++++++
->  3 files changed, 63 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/zynq-zybo-z7.dts
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+> Adding these two patches per the addition of required interrupt property
+> under emif node.
+>
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
