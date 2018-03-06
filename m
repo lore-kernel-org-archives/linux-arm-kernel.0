@@ -1,22 +1,26 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 6 Mar 2018 17:49:24 +0100
-Subject: [PATCH v5 3/6] arm64: dts: exynos: add micro-USB connector node
- to TM2 platforms
-In-Reply-To: <20180227071134.28063-4-a.hajda@samsung.com>
+Date: Tue, 6 Mar 2018 17:49:39 +0100
+Subject: [PATCH v5 4/6] arm64: dts: exynos: add OF graph between MHL and
+ USB connector
+In-Reply-To: <20180227071134.28063-5-a.hajda@samsung.com>
 References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071139eucas1p1d28b39a6636a7e6625aeb3a16091f81a@eucas1p1.samsung.com>
- <20180227071134.28063-4-a.hajda@samsung.com>
-Message-ID: <20180306164924.fvwx72pmobn67h7z@kozik-lap>
+ <CGME20180227071140eucas1p15a8b8443c6d52c5fab79cc82c37dce09@eucas1p1.samsung.com>
+ <20180227071134.28063-5-a.hajda@samsung.com>
+Message-ID: <20180306164939.jqpfawa6u2c2xb5e@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 08:11:31AM +0100, Andrzej Hajda wrote:
-> Since USB connector bindings are available we can describe it on TM2(e).
+On Tue, Feb 27, 2018 at 08:11:32AM +0100, Andrzej Hajda wrote:
+> OF graph describes MHL data lanes between MHL and respective USB
+> connector.
 > 
 > Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+> v5: removed extra parenthesis (kbuild test robot)
+> v4: added missing reg property in connector's port node (Krzysztof)
+> ---
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 31 +++++++++++++++++++---
+>  1 file changed, 28 insertions(+), 3 deletions(-)
 > 
 
 Thanks, applied.
