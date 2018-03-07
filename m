@@ -1,22 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:08:48 +0100
-Subject: [PATCH v2] ARM: socfpga: PM: Drop useless check for
- PM_SUSPEND_STANDBY
-In-Reply-To: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
-References: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAK8P3a3Nc2OPxCqdD9p=UUy_min5y=eRD-yGa1zEKSOHPS2vRg@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:09:30 +0100
+Subject: [PATCH] MAINTAINERS: Add Spreadtrum SoC entry
+In-Reply-To: <1519891755-17135-1-git-send-email-zhang.lyra@gmail.com>
+References: <1519891755-17135-1-git-send-email-zhang.lyra@gmail.com>
+Message-ID: <CAK8P3a1qETr4j4hcP5qS=TP_nZuVzFE7ANKeXie0D670=PdCLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 3:04 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> As SoCFPGA uses the standard suspend_valid_only_mem() for its
-> platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
-> callback will never be called with state equal to PM_SUSPEND_STANDBY.
+On Thu, Mar 1, 2018 at 9:09 AM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+> Add Spreadtrum's maintainer entry and Orson, Baolin and me
+> as maintainers.
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Dinh Nguyen <dinguyen@kernel.org>
+> Cc: Orson Zhai <orsonzhai@gmail.com>
+> Cc: Baolin Wang <baolin.wang@linaro.org>
+>
+> Signed-off-by: Chunyan Zhang <zhang.lyra@gmail.com>
 
 Applied to next/soc, thanks!
 
