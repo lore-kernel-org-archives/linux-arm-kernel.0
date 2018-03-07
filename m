@@ -1,41 +1,55 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 7 Mar 2018 17:12:21 +0800
-Subject: [PATCH v2 1/2] dt-bindings: thermal: add binding for MT7622 SoC
-In-Reply-To: <c72262a17332a227aa2db39b682db50e2324821a.1518856935.git.sean.wang@mediatek.com>
-References: <c72262a17332a227aa2db39b682db50e2324821a.1518856935.git.sean.wang@mediatek.com>
-Message-ID: <1520413941.677.0.camel@mtkswgap22>
+Date: Wed, 7 Mar 2018 17:17:04 +0800
+Subject: [PATCH v2 1/4] dt-bindings: soc: add SCPSYS binding for MT7623
+ and MT7623A SoC
+In-Reply-To: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
+References: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
+Message-ID: <1520414224.677.2.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rui
+Hi, Matthias
 
-just a gentle ping to the both patches
+just a gentle ping to the four related patches
 
 	Sean
 
-On Sat, 2018-02-17 at 16:49 +0800, sean.wang at mediatek.com wrote:
+On Wed, 2018-02-07 at 18:22 +0800, sean.wang at mediatek.com wrote:
 > From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Add devicetree bindings for MediaTek MT7622 thermal controller
-> 
-> Changes v1 -> v2: add tag from Rob
+> document the binding for enabling SCPSYS on MediaTek MT7623 and MT7623A
+> SoC. Where MT7623 SoC has the same definition about power domains with
+> MT2701, so it's fine to using MT2701 ones as MT7623's fallback.
 > 
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 > Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
->  Documentation/devicetree/bindings/thermal/mediatek-thermal.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> index 0d73ea5..41d6a44 100644
-> --- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> @@ -12,6 +12,7 @@ Required properties:
->    - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
->    - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
->    - "mediatek,mt2712-thermal" : For MT2712 family of SoCs
-> +  - "mediatek,mt7622-thermal" : For MT7622 SoC
->  - reg: Address range of the thermal controller
->  - interrupts: IRQ for the thermal controller
->  - clocks, clock-names: Clocks needed for the thermal controller. required
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> index 76bf45b..d6fe16f 100644
+> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> @@ -21,6 +21,8 @@ Required properties:
+>  	- "mediatek,mt2712-scpsys"
+>  	- "mediatek,mt6797-scpsys"
+>  	- "mediatek,mt7622-scpsys"
+> +	- "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
+> +	- "mediatek,mt7623a-scpsys": For MT7623A SoC
+>  	- "mediatek,mt8173-scpsys"
+>  - #power-domain-cells: Must be 1
+>  - reg: Address range of the SCPSYS unit
+> @@ -28,10 +30,11 @@ Required properties:
+>  - clock, clock-names: clocks according to the common clock binding.
+>                        These are clocks which hardware needs to be
+>                        enabled before enabling certain power domains.
+> -	Required clocks for MT2701: "mm", "mfg", "ethif"
+> +	Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
+>  	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
+>  	Required clocks for MT6797: "mm", "mfg", "vdec"
+>  	Required clocks for MT7622: "hif_sel"
+> +	Required clocks for MT7622A: "ethif"
+>  	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+>  
+>  Optional properties:
