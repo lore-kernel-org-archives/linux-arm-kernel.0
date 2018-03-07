@@ -1,47 +1,74 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 7 Mar 2018 11:38:32 -0300
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
-Message-ID: <20180307143832.GJ3701@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2018 15:39:27 +0100
+Subject: [GIT PULL 5/6] omap dts changes for v4.17
+In-Reply-To: <pull-1520273005-304551@atomide.com-5>
+References: <pull-1520273005-304551@atomide.com>
+ <pull-1520273005-304551@atomide.com-5>
+Message-ID: <CAK8P3a39+eDD_6iwuOam4dmr2FjyJ0D-8inJ+cZiw9uW6PvYFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
-> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
-> > There is MIDR change on ThunderX2 B0, adding an entry to mapfile
-> > to enable JSON events for B0.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> This series of changes updates the device tree files for omaps:
+>
+> - Nokia N9 support for magnetometer
+>
+> - Update at24 to use atmel as manufacturer for am335x-boneblue
+>
+> - Add support for am33xx based PDU001 board
+>
+> - Update Droid 4 touchscreen for reset-gpios and add audio
+>   codec and soundcard
+>
+> - Remove unused dra7 cooling level nodes
+>
+> - A series of changes to configure am335x and am437x for PM
+>
+> - Add pinmuxing for i2c2 and 3 for LogicPD boards
+>
+> - Add EMIF interrupt infor for am437x and am335x
+>
+> - Add missing omap3 sound-dai-cells
 
-Ganapatrao, can you please take this in consideration and if agreeing
-send a v2 patch?
+Pulled into next/dt with a simple conflict resolution as shown
+below, thanks!
 
-With that I can add an Acked-by: wcohen, Right?
+      Arnd
 
-- Arnaldo
-> > ---
-> >  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> > index e61c9ca..93c5d14 100644
-> > --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> > +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> > @@ -13,4 +13,5 @@
-> >  #
-> >  #Family-model,Version,Filename,EventType
-> >  0x00000000420f5160,v1,cavium,core
-> > +0x00000000430f0af0,v1,cavium,core
-> >  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
-> > 
-> 
-> Hi,
-> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
-> 
-> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
-> 
-> 
-> -Will Cohen
+diff --cc arch/arm/boot/dts/logicpd-torpedo-som.dtsi
+index 47915447a826,d2135c2f4a37..3e174e474d3d
+--- a/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
++++ b/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
+@@@ -138,12 -140,18 +142,24 @@@
+                        OMAP3_CORE1_IOPAD(0x21b8, PIN_INPUT |
+MUX_MODE0)        /* hsusb0_data7.hsusb0_data7 */
+                >;
+        };
+ +      i2c1_pins: pinmux_i2c1_pins {
+ +              pinctrl-single,pins = <
+ +                      OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT |
+MUX_MODE0)        /* i2c1_scl.i2c1_scl */
+ +                      OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT |
+MUX_MODE0)        /* i2c1_sda.i2c1_sda */
+ +              >;
+ +      };
++       i2c2_pins: pinmux_i2c2_pins {
++               pinctrl-single,pins = <
++                       OMAP3_CORE1_IOPAD(0x21be, PIN_INPUT |
+MUX_MODE0)        /* i2c2_scl */
++                       OMAP3_CORE1_IOPAD(0x21c0, PIN_INPUT |
+MUX_MODE0)        /* i2c2_sda */
++               >;
++       };
++       i2c3_pins: pinmux_i2c3_pins {
++               pinctrl-single,pins = <
++                       OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT |
+MUX_MODE0)        /* i2c3_scl */
++                       OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT |
+MUX_MODE0)        /* i2c3_sda */
++               >;
++       };
+  };
+
+  &uart2 {
