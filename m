@@ -1,48 +1,130 @@
-From: rohitkr@codeaurora.org (Rohit Kumar)
-Date: Wed, 7 Mar 2018 15:05:17 +0530
-Subject: [alsa-devel] [PATCH v3 19/25] ASoC: qcom: q6afe: add support to
- MI2S ports
-In-Reply-To: <20180213165837.1620-20-srinivas.kandagatla@linaro.org>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-20-srinivas.kandagatla@linaro.org>
-Message-ID: <7d3c344c-ccb5-78b8-e184-3ab65bdef6ac@codeaurora.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  7 Mar 2018 10:40:45 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a7795: sort subnodes of the cpu
+ node
+In-Reply-To: <20180307094046.4907-1-horms+renesas@verge.net.au>
+References: <20180307094046.4907-1-horms+renesas@verge.net.au>
+Message-ID: <20180307094046.4907-3-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sort subnodes of the cpu node alphanumerically.
 
+This is part of an ongoing effort to provide consistent node
+order in the DT of Renesas SoCs to improve maintainability.
 
-On 2/13/2018 10:28 PM, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->   include/dt-bindings/sound/qcom,q6afe.h |  10 +++
->   sound/soc/qcom/qdsp6/q6afe.c           | 111 +++++++++++++++++++++++++++++++++
->   sound/soc/qcom/qdsp6/q6afe.h           |  10 +++
->   3 files changed, 131 insertions(+)
->
-> diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
-> index e9004ee39f72..3cd862262369 100644
-> --- a/include/dt-bindings/sound/qcom,q6afe.h
-> +++ b/include/dt-bindings/sound/qcom,q6afe.h
-> @@ -16,6 +16,16 @@
->   #define SLIMBUS_4_TX    24
->   #define SLIMBUS_5_RX    25
->   #define SLIMBUS_5_TX    26
-> +#define QUATERNARY_MI2S_RX	34
-> +#define QUATERNARY_MI2S_TX	35
-> +#define SECONDARY_MI2S_RX	36
-> +#define SECONDARY_MI2S_TX	37
-> +#define TERTIARY_MI2S_RX	38
-> +#define TERTIARY_MI2S_TX	39
-> +#define PRIMARY_MI2S_RX		40
-> +#define PRIMARY_MI2S_TX		41
-Can we assign ids to Primary, secondary, tertiary and quaternary MI2S 
-ports in sequence starting with Primary.
-> +#define SECONDARY_PCM_RX	42
-> +#define SECONDARY_PCM_TX	43
-Why only SECONDARY_PCM_RX ? This is not required for MI2S right?
->   #define SLIMBUS_6_RX    45
->   #define SLIMBUS_6_TX    46
->
-[..]
+This should not have any run-time effect.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 88 ++++++++++++++++----------------
+ 1 file changed, 44 insertions(+), 44 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 119c245b4ee2..d2ecb1dfa487 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -34,6 +34,50 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
++		a53_0: cpu at 100 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x100>;
++			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
++			next-level-cache = <&L2_CA53>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
++			operating-points-v2 = <&cluster1_opp>;
++		};
++
++		a53_1: cpu at 101 {
++			compatible = "arm,cortex-a53","arm,armv8";
++			reg = <0x101>;
++			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA53_CPU1>;
++			next-level-cache = <&L2_CA53>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
++			operating-points-v2 = <&cluster1_opp>;
++		};
++
++		a53_2: cpu at 102 {
++			compatible = "arm,cortex-a53","arm,armv8";
++			reg = <0x102>;
++			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA53_CPU2>;
++			next-level-cache = <&L2_CA53>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
++			operating-points-v2 = <&cluster1_opp>;
++		};
++
++		a53_3: cpu at 103 {
++			compatible = "arm,cortex-a53","arm,armv8";
++			reg = <0x103>;
++			device_type = "cpu";
++			power-domains = <&sysc R8A7795_PD_CA53_CPU3>;
++			next-level-cache = <&L2_CA53>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
++			operating-points-v2 = <&cluster1_opp>;
++		};
++
+ 		a57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+@@ -82,50 +126,6 @@
+ 			#cooling-cells = <2>;
+ 		};
+ 
+-		a53_0: cpu at 100 {
+-			compatible = "arm,cortex-a53", "arm,armv8";
+-			reg = <0x100>;
+-			device_type = "cpu";
+-			power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
+-			next-level-cache = <&L2_CA53>;
+-			enable-method = "psci";
+-			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
+-			operating-points-v2 = <&cluster1_opp>;
+-		};
+-
+-		a53_1: cpu at 101 {
+-			compatible = "arm,cortex-a53","arm,armv8";
+-			reg = <0x101>;
+-			device_type = "cpu";
+-			power-domains = <&sysc R8A7795_PD_CA53_CPU1>;
+-			next-level-cache = <&L2_CA53>;
+-			enable-method = "psci";
+-			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
+-			operating-points-v2 = <&cluster1_opp>;
+-		};
+-
+-		a53_2: cpu at 102 {
+-			compatible = "arm,cortex-a53","arm,armv8";
+-			reg = <0x102>;
+-			device_type = "cpu";
+-			power-domains = <&sysc R8A7795_PD_CA53_CPU2>;
+-			next-level-cache = <&L2_CA53>;
+-			enable-method = "psci";
+-			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
+-			operating-points-v2 = <&cluster1_opp>;
+-		};
+-
+-		a53_3: cpu at 103 {
+-			compatible = "arm,cortex-a53","arm,armv8";
+-			reg = <0x103>;
+-			device_type = "cpu";
+-			power-domains = <&sysc R8A7795_PD_CA53_CPU3>;
+-			next-level-cache = <&L2_CA53>;
+-			enable-method = "psci";
+-			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
+-			operating-points-v2 = <&cluster1_opp>;
+-		};
+-
+ 		L2_CA57: cache-controller-0 {
+ 			compatible = "cache";
+ 			power-domains = <&sysc R8A7795_PD_CA57_SCU>;
+-- 
+2.11.0
