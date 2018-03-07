@@ -1,48 +1,31 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 7 Mar 2018 09:49:54 +0100
-Subject: [PATCH v3 0/3] Fix STi aliases property name
-Message-ID: <1520412597-30545-1-git-send-email-patrice.chotard@st.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 7 Mar 2018 09:51:58 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: add missing LEDs for Buffalo
+ WZR-900DHP
+In-Reply-To: <1520260563-4167-1-git-send-email-musashino.open@gmail.com>
+References: <1520260563-4167-1-git-send-email-musashino.open@gmail.com>
+Message-ID: <CACna6rwKt1wdryaSs1DsGztSjugBbfRfQqpzGKjvqWf=j=N5kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 5 March 2018 at 15:36,  <musashino.open@gmail.com> wrote:
+> From: INAGAKI Hiroshi <musashino.open@gmail.com>
+>
+> Buffalo WZR-900DHP has 8 LEDs, but there is not LED definitions in the
+> dts and cannot configure these LEDs.
+> I Added missing LED definitions for WZR-900DHP.
+>
+> Signed-off-by: INAGAKI Hiroshi <musashino.open@gmail.com>
 
-Since dtc v1.4.6-9-gaadd0b65c987, when compiling dtb with W=1 option,
-the following warnings are triggered :
-    
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+Looks almost good, thanks for sending this patch to Florian.
 
-_ Patch 1, convert the aliases property name in lowercase in 
-  all STi board dts files.
+One comment: please drop all linux,default-trigger = "default-off";
+lines. I did the same mistake long time ago, see my fixing commit:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=0b660259e927177dc0c6eb3b1c39f23c6a011c5f
 
-_ Patch 2, remove "console=serialN" from bootargs property
+When you fix that, please generate a V2 of your patch, you can do it
+with something like:
+git format-patch --subject-prefix="PATCH V2" -1
+and send again the same way.
 
-_ Patch 3, rework the tty driver st-asc accordingly, as aliases id is retrieved 
-  using of_alias_get_id() with a defined string with is not lowercase only.
-
-v3: Fix Rob Herring's remarks :
-      _ remove "console=serialN,115200" from bootargs and use prefered stdout-path property
-      _ update st-asc driver with "serial" alias prefix and keep "ttyAS" in second choice
-
-v2: Fix Rob Herring's remarks :
-      _ use serialN instead of ttyasN aliases to not break ABI
-      _ remove useless stdout-path property
-      _ update st-asc driver with "serial" alias prefix
-
-Patrice Chotard (3):
-  ARM: dts: STi: Fix aliases property name for STi boards
-  ARM: dts: STi: Remove console=serialN from bootargs for STi boards
-  tty: st-asc: Update tty alias
-
- arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
- arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
- arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
- arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
- drivers/tty/serial/st-asc.c         | 4 +++-
- 5 files changed, 11 insertions(+), 9 deletions(-)
-
--- 
-1.9.1
+Thanks!
