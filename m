@@ -1,32 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 Mar 2018 14:36:11 +0100
-Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
- kernel memory overwrite attempt detected" on QNAP NAS (ARM)
-In-Reply-To: <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
-References: <151652931598.757.4527606947579667082.reportbug@massive.lan>
- <20180304174157.ajom7whbo7pr3qb4@jirafa.cyrius.com>
- <20180304204115.GD21710@lunn.ch>
- <151652931598.757.4527606947579667082.reportbug@massive.lan>
- <20180305142846.GJ25189@lunn.ch>
- <1520265474.2408.8.camel@debian.org>
- <1520297697.4117371.1292731088.7BEDFAAE@webmail.messagingengine.com>
- <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
-Message-ID: <20180307133611.GC18030@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 7 Mar 2018 13:02:07 +0000
+Subject: [PATCH] KVM: arm/arm64: Reset mapped IRQs on VM reset
+In-Reply-To: <20180305103638.1633-1-cdall@kernel.org>
+References: <20180305103638.1633-1-cdall@kernel.org>
+Message-ID: <a5dbae97-7ab8-4f60-723f-d3599297f396@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What else can I try?
+On 05/03/18 10:36, Christoffer Dall wrote:
+> We currently don't allow resetting mapped IRQs from userspace, because
+> their state is controlled by the hardware.  But we do need to reset the
+> state when the VM is reset, so we provide a function for the 'owner' of
+> the mapped interrupt to reset the interrupt state.
+> 
+> Currently only the timer uses mapped interrupts, so we call this
+> function from the timer reset logic.
+> 
+> Signed-off-by: Christoffer Dall <cdall@kernel.org>
+> ---
+> This depends on "KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls
+> than KVM_RUN" from the VHE optimization series so that the reset doesn't
+> get called while vtimer->loaded is true.
 
-Do you have transparent huge pages enabled?
+Queued for 4.16-rc5.
 
-~$ cat /sys/kernel/mm/transparent_hugepage/enabled 
-[always] madvise never
+Thanks,
 
-If so, could you disable it with:
-
-echo never > /sys/kernel/mm/transparent_hugepage/enabled
-
-and run your rsync command.
-
-Thanks
-	Andrew
+	M.
+-- 
+Jazz is not dead. It just smells funny...
