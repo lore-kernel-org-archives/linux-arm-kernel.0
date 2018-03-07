@@ -1,68 +1,94 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 7 Mar 2018 14:54:54 -0800
-Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
-In-Reply-To: <20180307183227.17983-2-toshi.kani@hpe.com>
-References: <20180307183227.17983-1-toshi.kani@hpe.com>
- <20180307183227.17983-2-toshi.kani@hpe.com>
-Message-ID: <20180307145454.d3df4bed6d6431c52bcf271e@linux-foundation.org>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Wed, 7 Mar 2018 22:55:09 +0000
+Subject: [PATCH 1/2] dt-bindings: soc: Add ZynqMP PM bindings
+In-Reply-To: <20180305223328.la462hdwwsymvusk@rob-hp-laptop>
+References: <1519773866-18196-1-git-send-email-jollys@xilinx.com>
+ <1519773866-18196-2-git-send-email-jollys@xilinx.com>
+ <20180305223328.la462hdwwsymvusk@rob-hp-laptop>
+Message-ID: <DM2PR0201MB0767A880059E70642B3EB431B8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Mar 2018 11:32:26 -0700 Toshi Kani <toshi.kani@hpe.com> wrote:
+Hi Rob,
 
-> On architectures with CONFIG_HAVE_ARCH_HUGE_VMAP set, ioremap()
-> may create pud/pmd mappings.  Kernel panic was observed on arm64
-> systems with Cortex-A75 in the following steps as described by
-> Hanjun Guo.
-> 
-> 1. ioremap a 4K size, valid page table will build,
-> 2. iounmap it, pte0 will set to 0;
-> 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
->    then set the a new value for pmd;
-> 4. pte0 is leaked;
-> 5. CPU may meet exception because the old pmd is still in TLB,
->    which will lead to kernel panic.
-> 
-> This panic is not reproducible on x86.  INVLPG, called from iounmap,
-> purges all levels of entries associated with purged address on x86.
-> x86 still has memory leak.
-> 
-> Add two interfaces, pud_free_pmd_page() and pmd_free_pte_page(),
-> which clear a given pud/pmd entry and free up a page for the lower
-> level entries.
-> 
-> This patch implements their stub functions on x86 and arm64, which
-> work as workaround.
-> 
-> index 004abf9ebf12..942f4fa341f1 100644
-> --- a/arch/x86/mm/pgtable.c
-> +++ b/arch/x86/mm/pgtable.c
-> @@ -702,4 +702,24 @@ int pmd_clear_huge(pmd_t *pmd)
->  
->  	return 0;
->  }
-> +
-> +/**
-> + * pud_free_pmd_page - clear pud entry and free pmd page
-> + *
-> + * Returns 1 on success and 0 on failure (pud not cleared).
-> + */
-> +int pud_free_pmd_page(pud_t *pud)
-> +{
-> +	return pud_none(*pud);
-> +}
-> +
-> +/**
-> + * pmd_free_pte_page - clear pmd entry and free pte page
-> + *
-> + * Returns 1 on success and 0 on failure (pmd not cleared).
-> + */
-> +int pmd_free_pte_page(pmd_t *pmd)
-> +{
-> +	return pmd_none(*pmd);
-> +}
+Thanks for the review,
 
-Are these functions well named?  I mean, the comment says "clear pud
-entry and free pmd page" but the implementatin does neither of those
-things.  The name implies that the function frees a pmd_page but the
-callsites use the function as a way of querying state.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Monday, March 05, 2018 2:33 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> geert+renesas at glider.be; bjorn.andersson at linaro.org;
+> sean.wang at mediatek.com; m.szyprowski at samsung.com;
+> michal.simek at xilinx.com; mark.rutland at arm.com; Rajan Vaja
+> <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
+> <JOLLYS@xilinx.com>
+> Subject: Re: [PATCH 1/2] dt-bindings: soc: Add ZynqMP PM bindings
+> 
+> On Tue, Feb 27, 2018 at 03:24:25PM -0800, Jolly Shah wrote:
+> > Add documentation to describe Xilinx ZynqMP power management bindings.
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> >  .../bindings/soc/xilinx/xlnx,zynqmp-power.txt      | 28
+> ++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
+> > b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.txt
+> > new file mode 100644
+> > index 0000000..5b7d963
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-power.t
+> > +++ xt
+> > @@ -0,0 +1,28 @@
+> > +Xilinx Zynq MPSoC Power Management Device Tree Bindings
+> > +
+> > +The zynqmp-power node describes the power management configurations.
+> 
+> That really tells me nothing. What aspect of power management does this
+> interface control?
+> 
+
+It controls remote suspend/shutdown interfaces. Will add details in next version.
+
+> > +
+> > +Required properties:
+> > + - compatible	: Must contain:  "xlnx,zynqmp-power"
+> > + - mbox-names	: Name given to channels seen in the 'mboxes' property.
+> > +		  "rx" - Mailbox corresponding to receive path
+> > +		  "tx" - Mailbox corresponding to transmit path
+> > + - mboxes	: Standard property to specify a Mailbox. Each value of
+> > +		  the mboxes property should contain a phandle to the
+> > +		  mailbox controller device node and an args specifier
+> > +		  that will be the phandle to the intended sub-mailbox
+> > +		  child node to be used for communication. See
+> > +		  Documentation/devicetree/bindings/mailbox/mailbox.txt
+> > +		  for more details about the generic mailbox controller
+> > +		  and client driver bindings. Also see
+> > +		  Documentation/devicetree/bindings/mailbox/ \
+> > +		  xlnx,zynqmp-ipi-mailbox.txt for typical controller that
+> > +		  is used to communicate with this System controllers.
+> 
+> No need to define a standard property here. Just need to say how many entries
+> and refer to the common binding.
+> 
+
+Ok. Will update same in next version.
+
+> > +
+> > +Examples:
+> > +	zynqmp_power: zynqmp-power {
+> > +		compatible = "xlnx,zynqmp-power";
+> > +		mboxes = <&ipi_mailbox_pmu0 0>,
+> > +			 <&ipi_mailbox_pmu0 1>;
+> > +		mbox-names = "tx", "rx";
+> > +	};
+> > --
+> > 2.7.4
+> >
