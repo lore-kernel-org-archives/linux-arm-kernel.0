@@ -1,66 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 7 Mar 2018 17:21:20 +0100
-Subject: [GIT PULL 2/6] omap timer changes for v4.17
-In-Reply-To: <20180307152842.GH5799@atomide.com>
-References: <pull-1520273005-304551@atomide.com>
- <pull-1520273005-304551@atomide.com-2>
- <CAK8P3a0YwGtE+UkA6+rQ_FQsGO5paL9ub_=oOq_SE3xPUiH1ww@mail.gmail.com>
- <20180307152842.GH5799@atomide.com>
-Message-ID: <3c0b7ce1-a34a-6f1a-ff70-dbe2706b5478@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  7 Mar 2018 17:24:12 +0100
+Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
+Message-ID: <20180307162430.2664523-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2018 16:28, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [180307 15:22]:
->> On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> From: "Tony Lindgren" <tony@atomide.com>
->>>
->>> The following changes since commit 2fdc82776ac2ac49c5ee666d834718ac36420e49:
->>>
->>>   Merge branch 'omap-for-v.16/dmtimer-fix' into omap-for-v4.17/timer (2018-02-22 10:46:47 -0800)
->>>
->>> are available in the Git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/timer-signed
->>>
->>> for you to fetch changes up to 58a54f03e73d67432216931854363e4ba15839b9:
->>>
->>>   clocksource: timer-ti-dm: Check prescaler value (2018-02-28 13:41:30 -0800)
->>>
->>> ----------------------------------------------------------------
->>> Move omap timer to drivers for 4.17
->>>
->>> This series from Keerthy and Ladislav Michl move omap dmtimer code
->>> to drivers. As we don't want to export custom timer functions to
->>> random drivers, we also need to update the related PWM driver to
->>> pass the timer specific functions in platform data.
->>>
->>> Note that this series is based on a merge of omap1 specific timer
->>> fix and omap2+ platform data clean-up to keep things working and
->>> make the move a bit simpler.
->>
->> I was undecided whether this should be in next/drivers or next/soc,
->> ended up putting it into the latter.
->>
->> I don't see the clocksource maintainers involved in the patch series,
->> so I added them to Cc now to make sure they are aware of the move
->> of the driver.
-> 
-> OK thanks. We got some comments from Daniel for an earlier set of
-> patches in December. No acks though, but hopefully it's good enough
-> for further work to happen under drivers/clocksource :)
+The top-level CONFIG_ARCH_NPCM symbol is not guarded with a
+dependency, and can be selected for builds of traditional
+(non-multiplatform) builds as well, where it causes a build
+failure:
 
-Yeah, I had a look at the series. There is still work to do but IMO it
-is preferable to move it to drivers/clocksource and then continue the
-cleanup from there. So I'm fine with it.
+arch/arm/boot/Makefile:17: arch/arm/mach-npcm//Makefile.boot: No such file or directory
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+This moves the dependency to avoid that particular condition.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-npcm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
+diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+index 6ff9df2636be..2bc6697c8d97 100644
+--- a/arch/arm/mach-npcm/Kconfig
++++ b/arch/arm/mach-npcm/Kconfig
+@@ -1,5 +1,5 @@
+ menuconfig ARCH_NPCM
+-	bool "Nuvoton NPCM Architecture"
++	bool "Nuvoton NPCM Architecture" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select USE_OF
+ 	select PINCTRL
+@@ -10,7 +10,7 @@ if ARCH_NPCM
+ comment "NPCM7XX CPU type"
+ 
+ config ARCH_NPCM750
+-	depends on ARCH_NPCM && ARCH_MULTI_V7
++	depends on ARCH_NPCM
+ 	bool "Support for NPCM750 BMC CPU (Poleg)"
+ 	select CACHE_L2X0
+ 	select CPU_V7
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.9.0
