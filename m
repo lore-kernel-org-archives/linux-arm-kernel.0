@@ -1,129 +1,123 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Mar 2018 22:58:19 +0100
-Subject: [PATCH v5] drm/pl111: Use max memory bandwidth for resolution
-Message-ID: <20180307215819.15814-1-linus.walleij@linaro.org>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Wed, 7 Mar 2018 22:03:54 +0000
+Subject: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
+In-Reply-To: <573acd04-85c4-829d-a0d6-36b3958ac1ec@arm.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-4-git-send-email-jollys@xilinx.com>
+ <573acd04-85c4-829d-a0d6-36b3958ac1ec@arm.com>
+Message-ID: <CY1PR0201MB0764DDE30E3DFF713FAF0F7BB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were previously selecting 1024x768 and 32BPP as the default
-set-up for the PL111 consumers.
+Hi Sudeep,
 
-This does not work on elder systems: the device tree bindings
-support a property "max-memory-bandwidth" in bytes/second that
-states that if you exceed this the memory bus will saturate.
-The result is flickering and unstable images.
 
-Parse the "max-memory-bandwidth" and respect it when
-intializing the driver. On the RealView PB11MP, Versatile and
-Integrator/CP we get a nice console as default with this code.
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Thursday, March 01, 2018 6:44 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
+> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; Sudeep Holla <sudeep.holla@arm.com>; Rajan Vaja
+> <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org; Jolly Shah
+> <JOLLYS@xilinx.com>
+> Subject: Re: [PATCH v5 3/4] drivers: firmware: xilinx: Add sysfs interface
+> 
+> 
+> 
+> On 20/02/18 19:21, Jolly Shah wrote:
+> > Add Firmware-ggs sysfs interface which provides read/write interface
+> > to global storage registers.
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> >  .../ABI/stable/sysfs-driver-zynqmp-firmware        |  50 ++++
+> >  drivers/firmware/xilinx/zynqmp/Makefile            |   2 +-
+> >  drivers/firmware/xilinx/zynqmp/firmware-ggs.c      | 297
+> +++++++++++++++++++++
+> >  drivers/firmware/xilinx/zynqmp/firmware.c          |  13 +
+> >  include/linux/firmware/xilinx/zynqmp/firmware.h    |   2 +
+> >  5 files changed, 363 insertions(+), 1 deletion(-)  create mode 100644
+> > Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
+> >
+> > diff --git a/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> > b/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> > new file mode 100644
+> > index 0000000..b04727a
+> > --- /dev/null
+> > +++ b/Documentation/ABI/stable/sysfs-driver-zynqmp-firmware
+> > @@ -0,0 +1,50 @@
+> > +What:		/sys/devices/platform/zynqmp-firmware/ggs> +Date:
+> 		January 2018
+> > +KernelVersion:	4.15.0
+> > +Contact:	"Jolly Shah" <jollys@xilinx.com>
+> > +Description:
+> > +		Read/Write PMU global general storage register value,
+> > +		GLOBAL_GEN_STORAGE{0:3}.
+> > +		Global general storage register that can be used
+> > +		by system to pass information between masters.
+> > +
+> 
+> What kind of information ? Is there any semantics for that ?
+> Why does EEMI lack APIs for that if it's critical, giving access to such information
+> to userspace may not be good idea.
+> 	
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v4->v5:
-- Rebase on top of drm-next and resend so the patch
-  applies and produce a reasonable link. I have no clue
-  why patch does not apply, it looks like it should, but
-  the git moves in mysterious ways.
-ChangeLog v3->v4:
-- Switch the noisy DRM_INFO for DRM_DEBUG_KMS
-- Collect Eric's review tag
-ChangeLog v2->v3:
-- Account for the case where there is no bandwidth limitation
-  so priv->memory_bw is zero. Then just accept any modes.
-ChangeLog v1->v2:
-- Exploit the new .mode_valid() callback we added to the
-  simple KMS helper.
-- Use the hardcoded bits per pixel per variant instead of
-  trying to be heuristic about this setting for now.
----
- drivers/gpu/drm/pl111/pl111_display.c | 36 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/pl111/pl111_drm.h     |  1 +
- drivers/gpu/drm/pl111/pl111_drv.c     |  6 ++++++
- 3 files changed, 43 insertions(+)
+These are for general use. Information being passed can be application specific.
+Sysfs call underneath maps to EEMI ioctl call to read/write these registers.
 
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 5b8368c76734..310646427907 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -50,6 +50,41 @@ irqreturn_t pl111_irq(int irq, void *data)
- 	return status;
- }
- 
-+static enum drm_mode_status
-+pl111_mode_valid(struct drm_crtc *crtc,
-+		 const struct drm_display_mode *mode)
-+{
-+	struct drm_device *drm = crtc->dev;
-+	struct pl111_drm_dev_private *priv = drm->dev_private;
-+	u32 cpp = priv->variant->fb_bpp / 8;
-+	u64 bw;
-+
-+	/*
-+	 * We use the pixelclock to also account for interlaced modes, the
-+	 * resulting bandwidth is in bytes per second.
-+	 */
-+	bw = mode->clock * 1000; /* In Hz */
-+	bw = bw * mode->hdisplay * mode->vdisplay * cpp;
-+	bw = div_u64(bw, mode->htotal * mode->vtotal);
-+
-+	/*
-+	 * If no bandwidth constraints, anything goes, else
-+	 * check if we are too fast.
-+	 */
-+	if (priv->memory_bw && (bw > priv->memory_bw)) {
-+		DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu too fast\n",
-+			      mode->hdisplay, mode->vdisplay,
-+			      mode->clock * 1000, cpp, bw);
-+
-+		return MODE_BAD;
-+	}
-+	DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu bytes/s OK\n",
-+		      mode->hdisplay, mode->vdisplay,
-+		      mode->clock * 1000, cpp, bw);
-+
-+	return MODE_OK;
-+}
-+
- static int pl111_display_check(struct drm_simple_display_pipe *pipe,
- 			       struct drm_plane_state *pstate,
- 			       struct drm_crtc_state *cstate)
-@@ -348,6 +383,7 @@ static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
- }
- 
- static struct drm_simple_display_pipe_funcs pl111_display_funcs = {
-+	.mode_valid = pl111_mode_valid,
- 	.check = pl111_display_check,
- 	.enable = pl111_display_enable,
- 	.disable = pl111_display_disable,
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 2a93e0134061..8639b2d4ddf7 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -65,6 +65,7 @@ struct pl111_drm_dev_private {
- 	struct drm_simple_display_pipe pipe;
- 
- 	void *regs;
-+	u32 memory_bw;
- 	u32 ienb;
- 	u32 ctrl;
- 	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index e92a406c9ea9..4621259d5387 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -257,6 +257,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
- 
-+	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
-+				 &priv->memory_bw)) {
-+		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-+		priv->memory_bw = 0;
-+	}
-+
- 	/* The two variants swap this register */
- 	if (variant->is_pl110) {
- 		priv->ienb = CLCD_PL110_IENB;
--- 
-2.14.3
+> > +		The register is reset during system or power-on
+> > +		resets. Three registers are used by the FSBL and
+> > +		other Xilinx software products: GLOBAL_GEN_STORAGE{4:6}.
+> > +
+> 
+> FSBL ?
+> 
+> For what is it used ?
+
+There are total 8 such registers. 4 are reserved for customer application. Other 4 are being used by Xilinx sw products like FSBL.
+FSBL is using it to pass handoff information to other master.
+
+> 
+> > +		Usage:
+> > +		# cat /sys/.../zynqmp-firmware/ggs0
+> > +		# echo <mask> <value> > /sys/.../zynqmp-firmware/ggs0
+> > +
+> > +		Example:
+> > +		# cat /sys/.../zynqmp-firmware/ggs0
+> > +		# echo 0xFFFFFFFF 0x1234ABCD > /sys/.../zynqmp-
+> firmware/ggs0
+> > +
+> > +Users:		Xilinx
+> > +
+> > +What:		/sys/devices/platform/zynqmp-firmware/pggs*
+> > +Date:		January 2018
+> > +KernelVersion:	4.15.0
+> > +Contact:	"Jolly Shah" <jollys@xilinx.com>
+> > +Description:
+> > +		Read/Write PMU persistent global general storage register
+> > +		value, PERS_GLOB_GEN_STORAGE{0:3}.
+> > +		Persistent global general storage register that
+> > +		can be used by system to pass information between
+> > +		masters.
+> > +
+> 
+> Ditto
+> 
+> > +		This register is only reset by the power-on reset
+> > +		and maintains its value through a system reset.
+> > +		Four registers are used by the FSBL and other Xilinx
+> > +		software products: PERS_GLOB_GEN_STORAGE{4:7}.
+> > +		Register is reset only by a POR reset.
+> > +
+> 
+> Ditto
+> 
+> --
+> Regards,
+> Sudeep
