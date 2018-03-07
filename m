@@ -1,48 +1,111 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 7 Mar 2018 13:00:17 +0000
-Subject: [PATCH] mfd: tps65218: Reorder tps65218_regulator_id enum
-In-Reply-To: <20180216041705.6340-1-d-gerlach@ti.com>
-References: <20180216041705.6340-1-d-gerlach@ti.com>
-Message-ID: <20180307130017.m6swph3mlupu6g76@dell>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 7 Mar 2018 13:00:24 +0000
+Subject: [PATCH v7 03/14] iommu/rockchip: Request irqs in rk_iommu_probe()
+In-Reply-To: <20180306030252.3197-4-jeffy.chen@rock-chips.com>
+References: <20180306030252.3197-1-jeffy.chen@rock-chips.com>
+ <20180306030252.3197-4-jeffy.chen@rock-chips.com>
+Message-ID: <3c3aa82e-2a06-4ced-fb7e-8e219b25b812@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Feb 2018, Dave Gerlach wrote:
+On 06/03/18 03:02, Jeffy Chen wrote:
+> Move request_irq to the end of rk_iommu_probe().
 
-> Commit 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
-> changes the probe function of drivers/regulator/tps65218-regulator.c so
-> that it iterates through all available regulators and assumes that the
-> regulator IDs are sequential and match the order present in the enum
-> tps65218_regulator_id. However, for some reason the much older commit
-> c0ea88b890d6 ("regulator: tps65218: add support for LS3 current
-> regulator") updated all arrays with LS3 at the end but added it second
-> to last for the enum.
-> 
-> Because of this long standing mismatch in order between the
-> tps65218_regulator_id enum and the regulator_desc array in the tps65218
-> regulator driver, the new probe function causes the strobe values to be
-> associated with the wrong regulator ID. This causes LDO1 to fail to
-> suspend in tps65218_pmic_set_suspend_disable due to not having anything
-> probes for its strobe value. Fix the order in the enum so the probe
-> function works as the update intended.
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-This sounds super fragile.
-
-I'm willing to accept this patch if it 'makes stuff work', but we
-should look into why a dynamically assigned enum is sensitive to
-ordering.  At the very least you should consider providing a comment
-with working to that effect.
-
-> Fixes: 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Suggested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 > ---
->  include/linux/mfd/tps65218.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-
-Applied, thanks.
-
--- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+> Loop platform_get_irq() as Robin suggested.
+> 
+> Changes in v2: None
+> 
+>   drivers/iommu/rockchip-iommu.c | 38 +++++++++-----------------------------
+>   1 file changed, 9 insertions(+), 29 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index c2ef3cbd4401..b743d82e6fe1 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -90,8 +90,6 @@ struct rk_iommu {
+>   	struct device *dev;
+>   	void __iomem **bases;
+>   	int num_mmu;
+> -	int *irq;
+> -	int num_irq;
+>   	bool reset_disabled;
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+> @@ -830,13 +828,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   
+>   	iommu->domain = domain;
+>   
+> -	for (i = 0; i < iommu->num_irq; i++) {
+> -		ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
+> -				       IRQF_SHARED, dev_name(dev), iommu);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>   	for (i = 0; i < iommu->num_mmu; i++) {
+>   		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+>   			       rk_domain->dt_dma);
+> @@ -885,9 +876,6 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   	}
+>   	rk_iommu_disable_stall(iommu);
+>   
+> -	for (i = 0; i < iommu->num_irq; i++)
+> -		devm_free_irq(iommu->dev, iommu->irq[i], iommu);
+> -
+>   	iommu->domain = NULL;
+>   
+>   	dev_dbg(dev, "Detached from iommu domain\n");
+> @@ -1138,7 +1126,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	struct rk_iommu *iommu;
+>   	struct resource *res;
+>   	int num_res = pdev->num_resources;
+> -	int err, i;
+> +	int err, i, irq;
+>   
+>   	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
+>   	if (!iommu)
+> @@ -1165,23 +1153,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	if (iommu->num_mmu == 0)
+>   		return PTR_ERR(iommu->bases[0]);
+>   
+> -	iommu->num_irq = platform_irq_count(pdev);
+> -	if (iommu->num_irq < 0)
+> -		return iommu->num_irq;
+> -	if (iommu->num_irq == 0)
+> -		return -ENXIO;
+> +	i = 0;
+> +	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO) {
+> +		if (irq < 0)
+> +			return irq;
+>   
+> -	iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
+> -				  GFP_KERNEL);
+> -	if (!iommu->irq)
+> -		return -ENOMEM;
+> -
+> -	for (i = 0; i < iommu->num_irq; i++) {
+> -		iommu->irq[i] = platform_get_irq(pdev, i);
+> -		if (iommu->irq[i] < 0) {
+> -			dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
+> -			return -ENXIO;
+> -		}
+> +		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
+> +				       IRQF_SHARED, dev_name(dev), iommu);
+> +		if (err)
+> +			return err;
+>   	}
+>   
+>   	iommu->reset_disabled = device_property_read_bool(dev,
+> 
