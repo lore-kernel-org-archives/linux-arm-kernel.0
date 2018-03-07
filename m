@@ -1,53 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Mar 2018 07:28:42 -0800
-Subject: [GIT PULL 2/6] omap timer changes for v4.17
-In-Reply-To: <CAK8P3a0YwGtE+UkA6+rQ_FQsGO5paL9ub_=oOq_SE3xPUiH1ww@mail.gmail.com>
-References: <pull-1520273005-304551@atomide.com>
- <pull-1520273005-304551@atomide.com-2>
- <CAK8P3a0YwGtE+UkA6+rQ_FQsGO5paL9ub_=oOq_SE3xPUiH1ww@mail.gmail.com>
-Message-ID: <20180307152842.GH5799@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2018 16:30:48 +0100
+Subject: [GIT PULL 2/4] ARM: exynos: mach for v4.17
+In-Reply-To: <20180306180124.8987-5-krzk@kernel.org>
+References: <20180306180124.8987-1-krzk@kernel.org>
+ <20180306180124.8987-5-krzk@kernel.org>
+Message-ID: <CAK8P3a14jEtA2uDLOWgA_+WEpinU1kUo2nxqRO6aNQb7zxNu0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [180307 15:22]:
-> On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > From: "Tony Lindgren" <tony@atomide.com>
-> >
-> > The following changes since commit 2fdc82776ac2ac49c5ee666d834718ac36420e49:
-> >
-> >   Merge branch 'omap-for-v.16/dmtimer-fix' into omap-for-v4.17/timer (2018-02-22 10:46:47 -0800)
-> >
-> > are available in the Git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/timer-signed
-> >
-> > for you to fetch changes up to 58a54f03e73d67432216931854363e4ba15839b9:
-> >
-> >   clocksource: timer-ti-dm: Check prescaler value (2018-02-28 13:41:30 -0800)
-> >
-> > ----------------------------------------------------------------
-> > Move omap timer to drivers for 4.17
-> >
-> > This series from Keerthy and Ladislav Michl move omap dmtimer code
-> > to drivers. As we don't want to export custom timer functions to
-> > random drivers, we also need to update the related PWM driver to
-> > pass the timer specific functions in platform data.
-> >
-> > Note that this series is based on a merge of omap1 specific timer
-> > fix and omap2+ platform data clean-up to keep things working and
-> > make the move a bit simpler.
-> 
-> I was undecided whether this should be in next/drivers or next/soc,
-> ended up putting it into the latter.
-> 
-> I don't see the clocksource maintainers involved in the patch series,
-> so I added them to Cc now to make sure they are aware of the move
-> of the driver.
+On Tue, Mar 6, 2018 at 7:01 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.17
+>
+> for you to fetch changes up to cc14b2b1f0b98926b6640bdd66861188ded850eb:
+>
+>   ARM: EXYNOS: Extend cpuidle support to Midas boards (2018-02-19 17:55:49 +0100)
+>
+> ----------------------------------------------------------------
+> Samsung mach/soc changes for v4.17
+>
+> 1. Add few remaining SPDX license identifiers.
+> 2. Add cpuidle support to all Midas-based boards (including new
+>    GT-I9300/GT-I9305/GT-N7100/GT-N7105).
 
-OK thanks. We got some comments from Daniel for an earlier set of
-patches in December. No acks though, but hopefully it's good enough
-for further work to happen under drivers/clocksource :)
+Pulled into next/soc, thanks!
 
-Regards,
-
-Tony
+         Arnd
