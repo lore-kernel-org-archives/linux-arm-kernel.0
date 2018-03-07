@@ -1,100 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Mar 2018 12:09:27 +0000
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <CAGb2v67SuK9Xr7_dVb7RVGXUJwYRKnTiJwDrOJ-Su5CXmm7HXA@mail.gmail.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
- <CAGb2v67SuK9Xr7_dVb7RVGXUJwYRKnTiJwDrOJ-Su5CXmm7HXA@mail.gmail.com>
-Message-ID: <dd55eee9-8ddc-f186-0bef-0a15764ff368@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 7 Mar 2018 13:10:30 +0100 (CET)
+Subject: [PATCH 2/5] staging: vc04_services: Remove cache-line-size
+ property.
+In-Reply-To: <638bd870-bb17-a0e1-d2aa-30a364b53279@raspberrypi.org>
+References: <20180305202806.21219-1-eric@anholt.net>
+ <20180305202806.21219-3-eric@anholt.net>
+ <a8f369f5-691c-c05f-4c7c-2eadcf4c48c8@i2se.com> <87muzl9ger.fsf@anholt.net>
+ <638bd870-bb17-a0e1-d2aa-30a364b53279@raspberrypi.org>
+Message-ID: <1332781939.275857.1520424630939@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/18 16:17, Chen-Yu Tsai wrote:
-> On Fri, Feb 23, 2018 at 9:37 PM, Myl?ne Josserand
-> <mylene.josserand@bootlin.com> wrote:
->> On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
->> It should be done by the bootloader but it is currently not the case,
->> even for boot CPU because this SoC is booting in secure mode.
->> It leads to an random offset value meaning that each CPU will have a
->> different time, which isn't working very well.
->>
->> Add assembly code used for boot CPU and secondary CPU cores to make
->> sure that the CNTVOFF register is initialized.
->>
->> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
->> ---
->>  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
->>  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
->>  2 files changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
->> index d5c97e945e69..605896251927 100644
->> --- a/arch/arm/mach-sunxi/headsmp.S
->> +++ b/arch/arm/mach-sunxi/headsmp.S
->> @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
->>         first: .word sunxi_mc_smp_first_comer - .
->>  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
->>
->> +ENTRY(sunxi_init_cntvoff)
->> +       /*
->> +        * CNTVOFF has to be initialized either from non-secure Hypervisor
->> +        * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
->> +        * then it should be handled by the secure code
->> +        */
->> +       cps     #MON_MODE
->> +       mrc     p15, 0, r1, c1, c1, 0           /* Get Secure Config */
->> +       orr     r0, r1, #1
->> +       mcr     p15, 0, r0, c1, c1, 0           /* Set Non Secure bit */
->> +       instr_sync
->> +       mov     r0, #0
->> +       mcrr    p15, 4, r0, r0, c14             /* CNTVOFF = 0 */
->> +       instr_sync
->> +       mcr     p15, 0, r1, c1, c1, 0           /* Set Secure bit */
->> +       instr_sync
->> +       cps     #SVC_MODE
->> +       ret     lr
->> +ENDPROC(sunxi_init_cntvoff)
-> 
-> There is no need to move all the assembly into a separate file, just
-> to add this function. Everything can be inlined as a naked function.
-> The "instr_sync" macro can be replaced with "isb", which is what it
-> expands to anyway.
-> 
-> I really want to keep everything self-contained without global symbols,
-> and in C files if possible.
-> 
->> +
->>  #ifdef CONFIG_SMP
->>  ENTRY(sunxi_boot)
->>         bl      sunxi_mc_smp_cluster_cache_enable
->> +       bl      sunxi_init_cntvoff
->>         b       secondary_startup
->>  ENDPROC(sunxi_boot)
->>
->> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
->> index 5e9602ce1573..4bb041492b54 100644
->> --- a/arch/arm/mach-sunxi/sunxi.c
->> +++ b/arch/arm/mach-sunxi/sunxi.c
->> @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
->>  };
->>
->>  extern void __init sun6i_reset_init(void);
->> +extern void sunxi_init_cntvoff(void);
->> +
->>  static void __init sun6i_timer_init(void)
->>  {
->> +       sunxi_init_cntvoff();
-> 
-> You should check the enable-method to see if PSCI is set or not,
-> as an indicator whether the kernel is booted secure or non-secure.
-> AFAIK trying to set CNTVOFF under non-secure would be very bad.
+Hi Phil,
 
-Absolutely not. CNTVOFF *is* a non-secure register. The fact that it is
-not accessible from NS-PL1 is another problem. Please don't conflate the
-two things together.
+> Phil Elwell <phil@raspberrypi.org> hat am 7. M?rz 2018 um 09:02 geschrieben:
+> 
+> 
+> Hi Eric,
+> 
+> On 06/03/2018 19:02, Eric Anholt wrote:
+> > Stefan Wahren <stefan.wahren@i2se.com> writes:
+> > 
+> >> Hi Eric,
+> >>
+> >>
+> >> Am 05.03.2018 um 21:28 schrieb Eric Anholt:
+> >>> This was just a way for the DT-passed value to get out of sync with
+> >>> what Linux has configured the ARM for.
+> >>>
+> >>> Signed-off-by: Eric Anholt <eric@anholt.net>
+> >>> ---
+> >>>    .../interface/vchiq_arm/vchiq_2835_arm.c           | 25 +++++++---------------
+> >>>    .../interface/vchiq_arm/vchiq_pagelist.h           |  1 -
+> >>>    2 files changed, 8 insertions(+), 18 deletions(-)
+> >>>
+> >>> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> >>> index b59ef14890aa..e0e01c812036 100644
+> >>> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> >>> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> >>> @@ -77,7 +77,6 @@ struct vchiq_pagelist_info {
+> >>>    };
+> >>>    
+> >>>    static void __iomem *g_regs;
+> >>> -static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
+> >>>    static unsigned int g_fragments_size;
+> >>>    static char *g_fragments_base;
+> >>>    static char *g_free_fragments;
+> >>> @@ -117,15 +116,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+> >>>    	if (err < 0)
+> >>>    		return err;
+> >>>    
+> >>> -	err = of_property_read_u32(dev->of_node, "cache-line-size",
+> >>> -				   &g_cache_line_size);
+> >>> -
+> >>> -	if (err) {
+> >>> -		dev_err(dev, "Missing cache-line-size property\n");
+> >>> -		return -ENODEV;
+> >>> -	}
+> >>> -
+> >>> -	g_fragments_size = 2 * g_cache_line_size;
+> >>> +	g_fragments_size = 2 * cache_line_size();
+> >>>    
+> >>>    	/* Allocate space for the channels in coherent memory */
+> >>>    	slot_mem_size = PAGE_ALIGN(TOTAL_SLOTS * VCHIQ_SLOT_SIZE);
+> >>> @@ -548,9 +539,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type)
+> >>>    
+> >>>    	/* Partial cache lines (fragments) require special measures */
+> >>>    	if ((type == PAGELIST_READ) &&
+> >>> -		((pagelist->offset & (g_cache_line_size - 1)) ||
+> >>> +		((pagelist->offset & (cache_line_size() - 1)) ||
+> >>>    		((pagelist->offset + pagelist->length) &
+> >>> -		(g_cache_line_size - 1)))) {
+> >>> +		 (cache_line_size() - 1)))) {
+> >>>    		char *fragments;
+> >>>    
+> >>>    		if (down_interruptible(&g_free_fragments_sema) != 0) {
+> >>> @@ -598,10 +589,10 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
+> >>>    			g_fragments_size;
+> >>>    		int head_bytes, tail_bytes;
+> >>>    
+> >>> -		head_bytes = (g_cache_line_size - pagelist->offset) &
+> >>> -			(g_cache_line_size - 1);
+> >>> +		head_bytes = (cache_line_size() - pagelist->offset) &
+> >>> +			(cache_line_size() - 1);
+> >>>    		tail_bytes = (pagelist->offset + actual) &
+> >>> -			(g_cache_line_size - 1);
+> >>> +			(cache_line_size() - 1);
+> >>
+> >> should it be so easy? Back in 2016 we said that cache_line_size() won't
+> >> work. I always thought that we need the cache line size of L2 not of the
+> >> L1 one.
+> >>
+> >> Did you already test the behavior for these combinations?
+> >> BCM2835 ARM32, expected cache line size = 32
+> >> BCM2836 ARM32, expected cache line size = 64
+> >> BCM2837 ARM32, expected cache line size = 64
+> >> BCM2837 ARM64, expected cache line size = 64
+> > 
+> > I didn't explicitly test, but was going by:
+> > 
+> > config ARM_L1_CACHE_SHIFT_6
+> > 	bool
+> > 	default y if CPU_V7
+> > 	help
+> > 	  Setting ARM L1 cache line size to 64 Bytes.
+> > 
+> > config ARM_L1_CACHE_SHIFT_7
+> > 	bool
+> > 	help
+> > 	  Setting ARM L1 cache line size to 128 Bytes.
+> > 
+> > config ARM_L1_CACHE_SHIFT
+> > 	int
+> > 	default 7 if ARM_L1_CACHE_SHIFT_7
+> > 	default 6 if ARM_L1_CACHE_SHIFT_6
+> > 	default 5
+> > 
+> > and only L1_CACHE_SHIFT_7 gets selected by UNIPHIER and neither one is
+> > accessible by menus.
+> > 
+> > I think you're technically correct that it's the size of L2 that matters
+> > (or, specifically, the hardcoded value that the firmware is using on its
+> > side for the fragments list handling.  It overrides a cache-line-size DT
+> > property with that number if present).  However, I think L1==L2 cache
+> > line size this should be a safe assumption for us.
+> > 
+> > Phil, any opinion?
+> 
+> It is the L2 cache line size that matters, but as long as you end up with
+> the numbers Stefan mentioned - 32 on BCM2835, 64 on BCM2836 and BCM2837 -
+> I'm not too bothered how you get there.
 
-Thanks,
+i think a kernel with bcm2835_defconfig on RPi 2 could be such a corncase.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Am i right that the firmware doesn't rely on the existence of "cache-line-size"?
+
+Btw it would be nice to get fixed the corruption on ARM64 [1].
+
+Stefan
+
+[1] - https://github.com/lategoodbye/rpi-zero/issues/23
+
+> 
+> Phil
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
