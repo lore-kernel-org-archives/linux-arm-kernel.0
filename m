@@ -1,50 +1,84 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 7 Mar 2018 23:11:24 +0100
-Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
- document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <33bf6563-b220-7ff9-8b04-84e9bd781b3f@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
- <20180306124002.GA13950@amd>
- <33bf6563-b220-7ff9-8b04-84e9bd781b3f@linux.intel.com>
-Message-ID: <20180307221124.GD10438@amd>
+From: atull@kernel.org (Alan Tull)
+Date: Wed, 7 Mar 2018 16:20:41 -0600
+Subject: [PATCHv2 4/7] dt-bindings: fpga: add Stratix10 SoC FPGA manager
+ binding
+In-Reply-To: <20180307194745.657ewa6rtcta6eqm@rob-hp-laptop>
+References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
+ <1519949975-13548-5-git-send-email-richard.gong@linux.intel.com>
+ <20180307194745.657ewa6rtcta6eqm@rob-hp-laptop>
+Message-ID: <CANk1AXS3gbLLy5fvyxcmeSBEaV2LZY9P=M3sOUHUceTgso5YkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Mar 7, 2018 at 1:47 PM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Mar 01, 2018 at 06:19:32PM -0600, richard.gong at linux.intel.com wrote:
+>> From: Alan Tull <atull@kernel.org>
+>>
+>> Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
+>>
+>> Signed-off-by: Alan Tull <atull@kernel.org>
+>> ---
+>> v2: this patch is added in patch set version 2
+>> ---
+>>  .../devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt  | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+>> new file mode 100644
+>> index 0000000..78de689
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+>> @@ -0,0 +1,10 @@
+>> +Intel Stratix10 SoC FPGA Manager
+>> +
+>> +Required properties:
+>> +- compatible : should contain "intel,stratix10-soc-fpga-mgr"
+>> +
+>> +Example:
+>> +
+>> +     fpga_mgr: fpga-mgr at 0 {
+>> +             compatible = "intel,stratix10-soc-fpga-mgr";
+>
+> No reg or anything else? Is that because it all goes thru the service
+> layer firmware?
 
-> >Are these SoCs x86-based?
-> 
-> Yes, these are ARM SoCs. Please see Andrew's answer as well.
+Yes.
 
-Understood, thanks.
+There will be a few more clients of the service layer: QSPI, Crypto
+and warm reset.
 
-> >>+	Read sampling point selection. The whole period of a bit time will be
-> >>+	divided into 16 time frames. This value will determine which time frame
-> >>+	this controller will sample PECI signal for data read back. Usually in
-> >>+	the middle of a bit time is the best.
-> >
-> >English? "This value will determine when this controller"?
-> >
-> 
-> Could I change it like below?:
-> 
-> "This value will determine in which time frame this controller samples PECI
-> signal for data read back"
+> Just get the service layer driver to instantiate a
+> device for this driver or get rid of the 2 layers if that's all the
+> firmware interface does. DT is not a Linux driver instantiation
+> mechanism.
 
-I guess... I'm not native speaker, I guess this could be improved some
-more.
+Right, this should be describing hardware.
 
-Best regards,
-									Pavel
+I could add this to the service layer binding:
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180307/766a0748/attachment.sig>
+firmware {
+        svc {
+                compatible = "intel,stratix10-svc";
+                method = "smc";
+                memory-region = <&service_reserved>;
+                fpga-mgr {
+                        compatible = "intel,stratix10-soc-fpga-mgr";
+                };
+        };
+};
+
+>
+> And build your dts files with "W=1" because there's an error in this
+> example.
+
+Ouch.  Yes.
+
+Warning (unit_address_vs_reg): Node /soc/fpga-mgr at 0 has a unit name,
+but no reg property
+
+Thanks for the review,
+Alan
+
+>
+> Rob
