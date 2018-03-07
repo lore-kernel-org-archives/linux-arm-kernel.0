@@ -1,72 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Mar 2018 09:21:16 +0100
-Subject: [PATCH] drm/pl111: Enable device-specific assigned memory
-Message-ID: <20180307082116.13568-1-linus.walleij@linaro.org>
+From: gaku.inami.xh@renesas.com (Gaku Inami)
+Date: Wed, 7 Mar 2018 08:23:50 +0000
+Subject: [PATCH 3/5] arm64: dts: renesas: r8a7795: Add cpu
+ capacity-dmips-mhz
+In-Reply-To: <20180307081112.scl7cwnat562muer@verge.net.au>
+References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
+ <1519697995-6061-4-git-send-email-gaku.inami.xh@renesas.com>
+ <CAMuHMdWswL8N3uTCcGmWSfa98_bpz7_11PDs=m+_RC--wBVu6w@mail.gmail.com>
+ <OSBPR01MB1800C2DBEAB2BC506BF80AB9A2D80@OSBPR01MB1800.jpnprd01.prod.outlook.com>
+ <CAMuHMdXYZB8emmj5TdZih-VQ5SVF-F0LkBRsPPGe=XGvNDt_Lg@mail.gmail.com>
+ <20180307081112.scl7cwnat562muer@verge.net.au>
+Message-ID: <OSBPR01MB180025867BBE83FBCCE1A139A2D80@OSBPR01MB1800.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-on the motherboard, which is what we should be using for the
-PL111 if available. On this platform, the memory backplane
-is constructed so that only this memory will work properly
-with the CLCD on the motherboard, using any other memory
-region just gives random snow on the display.
+Hi Geert-san, Simon-san,
 
-The CA9 Versatile Express also has a PL111 instance on its
-core tile. This is OK, it has been tested with the motherboard
-VRAM and that works just as fine as regular CMA memory.
+> -----Original Message-----
+> From: linux-renesas-soc-owner at vger.kernel.org [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Simon
+> Horman
+> Sent: Wednesday, March 7, 2018 5:11 PM
+[snip]
+> >
+> > Documentation/devicetree/bindings/arm/cpu-capacity.txt:
+> >
+> > "capacity-dmips-mhz is an optional cpu node [1] property: u32 value
+> >  representing CPU capacity expressed in normalized DMIPS/MHz. At boot time, the
+> >  maximum frequency available to the cpu is then used to calculate the capacity
+> >  value internally used by the kernel."
+> >
+> > IIUIC, you should thus not use 15532585 and 6241541 directly, but
+> > scale them to the frequency.
+> >
+> > So the formula for CA53 becomes:
+> >
+> > 1024 / (15532585 / 1500) * (6241541 / 1200) = 514
+> >
+> > > Considering cpufreq is available later, is it better to set the value(514)
+> > > for CA53 scaled by different maximum frequencies?
+> >
+> > DT describes the hardware, not software limitations, so IMHO 514 is the correct
+> > value.
 
-The memory is assigned to the device using the memory-region
-device tree property and a "shared-dma-pool" reserved
-memory pool like this:
+Sorry, I misunderstood the intention of definition in DT.
+Thanks for your detailed explanation. I understood it.
 
-reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
+> Yes agreed. Please refresh this patchset accordingly.
 
-        vram: vram at 48000000 {
-                compatible = "shared-dma-pool";
-                reg = <0x48000000 0x00800000>;
-                no-map;
-        };
-};
+I will update v2 patch.
 
-clcd at 1f000 {
-        compatible = "arm,pl111", "arm,primecell";
-	(...)
-        memory-region = <&vram>;
-}?;
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mali DP Maintainers <malidp@foss.arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpu/drm/pl111/pl111_drv.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index b469aa317d9d..e301f2a719a3 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -60,6 +60,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_graph.h>
-+#include <linux/of_reserved_mem.h>
- 
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -262,6 +263,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
- 
-+	ret = of_reserved_mem_device_init(dev);
-+	if (!ret)
-+		dev_info(dev, "using device-specific reserved memory\n");
-+
- 	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
- 				 &priv->memory_bw)) {
- 		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
--- 
-2.14.3
+Regards,
+Inami
