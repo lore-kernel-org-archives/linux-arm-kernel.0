@@ -1,21 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 15:30:28 +0100
-Subject: [PATCH 2/2] arm64: dts: replace 'linux,
- stdout-path' with 'stdout-path'
-In-Reply-To: <20180228224116.2596-2-robh@kernel.org>
-References: <20180228224116.2596-1-robh@kernel.org>
- <20180228224116.2596-2-robh@kernel.org>
-Message-ID: <CAK8P3a3j+VE8eRPXx--m_y46f45PbKVH1B51VGmpkXmnjONRdA@mail.gmail.com>
+Date: Wed, 7 Mar 2018 15:32:00 +0100
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.17
+In-Reply-To: <20180301162052.GA1752@e107155-lin>
+References: <20180301162052.GA1752@e107155-lin>
+Message-ID: <CAK8P3a3GN9zGScvvFc69C68hnXb1Wdtp0az0EcOiCvYCSj_E8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 11:41 PM, Rob Herring <robh@kernel.org> wrote:
-> 'linux,stdout-path' has been deprecated for some time in favor of
-> 'stdout-path'. Now dtc will warn on occurrences of 'linux,stdout-path'.
-> Search and replace the one occurrence with 'stdout-path'.
+On Thu, Mar 1, 2018 at 5:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 >
-> Signed-off-by: Rob Herring <robh@kernel.org>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.17
+>
+> for you to fetch changes up to 3f5098135b2cd23941e5573a3f0abaf75b0e1d0a:
+>
+>   arm64: dts: juno: fix size of GICv2m MSI frames (2018-02-28 16:58:13 +0000)
+>
+> ----------------------------------------------------------------
+> ARMv8 Vexpress/Juno DT updates for v4.17
+>
+> 1. Extends support for missing 3 GICv2m MSI frames
+> 2. Fixes the incorrect GICv2m frame size(64kB instead of 4kB)
 
-Applied to next/dt as well, thanks!
+Pulled into next/dt, thanks!
 
-     Arnd
+      Arnd
