@@ -1,85 +1,44 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 07 Mar 2018 13:36:23 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <f340190f-8286-bd3c-c743-79a3d48cc33d@arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
- <5A972A7D.9020301@codeaurora.org>
- <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
- <5A986425.9080007@codeaurora.org>
- <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
- <5A99A3DC.9020400@codeaurora.org>
- <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
- <5A9DC03B.8020201@codeaurora.org>
- <f340190f-8286-bd3c-c743-79a3d48cc33d@arm.com>
-Message-ID: <5AA05B57.9010005@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 7 Mar 2018 14:38:26 -0700
+Subject: [PATCH] coresight: use %px to print pcsr instead of %p
+In-Reply-To: <1520050981-17129-1-git-send-email-leo.yan@linaro.org>
+References: <1520050981-17129-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkxna9Myejt0x6o5A4xRz-12x5grAOUOu2PGyZgNehAJnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2018 06:59 AM, Suzuki K Poulose wrote:
+On 2 March 2018 at 21:23, Leo Yan <leo.yan@linaro.org> wrote:
+> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
+> printk specifier %p to hash all addresses before printing, this was
+> resulting in the high 32 bits of pcsr can only output zeros.  So
+> module cannot completely print pc value and it's pointless for debugging
+> purpose.
 >
+> This patch fixes this by using %px to print pcsr instead.
 >
-> Hi Saravana,
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Sorry for the late response, I was out on vacation.
+> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> index 6ea62c6..9cdb3fb 100644
+> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> @@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
+>         }
 >
-> On 05/03/18 22:10, Saravana Kannan wrote:
->> On 03/05/2018 02:59 AM, Mark Rutland wrote:
->>> On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
->>>> On 03/02/2018 02:42 AM, Mark Rutland wrote:
->>>>> It's important to note that the DSU PMU's event_init() ensures events
->>>>> are affine to a single CPU, and the perf core code serializes
->>>>> operations
->>>>> on those events via the context lock.
->>>>
->>>> Ah, I see that now. Thanks!
->>>>
->>>>> Therefore, two CPUs *won't* try to access the registers
->>>>> simultaneously.
->>>>
->>>> Right, and this driver seems to be going through a lot of work to
->>>> make sure
->>>> all events are read in one CPU.
->>>>
->>>> Do you even have an upstream target where there are multiple DSU's in a
->>>> system?
->>>
->>> I have no idea, though I do beleive that it's possible for a system to
->>> have multiple DSUs.
->>>
->>>> If not, we can simplify a ton of this code (no hotplug notifiers, no
->>>> migrating PMUs, no SMP calls, etc) by just adding a spinlock and
->>>> letting any
->>>> CPU read these DSU counters.
->>>
->>> Regardless of whether we allow arbitrary CPUs to read the counters,
->>> other logic still needs to be CPU affine, and we'll still need hotplug
->>> notifiers and event migration.
->>
->> If you have to support multiple DSUs in a system, then the need is
->> obvious. But if you don't have to support multiple DSU, it's not
->> obvious to me on why you still need CPU affining or hotplug notifiers.
->> Could you please provide me pointers for general understanding?
->>
+>         pc = debug_adjust_pc(drvdata);
+> -       dev_emerg(dev, " EDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
+> +       dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
 >
-> We need to support multiple DSUs as such configurations are possible.
->
->>
->>> I am not necessarily opposed to allowing read() calls from associated
->>> CPUs, but as before, I'll leave that to Suzuki.
->
-> I am fine with reading the registers from any of the associated CPUs.
->
+>         if (drvdata->edcidsr_present)
+>                 dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
 
-If that's the case, can you please use my patch? And if it looks good to 
-you, give an Ack and ask Peter to pull it in as you'd be the user?
+Applied - thanks
+Mathieu
 
-Thanks,
-Saravana
-
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> --
+> 2.7.4
+>
