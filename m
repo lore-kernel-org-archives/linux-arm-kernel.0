@@ -1,42 +1,97 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Mar 2018 10:44:36 +0530
-Subject: [PATCH v2] arm64: dts: msm8916: Add cpu cooling maps
-In-Reply-To: <4d134dee2154ae3fa56b375aaed9568e21b1a777.1520398076.git.amit.kucheria@linaro.org>
-References: <cover.1520398076.git.amit.kucheria@linaro.org>
- <9f7199f0027ef2382e5ccc61a5118d0a00fa2e63.1520340931.git.amit.kucheria@linaro.org>
- <4d134dee2154ae3fa56b375aaed9568e21b1a777.1520398076.git.amit.kucheria@linaro.org>
-Message-ID: <CAOh2x=k6aXd=pPaNKhd-fna58wk4mNcMWgy1Eb=VYwECRtqLaA@mail.gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed,  7 Mar 2018 12:02:19 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support for qcom,smmu-500 variant
+Message-ID: <20180307063219.14409-1-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 10:30 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> From: Rajendra Nayak <rnayak@codeaurora.org>
->
-> Add cpu cooling maps for cpu passive trip points. The cpu cooling
-> device states are mapped to cpufreq based scaling frequencies.
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index e468277..66b318e 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -15,6 +15,7 @@
->  #include <dt-bindings/clock/qcom,gcc-msm8916.h>
->  #include <dt-bindings/reset/qcom,gcc-msm8916.h>
->  #include <dt-bindings/clock/qcom,rpmcc.h>
-> +#include <dt-bindings/thermal/thermal.h>
->
->  / {
->         model = "Qualcomm Technologies, Inc. MSM8916";
-> @@ -115,6 +116,7 @@
->                         cpu-idle-states = <&CPU_SPC>;
->                         clocks = <&apcs 0>;
->                         operating-points-v2 = <&cpu_opp_table>;
-> +                       #cooling-cells = <2>;
+Qualcomm's arm-smmu 500 implementation supports runtime pm
+so enable the same.
 
-LGTM.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+---
+
+ Based on iommu/arm-smmu pm runtime support series [1]:
+ [PATCH v8 0/5] iommu/arm-smmu: Add runtime pm/sleep support
+ 
+ Tested on sdm845 with necessary support to enable the smmu
+ and with necessary user.
+
+ [1] https://lkml.org/lkml/2018/3/2/325
+
+ Documentation/devicetree/bindings/iommu/arm,smmu.txt | 14 ++++++++++++++
+ drivers/iommu/arm-smmu.c                             |  8 ++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 6ea27bd4f785..0b5c6d2a9865 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -18,6 +18,7 @@ conditions.
+                         "arm,mmu-500"
+                         "cavium,smmu-v2"
+                         "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
++                        "qcom,<soc>-smmu-500", "qcom,smmu-500"
+ 
+                   depending on the particular implementation and/or the
+                   version of the architecture implemented.
+@@ -30,6 +31,10 @@ conditions.
+                   An example string would be -
+                   "qcom,msm8996-smmu-v2", "qcom,smmu-v2".
+ 
++                  "qcom,smmu-500" is arm,mmu-500 implementation that supports
++                  efficient power management by supporting smmu's state
++                  retention.
++
+ - reg           : Base address and size of the SMMU.
+ 
+ - #global-interrupts : The number of global interrupts exposed by the
+@@ -179,3 +184,12 @@ conditions.
+ 			 <&mmcc SMMU_MDP_AHB_CLK>;
+ 		clock-names = "bus", "iface";
+ 	};
++
++	smmu5: iommu {
++		compatible = "qcom,sdm845-smmu-500", "qcom,smmu-500";
++		reg = <0x15000000 0x80000>;
++		#iommu-cells = <2>;
++		#global-interrupts = <1>;
++
++		...
++	};
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7a96c924ae22..7f52456c6b25 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2008,6 +2008,12 @@ static const char * const qcom_smmuv2_clks[] = {
+ 	"bus", "iface",
+ };
+ 
++static const struct arm_smmu_match_data qcom_smmu500 = {
++	.version = ARM_SMMU_V2,
++	.model = ARM_MMU500,
++	.rpm_supported = true,
++};
++
+ static const struct arm_smmu_match_data qcom_smmuv2 = {
+ 	.version = ARM_SMMU_V2,
+ 	.model = QCOM_SMMUV2,
+@@ -2024,6 +2030,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
+ 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
+ 	{ .compatible = "qcom,smmu-v2", .data = &qcom_smmuv2 },
++	{ .compatible = "qcom,smmu-500", .data = &qcom_smmu500 },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+@@ -2394,6 +2401,7 @@ IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401");
+ IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500");
+ IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2");
+ IOMMU_OF_DECLARE(qcom_smmuv2, "qcom,smmu-v2");
++IOMMU_OF_DECLARE(qcom_smmu500, "qcom,smmu-500");
+ 
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
