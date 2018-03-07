@@ -1,29 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 15:22:15 +0100
-Subject: [GIT PULL] STi DT update for v4.17 round 1
-In-Reply-To: <e30ac9b4-253c-106d-4ea5-604ec3eeb953@st.com>
-References: <e30ac9b4-253c-106d-4ea5-604ec3eeb953@st.com>
-Message-ID: <CAK8P3a0eyD-LaW4CVZuOKzuOSoksW4saNoCyJm=dJjr9i7_-MA@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 07 Mar 2018 15:23:30 +0100
+Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
+ register clock
+In-Reply-To: <20180306134311.7bbf8ce7@bbrezillon> (Boris Brezillon's message
+ of "Tue, 6 Mar 2018 13:43:11 +0100")
+References: <20180228143553.12485-1-gregory.clement@bootlin.com>
+ <20180301183520.4251439a@bbrezillon> <874llt5ut2.fsf@bootlin.com>
+ <20180306134311.7bbf8ce7@bbrezillon>
+Message-ID: <87woyo3qxp.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 26, 2018 at 9:32 AM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
-> warn: You locally have sti-dt-for-v4.17-round1 but it does not (yet)
-> warn: appear to be at
-> git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-> warn: Do you want to push it there, perhaps?
-> warning: refname 'sti-dt-for-v4.17-round1' is ambiguous.
-> STi dts update:
->
-> Fix all DT dtc warnings when building with W=1
-> For most of implicated node, the addition of a fake reg property
-> fixes these warnings.
-> For others nodes, their location in device tree
-> have been updated.
->
+Hi Boris,
+ 
+ On mar., mars 06 2018, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-Something went wrong with your git-request-pull command, but
-I have pulled the tag tags/sti-dt-for-v4.17-round1 into branch next/dt
-now, as this seems to be what you had intended to send.
+>> >
+>> > Another solution would be to retrieve the reg clk only on platforms
+>> > that need it (based on the compatible). This way you won't have to test
+>> > for -ENOENT and could simply propagate the error to the upper layer.  
+>> 
+>> We can't do this because we need to be bacwkard compatible.
+>
+> I don't get it. If the clock is missing in the DT, the NAND is
+> already not working on these platforms, right? How could we break
+> something that is already broken?
 
-      Arnd
+As you probably know this patch have been tested on an Armada 7K based
+board, so it more or less works.
+
+But it works because the second clock used by the nand controller is
+also used by other IP and already setup by the drivers of these IP. So
+today it is only if you boot a kernel without crypto, i2c, spi and uart
+support that the nand won't work.
+
+Then the current representation is wrong, but it is still usable in most
+of the case. So that's why we still need to support the case where we
+have only one clock in the device tree.
+
+Gregory
+
+
+>
+> Regards,
+>
+> Boris
+>
+> -- 
+> Boris Brezillon, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
