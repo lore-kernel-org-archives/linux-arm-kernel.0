@@ -1,76 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Mar 2018 18:14:42 +0000
-Subject: [PATCH] arm64: kdump: fix interrupt handling done during
- machine_crash_shutdown
-In-Reply-To: <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
-References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
- <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
- <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
- <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
-Message-ID: <9a709b76-1b45-8250-9d8e-adbad59a43cc@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 07 Mar 2018 18:15:02 +0000
+Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
+ add/remove and notify code
+In-Reply-To: <20180301223529.GA28811@pd.tnic>
+References: <20180215185606.26736-1-james.morse@arm.com>
+ <20180215185606.26736-3-james.morse@arm.com> <20180301150144.GA4215@pd.tnic>
+ <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
+ <20180301223529.GA28811@pd.tnic>
+Message-ID: <5AA02C26.10803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/18 11:56, Grzegorz Jaszczyk wrote:
-> Thank you for your feedback. I probably over-interpreted some of the
-> documentation paragraph to justify (probably) buggy behavior that I am
-> seeing. Regardless of correctness of this patch I will appreciate if
-> you could help understanding this issue.
-> 
-> First the whole story: I was debugging why the crashdump kernel hangs
-> in v. early stage, when the kdump was triggered from the
-> ARM_SBSA_WATCHDOG interrupt handler, while everything worked fine when
-> it was triggered from the process context. Finally It occurred that it
-> is because the crashdump kernel doesn't get any timer interrupt. I
-> also notice that this problem doesn't occur when the gic is configured
-> to work in EOImode == 1. In such circumstances, the write to
-> GIC_CPU_EOI in gic_handle_irq is causing priority drop to idle, and
-> therefore when the crashdump kernel starts, the timer interrupt is
-> able to preempt still active watchdog interrupt (I know that this
-> interrupt shouldn't be active after irq_set_irqchip_state but for some
-> reason it seems to not do the job correctly).
-> 
-> In my commit log I wrongly describe the bahaviour of
-> irq_set_irqchip_state and irq_get_irqchip_state. In
-> machine_kexec_mask_interrupts (when watchdog interrupt is active)
-> after adding some debugs I see that (focusing only on watchdog
-> interrupt):
-> 1) before calling irq_set_irqchip_state when I check the status with
-> irq_get_irqchip_state I see that watchdog interrupt is active
-> 2) decative interrupt via irq_set_irqchip_state
-> 3) check the status via irq_get_irqchip_state which indicates that the
-> status has changed to inactive, so everything seems to be fine, but
-> still in crashdump kernel I don't get any interrupts (when the EOImode
-> == 0).
-> 
-> When I modify the machine_kexec_mask_interrupts, to call the eoi for
-> watchdog (only temporary to observe the effect):
-> if (i == watchdog_irq)
->      chip->irq_eoi(&desc->irq_data);
-> 
-> everything is working. So it seems that deactivating the interrupt via
-> write to GIC_CPU_EOI (EOImode == 0) or GIC_CPU_EOI +
-> GIC_CPU_DEACTIVATE (EOImode == 1) does the job, while deactivating it
-> with use of GIC_DIST_ACTIVE_CLEAR doesn't.
-> 
-> I am using the unmodified GICv2m ("arm,gic-400") and the watchdog
-> interrupt is connected as one of the SPI. Do you have any idea what
-> can be wrong? Maybe I am missing something? gic configuration? I also
-> don't exclude that nobody who work with kdump doesn't use (EOImode ==
-> 0) and therefore didn't see this behavior.
+Hi Borislav, Punit,
 
-Not using EOImode==1 is definitely an oddity (at least on the host), but
-that doesn't mean it shouldn't work.
+On 01/03/18 22:35, Borislav Petkov wrote:
+> On Thu, Mar 01, 2018 at 06:06:59PM +0000, Punit Agrawal wrote:
+>> The 64-bit support lives in arch/arm64 and the die() there doesn't
+>> contain an oops_begin()/oops_end(). But the lack of oops_begin() on
+>> arm64 doesn't really matter here.
 
-The reason the thing is hanging is that although we correctly deactivate
-the interrupt, nothing performs the priority drop. Your write to EOI
-helps in the sense that it guarantees that both priority drop and
-deactivate are done with the same operation, but that's not something
-we'd want to expose.
+>> One issue I see with calling die() is that it is defined in different
+>> includes across various architectures, (e.g., include/asm/kdebug.h for
+>> x86, include/asm/system_misc.h in arm64, etc.)
+> 
+> I don't think that's insurmountable.
 
-My preferred approach would be to nuke the active priority registers at
-boot time, as the CPUs come up. I'll try to write something this week.
+I don't think die() helps us, its not quite the same as oops_begin()/panic(),
+which means we're interpreting the APEI notification's severity differently,
+depending on when we took it.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+> The more important question is, can we do the same set of calls when
+> panic severity on all architectures which support APEI or should we have
+> arch-specific ghes_panic() callbacks or so.
+
+I think the purpose of this oops_begin() is to ensure two CPUs calling
+oops_begin() at the same time don't have their traces interleaved, unblanks the
+screen and 'busts' any spinlocks printk() may need (console etc).
+
+This code is called in_nmi(), printk() now supports this so it doesn't need its
+locks busting.
+When called in_nmi(), printk batches the messages into its per-cpu
+printk_safe_seq_buf, which in our case is dumped by panic() using
+printk_safe_flush_on_panic(). So provided we call panic(), the in_nmi() messages
+from ghes.c are already batched, and printed behind panic()'s atomic_cmpxchg()
+exclusion thing.
+
+If your arm64 system has one of these futuristic 'screens', they get unblanked
+when panic() calls console_verbose() and bust_spinlocks(1).
+
+
+> As it is now, it would turn into a mess if we start with the ifdeffery
+> and the different requirements architectures might have...
+
+Today its just x86 and arm64. arm64 doesn't have a hook to do this. I'm happy to
+add an empty declaration or leave it under an ifdef until someone complains
+about any behaviour I missed!
+
+
+Thanks,
+
+James
