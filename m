@@ -1,46 +1,47 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Wed, 07 Mar 2018 15:37:04 +0100
-Subject: Regulator regression in next-20180305
-In-Reply-To: <20180307141027.GD7290@sirena.org.uk>
-References: <20180305231246.GB5799@atomide.com>
- <CAOMZO5CXy=7ZKVapp_2Q4wq=mY-dJ0owZZN84vqUj1j1xasOKg@mail.gmail.com>
- <CGME20180306163044epcas2p1b5bc62e4cba6c6e8c8ea7e75329c11ef@epcas2p1.samsung.com>
- <20180306163035.GE13586@sirena.org.uk>
- <bb1adc11-40ff-d37d-60f1-d6e706b058a6@samsung.com>
- <20180307141027.GD7290@sirena.org.uk>
-Message-ID: <339dfd3e-5c5d-1e91-8890-5bfb69049d12@samsung.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed, 7 Mar 2018 11:38:32 -0300
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for
+ ThunderX2 B0
+In-Reply-To: <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
+ <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+Message-ID: <20180307143832.GJ3701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
+> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
+> > There is MIDR change on ThunderX2 B0, adding an entry to mapfile
+> > to enable JSON events for B0.
+> > 
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-On 03/07/2018 03:10 PM, Mark Brown wrote:
-> On Wed, Mar 07, 2018 at 01:57:12PM +0100, Maciej Purski wrote:
+Ganapatrao, can you please take this in consideration and if agreeing
+send a v2 patch?
+
+With that I can add an Acked-by: wcohen, Right?
+
+- Arnaldo
+> > ---
+> >  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > index e61c9ca..93c5d14 100644
+> > --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> > @@ -13,4 +13,5 @@
+> >  #
+> >  #Family-model,Version,Filename,EventType
+> >  0x00000000420f5160,v1,cavium,core
+> > +0x00000000430f0af0,v1,cavium,core
+> >  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
+> > 
 > 
->> I'm trying to figure out what is so special about these boards. The only
->> strange thing, that I haven't noticed at first, is that all regulators share
->> a common supply - dummy regulator. It is defined in anatop_regulator.c.
+> Hi,
+> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
 > 
-> No, that's a regulator framework thing - the regulator framework will
-> use the dummy regulator as a supply when there's nothing described in
-> the DT so long as the client doesn't explicitly tell it that the supply
-> might be optional.
+> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
 > 
-
-Ok, thanks for explanation. I think I have found a possibly dangerous scenario, 
-but I can't see this situation possible in Fabio's case.
-
-Assume, that we have a chain of supplies, consisting of at least 3. Say: A->B->C.
-
-When we're setting voltage on A, we lock it, call balance_voltage(), lock 
-suppliers and call set_voltage_rdev(). So we have regulators A, B, C locked. 
-Then set_voltage_rdev() is trying to set voltage of its supply by calling 
-set_voltage_unlocked().
-
-Now we're on the regulator B. Set_voltage_unlocked() calls balance_voltage(), 
-which again locks its supplies, if they exist. B's supply is C, so we end up 
-with having a deadlock on regulator C.
-
-Tony and Fabio, do you find this scenario possible on your boards?
-
-Best regards
-Maciej Purski
+> 
+> -Will Cohen
