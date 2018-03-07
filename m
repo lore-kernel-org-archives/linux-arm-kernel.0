@@ -1,28 +1,74 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:44:33 +0100
-Subject: [GIT PULL] firmware: arm_scpi: updates for v4.17
-In-Reply-To: <20180301162318.GB1752@e107155-lin>
-References: <20180301162318.GB1752@e107155-lin>
-Message-ID: <CAK8P3a3CPs6PaxvrJCDsrO8NBSZhOwwTArVYr4=cW16XvH-7WA@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:48:12 +0100
+Subject: [GIT PULL] firmware: ARM SCMI support for v4.17
+In-Reply-To: <20180301162731.GC1752@e107155-lin>
+References: <20180301162731.GC1752@e107155-lin>
+Message-ID: <CAK8P3a0C8_0Kc7aX5jrCDLR5h7TTqZwYoXWt09CJYFUT+xkUUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 5:23 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Thu, Mar 1, 2018 at 5:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-> ARM SCPI updates/cleanups for v4.17
+> ----------------------------------------------------------------
+> ARM SCMI support for v4.17
 >
-> 1. Fixes to get rid of sparse warnings
-> 2. Use of FIELD_GET and GENMASK for better subfields handling
-> 3. Make mbox_free_channels device-managed helping in removing unnecessary code
-> 4. Various other cleanups to simplify and improve code readability
+> ARM System Control and Management Interface(SCMI)[1] is more flexible and
+> easily extensible than any of the existing interfaces.
 >
-> Note that similar set of changes were merged in v4.15, however got reverted
-> through the commit 81faa5566864 ("firmware: arm_scpi: Revert updates made
-> during v4.15 merge window") for reasons mentioned in that commit.
+> Few existing as well as future ARM platforms provide micro-controllers
+> to abstract various power and other system management tasks which have
+> similar interfaces, both in terms of the functions that are provided by
+> them, and in terms of how requests are communicated to them.
 >
-> This is the resend with the culprit patch removed. Kevin Hilman tested this
-> series on Amlogic and reported it to be fine.
+> There are quite a few protocols like ARM SCPI, TI SCI, QCOM RPM, Nvidia Tegra
+> BPMP, and so on already. This specification is to standardize and avoid any
+> further fragmentation in the design of such interface by various vendors.
+>
+> The current SCMI driver implementation is very basic and initial support.
+> It lacks support for notifications, asynchronous/delayed response, perf/power
+> statistics region and sensor register region.
+>
+> Mailbox is the only form of transport supported currently in the driver.
+> SCMI supports interrupt based mailbox communication, where, on completion
+> of the processing of a message, the caller receives an interrupt as well as
+> polling for completion.
+>
+> SCMI is designed to minimize the dependency on the mailbox/transport
+> hardware. So in terms of SCMI, each channel in the mailbox includes
+> memory area, doorbell and completion interrupt.
+>
+> However the doorbell and completion interrupt is highly mailbox dependent
+> which was bit of controversial as part of SCMI/mailbox discussions.
+>
+> Arnd and me discussed about the few aspects of SCMI and the mailbox framework:
+>
+> 1. Use of mailbox framework for doorbell type mailbox controller:
+>    - Such hardware may not require any data to be sent to signal the remote
+>      about the presence of a message. The channel will have in-built
+>      information on how to trigger the signal to the remote.
+>      There are few mailbox controller drivers which are purely doorbell based.
+>      e.g.QCOM IPC, STM, Tegra, ACPI PCC,..etc
+>
+> 2. Supporting other mailbox controller:
+>    - SCMI just needs a mechanism to signal the remote firmware. Such
+>      controller may need fixed message to be sent to trigger a doorbell.
+>      In such case we may need to get that data from DT and pass the same
+>      to the controller. It's not covered in the current DT binding, but
+>      can be extended as optional property in future.
+>
+>      However handling notifications may be interesting on such mailbox, but
+>      again there is no way to interpret what the data field(remote message)
+>      means, it could be a bit mask or a number or don't-care.
+>
+> Arnd mentioned that he doesn't like the way the mailbox binding deals
+> with doorbell-type hardware, but we do have quite a few precedent drivers
+> already and changing the binding to add a data field would not make it any
+> better, but could cause other problems. So he is happy with the status quo
+> of SCMI implementation.
+>
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0056a/index.html
 
-Pulled into next/drivers, thanks!
+Pulled into next/drivers, I'm glad we came to a conclusion at last.
+Thanks for the detailed tag description.
 
          Arnd
