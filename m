@@ -1,32 +1,57 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Wed, 7 Mar 2018 11:55:16 +0000
-Subject: [PATCH] arm64: dts: renesas: r8a7795: Add IPMMU-PV1 device node
-In-Reply-To: <20180306093430.12486-1-horms+renesas@verge.net.au>
-References: <20180306093430.12486-1-horms+renesas@verge.net.au>
-Message-ID: <TY1PR06MB09925629ADC09D1DA9FE43E6D8D80@TY1PR06MB0992.apcprd06.prod.outlook.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 7 Mar 2018 12:08:24 +0000
+Subject: [PATCH 0/7] ARM: dts: dra7: Enable x2 lane mode support
+In-Reply-To: <20171219093133.16565-1-kishon@ti.com>
+References: <20171219093133.16565-1-kishon@ti.com>
+Message-ID: <20180307120824.GC15139@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon-san,
+On Tue, Dec 19, 2017 at 03:01:26PM +0530, Kishon Vijay Abraham I wrote:
+> Add properties to enable PCIe x2 lane mode since all dra7
+> based SoCs support x2 lane mode.
+> 
+> However only dra76-evm has a slot which can support x2 lane
+> cards. Hence only enable x2 lane mode in dra76-evm.
+> (am571x-idk can support x2 lane mode but that makes usb port
+> not functional so not including the patch to enable
+> x2 mode in am571x-idk)
+> 
+> Also included in this series is patch to enable PCIe configs
+> (both host and device) in omap2plus_defconfig and
+> multi_v7_defconfig
+> 
+> In order to get x2 mode working [1] is required.
+> 
+> However by keeping the older compatible, this series won't
+> break functionality if this series is merged before [1]
+> 
+> [1] -> https://lkml.org/lkml/2017/12/19/175
+> 
+> Kishon Vijay Abraham I (7):
+>   ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
+>   ARM: dts: DRA74x: Use PCIe compatible specific to dra74
+>   ARM: dts: DRA72x: Use PCIe compatible specific to dra72
+>   ARM: dts: dra76-evm: Enable x2 PCIe lanes
+>   ARM: dts: dra7: Remove deprecated PCI compatible string
+>   ARM: omap2plus_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
+>     modes)
+>   ARM: multi_v7_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
+>     modes)
+> 
+>  arch/arm/boot/dts/dra7.dtsi          |  9 +++++----
+>  arch/arm/boot/dts/dra72x.dtsi        | 12 ++++++++++++
+>  arch/arm/boot/dts/dra74x.dtsi        | 12 ++++++++++++
+>  arch/arm/boot/dts/dra76-evm.dts      | 16 ++++++++++++++++
+>  arch/arm/configs/multi_v7_defconfig  |  6 ++++++
+>  arch/arm/configs/omap2plus_defconfig |  8 ++++++++
+>  6 files changed, 59 insertions(+), 4 deletions(-)
 
-> From: Simon Horman, Sent: Tuesday, March 6, 2018 6:35 PM
-> 
-> Add r8a7795 IPMMU-PV1 and keep it disabled by default.
-> 
-> This device is not present in r8a7795 ES1.x and
-> is removed from the DT of those SoCs.
-> 
-> This corrects an omission in
-> 3b7e7848f0e8 ("arm64: dts: renesas: r8a7795: Add IPMMU device nodes")
-> 
-> This does not have any runtime effect.
-> 
-> Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Kishon,
 
-Thank you for the patch!
+I would like to ask you please what are your expectations with this
+series, which tree these changes are going to be queued through ?
 
-Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Please let me know, thanks.
 
-Best regards,
-Yoshihiro Shimoda
+Lorenzo
