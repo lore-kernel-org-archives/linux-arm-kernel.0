@@ -1,57 +1,32 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 07 Mar 2018 15:23:30 +0100
-Subject: [PATCH] mtd: nand: marvell: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180306134311.7bbf8ce7@bbrezillon> (Boris Brezillon's message
- of "Tue, 6 Mar 2018 13:43:11 +0100")
-References: <20180228143553.12485-1-gregory.clement@bootlin.com>
- <20180301183520.4251439a@bbrezillon> <874llt5ut2.fsf@bootlin.com>
- <20180306134311.7bbf8ce7@bbrezillon>
-Message-ID: <87woyo3qxp.fsf@bootlin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2018 15:25:43 +0100
+Subject: [GIT PULL 2/3] DaVinci device-tree updates for v4.17
+In-Reply-To: <20180227075745.23970-2-nsekhar@ti.com>
+References: <20180227075745.23970-1-nsekhar@ti.com>
+ <20180227075745.23970-2-nsekhar@ti.com>
+Message-ID: <CAK8P3a3gjoMg=9_3PKid_+dXfPv3q2PpDU9CqeF3Lrcx4xCJww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
- 
- On mar., mars 06 2018, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-
->> >
->> > Another solution would be to retrieve the reg clk only on platforms
->> > that need it (based on the compatible). This way you won't have to test
->> > for -ENOENT and could simply propagate the error to the upper layer.  
->> 
->> We can't do this because we need to be bacwkard compatible.
+On Tue, Feb 27, 2018 at 8:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 >
-> I don't get it. If the clock is missing in the DT, the NAND is
-> already not working on these platforms, right? How could we break
-> something that is already broken?
-
-As you probably know this patch have been tested on an Armada 7K based
-board, so it more or less works.
-
-But it works because the second clock used by the nand controller is
-also used by other IP and already setup by the drivers of these IP. So
-today it is only if you boot a kernel without crypto, i2c, spi and uart
-support that the nand won't work.
-
-Then the current representation is wrong, but it is still usable in most
-of the case. So that's why we still need to support the case where we
-have only one clock in the device tree.
-
-Gregory
-
-
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 >
-> Regards,
+> are available in the git repository at:
 >
-> Boris
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.17/dt
 >
-> -- 
-> Boris Brezillon, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+> for you to fetch changes up to 25c88cb1c05856f365484c6647d8e17bfd7f3363:
+>
+>   ARM: dts: da850-evm: add chosen and SPI alias (2018-02-26 12:02:24 +0530)
+>
+> ----------------------------------------------------------------
+> DaVinci DT support enhancements for v4.17
+>
+> * Lego EV3 gains firmware recovery mode support
+> * Miscellaneous non-critical clean-up
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Pulled into next/dt, thanks!
+
+     Arnd
