@@ -1,29 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:02:49 +0100
-Subject: [GIT PULL 1/3] DaVinci SoC support updates for v4.17
-In-Reply-To: <20180227075745.23970-1-nsekhar@ti.com>
+Date: Wed, 7 Mar 2018 16:03:18 +0100
+Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.17
+In-Reply-To: <20180227075745.23970-3-nsekhar@ti.com>
 References: <20180227075745.23970-1-nsekhar@ti.com>
-Message-ID: <CAK8P3a2OS5+-0Ds33NgJ=Jbc_9+uNwgMbJ-G3PaUmR05McggWg@mail.gmail.com>
+ <20180227075745.23970-3-nsekhar@ti.com>
+Message-ID: <CAK8P3a03eQ5inAb-nZjQt-zqx793zLDzNRodH-0ObfWPnhsfPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 27, 2018 at 8:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Miscellaneous DaVinci SoC support improvements for v4.17
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 >
-> * rationalization of con_id names for phy clocks to make DT conversion easy
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 >
-> * A patch to move away from syscon as platform device. This is needed for
->   common clock framework conversion as well as helps get rid of
->   syscon_regmap_lookup_by_pdevname() by removing the last known user.
+> are available in the git repository at:
 >
-> * convert mach-davinci to use reset support available in watchdog driver
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.17/defconfig
 >
-> * a non-critical warning fix. It has been around since beginning so not sending
->   as a standalone fix for -rc cycle.
+> for you to fetch changes up to 35ba26772c827dbfc03be8adc3af8ff0d294b38f:
 >
-> * moving mach-davinci clock init to .init_time() for legacy boot. This is
->   again in preparation for CCF conversion.
+>   ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y (2018-02-26 11:41:53 +0530)
+>
+> ----------------------------------------------------------------
+> DaVinci defconfig updates for v4.17
+>
+> Enable SYSCON_REBOOT_MODE needed for Lego EV3 and build the DaVinci
+> watchdog driver in so reboot works even when modules are not loaded.
+>
 
 Pulled into next/soc, thanks!
 
-     Arnd
+         Arnd
