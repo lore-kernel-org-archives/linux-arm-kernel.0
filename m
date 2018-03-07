@@ -1,101 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Mar 2018 12:18:33 +0000
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180223133742.26044-11-mylene.josserand@bootlin.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
-Message-ID: <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 Mar 2018 17:57:37 +0530
+Subject: [PATCH 0/7] ARM: dts: dra7: Enable x2 lane mode support
+In-Reply-To: <20180307120824.GC15139@e107981-ln.cambridge.arm.com>
+References: <20171219093133.16565-1-kishon@ti.com>
+ <20180307120824.GC15139@e107981-ln.cambridge.arm.com>
+Message-ID: <6698a64b-8f4d-53fd-ad93-36c742633d0c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/18 13:37, Myl?ne Josserand wrote:
-> On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
+Hi Lorenzo,
 
-Only on A7? Is that specific to your platform?
-
-> It should be done by the bootloader but it is currently not the case,
-> even for boot CPU because this SoC is booting in secure mode.
-> It leads to an random offset value meaning that each CPU will have a
-> different time, which isn't working very well.
+On Wednesday 07 March 2018 05:38 PM, Lorenzo Pieralisi wrote:
+> On Tue, Dec 19, 2017 at 03:01:26PM +0530, Kishon Vijay Abraham I wrote:
+>> Add properties to enable PCIe x2 lane mode since all dra7
+>> based SoCs support x2 lane mode.
+>>
+>> However only dra76-evm has a slot which can support x2 lane
+>> cards. Hence only enable x2 lane mode in dra76-evm.
+>> (am571x-idk can support x2 lane mode but that makes usb port
+>> not functional so not including the patch to enable
+>> x2 mode in am571x-idk)
+>>
+>> Also included in this series is patch to enable PCIe configs
+>> (both host and device) in omap2plus_defconfig and
+>> multi_v7_defconfig
+>>
+>> In order to get x2 mode working [1] is required.
+>>
+>> However by keeping the older compatible, this series won't
+>> break functionality if this series is merged before [1]
+>>
+>> [1] -> https://lkml.org/lkml/2017/12/19/175
+>>
+>> Kishon Vijay Abraham I (7):
+>>   ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
+>>   ARM: dts: DRA74x: Use PCIe compatible specific to dra74
+>>   ARM: dts: DRA72x: Use PCIe compatible specific to dra72
+>>   ARM: dts: dra76-evm: Enable x2 PCIe lanes
+>>   ARM: dts: dra7: Remove deprecated PCI compatible string
+>>   ARM: omap2plus_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
+>>     modes)
+>>   ARM: multi_v7_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
+>>     modes)
+>>
+>>  arch/arm/boot/dts/dra7.dtsi          |  9 +++++----
+>>  arch/arm/boot/dts/dra72x.dtsi        | 12 ++++++++++++
+>>  arch/arm/boot/dts/dra74x.dtsi        | 12 ++++++++++++
+>>  arch/arm/boot/dts/dra76-evm.dts      | 16 ++++++++++++++++
+>>  arch/arm/configs/multi_v7_defconfig  |  6 ++++++
+>>  arch/arm/configs/omap2plus_defconfig |  8 ++++++++
+>>  6 files changed, 59 insertions(+), 4 deletions(-)
 > 
-> Add assembly code used for boot CPU and secondary CPU cores to make
-> sure that the CNTVOFF register is initialized.
+> Hi Kishon,
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
->  2 files changed, 25 insertions(+)
+> I would like to ask you please what are your expectations with this
+> series, which tree these changes are going to be queued through ?
 > 
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> index d5c97e945e69..605896251927 100644
-> --- a/arch/arm/mach-sunxi/headsmp.S
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
->  	first: .word sunxi_mc_smp_first_comer - .
->  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
->  
-> +ENTRY(sunxi_init_cntvoff)
-> +	/*
-> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-> +	 * then it should be handled by the secure code
-> +	 */
-> +	cps	#MON_MODE
-> +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-> +	orr	r0, r1, #1
-> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-> +	instr_sync
+> Please let me know, thanks.
 
-Since these CPUs are all ARMv7, you can use isb directly. Nobody wants
-to see more of the CP15 barriers.
+Rob has given some comments on the dt [1]. I'll post the driver changes and
+once that gets accepted I'll post the dts changes. dts changes are generally
+merged via linux-omap tree maintained by Tony.
 
-> +	mov	r0, #0
-> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-> +	instr_sync
-> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-> +	instr_sync
-> +	cps	#SVC_MODE
-> +	ret	lr
+Thanks
+Kishon
 
-Given that this code is identical to the shmobile hack, it'd be good to
-make it common, one way or another.
-
-> +ENDPROC(sunxi_init_cntvoff)
-> +
->  #ifdef CONFIG_SMP
->  ENTRY(sunxi_boot)
->  	bl	sunxi_mc_smp_cluster_cache_enable
-> +	bl	sunxi_init_cntvoff
->  	b	secondary_startup
->  ENDPROC(sunxi_boot)
->  
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 5e9602ce1573..4bb041492b54 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
->  };
->  
->  extern void __init sun6i_reset_init(void);
-> +extern void sunxi_init_cntvoff(void);
-> +
->  static void __init sun6i_timer_init(void)
->  {
-> +	sunxi_init_cntvoff();
-> +
-
-It is slightly odd that some CPUs get initialized from the early asm
-code, and some others do a detour via some C code. I'm sure this could
-be made to work
-
->  	of_clk_init(NULL);
->  	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
->  		sun6i_reset_init();
+https://lkml.org/lkml/2017/12/20/625
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Lorenzo
+> 
