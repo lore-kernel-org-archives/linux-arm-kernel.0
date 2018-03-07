@@ -1,71 +1,80 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Wed, 7 Mar 2018 13:31:35 -0500
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
- <20180307143832.GJ3701@kernel.org>
- <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
-Message-ID: <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 7 Mar 2018 17:39:09 +0000
+Subject: [PATCH v3 21/22] arm64: Delay enabling hardware DBM feature
+In-Reply-To: <20180209185840.GJ5862@e103592.cambridge.arm.com>
+References: <20180209175513.17100-1-suzuki.poulose@arm.com>
+ <20180209175513.17100-43-suzuki.poulose@arm.com>
+ <20180209185840.GJ5862@e103592.cambridge.arm.com>
+Message-ID: <e8b40320-10d2-6117-ef7f-7bbb46823ffb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2018 12:35 PM, Ganapatrao Kulkarni wrote:
-> Hi Will Cohen,
-> 
-> On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
-> <acme@kernel.org> wrote:
->> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
->>> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
->>>> There is MIDR change on ThunderX2 B0, adding an entry to mapfile
->>>> to enable JSON events for B0.
->>>>
->>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+On 09/02/18 18:58, Dave Martin wrote:
+> On Fri, Feb 09, 2018 at 05:55:12PM +0000, Suzuki K Poulose wrote:
+>> We enable hardware DBM bit in a capable CPU, very early in the
+>> boot via __cpu_setup. This doesn't give us a flexibility of
+>> optionally disable the feature, as the clearing the bit
+>> is a bit costly as the TLB can cache the settings. Instead,
+>> we delay enabling the feature until the CPU is brought up
+>> into the kernel. We use the feature capability mechanism
+>> to handle it.
 >>
->> Ganapatrao, can you please take this in consideration and if agreeing
->> send a v2 patch?
+>> The hardware DBM is a non-conflicting feature. i.e, the kernel
+>> can safely run with a mix of CPUs with some using the feature
+>> and the others don't. So, it is safe for a late CPU to have
+>> this capability and enable it, even if the active CPUs don't.
 >>
->> With that I can add an Acked-by: wcohen, Right?
+>> To get this handled properly by the infrastructure, we
+>> unconditionally set the capability and only enable it
+>> on CPUs which really have the feature. Also, we print the
+>> feature detection from the "matches" call back to make sure
+>> we don't mislead the user when none of the CPUs could use the
+>> feature.
 >>
->> - Arnaldo
->>>> ---
->>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>> index e61c9ca..93c5d14 100644
->>>> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>> @@ -13,4 +13,5 @@
->>>>  #
->>>>  #Family-model,Version,Filename,EventType
->>>>  0x00000000420f5160,v1,cavium,core
->>>> +0x00000000430f0af0,v1,cavium,core
->>>>  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
->>>>
->>>
->>> Hi,
->>> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
-> 
-> for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
-> are ignored/dont-care.
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since V2
+>>   - Print the feature detection message only when at least one CPU
+>>     is actually using it.
 
-Thanks for pointing that out.  See the code masking out those bits in linux/toos/perf/arch/util/header.c. For the ppc64 it just copies the equivalent of the MIDR including the revision bits. Thus, the need for regular expression matching to avoid having to create a new entry for each revision.
 
--Will
+>> +static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
+>> +		       int __unused)
+>> +{
+>> +	static bool detected = false;
+>> +	/*
+>> +	 * DBM is a non-conflicting feature. i.e, the kernel can safely
+>> +	 * run a mix of CPUs with and without the feature. So, we
+>> +	 * unconditionally enable the capability to allow any late CPU
+>> +	 * to use the feature. We only enable the control bits on the
+>> +	 * CPU, if it actually supports.
+>> +	 *
+>> +	 * We have to make sure we print the "feature" detection only
+>> +	 * when at least one CPU actually uses it. So check if this CPU
+>> +	 * can actually use it and print the message exactly once.
+>> +	 *
+>> +	 * This is safe as all CPUs (including secondary CPUs - due to the
+>> +	 * LOCAL_CPU scope - and the hotplugged CPUs - via verification)
+>> +	 * goes through the "matches" check exactly once. Also if a CPU
+>> +	 * matches the criteria, it is guaranteed that the CPU will turn
+>> +	 * the DBM on, as the capability is unconditionally enabled.
+>> +	 */
+>> +	if (!detected && cpu_can_use_dbm(cap)) {
+>> +		detected = true;
+>> +		pr_info("detected feature: Hardware dirty bit management\n");
+>> +	}
+> 
+> Can we just do
+> 
+> 	if (cpu_can_use_dbm(cap))
+> 		pr_info_once(...);
+> 
+> Then we can get rid of "detected".
 
-> 
->>>
->>> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
->>>
->>>
->>> -Will Cohen
->>
-> 
-> thanks
-> Ganapat
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The reason for open coding is the cost of cpu_can_use_dbm() with
+addition of black listed CPUs in the next patch in the series.
+
+Cheers
+Suzuki
