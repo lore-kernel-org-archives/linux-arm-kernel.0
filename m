@@ -1,46 +1,119 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Mar 2018 02:07:14 +0000
-Subject: [PATCH 0/5] drivers: pwm: sun4i: Improve support for A64 and H6 SoCs
-Message-ID: <20180307020719.6675-1-andre.przywara@arm.com>
+Date: Wed,  7 Mar 2018 02:07:17 +0000
+Subject: [PATCH 3/5] pwm: sun4i: Introduce (optional) reset support
+In-Reply-To: <20180307020719.6675-1-andre.przywara@arm.com>
+References: <20180307020719.6675-1-andre.przywara@arm.com>
+Message-ID: <20180307020719.6675-4-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds PWM support for new Allwinner SoCs. Actually the A64 PWM 
-is fully compatible with the A13 and H3 PWM IP, so the driver does not
-need any additional code. But I use this opportunity to provide some
-cleanup and to add optional reset controller support, which will be needed
-for the H6.
-Patch 1 removes a no longer used parameter from our per-SoC data structure,
-to simplify patch 2, which groups SoCs with a compatible PWM controller.
-Patch 3 adds optional reset controller support, the line will be deasserted
-and asserted at the same time we enable and disable the clock. Patch 4 adds
-the new compatible strings to the binding documentation (and just there,
-we expect to use "allwinner,sun5i-a13-pwm" as a fallback compatible string).
-The final patch 5 adds the respective PWM nodes to the A64 .dtsi.
-This eventually does not enable the PWM on any new board at the moment, as
-the PWM pins are either not usable (muxed with Ethernet) or exposed on
-a header pin not dedicated to PWM. But the Pinebook (and Teres I) should be
-able to use the PWM for the LCD backlights, plus users can enable the
-R_PWM on their Pine64 boards, if they like.
+While the PWM IP in the Allwinner H6 SoC is fully compatible to those
+used in older SoCs (H3, A64), it features a dedicated reset line which
+needs to be de-asserted.
+Add support for an optional "resets" DT property in our pwm-sun4i probe
+routine, and assert and de-assert the reset line, where needed.
+This allows to enable PWM support on the H6.
 
-Tested by manually enabling r_pwm on a Pine64-LTS.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/pwm/pwm-sun4i.c | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
 
-Let me know how you like it and what needs to change.
-
-Cheers,
-Andre.
-
-Andre Przywara (5):
-  pwm: sun4i: drop unused .has_rdy member
-  pwm: sun4i: simplify controller mapping
-  pwm: sun4i: Introduce (optional) reset support
-  dt-bindings: pwm: sunxi: add new compatible strings
-  dts: sunxi: A64: Add PWM controllers
-
- .../devicetree/bindings/pwm/pwm-sun4i.txt          |  6 ++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 28 +++++++++
- drivers/pwm/pwm-sun4i.c                            | 66 ++++++++++++----------
- 3 files changed, 69 insertions(+), 31 deletions(-)
-
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 078172dee462..4eefb27fe80b 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/pwm.h>
++#include <linux/reset.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/time.h>
+@@ -79,6 +80,7 @@ struct sun4i_pwm_data {
+ struct sun4i_pwm_chip {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
++	struct reset_control *reset;
+ 	void __iomem *base;
+ 	spinlock_t ctrl_lock;
+ 	const struct sun4i_pwm_data *data;
+@@ -206,7 +208,7 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+ 	struct pwm_state cstate;
+ 	u32 ctrl;
+-	int ret;
++	int ret = 0;
+ 	unsigned int delay_us;
+ 	unsigned long now;
+ 
+@@ -218,6 +220,18 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			dev_err(chip->dev, "failed to enable PWM clock\n");
+ 			return ret;
+ 		}
++
++		/* Deassert reset if we have a reset control */
++		if (sun4i_pwm->reset) {
++			ret = reset_control_deassert(sun4i_pwm->reset);
++			if (ret) {
++				dev_err(chip->dev,
++					"Cannot deassert reset control\n");
++				clk_disable_unprepare(sun4i_pwm->clk);
++
++				return ret;
++			}
++		}
+ 	}
+ 
+ 	spin_lock(&sun4i_pwm->ctrl_lock);
+@@ -234,7 +248,8 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			dev_err(chip->dev, "period exceeds the maximum value\n");
+ 			spin_unlock(&sun4i_pwm->ctrl_lock);
+ 			if (!cstate.enabled)
+-				clk_disable_unprepare(sun4i_pwm->clk);
++				goto out_disable;
++
+ 			return ret;
+ 		}
+ 
+@@ -274,10 +289,8 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (state->enabled)
+ 		return 0;
+ 
+-	if (!sun4i_pwm->needs_delay[pwm->hwpwm]) {
+-		clk_disable_unprepare(sun4i_pwm->clk);
+-		return 0;
+-	}
++	if (!sun4i_pwm->needs_delay[pwm->hwpwm])
++		goto out_disable;
+ 
+ 	/* We need a full period to elapse before disabling the channel. */
+ 	now = jiffies;
+@@ -299,9 +312,12 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	sun4i_pwm_writel(sun4i_pwm, ctrl, PWM_CTRL_REG);
+ 	spin_unlock(&sun4i_pwm->ctrl_lock);
+ 
++out_disable:
+ 	clk_disable_unprepare(sun4i_pwm->clk);
++	if (sun4i_pwm->reset)
++		reset_control_assert(sun4i_pwm->reset);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static const struct pwm_ops sun4i_pwm_ops = {
+@@ -370,6 +386,10 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pwm->clk))
+ 		return PTR_ERR(pwm->clk);
+ 
++	pwm->reset = devm_reset_control_get_optional(&pdev->dev, NULL);
++	if (IS_ERR(pwm->reset))
++		return PTR_ERR(pwm->reset);
++
+ 	pwm->chip.dev = &pdev->dev;
+ 	pwm->chip.ops = &sun4i_pwm_ops;
+ 	pwm->chip.base = -1;
 -- 
 2.14.1
