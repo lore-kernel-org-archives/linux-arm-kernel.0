@@ -1,94 +1,79 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed,  7 Mar 2018 10:30:02 +0530
-Subject: [PATCH v2] arm64: dts: msm8916: Add cpu cooling maps
-In-Reply-To: <9f7199f0027ef2382e5ccc61a5118d0a00fa2e63.1520340931.git.amit.kucheria@linaro.org>
-References: <9f7199f0027ef2382e5ccc61a5118d0a00fa2e63.1520340931.git.amit.kucheria@linaro.org>
-Message-ID: <4d134dee2154ae3fa56b375aaed9568e21b1a777.1520398076.git.amit.kucheria@linaro.org>
+From: haiyue.wang@linux.intel.com (Haiyue Wang)
+Date: Wed,  7 Mar 2018 13:04:50 +0800
+Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS node
+Message-ID: <1520399090-2455-1-git-send-email-haiyue.wang@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+The IPMI KCS device part of the LPC interface and is used for
+communication with the host processor.
 
-Add cpu cooling maps for cpu passive trip points. The cpu cooling
-device states are mapped to cpufreq based scaling frequencies.
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/aspeed-g5.dtsi | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index e468277..66b318e 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/clock/qcom,gcc-msm8916.h>
- #include <dt-bindings/reset/qcom,gcc-msm8916.h>
- #include <dt-bindings/clock/qcom,rpmcc.h>
-+#include <dt-bindings/thermal/thermal.h>
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 8eac57c..f443169 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -267,8 +267,40 @@
+ 				ranges = <0x0 0x1e789000 0x1000>;
  
- / {
- 	model = "Qualcomm Technologies, Inc. MSM8916";
-@@ -115,6 +116,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		CPU1: cpu at 1 {
-@@ -126,6 +128,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -137,6 +140,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -148,6 +152,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 			clocks = <&apcs 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		L2_0: l2-cache {
-@@ -196,6 +201,13 @@
- 					type = "critical";
- 				};
- 			};
+ 				lpc_bmc: lpc-bmc at 0 {
+-					compatible = "aspeed,ast2500-lpc-bmc";
++					compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
+ 					reg = <0x0 0x80>;
++					reg-io-width = <4>;
 +
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device = <&CPU0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
- 
- 		cpu-thermal1 {
-@@ -216,6 +228,13 @@
- 					type = "critical";
- 				};
- 			};
++					#address-cells = <1>;
++					#size-cells = <1>;
++					ranges = <0x0 0x0 0x80>;
 +
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert1>;
-+					cooling-device = <&CPU0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
- 		};
++					kcs1: kcs1 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <1>;
++						kcs_addr = <0x0>;
++						status = "disabled";
++					};
++
++					kcs2: kcs2 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <2>;
++						kcs_addr = <0x0>;
++						status = "disabled";
++					};
++
++					kcs3: kcs3 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <3>;
++						kcs_addr = <0x0>;
++						status = "disabled";
++					};
+ 				};
  
- 	};
+ 				lpc_host: lpc-host at 80 {
+@@ -294,6 +326,15 @@
+ 						status = "disabled";
+ 					};
+ 
++					kcs4: kcs4 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0xa0>;
++						interrupts = <8>;
++						kcs_chan = <4>;
++						kcs_addr = <0x0>;
++						status = "disabled";
++					};
++
+ 					lhc: lhc at 20 {
+ 						compatible = "aspeed,ast2500-lhc";
+ 						reg = <0x20 0x24 0x48 0x8>;
 -- 
 2.7.4
