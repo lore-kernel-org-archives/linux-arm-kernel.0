@@ -1,54 +1,124 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 7 Mar 2018 08:35:39 +0000
-Subject: [PATCH v2 0/6] Add mmc support for STM32F7 boards
-In-Reply-To: <44ed2e2c-83f1-77f5-fa70-29c5525b9ee7@st.com>
-References: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
- <44ed2e2c-83f1-77f5-fa70-29c5525b9ee7@st.com>
-Message-ID: <20180307083538.vicxhbu72jex7zi6@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  7 Mar 2018 09:43:16 +0100
+Subject: [PATCH 2/4 v4] drm/pl111: Use max memory bandwidth for resolution
+Message-ID: <20180307084316.23623-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 Mar 2018, Alexandre Torgue wrote:
+We were previously selecting 1024x768 and 32BPP as the default
+set-up for the PL111 consumers.
 
-> Hi Patrice,
-> 
-> On 03/01/2018 11:53 AM, patrice.chotard at st.com wrote:
-> > From: Patrice Chotard <patrice.chotard@st.com>
-> > 
-> > This series adds :
-> >   _ SDIO pins definition for STM32F7 SoCs family
-> >   _ add sdio1 DT entry for STM32F746 Discovery board
-> >   _ add sdio1 DT entry for STM32F746 Evaluation board
-> >   _ add sdio1 DT entry for STM32F769 Discovery board
-> >   _ add SDMMC2 entry in stm32f7-rcc.h
-> >   _ replace sdio2 hard coded value in stm32f746.dtsi
-> > 
-> > v2: _ rename sdio_pins / sdio_od_pins to sdio_pins_a / sdio_od_pins_a
-> >        and update board dts files accordingly.
-> > 
-> > 
-> > Patrice Chotard (6):
-> >    ARM: dts: stm32: Add sdio pins definition for stm32f7
-> >    ARM: dts: stm32: Enable sdio1 for stm32f746-disco
-> >    ARM: dts: stm32: Enable sdio1 for stm32f746-eval
-> >    ARM: dts: stm32: Enable sdio1 for stm32f769-disco
-> >    dt-bindings: mfd: Add STM32F7 SDMMC2 rcc entry
-> >    ARM: dts: stm32: Fix sdio2 rcc hard coded value
-> > 
-> >   arch/arm/boot/dts/stm32746g-eval.dts   | 17 ++++++++++
-> >   arch/arm/boot/dts/stm32f7-pinctrl.dtsi | 62 ++++++++++++++++++++++++++++++++++
-> >   arch/arm/boot/dts/stm32f746-disco.dts  | 19 +++++++++++
-> >   arch/arm/boot/dts/stm32f746.dtsi       |  2 +-
-> >   arch/arm/boot/dts/stm32f769-disco.dts  | 19 +++++++++++
-> >   include/dt-bindings/mfd/stm32f7-rcc.h  |  1 +
-> >   6 files changed, 119 insertions(+), 1 deletion(-)
-> > 
-> Series applied on stm32-next.
+This does not work on elder systems: the device tree bindings
+support a property "max-memory-bandwidth" in bytes/second that
+states that if you exceed this the memory bus will saturate.
+The result is flickering and unstable images.
 
-Even the MFD patch?
+Parse the "max-memory-bandwidth" and respect it when
+intializing the driver. On the RealView PB11MP, Versatile and
+Integrator/CP we get a nice console as default with this code.
 
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v3->v4:
+- Switch the noisy DRM_INFO for DRM_DEBUG_KMS
+- Collect Eric's review tag
+ChangeLog v2->v3:
+- Account for the case where there is no bandwidth limitation
+  so priv->memory_bw is zero. Then just accept any modes.
+ChangeLog v1->v2:
+- Exploit the new .mode_valid() callback we added to the
+  simple KMS helper.
+- Use the hardcoded bits per pixel per variant instead of
+  trying to be heuristic about this setting for now.
+---
+ drivers/gpu/drm/pl111/pl111_display.c | 36 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/pl111/pl111_drm.h     |  1 +
+ drivers/gpu/drm/pl111/pl111_drv.c     |  6 ++++++
+ 3 files changed, 43 insertions(+)
+
+diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+index d75923896609..72e85397611a 100644
+--- a/drivers/gpu/drm/pl111/pl111_display.c
++++ b/drivers/gpu/drm/pl111/pl111_display.c
+@@ -50,6 +50,41 @@ irqreturn_t pl111_irq(int irq, void *data)
+ 	return status;
+ }
+ 
++static enum drm_mode_status
++pl111_mode_valid(struct drm_crtc *crtc,
++		 const struct drm_display_mode *mode)
++{
++	struct drm_device *drm = crtc->dev;
++	struct pl111_drm_dev_private *priv = drm->dev_private;
++	u32 cpp = priv->variant->fb_bpp / 8;
++	u64 bw;
++
++	/*
++	 * We use the pixelclock to also account for interlaced modes, the
++	 * resulting bandwidth is in bytes per second.
++	 */
++	bw = mode->clock * 1000; /* In Hz */
++	bw = bw * mode->hdisplay * mode->vdisplay * cpp;
++	bw = div_u64(bw, mode->htotal * mode->vtotal);
++
++	/*
++	 * If no bandwidth constraints, anything goes, else
++	 * check if we are too fast.
++	 */
++	if (priv->memory_bw && (bw > priv->memory_bw)) {
++		DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu too fast\n",
++			      mode->hdisplay, mode->vdisplay,
++			      mode->clock * 1000, cpp, bw);
++
++		return MODE_BAD;
++	}
++	DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu bytes/s OK\n",
++		      mode->hdisplay, mode->vdisplay,
++		      mode->clock * 1000, cpp, bw);
++
++	return MODE_OK;
++}
++
+ static int pl111_display_check(struct drm_simple_display_pipe *pipe,
+ 			       struct drm_plane_state *pstate,
+ 			       struct drm_crtc_state *cstate)
+@@ -344,6 +379,7 @@ static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
+ }
+ 
+ static const struct drm_simple_display_pipe_funcs pl111_display_funcs = {
++	.mode_valid = pl111_mode_valid,
+ 	.check = pl111_display_check,
+ 	.enable = pl111_display_enable,
+ 	.disable = pl111_display_disable,
+diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+index 360fbdd2203c..70b092670c04 100644
+--- a/drivers/gpu/drm/pl111/pl111_drm.h
++++ b/drivers/gpu/drm/pl111/pl111_drm.h
+@@ -65,6 +65,7 @@ struct pl111_drm_dev_private {
+ 	struct drm_simple_display_pipe pipe;
+ 
+ 	void *regs;
++	u32 memory_bw;
+ 	u32 ienb;
+ 	u32 ctrl;
+ 	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
+diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+index 73d252351438..b469aa317d9d 100644
+--- a/drivers/gpu/drm/pl111/pl111_drv.c
++++ b/drivers/gpu/drm/pl111/pl111_drv.c
+@@ -262,6 +262,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
+ 	drm->dev_private = priv;
+ 	priv->variant = variant;
+ 
++	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
++				 &priv->memory_bw)) {
++		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
++		priv->memory_bw = 0;
++	}
++
+ 	/* The two variants swap this register */
+ 	if (variant->is_pl110) {
+ 		priv->ienb = CLCD_PL110_IENB;
 -- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.14.3
