@@ -1,64 +1,53 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 7 Mar 2018 23:05:33 +0530
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <20180307143832.GJ3701@kernel.org>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
- <20180307143832.GJ3701@kernel.org>
-Message-ID: <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 7 Mar 2018 18:35:31 +0100
+Subject: [PATCH v4 0/3] Fix STi aliases property name
+Message-ID: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will Cohen,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
-<acme@kernel.org> wrote:
-> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
->> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
->> > There is MIDR change on ThunderX2 B0, adding an entry to mapfile
->> > to enable JSON events for B0.
->> >
->> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->
-> Ganapatrao, can you please take this in consideration and if agreeing
-> send a v2 patch?
->
-> With that I can add an Acked-by: wcohen, Right?
->
-> - Arnaldo
->> > ---
->> >  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> > index e61c9ca..93c5d14 100644
->> > --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> > +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> > @@ -13,4 +13,5 @@
->> >  #
->> >  #Family-model,Version,Filename,EventType
->> >  0x00000000420f5160,v1,cavium,core
->> > +0x00000000430f0af0,v1,cavium,core
->> >  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
->> >
->>
->> Hi,
->> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
+Since dtc v1.4.6-9-gaadd0b65c987, when compiling dtb with W=1 option,
+the following warnings are triggered :
+    
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih407-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
 
-for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
-are ignored/dont-care.
+_ Patch 1, convert the aliases property name in lowercase in 
+  all STi board dts files.
 
->>
->> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
->>
->>
->> -Will Cohen
->
+_ Patch 2, remove "console=serialN" from bootargs property
 
-thanks
-Ganapat
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+_ Patch 3, rework the tty driver st-asc accordingly, as aliases id is retrieved 
+  using of_alias_get_id() with a defined string with is not lowercase only.
+
+v4: Fix Rob Herring's remarks :
+      _ reorder patches, first st-asc driver update and the DTS patches
+        in order to not break boot.
+      _ squash chunks of previous patch 1 into previous patch 2
+
+v3: Fix Rob Herring's remarks :
+      _ remove "console=serialN,115200" from bootargs and use prefered stdout-path property
+      _ update st-asc driver with "serial" alias prefix and keep "ttyAS" in second choice
+
+v2: Fix Rob Herring's remarks :
+      _ use serialN instead of ttyasN aliases to not break ABI
+      _ remove useless stdout-path property
+      _ update st-asc driver with "serial" alias prefix
+
+Patrice Chotard (3):
+  tty: st-asc: Update tty alias
+  ARM: dts: STi: Fix aliases property name for STi boards
+  ARM: dts: STi: Remove "console=ttyASN" from bootargs for STi boards
+
+ arch/arm/boot/dts/stih407-b2120.dts | 4 ++--
+ arch/arm/boot/dts/stih410-b2120.dts | 4 ++--
+ arch/arm/boot/dts/stih410-b2260.dts | 4 ++--
+ arch/arm/boot/dts/stih418-b2199.dts | 4 ++--
+ drivers/tty/serial/st-asc.c         | 4 +++-
+ 5 files changed, 11 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
