@@ -1,34 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:42:57 +0100
-Subject: [PATCH] ARM: ux500: Fix PMU IRQ regression
-In-Reply-To: <20180307132033.4534-1-linus.walleij@linaro.org>
-References: <20180307132033.4534-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a1iD_pPfpTw6R9TuPKf5sowfODgiROgjy9Zuc1qN=dg-A@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:44:33 +0100
+Subject: [GIT PULL] firmware: arm_scpi: updates for v4.17
+In-Reply-To: <20180301162318.GB1752@e107155-lin>
+References: <20180301162318.GB1752@e107155-lin>
+Message-ID: <CAK8P3a3CPs6PaxvrJCDsrO8NBSZhOwwTArVYr4=cW16XvH-7WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 2:20 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Commit 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
-> deleted some code to bounce and work around the weird PMU
-> IRQs in the DB8500 ASIC, but did a semantic mistake:
-> since the auxdata was now unused, the call to
-> of_platform_populate() was removed, but this does not
-> work: the default platform population will only kick in
-> if .init_machine() is assigned NULL, and since the U8540
-> was still using the callback that was not the case.
->
-> Fix this by reinstating the call to of_platform_populate(),
-> but pass NULL as auxdata.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Fixes: 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please pick this up directly for fixed if
-> Mark is OK with the fix. It'd be nice to have in v4.16 since
-> it is a boot regression.
+On Thu, Mar 1, 2018 at 5:23 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Applied to fixes, thanks!
+> ARM SCPI updates/cleanups for v4.17
+>
+> 1. Fixes to get rid of sparse warnings
+> 2. Use of FIELD_GET and GENMASK for better subfields handling
+> 3. Make mbox_free_channels device-managed helping in removing unnecessary code
+> 4. Various other cleanups to simplify and improve code readability
+>
+> Note that similar set of changes were merged in v4.15, however got reverted
+> through the commit 81faa5566864 ("firmware: arm_scpi: Revert updates made
+> during v4.15 merge window") for reasons mentioned in that commit.
+>
+> This is the resend with the culprit patch removed. Kevin Hilman tested this
+> series on Amlogic and reported it to be fine.
 
-        Arnd
+Pulled into next/drivers, thanks!
+
+         Arnd
