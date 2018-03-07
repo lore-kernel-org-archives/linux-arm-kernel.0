@@ -1,41 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:07:01 +0100
-Subject: [GIT PULL 6/6] dra7 sdhci dts changes for v4.17
-In-Reply-To: <20180307150408.GE5799@atomide.com>
-References: <pull-1520273005-304551@atomide.com>
- <pull-1520273005-304551@atomide.com-6>
- <CAK8P3a0ez9KPNNpv3EAEKtYkLd-+jTFOniBJMHZzy9s-69h_Rw@mail.gmail.com>
- <20180307150408.GE5799@atomide.com>
-Message-ID: <CAK8P3a2Lff9a076GBRGKVOhBhcFK5OKSDOuT6U99e8xfdmFuGw@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:08:02 +0100
+Subject: [PATCH resend^2] ARM: nspire: Remove unneeded nspire_map_io()
+In-Reply-To: <f87260a9-66a9-1f5c-4787-2632ad3daafb@arm.com>
+References: <1519997885-12374-1-git-send-email-geert+renesas@glider.be>
+ <f87260a9-66a9-1f5c-4787-2632ad3daafb@arm.com>
+Message-ID: <CAK8P3a1L=2KdzdfYr+B3pEnvQQ4NA2+wuhhRuQMMdfQE4tSsGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 4:04 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Arnd Bergmann <arnd@arndb.de> [180307 14:41]:
->> On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > From: "Tony Lindgren" <tony@atomide.com>
->> >
->> > The following changes since commit 5bfd9c8e7bfcba36bfbe24e967bf42de83c7f56c:
->> >
->> >   ARM: omap2plus_defconfig: Enable CONFIG_MMC_SDHCI_OMAP (2018-02-28 14:24:57 -0800)
->> >
->> > are available in the Git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.17/dt-sdhci
->> >
->> > for you to fetch changes up to 18aa0f4bca701cb078a6d58a3ed804aa6a4690c7:
+On Fri, Mar 2, 2018 at 2:49 PM, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+> On 02/03/18 13:38, Geert Uytterhoeven wrote:
+>> nspire_map_io() just calls debug_ll_io_init().
 >>
->> I suspect you created a signed tag but forgot to upload it, can you check?
+>> If machine_desc.map_io is not set, devicemaps_init() in the
+>> common ARM code will call debug_ll_io_init(), so nspire_map_io() and the
+>> initialization of .map_io can be removed.
 >>
->> I did not pull this yet, but will do so once I get an update.
->
-> Oops, sorry about that. Yes I signed a tag for it, but then
-> probably got interrupted and forgot to push it and update my
-> list of branches :)
->
-> The signed tag to use is omap-for-v4.17/dt-sdhci-signed, just
-> pushed it so it might take few minutes to propagate.
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Pulled now, thanks for the quick update!
+Applied to next/soc, thanks!
 
        Arnd
