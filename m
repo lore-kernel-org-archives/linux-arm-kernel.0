@@ -1,117 +1,88 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Mar 2018 18:50:12 +0530
-Subject: [PATCH v3 03/11] mmc: sdhci-omap: Workaround for Errata i843
+Date: Wed, 7 Mar 2018 18:50:15 +0530
+Subject: [PATCH v3 06/11] mmc: sdhci: Add quirk to disable HW timeout
 In-Reply-To: <20180307132020.30951-1-kishon@ti.com>
 References: <20180307132020.30951-1-kishon@ti.com>
-Message-ID: <20180307132020.30951-4-kishon@ti.com>
+Message-ID: <20180307132020.30951-7-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i843 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
-(SPRZ429K July 2014?Revised March 2017 [1]) mentions
-PG 1.0/1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
-can operate.
-
-Use soc_device_match() to identify rev 1.0/1.1 silicon and
-override mmc->f_max according to the errata workaround.
-"max-frequency" dt property cannot be used since the device
-tree is added for rev 2.0 silicon.
-
-soc_device_match() is also used in order to get the IODelay values
-for rev 1.0/1.1 silicon.
-
-[1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+Add quirk to disable HW timeout if the requested timeout is more than
+the maximum obtainable timeout.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/sdhci-omap.c | 35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sdhci.c | 27 +++++++++++++++++++++------
+ drivers/mmc/host/sdhci.h |  5 +++++
+ 2 files changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index 0c40b13fb67d..fbc20a4fbb23 100644
---- a/drivers/mmc/host/sdhci-omap.c
-+++ b/drivers/mmc/host/sdhci-omap.c
-@@ -26,6 +26,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/sys_soc.h>
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index aa8b5ca0d1b0..1dd117cbeb6e 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -767,12 +767,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 			break;
+ 	}
  
- #include "sdhci-pltfm.h"
- 
-@@ -100,6 +101,7 @@ struct sdhci_omap_data {
- };
- 
- struct sdhci_omap_host {
-+	char			*version;
- 	void __iomem		*base;
- 	struct device		*dev;
- 	struct	regulator	*pbias;
-@@ -733,12 +735,21 @@ static struct pinctrl_state
- 				  u32 *caps, u32 capmask)
- {
- 	struct device *dev = omap_host->dev;
-+	char *version = omap_host->version;
- 	struct pinctrl_state *pinctrl_state = ERR_PTR(-ENODEV);
-+	char str[20];
- 
- 	if (!(*caps & capmask))
- 		goto ret;
- 
--	pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
-+	if (version) {
-+		snprintf(str, 20, "%s-%s", mode, version);
-+		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, str);
-+	}
-+
-+	if (IS_ERR(pinctrl_state))
-+		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
-+
- 	if (IS_ERR(pinctrl_state)) {
- 		dev_err(dev, "no pinctrl state for %s mode", mode);
- 		*caps &= ~capmask;
-@@ -830,6 +841,16 @@ static int sdhci_omap_config_iodelay_pinctrl_state(struct sdhci_omap_host
- 	return 0;
+-	if (count >= 0xF) {
+-		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+-		    count, cmd->opcode);
+-		count = 0xE;
+-	}
+-
+ 	return count;
  }
  
-+static const struct soc_device_attribute sdhci_omap_soc_devices[] = {
-+	{
-+		.machine = "DRA7[45]*",
-+		.revision = "ES1.[01]",
-+	},
-+	{
-+		/* sentinel */
-+	}
-+};
+@@ -790,6 +784,16 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
+ 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ }
+ 
++static void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
++{
++	if (enable)
++		host->ier |= SDHCI_INT_DATA_TIMEOUT;
++	else
++		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
++}
 +
- static int sdhci_omap_probe(struct platform_device *pdev)
+ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
  {
- 	int ret;
-@@ -841,6 +862,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 	struct mmc_host *mmc;
- 	const struct of_device_id *match;
- 	struct sdhci_omap_data *data;
-+	const struct soc_device_attribute *soc;
- 
- 	match = of_match_device(omap_sdhci_match, dev);
- 	if (!match)
-@@ -875,6 +897,17 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_pltfm_free;
- 
-+	soc = soc_device_match(sdhci_omap_soc_devices);
-+	if (soc) {
-+		omap_host->version = "rev11";
-+		if (!strcmp(dev_name(dev), "4809c000.mmc"))
-+			mmc->f_max = 96000000;
-+		if (!strcmp(dev_name(dev), "480b4000.mmc"))
-+			mmc->f_max = 48000000;
-+		if (!strcmp(dev_name(dev), "480ad000.mmc"))
-+			mmc->f_max = 48000000;
-+	}
+ 	u8 count;
+@@ -798,6 +802,17 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 		host->ops->set_timeout(host, cmd);
+ 	} else {
+ 		count = sdhci_calc_timeout(host, cmd);
++		if (count >= 0xF &&
++		    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT)
++			sdhci_set_data_timeout_irq(host, false);
++		else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT))
++			sdhci_set_data_timeout_irq(host, true);
 +
- 	pltfm_host->clk = devm_clk_get(dev, "fck");
- 	if (IS_ERR(pltfm_host->clk)) {
- 		ret = PTR_ERR(pltfm_host->clk);
++		if (count >= 0xF) {
++			DBG("Too large timeout 0x%x requested for CMD%d!\n",
++			    count, cmd->opcode);
++			count = 0xE;
++		}
+ 		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+ 	}
+ }
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index c95b0a4a7594..ff283ee08854 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -437,6 +437,11 @@ struct sdhci_host {
+ #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+ /* Controller has CRC in 136 bit Command Response */
+ #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
++/*
++ * Disable HW timeout if the requested timeout is more than the maximum
++ * obtainable timeout
++ */
++#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
+ 
+ 	int irq;		/* Device IRQ */
+ 	void __iomem *ioaddr;	/* Mapped address */
 -- 
 2.11.0
