@@ -1,23 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:08:02 +0100
-Subject: [PATCH resend^2] ARM: nspire: Remove unneeded nspire_map_io()
-In-Reply-To: <f87260a9-66a9-1f5c-4787-2632ad3daafb@arm.com>
-References: <1519997885-12374-1-git-send-email-geert+renesas@glider.be>
- <f87260a9-66a9-1f5c-4787-2632ad3daafb@arm.com>
-Message-ID: <CAK8P3a1L=2KdzdfYr+B3pEnvQQ4NA2+wuhhRuQMMdfQE4tSsGw@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:08:48 +0100
+Subject: [PATCH v2] ARM: socfpga: PM: Drop useless check for
+ PM_SUSPEND_STANDBY
+In-Reply-To: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
+References: <1519999487-15474-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAK8P3a3Nc2OPxCqdD9p=UUy_min5y=eRD-yGa1zEKSOHPS2vRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 2, 2018 at 2:49 PM, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> On 02/03/18 13:38, Geert Uytterhoeven wrote:
->> nspire_map_io() just calls debug_ll_io_init().
->>
->> If machine_desc.map_io is not set, devicemaps_init() in the
->> common ARM code will call debug_ll_io_init(), so nspire_map_io() and the
->> initialization of .map_io can be removed.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Fri, Mar 2, 2018 at 3:04 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> As SoCFPGA uses the standard suspend_valid_only_mem() for its
+> platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
+> callback will never be called with state equal to PM_SUSPEND_STANDBY.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Dinh Nguyen <dinguyen@kernel.org>
 
 Applied to next/soc, thanks!
 
