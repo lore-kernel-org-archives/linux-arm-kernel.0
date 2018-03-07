@@ -1,89 +1,91 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 07 Mar 2018 10:29:45 -0800
-Subject: [PATCH] drm/pl111: Enable device-specific assigned memory
-In-Reply-To: <20180307082116.13568-1-linus.walleij@linaro.org>
-References: <20180307082116.13568-1-linus.walleij@linaro.org>
-Message-ID: <87zi3jwxgm.fsf@anholt.net>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Wed, 7 Mar 2018 10:30:59 -0800
+Subject: [PATCH 2/7] ARM: LTO: avoid THUMB2_KERNEL+LTO
+In-Reply-To: <20180220215954.4092811-3-arnd@arndb.de>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-3-arnd@arndb.de>
+Message-ID: <20180307183059.GA57047@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+El Tue, Feb 20, 2018 at 10:59:49PM +0100 Arnd Bergmann ha dit:
 
-> The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-> on the motherboard, which is what we should be using for the
-> PL111 if available. On this platform, the memory backplane
-> is constructed so that only this memory will work properly
-> with the CLCD on the motherboard, using any other memory
-> region just gives random snow on the display.
->
-> The CA9 Versatile Express also has a PL111 instance on its
-> core tile. This is OK, it has been tested with the motherboard
-> VRAM and that works just as fine as regular CMA memory.
->
-> The memory is assigned to the device using the memory-region
-> device tree property and a "shared-dma-pool" reserved
-> memory pool like this:
->
-> reserved-memory {
->         #address-cells = <1>;
->         #size-cells = <1>;
->         ranges;
->
->         vram: vram at 48000000 {
->                 compatible = "shared-dma-pool";
->                 reg = <0x48000000 0x00800000>;
->                 no-map;
->         };
-> };
->
-> clcd at 1f000 {
->         compatible = "arm,pl111", "arm,primecell";
-> 	(...)
->         memory-region = <&vram>;
-> }?;
->
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Mali DP Maintainers <malidp@foss.arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Trying to build an LTO-Enabled kernel with Thumb2 instructions failed
+> horribly for me, with an endless output of things like
+> 
+> ccVnNycO.s:2665: Error: thumb conditional instruction should be in IT block -- `bxne lr'
+> ccVnNycO.s:7128: Error: thumb conditional instruction should be in IT block -- `strexeq r5,r2,[r3]'
+> ccVnNycO.s:7258: Error: thumb conditional instruction should be in IT block -- `strexeq lr,r0,[r3]'
+> ccVnNycO.s:17380: Error: thumb conditional instruction should be in IT block -- `strexeq r1,r2,[r6]'
+> ccVnNycO.s:19163: Error: thumb conditional instruction should be in IT block -- `strexeq r8,r6,[r3]'
+> ccVnNycO.s:22722: Error: thumb conditional instruction should be in IT block -- `strexeq r7,r1,[r0]'
+> ccVnNycO.s:24105: conditional infixes are deprecated in unified syntax
+> ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `sbcccs r1,r1,r3'
+> ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
+> ccVnNycO.s:24210: conditional infixes are deprecated in unified syntax
+> ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `sbcccs r2,r2,r3'
+> ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
+
+For the record:
+
+The errors about sbcccs and movcc probably stem from here:
+
+/* We use 33-bit arithmetic here... */
+#define __range_ok(addr, size) ({ \
+        unsigned long flag, roksum; \
+        __chk_user_ptr(addr);   \
+        __asm__("adds %1, %2, %3; sbcccs %1, %1, %0; movcc %0, #0" \
+                : "=&r" (flag), "=&r" (roksum) \
+                : "r" (addr), "Ir" (size), "0" (current_thread_info()->addr_limit) \
+                : "cc"); \
+        flag; })
+
+arch/arm/include/asm/uaccess.h
+
+I stumbled across this when trying to build a 32-bit ARM kernel with
+clang. This post has some more information:
+
+https://lists.linuxfoundation.org/pipermail/llvmlinux/2012-November/000073.html
+
+"This is a problem with the above Linux inline ASM code, not with Clang,
+nor with gas. It appears the new "Unified syntax" for ARM ASM code now
+used by gas doesn't allow the use of conditional infixes anymore (the CC
+part)."
+
+Unfortunately I'm probably not fluent enough with ARM inline assembly
+to come up with a good alternative.
+
+Matthias
+
+> I did not investigate this too much, disabling Thumb2 support when LTO is
+> set lets me build randconfig kernels.
+> 
+> Since ARM_SINGLE_ARMV7M is Thumb2-only, I have to disallow LTO for V7-M
+> targets.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/gpu/drm/pl111/pl111_drv.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index b469aa317d9d..e301f2a719a3 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -60,6 +60,7 @@
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  #include <linux/of_graph.h>
-> +#include <linux/of_reserved_mem.h>
->  
->  #include <drm/drmP.h>
->  #include <drm/drm_atomic_helper.h>
-> @@ -262,6 +263,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	drm->dev_private = priv;
->  	priv->variant = variant;
->  
-> +	ret = of_reserved_mem_device_init(dev);
-> +	if (!ret)
-> +		dev_info(dev, "using device-specific reserved memory\n");
-> +
->  	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
->  				 &priv->memory_bw)) {
->  		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-> -- 
-> 2.14.3
-
-It looks like you'll want a matching of_reserved_mem_device_release() at
-remove / dev_unref time.
-
-This will still allow BO imports from non-reserved memory, I think.
-Should we just error out of import_sg_table() on this platform?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180307/15e2924c/attachment.sig>
+>  arch/arm/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 8ed0f664f86f..fbf2c3ab9a97 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -18,7 +18,7 @@ config ARM
+>  	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
+>  	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+> -	select ARCH_SUPPORTS_LTO
+> +	select ARCH_SUPPORTS_LTO if !ARM_SINGLE_ARMV7M
+>  	select ARCH_USE_BUILTIN_BSWAP
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+>  	select ARCH_WANT_IPC_PARSE_VERSION
+> @@ -1533,6 +1533,7 @@ config SCHED_HRTICK
+>  config THUMB2_KERNEL
+>  	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
+>  	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+> +	depends on !LTO
+>  	default y if CPU_THUMBONLY
+>  	select ARM_UNWIND
+>  	help
