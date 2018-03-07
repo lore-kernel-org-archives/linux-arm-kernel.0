@@ -1,45 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 15:48:49 +0100
-Subject: [PATCH v2 0/8] ARTPEC-6 ARM SoC device tree updates
-In-Reply-To: <20180307144027.GA17727@axis.com>
-References: <20180221090000.18091-1-niklas.cassel@axis.com>
- <CAK8P3a0ykwsO40w49TL9xgVKv3wrvx7KXz1o6XD5+qXQ6n8YUA@mail.gmail.com>
- <20180307144027.GA17727@axis.com>
-Message-ID: <CAK8P3a3=nNvR=Dk_fYKwbb+srgQ6XQ73E1i_2GNwvs44ZhFyug@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 7 Mar 2018 14:59:34 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5A9DC03B.8020201@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
+ <5A972A7D.9020301@codeaurora.org>
+ <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
+ <5A986425.9080007@codeaurora.org>
+ <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+ <5A99A3DC.9020400@codeaurora.org>
+ <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
+ <5A9DC03B.8020201@codeaurora.org>
+Message-ID: <f340190f-8286-bd3c-c743-79a3d48cc33d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 3:40 PM, Niklas Cassel <niklas.cassel@axis.com> wrote:
-> On Tue, Mar 06, 2018 at 05:45:30PM +0100, Arnd Bergmann wrote:
->> On Wed, Feb 21, 2018 at 9:59 AM, Niklas Cassel <niklas.cassel@axis.com> wrote:
->> > Hello,
->> >
->> > Here comes some ARTPEC-6 ARM SoC device tree updates.
->> >
->> > Niklas Cassel (8):
->> >   ARM: dts: artpec: disable Accelerator Coherency Port
->> >   ARM: dts: artpec: use 1 GiB RAM
->> >   ARM: dts: artpec: remove 0x prefix from clkctrl unit address
->> >   ARM: dts: artpec: migrate ethernet to stmmac binding
->> >   ARM: dts: artpec: add and utilize artpec6 pin controller
->> >   ARM: dts: artpec: add and utilize nbpfaxi DMA controllers
->> >   ARM: dts: artpec: add disabled node for PCIe endpoint mode
->> >   ARM: dts: artpec: add node for hardware crypto accelerator
->>
->> For a series eight patches, a pull request would save me some work, but
->> I applied it anyway.
->
-> Thank you Arnd.
-> You will receive pull requests in the future.
->
->>
->> Are you sure that the first three patches shouldn't be applied to stable
->> backports?
->
-> The only DTS available upstream is for the ARTPEC-6 devboard.
-> Considering that ARTPEC-6 devboards are only used in-house,
-> I don't see a reason to backport anything from this series.
 
-Ok, makes sense. Thanks for checking!
 
-      Arnd
+Hi Saravana,
+
+Sorry for the late response, I was out on vacation.
+
+On 05/03/18 22:10, Saravana Kannan wrote:
+> On 03/05/2018 02:59 AM, Mark Rutland wrote:
+>> On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
+>>> On 03/02/2018 02:42 AM, Mark Rutland wrote:
+>>>> It's important to note that the DSU PMU's event_init() ensures events
+>>>> are affine to a single CPU, and the perf core code serializes operations
+>>>> on those events via the context lock.
+>>>
+>>> Ah, I see that now. Thanks!
+>>>
+>>>> Therefore, two CPUs *won't* try to access the registers simultaneously.
+>>>
+>>> Right, and this driver seems to be going through a lot of work to make sure
+>>> all events are read in one CPU.
+>>>
+>>> Do you even have an upstream target where there are multiple DSU's in a
+>>> system?
+>>
+>> I have no idea, though I do beleive that it's possible for a system to
+>> have multiple DSUs.
+>>
+>>> If not, we can simplify a ton of this code (no hotplug notifiers, no
+>>> migrating PMUs, no SMP calls, etc) by just adding a spinlock and letting any
+>>> CPU read these DSU counters.
+>>
+>> Regardless of whether we allow arbitrary CPUs to read the counters,
+>> other logic still needs to be CPU affine, and we'll still need hotplug
+>> notifiers and event migration.
+> 
+> If you have to support multiple DSUs in a system, then the need is obvious. But if you don't have to support multiple DSU, it's not obvious to me on why you still need CPU affining or hotplug notifiers. Could you please provide me pointers for general understanding?
+> 
+
+We need to support multiple DSUs as such configurations are possible.
+
+> 
+>> I am not necessarily opposed to allowing read() calls from associated
+>> CPUs, but as before, I'll leave that to Suzuki.
+
+I am fine with reading the registers from any of the associated CPUs.
+
+> 
+> Can you make sure this thread is on Suzuki's radar?
+> 
+> Suzuki,
+> 
+> Could please respond? IPI for DSUs are definitely a pain for us.
+
+Thanks
+Suzuki
