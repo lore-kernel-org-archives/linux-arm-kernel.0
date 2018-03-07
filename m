@@ -1,31 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Mar 2018 09:33:28 +0100
-Subject: [PATCH] drm/bridge: sii902x: Retry status read after DDI I2C
-In-Reply-To: <20180305160551.GD16053@e110455-lin.cambridge.arm.com>
-References: <20180305101702.13441-1-linus.walleij@linaro.org>
- <20180305160551.GD16053@e110455-lin.cambridge.arm.com>
-Message-ID: <CACRpkdb7__0iLXPgzR0fBX+-2PTMtbAoicfHGkAuW4nxi58RWw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 7 Mar 2018 08:35:39 +0000
+Subject: [PATCH v2 0/6] Add mmc support for STM32F7 boards
+In-Reply-To: <44ed2e2c-83f1-77f5-fa70-29c5525b9ee7@st.com>
+References: <1519901623-23216-1-git-send-email-patrice.chotard@st.com>
+ <44ed2e2c-83f1-77f5-fa70-29c5525b9ee7@st.com>
+Message-ID: <20180307083538.vicxhbu72jex7zi6@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 5:05 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+On Mon, 05 Mar 2018, Alexandre Torgue wrote:
 
->> Cc: Ville Syrj?l? <ville.syrjala@linux.intel.com>
->> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
->
-> I don't have a suitable configuration to test this, but looks goot to me.
->
-> Reviewed-by: Liviu Dudau <liviu.dudau@arm.com>
+> Hi Patrice,
+> 
+> On 03/01/2018 11:53 AM, patrice.chotard at st.com wrote:
+> > From: Patrice Chotard <patrice.chotard@st.com>
+> > 
+> > This series adds :
+> >   _ SDIO pins definition for STM32F7 SoCs family
+> >   _ add sdio1 DT entry for STM32F746 Discovery board
+> >   _ add sdio1 DT entry for STM32F746 Evaluation board
+> >   _ add sdio1 DT entry for STM32F769 Discovery board
+> >   _ add SDMMC2 entry in stm32f7-rcc.h
+> >   _ replace sdio2 hard coded value in stm32f746.dtsi
+> > 
+> > v2: _ rename sdio_pins / sdio_od_pins to sdio_pins_a / sdio_od_pins_a
+> >        and update board dts files accordingly.
+> > 
+> > 
+> > Patrice Chotard (6):
+> >    ARM: dts: stm32: Add sdio pins definition for stm32f7
+> >    ARM: dts: stm32: Enable sdio1 for stm32f746-disco
+> >    ARM: dts: stm32: Enable sdio1 for stm32f746-eval
+> >    ARM: dts: stm32: Enable sdio1 for stm32f769-disco
+> >    dt-bindings: mfd: Add STM32F7 SDMMC2 rcc entry
+> >    ARM: dts: stm32: Fix sdio2 rcc hard coded value
+> > 
+> >   arch/arm/boot/dts/stm32746g-eval.dts   | 17 ++++++++++
+> >   arch/arm/boot/dts/stm32f7-pinctrl.dtsi | 62 ++++++++++++++++++++++++++++++++++
+> >   arch/arm/boot/dts/stm32f746-disco.dts  | 19 +++++++++++
+> >   arch/arm/boot/dts/stm32f746.dtsi       |  2 +-
+> >   arch/arm/boot/dts/stm32f769-disco.dts  | 19 +++++++++++
+> >   include/dt-bindings/mfd/stm32f7-rcc.h  |  1 +
+> >   6 files changed, 119 insertions(+), 1 deletion(-)
+> > 
+> Series applied on stm32-next.
 
-Thanks!
+Even the MFD patch?
 
-> BTW, Linus, could it be that your DVI-to-VGA connector doesn't wire
-> correctly the EDID pin?
-
-Very possible. I also suspect signal levels or something like
-that, possibly no proper pull-up resistor on the line. Or
-anything similar... it now falls back nicely to default EDID
-modes though.
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
