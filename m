@@ -1,124 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Mar 2018 09:43:16 +0100
-Subject: [PATCH 2/4 v4] drm/pl111: Use max memory bandwidth for resolution
-Message-ID: <20180307084316.23623-1-linus.walleij@linaro.org>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 7 Mar 2018 09:49:56 +0100
+Subject: [PATCH v3 2/3] ARM: dts: STi: Remove console=serialN from bootargs
+ for STi boards
+In-Reply-To: <1520412597-30545-1-git-send-email-patrice.chotard@st.com>
+References: <1520412597-30545-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1520412597-30545-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were previously selecting 1024x768 and 32BPP as the default
-set-up for the PL111 consumers.
+From: Patrice Chotard <patrice.chotard@st.com>
 
-This does not work on elder systems: the device tree bindings
-support a property "max-memory-bandwidth" in bytes/second that
-states that if you exceed this the memory bus will saturate.
-The result is flickering and unstable images.
+As serial interface is already specified into stdout-path property,
+"console=serialN,115200" from bootargs can be removed.
 
-Parse the "max-memory-bandwidth" and respect it when
-intializing the driver. On the RealView PB11MP, Versatile and
-Integrator/CP we get a nice console as default with this code.
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
-ChangeLog v3->v4:
-- Switch the noisy DRM_INFO for DRM_DEBUG_KMS
-- Collect Eric's review tag
-ChangeLog v2->v3:
-- Account for the case where there is no bandwidth limitation
-  so priv->memory_bw is zero. Then just accept any modes.
-ChangeLog v1->v2:
-- Exploit the new .mode_valid() callback we added to the
-  simple KMS helper.
-- Use the hardcoded bits per pixel per variant instead of
-  trying to be heuristic about this setting for now.
----
- drivers/gpu/drm/pl111/pl111_display.c | 36 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/pl111/pl111_drm.h     |  1 +
- drivers/gpu/drm/pl111/pl111_drv.c     |  6 ++++++
- 3 files changed, 43 insertions(+)
+v3: _ remove "console=serialN,115200" from bootargs and use prefered 
+      stdout-path property
+v2: _ none
 
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index d75923896609..72e85397611a 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -50,6 +50,41 @@ irqreturn_t pl111_irq(int irq, void *data)
- 	return status;
- }
+ arch/arm/boot/dts/stih407-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2260.dts | 2 +-
+ arch/arm/boot/dts/stih418-b2199.dts | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+index 2c4d6033b448..62ce1cecbb1f 100644
+--- a/arch/arm/boot/dts/stih407-b2120.dts
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih407-b2120", "st,stih407";
  
-+static enum drm_mode_status
-+pl111_mode_valid(struct drm_crtc *crtc,
-+		 const struct drm_display_mode *mode)
-+{
-+	struct drm_device *drm = crtc->dev;
-+	struct pl111_drm_dev_private *priv = drm->dev_private;
-+	u32 cpp = priv->variant->fb_bpp / 8;
-+	u64 bw;
-+
-+	/*
-+	 * We use the pixelclock to also account for interlaced modes, the
-+	 * resulting bandwidth is in bytes per second.
-+	 */
-+	bw = mode->clock * 1000; /* In Hz */
-+	bw = bw * mode->hdisplay * mode->vdisplay * cpp;
-+	bw = div_u64(bw, mode->htotal * mode->vtotal);
-+
-+	/*
-+	 * If no bandwidth constraints, anything goes, else
-+	 * check if we are too fast.
-+	 */
-+	if (priv->memory_bw && (bw > priv->memory_bw)) {
-+		DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu too fast\n",
-+			      mode->hdisplay, mode->vdisplay,
-+			      mode->clock * 1000, cpp, bw);
-+
-+		return MODE_BAD;
-+	}
-+	DRM_DEBUG_KMS("%d x %d @ %d Hz, %d cpp, bw %llu bytes/s OK\n",
-+		      mode->hdisplay, mode->vdisplay,
-+		      mode->clock * 1000, cpp, bw);
-+
-+	return MODE_OK;
-+}
-+
- static int pl111_display_check(struct drm_simple_display_pipe *pipe,
- 			       struct drm_plane_state *pstate,
- 			       struct drm_crtc_state *cstate)
-@@ -344,6 +379,7 @@ static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
- }
+ 	chosen {
+-		bootargs = "console=serial0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
  
- static const struct drm_simple_display_pipe_funcs pl111_display_funcs = {
-+	.mode_valid = pl111_mode_valid,
- 	.check = pl111_display_check,
- 	.enable = pl111_display_enable,
- 	.disable = pl111_display_disable,
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 360fbdd2203c..70b092670c04 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -65,6 +65,7 @@ struct pl111_drm_dev_private {
- 	struct drm_simple_display_pipe pipe;
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 5422850641e8..2a5a9802a5ec 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih410-b2120", "st,stih410";
  
- 	void *regs;
-+	u32 memory_bw;
- 	u32 ienb;
- 	u32 ctrl;
- 	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 73d252351438..b469aa317d9d 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -262,6 +262,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
+ 	chosen {
+-		bootargs = "console=serial0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
  
-+	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
-+				 &priv->memory_bw)) {
-+		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-+		priv->memory_bw = 0;
-+	}
-+
- 	/* The two variants swap this register */
- 	if (variant->is_pl110) {
- 		priv->ienb = CLCD_PL110_IENB;
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+index ca347160e35d..155caa8c002a 100644
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -15,7 +15,7 @@
+ 	compatible = "st,stih410-b2260", "st,stih410";
+ 
+ 	chosen {
+-		bootargs = "console=serial1,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &uart1;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
+index dbf7bb704a1a..cd0d719e31b7 100644
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih418-b2199", "st,stih418";
+ 
+ 	chosen {
+-		bootargs = "console=serial0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
+ 
 -- 
-2.14.3
+1.9.1
