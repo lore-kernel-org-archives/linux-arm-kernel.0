@@ -1,33 +1,41 @@
-From: himanshujha199640@gmail.com (Himanshu Jha)
-Date: Wed,  7 Mar 2018 23:36:01 +0530
-Subject: [PATCH] mfd: ab8500-debugfs: Use kasprintf
-Message-ID: <1520445961-12160-1-git-send-email-himanshujha199640@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Mar 2018 18:09:25 +0000
+Subject: [PATCH v5 01/23] arm64: alternatives: Add dynamic patching feature
+In-Reply-To: <20180301155538.26860-2-marc.zyngier@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-2-marc.zyngier@arm.com>
+Message-ID: <20180307180925.ageajlaeqwtt4c2m@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use kasprintf instead of combination of kmalloc and sprintf.
+On Thu, Mar 01, 2018 at 03:55:16PM +0000, Marc Zyngier wrote:
+> We've so far relied on a patching infrastructure that only gave us
+> a single alternative, without any way to provide a range of potential
+> replacement instructions. For a single feature, this is an all or
+> nothing thing.
+> 
+> It would be interesting to have a more flexible grained way of patching
+> the kernel though, where we could dynamically tune the code that gets
+> injected.
+> 
+> In order to achive this, let's introduce a new form of dynamic patching,
+> assiciating a callback to a patching site. This callback gets source and
+> target locations of the patching request, as well as the number of
+> instructions to be patched.
+> 
+> Dynamic patching is declared with the new ALTERNATIVE_CB and alternative_cb
+> directives:
+> 
+> 	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
+> 		     : "r" (v));
+> or
+> 	alternative_cb callback
+> 		mov	x0, #0
+> 	alternative_cb_end
+> 
+> where callback is the C function computing the alternative.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
----
- drivers/mfd/ab8500-debugfs.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 8ba4107..831a1ce 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -2519,11 +2519,10 @@ static ssize_t ab8500_subscribe_write(struct file *file,
- 	if (!dev_attr[irq_index])
- 		return -ENOMEM;
- 
--	event_name[irq_index] = kmalloc(count, GFP_KERNEL);
-+	event_name[irq_index] = kasprintf(GFP_KERNEL, "%lu", user_val);
- 	if (!event_name[irq_index])
- 		return -ENOMEM;
- 
--	sprintf(event_name[irq_index], "%lu", user_val);
- 	dev_attr[irq_index]->show = show_irq;
- 	dev_attr[irq_index]->store = NULL;
- 	dev_attr[irq_index]->attr.name = event_name[irq_index];
--- 
-2.7.4
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
