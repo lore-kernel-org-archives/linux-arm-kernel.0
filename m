@@ -1,44 +1,48 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 7 Mar 2018 17:21:39 +0800
-Subject: [PATCH] soc: mediatek: fix the mistaken pointer accessed when
- subdomains are added
-In-Reply-To: <9d9d75250bf62b491294a0c550c35ab7aba05eef.1518113047.git.sean.wang@mediatek.com>
-References: <9d9d75250bf62b491294a0c550c35ab7aba05eef.1518113047.git.sean.wang@mediatek.com>
-Message-ID: <1520414499.677.5.camel@mtkswgap22>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Wed, 7 Mar 2018 15:05:17 +0530
+Subject: [alsa-devel] [PATCH v3 19/25] ASoC: qcom: q6afe: add support to
+ MI2S ports
+In-Reply-To: <20180213165837.1620-20-srinivas.kandagatla@linaro.org>
+References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
+ <20180213165837.1620-20-srinivas.kandagatla@linaro.org>
+Message-ID: <7d3c344c-ccb5-78b8-e184-3ab65bdef6ac@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthis
-	
-also a gentle ping for the patch
-	
-	Sean
 
-On Fri, 2018-02-09 at 02:07 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Fix the pointer to struct scp_subdomian not being moved forward
-> when each sub-domain is expected to be iteratively added through
-> pm_genpd_add_subdomain call.
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: 53fddb1a66dd ("soc: mediatek: reduce code duplication of scpsys_probe across all SoCs")
-> Reported-by: Weiyi Lu <weiyi.lu@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+
+On 2/13/2018 10:28 PM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  drivers/soc/mediatek/mtk-scpsys.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index fc55faa..9de801e 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -1048,7 +1048,7 @@ static int scpsys_probe(struct platform_device *pdev)
->  
->  	pd_data = &scp->pd_data;
->  
-> -	for (i = 0, sd = soc->subdomains ; i < soc->num_subdomains ; i++) {
-> +	for (i = 0, sd = soc->subdomains; i < soc->num_subdomains; i++, sd++) {
->  		ret = pm_genpd_add_subdomain(pd_data->domains[sd->origin],
->  					     pd_data->domains[sd->subdomain]);
->  		if (ret && IS_ENABLED(CONFIG_PM))
+>   include/dt-bindings/sound/qcom,q6afe.h |  10 +++
+>   sound/soc/qcom/qdsp6/q6afe.c           | 111 +++++++++++++++++++++++++++++++++
+>   sound/soc/qcom/qdsp6/q6afe.h           |  10 +++
+>   3 files changed, 131 insertions(+)
+>
+> diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
+> index e9004ee39f72..3cd862262369 100644
+> --- a/include/dt-bindings/sound/qcom,q6afe.h
+> +++ b/include/dt-bindings/sound/qcom,q6afe.h
+> @@ -16,6 +16,16 @@
+>   #define SLIMBUS_4_TX    24
+>   #define SLIMBUS_5_RX    25
+>   #define SLIMBUS_5_TX    26
+> +#define QUATERNARY_MI2S_RX	34
+> +#define QUATERNARY_MI2S_TX	35
+> +#define SECONDARY_MI2S_RX	36
+> +#define SECONDARY_MI2S_TX	37
+> +#define TERTIARY_MI2S_RX	38
+> +#define TERTIARY_MI2S_TX	39
+> +#define PRIMARY_MI2S_RX		40
+> +#define PRIMARY_MI2S_TX		41
+Can we assign ids to Primary, secondary, tertiary and quaternary MI2S 
+ports in sequence starting with Primary.
+> +#define SECONDARY_PCM_RX	42
+> +#define SECONDARY_PCM_TX	43
+Why only SECONDARY_PCM_RX ? This is not required for MI2S right?
+>   #define SLIMBUS_6_RX    45
+>   #define SLIMBUS_6_TX    46
+>
+[..]
