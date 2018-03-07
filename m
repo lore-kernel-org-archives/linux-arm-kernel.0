@@ -1,109 +1,130 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Wed, 07 Mar 2018 12:39:29 -0500
-Subject: [RFC V3 1/3] perf, tools: Support wildcards on pmu name in
- dynamic pmu events
-In-Reply-To: <20180307160224.GN3701@kernel.org>
-References: <1520345084-42646-1-git-send-email-agustinv@codeaurora.org>
- <1520345084-42646-2-git-send-email-agustinv@codeaurora.org>
- <20180307160224.GN3701@kernel.org>
-Message-ID: <d3bd59db56fbc13b931ae45573bf94d8@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 7 Mar 2018 17:42:27 +0000
+Subject: [PATCH v3 14/22] arm64: capabilities: Add support for features
+ enabled early
+In-Reply-To: <20180212171712.GK5862@e103592.cambridge.arm.com>
+References: <20180209175513.17100-1-suzuki.poulose@arm.com>
+ <20180209175513.17100-28-suzuki.poulose@arm.com>
+ <20180212171712.GK5862@e103592.cambridge.arm.com>
+Message-ID: <986f7445-8f67-96e9-21f7-6eb1ff5a23c1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-07 11:02, Arnaldo Carvalho de Melo wrote:
-> Em Tue, Mar 06, 2018 at 09:04:42AM -0500, Agustin Vega-Frias escreveu:
+On 12/02/18 17:17, Dave Martin wrote:
+> On Fri, Feb 09, 2018 at 05:54:57PM +0000, Suzuki K Poulose wrote:
+>> The kernel detects and uses some of the features based on the boot
+>> CPU and expects that all the following CPUs conform to it. e.g,
+>> with VHE and the boot CPU running at EL2, the kernel decides to
+>> keep the kernel running at EL2. If another CPU is brought up without
+>> this capability, we use custom hooks (via check_early_cpu_features())
+>> to handle it. To handle such capabilities add support for detecting
+>> and enabling capabilities based on the boot CPU.
+>>
 
-[snip]
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index 383c69c95f23..5f56a8342065 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -104,7 +104,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *    some checks at runtime. This could be, e.g, checking the value of a field
+>>    *    in CPU ID feature register or checking the cpu model. The capability
+>>    *    provides a call back ( @matches() ) to perform the check.
+>> - *    Scope defines how the checks should be performed. There are two cases:
+>> + *    Scope defines how the checks should be performed. There are three cases:
+>>    *
+>>    *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
+>>    *        matches. This implies, we have to run the check on all the booting
+>> @@ -117,6 +117,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *        field in one of the CPU ID feature registers, we use the sanitised
+>>    *        value of the register from the CPU feature infrastructure to make
+>>    *        the decision.
+>> + *		Or
+>> + *     c) SCOPE_BOOT_CPU: Check only on the primary boot CPU to detect the feature.
+>> + *        This category is for features that are "finalised" (or used) by the kernel
+>> + *        very early even before the SMP cpus are brought up.
+>> + *
+> 
+> Nit: the overlong lines bring no benefit here.  Please wrap them if
+> possible -- but to avoid patch churn only bother for lines actually
+> changed/added by this patch.
 
-> This breaks the build in at least Alpine Linux 3.4, 3.5 and 3.6 and
-> android-ndk:r15c-arm
+Sure
+
+>>   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+>> @@ -1277,12 +1277,21 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_m
+>>   
+>>   		if (caps->cpu_enable) {
+>>   			/*
+>> -			 * Use stop_machine() as it schedules the work allowing
+>> -			 * us to modify PSTATE, instead of on_each_cpu() which
+>> -			 * uses an IPI, giving us a PSTATE that disappears when
+>> -			 * we return.
+>> +			 * If we are dealing with a boot CPU capability, we
+>> +			 * have to enable this only on the Boot CPU, where it
+>> +			 * is detected. All the secondaries enable it via
+>> +			 * check_local_cpu_capabilities().
 > 
-> Alpine 3.6 build failure:
+> I found this confusing to read, because it's not 100% clear whether the
+> "If we are dealing with a boot CPU capability" applies to the second
+> sentence as well.
 > 
->   CC       /tmp/build/perf/util/parse-events-bison.o
-> util/parse-events.y: In function 'parse_events_parse':
-> util/parse-events.y:244:37: error: 'FNM_EXTMATCH' undeclared (first
-> use in this function)
->     if (!fnmatch(pattern, pmu->name, FNM_EXTMATCH)) {
->                                      ^~~~~~~~~~~~
-> util/parse-events.y:244:37: note: each undeclared identifier is
-> reported only once for each function it appears in
->   CC       /tmp/build/perf/bench/mem-functions.o
-> mv: can't rename '/tmp/build/perf/util/.parse-events-bison.o.tmp': No
-> such file or directory
-> make[4]: *** [/git/linux/tools/build/Makefile.build:96:
-> /tmp/build/perf/util/parse-events-bison.o] Error 1
-> make[3]: *** [/git/linux/tools/build/Makefile.build:139: util] Error 2
-> make[2]: *** [Makefile.perf:623: /tmp/build/perf/libperf-in.o] Error 2
-> make[2]: *** Waiting for unfinished jobs....
+> Maybe this would be clearer as:
 > 
-> Android NDK r15c ARM, cross built from, IIRC, Fedora 24:
+> "Capabilities with SCOPE_BOOT_CPU are finalised before any secondary
+> CPU boots.  Thus, each secondary will enable the capability as
+> appropriate via check_local_cpu_capabilities().  The only exception is
+> the boot CPU, for which the capability must be enabled here.  This
+> approach avoids costly stop_machine() calls for this case."
 > 
->  CC       /tmp/build/perf/util/parse-events-bison.o
-> util/parse-events.y: In function 'parse_events_parse':
-> util/parse-events.y:244:37: error: 'FNM_EXTMATCH' undeclared (first
-> use in this function)
->     if (!fnmatch(pattern, pmu->name, FNM_EXTMATCH)) {
->                                      ^
-> util/parse-events.y:244:37: note: each undeclared identifier is
-> reported only once for each function it appears in
-> mv: cannot stat '/tmp/build/perf/util/.parse-events-bison.o.tmp': No
-> such file or directory
-> make[4]: *** [/git/linux/tools/build/Makefile.build:96:
-> /tmp/build/perf/util/parse-events-bison.o] Error 1
-> make[4]: *** Waiting for unfinished jobs....
->   CC       /tmp/build/perf/builtin-kmem.o
-> make[3]: *** [/git/linux/tools/build/Makefile.build:139: util] Error 2
-> make[2]: *** [Makefile.perf:623: /tmp/build/perf/libperf-in.o] Error 2
+> Thoughts?
+
+Definitely better, will change it.
+
+
+>> @@ -1362,6 +1371,12 @@ static void check_early_cpu_features(void)
+>>   {
+>>   	verify_cpu_run_el();
+>>   	verify_cpu_asid_bits();
+>> +	/*
+>> +	 * Early features are used by the kernel already. If there
+>> +	 * is a conflict, we cannot proceed further.
+>> +	 */
+>> +	if (!verify_local_cpu_caps(SCOPE_BOOT_CPU))
+>> +		cpu_panic_kernel();
+>>   }
+>>   
+>>   static void
+>> @@ -1403,9 +1418,8 @@ static void verify_sve_features(void)
+>>    */
+>>   static void verify_local_cpu_capabilities(void)
+>>   {
 > 
+> Nit: Maybe add a comment saying where SCOPE_BOOT_CPU capabilities are
+> checked.
+
+Ok
+
 > 
-> Probably others, I'll investigate later, feel free to do it if you have
-> the time now :-)
+>> -	if (!verify_local_cpu_caps(SCOPE_ALL))
+>> +	if (!verify_local_cpu_caps(SCOPE_ALL & ~SCOPE_BOOT_CPU))
+>>   		cpu_die_early();
+>> -
+> 
+> Nit: keep blank line?
+> 
+> Otherwise it looks like the if() falls through, where really
+> cpu_die_early() does not return.
 > 
 
-Sorry about that. That's probably because FNM_EXTMATCH is a GNU 
-extension,
-not POSIX, and the Alpine and Android runtimes likely don't implement 
-that...
-I'll send a fix reverting back to the strncmp to ignore the uncore_ 
-prefix,
-and dropping that extension.
+ok
 
-Agust?n
+>>   void __init setup_cpu_features(void)
+>> -- 
+>> 2.14.3
+> 
+> With fair consideration given to the nits above:
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-> Extra info:
-> 
-> 
->    1    46.29 alpine:3.4                    : FAIL gcc (Alpine 5.3.0) 
-> 5.3.0
->    2    53.37 alpine:3.5                    : FAIL gcc (Alpine 6.2.1)
-> 6.2.1 20160822
->    3    48.42 alpine:3.6                    : FAIL gcc (Alpine 6.3.0) 
-> 6.3.0
->    4    35.88 alpine:edge                   : FAIL gcc (Alpine 6.4.0) 
-> 6.4.0
->    5    96.79 amazonlinux:1                 : Ok   gcc (GCC) 4.8.5
-> 20150623 (Red Hat 4.8.5-11)
->    6   116.40 amazonlinux:2                 : Ok   gcc (GCC) 7.2.1
-> 20170915 (Red Hat 7.2.1-2)
->    7    34.30 android-ndk:r12b-arm          : FAIL
-> arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
->    8    33.69 android-ndk:r15c-arm          : FAIL
-> arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
->    9    60.50 centos:5                      : Ok   gcc (GCC) 4.1.2
-> 20080704 (Red Hat 4.1.2-55)
->   10    88.54 centos:6                      : Ok   gcc (GCC) 4.4.7
-> 20120313 (Red Hat 4.4.7-18)
->   11   108.89 centos:7                      : Ok   gcc (GCC) 4.8.5
-> 20150623 (Red Hat 4.8.5-16)
-> 
-> 
-> The builds are still ongoing.
-> 
-> - Arnaldo
-
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+Cheers
+Suzuki
