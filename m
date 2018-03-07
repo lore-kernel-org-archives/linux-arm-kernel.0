@@ -1,28 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 15:40:57 +0100
-Subject: [GIT PULL 6/6] dra7 sdhci dts changes for v4.17
-In-Reply-To: <pull-1520273005-304551@atomide.com-6>
-References: <pull-1520273005-304551@atomide.com>
- <pull-1520273005-304551@atomide.com-6>
-Message-ID: <CAK8P3a0ez9KPNNpv3EAEKtYkLd-+jTFOniBJMHZzy9s-69h_Rw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 7 Mar 2018 14:44:12 +0000
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
+ with the same vintid
+In-Reply-To: <20180307124055.13800-2-marc.zyngier@arm.com>
+References: <20180307124055.13800-1-marc.zyngier@arm.com>
+ <20180307124055.13800-2-marc.zyngier@arm.com>
+Message-ID: <ac9ecbfb-4641-b608-a992-76f7e0f57164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
->
-> The following changes since commit 5bfd9c8e7bfcba36bfbe24e967bf42de83c7f56c:
->
->   ARM: omap2plus_defconfig: Enable CONFIG_MMC_SDHCI_OMAP (2018-02-28 14:24:57 -0800)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.17/dt-sdhci
->
-> for you to fetch changes up to 18aa0f4bca701cb078a6d58a3ed804aa6a4690c7:
+Hi,
 
-I suspect you created a signed tag but forgot to upload it, can you check?
+On 07/03/18 12:40, Marc Zyngier wrote:
+> The vgic code is trying to be clever when injecting GICv2 SGIs,
+> and will happily populate LRs with the same interrupt number if
+> they come from multiple vcpus (after all, they are distinct
+> interrupt sources).
+> 
+> Unfortunately, this is against the letter of the architecture,
+> and the GICv2 architecture spec says "Each valid interrupt stored
+> in the List registers must have a unique VirtualID for that
+> virtual CPU interface.". GICv3 has similar (although slightly
+> ambiguous) restrictions.
 
-I did not pull this yet, but will do so once I get an update.
+Ah, good catch. I was silently assuming that this "unique interrupt"
+restriction was including the source ID, but fair enough.
 
-       Arnd
+> This results in guests locking up when using GICv2-on-GICv3, for
+> example. The obvious fix is to stop trying so hard, and inject
+> a single vcpu per SGI per guest entry. After all, pending SGIs
+> with multiple source vcpus are pretty rare, and are mostly seen
+> in scenario where the physical CPUs are severely overcomitted.
+> 
+> Cc: stable at vger.kernel.org
+> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Thanks!
+Andre.
+
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 11 +----------
+>  1 file changed, 1 insertion(+), 10 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index c7c5ef190afa..1f7ff175f47b 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+>  	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+>  		spin_lock(&irq->irq_lock);
+>  
+> -		if (unlikely(vgic_target_oracle(irq) != vcpu))
+> -			goto next;
+> -
+> -		/*
+> -		 * If we get an SGI with multiple sources, try to get
+> -		 * them in all at once.
+> -		 */
+> -		do {
+> +		if (likely(vgic_target_oracle(irq) == vcpu))
+>  			vgic_populate_lr(vcpu, irq, count++);
+> -		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
+>  
+> -next:
+>  		spin_unlock(&irq->irq_lock);
+>  
+>  		if (count == kvm_vgic_global_state.nr_lr) {
+> 
