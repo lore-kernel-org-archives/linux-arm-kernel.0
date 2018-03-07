@@ -1,44 +1,34 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 7 Mar 2018 10:36:24 +0530
-Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
- <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
- <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
- <20180306042656.GJ23018@vireshk-i7>
- <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
-Message-ID: <20180307050624.GR23018@vireshk-i7>
+Date: Wed, 7 Mar 2018 10:39:56 +0530
+Subject: [PATCH v9 14/15] cpufreq: Add module to register cpufreq on
+ Krait CPUs
+In-Reply-To: <1520347148-27852-15-git-send-email-sricharan@codeaurora.org>
+References: <1520347148-27852-1-git-send-email-sricharan@codeaurora.org>
+ <1520347148-27852-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180307050956.GA6842@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-03-18, 08:37, Jordan Crouse wrote:
-> I'll try to explain but I might need Stephen or some of the other folks to jump
-> in and save me.
-
-Maybe you should start using his kernel.org address then ? :)
-
-> On sdm845 there are shared power resources controlled by the RPMh which is
-> programed by a series of commands from the regulator driver; but in the case
-> of the GPU the votes are passed to the GMU (graphics management unit) which
-> communicates with the RPMh on behalf of the GPU.
+On 06-03-18, 20:09, Sricharan R wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> In order to construct the RPMh vote we need first need a voltage level that we
-> can look up in a database. qcom,arc-level is the voltage level associated with
-> a specific OPP.
+> Register a cpufreq-generic device whenever we detect that a
+> "qcom,krait" compatible CPU is present in DT.
 > 
-> I had previously been abusing this with opp-microvolt but that was wrong for
-> obvious reasons and then Stephen pointed out that this would be a better way.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> [Sricharan: updated to use dev_pm_opp_set_prop_name and
+> 	    nvmem apis]
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |  10 ++
+>  drivers/cpufreq/Makefile             |   1 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c |   5 +
+>  drivers/cpufreq/qcom-cpufreq.c       | 183 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 199 insertions(+)
+>  create mode 100644 drivers/cpufreq/qcom-cpufreq.c
 
-Glad that you shared that :)
-
-A solution is already in progress for that and is partially merged as
-well.
-
-Look for "performance_state" in genpd and OPP cores (already merged),
-followed by this series here:
-
-https://lkml.kernel.org/r/cover.1513926033.git.viresh.kumar at linaro.org
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
 viresh
