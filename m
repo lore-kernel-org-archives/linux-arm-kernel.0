@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:03:18 +0100
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.17
-In-Reply-To: <20180227075745.23970-3-nsekhar@ti.com>
-References: <20180227075745.23970-1-nsekhar@ti.com>
- <20180227075745.23970-3-nsekhar@ti.com>
-Message-ID: <CAK8P3a03eQ5inAb-nZjQt-zqx793zLDzNRodH-0ObfWPnhsfPw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Mar 2018 07:04:08 -0800
+Subject: [GIT PULL 6/6] dra7 sdhci dts changes for v4.17
+In-Reply-To: <CAK8P3a0ez9KPNNpv3EAEKtYkLd-+jTFOniBJMHZzy9s-69h_Rw@mail.gmail.com>
+References: <pull-1520273005-304551@atomide.com>
+ <pull-1520273005-304551@atomide.com-6>
+ <CAK8P3a0ez9KPNNpv3EAEKtYkLd-+jTFOniBJMHZzy9s-69h_Rw@mail.gmail.com>
+Message-ID: <20180307150408.GE5799@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 8:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.17/defconfig
->
-> for you to fetch changes up to 35ba26772c827dbfc03be8adc3af8ff0d294b38f:
->
->   ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y (2018-02-26 11:41:53 +0530)
->
-> ----------------------------------------------------------------
-> DaVinci defconfig updates for v4.17
->
-> Enable SYSCON_REBOOT_MODE needed for Lego EV3 and build the DaVinci
-> watchdog driver in so reboot works even when modules are not loaded.
->
+* Arnd Bergmann <arnd@arndb.de> [180307 14:41]:
+> On Mon, Mar 5, 2018 at 7:11 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > From: "Tony Lindgren" <tony@atomide.com>
+> >
+> > The following changes since commit 5bfd9c8e7bfcba36bfbe24e967bf42de83c7f56c:
+> >
+> >   ARM: omap2plus_defconfig: Enable CONFIG_MMC_SDHCI_OMAP (2018-02-28 14:24:57 -0800)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.17/dt-sdhci
+> >
+> > for you to fetch changes up to 18aa0f4bca701cb078a6d58a3ed804aa6a4690c7:
+> 
+> I suspect you created a signed tag but forgot to upload it, can you check?
+> 
+> I did not pull this yet, but will do so once I get an update.
 
-Pulled into next/soc, thanks!
+Oops, sorry about that. Yes I signed a tag for it, but then
+probably got interrupted and forgot to push it and update my
+list of branches :)
 
-         Arnd
+The signed tag to use is omap-for-v4.17/dt-sdhci-signed, just
+pushed it so it might take few minutes to propagate.
+
+Regards,
+
+Tony
