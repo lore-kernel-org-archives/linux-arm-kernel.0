@@ -1,47 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Mar 2018 14:20:33 +0100
-Subject: [PATCH] ARM: ux500: Fix PMU IRQ regression
-Message-ID: <20180307132033.4534-1-linus.walleij@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 Mar 2018 18:50:13 +0530
+Subject: [PATCH v3 04/11] mmc: sdhci-omap: Invoke sdhci_get_of_property to
+ read sdhci dt properties
+In-Reply-To: <20180307132020.30951-1-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+Message-ID: <20180307132020.30951-5-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
-deleted some code to bounce and work around the weird PMU
-IRQs in the DB8500 ASIC, but did a semantic mistake:
-since the auxdata was now unused, the call to
-of_platform_populate() was removed, but this does not
-work: the default platform population will only kick in
-if .init_machine() is assigned NULL, and since the U8540
-was still using the callback that was not the case.
+Invoke sdhci_get_of_property defined in sdhci-pltfm.c to read
+sdhci specific properties from dt node.
 
-Fix this by reinstating the call to of_platform_populate(),
-but pass NULL as auxdata.
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Fixes: 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
-ARM SoC folks: please pick this up directly for fixed if
-Mark is OK with the fix. It'd be nice to have in v4.16 since
-it is a boot regression.
----
- arch/arm/mach-ux500/cpu-db8500.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/mmc/host/sdhci-omap.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 7e5d7a083707..36cd23c8be9b 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -133,6 +133,9 @@ static void __init u8500_init_machine(void)
- 	if (of_machine_is_compatible("st-ericsson,u8540"))
- 		of_platform_populate(NULL, u8500_local_bus_nodes,
- 				     u8540_auxdata_lookup, NULL);
-+	else
-+		of_platform_populate(NULL, u8500_local_bus_nodes,
-+				     NULL, NULL);
- }
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index fbc20a4fbb23..314dbe4d7412 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -893,6 +893,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+ 	host->ioaddr += offset;
  
- static const char * stericsson_dt_platform_compat[] = {
+ 	mmc = host->mmc;
++	sdhci_get_of_property(pdev);
+ 	ret = mmc_of_parse(mmc);
+ 	if (ret)
+ 		goto err_pltfm_free;
 -- 
-2.14.3
+2.11.0
