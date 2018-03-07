@@ -1,77 +1,85 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 07 Mar 2018 22:11:56 +0100
-Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
-In-Reply-To: <26212674.B0xcQEiVyd@jernej-laptop>
-References: <2424862.oPtAVTfrB9@jernej-laptop>
- <20180302124050.GF6255@sirena.org.uk> <26212674.B0xcQEiVyd@jernej-laptop>
-Message-ID: <1832733.mujlD9skaR@jernej-laptop>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 07 Mar 2018 13:36:23 -0800
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <f340190f-8286-bd3c-c743-79a3d48cc33d@arm.com>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5A90B77E.8040105@codeaurora.org> <20180225143653.peb4quk3ha5h3t5x@salmiak>
+ <5A972A7D.9020301@codeaurora.org>
+ <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
+ <5A986425.9080007@codeaurora.org>
+ <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
+ <5A99A3DC.9020400@codeaurora.org>
+ <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
+ <5A9DC03B.8020201@codeaurora.org>
+ <f340190f-8286-bd3c-c743-79a3d48cc33d@arm.com>
+Message-ID: <5AA05B57.9010005@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/07/2018 06:59 AM, Suzuki K Poulose wrote:
+>
+>
+> Hi Saravana,
+>
+> Sorry for the late response, I was out on vacation.
+>
+> On 05/03/18 22:10, Saravana Kannan wrote:
+>> On 03/05/2018 02:59 AM, Mark Rutland wrote:
+>>> On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
+>>>> On 03/02/2018 02:42 AM, Mark Rutland wrote:
+>>>>> It's important to note that the DSU PMU's event_init() ensures events
+>>>>> are affine to a single CPU, and the perf core code serializes
+>>>>> operations
+>>>>> on those events via the context lock.
+>>>>
+>>>> Ah, I see that now. Thanks!
+>>>>
+>>>>> Therefore, two CPUs *won't* try to access the registers
+>>>>> simultaneously.
+>>>>
+>>>> Right, and this driver seems to be going through a lot of work to
+>>>> make sure
+>>>> all events are read in one CPU.
+>>>>
+>>>> Do you even have an upstream target where there are multiple DSU's in a
+>>>> system?
+>>>
+>>> I have no idea, though I do beleive that it's possible for a system to
+>>> have multiple DSUs.
+>>>
+>>>> If not, we can simplify a ton of this code (no hotplug notifiers, no
+>>>> migrating PMUs, no SMP calls, etc) by just adding a spinlock and
+>>>> letting any
+>>>> CPU read these DSU counters.
+>>>
+>>> Regardless of whether we allow arbitrary CPUs to read the counters,
+>>> other logic still needs to be CPU affine, and we'll still need hotplug
+>>> notifiers and event migration.
+>>
+>> If you have to support multiple DSUs in a system, then the need is
+>> obvious. But if you don't have to support multiple DSU, it's not
+>> obvious to me on why you still need CPU affining or hotplug notifiers.
+>> Could you please provide me pointers for general understanding?
+>>
+>
+> We need to support multiple DSUs as such configurations are possible.
+>
+>>
+>>> I am not necessarily opposed to allowing read() calls from associated
+>>> CPUs, but as before, I'll leave that to Suzuki.
+>
+> I am fine with reading the registers from any of the associated CPUs.
+>
 
-Dne ponedeljek, 05. marec 2018 ob 22:30:23 CET je Jernej ?krabec napisal(a):
-> Hi,
-> 
-> Dne petek, 02. marec 2018 ob 13:40:50 CET je Mark Brown napisal(a):
-> > On Thu, Mar 01, 2018 at 11:23:57PM +0100, Jernej ?krabec wrote:
-> > > I removed parts of the code from the sun4i codec driver and
-> > > interestingly
-> > > it doesn't crash if I remove following lines:
-> > > 
-> > > ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-> > > if (ret) {
-> > > 
-> > > 	dev_err(&pdev->dev, "Failed to register against DMAEngine\n");
-> > > 	goto err_assert_reset;
-> > > 
-> > > }
-> > > 
-> > > Is it possible that NULL pointer causes troubles somewhere down the
-> > > line?
-> > 
-> > Shouldn't be, that's just the configuration which is optional and not
-> > what we're crashing trying to register, we can mostly configure things
-> > by querying the capabilities of the DMA controller via the dmaengine API
-> > these days.  You're removing all the DMA support there so cutting out a
-> > huge segment of the initialization of both this driver and the machine
-> > driver.  Other sunxi devices seem to be starting happily in -next so
-> > there's something system dependent here...
-> 
-> I enabled memory debugging and it seems that there is an issue caused by
-> loading sun4i-codec driver and it is somehow connected to
-> snd_dmaengine_pcm_unregister().
-> 
-> Here is relevant dmesg: https://pastebin.com/raw/80K9GPnB
-> 
+If that's the case, can you please use my patch? And if it looks good to 
+you, give an Ack and ask Peter to pull it in as you'd be the user?
 
-I found the issue. Commit be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: 
-replace platform to component") changes struct dmaengine_pcm:
+Thanks,
+Saravana
 
- struct dmaengine_pcm {
- 	struct dma_chan *chan[SNDRV_PCM_STREAM_LAST + 1];
- 	const struct snd_dmaengine_pcm_config *config;
--	struct snd_soc_platform platform;
-+	struct snd_soc_component component;
- 	unsigned int flags;
- };
 
-In snd_dmaengine_pcm_register():
-ret = snd_soc_add_component(dev, &pcm->component,
-				    &dmaengine_pcm_component, NULL, 0);
-
-And now, sun4i-codec first time returns -EPROBE_DEFER since driver for analog 
-part is not yet loaded. Because of that, all components get destroyed.
-
-snd_dmaengine_pcm_unregister() calls snd_soc_unregister_component() and that 
-one calls __snd_soc_unregister_component() multiple times (until it fails).
-
-Issue is that __snd_soc_unregister_component() uses kfree() on component 
-pointer and that naturally can't succed since component was never kmalloc'ed 
-since it is a part of a bigger structure - struct dmaengine_pcm.
-
-What would be the best fix? Changing struct dmaengine_pcm to have pointer to a 
-component, so it can be freed?
-
-Best regards,
-Jernej
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
