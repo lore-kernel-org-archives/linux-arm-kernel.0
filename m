@@ -1,128 +1,66 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Wed, 7 Mar 2018 08:02:49 +0000
-Subject: [PATCH 2/5] staging: vc04_services: Remove cache-line-size
- property.
-In-Reply-To: <87muzl9ger.fsf@anholt.net>
-References: <20180305202806.21219-1-eric@anholt.net>
- <20180305202806.21219-3-eric@anholt.net>
- <a8f369f5-691c-c05f-4c7c-2eadcf4c48c8@i2se.com> <87muzl9ger.fsf@anholt.net>
-Message-ID: <638bd870-bb17-a0e1-d2aa-30a364b53279@raspberrypi.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 7 Mar 2018 09:11:13 +0100
+Subject: [PATCH 3/5] arm64: dts: renesas: r8a7795: Add cpu
+ capacity-dmips-mhz
+In-Reply-To: <CAMuHMdXYZB8emmj5TdZih-VQ5SVF-F0LkBRsPPGe=XGvNDt_Lg@mail.gmail.com>
+References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
+ <1519697995-6061-4-git-send-email-gaku.inami.xh@renesas.com>
+ <CAMuHMdWswL8N3uTCcGmWSfa98_bpz7_11PDs=m+_RC--wBVu6w@mail.gmail.com>
+ <OSBPR01MB1800C2DBEAB2BC506BF80AB9A2D80@OSBPR01MB1800.jpnprd01.prod.outlook.com>
+ <CAMuHMdXYZB8emmj5TdZih-VQ5SVF-F0LkBRsPPGe=XGvNDt_Lg@mail.gmail.com>
+Message-ID: <20180307081112.scl7cwnat562muer@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Wed, Mar 07, 2018 at 08:47:43AM +0100, Geert Uytterhoeven wrote:
+> Hi Inami-san,
+> 
+> On Wed, Mar 7, 2018 at 2:48 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
+> >> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
+> >> Sent: Monday, March 5, 2018 7:24 PM
+> > [snip]
+> >>
+> >> 411 for the A53 cores sounds a bit low to me, though.
+> >> Documentation/devicetree/bindings/arm/cpu-capacity.txt uses 578.
+> >>
+> >> Perhaps you already took into account the maximum clock frequencies?
+> >> According to the binding document, you should not do that (cfr.
+> >> "final capacities are 1024 for cluster0 and 446 for cluster1" in the
+> >> bindings doc).
+> >
+> > Thanks for your review.
+> >
+> > I set 411 for CA53 based on dhrystone measurement and current implementation.
+> >
+> > The average in 10 times of measurement as follows:
+> >
+> >   cpu   max-freq   dhrystone
+> >   ---------------------------------
+> >   A57   1500 MHz  15532585 lps/s
+> >   A53   1200 MHz   6241541 lps/s
+> >
+> > With the value of CA57 is scaled at 1024, I end up with 411 for CA53.
+> > However, since cpufreq is not available on renesas-devel-20180212-v4.16-rc1,
+> > the final capacity is set by directly using capacity-dmips-mhz in dt as below.
+> 
+> Documentation/devicetree/bindings/arm/cpu-capacity.txt:
+> 
+> "capacity-dmips-mhz is an optional cpu node [1] property: u32 value
+>  representing CPU capacity expressed in normalized DMIPS/MHz. At boot time, the
+>  maximum frequency available to the cpu is then used to calculate the capacity
+>  value internally used by the kernel."
+> 
+> IIUIC, you should thus not use 15532585 and 6241541 directly, but
+> scale them to the frequency.
+> 
+> So the formula for CA53 becomes:
+> 
+> 1024 / (15532585 / 1500) * (6241541 / 1200) = 514
+> 
+> > Considering cpufreq is available later, is it better to set the value(514)
+> > for CA53 scaled by different maximum frequencies?
+> 
+> DT describes the hardware, not software limitations, so IMHO 514 is the correct
+> value.
 
-On 06/03/2018 19:02, Eric Anholt wrote:
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
->> Hi Eric,
->>
->>
->> Am 05.03.2018 um 21:28 schrieb Eric Anholt:
->>> This was just a way for the DT-passed value to get out of sync with
->>> what Linux has configured the ARM for.
->>>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>> ---
->>>    .../interface/vchiq_arm/vchiq_2835_arm.c           | 25 +++++++---------------
->>>    .../interface/vchiq_arm/vchiq_pagelist.h           |  1 -
->>>    2 files changed, 8 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->>> index b59ef14890aa..e0e01c812036 100644
->>> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->>> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->>> @@ -77,7 +77,6 @@ struct vchiq_pagelist_info {
->>>    };
->>>    
->>>    static void __iomem *g_regs;
->>> -static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
->>>    static unsigned int g_fragments_size;
->>>    static char *g_fragments_base;
->>>    static char *g_free_fragments;
->>> @@ -117,15 +116,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
->>>    	if (err < 0)
->>>    		return err;
->>>    
->>> -	err = of_property_read_u32(dev->of_node, "cache-line-size",
->>> -				   &g_cache_line_size);
->>> -
->>> -	if (err) {
->>> -		dev_err(dev, "Missing cache-line-size property\n");
->>> -		return -ENODEV;
->>> -	}
->>> -
->>> -	g_fragments_size = 2 * g_cache_line_size;
->>> +	g_fragments_size = 2 * cache_line_size();
->>>    
->>>    	/* Allocate space for the channels in coherent memory */
->>>    	slot_mem_size = PAGE_ALIGN(TOTAL_SLOTS * VCHIQ_SLOT_SIZE);
->>> @@ -548,9 +539,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type)
->>>    
->>>    	/* Partial cache lines (fragments) require special measures */
->>>    	if ((type == PAGELIST_READ) &&
->>> -		((pagelist->offset & (g_cache_line_size - 1)) ||
->>> +		((pagelist->offset & (cache_line_size() - 1)) ||
->>>    		((pagelist->offset + pagelist->length) &
->>> -		(g_cache_line_size - 1)))) {
->>> +		 (cache_line_size() - 1)))) {
->>>    		char *fragments;
->>>    
->>>    		if (down_interruptible(&g_free_fragments_sema) != 0) {
->>> @@ -598,10 +589,10 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
->>>    			g_fragments_size;
->>>    		int head_bytes, tail_bytes;
->>>    
->>> -		head_bytes = (g_cache_line_size - pagelist->offset) &
->>> -			(g_cache_line_size - 1);
->>> +		head_bytes = (cache_line_size() - pagelist->offset) &
->>> +			(cache_line_size() - 1);
->>>    		tail_bytes = (pagelist->offset + actual) &
->>> -			(g_cache_line_size - 1);
->>> +			(cache_line_size() - 1);
->>
->> should it be so easy? Back in 2016 we said that cache_line_size() won't
->> work. I always thought that we need the cache line size of L2 not of the
->> L1 one.
->>
->> Did you already test the behavior for these combinations?
->> BCM2835 ARM32, expected cache line size = 32
->> BCM2836 ARM32, expected cache line size = 64
->> BCM2837 ARM32, expected cache line size = 64
->> BCM2837 ARM64, expected cache line size = 64
-> 
-> I didn't explicitly test, but was going by:
-> 
-> config ARM_L1_CACHE_SHIFT_6
-> 	bool
-> 	default y if CPU_V7
-> 	help
-> 	  Setting ARM L1 cache line size to 64 Bytes.
-> 
-> config ARM_L1_CACHE_SHIFT_7
-> 	bool
-> 	help
-> 	  Setting ARM L1 cache line size to 128 Bytes.
-> 
-> config ARM_L1_CACHE_SHIFT
-> 	int
-> 	default 7 if ARM_L1_CACHE_SHIFT_7
-> 	default 6 if ARM_L1_CACHE_SHIFT_6
-> 	default 5
-> 
-> and only L1_CACHE_SHIFT_7 gets selected by UNIPHIER and neither one is
-> accessible by menus.
-> 
-> I think you're technically correct that it's the size of L2 that matters
-> (or, specifically, the hardcoded value that the firmware is using on its
-> side for the fragments list handling.  It overrides a cache-line-size DT
-> property with that number if present).  However, I think L1==L2 cache
-> line size this should be a safe assumption for us.
-> 
-> Phil, any opinion?
-
-It is the L2 cache line size that matters, but as long as you end up with
-the numbers Stefan mentioned - 32 on BCM2835, 64 on BCM2836 and BCM2837 -
-I'm not too bothered how you get there.
-
-Phil
+Yes agreed. Please refresh this patchset accordingly.
