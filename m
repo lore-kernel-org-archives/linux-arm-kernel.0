@@ -1,49 +1,145 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 7 Mar 2018 10:39:04 -0600
-Subject: [PATCH v1 2/2] perf/core: Add support for PMUs that can be read
- from any CPU
-In-Reply-To: <20180303154113.GH25201@hirez.programming.kicks-ass.net>
-References: <1519431578-11995-1-git-send-email-skannan@codeaurora.org>
- <1519431578-11995-2-git-send-email-skannan@codeaurora.org>
- <20180224084106.GC25201@hirez.programming.kicks-ass.net>
- <7cab1b91545e81e4b6b09e85c2f81d7e@codeaurora.org>
- <20180303154113.GH25201@hirez.programming.kicks-ass.net>
-Message-ID: <dcf756fa-4e12-68de-2848-b3192a064a6f@arm.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Wed,  7 Mar 2018 17:43:36 +0100
+Subject: [PATCH] arm: dts: nes: add Nintendo NES Classic Edition support
+Message-ID: <20180307164336.32359-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Nintendo NES Classic features an R16 already well supported in
+mainline.
 
-On 03/03/2018 09:41 AM, Peter Zijlstra wrote:
-> On Mon, Feb 26, 2018 at 05:53:57PM -0800, skannan at codeaurora.org wrote:
->> On 2018-02-24 00:41, Peter Zijlstra wrote:
->>> On Fri, Feb 23, 2018 at 04:19:38PM -0800, Saravana Kannan wrote:
->>>> Some PMUs events can be read from any CPU. So allow the PMU to mark
->>>> events as such. For these events, we don't need to reject reads or
->>>> make smp calls to the event's CPU and cause unnecessary wake ups.
->>>>
->>>> Good examples of such events would be events from caches shared across
->>>> all CPUs.
->>>
->>> So why would the existing ACTIVE_PKG not work for you? Because clearly
->>> your example does not cross a package.
->>
->> Because based on testing it on hardware, it looks like the two clusters in
->> an ARM DynamIQ design are not considered part of the same "package". When I
->> say clusters, I using the more common interpretation of "homogeneous CPUs
->> running on the same clock"/CPUs in a cpufreq policy and not ARM's new
->> redefinition of cluster. So, on a SoC with 4 little and 4 big cores, it'll
->> still trigger a lot of unnecessary smp calls/IPIs that cause unnecessary
->> wakeups.
-> 
-> arch/arm64/include/asm/topology.h:#define topology_physical_package_id(cpu)     (cpu_topology[cpu].cluster_id)
-> 
-> *sigh*... that's just broken...
-> 
+The console over UART0 may be wired on two ports of the R16, both
+available on the NES Classic PCB.
 
-Its being reworked in the PPTT (currently v7) patch set. For ACPI 
-systems (and hopefully DT machines with the package property set) 
-topology_physical_package and core siblings represent the socket as one 
-would expect.
+USB host can be used after a bit of soldering to wire a 5V power supply
+directly on the PCB, in order to free the micro-USB port from that task
+and allow the plug of any USB device.
 
-Thanks,
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 18 ++++++
+ .../dts/sun8i-r16-nintendo-nes-classic-edition.dts | 71 ++++++++++++++++++++++
+ 3 files changed, 90 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ade7a38543dc..eed4e1222897 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -990,6 +990,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-h3-orangepi-plus.dtb \
+ 	sun8i-h3-orangepi-plus2e.dtb \
+ 	sun8i-r16-bananapi-m2m.dtb \
++	sun8i-r16-nintendo-nes-classic-edition.dtb \
+ 	sun8i-r16-parrot.dtb \
+ 	sun8i-r40-bananapi-m2-ultra.dtb \
+ 	sun8i-v3s-licheepi-zero.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 971f9be699a7..1ad7291581be 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -315,6 +315,24 @@
+ 				bias-pull-up;
+ 			};
+ 
++			nand_pins_a: nand-base0 at 0 {
++				pins = "PC0", "PC1", "PC2",
++				       "PC5", "PC8", "PC9", "PC10",
++				       "PC11", "PC12", "PC13", "PC14",
++				       "PC15";
++				function = "nand0";
++			};
++
++			nand_cs0_pins_a: nand-cs at 0 {
++				pins = "PC4";
++				function = "nand0";
++			};
++
++			nand_rb0_pins_a: nand-rb at 0 {
++				pins = "PC6";
++				function = "nand0";
++			};
++
+ 			pwm0_pins: pwm0 {
+ 				pins = "PH0";
+ 				function = "pwm0";
+diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
+new file mode 100644
+index 000000000000..63c289f1f46d
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: GPL-2.0 OR X11
++/* Copyright (c) 2016 FUKAUMI Naoki <naobsd@gmail.com> */
++
++/dts-v1/;
++#include "sun8i-a33.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Nintendo NES Classic Edition";
++	compatible = "nintendo,nes-classic-edition", "allwinner,sun8i-a33";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&uart0 {
++	/*
++	 * UART0 is available on two ports, both accessible on the NES Classic
++	 * PCB. One can use the <&uart0_pins_b> handle instead.
++	 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&nfc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
++	status = "okay";
++
++	/* 2Gb Macronix MX30LF2G18AC (3V) */
++	nand at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0>;
++		allwinner,rb = <0>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <16>;
++		nand-ecc-step-size = <1024>;
++	};
++};
++
++/*
++ * The NES is powered by the USB port. However it is possible to solder a wire
++ * from the internal side of the connector on VBUS pin to supply the required 5V
++ * without the need of a cable plugged in the micro USB port. This way it is
++ * easy to use any USB device.
++ */
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbphy {
++	/* VBUS is always on because it is wired to the power supply */
++	usb1_vbus-supply = <&reg_vcc5v0>;
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
+-- 
+2.14.1
