@@ -1,44 +1,21 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 7 Mar 2018 11:30:04 -0300
-Subject: [RFC V3 0/3] perf stat: improvements for handling of multiple PMUs
-In-Reply-To: <20180307135105.GA9080@krava>
-References: <1520345084-42646-1-git-send-email-agustinv@codeaurora.org>
- <20180307100408.GA22848@krava> <20180307133630.GD3701@kernel.org>
- <20180307135105.GA9080@krava>
-Message-ID: <20180307143004.GH3701@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2018 15:30:28 +0100
+Subject: [PATCH 2/2] arm64: dts: replace 'linux,
+ stdout-path' with 'stdout-path'
+In-Reply-To: <20180228224116.2596-2-robh@kernel.org>
+References: <20180228224116.2596-1-robh@kernel.org>
+ <20180228224116.2596-2-robh@kernel.org>
+Message-ID: <CAK8P3a3j+VE8eRPXx--m_y46f45PbKVH1B51VGmpkXmnjONRdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Mar 07, 2018 at 02:51:05PM +0100, Jiri Olsa escreveu:
-> On Wed, Mar 07, 2018 at 10:36:30AM -0300, Arnaldo Carvalho de Melo wrote:
-> > Em Wed, Mar 07, 2018 at 11:04:08AM +0100, Jiri Olsa escreveu:
-> > > On Tue, Mar 06, 2018 at 09:04:41AM -0500, Agustin Vega-Frias wrote:
-> > > > This series of patches adds some simple improvements to the way perf stat
-> > > > handles PMUs that have multiple instances by:
-> > > > 
-> > > > 1. Adding glob-like matching in addition to the prefix-based matching
-> > > >    introduced previously (patch 1).
-> > > > 2. Adding the ability to recover the PMU names when printing the events
-> > > >    separately with the --no-merge option (patch 2).
-> > > > 3. Restoring auto-merge for events created by prefix or glob-like match
-> > > >    (patch 3). Note that this still keeps the behavior that disables
-> > > >    auto-merging of legacy symbolic events (e.g. cycles).
-> > > > 
-> > > > V3:
-> > > > 
-> > > > - Consolidated prefix and glob matching into a single glob match with a
-> > > >   trailing * to maintain prefix matching and have more consistent behavior.
-> > > >   E.g., all of these match all the uncore_imc PMUs: imc, imc*, *imc, *imc*
-> > > 
-> > > Acked-by: Jiri Olsa <jolsa@kernel.org>
-> > 
-> > Thanks, applied.
-> > 
-> > I guess Andi had Acked or Reviewed this, no?
-> 
-> not the latest version.. please wait for his ack
+On Wed, Feb 28, 2018 at 11:41 PM, Rob Herring <robh@kernel.org> wrote:
+> 'linux,stdout-path' has been deprecated for some time in favor of
+> 'stdout-path'. Now dtc will warn on occurrences of 'linux,stdout-path'.
+> Search and replace the one occurrence with 'stdout-path'.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Sure, I have this applied to my local branch, and will add his acks or
-drop the patches if he still has any objection, Andi?
+Applied to next/dt as well, thanks!
 
-- Arnaldo
+     Arnd
