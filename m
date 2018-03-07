@@ -1,81 +1,54 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Wed, 7 Mar 2018 23:02:12 +0000
-Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
-In-Reply-To: <20180307145454.d3df4bed6d6431c52bcf271e@linux-foundation.org>
-References: <20180307183227.17983-1-toshi.kani@hpe.com>
- <20180307183227.17983-2-toshi.kani@hpe.com>
- <20180307145454.d3df4bed6d6431c52bcf271e@linux-foundation.org>
-Message-ID: <1520466429.2693.43.camel@hpe.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 7 Mar 2018 15:15:01 -0800
+Subject: [RFC] android: ion: How to properly clean caches for uncached
+ allocations
+In-Reply-To: <alpine.DEB.2.02.1802282111320.22860@lmark-linux.qualcomm.com>
+References: <alpine.DEB.2.02.1802282111320.22860@lmark-linux.qualcomm.com>
+Message-ID: <b1479541-13bd-85ea-f9c7-25264c91f9b9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-07 at 14:54 -0800, Andrew Morton wrote:
-> On Wed,  7 Mar 2018 11:32:26 -0700 Toshi Kani <toshi.kani@hpe.com> wrote:
+On 02/28/2018 09:18 PM, Liam Mark wrote:
+> The issue:
 > 
-> > On architectures with CONFIG_HAVE_ARCH_HUGE_VMAP set, ioremap()
-> > may create pud/pmd mappings.  Kernel panic was observed on arm64
-> > systems with Cortex-A75 in the following steps as described by
-> > Hanjun Guo.
-> > 
-> > 1. ioremap a 4K size, valid page table will build,
-> > 2. iounmap it, pte0 will set to 0;
-> > 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
-> >    then set the a new value for pmd;
-> > 4. pte0 is leaked;
-> > 5. CPU may meet exception because the old pmd is still in TLB,
-> >    which will lead to kernel panic.
-> > 
-> > This panic is not reproducible on x86.  INVLPG, called from iounmap,
-> > purges all levels of entries associated with purged address on x86.
-> > x86 still has memory leak.
-> > 
-> > Add two interfaces, pud_free_pmd_page() and pmd_free_pte_page(),
-> > which clear a given pud/pmd entry and free up a page for the lower
-> > level entries.
-> > 
-> > This patch implements their stub functions on x86 and arm64, which
-> > work as workaround.
-> > 
-> > index 004abf9ebf12..942f4fa341f1 100644
-> > --- a/arch/x86/mm/pgtable.c
-> > +++ b/arch/x86/mm/pgtable.c
-> > @@ -702,4 +702,24 @@ int pmd_clear_huge(pmd_t *pmd)
-> >  
-> >  	return 0;
-> >  }
-> > +
-> > +/**
-> > + * pud_free_pmd_page - clear pud entry and free pmd page
-> > + *
-> > + * Returns 1 on success and 0 on failure (pud not cleared).
-> > + */
-> > +int pud_free_pmd_page(pud_t *pud)
-> > +{
-> > +	return pud_none(*pud);
-> > +}
-> > +
-> > +/**
-> > + * pmd_free_pte_page - clear pmd entry and free pte page
-> > + *
-> > + * Returns 1 on success and 0 on failure (pmd not cleared).
-> > + */
-> > +int pmd_free_pte_page(pmd_t *pmd)
-> > +{
-> > +	return pmd_none(*pmd);
-> > +}
+> Currently in ION if you allocate uncached memory it is possible that there
+> are still dirty lines in the cache.  And often these dirty lines in the
+> cache are the zeros which were meant to clear out any sensitive kernel
+> data.
 > 
-> Are these functions well named?  I mean, the comment says "clear pud
-> entry and free pmd page" but the implementatin does neither of those
-> things.  The name implies that the function frees a pmd_page but the
-> callsites use the function as a way of querying state.
+> What this means is that if you allocate uncached memory from ION, and then
+> subsequently write to that buffer (using the uncached mapping you are
+> provided by ION) then the data you have written could be corrupted at some
+> point in the future if a dirty line is evicted from the cache.
+> 
+> Also this means there is a potential security issue.  If an un-privileged
+> userspace user allocated uncached memory (for example from the system heap)
+> and then if they were to read from that buffer (through the un-cached
+> mapping they are provided by ION), and if some of the zeros which were
+> written to that memory are still in the cache then this un-privileged
+> userspace user could read potentially sensitive kernel data.
 
-This patch 1/2 only implements stubs.  Patch 2/2 implements what is
-described here.
+For the use case you are describing we don't actually need the
+memory to be non-cached until it comes time to do the dma mapping.
+Here's a proposal to shoot holes in:
 
-> Also, as this fixes an arm64 kernel panic, should we be using
-> cc:stable?
+- Before any dma_buf attach happens, all mmap mappings are cached
+- At the time attach happens, we shoot down any existing userspace
+mappings, do the dma_map with appropriate flags to clean the pages
+and then allow remapping to userspace as uncached. Really this
+looks like a variation on the old Ion faulting code which I removed
+except it's for uncached buffers instead of cached buffers.
 
-Right.
+Potential problems:
+- I'm not 100% about the behavior here if the attaching device
+is already dma_coherent. I also consider uncached mappings
+enough of a device specific optimization that you shouldn't
+do them unless you know it's needed.
+- The locking/sequencing with userspace could be tricky
+since userspace may not like us ripping mappings out from
+underneath if it's trying to access.
+
+Thoughts?
 
 Thanks,
--Toshi
+Laura
