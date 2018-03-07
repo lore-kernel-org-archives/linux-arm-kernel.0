@@ -1,22 +1,96 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+From: a.hajda@samsung.com (Andrzej Hajda)
 Date: Wed, 7 Mar 2018 12:40:40 +0100
-Subject: [PATCH V2] ARM: dts: BCM5301X: add missing LEDs for Buffalo
- WZR-900DHP
-In-Reply-To: <1520422436-9405-1-git-send-email-musashino.open@gmail.com>
-References: <1520422436-9405-1-git-send-email-musashino.open@gmail.com>
-Message-ID: <CACna6rwS+zQ4B4qk32qQk=ACg7PTV3sJ+5HYu+8Oj3Uf3ZzJxA@mail.gmail.com>
+Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <CAJKOXPfWwD-wYOzYacH4j7gfgDGh5MPAhXTR46wbYU=pw3zEhg@mail.gmail.com>
+References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
+ <20180227071134.28063-1-a.hajda@samsung.com>
+ <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
+ <5A9F4A7D.9020409@samsung.com> <5A9F6F29.5020501@samsung.com>
+ <b64d77c1-c80f-1bd9-a599-3027424ec667@samsung.com>
+ <CAJKOXPfWwD-wYOzYacH4j7gfgDGh5MPAhXTR46wbYU=pw3zEhg@mail.gmail.com>
+Message-ID: <9778a303-36b0-2acb-5d15-766ae9f45727@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 March 2018 at 12:33,  <musashino.open@gmail.com> wrote:
-> From: INAGAKI Hiroshi <musashino.open@gmail.com>
+On 07.03.2018 12:22, Krzysztof Kozlowski wrote:
+> On Wed, Mar 7, 2018 at 12:13 PM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>> Hi Chanwoo, Archit,
+>>
+>> On 07.03.2018 05:48, Chanwoo Choi wrote:
+>>> On 2018? 03? 07? 11:12, Chanwoo Choi wrote:
+>>>> Hi Rob and Andrzej,
+>>>>
+>>>> On 2018? 03? 06? 21:53, Andrzej Hajda wrote:
+>>>>> Hi Rob, Chanwoo, Krzysztof,
+>>>>>
+>>>>>
+>>>>> On 27.02.2018 08:11, Andrzej Hajda wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> Thanks for reviews of previous iterations.
+>>>>>>
+>>>>>> This patchset introduces USB physical connector bindings, together with
+>>>>>> working example.
+>>>>>> I have removed RFC prefix - the patchset seems to be heading
+>>>>>> to a happy end :)
+>>>>>>
+>>>>>> v5: fixed extra parenthesis in dts, renamed extcon function.
+>>>>>> v4: improved binding descriptions, added missing reg in dts.
+>>>>>> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
+>>>>>>     example.
+>>>>>> v2: I have addressed comments by Rob and Laurent, thanks
+>>>>>>
+>>>>>> Changes in datail are described in the patches.
+>>>>>>
+>>>>>> Regards
+>>>>>> Andrzej
+>>>>>>
+>>>>>>
+>>>>>> Andrzej Hajda (5):
+>>>>>>   dt-bindings: add bindings for USB physical connector
+>>>>>>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
+>>>>>>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
+>>>>>>   arm64: dts: exynos: add OF graph between MHL and USB connector
+>>>>>>   extcon: add possibility to get extcon device by OF node
+>>>>>>
+>>>>>> Maciej Purski (1):
+>>>>>>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
+>>>>> It looks like all patches received R-B or acks (I forgot add Krzysztof's
+>>>>> acks for dts part).
+>>>>> Now I have a question how to merge them.
+>>>>> The only functional dependency is between bridge and extcon, and from
+>>>>> the formal PoV bindings should be merged 1st.
+>>>>> I can merge it:
+>>>>> 1. All patches via drm-misc tree.
+>>>>> 2. All patches except dts via drm-misc, and Krzysztof will merge dts via
+>>>>> samsung-soc tree.
+>>>>>
+>>>>> Is it OK, for all? Better ideas?
+>>>> Krzysztof picked the dts patches. I'll make the immutable branch based on v4.16-rc1
+>>>> and apply them except for dts patchs. And I'll send the immutable branch to Rob and Andrzej.
+>>>>
+>>>>
+>>> I made the immutable branch[1] as following: If you agree, I'll send pull request.
+>>> [1] https://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git/log/?h=ib-extcon-drm-dt-v4.17
+>>>
+>>> Or you can make the immutable branch and send pull request to Rob and me.
+>>>
+>> It seems you took v5 instead of v6 version of extcon patch.
+> I also took v5:
+> https://patchwork.kernel.org/patch/10244407/
+> https://patchwork.kernel.org/patch/10244431/
 >
-> Buffalo WZR-900DHP has 8 LEDs, but there is not LED definitions in the
-> dts and cannot configure these LEDs.
-> I Added missing LED definitions for WZR-900DHP.
+> There was no v6 in samsung-soc patchwork. Is it a problem for DTS?
+
+No, v6 was only typo fix in comment, and only extcon patch has v6.
+
+Regards
+Andrzej
+
 >
-> Signed-off-by: INAGAKI Hiroshi <musashino.open@gmail.com>
-
-Nice work, thanks!
-
-Reviewed-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> BR,
+> Krzysztof
+>
+>
+>
