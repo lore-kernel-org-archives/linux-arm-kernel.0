@@ -1,79 +1,44 @@
-From: haiyue.wang@linux.intel.com (Haiyue Wang)
-Date: Wed,  7 Mar 2018 13:04:50 +0800
-Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS node
-Message-ID: <1520399090-2455-1-git-send-email-haiyue.wang@linux.intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 7 Mar 2018 10:36:24 +0530
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+Message-ID: <20180307050624.GR23018@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPMI KCS device part of the LPC interface and is used for
-communication with the host processor.
+On 06-03-18, 08:37, Jordan Crouse wrote:
+> I'll try to explain but I might need Stephen or some of the other folks to jump
+> in and save me.
 
-Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
----
- arch/arm/boot/dts/aspeed-g5.dtsi | 43 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+Maybe you should start using his kernel.org address then ? :)
 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 8eac57c..f443169 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -267,8 +267,40 @@
- 				ranges = <0x0 0x1e789000 0x1000>;
- 
- 				lpc_bmc: lpc-bmc at 0 {
--					compatible = "aspeed,ast2500-lpc-bmc";
-+					compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
- 					reg = <0x0 0x80>;
-+					reg-io-width = <4>;
-+
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0x0 0x0 0x80>;
-+
-+					kcs1: kcs1 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0x80>;
-+						interrupts = <8>;
-+						kcs_chan = <1>;
-+						kcs_addr = <0x0>;
-+						status = "disabled";
-+					};
-+
-+					kcs2: kcs2 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0x80>;
-+						interrupts = <8>;
-+						kcs_chan = <2>;
-+						kcs_addr = <0x0>;
-+						status = "disabled";
-+					};
-+
-+					kcs3: kcs3 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0x80>;
-+						interrupts = <8>;
-+						kcs_chan = <3>;
-+						kcs_addr = <0x0>;
-+						status = "disabled";
-+					};
- 				};
- 
- 				lpc_host: lpc-host at 80 {
-@@ -294,6 +326,15 @@
- 						status = "disabled";
- 					};
- 
-+					kcs4: kcs4 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0xa0>;
-+						interrupts = <8>;
-+						kcs_chan = <4>;
-+						kcs_addr = <0x0>;
-+						status = "disabled";
-+					};
-+
- 					lhc: lhc at 20 {
- 						compatible = "aspeed,ast2500-lhc";
- 						reg = <0x20 0x24 0x48 0x8>;
+> On sdm845 there are shared power resources controlled by the RPMh which is
+> programed by a series of commands from the regulator driver; but in the case
+> of the GPU the votes are passed to the GMU (graphics management unit) which
+> communicates with the RPMh on behalf of the GPU.
+> 
+> In order to construct the RPMh vote we need first need a voltage level that we
+> can look up in a database. qcom,arc-level is the voltage level associated with
+> a specific OPP.
+> 
+> I had previously been abusing this with opp-microvolt but that was wrong for
+> obvious reasons and then Stephen pointed out that this would be a better way.
+
+Glad that you shared that :)
+
+A solution is already in progress for that and is partially merged as
+well.
+
+Look for "performance_state" in genpd and OPP cores (already merged),
+followed by this series here:
+
+https://lkml.kernel.org/r/cover.1513926033.git.viresh.kumar at linaro.org
+
 -- 
-2.7.4
+viresh
