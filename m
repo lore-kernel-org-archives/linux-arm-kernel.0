@@ -1,52 +1,42 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 7 Mar 2018 08:49:09 +0100
-Subject: [PATCH 1/3] drm/sun4i: tcon: Reduce the scope of the LVDS error
- a bit
-In-Reply-To: <CAGb2v66vnba4UPvdGS6ber2N2HRANVLAzDArBTApFJ1Su-Gr7w@mail.gmail.com>
-References: <20180221125703.4595-1-maxime.ripard@bootlin.com>
- <CAGb2v66vnba4UPvdGS6ber2N2HRANVLAzDArBTApFJ1Su-Gr7w@mail.gmail.com>
-Message-ID: <20180307074909.pdt7rohlhjbpe6rh@flea.lan>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 07 Mar 2018 08:52:20 +0100
+Subject: [GIT PULL] Reset controller changes for v4.17
+In-Reply-To: <CAK8P3a1J8_26+30_KhubMppfXThbpg8psV8KQhRne08mJFPufA@mail.gmail.com>
+References: <1519300351.7447.8.camel@pengutronix.de>
+ <CAK8P3a1J8_26+30_KhubMppfXThbpg8psV8KQhRne08mJFPufA@mail.gmail.com>
+Message-ID: <1520409140.3395.0.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Mar 06, 2018 at 03:38:25PM +0800, Chen-Yu Tsai wrote:
-> > -       /*
-> > -        * This can only be made optional since we've had DT nodes
-> > -        * without the LVDS reset properties.
-> > -        *
-> > -        * If the property is missing, just disable LVDS, and print a
-> > -        * warning.
-> > -        */
-> > -       if (tcon->quirks->has_lvds_alt) {
-> > -               tcon->lvds_pll = devm_clk_get(dev, "lvds-alt");
-> > -               if (IS_ERR(tcon->lvds_pll)) {
-> > -                       if (PTR_ERR(tcon->lvds_pll) == -ENOENT) {
-> > -                               has_lvds_alt = false;
-> > +               /*
-> > +                * This can only be made optional since we've had DT
-> > +                * nodes without the LVDS reset properties.
+On Tue, 2018-03-06 at 17:48 +0100, Arnd Bergmann wrote:
+> On Thu, Feb 22, 2018 at 12:52 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > Dear arm-soc maintainers,
+> > 
+> > Please consider merging this tag for v4.17. It contains level reset
+> > support for Meson8b SoCs, which was already implemented for the newer
+> > Meson GX, removing the distinction between the two families in the
+> > meson-reset driver. Also the ASPEED LPC reset controller is enabled for
+> > AST2400 and AST2500 SoCs by extending the compatibles list in the
+> > simple-reset driver.
+> > 
 > 
-> This comment doesn't match the code following it. Otherwise,
+> Pulled into next/drivers, thanks!
+> 
+> 
+> > ----------------------------------------------------------------
+> > Reset controller changes for v4.17
+> > 
+> > This enables level resets on Meson8b SoCs. Level resets have been
+> > previously implemented for the newer Meson GX SoCs, so this removes
+> > the distinction between the two families in the meson-reset driver.
+> > 
+> > Also enables the ASPEED LPC reset controller on ASPEED AST2400 and
+> > AST2500 SoCs, by adding compatibles to the simple-reset driver.
+> 
+> You seem to be saying the same thing here and above in different words,
+> No need for that when you have a proper tag description.
 
-It was there before, and it was a typo. I'll send a followup patch
+Got it, thanks!
 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
-And I've applied all three patches.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180307/1efe6916/attachment.sig>
+regards
+Philipp
