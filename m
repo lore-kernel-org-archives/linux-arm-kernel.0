@@ -1,45 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Mar 2018 12:40:55 +0000
-Subject: [PATCH 2/2] kvm: arm/arm64: vgic-v3: Tighten synchronization for
- guests using v2 on v3
+Date: Wed,  7 Mar 2018 12:40:54 +0000
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs with
+ the same vintid
 In-Reply-To: <20180307124055.13800-1-marc.zyngier@arm.com>
 References: <20180307124055.13800-1-marc.zyngier@arm.com>
-Message-ID: <20180307124055.13800-3-marc.zyngier@arm.com>
+Message-ID: <20180307124055.13800-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On guest exit, and when using GICv2 on GICv3, we use a dsb(st) to
-force synchronization between the memory-mapped guest view and
-the system-register view that the hypervisor uses.
+The vgic code is trying to be clever when injecting GICv2 SGIs,
+and will happily populate LRs with the same interrupt number if
+they come from multiple vcpus (after all, they are distinct
+interrupt sources).
 
-This is incorrect, as the spec calls out the need for "a DSB whose
-required access type is both loads and stores with any Shareability
-attribute", while we're only synchronizing stores.
+Unfortunately, this is against the letter of the architecture,
+and the GICv2 architecture spec says "Each valid interrupt stored
+in the List registers must have a unique VirtualID for that
+virtual CPU interface.". GICv3 has similar (although slightly
+ambiguous) restrictions.
 
-We also lack an isb after the dsb to ensure that the latter has
-actually been executed before we start reading stuff from the sysregs.
+This results in guests locking up when using GICv2-on-GICv3, for
+example. The obvious fix is to stop trying so hard, and inject
+a single vcpu per SGI per guest entry. After all, pending SGIs
+with multiple source vcpus are pretty rare, and are mostly seen
+in scenario where the physical CPUs are severely overcomitted.
 
-The fix is pretty easy: turn dsb(st) into dsb(sy), and slap an isb()
-just after.
-
+Cc: stable at vger.kernel.org
+Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index f5c3d6d7019e..b89ce5432214 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -215,7 +215,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	 * are now visible to the system register interface.
- 	 */
- 	if (!cpu_if->vgic_sre) {
--		dsb(st);
-+		dsb(sy);
-+		isb();
- 		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
- 	}
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index c7c5ef190afa..1f7ff175f47b 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		spin_lock(&irq->irq_lock);
  
+-		if (unlikely(vgic_target_oracle(irq) != vcpu))
+-			goto next;
+-
+-		/*
+-		 * If we get an SGI with multiple sources, try to get
+-		 * them in all at once.
+-		 */
+-		do {
++		if (likely(vgic_target_oracle(irq) == vcpu))
+ 			vgic_populate_lr(vcpu, irq, count++);
+-		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
+ 
+-next:
+ 		spin_unlock(&irq->irq_lock);
+ 
+ 		if (count == kvm_vgic_global_state.nr_lr) {
 -- 
 2.14.2
