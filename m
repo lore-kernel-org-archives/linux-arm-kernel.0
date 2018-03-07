@@ -1,283 +1,155 @@
-From: juliac@eso.teric.us (Julia Cartwright)
-Date: Tue, 6 Mar 2018 21:19:07 -0600
-Subject: [PATCH v2 1/8] [PATCH 1/8] drivers/peci: Add support for PECI
- bus driver core
-In-Reply-To: <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
-References: <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
- <20180221161606.32247-2-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180307031907.GD1924@kryptos.localdomain>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 7 Mar 2018 12:24:25 +0900
+Subject: [PATCH v7 13/14] iommu/rockchip: Add runtime PM support
+In-Reply-To: <CAAFQd5DPewKda7ThqMGKRvnArZ0X8ChD10E06nLZaNa-SBNdwA@mail.gmail.com>
+References: <20180306030252.3197-1-jeffy.chen@rock-chips.com>
+ <20180306032759.29069-1-jeffy.chen@rock-chips.com>
+ <20180306032759.29069-4-jeffy.chen@rock-chips.com>
+ <CAAFQd5DPewKda7ThqMGKRvnArZ0X8ChD10E06nLZaNa-SBNdwA@mail.gmail.com>
+Message-ID: <CAAFQd5D_wnj9DNYDa_rLkEy3u71ADLp9gc9fdwQPxHz2J-LLAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 21, 2018 at 08:15:59AM -0800, Jae Hyun Yoo wrote:
-> This commit adds driver implementation for PECI bus into linux
-> driver framework.
-> 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> ---
-[..]
-> +static int peci_locked_xfer(struct peci_adapter *adapter,
-> +			    struct peci_xfer_msg *msg,
-> +			    bool do_retry,
-> +			    bool has_aw_fcs)
+On Tue, Mar 6, 2018 at 7:07 PM, Tomasz Figa <tfiga@chromium.org> wrote:
+> Hi Jeffy,
+>
+> It looks like I missed some details of how runtime PM enable works
+> before, so we might be able to simplify things. Sorry for not getting
+> things right earlier.
+>
+> On Tue, Mar 6, 2018 at 12:27 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+>> When the power domain is powered off, the IOMMU cannot be accessed and
+>> register programming must be deferred until the power domain becomes
+>> enabled.
+>>
+>> Add runtime PM support, and use runtime PM device link from IOMMU to
+>> master to startup and shutdown IOMMU.
+>>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> ---
+>>
+>> Changes in v7:
+>> Add WARN_ON in irq isr, and modify iommu archdata comment.
+>>
+>> Changes in v6: None
+>> Changes in v5:
+>> Avoid race about pm_runtime_get_if_in_use() and pm_runtime_enabled().
+>>
+>> Changes in v4: None
+>> Changes in v3:
+>> Only call startup() and shutdown() when iommu attached.
+>> Remove pm_mutex.
+>> Check runtime PM disabled.
+>> Check pm_runtime in rk_iommu_irq().
+>>
+>> Changes in v2: None
+>>
+>>  drivers/iommu/rockchip-iommu.c | 189 ++++++++++++++++++++++++++++++++---------
+>>  1 file changed, 148 insertions(+), 41 deletions(-)
+>>
+>> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+>> index 2448a0528e39..db08978203f7 100644
+>> --- a/drivers/iommu/rockchip-iommu.c
+>> +++ b/drivers/iommu/rockchip-iommu.c
+>> @@ -22,6 +22,7 @@
+>>  #include <linux/of_iommu.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/pm_runtime.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/spinlock.h>
+>>
+>> @@ -105,7 +106,14 @@ struct rk_iommu {
+>>         struct iommu_domain *domain; /* domain to which iommu is attached */
+>>  };
+>>
+>> +/**
+>> + * struct rk_iommudata - iommu archdata of master device.
+>> + * @link:      device link with runtime PM integration from the master
+>> + *             (consumer) to the IOMMU (supplier).
+>> + * @iommu:     IOMMU of the master device.
+>> + */
+>>  struct rk_iommudata {
+>> +       struct device_link *link;
+>>         struct rk_iommu *iommu;
+>>  };
+>>
+>> @@ -518,7 +526,13 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>>         u32 int_status;
+>>         dma_addr_t iova;
+>>         irqreturn_t ret = IRQ_NONE;
+>> -       int i;
+>> +       bool need_runtime_put;
+>> +       int i, err;
+>> +
+>> +       err = pm_runtime_get_if_in_use(iommu->dev);
+>> +       if (WARN_ON(err <= 0 && err != -EINVAL))
+>> +               return ret;
+>> +       need_runtime_put = err > 0;
+>
+> Actually, for our purposes, we can assume that runtime PM enable
+> status can be only changed by the driver itself. Looking at the LXR,
+> PM core also calls __pm_runtime_disable() before calling
+> .suspend_late() callback and pm_runtime_enable() after calling
+> .resume_early() callback, but we should be able to ignore this,
+> because we handle things in .suspend() callback in this driver.
+>
+> With this assumption in mind, all we need to do here is:
+>
+> if (WARN_ON(!pm_runtime_get_if_in_use(iommu->dev)))
+>     return 0;
+>
+>>
+>>         WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+>>
+>> @@ -570,6 +584,9 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>>
+>>         clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+>>
+>> +       if (need_runtime_put)
+>> +               pm_runtime_put(iommu->dev);
+>
+> if (pm_runtime_enabled())
+>         pm_runtime_put(iommu->dev);
 
-_locked generally means that this function is invoked with some critical
-lock held, what lock does the caller need to acquire before invoking
-this function?
+Actually, we don't even need this pm_runtime_enabled() check and can
+always call pm_runtime_put(), because at this point we would be only
+in either of cases:
+1) runtime PM compiled in and enabled, so we got the enable count and
+need to put it,
+2) runtime PM not compiled in, so pm_runtime_put() is a no-op.
 
-> +{
-> +	ktime_t start, end;
-> +	s64 elapsed_ms;
-> +	int rc = 0;
-> +
-> +	if (!adapter->xfer) {
+>
+>> +
+>>         return ret;
+>>  }
+>>
+>> @@ -611,10 +628,20 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+>>         spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+>>         list_for_each(pos, &rk_domain->iommus) {
+>>                 struct rk_iommu *iommu;
+>> +               int ret;
+>> +
+>>                 iommu = list_entry(pos, struct rk_iommu, node);
+>> -               WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+>> -               rk_iommu_zap_lines(iommu, iova, size);
+>> -               clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+>> +
+>> +               /* Only zap TLBs of IOMMUs that are powered on. */
+>> +               ret = pm_runtime_get_if_in_use(iommu->dev);
+>> +               if (ret > 0 || ret == -EINVAL) {
+>
+> if (pm_runtime_get_if_in_use(iommu->dev)) {
+>
+>> +                       WARN_ON(clk_bulk_enable(iommu->num_clocks,
+>> +                                               iommu->clocks));
+>> +                       rk_iommu_zap_lines(iommu, iova, size);
+>> +                       clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+>
+>         if (pm_runtime_enabled(iommu->dev))
+>                 pm_runtime_put(iommu->dev);
 
-Is this really an optional feature of an adapter?  If this is not
-optional, then this check should be in place when the adapter is
-registered, not here.  (And it should WARN_ON(), because it's a driver
-developer error).
+Same here.
 
-> +		dev_dbg(&adapter->dev, "PECI level transfers not supported\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (in_atomic() || irqs_disabled()) {
-
-As Andrew mentioned, this is broken.
-
-You don't even need a might_sleep().  The locking functions you use here
-will already include a might_sleep() w/ CONFIG_DEBUG_ATOMIC_SLEEP.
-
-> +		rt_mutex_trylock(&adapter->bus_lock);
-> +		if (!rc)
-> +			return -EAGAIN; /* PECI activity is ongoing */
-> +	} else {
-> +		rt_mutex_lock(&adapter->bus_lock);
-> +	}
-> +
-> +	if (do_retry)
-> +		start = ktime_get();
-> +
-> +	do {
-> +		rc = adapter->xfer(adapter, msg);
-> +
-> +		if (!do_retry)
-> +			break;
-> +
-> +		/* Per the PECI spec, need to retry commands that return 0x8x */
-> +		if (!(!rc && ((msg->rx_buf[0] & DEV_PECI_CC_RETRY_ERR_MASK) ==
-> +			      DEV_PECI_CC_TIMEOUT)))
-> +			break;
-
-This is pretty difficult to parse.  Can you split it into two different
-conditions?
-
-> +
-> +		/* Set the retry bit to indicate a retry attempt */
-> +		msg->tx_buf[1] |= DEV_PECI_RETRY_BIT;
-
-Are you sure this bit is to be set in the _second_ byte of tx_buf?
-
-> +
-> +		/* Recalculate the AW FCS if it has one */
-> +		if (has_aw_fcs)
-> +			msg->tx_buf[msg->tx_len - 1] = 0x80 ^
-> +						peci_aw_fcs((u8 *)msg,
-> +							    2 + msg->tx_len);
-> +
-> +		/* Retry for at least 250ms before returning an error */
-> +		end = ktime_get();
-> +		elapsed_ms = ktime_to_ms(ktime_sub(end, start));
-> +		if (elapsed_ms >= DEV_PECI_RETRY_TIME_MS) {
-> +			dev_dbg(&adapter->dev, "Timeout retrying xfer!\n");
-> +			break;
-> +		}
-> +	} while (true);
-> +
-> +	rt_mutex_unlock(&adapter->bus_lock);
-> +
-> +	return rc;
-> +}
-> +
-> +static int peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg)
-> +{
-> +	return peci_locked_xfer(adapter, msg, false, false);
-> +}
-> +
-> +static int peci_xfer_with_retries(struct peci_adapter *adapter,
-> +				  struct peci_xfer_msg *msg,
-> +				  bool has_aw_fcs)
-> +{
-> +	return peci_locked_xfer(adapter, msg, true, has_aw_fcs);
-> +}
-> +
-> +static int peci_scan_cmd_mask(struct peci_adapter *adapter)
-> +{
-> +	struct peci_xfer_msg msg;
-> +	u32 dib;
-> +	int rc = 0;
-> +
-> +	/* Update command mask just once */
-> +	if (adapter->cmd_mask & BIT(PECI_CMD_PING))
-> +		return 0;
-> +
-> +	msg.addr      = PECI_BASE_ADDR;
-> +	msg.tx_len    = GET_DIB_WR_LEN;
-> +	msg.rx_len    = GET_DIB_RD_LEN;
-> +	msg.tx_buf[0] = GET_DIB_PECI_CMD;
-> +
-> +	rc = peci_xfer(adapter, &msg);
-> +	if (rc < 0) {
-> +		dev_dbg(&adapter->dev, "PECI xfer error, rc : %d\n", rc);
-> +		return rc;
-> +	}
-> +
-> +	dib = msg.rx_buf[0] | (msg.rx_buf[1] << 8) |
-> +	      (msg.rx_buf[2] << 16) | (msg.rx_buf[3] << 24);
-> +
-> +	/* Check special case for Get DIB command */
-> +	if (dib == 0x00) {
-> +		dev_dbg(&adapter->dev, "DIB read as 0x00\n");
-> +		return -1;
-> +	}
-> +
-> +	if (!rc) {
-
-You should change this to:
-
-	if (rc) {
-		dev_dbg(&adapter->dev, "Error reading DIB, rc : %d\n", rc);
-		return rc;
-	}
-
-And then leave the happy path below unindented.
-
-> +		/**
-> +		 * setting up the supporting commands based on minor rev#
-> +		 * see PECI Spec Table 3-1
-> +		 */
-> +		dib = (dib >> 8) & 0xF;
-> +
-> +		if (dib >= 0x1) {
-> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PKG_CFG);
-> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PKG_CFG);
-> +		}
-> +
-> +		if (dib >= 0x2)
-> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_IA_MSR);
-> +
-> +		if (dib >= 0x3) {
-> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG_LOCAL);
-> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG_LOCAL);
-> +		}
-> +
-> +		if (dib >= 0x4)
-> +			adapter->cmd_mask |= BIT(PECI_CMD_RD_PCI_CFG);
-> +
-> +		if (dib >= 0x5)
-> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_PCI_CFG);
-> +
-> +		if (dib >= 0x6)
-> +			adapter->cmd_mask |= BIT(PECI_CMD_WR_IA_MSR);
-> +
-> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_TEMP);
-> +		adapter->cmd_mask |= BIT(PECI_CMD_GET_DIB);
-> +		adapter->cmd_mask |= BIT(PECI_CMD_PING);
-
-These cmd_mask updates are not done with any locking in mind.  Is this
-intentional?  Or: is synchronization not necessary because this is
-always done during enumeration prior to exposing the adapter to users?
-
-> +	} else {
-> +		dev_dbg(&adapter->dev, "Error reading DIB, rc : %d\n", rc);
-> +	}
-> +
-> +	return rc;
-> +}
-> +
-> +static int peci_cmd_support(struct peci_adapter *adapter, enum peci_cmd cmd)
-> +{
-> +	if (!(adapter->cmd_mask & BIT(PECI_CMD_PING)) &&
-> +	    peci_scan_cmd_mask(adapter) < 0) {
-> +		dev_dbg(&adapter->dev, "Failed to scan command mask\n");
-> +		return -EIO;
-> +	}
-> +
-> +	if (!(adapter->cmd_mask & BIT(cmd))) {
-> +		dev_dbg(&adapter->dev, "Command %d is not supported\n", cmd);
-> +		return -EINVAL;
-> +	}
-
-It would be nicer if you did this check prior to dispatching to the
-various subfunctions (peci_ioctl_ping, peci_ioctl_get_dib, etc.).  In
-that way, these functions could just assume the adapter supports them.
-
-[..]
-> +static int peci_register_adapter(struct peci_adapter *adapter)
-> +{
-> +	int res = -EINVAL;
-> +
-> +	/* Can't register until after driver model init */
-> +	if (WARN_ON(!is_registered)) {
-
-Is this solving a problem you actually ran into?
-
-[.. skipped review due to fatigue ..]
-
-> +++ b/include/linux/peci.h
-> @@ -0,0 +1,97 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2018 Intel Corporation
-> +
-> +#ifndef __LINUX_PECI_H
-> +#define __LINUX_PECI_H
-> +
-> +#include <linux/cdev.h>
-> +#include <linux/device.h>
-> +#include <linux/peci-ioctl.h>
-> +#include <linux/rtmutex.h>
-> +
-> +#define PECI_BUFFER_SIZE  32
-> +#define PECI_NAME_SIZE    32
-> +
-> +struct peci_xfer_msg {
-> +	u8	addr;
-> +	u8	tx_len;
-> +	u8	rx_len;
-> +	u8	tx_buf[PECI_BUFFER_SIZE];
-> +	u8	rx_buf[PECI_BUFFER_SIZE];
-> +} __attribute__((__packed__));
-
-The packed attribute has historically caused gcc to emit atrocious code,
-as it seems to assume packed implies members might not be naturally
-aligned.  Seeing as you're only working with u8s in this case, though,
-this shouldn't be a problem.
-
-> +struct peci_board_info {
-> +	char			type[PECI_NAME_SIZE];
-> +	u8			addr;	/* CPU client address */
-> +	struct device_node	*of_node;
-> +};
-> +
-> +struct peci_adapter {
-> +	struct module	*owner;
-> +	struct rt_mutex	bus_lock;
-
-Why an rt_mutex, instead of a regular mutex.  Do you explicitly need PI
-in mainline?
-
-> +	struct device	dev;
-> +	struct cdev	cdev;
-> +	int		nr;
-> +	char		name[PECI_NAME_SIZE];
-> +	int		(*xfer)(struct peci_adapter *adapter,
-> +				struct peci_xfer_msg *msg);
-> +	uint		cmd_mask;
-> +};
-> +
-> +#define to_peci_adapter(d) container_of(d, struct peci_adapter, dev)
-
-You can also do this with a static inline, which provides a marginally
-better error when screwed up.
-
-   Julia
+Best regards,
+Tomasz
