@@ -1,99 +1,22 @@
-From: musashino.open@gmail.com (musashino.open at gmail.com)
-Date: Wed,  7 Mar 2018 20:33:56 +0900
-Subject: [PATCH V2] ARM: dts: BCM5301X: add missing LEDs for Buffalo WZR-900DHP
-Message-ID: <1520422436-9405-1-git-send-email-musashino.open@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 7 Mar 2018 12:40:40 +0100
+Subject: [PATCH V2] ARM: dts: BCM5301X: add missing LEDs for Buffalo
+ WZR-900DHP
+In-Reply-To: <1520422436-9405-1-git-send-email-musashino.open@gmail.com>
+References: <1520422436-9405-1-git-send-email-musashino.open@gmail.com>
+Message-ID: <CACna6rwS+zQ4B4qk32qQk=ACg7PTV3sJ+5HYu+8Oj3Uf3ZzJxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: INAGAKI Hiroshi <musashino.open@gmail.com>
+On 7 March 2018 at 12:33,  <musashino.open@gmail.com> wrote:
+> From: INAGAKI Hiroshi <musashino.open@gmail.com>
+>
+> Buffalo WZR-900DHP has 8 LEDs, but there is not LED definitions in the
+> dts and cannot configure these LEDs.
+> I Added missing LED definitions for WZR-900DHP.
+>
+> Signed-off-by: INAGAKI Hiroshi <musashino.open@gmail.com>
 
-Buffalo WZR-900DHP has 8 LEDs, but there is not LED definitions in the
-dts and cannot configure these LEDs.
-I Added missing LED definitions for WZR-900DHP.
+Nice work, thanks!
 
-Signed-off-by: INAGAKI Hiroshi <musashino.open@gmail.com>
----
- arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 68 +++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-index 8bef642..87ea6ba 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-@@ -35,6 +35,74 @@
- 		       0x88000000 0x08000000>;
- 	};
- 
-+	spi {
-+		compatible = "spi-gpio";
-+		num-chipselects = <1>;
-+		gpio-sck = <&chipcommon 7 0>;
-+		gpio-mosi = <&chipcommon 4 0>;
-+		cs-gpios = <&chipcommon 6 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		hc595: gpio_spi at 0 {
-+			compatible = "fairchild,74hc595";
-+			reg = <0>;
-+			registers-number = <1>;
-+			spi-max-frequency = <100000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		usb {
-+			label = "bcm53xx:green:usb";
-+			gpios = <&hc595 0 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		power0 {
-+			label = "bcm53xx:green:power";
-+			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power1 {
-+			label = "bcm53xx:red:power";
-+			gpios = <&hc595 2 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		router0 {
-+			label = "bcm53xx:green:router";
-+			gpios = <&hc595 3 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		router1 {
-+			label = "bcm53xx:amber:router";
-+			gpios = <&hc595 4 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wan {
-+			label = "bcm53xx:green:wan";
-+			gpios = <&hc595 5 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		wireless0 {
-+			label = "bcm53xx:green:wireless";
-+			gpios = <&hc595 6 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wireless1 {
-+			label = "bcm53xx:amber:wireless";
-+			gpios = <&hc595 7 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
--- 
-2.7.4
+Reviewed-by: Rafa? Mi?ecki <rafal@milecki.pl>
