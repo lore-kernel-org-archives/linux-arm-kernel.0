@@ -1,45 +1,65 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Mar 2018 02:07:18 +0000
-Subject: [PATCH 4/5] dt-bindings: pwm: sunxi: add new compatible strings
+Date: Wed,  7 Mar 2018 02:07:15 +0000
+Subject: [PATCH 1/5] pwm: sun4i: drop unused .has_rdy member
 In-Reply-To: <20180307020719.6675-1-andre.przywara@arm.com>
 References: <20180307020719.6675-1-andre.przywara@arm.com>
-Message-ID: <20180307020719.6675-5-andre.przywara@arm.com>
+Message-ID: <20180307020719.6675-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM controllers found in the Allwinner A64, H5 and H6 SoCs are fully
-compatible to the PWM controllers found in the A13 and H3.
-Add new compatible strings for those SoCs to the binding document, so
-that they can be safely used, together with a fallback string
-(preferably "allwinner,sun5i-a13-pwm").
-Add add the optionals "resets" property, needed by the H6.
+Commit a054c4d68408 ("pwm: sun4i: Drop legacy callbacks") dropped the
+only user of the .has_rdy member in our sun4i_pwm_data struct.
+Consequently we don't need to store this anymore for the various SoCs,
+which paves the way for further simplifications.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- Documentation/devicetree/bindings/pwm/pwm-sun4i.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/pwm/pwm-sun4i.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-index 51ff54c8b8ef..b3a127a0e58c 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-@@ -7,11 +7,17 @@ Required properties:
-     - "allwinner,sun5i-a13-pwm"
-     - "allwinner,sun7i-a20-pwm"
-     - "allwinner,sun8i-h3-pwm"
-+    - "allwinner,sun50i-a64-pwm"
-+    - "allwinner,sun50i-h5-pwm"
-+    - "allwinner,sun50i-h6-pwm"
-   - reg: physical base address and length of the controller's registers
-   - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-     the cells format.
-   - clocks: From common clock binding, handle to the parent clock.
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 334199c58f1d..b3e4a4b3774d 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -73,7 +73,6 @@ static const u32 prescaler_table[] = {
  
-+Optional properties:
-+  - resets: shall be the reset control phandle for the PWM block, if required.
-+
- Example:
+ struct sun4i_pwm_data {
+ 	bool has_prescaler_bypass;
+-	bool has_rdy;
+ 	unsigned int npwm;
+ };
  
- 	pwm: pwm at 1c20e00 {
+@@ -313,31 +312,26 @@ static const struct pwm_ops sun4i_pwm_ops = {
+ 
+ static const struct sun4i_pwm_data sun4i_pwm_data_a10 = {
+ 	.has_prescaler_bypass = false,
+-	.has_rdy = false,
+ 	.npwm = 2,
+ };
+ 
+ static const struct sun4i_pwm_data sun4i_pwm_data_a10s = {
+ 	.has_prescaler_bypass = true,
+-	.has_rdy = true,
+ 	.npwm = 2,
+ };
+ 
+ static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
+ 	.has_prescaler_bypass = true,
+-	.has_rdy = true,
+ 	.npwm = 1,
+ };
+ 
+ static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
+ 	.has_prescaler_bypass = true,
+-	.has_rdy = true,
+ 	.npwm = 2,
+ };
+ 
+ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
+ 	.has_prescaler_bypass = true,
+-	.has_rdy = true,
+ 	.npwm = 1,
+ };
+ 
 -- 
 2.14.1
