@@ -1,31 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Mar 2018 13:02:07 +0000
-Subject: [PATCH] KVM: arm/arm64: Reset mapped IRQs on VM reset
-In-Reply-To: <20180305103638.1633-1-cdall@kernel.org>
-References: <20180305103638.1633-1-cdall@kernel.org>
-Message-ID: <a5dbae97-7ab8-4f60-723f-d3599297f396@arm.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 7 Mar 2018 14:51:05 +0100
+Subject: [RFC V3 0/3] perf stat: improvements for handling of multiple PMUs
+In-Reply-To: <20180307133630.GD3701@kernel.org>
+References: <1520345084-42646-1-git-send-email-agustinv@codeaurora.org>
+ <20180307100408.GA22848@krava> <20180307133630.GD3701@kernel.org>
+Message-ID: <20180307135105.GA9080@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 10:36, Christoffer Dall wrote:
-> We currently don't allow resetting mapped IRQs from userspace, because
-> their state is controlled by the hardware.  But we do need to reset the
-> state when the VM is reset, so we provide a function for the 'owner' of
-> the mapped interrupt to reset the interrupt state.
+On Wed, Mar 07, 2018 at 10:36:30AM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Wed, Mar 07, 2018 at 11:04:08AM +0100, Jiri Olsa escreveu:
+> > On Tue, Mar 06, 2018 at 09:04:41AM -0500, Agustin Vega-Frias wrote:
+> > > This series of patches adds some simple improvements to the way perf stat
+> > > handles PMUs that have multiple instances by:
+> > > 
+> > > 1. Adding glob-like matching in addition to the prefix-based matching
+> > >    introduced previously (patch 1).
+> > > 2. Adding the ability to recover the PMU names when printing the events
+> > >    separately with the --no-merge option (patch 2).
+> > > 3. Restoring auto-merge for events created by prefix or glob-like match
+> > >    (patch 3). Note that this still keeps the behavior that disables
+> > >    auto-merging of legacy symbolic events (e.g. cycles).
+> > > 
+> > > V3:
+> > > 
+> > > - Consolidated prefix and glob matching into a single glob match with a
+> > >   trailing * to maintain prefix matching and have more consistent behavior.
+> > >   E.g., all of these match all the uncore_imc PMUs: imc, imc*, *imc, *imc*
+> > 
+> > Acked-by: Jiri Olsa <jolsa@kernel.org>
 > 
-> Currently only the timer uses mapped interrupts, so we call this
-> function from the timer reset logic.
+> Thanks, applied.
 > 
-> Signed-off-by: Christoffer Dall <cdall@kernel.org>
-> ---
-> This depends on "KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls
-> than KVM_RUN" from the VHE optimization series so that the reset doesn't
-> get called while vtimer->loaded is true.
+> I guess Andi had Acked or Reviewed this, no?
 
-Queued for 4.16-rc5.
+not the latest version.. please wait for his ack
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+jirka
