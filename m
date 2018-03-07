@@ -1,46 +1,82 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 7 Mar 2018 18:35:32 +0100
-Subject: [PATCH v4 1/3] tty: st-asc: Update tty alias
+Date: Wed, 7 Mar 2018 18:35:34 +0100
+Subject: [PATCH v4 3/3] ARM: dts: STi: Remove "console=ttyASN" from bootargs
+ for STi boards
 In-Reply-To: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
 References: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1520444134-30144-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Since dtc v1.4.6-9-gaadd0b65c987, aliases property name
-must include only lowercase and '-'.
-
-After having updated all STi boards serial aliases from "ttyASN"
-to "serialN", st-asc driver need to be updated accordingly as tty
-aliases id is retrieved using of_alias_get_id().
+As serial interface is already specified into stdout-path property,
+"console=ttyASN,115200" from bootargs can be removed.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
+v4: _ none
+v3: _ remove "console=serialN,115200" from bootargs and use prefered 
+      stdout-path property
+v2: _ none
 
-v4: _ add Reviewed-by
-v3: _ update st-asc driver with "serial" alias prefix and keep "ttyAS" in second choice
-v2: _ update st-asc driver with "serial" alias prefix
+ arch/arm/boot/dts/stih407-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2260.dts | 2 +-
+ arch/arm/boot/dts/stih418-b2199.dts | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
- drivers/tty/serial/st-asc.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index c763253514e9..5f9f01fac6dd 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -782,7 +782,9 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
- 	if (!np)
- 		return NULL;
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+index 00de810a3bcc..62ce1cecbb1f 100644
+--- a/arch/arm/boot/dts/stih407-b2120.dts
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih407-b2120", "st,stih407";
  
--	id = of_alias_get_id(np, ASC_SERIAL_NAME);
-+	id = of_alias_get_id(np, "serial");
-+	if (id < 0)
-+		id = of_alias_get_id(np, ASC_SERIAL_NAME);
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
  
- 	if (id < 0)
- 		id = 0;
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 07d7969923ea..2a5a9802a5ec 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih410-b2120", "st,stih410";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+index 0b2129712bef..155caa8c002a 100644
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -15,7 +15,7 @@
+ 	compatible = "st,stih410-b2260", "st,stih410";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &uart1;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
+index f88856c36a3f..cd0d719e31b7 100644
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih418-b2199", "st,stih418";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		stdout-path = &sbc_serial0;
+ 	};
+ 
 -- 
 1.9.1
