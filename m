@@ -1,70 +1,35 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 07 Mar 2018 11:12:13 +0900
-Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
-References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
- <20180227071134.28063-1-a.hajda@samsung.com>
- <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
-Message-ID: <5A9F4A7D.9020409@samsung.com>
+From: stschake@gmail.com (Stefan Schake)
+Date: Wed, 7 Mar 2018 03:28:53 +0100
+Subject: [PATCH v3 1/8] drm/blend: Add a generic alpha property
+In-Reply-To: <20180221130435.yqkpjk4i6qeq3eud@flea.lan>
+References: <cover.5d87bf4ea23323f77697cd002dd9e210a27d6062.1518802627.git-series.maxime.ripard@bootlin.com>
+ <9403570d73b6eb63ab87488d5e8eb767ba6f1ac7.1518802627.git-series.maxime.ripard@bootlin.com>
+ <20180216182041.GU5453@intel.com>
+ <CAOZHkRw=eNmkKwpFc=tRaO=TjpNPzcfncCCUneaDb0aBaaONQw@mail.gmail.com>
+ <20180221130435.yqkpjk4i6qeq3eud@flea.lan>
+Message-ID: <CAOZHkRzF19kQdzf3g4anceVCdZ=ANQg7WxFoDODsGNWWRTsnQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob and Andrzej,
+Hey,
 
-On 2018? 03? 06? 21:53, Andrzej Hajda wrote:
-> Hi Rob, Chanwoo, Krzysztof,
-> 
-> 
-> On 27.02.2018 08:11, Andrzej Hajda wrote:
->> Hi,
->>
->> Thanks for reviews of previous iterations.
->>
->> This patchset introduces USB physical connector bindings, together with
->> working example.
->> I have removed RFC prefix - the patchset seems to be heading
->> to a happy end :)
->>
->> v5: fixed extra parenthesis in dts, renamed extcon function.
->> v4: improved binding descriptions, added missing reg in dts.
->> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
->>     example.
->> v2: I have addressed comments by Rob and Laurent, thanks 
->>
->> Changes in datail are described in the patches.
->>
->> Regards
->> Andrzej
->>
->>
->> Andrzej Hajda (5):
->>   dt-bindings: add bindings for USB physical connector
->>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
->>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
->>   arm64: dts: exynos: add OF graph between MHL and USB connector
->>   extcon: add possibility to get extcon device by OF node
->>
->> Maciej Purski (1):
->>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
-> 
-> It looks like all patches received R-B or acks (I forgot add Krzysztof's
-> acks for dts part).
-> Now I have a question how to merge them.
-> The only functional dependency is between bridge and extcon, and from
-> the formal PoV bindings should be merged 1st.
-> I can merge it:
-> 1. All patches via drm-misc tree.
-> 2. All patches except dts via drm-misc, and Krzysztof will merge dts via
-> samsung-soc tree.
-> 
-> Is it OK, for all? Better ideas?
+On Wed, Feb 21, 2018 at 2:04 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> What is the behaviour of the tegra engine when it has both a
+> pixel-alpha and a plane-alpha?
+>
+> Atmel at least will drop one (but I'm not sure which one anymore).
 
-Krzysztof picked the dts patches. I'll make the immutable branch based on v4.16-rc1
-and apply them except for dts patchs. And I'll send the immutable branch to Rob and Andrzej.
+Sorry, I have no more on the Tegra beyond that commit. But I did have some
+more play time with drm_hwcomposer and from the rendering, it certainly
+expects both to apply at the same time. To further complicate it, from
+what I can tell with the VC4 HVS, you can actually configure it to
+1) use only pixel alpha 2) use only plane alpha or 3) mix both pixel
+and plane alpha, with 3 being what drm_hwc seems to want.
 
+I think once writeback lands it would be a good idea to have some tests
+that establish DRM plane blending standards beyond text in docs :)
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Regards,
+Stefan
