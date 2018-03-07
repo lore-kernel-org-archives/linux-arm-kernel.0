@@ -1,84 +1,87 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  7 Mar 2018 02:07:16 +0000
-Subject: [PATCH 2/5] pwm: sun4i: simplify controller mapping
+Date: Wed,  7 Mar 2018 02:07:19 +0000
+Subject: [PATCH 5/5] dts: sunxi: A64: Add PWM controllers
 In-Reply-To: <20180307020719.6675-1-andre.przywara@arm.com>
 References: <20180307020719.6675-1-andre.przywara@arm.com>
-Message-ID: <20180307020719.6675-3-andre.przywara@arm.com>
+Message-ID: <20180307020719.6675-6-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment we assign our supported compatible strings to a respective
-instance of our sun4i_pwm_data structure, even though some of them
-are the same.
-To avoid further clutter, split out the three different combinations of
-features we have at the moment and name them accordingly.
-This should make it more obvious which compatible string to use for new
-SoCs.
+The Allwinner A64 SoC features two PWM controllers, which are fully
+compatible to the one used in the A13 and H3 chips.
+Add the respective device nodes (one for the "normal" PWM, the other for
+the one in the CPUS domain) and the pin their output is connected to.
+On the A64 the "normal" PWM is muxed together with one of the MDIO pins
+used to communicate with the Ethernet PHY, so it won't be usable on many
+boards. But the Pinebook laptop uses this pin for controlling the LCD
+backlight.
+The CPUS PWM pin however is routed to the "RPi2" header, at the same
+location as the PWM pin on the RaspberryPi.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/pwm/pwm-sun4i.c | 26 ++++++++------------------
- 1 file changed, 8 insertions(+), 18 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 28 +++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index b3e4a4b3774d..078172dee462 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -310,27 +310,17 @@ static const struct pwm_ops sun4i_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d783d164b9c3..5dd89d19f744 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -321,6 +321,11 @@
+ 				bias-pull-up;
+ 			};
  
--static const struct sun4i_pwm_data sun4i_pwm_data_a10 = {
-+static const struct sun4i_pwm_data sun4i_pwm_dual_nobypass = {
- 	.has_prescaler_bypass = false,
- 	.npwm = 2,
- };
++			pwm_pin: pwm_pin {
++				pins = "PD22";
++				function = "pwm";
++			};
++
+ 			rmii_pins: rmii_pins {
+ 				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
+ 				       "PD18", "PD19", "PD20", "PD22", "PD23";
+@@ -537,6 +542,15 @@
+ 			#interrupt-cells = <3>;
+ 		};
  
--static const struct sun4i_pwm_data sun4i_pwm_data_a10s = {
-+static const struct sun4i_pwm_data sun4i_pwm_dual_bypass = {
- 	.has_prescaler_bypass = true,
- 	.npwm = 2,
- };
++		pwm: pwm at 1C21400 {
++			compatible = "allwinner,sun50i-a64-pwm",
++				     "allwinner,sun5i-a13-pwm";
++			reg = <0x01c21400 0x400>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
++
+ 		rtc: rtc at 1f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
+@@ -563,6 +577,15 @@
+ 			#reset-cells = <1>;
+ 		};
  
--static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
--	.has_prescaler_bypass = true,
--	.npwm = 1,
--};
--
--static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
--	.has_prescaler_bypass = true,
--	.npwm = 2,
--};
--
--static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
-+static const struct sun4i_pwm_data sun4i_pwm_single_bypass = {
- 	.has_prescaler_bypass = true,
- 	.npwm = 1,
- };
-@@ -338,19 +328,19 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
- static const struct of_device_id sun4i_pwm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-pwm",
--		.data = &sun4i_pwm_data_a10,
-+		.data = &sun4i_pwm_dual_nobypass,
- 	}, {
- 		.compatible = "allwinner,sun5i-a10s-pwm",
--		.data = &sun4i_pwm_data_a10s,
-+		.data = &sun4i_pwm_dual_bypass,
- 	}, {
- 		.compatible = "allwinner,sun5i-a13-pwm",
--		.data = &sun4i_pwm_data_a13,
-+		.data = &sun4i_pwm_single_bypass,
- 	}, {
- 		.compatible = "allwinner,sun7i-a20-pwm",
--		.data = &sun4i_pwm_data_a20,
-+		.data = &sun4i_pwm_dual_bypass,
- 	}, {
- 		.compatible = "allwinner,sun8i-h3-pwm",
--		.data = &sun4i_pwm_data_h3,
-+		.data = &sun4i_pwm_single_bypass,
- 	}, {
- 		/* sentinel */
- 	},
++		r_pwm: pwm at 1f03800 {
++			compatible = "allwinner,sun50i-a64-pwm",
++				     "allwinner,sun5i-a13-pwm";
++			reg = <0x01f03800 0x400>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
++
+ 		r_pio: pinctrl at 1f02c00 {
+ 			compatible = "allwinner,sun50i-a64-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
+@@ -578,6 +601,11 @@
+ 				pins = "PL0", "PL1";
+ 				function = "s_rsb";
+ 			};
++
++			r_pwm_pin: pwm {
++				pins = "PL10";
++				function = "s_pwm";
++			};
+ 		};
+ 
+ 		r_rsb: rsb at 1f03400 {
 -- 
 2.14.1
