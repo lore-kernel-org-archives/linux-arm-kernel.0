@@ -1,35 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Mar 2018 12:40:53 +0000
-Subject: [PATCH 0/2] KVM: arm/arm64: GICv2-on-v3 fixes
-Message-ID: <20180307124055.13800-1-marc.zyngier@arm.com>
+Date: Wed,  7 Mar 2018 12:40:55 +0000
+Subject: [PATCH 2/2] kvm: arm/arm64: vgic-v3: Tighten synchronization for
+ guests using v2 on v3
+In-Reply-To: <20180307124055.13800-1-marc.zyngier@arm.com>
+References: <20180307124055.13800-1-marc.zyngier@arm.com>
+Message-ID: <20180307124055.13800-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been trying to run VMs on a GICv3-based system that offers the
-GICv2 compatibility feature, and noticed that they would tend to
-slowly die under load.
+On guest exit, and when using GICv2 on GICv3, we use a dsb(st) to
+force synchronization between the memory-mapped guest view and
+the system-register view that the hypervisor uses.
 
-It turned out that this is due to KVM not being exactly true to the
-architecture, and ends up injecting multiple SGI with the same vintid,
-which the architecture clearly outlines as a "don't do that". This bug
-has been there since the first days of the "new vgic".
+This is incorrect, as the spec calls out the need for "a DSB whose
+required access type is both loads and stores with any Shareability
+attribute", while we're only synchronizing stores.
 
-Another issue is that we don't use the right barriers when exiting
-from the guest, as we only synchronize stores, while the architecture
-requires to synchronize both loads and stores. And we miss an isb to
-force execution of the previous dsb.
+We also lack an isb after the dsb to ensure that the latter has
+actually been executed before we start reading stuff from the sysregs.
 
-Unless someone shouts, I'm planning to take these patches into 4.16 as
-they directly affect my laptop (yes, I'm biased).
+The fix is pretty easy: turn dsb(st) into dsb(sy), and slap an isb()
+just after.
 
-Marc Zyngier (2):
-  KVM: arm/arm64: vgic: Don't populate multiple LRs with the same vintid
-  kvm: arm/arm64: vgic-v3: Tighten synchronization for guests using v2
-    on v3
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- virt/kvm/arm/hyp/vgic-v3-sr.c |  3 ++-
- virt/kvm/arm/vgic/vgic.c      | 11 +----------
- 2 files changed, 3 insertions(+), 11 deletions(-)
-
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index f5c3d6d7019e..b89ce5432214 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -215,7 +215,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 	 * are now visible to the system register interface.
+ 	 */
+ 	if (!cpu_if->vgic_sre) {
+-		dsb(st);
++		dsb(sy);
++		isb();
+ 		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+ 	}
+ 
 -- 
 2.14.2
