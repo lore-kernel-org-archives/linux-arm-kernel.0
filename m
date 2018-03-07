@@ -1,74 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2018 16:48:12 +0100
-Subject: [GIT PULL] firmware: ARM SCMI support for v4.17
-In-Reply-To: <20180301162731.GC1752@e107155-lin>
-References: <20180301162731.GC1752@e107155-lin>
-Message-ID: <CAK8P3a0C8_0Kc7aX5jrCDLR5h7TTqZwYoXWt09CJYFUT+xkUUw@mail.gmail.com>
+Date: Wed, 7 Mar 2018 16:50:21 +0100
+Subject: [GIT PULL 2/2] SOC: Couple of drivers changes for v4.17
+In-Reply-To: <1520296873-12982-2-git-send-email-santosh.shilimkar@oracle.com>
+References: <1520296873-12982-1-git-send-email-santosh.shilimkar@oracle.com>
+ <1520296873-12982-2-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <CAK8P3a3HbkMJsppb4jN-755T-8CyASsN7kJ1ZLTg31XXeBnO=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2018 at 5:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-
+On Tue, Mar 6, 2018 at 1:41 AM, Santosh Shilimkar
+<santosh.shilimkar@oracle.com> wrote:
+> The following changes since commit 91ab883eb21325ad80f3473633f794c78ac87f51:
+>
+>   Linux 4.16-rc2 (2018-02-18 17:29:42 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.17
+>
+> for you to fetch changes up to a817e5d82a2dc5daaa0a8a66cfab268fdf2f6bb6:
+>
+>   memory: ti-emif-sram: remove redundant dev_err call in ti_emif_probe() (2018-03-05 16:21:31 -0800)
+>
 > ----------------------------------------------------------------
-> ARM SCMI support for v4.17
+> SOC driver changes for v4.17
 >
-> ARM System Control and Management Interface(SCMI)[1] is more flexible and
-> easily extensible than any of the existing interfaces.
->
-> Few existing as well as future ARM platforms provide micro-controllers
-> to abstract various power and other system management tasks which have
-> similar interfaces, both in terms of the functions that are provided by
-> them, and in terms of how requests are communicated to them.
->
-> There are quite a few protocols like ARM SCPI, TI SCI, QCOM RPM, Nvidia Tegra
-> BPMP, and so on already. This specification is to standardize and avoid any
-> further fragmentation in the design of such interface by various vendors.
->
-> The current SCMI driver implementation is very basic and initial support.
-> It lacks support for notifications, asynchronous/delayed response, perf/power
-> statistics region and sensor register region.
->
-> Mailbox is the only form of transport supported currently in the driver.
-> SCMI supports interrupt based mailbox communication, where, on completion
-> of the processing of a message, the caller receives an interrupt as well as
-> polling for completion.
->
-> SCMI is designed to minimize the dependency on the mailbox/transport
-> hardware. So in terms of SCMI, each channel in the mailbox includes
-> memory area, doorbell and completion interrupt.
->
-> However the doorbell and completion interrupt is highly mailbox dependent
-> which was bit of controversial as part of SCMI/mailbox discussions.
->
-> Arnd and me discussed about the few aspects of SCMI and the mailbox framework:
->
-> 1. Use of mailbox framework for doorbell type mailbox controller:
->    - Such hardware may not require any data to be sent to signal the remote
->      about the presence of a message. The channel will have in-built
->      information on how to trigger the signal to the remote.
->      There are few mailbox controller drivers which are purely doorbell based.
->      e.g.QCOM IPC, STM, Tegra, ACPI PCC,..etc
->
-> 2. Supporting other mailbox controller:
->    - SCMI just needs a mechanism to signal the remote firmware. Such
->      controller may need fixed message to be sent to trigger a doorbell.
->      In such case we may need to get that data from DT and pass the same
->      to the controller. It's not covered in the current DT binding, but
->      can be extended as optional property in future.
->
->      However handling notifications may be interesting on such mailbox, but
->      again there is no way to interpret what the data field(remote message)
->      means, it could be a bit mask or a number or don't-care.
->
-> Arnd mentioned that he doesn't like the way the mailbox binding deals
-> with doorbell-type hardware, but we do have quite a few precedent drivers
-> already and changing the binding to add a data field would not make it any
-> better, but could cause other problems. So he is happy with the status quo
-> of SCMI implementation.
->
-> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0056a/index.html
+>  - Remove deundant dev_err from probe in ti-emif-srma driver
+                     ^^ I fixed the typo while applying
 
-Pulled into next/drivers, I'm glad we came to a conclusion at last.
-Thanks for the detailed tag description.
+>  - Make use of seq_putc in emif reg show
 
-         Arnd
+Pulled into next/drivers, thanks!
+
+        Arnd
