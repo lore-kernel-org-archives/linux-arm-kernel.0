@@ -1,27 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Mar 2018 13:39:19 -0600
-Subject: [PATCHv2 1/7] dt-bindings, firmware: add Intel Stratix10 service
- layer binding
-In-Reply-To: <1519949975-13548-2-git-send-email-richard.gong@linux.intel.com>
-References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
- <1519949975-13548-2-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <20180307193919.56ogsh32odpk6bul@rob-hp-laptop>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed, 7 Mar 2018 16:39:30 -0300
+Subject: [RFC V3 1/3] perf, tools: Support wildcards on pmu name in
+ dynamic pmu events
+In-Reply-To: <20180307190543.GR3701@kernel.org>
+References: <1520345084-42646-1-git-send-email-agustinv@codeaurora.org>
+ <1520345084-42646-2-git-send-email-agustinv@codeaurora.org>
+ <20180307160224.GN3701@kernel.org>
+ <d3bd59db56fbc13b931ae45573bf94d8@codeaurora.org>
+ <20180307185415.GK25017@tassilo.jf.intel.com>
+ <20180307190509.GQ3701@kernel.org>
+ <20180307190543.GR3701@kernel.org>
+Message-ID: <20180307193930.GW3701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 06:19:29PM -0600, richard.gong at linux.intel.com wrote:
-> From: Richard Gong <richard.gong@intel.com>
+Em Wed, Mar 07, 2018 at 04:05:43PM -0300, Arnaldo Carvalho de Melo escreveu:
+> Em Wed, Mar 07, 2018 at 04:05:09PM -0300, Arnaldo Carvalho de Melo escreveu:
+> > Em Wed, Mar 07, 2018 at 10:54:15AM -0800, Andi Kleen escreveu:
+> > > > Sorry about that. That's probably because FNM_EXTMATCH is a GNU extension,
+> > > > not POSIX, and the Alpine and Android runtimes likely don't implement
+> > > > that...
+> > > > I'll send a fix reverting back to the strncmp to ignore the uncore_ prefix,
+> > > > and dropping that extension.
+> > > 
+> > > Just don't set it? Even the basic glob patterns are useful.
+> > 
+> > Or use:
+> > 
+> > #ifndef FNM_EXTMATCH
+> > #define FNM_EXTMATCH 0
+> > #endif
+> > 
+> > So on systems without it, its not used, while on GNU systems, we have
+> > that functionality (pretty fancy, someone may need that... ;-))
 > 
-> Add a device tree binding for the Intel Stratix10 service layer driver
-> 
-> Signed-off-by: Richard Gong <richard.gong@intel.com>
-> Signed-off-by: Alan Tull <atull@kernel.org>
-> ---
-> v2: Change to put service layer driver node under the firmware node
->     Change compatible to "intel, stratix10-svc"
-> ---
->  .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+> I'll try this route, btw, no need to send more patches for now.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+So, with the patch at the end of this message, it works now in those
+systems:
+
+[root at jouet ~]# dm
+   1 alpine:3.4                    : Ok   gcc (Alpine 5.3.0) 5.3.0
+   2 alpine:3.5                    : Ok   gcc (Alpine 6.2.1) 6.2.1 20160822
+   3 alpine:3.6                    : Ok   gcc (Alpine 6.3.0) 6.3.0
+   4 alpine:edge                   : Ok   gcc (Alpine 6.4.0) 6.4.0
+   5 amazonlinux:1                 : Ok   gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-11)
+   6 amazonlinux:2                 : Ok   gcc (GCC) 7.2.1 20170915 (Red Hat 7.2.1-2)
+   7 android-ndk:r12b-arm          : Ok   arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
+   8 android-ndk:r15c-arm          : Ok   arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
+   9 centos:5                      : Ok   gcc (GCC) 4.1.2 20080704 (Red Hat 4.1.2-55)
+  10 centos:6                      : Ok   gcc (GCC) 4.4.7 20120313 (Red Hat 4.4.7-18)
+
+I stopped the test at this point to process some more patches, will
+restart the tests with those extra patches and if all goes well with the
+other 46 build environments, push upstream, thanks.
+
+- Arnaldo
+
+diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+index 316ac073aa78..18473be7d787 100644
+--- a/tools/perf/util/parse-events.y
++++ b/tools/perf/util/parse-events.y
+@@ -9,6 +9,13 @@
+ #define YYDEBUG 1
+ 
+ #include <fnmatch.h>
++/*
++ * GNU extension, so better define it to 0 for systems such
++ * as Android and Alpine Linux.
++ */
++#ifndef FNM_EXTMATCH
++#define FNM_EXTMATCH 0
++#endif
+ #include <linux/compiler.h>
+ #include <linux/list.h>
+ #include <linux/types.h>
