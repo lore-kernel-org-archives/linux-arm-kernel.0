@@ -1,67 +1,52 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Wed, 7 Mar 2018 23:34:17 +0000
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
- with the same vintid
-In-Reply-To: <20180307124055.13800-2-marc.zyngier@arm.com>
-References: <20180307124055.13800-1-marc.zyngier@arm.com>
- <20180307124055.13800-2-marc.zyngier@arm.com>
-Message-ID: <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Wed,  7 Mar 2018 15:57:26 -0800
+Subject: Make set_handle_irq and handle_arch_irq generic, v3
+Message-ID: <20180307235731.22627-1-palmer@sifive.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 12:40 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The vgic code is trying to be clever when injecting GICv2 SGIs,
-> and will happily populate LRs with the same interrupt number if
-> they come from multiple vcpus (after all, they are distinct
-> interrupt sources).
->
-> Unfortunately, this is against the letter of the architecture,
-> and the GICv2 architecture spec says "Each valid interrupt stored
-> in the List registers must have a unique VirtualID for that
-> virtual CPU interface.". GICv3 has similar (although slightly
-> ambiguous) restrictions.
->
-> This results in guests locking up when using GICv2-on-GICv3, for
-> example. The obvious fix is to stop trying so hard, and inject
-> a single vcpu per SGI per guest entry. After all, pending SGIs
-> with multiple source vcpus are pretty rare, and are mostly seen
-> in scenario where the physical CPUs are severely overcomitted.
->
-> Cc: stable at vger.kernel.org
-> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic.c | 11 +----------
->  1 file changed, 1 insertion(+), 10 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index c7c5ef190afa..1f7ff175f47b 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
->         list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
->                 spin_lock(&irq->irq_lock);
->
-> -               if (unlikely(vgic_target_oracle(irq) != vcpu))
-> -                       goto next;
-> -
-> -               /*
-> -                * If we get an SGI with multiple sources, try to get
-> -                * them in all at once.
-> -                */
-> -               do {
-> +               if (likely(vgic_target_oracle(irq) == vcpu))
->                         vgic_populate_lr(vcpu, irq, count++);
+This is my third version of this patch set, but the original cover
+letter is still the most relevant description I can come up with.
 
-I think we need to change vgic_populate_lr to set the EOI maintenance
-interrupt flag so that when the interrupt is deactivated, if there are
-additional pending sources, we exit the guest and pick up the
-interrupt.
+    This patch set has been sitting around for a while, but it got a bit lost
+    in the shuffle.  In RISC-V land we currently couple do_IRQ (the C entry
+    point for interrupt handling) to our first-level interrupt controller.
+    While this isn't completely crazy (as the first-level interrupt controller
+    is specified by the ISA), it is a bit awkward.
 
-An alternative would be to set the underflow interrupt, but I don't
-think that would be correct for multiple priorities, because the SGI
-could have a higher priority than other pending interrupts we put in
-the LR.
+    This patch set decouples our trap handler from our first-level IRQ chip
+    driver by copying what a handful of other architectures are doing.  This
+    does add an additional load to the interrupt handling path, but there's a
+    handful of performance problems in there that I've been meaning to look at
+    so I don't mind adding another one for now.  The advantage is that our
+    irqchip driver is decoupled from our arch port, at least at compile time.
 
-Thanks,
-Christoffer
+I've build tested this with defconfigs on all the modified architectures
+after both patch 1 and 5.  I've left the old acks in for the later
+patches as the patch set has changed very little since I last submitted
+it.
+
+Changes since v2:
+
+* This is now called CONFIG_GENERIC_IRQ_MULTI_HANDLER instead of
+  MULTI_IRQ_HANDLER.
+* Rather than converting the ARM code to generic code, this adds new
+  generic code (based on the ARM implementation) and then provides
+  separate patches to convert each architecture over to use
+  CONFIG_GENERIC_IRQ_MULTI_HANDLER.
+
+Changes since v1:
+
+* I based this on arm instead of arm64, which means we guard the selection of
+  these routines with CONFIG_MULTI_IRQ_HANDLER.
+* The changes are in kernel/irq/handle.c and include/linux/irq.h instead of
+  lib.
+* I've converted the arm, arm64, and openrisc ports to use the generic versions
+  of these routines.
+
+
+[PATCH v3 1/5] irq: Add CONFIG_GENERIC_IRQ_MULTI_HANDLER
+[PATCH v3 2/5] RISC-V: Move to the new GENERIC_IRQ_MULTI_HANDLER
+[PATCH v3 3/5] arm: Convert to GENERIC_IRQ_MULTI_HANDLER
+[PATCH v3 4/5] arm64: Use the new GENERIC_IRQ_MULTI_HANDLER
+[PATCH v3 5/5] openrisc: Use the new GENERIC_IRQ_MULTI_HANDLER
