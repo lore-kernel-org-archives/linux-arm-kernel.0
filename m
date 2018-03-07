@@ -1,91 +1,71 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 7 Mar 2018 10:30:59 -0800
-Subject: [PATCH 2/7] ARM: LTO: avoid THUMB2_KERNEL+LTO
-In-Reply-To: <20180220215954.4092811-3-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-3-arnd@arndb.de>
-Message-ID: <20180307183059.GA57047@google.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Wed, 7 Mar 2018 13:31:35 -0500
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for
+ ThunderX2 B0
+In-Reply-To: <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
+ <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+ <20180307143832.GJ3701@kernel.org>
+ <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+Message-ID: <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Tue, Feb 20, 2018 at 10:59:49PM +0100 Arnd Bergmann ha dit:
-
-> Trying to build an LTO-Enabled kernel with Thumb2 instructions failed
-> horribly for me, with an endless output of things like
+On 03/07/2018 12:35 PM, Ganapatrao Kulkarni wrote:
+> Hi Will Cohen,
 > 
-> ccVnNycO.s:2665: Error: thumb conditional instruction should be in IT block -- `bxne lr'
-> ccVnNycO.s:7128: Error: thumb conditional instruction should be in IT block -- `strexeq r5,r2,[r3]'
-> ccVnNycO.s:7258: Error: thumb conditional instruction should be in IT block -- `strexeq lr,r0,[r3]'
-> ccVnNycO.s:17380: Error: thumb conditional instruction should be in IT block -- `strexeq r1,r2,[r6]'
-> ccVnNycO.s:19163: Error: thumb conditional instruction should be in IT block -- `strexeq r8,r6,[r3]'
-> ccVnNycO.s:22722: Error: thumb conditional instruction should be in IT block -- `strexeq r7,r1,[r0]'
-> ccVnNycO.s:24105: conditional infixes are deprecated in unified syntax
-> ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `sbcccs r1,r1,r3'
-> ccVnNycO.s:24105: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
-> ccVnNycO.s:24210: conditional infixes are deprecated in unified syntax
-> ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `sbcccs r2,r2,r3'
-> ccVnNycO.s:24210: Error: thumb conditional instruction should be in IT block -- `movcc r3,#0'
-
-For the record:
-
-The errors about sbcccs and movcc probably stem from here:
-
-/* We use 33-bit arithmetic here... */
-#define __range_ok(addr, size) ({ \
-        unsigned long flag, roksum; \
-        __chk_user_ptr(addr);   \
-        __asm__("adds %1, %2, %3; sbcccs %1, %1, %0; movcc %0, #0" \
-                : "=&r" (flag), "=&r" (roksum) \
-                : "r" (addr), "Ir" (size), "0" (current_thread_info()->addr_limit) \
-                : "cc"); \
-        flag; })
-
-arch/arm/include/asm/uaccess.h
-
-I stumbled across this when trying to build a 32-bit ARM kernel with
-clang. This post has some more information:
-
-https://lists.linuxfoundation.org/pipermail/llvmlinux/2012-November/000073.html
-
-"This is a problem with the above Linux inline ASM code, not with Clang,
-nor with gas. It appears the new "Unified syntax" for ARM ASM code now
-used by gas doesn't allow the use of conditional infixes anymore (the CC
-part)."
-
-Unfortunately I'm probably not fluent enough with ARM inline assembly
-to come up with a good alternative.
-
-Matthias
-
-> I did not investigate this too much, disabling Thumb2 support when LTO is
-> set lets me build randconfig kernels.
+> On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
+> <acme@kernel.org> wrote:
+>> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
+>>> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
+>>>> There is MIDR change on ThunderX2 B0, adding an entry to mapfile
+>>>> to enable JSON events for B0.
+>>>>
+>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>
+>> Ganapatrao, can you please take this in consideration and if agreeing
+>> send a v2 patch?
+>>
+>> With that I can add an Acked-by: wcohen, Right?
+>>
+>> - Arnaldo
+>>>> ---
+>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
+>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>> index e61c9ca..93c5d14 100644
+>>>> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>> @@ -13,4 +13,5 @@
+>>>>  #
+>>>>  #Family-model,Version,Filename,EventType
+>>>>  0x00000000420f5160,v1,cavium,core
+>>>> +0x00000000430f0af0,v1,cavium,core
+>>>>  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
+>>>>
+>>>
+>>> Hi,
+>>> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
 > 
-> Since ARM_SINGLE_ARMV7M is Thumb2-only, I have to disallow LTO for V7-M
-> targets.
+> for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
+> are ignored/dont-care.
+
+Thanks for pointing that out.  See the code masking out those bits in linux/toos/perf/arch/util/header.c. For the ppc64 it just copies the equivalent of the MIDR including the revision bits. Thus, the need for regular expression matching to avoid having to create a new entry for each revision.
+
+-Will
+
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
+>>>
+>>>
+>>> -Will Cohen
+>>
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 8ed0f664f86f..fbf2c3ab9a97 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -18,7 +18,7 @@ config ARM
->  	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
->  	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
->  	select ARCH_SUPPORTS_ATOMIC_RMW
-> -	select ARCH_SUPPORTS_LTO
-> +	select ARCH_SUPPORTS_LTO if !ARM_SINGLE_ARMV7M
->  	select ARCH_USE_BUILTIN_BSWAP
->  	select ARCH_USE_CMPXCHG_LOCKREF
->  	select ARCH_WANT_IPC_PARSE_VERSION
-> @@ -1533,6 +1533,7 @@ config SCHED_HRTICK
->  config THUMB2_KERNEL
->  	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
->  	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
-> +	depends on !LTO
->  	default y if CPU_THUMBONLY
->  	select ARM_UNWIND
->  	help
+> thanks
+> Ganapat
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
