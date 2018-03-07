@@ -1,58 +1,33 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Mar 2018 18:50:10 +0530
-Subject: [PATCH v3 01/11] mmc: sdhci-omap: Fix when capabilities are obtained
- from SDHCI_CAPABILITIES reg
+Date: Wed, 7 Mar 2018 18:50:18 +0530
+Subject: [PATCH v3 09/11] dt-bindings: sdhci-omap: Add K2G specific binding
 In-Reply-To: <20180307132020.30951-1-kishon@ti.com>
 References: <20180307132020.30951-1-kishon@ti.com>
-Message-ID: <20180307132020.30951-2-kishon@ti.com>
+Message-ID: <20180307132020.30951-10-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdhci_omap_config_iodelay_pinctrl_state() requires caps and caps2 to be
-initialized (speed mode capabilities like UHS/HS200) before it is
-invoked. While mmc_of_parse() initializes caps/caps2 if capabilities is
-populated in device tree, it will remain uninitialized for capabilities
-obtained from SDHCI_CAPABILITIES register.
-Fix sdhci_omap_config_iodelay_pinctrl_state() to be used even while
-getting the capabilities from SDHCI_CAPABILITIES register by invoking
-sdhci_setup_host() before sdhci_omap_config_iodelay_pinctrl_state().
+Add binding for the TI's sdhci-omap controller present in K2G.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/mmc/host/sdhci-omap.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/mmc/sdhci-omap.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index 1456abd5eeb9..3cce30584d2f 100644
---- a/drivers/mmc/host/sdhci-omap.c
-+++ b/drivers/mmc/host/sdhci-omap.c
-@@ -916,10 +916,6 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 		goto err_put_sync;
- 	}
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+index 51775a372c06..8d09b837e350 100644
+--- a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
++++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+@@ -4,7 +4,9 @@ Refer to mmc.txt for standard MMC bindings.
  
--	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
--	if (ret)
--		goto err_put_sync;
--
- 	host->mmc_host_ops.get_ro = mmc_gpio_get_ro;
- 	host->mmc_host_ops.start_signal_voltage_switch =
- 					sdhci_omap_start_signal_voltage_switch;
-@@ -930,7 +926,15 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 	sdhci_read_caps(host);
- 	host->caps |= SDHCI_CAN_DO_ADMA2;
+ Required properties:
+ - compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
++	      Should be "ti,k2g-sdhci" for K2G
+ - ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
++	     (Not required for K2G).
  
--	ret = sdhci_add_host(host);
-+	ret = sdhci_setup_host(host);
-+	if (ret)
-+		goto err_put_sync;
-+
-+	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
-+	if (ret)
-+		goto err_put_sync;
-+
-+	ret = __sdhci_add_host(host);
- 	if (ret)
- 		goto err_put_sync;
- 
+ Example:
+ 	mmc1: mmc at 4809c000 {
 -- 
 2.11.0
