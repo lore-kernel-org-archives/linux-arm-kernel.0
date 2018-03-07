@@ -1,66 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  7 Mar 2018 17:24:13 +0100
-Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
-In-Reply-To: <20180307162430.2664523-1-arnd@arndb.de>
-References: <20180307162430.2664523-1-arnd@arndb.de>
-Message-ID: <20180307162430.2664523-2-arnd@arndb.de>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 7 Mar 2018 10:30:09 -0600
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support for qcom, smmu-500 variant
+In-Reply-To: <20180307063219.14409-1-vivek.gautam@codeaurora.org>
+References: <20180307063219.14409-1-vivek.gautam@codeaurora.org>
+Message-ID: <CAL_Jsq+WWR5r-RcuE2KGpswdRgwzOV_BZjEOzHj5bAULFD6_Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While looking at the build regression, I noticed that the
-platform selects a lot of other Kconfig symbols that it really
-should not:
+On Wed, Mar 7, 2018 at 12:32 AM, Vivek Gautam
+<vivek.gautam@codeaurora.org> wrote:
+> Qualcomm's arm-smmu 500 implementation supports runtime pm
+> so enable the same.
 
-CPU_V7, ARM_GIC, HAVE_SMP, COMMON_CLK, GENERIC_CLOCKEVENTS,
-and CLKDEV_LOOKUP are all implied by ARCH_MULTI_V7, so they
-can be dropped.
+That's a driver detail unrelated to the binding.
 
-CACHE_L2X0, SMP and USB are meant to be user-selectable, we
-want to be able to turn those off for testing purposes.
+>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> ---
+>
+>  Based on iommu/arm-smmu pm runtime support series [1]:
+>  [PATCH v8 0/5] iommu/arm-smmu: Add runtime pm/sleep support
+>
+>  Tested on sdm845 with necessary support to enable the smmu
+>  and with necessary user.
+>
+>  [1] https://lkml.org/lkml/2018/3/2/325
+>
+>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 14 ++++++++++++++
 
-CPU_USE_DOMAINS looks completely misplaced here, we should not
-select that for an ARMv7 platform.
+Please split bindings to separate patches.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-npcm/Kconfig | 18 ------------------
- 1 file changed, 18 deletions(-)
+>  drivers/iommu/arm-smmu.c                             |  8 ++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 6ea27bd4f785..0b5c6d2a9865 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -18,6 +18,7 @@ conditions.
+>                          "arm,mmu-500"
+>                          "cavium,smmu-v2"
+>                          "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
 
-diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
-index 2bc6697c8d97..c6a16230e8ef 100644
---- a/arch/arm/mach-npcm/Kconfig
-+++ b/arch/arm/mach-npcm/Kconfig
-@@ -12,12 +12,6 @@ comment "NPCM7XX CPU type"
- config ARCH_NPCM750
- 	depends on ARCH_NPCM
- 	bool "Support for NPCM750 BMC CPU (Poleg)"
--	select CACHE_L2X0
--	select CPU_V7
--	select ARM_GIC
--	select HAVE_SMP
--	select SMP
--	select SMP_ON_UP
- 	select HAVE_ARM_SCU
- 	select HAVE_ARM_TWD if SMP
- 	select ARM_ERRATA_720789
-@@ -26,18 +20,6 @@ config ARCH_NPCM750
- 	select ARM_ERRATA_794072
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
--	select USB_EHCI_ROOT_HUB_TT
--	select USB_ARCH_HAS_HCD
--	select USB_ARCH_HAS_EHCI
--	select USB_EHCI_HCD
--	select USB_ARCH_HAS_OHCI
--	select USB_OHCI_HCD
--	select USB
--	select FIQ
--	select CPU_USE_DOMAINS
--	select GENERIC_CLOCKEVENTS
--	select CLKDEV_LOOKUP
--	select COMMON_CLK if OF
- 	select NPCM750_TIMER
- 	select MFD_SYSCON
- 	help
--- 
-2.9.0
+I don't even see this one in the tree yet...
+
+> +                        "qcom,<soc>-smmu-500", "qcom,smmu-500"
+
+IIRC, the mmu-500 is SMMU v2 implementation, right? Having
+qcom,smmu-500 seems kind of pointless.
+
+Given that we're there's only 1 SoC for "qcom,<soc>-smmu-v2" and
+you're already on to a new genericish compatible, just do SoC specific
+compatible strings.
+
+Rob
