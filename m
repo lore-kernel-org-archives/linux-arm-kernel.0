@@ -1,51 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 7 Mar 2018 12:59:55 +0000
-Subject: [PATCH v7 02/14] iommu/rockchip: Fix error handling in probe
-In-Reply-To: <20180306030252.3197-3-jeffy.chen@rock-chips.com>
-References: <20180306030252.3197-1-jeffy.chen@rock-chips.com>
- <20180306030252.3197-3-jeffy.chen@rock-chips.com>
-Message-ID: <ac9eb221-8483-45e5-6f87-6dcc5decfb45@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 7 Mar 2018 13:00:17 +0000
+Subject: [PATCH] mfd: tps65218: Reorder tps65218_regulator_id enum
+In-Reply-To: <20180216041705.6340-1-d-gerlach@ti.com>
+References: <20180216041705.6340-1-d-gerlach@ti.com>
+Message-ID: <20180307130017.m6swph3mlupu6g76@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/18 03:02, Jeffy Chen wrote:
-> Add missing iommu_device_sysfs_remove in error path.
+On Thu, 15 Feb 2018, Dave Gerlach wrote:
 
-Acked-by: Robin Murphy <robin.murphy@arm.com>
+> Commit 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
+> changes the probe function of drivers/regulator/tps65218-regulator.c so
+> that it iterates through all available regulators and assumes that the
+> regulator IDs are sequential and match the order present in the enum
+> tps65218_regulator_id. However, for some reason the much older commit
+> c0ea88b890d6 ("regulator: tps65218: add support for LS3 current
+> regulator") updated all arrays with LS3 at the end but added it second
+> to last for the enum.
+> 
+> Because of this long standing mismatch in order between the
+> tps65218_regulator_id enum and the regulator_desc array in the tps65218
+> regulator driver, the new probe function causes the strobe values to be
+> associated with the wrong regulator ID. This causes LDO1 to fail to
+> suspend in tps65218_pmic_set_suspend_disable due to not having anything
+> probes for its strobe value. Fix the order in the enum so the probe
+> function works as the update intended.
 
-(strictly you don't need to introduce the additional return, but it's 
-only a couple of lines and definitely not worth respinning just for that)
+This sounds super fragile.
 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+I'm willing to accept this patch if it 'makes stuff work', but we
+should look into why a dynamically assigned enum is sensitive to
+ordering.  At the very least you should consider providing a comment
+with working to that effect.
+
+> Fixes: 2dc4940360d4 ("regulator: tps65218: Remove all the compatibles")
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
-> 
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->   drivers/iommu/rockchip-iommu.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 16cd8780c289..c2ef3cbd4401 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1193,8 +1193,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   
->   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
->   	err = iommu_device_register(&iommu->iommu);
-> +	if (err) {
-> +		iommu_device_sysfs_remove(&iommu->iommu);
-> +		return err;
-> +	}
->   
-> -	return err;
-> +	return 0;
->   }
->   
->   static const struct of_device_id rk_iommu_dt_ids[] = {
-> 
+>  include/linux/mfd/tps65218.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Applied, thanks.
+
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
