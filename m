@@ -1,63 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 07 Mar 2018 18:15:02 +0000
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <20180301223529.GA28811@pd.tnic>
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com> <20180301150144.GA4215@pd.tnic>
- <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
- <20180301223529.GA28811@pd.tnic>
-Message-ID: <5AA02C26.10803@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 7 Mar 2018 18:24:09 +0000
+Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
+In-Reply-To: <20180302165415.GB8704@kroah.com>
+References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+ <20180301152450.GA4061@kroah.com>
+ <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
+ <20180302165415.GB8704@kroah.com>
+Message-ID: <CAKv+Gu-HdLkjYeNBQOW=JuWt3GjdZJFjyXCHCbGU01hkO81BNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav, Punit,
+On 2 March 2018 at 16:54, Greg KH <greg@kroah.com> wrote:
+> On Fri, Mar 02, 2018 at 05:14:50PM +0800, Alex Shi wrote:
+>>
+>>
+>> On 03/01/2018 11:24 PM, Greg KH wrote:
+>> > On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
+>> >> Hi All,
+>> >>
+>> >> This backport patchset fixed the meltdown issue, it's original branch:
+>> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+>> >> A few dependency or fixingpatches are also picked up, if they are necessary
+>> >>  and no functional changes.
+>> >>
+>> >> The patchset also on repository:
+>> >>    git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2
+>> >>
+>> >> No bug found yet from kernelci.org and lkft testing.
+>> >
+>> > No bugs is good, but does it actually fix the meltdown problem?  What
+>> > did you test it on?
+>>
+>> Oh, I have no A73/A75 cpu, so I can not reproduce meltdown bug.
+>
+> Then why should I trust this backport at all?
+>
+> Please test on the hardware that is affected, otherwise you do not know
+> if your patches do anything or not.
+>
 
-On 01/03/18 22:35, Borislav Petkov wrote:
-> On Thu, Mar 01, 2018 at 06:06:59PM +0000, Punit Agrawal wrote:
->> The 64-bit support lives in arch/arm64 and the die() there doesn't
->> contain an oops_begin()/oops_end(). But the lack of oops_begin() on
->> arm64 doesn't really matter here.
+I don't think it is feasible to test these backports by confirming
+that they make the fundamental issue go away. We simply don't have the
+code to reproduce all the variants, and we have to rely on the
+information provided by ARM Ltd. regarding which cores are affected
+and which aren't.
 
->> One issue I see with calling die() is that it is defined in different
->> includes across various architectures, (e.g., include/asm/kdebug.h for
->> x86, include/asm/system_misc.h in arm64, etc.)
-> 
-> I don't think that's insurmountable.
+What we can do (and what I did for the v4.14 backport) is ensure that
+the mitigations take effect when they are expected to, i.e., confirm
+that the trampoline vector table and page tables are being used (which
+can be done using the exploit code for variant 3a btw), and to check
+that the branch predictor maintenance code is called as expected. For
+variant 1, we just have to have faith ...
 
-I don't think die() helps us, its not quite the same as oops_begin()/panic(),
-which means we're interpreting the APEI notification's severity differently,
-depending on when we took it.
-
-
-> The more important question is, can we do the same set of calls when
-> panic severity on all architectures which support APEI or should we have
-> arch-specific ghes_panic() callbacks or so.
-
-I think the purpose of this oops_begin() is to ensure two CPUs calling
-oops_begin() at the same time don't have their traces interleaved, unblanks the
-screen and 'busts' any spinlocks printk() may need (console etc).
-
-This code is called in_nmi(), printk() now supports this so it doesn't need its
-locks busting.
-When called in_nmi(), printk batches the messages into its per-cpu
-printk_safe_seq_buf, which in our case is dumped by panic() using
-printk_safe_flush_on_panic(). So provided we call panic(), the in_nmi() messages
-from ghes.c are already batched, and printed behind panic()'s atomic_cmpxchg()
-exclusion thing.
-
-If your arm64 system has one of these futuristic 'screens', they get unblanked
-when panic() calls console_verbose() and bust_spinlocks(1).
-
-
-> As it is now, it would turn into a mess if we start with the ifdeffery
-> and the different requirements architectures might have...
-
-Today its just x86 and arm64. arm64 doesn't have a hook to do this. I'm happy to
-add an empty declaration or leave it under an ifdef until someone complains
-about any behaviour I missed!
-
-
-Thanks,
-
-James
+Note that I haven't done so for *this* backport, and I currently don't
+have any time to spend on this.
