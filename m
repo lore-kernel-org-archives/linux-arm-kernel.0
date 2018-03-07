@@ -1,66 +1,89 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 7 Mar 2018 09:11:13 +0100
-Subject: [PATCH 3/5] arm64: dts: renesas: r8a7795: Add cpu
- capacity-dmips-mhz
-In-Reply-To: <CAMuHMdXYZB8emmj5TdZih-VQ5SVF-F0LkBRsPPGe=XGvNDt_Lg@mail.gmail.com>
-References: <1519697995-6061-1-git-send-email-gaku.inami.xh@renesas.com>
- <1519697995-6061-4-git-send-email-gaku.inami.xh@renesas.com>
- <CAMuHMdWswL8N3uTCcGmWSfa98_bpz7_11PDs=m+_RC--wBVu6w@mail.gmail.com>
- <OSBPR01MB1800C2DBEAB2BC506BF80AB9A2D80@OSBPR01MB1800.jpnprd01.prod.outlook.com>
- <CAMuHMdXYZB8emmj5TdZih-VQ5SVF-F0LkBRsPPGe=XGvNDt_Lg@mail.gmail.com>
-Message-ID: <20180307081112.scl7cwnat562muer@verge.net.au>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 7 Mar 2018 16:16:25 +0800
+Subject: [PATCH v6 0/3] add support for Mediatek High-Speed DMA controller on
+ MT7622 and MT7623 SoC
+Message-ID: <cover.1520407882.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 08:47:43AM +0100, Geert Uytterhoeven wrote:
-> Hi Inami-san,
-> 
-> On Wed, Mar 7, 2018 at 2:48 AM, Gaku Inami <gaku.inami.xh@renesas.com> wrote:
-> >> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
-> >> Sent: Monday, March 5, 2018 7:24 PM
-> > [snip]
-> >>
-> >> 411 for the A53 cores sounds a bit low to me, though.
-> >> Documentation/devicetree/bindings/arm/cpu-capacity.txt uses 578.
-> >>
-> >> Perhaps you already took into account the maximum clock frequencies?
-> >> According to the binding document, you should not do that (cfr.
-> >> "final capacities are 1024 for cluster0 and 446 for cluster1" in the
-> >> bindings doc).
-> >
-> > Thanks for your review.
-> >
-> > I set 411 for CA53 based on dhrystone measurement and current implementation.
-> >
-> > The average in 10 times of measurement as follows:
-> >
-> >   cpu   max-freq   dhrystone
-> >   ---------------------------------
-> >   A57   1500 MHz  15532585 lps/s
-> >   A53   1200 MHz   6241541 lps/s
-> >
-> > With the value of CA57 is scaled at 1024, I end up with 411 for CA53.
-> > However, since cpufreq is not available on renesas-devel-20180212-v4.16-rc1,
-> > the final capacity is set by directly using capacity-dmips-mhz in dt as below.
-> 
-> Documentation/devicetree/bindings/arm/cpu-capacity.txt:
-> 
-> "capacity-dmips-mhz is an optional cpu node [1] property: u32 value
->  representing CPU capacity expressed in normalized DMIPS/MHz. At boot time, the
->  maximum frequency available to the cpu is then used to calculate the capacity
->  value internally used by the kernel."
-> 
-> IIUIC, you should thus not use 15532585 and 6241541 directly, but
-> scale them to the frequency.
-> 
-> So the formula for CA53 becomes:
-> 
-> 1024 / (15532585 / 1500) * (6241541 / 1200) = 514
-> 
-> > Considering cpufreq is available later, is it better to set the value(514)
-> > for CA53 scaled by different maximum frequencies?
-> 
-> DT describes the hardware, not software limitations, so IMHO 514 is the correct
-> value.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Yes agreed. Please refresh this patchset accordingly.
+Changes since v5:
+- use C99 style comments at the first two lines
+- remove unused header includes
+- use directly KBUILD_MODNAME as a driver name
+- use DMA_SLAVE_BUSWIDTH_4_BYTES to reflect the real bus width
+- refine comments
+- refine code style aligning with 80 chars and wrap
+- use GFP_NOWAIT as the flag for memory allocations for DMA
+- changing flow for it should be returning 0 instead of -ENOSPC for all
+  successful descriptor issuing either in part or in full
+- refine ISR with a fail-safe loop, and having a status check at the start
+- remove a few unused code
+- refine callback device_terminate_all, which does it should be freeing
+  all descriptors
+- refine callback device_free_chan_resources, which does it should be
+  freeing all descriptors before freeing physical channel
+- remove unnecessary callback device_synchronize
+
+Changes since v4:
+- rebase to 4.16-rc1
+- fold back patch 4 and 5 in v4 into the original commit
+- add the missing header included
+- fix typo and add more explanation in existing comments
+- fix the comments with kernel-doc style which uses /** as the begin
+- begin the multi-line comments with /*
+
+Changes since v3:
+- enhance dt-binding documents based on Rob's comments
+- make consistent among all comments
+- perfer ordering declarations longest to shortest
+- fix warning reported from kbuild test robot
+- add patch 4 and 5 to keep Fengguang and Julia's effort
+
+Changes since v2:
+- remove extra tasklets and refactor driver for letting descriptors being processed ASAP.
+- add more comments stating the relevant logic
+- remove unused macro and variables
+- change to use the disclaimer with SPDX identifier
+- add mt7622 support
+- refine hardware initialization sequence
+- add tx_status support for DMA_RESIDUE_GRANULARITY_SEGMENT
+- refine remove handler with killing vc's tasklet
+
+Changes since v1:
+- fix typo in the commit message.
+- delete status shown in the dt-binding example.
+
+This patchset introduces support for MediaTek High-Speed DMA controller
+(MTK-HSDMA) Currently, the driver is already tested successfully with
+dmatest module on MT7622 and MT7623 SoC. 
+
+MTK-HSDMA on MT7622/23 SoC has a single ring which is dedicated for
+doing memory-to-memory transfer through ring-based descriptor management.
+Even though there is only a single ring available inside HSDMA, the
+driver is being extended to the support for multiple virtual channels
+processing simultaneously by means of DMA_VIRTUAL_CHANNELS.
+
+Sean Wang (3):
+  dt-bindings: dmaengine: Add MediaTek High-Speed DMA controller
+    bindings
+  dmaengine: mediatek: Add MediaTek High-Speed DMA controller for MT7622
+    and MT7623 SoC
+  dmaengine: mediatek: update MAINTAINERS entry with MediaTek DMA driver
+
+ .../devicetree/bindings/dma/mtk-hsdma.txt          |   33 +
+ MAINTAINERS                                        |    9 +
+ drivers/dma/Kconfig                                |    2 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/mediatek/Kconfig                       |   13 +
+ drivers/dma/mediatek/Makefile                      |    1 +
+ drivers/dma/mediatek/mtk-hsdma.c                   | 1056 ++++++++++++++++++++
+ 7 files changed, 1115 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+ create mode 100644 drivers/dma/mediatek/Kconfig
+ create mode 100644 drivers/dma/mediatek/Makefile
+ create mode 100644 drivers/dma/mediatek/mtk-hsdma.c
+
+-- 
+2.7.4
