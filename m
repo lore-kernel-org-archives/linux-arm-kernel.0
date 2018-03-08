@@ -1,77 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Mar 2018 13:59:35 +0000
-Subject: [PATCH v4 5/5] arm64/kernel: enable A53 erratum #8434319
- handling at runtime
-In-Reply-To: <CAKv+Gu9a8pWdhN4PjN2t0dSpiocQfWhvr_jioxmhU2iJRSfV7g@mail.gmail.com>
-References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
- <20180306171535.25681-6-ard.biesheuvel@linaro.org>
- <20180308134512.GA18452@arm.com>
- <CAKv+Gu_4xYW=kc3WGmMpneUqboasdJNFAZ19oCOws9=wgADz7Q@mail.gmail.com>
- <20180308134907.66ztteiu6kv6q3wn@lakrids.cambridge.arm.com>
- <CAKv+Gu9a8pWdhN4PjN2t0dSpiocQfWhvr_jioxmhU2iJRSfV7g@mail.gmail.com>
-Message-ID: <20180308135935.GA9573@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Mar 2018 13:59:45 +0000
+Subject: [PATCH v5 19/23] arm64: KVM: Allow far branches from vector
+ slots to the main vectors
+In-Reply-To: <20180301155538.26860-20-marc.zyngier@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-20-marc.zyngier@arm.com>
+Message-ID: <20180308135944.oqrm5n7hmvitknxu@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 01:54:26PM +0000, Ard Biesheuvel wrote:
-> On 8 March 2018 at 13:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Mar 08, 2018 at 01:46:34PM +0000, Ard Biesheuvel wrote:
-> >> On 8 March 2018 at 13:45, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Tue, Mar 06, 2018 at 05:15:35PM +0000, Ard Biesheuvel wrote:
-> >> >> Omit patching of ADRP instruction at module load time if the current
-> >> >> CPUs are not susceptible to the erratum.
-> >> >
-> >> > [...]
-> >> >
-> >> >> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> >> >> index 534bf1d47119..1a583ccace00 100644
-> >> >> --- a/arch/arm64/kernel/module-plts.c
-> >> >> +++ b/arch/arm64/kernel/module-plts.c
-> >> >> @@ -158,7 +158,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
-> >> >>                       break;
-> >> >>               case R_AARCH64_ADR_PREL_PG_HI21_NC:
-> >> >>               case R_AARCH64_ADR_PREL_PG_HI21:
-> >> >> -                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
-> >> >> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-> >> >> +                         !cpus_have_const_cap(ARM64_WORKAROUND_843419))
-> >> >>                               break;
-> >> >>
-> >> >>                       /*
-> >> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> >> >> index 89217704944e..47b40aaa1a5d 100644
-> >> >> --- a/arch/arm64/kernel/module.c
-> >> >> +++ b/arch/arm64/kernel/module.c
-> >> >> @@ -201,6 +201,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
-> >> >>  static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
-> >> >>  {
-> >> >>       if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-> >> >> +         !cpus_have_const_cap(ARM64_WORKAROUND_843419) ||
-> >> >
-> >> > Mind if I drop the IS_ENABLED check here and in the hunk above? The
-> >> > const_cap check along should be sufficient, no?
-> >> >
-> >>
-> >> Without the IS_ENABLED() check, the code will always be present in the
-> >> object file.
-> >>
-> >> I have no strong preference either way, though.
-> >
-> > As with other case, perhaps fold this into a helper in
-> > <asm/cpufeature.h> ?
-> >
-> > static inline bool system_needs_arm64_workaround_843419()
-> > {
-> >         return (IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
-> >                 cpus_have_const_cap(ARM64_WORKAROUND_843419))
-> > }
-> >
-> > ... then use the inverse in the cases above.
-> >
+On Thu, Mar 01, 2018 at 03:55:34PM +0000, Marc Zyngier wrote:
+> So far, the branch from the vector slots to the main vectors can at
+> most be 4GB from the main vectors (the reach of ADRP), and this
+> distance is known at compile time. If we were to remap the slots
+> to an unrelated VA, things would break badly.
 > 
-> I'm fine with adding a helper, but
-> 'system_needs_arm64_workaround_843419' is a bit misleading, given that
-> it returns false if the system needs it but support is compiled out.
+> A way to achieve VA independence would be to load the absolute
+> address of the vectors (__kvm_hyp_vector), either using a constant
+> pool or a series of movs, followed by an indirect branch.
+> 
+> This patches implements the latter solution, using another instance
+> of a patching callback.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-FWIW, I'm fine with the code as it is.
-
-Will
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
