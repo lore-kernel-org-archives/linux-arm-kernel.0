@@ -1,48 +1,37 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu, 08 Mar 2018 08:28:13 -0500
-Subject: [RFC V4] perf, tools: Support wildcards on pmu name in dynamic
- pmu events
-In-Reply-To: <20180308130358.GC3701@kernel.org>
-References: <1520454947-16977-1-git-send-email-agustinv@codeaurora.org>
- <20180308130358.GC3701@kernel.org>
-Message-ID: <ae102272a8186f0351363511f4ed07f8@codeaurora.org>
+From: colin.king@canonical.com (Colin King)
+Date: Thu,  8 Mar 2018 14:32:49 +0100
+Subject: [PATCH] ASoC: cygnus: remove redundant assignment to pointer 'res'
+Message-ID: <20180308133249.22032-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-08 08:03, Arnaldo Carvalho de Melo wrote:
-> Em Wed, Mar 07, 2018 at 03:35:47PM -0500, Agustin Vega-Frias escreveu:
->> +++ b/tools/perf/util/parse-events.y
->> @@ -8,6 +8,7 @@
->> 
->>  #define YYDEBUG 1
->> 
->> +#include <fnmatch.h>
->>  #include <linux/compiler.h>
->>  #include <linux/list.h>
->>  #include <linux/types.h>
->> @@ -234,6 +235,10 @@ PE_NAME opt_event_config
->>  	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
->>  		struct perf_pmu *pmu = NULL;
->>  		int ok = 0;
->> +		char *pattern;
->> +
->> +		if (asprintf(&pattern, "%s*", $1) < 0)
->> +			YYABORT;
-> 
-> +               if (asprintf(&pattern, "?(uncore_)%s*", $1) < 0)
-> 
-> I completely overlook that you were using this and thus needed that
-> extension, duh, thanks for the patience 8-) and for the new patch.
-> 
+From: Colin Ian King <colin.king@canonical.com>
 
-NP Arnaldo, thanks for the quick turnaround on these patches :o)
-Just so I know, since these are my first patches on perf tools,
-where are perf tools patches queued once acked?
+The pointer res is being initialized with a value that is never read
+and re-assigned immediately after, hence the initialization is redundant
+and can be removed.
 
-Thanks!
+Cleans up clang warning:
+sound/soc/bcm/cygnus-ssp.c:1284:19: warning: Value stored to 'res'
+during its initialization is never read
 
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ sound/soc/bcm/cygnus-ssp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+index abafadc0b534..b733f1446353 100644
+--- a/sound/soc/bcm/cygnus-ssp.c
++++ b/sound/soc/bcm/cygnus-ssp.c
+@@ -1281,7 +1281,7 @@ static int cygnus_ssp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *child_node;
+-	struct resource *res = pdev->resource;
++	struct resource *res;
+ 	struct cygnus_audio *cygaud;
+ 	int err = -EINVAL;
+ 	int node_count;
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+2.15.1
