@@ -1,103 +1,93 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 8 Mar 2018 12:55:03 +0100
-Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
-In-Reply-To: <1520488103.13063.1.camel@aosc.io>
-References: <1520261458.33502.10.camel@aosc.io>
- <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
- <1520308623.33502.13.camel@aosc.io>
- <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
- <1520488103.13063.1.camel@aosc.io>
-Message-ID: <bd1b5f52-27db-d323-bde5-926be66e7f58@sigmadesigns.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Mar 2018 11:59:28 +0000
+Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
+ CONFIG_RANDOMIZE_BASE=y
+In-Reply-To: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
+References: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180308115925.GO32331@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2018 06:48, Icenowy Zheng wrote:
+On Mon, Mar 05, 2018 at 10:08:48AM +0000, Will Deacon wrote:
+> TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
 
-> I'm trying to implement a driver for the quirky (DW) PCIe RC in the
-> Allwinner H6 SoC.
+suppressing
+
+> memory accesses (e.g. speculative accesses from a first-fault gather load)
+> which translate via TTBR1_EL1 result in a translation fault if they
+> miss in the TLB when executed from EL0. This mitigates some timing attacks
+> against KASLR, where the kernel address space could otherwise be probed
+> efficiently using the FFR in conjunction with suppressed faults on SVE
+> loads.
+
+To be clear, I might say
+
+	result in a (suppressed) translation fault
+
+(there is no new exception taken here; the effect is only to suppress
+the table walk on TLB miss in these cases).
+
+Cheers
+---Dave
+
 > 
-> The quirk is that only the "dbi" space is always mapped, but at the 
-> same time only 64KiB of other spaces (config, downstream IO and non- 
-> prefetchable memory) are accessible. To access a certain address the 
-> high 16-bit of the address (all bus addresses in H6 SoC are 32- bit 
-> despite the CPU is 64-bit) needs to be written into the 
-> PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI 
-> space). So the access to these spaces cannot be processed correctly 
-> with just readl/writel, as the existing code does.
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
 > 
-> Is it possible to workaround this in the PCI subsystem of Linux?
-
-I didn't think anyone would come up with something more broken
-than tango's PCIe host bridge...
-
-It's hard to understand what's going on inside the minds of these
-HW devs. I mean, if the steps required are
-
-	WRITE MAGIC CONFIG REG
-	READ/WRITE ADDRESS REG
-
-then the whole operation is clearly not atomic, and bad things happen
-when 2+ operations race.
-
-Do they think in terms of single core systems with non-multitasking OS?
-Probably not.
-
-Maybe they think it is not a problem to wrap the operation using a
-mutex? I'll confess I have no idea how bad that is for performance.
-However, that is not an option in Linux, because mem space accesses
-are just plain mmio accesses, and it's not possible to rewrite the
-drivers, even as an out-of-tree patch.
-
-I suppose it could be possible to make the first write "magic" in the
-sense that it could "lock" the bus until the second access is performed?
-Sort of like an implicit HW mutex. Actually, tango has explicit HW
-mutexes that work along these lines.
-
-> (I have thought a workaround that only maps the current accessible 
-> 64KiB with the MMU, and when accessing the non-accessible part, 
-> catch the page fault and re-setup the map to the new 64KiB page. But 
-> surely it will kill the performance.)
-
-The implementation might be non-trivial, as well.
-
-> [tango is] still less quirky than Allwinner H6 PCIe. It's only a
-> config/MMIO mux on tango; however on H6 PCIe both config space and
-> MMIO space are splitted to many pages. So on H6 if no solution is
-> worked out, it will not be unreliable -- it will be unusable
-> instead.
-
-I have only limited experience, but it seems that many useful PCIe
-adapters require only very little mem address space.
-
-For example, the USB3 PCIe adapter I tested my implementation with
-requires only 8 KB.
-
-01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
-        Flags: fast devsel
-        Memory at 50400000 (64-bit, non-prefetchable) [size=8K]
-        Capabilities: [50] Power Management version 3
-        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
-        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
-        Capabilities: [a0] Express Endpoint, MSI 00
-        Capabilities: [100] Advanced Error Reporting
-        Capabilities: [150] Latency Tolerance Reporting
-
-
-Same thing for the following WiFi adapter.
-
-01:00.0 Network controller: Intel Corporation Wireless 7260 (rev bb)
-        Subsystem: Intel Corporation Dual Band Wireless-AC 7260
-        Flags: fast devsel, IRQ 22
-        Memory at 50400000 (64-bit, non-prefetchable) [disabled] [size=8K]
-        Capabilities: [c8] Power Management version 3
-        Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [40] Express Endpoint, MSI 00
-        Capabilities: [100] Advanced Error Reporting
-        Capabilities: [140] Device Serial Number 48-51-b7-ff-ff-84-69-26
-        Capabilities: [14c] Latency Tolerance Reporting
-        Capabilities: [154] Vendor Specific Information: ID=cafe Rev=1 Len=014 <?>
-
-
-Maybe you can decide that you will support only 64 KB?
-
-Regards.
+> Sending as RFC because this doesn't make any difference if kpti is enabled,
+> which is the default with KASLR. It helps if kpti=off is being passed and
+> shouldn't have an impact on performance.
+> 
+>  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+>  arch/arm64/mm/proc.S                   | 9 ++++++++-
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index cdfe3e657a9e..fd208eac9f2a 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -291,6 +291,7 @@
+>  #define TCR_TBI0		(UL(1) << 37)
+>  #define TCR_HA			(UL(1) << 39)
+>  #define TCR_HD			(UL(1) << 40)
+> +#define TCR_NFD1		(UL(1) << 54)
+>  
+>  /*
+>   * TTBR.
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index c0af47617299..8f074d64b760 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -36,6 +36,12 @@
+>  #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
+>  #endif
+>  
+> +#ifdef CONFIG_RANDOMIZE_BASE
+> +#define TCR_KASLR_FLAGS	TCR_NFD1
+> +#else
+> +#define TCR_KASLR_FLAGS	0
+> +#endif
+> +
+>  #define TCR_SMP_FLAGS	TCR_SHARED
+>  
+>  /* PTWs cacheable, inner/outer WBWA */
+> @@ -432,7 +438,8 @@ ENTRY(__cpu_setup)
+>  	 * both user and kernel.
+>  	 */
+>  	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+> -			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
+> +			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
+> +			TCR_TBI0 | TCR_A1
+>  	tcr_set_idmap_t0sz	x10, x9
+>  
+>  	/*
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
