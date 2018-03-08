@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 08 Mar 2018 17:22:26 +0000
-Subject: Applied "ASoC: cygnus: remove redundant assignment to pointer 'res'"
- to the asoc tree
-In-Reply-To: <20180308133249.22032-1-colin.king@canonical.com>
-Message-ID: <E1etzFK-0007WS-K7@debutante>
+Date: Thu, 08 Mar 2018 17:22:37 +0000
+Subject: Applied "ASoC: uniphier: remove superfluous <linux/mfd/syscon.h>
+ inclusion" to the asoc tree
+In-Reply-To: <1520496569-32032-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <E1etzFV-0007XV-Lg@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: cygnus: remove redundant assignment to pointer 'res'
+   ASoC: uniphier: remove superfluous <linux/mfd/syscon.h> inclusion
 
 has been applied to the asoc tree at
 
@@ -34,37 +34,32 @@ to this mail.
 Thanks,
 Mark
 
->From 0338753a57aaf331cb7016bbfdba6086bf93149c Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Thu, 8 Mar 2018 14:32:49 +0100
-Subject: [PATCH] ASoC: cygnus: remove redundant assignment to pointer 'res'
+>From d2b9430771cae7edc9927b36ce0e76a336fd952c Mon Sep 17 00:00:00 2001
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Thu, 8 Mar 2018 17:09:29 +0900
+Subject: [PATCH] ASoC: uniphier: remove superfluous <linux/mfd/syscon.h>
+ inclusion
 
-The pointer res is being initialized with a value that is never read
-and re-assigned immediately after, hence the initialization is redundant
-and can be removed.
+None of aio-compress.c depends on the syscon header.
 
-Cleans up clang warning:
-sound/soc/bcm/cygnus-ssp.c:1284:19: warning: Value stored to 'res'
-during its initialization is never read
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/bcm/cygnus-ssp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/uniphier/aio-compress.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
-index abafadc0b534..b733f1446353 100644
---- a/sound/soc/bcm/cygnus-ssp.c
-+++ b/sound/soc/bcm/cygnus-ssp.c
-@@ -1281,7 +1281,7 @@ static int cygnus_ssp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct device_node *child_node;
--	struct resource *res = pdev->resource;
-+	struct resource *res;
- 	struct cygnus_audio *cygaud;
- 	int err = -EINVAL;
- 	int node_count;
+diff --git a/sound/soc/uniphier/aio-compress.c b/sound/soc/uniphier/aio-compress.c
+index 4751c8bdabec..4c1027aa615e 100644
+--- a/sound/soc/uniphier/aio-compress.c
++++ b/sound/soc/uniphier/aio-compress.c
+@@ -22,7 +22,6 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+-#include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
 -- 
 2.16.2
