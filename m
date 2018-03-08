@@ -1,87 +1,96 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 8 Mar 2018 14:00:03 +0900
-Subject: arm crypto .S_shipped files sometimes get rebuilt randomly
-In-Reply-To: <1520450729.13685.19.camel@nxp.com>
-References: <1520450729.13685.19.camel@nxp.com>
-Message-ID: <CAK7LNARDPOaLyvcijXe5VX3hJhxzS-R5hdbk310bRUuZwQFMmw@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 08 Mar 2018 13:48:23 +0800
+Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
+In-Reply-To: <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
+References: <1520261458.33502.10.camel@aosc.io>
+ <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
+ <1520308623.33502.13.camel@aosc.io>
+ <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1520488103.13063.1.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-08 4:25 GMT+09:00 Leonard Crestez <leonard.crestez@nxp.com>:
-> Hello,
->
-> I am using a toolchain with a broken/old version of perl which doesn't
-> include integer.pm and I noticed it triggers occasional build failures
-> on arch/arm64/crypto/sha512-core.S_shipped. Workarounds are easy, but
-> if the purpose of the .S_shipped is to avoid the need to have all
-> dependencies on the build machine then something went wrong?
->
-> This was introduced by commit 7918ecef073f ("crypto: arm64/sha2 -
-> integrate OpenSSL implementations of SHA256/SHA512"). The makefile
-> rules are not terribly complicated:
->
-> quiet_cmd_perlasm = PERLASM $@
->       cmd_perlasm = $(PERL) $(<) void $(@)
->
-> $(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
->         $(call cmd,perlasm)
->
-> If a decision to rerun the rule is made based on their relative
-> timestamps but both .S_shipped and sha512-armv8.pl are included in git
-> then won't the result be essentially random, depending on file checkout
-> order?
->
-> I see random success/failure by just running something like the
-> following multiple times:
->         rm -rf arch/arm64/crypto
->         git co -f arch/arm64/crypto
->         make -- arch/arm64/crypto/
->
-> A reasonable fix might be to simply drop .S_shipped and require a
-> functional recent version of perl. Then if it fails it will fail
-> reliably.
->
+? 2018-03-06?? 17:38 -0600?Bjorn Helgaas???
+> [+cc Marc]
+> 
+> On Tue, Mar 06, 2018 at 11:57:03AM +0800, Icenowy Zheng wrote:
+> > ? 2018-03-05?? 15:47 -0600?Bjorn Helgaas???
+> > > On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
+> > > > Hi everyone,
+> > > > 
+> > > > I'm trying to implement a driver for the quirky (DW) PCIe RC in
+> > > > the
+> > > > Allwinner H6 SoC.
+> > > > 
+> > > > The quirk is that only the "dbi" space is always mapped, but at
+> > > > the
+> > > > same time only 64KiB of other spaces (config, downstream IO and
+> > > > non-
+> > > > prefetchable memory) are accessible. To access a certain
+> > > > address
+> > > > the
+> > > > high 16-bit of the address (all bus addresses in H6 SoC are 32-
+> > > > bit
+> > > > despite the CPU is 64-bit) needs to be written into the
+> > > > PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI
+> > > > space).
+> > > > So the access to these spaces cannot be processed correctly
+> > > > with
+> > > > just
+> > > > readl/writel, as the existing code does.
+> > > > 
+> > > > Is it possible to workaround this in the PCI subsystem of
+> > > > Linux?
+> > > > 
+> > > > (I have thought a workaround that only maps the current
+> > > > accessible
+> > > > 64KiB with the MMU, and when accessing the non-accessible part,
+> > > > catch
+> > > > the page fault and re-setup the map to the new 64KiB page. But
+> > > > surely
+> > > > it will kill the performance.)
+> > > 
+> > > If you only need to write to PCIE_ADDR_PAGE_CFG for *config*
+> > > accesses,
+> > > this should be easy.  All config accesses go through wrappers
+> > > (pci_read_config_word(), etc) and several host bridge drivers
+> > > have to
+> > > update a register with parts of the config address, e.g.,
+> > > advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
+> > > 
+> > > It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O
+> > > port
+> > > accesses.  I/O port accesses do go through a wrapper (inb(),
+> > > etc), so
+> > > it might be possible in principle to intercept these, although
+> > > much
+> > > more difficult than config accesses, because the config accesses
+> > > are
+> > > already set up with per-host bridge hooks, while the I/O port
+> > > accessors are mostly per-arch.
+> > > 
+> > > But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
+> > > that's really a problem because drivers are allowed to
+> > > essentially
+> > > read a memory BAR, convert that bus address to a CPU physical
+> > > memory
+> > > address, ioremap() it, then directly access the PCIe memory with
+> > > loads
+> > > and stores.
+> > 
+> > Unfortunately this is the case. All above (config, IO, memory)
+> > needs
+> > PCIE_ADDR_PAGE_CFG update.
+> 
+> tango_pcie_probe() has a similar issue.  We don't have a good
+> solution
+> there, so we just live with the fact that the platform will be
+> unreliable.
 
-Indeed, this Makefile is weird.
-We have two choices.
+It's still less quirky than Allwinner H6 PCIe. It's only a config/MMIO
+mux on tango; however on H6 PCIe both config space and MMIO space are
+splitted to many pages. So on H6 if no solution is worked out, it will
+not be unreliable -- it will be unusable instead.
 
-
-[1] If we intend to generate
-sha{256,512}-core.S from the perl script during the build,
-this should be:
-
-$(obj)/sha512-core.S: $(src)/sha512-armv8.pl
-        $(call cmd,perlasm)
-
-$(obj)/sha512-core.S: $(src)/sha512-armv8.pl
-        $(call cmd,perlasm)
-
-
-[2] If we want to check-in _shipped files
-and avoid running perl during the build,
-we can surround unnecessary rules with if-conditional, like
-
-
-if REGENERATE_ARM64_SHA
-$(src)/sha256-core.S_shipped: $(src)/sha512-armv8.pl
-        $(call cmd,perlasm)
-
-$(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
-        $(call cmd,perlasm)
-endif
-
-
-Set REGENERATE_ARM64_SHA=1 from the command line
-only when you need to update the _shipped files.
-
-This is what commit 7373f4f83c71d50f0aece6d94309ab7fde42180f did.
-
-
-
-
-Recently, Kconfig switched to [1].
-So, flex and bison are required to build the kernel.
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Bjorn
