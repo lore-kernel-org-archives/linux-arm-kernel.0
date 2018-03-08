@@ -1,92 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 8 Mar 2018 15:30:53 +0100
-Subject: Nokia N900: refcount_t underflow, use after free
-Message-ID: <20180308143053.GA17267@amd>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 8 Mar 2018 06:31:24 -0800
+Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
+ based tachometer
+In-Reply-To: <5bffef40-a4a7-5f7d-a448-b2a381c57822@nvidia.com>
+References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
+ <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
+ <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
+ <2510b525-ec36-b49d-5a62-81f335c0d10d@nvidia.com>
+ <cfe0d0ce-3a89-bad0-85ba-6edf1135d2dc@roeck-us.net>
+ <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
+ <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
+ <62ba7f67-5a99-51ab-1214-eb68ebb7e642@roeck-us.net>
+ <952cb50e-d9a0-ae5e-d9f6-d1ce268f0384@nvidia.com>
+ <f7818e4c-17b6-c58b-3424-85749bb9c1cc@roeck-us.net>
+ <5bffef40-a4a7-5f7d-a448-b2a381c57822@nvidia.com>
+Message-ID: <d4e745a6-5534-662e-f6d5-a91bf580f550@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 03/07/2018 10:06 PM, Laxman Dewangan wrote:
+> 
+> 
+> On Wednesday 07 March 2018 07:50 PM, Guenter Roeck wrote:
+>> On 03/07/2018 01:47 AM, Rajkumar Rampelli wrote:
+>>>
+>>>>
+>>>> While I am not opposed to ABI changes, the merits of those would need to be
+>>>> discussed on the mailing list. But replacing "fan1_input" with "rpm" is
+>>>> not an acceptable ABI change, even if it may measure something that turns
+>>>> but isn't a fan.
+>>>>
+>>>> If this _is_ in fact supposed to be used for something else but fans, we
+>>>> would have to discuss what that might be, and if hwmon is the appropriate
+>>>> subsystem to measure and report it. This does to some degree lead back to
+>>>> my concern of having the "fan" part of this patch series in the pwm core.
+>>>> I am still not sure if that makes sense.
+>>>>
+>>>> Thanks,
+>>>> Guenter
+>>> I am planning to add tachometer support in pwm-fan.c driver (drivers/hwmon/) instead of adding new generic-pwm-tachometer.c driver. Measuring RPM value will be done in pwm-fan driver itself using pwm capture feature and will add new sysfs attributes under this driver to report rpm value of fan.
+>>
+>> There is an existing attribute to report the RPM of fans. It is called fan[1..n]_input.
+>>
+>> "replacing "fan1_input" with "rpm" is not an acceptable ABI change"
+>>
+>> Preemptive NACK.
+> 
+> The RPM is measured speed via PWM signal capture? which is output from fan.
+> So should we have the fan[1..n]_output_rpm?
+> 
 
-I'm getting this warning... Has anyone seen/debugged that before?
-Unfortunately the backtrace does not seem to be too useful :-(.
+No. I hear you clearly that you for some reason dislike fan[1..n]_input.
+While ABIs are not always to our liking, that doesn't mean that we get
+to change them at our whim. If that is not acceptable for you, I can't
+help you. And you can't change inX_input to inX_voltage either, sorry.
 
-	      	  	    	     	     	    	   Pavel
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.16.0-rc3-next-20180302 (pavel at duo) (gcc
-version 4.7.2 (GC
-C)) #70 Fri Mar 2 10:16:00 CET 2018
-[    0.000000] CPU: ARMv7 Processor [411fc083] revision 3 (ARMv7),
-cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT
-nonaliasing instruction cac
-...
-[    1.244140] omap3isp 480bc000.isp: 480bc000.isp supply vdd-csiphy2
-not found, using d
-ummy regulator
-[    1.254089] omap3isp 480bc000.isp: Revision 2.0 found
-[    1.260009] omap-iommu 480bd400.mmu: 480bd400.mmu: version 1.1
-[    1.266693] ------------[ cut here ]------------
-[    1.271606] WARNING: CPU: 0 PID: 1 at lib/refcount.c:187
-refcount_sub_and_test+0x94/0xa8
-[    1.280181] refcount_t: underflow; use-after-free.
-[    1.285247] Modules linked in:
-[    1.288482] CPU: 0 PID: 1 Comm: swapper Not tainted
-4.16.0-rc3-next-20180302 #70
-[    1.296295] Hardware name: Nokia RX-51 board
-[    1.300811] [<c010d6cc>] (unwind_backtrace) from [<c010b560>]
-(show_stack+0x10/0x14)
-[    1.309020] [<c010b560>] (show_stack) from [<c0127dec>]
-(__warn+0xe8/0x110)
-[    1.316375] [<c0127dec>] (__warn) from [<c0127edc>]
-(warn_slowpath_fmt+0x38/0x48)
-[    1.324310] [<c0127edc>] (warn_slowpath_fmt) from [<c034e630>]
-(refcount_sub_and_test+0x94/0xa8)
-[    1.333557] [<c034e630>] (refcount_sub_and_test) from [<c01109a8>]
-(arm_iommu_release_mapping+0x18/0x2c)
-[    1.343597] [<c01109a8>] (arm_iommu_release_mapping) from
-[<c041752c>] (driver_probe_device+0x24c/0x314)
-[    1.353637] [<c041752c>] (driver_probe_device) from [<c04176a0>]
-(__driver_attach+0xac/0xb0)
-[    1.362548] [<c04176a0>] (__driver_attach) from [<c0415b94>]
-(bus_for_each_dev+0x58/0x7c)
-[    1.371185] [<c0415b94>] (bus_for_each_dev) from [<c0416a14>]
-(bus_add_driver+0xe0/0x1f0)
-[    1.379852] [<c0416a14>] (bus_add_driver) from [<c0417f10>]
-(driver_register+0x78/0xf4)
-[    1.388305] [<c0417f10>] (driver_register) from [<c010257c>]
-(do_one_initcall+0x3c/0x16c)
-[    1.396972] [<c010257c>] (do_one_initcall) from [<c0b00d5c>]
-(kernel_init_freeable+0xf8/0x1c4)
-[    1.406066] [<c0b00d5c>] (kernel_init_freeable) from [<c071640c>]
-(kernel_init+0x8/0x108)
-[    1.414703] [<c071640c>] (kernel_init) from [<c01010e8>]
-(ret_from_fork+0x14/0x2c)
-[    1.422698] Exception stack(0xce049fb0 to 0xce049ff8)
-[    1.428039] 9fa0:                                     00000000
-00000000 00000000 00000000
-[    1.436676] 9fc0: 00000000 00000000 00000000 00000000 00000000
-00000000 00000000 00000000
-[    1.445312] 9fe0: 00000000 00000000 00000000 00000000 00000013
-00000000
-[    1.452270] ---[ end trace dcb3a72772bbfe7a ]---
-[    1.459045] ti-soc-thermal 48002524.bandgap: This OMAP thermal
-sensor is unreliable. You've been warned
-[    1.469055] ti-soc-thermal 48002524.bandgap: Non-trimmed BGAP, Temp
-not accurate
-[    1.476898] ti-soc-thermal 48002524.bandgap: thermal zone device is
-NULL
-[    1.485198] omap_wdt: OMAP Watchdog Timer Rev 0x31: initial timeout
-60 sec
-[    1.495208] omap_hsmmc 4809c000.mmc: GPIO lookup for consumer cd
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/e88afd0f/attachment.sig>
+Guenter
