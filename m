@@ -1,28 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Mar 2018 16:37:14 +0000
-Subject: [PATCH v2 3/3] arm64: signal: Ensure si_code is valid for all
- fault signals
-In-Reply-To: <1519926248-12591-4-git-send-email-Dave.Martin@arm.com>
-References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
- <1519926248-12591-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180308163713.GD9573@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 08 Mar 2018 17:38:20 +0100
+Subject: [PATCH v9 1/5] drm/rockchip: dw-mipi-dsi: Fix connector and
+ encoder cleanup.
+In-Reply-To: <20180302175757.28192-2-enric.balletbo@collabora.com>
+References: <20180302175757.28192-1-enric.balletbo@collabora.com>
+ <20180302175757.28192-2-enric.balletbo@collabora.com>
+Message-ID: <6137181.UL6MkM7i5q@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Am Freitag, 2. M?rz 2018, 18:57:53 CET schrieb Enric Balletbo i Serra:
+> From: Jeffy Chen <jeffy.chen@rock-chips.com>
+> 
+> In bind()'s error handling path call destroy functions instead of
+> cleanup functions for encoder and connector and reorder to match how is
+> called in bind().
+> 
+> In unbind() call the connector and encoder destroy functions.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-On Thu, Mar 01, 2018 at 05:44:08PM +0000, Dave Martin wrote:
-> Currently, as reported by Eric, an invalid si_code value 0 is
-> passed in many signals delivered to userspace in response to faults
-> and other kernel errors.  Typically 0 is passed when the fault is
-> insufficiently diagnosable or when there does not appear to be any
-> sensible alternative value to choose.
+applied to drm-misc-next
 
-This looks good to me. Please could you rebase it on top of for-next/core,
-so that I can apply it for 4.17? The other two patches in the series need
-an Ack for the core changes, so it would be worth dealing with those
-separately imo.
-
-Cheers,
-
-Will
+Thanks
+Heiko
