@@ -1,63 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Mar 2018 13:48:21 +0000
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Mar 2018 13:49:54 +0000
 Subject: [PATCH v4 5/5] arm64/kernel: enable A53 erratum #8434319
  handling at runtime
-In-Reply-To: <CAKv+Gu8FbZURQTxNFjBLRbwgnOWvWdN6+exZhm5d7CJGdKm-Bg@mail.gmail.com>
+In-Reply-To: <CAKv+Gu_4xYW=kc3WGmMpneUqboasdJNFAZ19oCOws9=wgADz7Q@mail.gmail.com>
 References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
  <20180306171535.25681-6-ard.biesheuvel@linaro.org>
  <20180308134512.GA18452@arm.com>
  <CAKv+Gu_4xYW=kc3WGmMpneUqboasdJNFAZ19oCOws9=wgADz7Q@mail.gmail.com>
- <CAKv+Gu8FbZURQTxNFjBLRbwgnOWvWdN6+exZhm5d7CJGdKm-Bg@mail.gmail.com>
-Message-ID: <20180308134820.GB18452@arm.com>
+Message-ID: <20180308134907.66ztteiu6kv6q3wn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 01:47:26PM +0000, Ard Biesheuvel wrote:
-> On 8 March 2018 at 13:46, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 8 March 2018 at 13:45, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Tue, Mar 06, 2018 at 05:15:35PM +0000, Ard Biesheuvel wrote:
-> >>> Omit patching of ADRP instruction at module load time if the current
-> >>> CPUs are not susceptible to the erratum.
-> >>
-> >> [...]
-> >>
-> >>> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> >>> index 534bf1d47119..1a583ccace00 100644
-> >>> --- a/arch/arm64/kernel/module-plts.c
-> >>> +++ b/arch/arm64/kernel/module-plts.c
-> >>> @@ -158,7 +158,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
-> >>>                       break;
-> >>>               case R_AARCH64_ADR_PREL_PG_HI21_NC:
-> >>>               case R_AARCH64_ADR_PREL_PG_HI21:
-> >>> -                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
-> >>> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-> >>> +                         !cpus_have_const_cap(ARM64_WORKAROUND_843419))
-> >>>                               break;
-> >>>
-> >>>                       /*
-> >>> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> >>> index 89217704944e..47b40aaa1a5d 100644
-> >>> --- a/arch/arm64/kernel/module.c
-> >>> +++ b/arch/arm64/kernel/module.c
-> >>> @@ -201,6 +201,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
-> >>>  static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
-> >>>  {
-> >>>       if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-> >>> +         !cpus_have_const_cap(ARM64_WORKAROUND_843419) ||
-> >>
-> >> Mind if I drop the IS_ENABLED check here and in the hunk above? The
-> >> const_cap check along should be sufficient, no?
-> >>
+On Thu, Mar 08, 2018 at 01:46:34PM +0000, Ard Biesheuvel wrote:
+> On 8 March 2018 at 13:45, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Mar 06, 2018 at 05:15:35PM +0000, Ard Biesheuvel wrote:
+> >> Omit patching of ADRP instruction at module load time if the current
+> >> CPUs are not susceptible to the erratum.
 > >
-> > Without the IS_ENABLED() check, the code will always be present in the
-> > object file.
+> > [...]
 > >
-> > I have no strong preference either way, though.
+> >> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+> >> index 534bf1d47119..1a583ccace00 100644
+> >> --- a/arch/arm64/kernel/module-plts.c
+> >> +++ b/arch/arm64/kernel/module-plts.c
+> >> @@ -158,7 +158,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+> >>                       break;
+> >>               case R_AARCH64_ADR_PREL_PG_HI21_NC:
+> >>               case R_AARCH64_ADR_PREL_PG_HI21:
+> >> -                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
+> >> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
+> >> +                         !cpus_have_const_cap(ARM64_WORKAROUND_843419))
+> >>                               break;
+> >>
+> >>                       /*
+> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> >> index 89217704944e..47b40aaa1a5d 100644
+> >> --- a/arch/arm64/kernel/module.c
+> >> +++ b/arch/arm64/kernel/module.c
+> >> @@ -201,6 +201,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
+> >>  static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
+> >>  {
+> >>       if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
+> >> +         !cpus_have_const_cap(ARM64_WORKAROUND_843419) ||
+> >
+> > Mind if I drop the IS_ENABLED check here and in the hunk above? The
+> > const_cap check along should be sufficient, no?
+> >
 > 
-> Ehm, strike that. You will probably hit a linker error if you drop it,
-> because some dependent functions are #ifdef'ed out if the erratum
-> workaround is disabled.
+> Without the IS_ENABLED() check, the code will always be present in the
+> object file.
+> 
+> I have no strong preference either way, though.
 
-Ah, ok then. Thanks for the quick response.
+As with other case, perhaps fold this into a helper in
+<asm/cpufeature.h> ?
 
-Will
+static inline bool system_needs_arm64_workaround_843419()
+{
+	return (IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
+		cpus_have_const_cap(ARM64_WORKAROUND_843419))
+}
+
+... then use the inverse in the cases above.
+
+Thanks,
+Mark.
