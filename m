@@ -1,50 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Mar 2018 13:35:49 +0000
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <20180308132139.apabmgw4magrp3d7@pali>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180308122715.GB21514@amd> <20180308132139.apabmgw4magrp3d7@pali>
-Message-ID: <07d4709b-df73-0107-ce0f-5af55e34913e@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 8 Mar 2018 13:36:12 +0000
+Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
+In-Reply-To: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
+References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 13:21, Pali Roh?r wrote:
-> On Thursday 08 March 2018 13:27:15 Pavel Machek wrote:
->> Hi!
->>
->>> Resent without non-upstream patches.
->>>
->>> This backport patchset fixed the spectre issue, it's original branch:
->>> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
->>> A few dependency or fixingpatches are also picked up, if they are necessary
->>>  and no functional changes.
->>>
->>> No bug found from kernelci.org and lkft testing. It also could be gotten from:
->>>
->>> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
->>>
->>> Comments are appreciated!
->>
->> Not entirely related to this patched, but... I have few older ARM
->> boards here, and Nokia N9000 I really care about.
->>
->> AFAICT Meltdown is arm64 only?
+On 16/02/18 14:14, Vladimir Murzin wrote:
+> Hi,
 > 
-> IIRC ARMv7 is not affected by meltdown.
+> This series adds support for PMSAv8 MPU defined by ARMv8R/M
+> architecture.
 > 
->> Spectre affects the older boards, too, right? Was there any work done
->> on that? cpuinfo says "ARMv7" for N900.
+> Changelog:
 > 
-> I remember that I saw some spectre patches for ARMv7 on LKML.
+>      v1 -> v2
+>         - Included missed patch.
+> 	- Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
+> 	  restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
+> 	  allows us to refer PMSAv8_MINALIGN in linker scripts.
+> 	- Improved and tested XIP support
 > 
-> In general for ARMv7 it is problematic as mitigation needs to change IBE
+>     RFC -> v1
+>         - Rebased on v4.16-rc1
+> 	- Added Tested-by for v7M bits from Andras
+> 
+> Thanks!
 
-Not quite. IBE is part of ACTLR, which is an implementation defined
-register, so generalizing this statement to "ARMv7" is plain wrong. Case
-in point: A9, A12/A17 do not need any bit to be set. A8 needs IBE to
-allow BPIALL to work, A15 needs it for ICIALLUI to perform a BP
-invalidation.
+OK for patch tracker?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Vladimir
+
+> 
+> Vladimir Murzin (4):
+>   ARM: NOMMU: Move PMSAv7 MPU under it's own namespace
+>   ARM: NOMMU: Reorganise __setup_mpu
+>   ARM: NOMMU: Postpone MPU activation till __after_proc_init
+>   ARM: NOMMU: Support PMSAv8 MPU
+> 
+>  arch/arm/include/asm/mpu.h        | 112 +++++++++-----
+>  arch/arm/include/asm/v7m.h        |  14 +-
+>  arch/arm/kernel/asm-offsets.c     |   8 +-
+>  arch/arm/kernel/head-nommu.S      | 289 ++++++++++++++++++++++++++++-------
+>  arch/arm/kernel/vmlinux-xip.lds.S |   4 +
+>  arch/arm/kernel/vmlinux.lds.S     |   7 +
+>  arch/arm/mm/Makefile              |   2 +-
+>  arch/arm/mm/nommu.c               |  32 ++++
+>  arch/arm/mm/pmsa-v7.c             |  59 +++-----
+>  arch/arm/mm/pmsa-v8.c             | 307 ++++++++++++++++++++++++++++++++++++++
+>  10 files changed, 701 insertions(+), 133 deletions(-)
+>  create mode 100644 arch/arm/mm/pmsa-v8.c
+> 
