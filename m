@@ -1,132 +1,195 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 8 Mar 2018 17:54:00 +0100
-Subject: [PATCH v2 07/12] clk: stm32mp1: add Sub System clocks
+Date: Thu, 8 Mar 2018 17:53:56 +0100
+Subject: [PATCH v2 03/12] clk: stm32mp1: add MP1 gate for hse/hsi/csi
+ oscillators
 In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
 References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1520528045-18330-8-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1520528045-18330-4-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-The RCC handles three sub-system clocks: ck_mpuss, ck_axiss
-and ck_mcuss.
-This patch adds also some MUX system and several prescalers.
+MP1 Gate is a gate with a set and a clear register.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32mp1.c | 85 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+ drivers/clk/clk-stm32mp1.c | 143 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
 
 diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index 3a99ad7..77d96d9 100644
+index 6261a92..56b738e 100644
 --- a/drivers/clk/clk-stm32mp1.c
 +++ b/drivers/clk/clk-stm32mp1.c
-@@ -116,6 +116,42 @@
- 	"ck_hsi", "ck_hse", "ck_csi"
+@@ -140,6 +140,11 @@ struct div_cfg {
+ 	const struct clk_div_table *table;
  };
  
-+static const char * const cpu_src[] = {
-+	"ck_hsi", "ck_hse", "pll1_p"
++struct stm32_gate_cfg {
++	struct gate_cfg		*gate;
++	const struct clk_ops	*ops;
 +};
 +
-+static const char * const axi_src[] = {
-+	"ck_hsi", "ck_hse", "pll2_p", "pll3_p"
-+};
-+
-+static const char * const per_src[] = {
-+	"ck_hsi", "ck_csi", "ck_hse"
-+};
-+
-+static const char * const mcu_src[] = {
-+	"ck_hsi", "ck_hse", "ck_csi", "pll3_p"
-+};
-+
-+static const struct clk_div_table axi_div_table[] = {
-+	{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 4 },
-+	{ 4, 4 }, { 5, 4 }, { 6, 4 }, { 7, 4 },
-+	{ 0 },
-+};
-+
-+static const struct clk_div_table mcu_div_table[] = {
-+	{ 0, 1 }, { 1, 2 }, { 2, 4 }, { 3, 8 },
-+	{ 4, 16 }, { 5, 32 }, { 6, 64 }, { 7, 128 },
-+	{ 8, 512 }, { 9, 512 }, { 10, 512}, { 11, 512 },
-+	{ 12, 512 }, { 13, 512 }, { 14, 512}, { 15, 512 },
-+	{ 0 },
-+};
-+
-+static const struct clk_div_table apb_div_table[] = {
-+	{ 0, 1 }, { 1, 2 }, { 2, 4 }, { 3, 8 },
-+	{ 4, 16 }, { 5, 16 }, { 6, 16 }, { 7, 16 },
-+	{ 0 },
-+};
-+
- struct clock_config {
- 	u32 id;
- 	const char *name;
-@@ -781,6 +817,21 @@ struct clk_hw *_clk_register_pll(struct device *dev,
- 	_STM32_DIV(_div_offset, _div_shift, _div_width,\
- 		   _div_flags, _div_table, NULL)\
+ static struct clk_hw *
+ _clk_hw_register_gate(struct device *dev,
+ 		      struct clk_hw_onecell_data *clk_data,
+@@ -191,6 +196,112 @@ struct div_cfg {
+ 					     lock);
+ }
  
-+#define _STM32_MUX(_offset, _shift, _width, _mux_flags, _ops)\
-+	.mux = &(struct stm32_mux_cfg) {\
-+		&(struct mux_cfg) {\
-+			.reg_off	= _offset,\
-+			.shift		= _shift,\
-+			.width		= _width,\
-+			.mux_flags	= _mux_flags,\
-+			.table		= NULL,\
-+		},\
-+		.ops		= _ops,\
++/* MP1 Gate clock with set & clear registers */
++
++static int mp1_gate_clk_enable(struct clk_hw *hw)
++{
++	if (!clk_gate_ops.is_enabled(hw))
++		clk_gate_ops.enable(hw);
++
++	return 0;
++}
++
++static void mp1_gate_clk_disable(struct clk_hw *hw)
++{
++	struct clk_gate *gate = to_clk_gate(hw);
++	unsigned long flags = 0;
++
++	if (clk_gate_ops.is_enabled(hw)) {
++		spin_lock_irqsave(gate->lock, flags);
++		writel_relaxed(BIT(gate->bit_idx), gate->reg + RCC_CLR);
++		spin_unlock_irqrestore(gate->lock, flags);
++	}
++}
++
++const struct clk_ops mp1_gate_clk_ops = {
++	.enable		= mp1_gate_clk_enable,
++	.disable	= mp1_gate_clk_disable,
++	.is_enabled	= clk_gate_is_enabled,
++};
++
++static struct clk_hw *
++_get_stm32_gate(void __iomem *base,
++		const struct stm32_gate_cfg *cfg, spinlock_t *lock)
++{
++	struct clk_gate *gate;
++	struct clk_hw *gate_hw;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
++
++	gate->reg = cfg->gate->reg_off + base;
++	gate->bit_idx = cfg->gate->bit_idx;
++	gate->flags = cfg->gate->gate_flags;
++	gate->lock = lock;
++	gate_hw = &gate->hw;
++
++	return gate_hw;
++}
++
++static struct clk_hw *
++clk_stm32_register_gate_ops(struct device *dev,
++			    const char *name,
++			    const char *parent_name,
++			    unsigned long flags,
++			    void __iomem *base,
++			    const struct stm32_gate_cfg *cfg,
++			    spinlock_t *lock)
++{
++	struct clk_init_data init = { NULL };
++	struct clk_gate *gate;
++	struct clk_hw *hw;
++	int ret;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	init.flags = flags;
++
++	init.ops = &clk_gate_ops;
++
++	if (cfg->ops)
++		init.ops = cfg->ops;
++
++	hw = _get_stm32_gate(base, cfg, lock);
++	if (IS_ERR(hw))
++		return ERR_PTR(-ENOMEM);
++
++	hw->init = &init;
++
++	ret = clk_hw_register(dev, hw);
++	if (ret) {
++		kfree(gate);
++		hw = ERR_PTR(ret);
 +	}
 +
-+#define _MUX(_offset, _shift, _width, _mux_flags)\
-+	_STM32_MUX(_offset, _shift, _width, _mux_flags, NULL)\
++	return hw;
++}
 +
- #define PARENT(_parent) ((const char *[]) { _parent})
++static struct clk_hw *
++_clk_stm32_register_gate(struct device *dev,
++			 struct clk_hw_onecell_data *clk_data,
++			 void __iomem *base, spinlock_t *lock,
++			 const struct clock_config *cfg)
++{
++	return clk_stm32_register_gate_ops(dev,
++				    cfg->name,
++				    cfg->parent_name,
++				    cfg->flags,
++				    base,
++				    cfg->cfg,
++				    lock);
++}
++
+ #define GATE(_id, _name, _parent, _flags, _offset, _bit_idx, _gate_flags)\
+ {\
+ 	.id		= _id,\
+@@ -239,12 +350,44 @@ struct div_cfg {
+ 	DIV_TABLE(_id, _name, _parent, _flags, _offset, _shift, _width,\
+ 		  _div_flags, NULL)
  
- #define _NO_MUX .mux = NULL
-@@ -882,6 +933,40 @@ struct clk_hw *_clk_register_pll(struct device *dev,
- 		  _GATE(RCC_PLL4CR, 6, 0),
- 		  _NO_MUX,
- 		  _DIV(RCC_PLL4CFGR2, 16, 7, 0, NULL)),
++/* STM32 GATE */
++#define STM32_GATE(_id, _name, _parent, _flags, _gate)\
++{\
++	.id		= _id,\
++	.name		= _name,\
++	.parent_name	= _parent,\
++	.flags		= _flags,\
++	.cfg		= (struct stm32_gate_cfg *) {_gate},\
++	.func		= _clk_stm32_register_gate,\
++}
 +
-+	/* MUX system clocks */
-+	MUX(CK_PER, "ck_per", per_src, CLK_OPS_PARENT_ENABLE,
-+	    RCC_CPERCKSELR, 0, 2, 0),
++#define _STM32_GATE(_gate_offset, _gate_bit_idx, _gate_flags, _ops)\
++	(&(struct stm32_gate_cfg) {\
++		&(struct gate_cfg) {\
++			.reg_off	= _gate_offset,\
++			.bit_idx	= _gate_bit_idx,\
++			.gate_flags	= _gate_flags,\
++		},\
++		.ops		= _ops,\
++	})
 +
-+	MUX(CK_MPU, "ck_mpu", cpu_src, CLK_OPS_PARENT_ENABLE |
-+	     CLK_IS_CRITICAL, RCC_MPCKSELR, 0, 2, 0),
++#define _GATE_MP1(_gate_offset, _gate_bit_idx, _gate_flags)\
++	_STM32_GATE(_gate_offset, _gate_bit_idx, _gate_flags,\
++		    &mp1_gate_clk_ops)\
 +
-+	COMPOSITE(CK_AXI, "ck_axi", axi_src, CLK_IS_CRITICAL |
-+		   CLK_OPS_PARENT_ENABLE,
-+		   _NO_GATE,
-+		   _MUX(RCC_ASSCKSELR, 0, 2, 0),
-+		   _DIV(RCC_AXIDIVR, 0, 3, 0, axi_div_table)),
++#define GATE_MP1(_id, _name, _parent, _flags, _offset, _bit_idx, _gate_flags)\
++	STM32_GATE(_id, _name, _parent, _flags,\
++		   _GATE_MP1(_offset, _bit_idx, _gate_flags))
 +
-+	COMPOSITE(CK_MCU, "ck_mcu", mcu_src, CLK_IS_CRITICAL |
-+		   CLK_OPS_PARENT_ENABLE,
-+		   _NO_GATE,
-+		   _MUX(RCC_MSSCKSELR, 0, 2, 0),
-+		   _DIV(RCC_MCUDIVR, 0, 4, 0, mcu_div_table)),
-+
-+	DIV_TABLE(NO_ID, "pclk1", "ck_mcu", CLK_IGNORE_UNUSED, RCC_APB1DIVR, 0,
-+		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
-+
-+	DIV_TABLE(NO_ID, "pclk2", "ck_mcu", CLK_IGNORE_UNUSED, RCC_APB2DIVR, 0,
-+		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
-+
-+	DIV_TABLE(NO_ID, "pclk3", "ck_mcu", CLK_IGNORE_UNUSED, RCC_APB3DIVR, 0,
-+		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
-+
-+	DIV_TABLE(NO_ID, "pclk4", "ck_axi", CLK_IGNORE_UNUSED, RCC_APB4DIVR, 0,
-+		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
-+
-+	DIV_TABLE(NO_ID, "pclk5", "ck_axi", CLK_IGNORE_UNUSED, RCC_APB5DIVR, 0,
-+		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
- };
+ static const struct clock_config stm32mp1_clock_cfg[] = {
+ 	/* Oscillator divider */
+ 	DIV(NO_ID, "clk-hsi-div", "clk-hsi", 0, RCC_HSICFGR, 0, 2,
+ 	    CLK_DIVIDER_READ_ONLY),
  
- struct stm32_clock_match_data {
+ 	/*  External / Internal Oscillators */
++	GATE_MP1(CK_HSE, "ck_hse", "clk-hse", 0, RCC_OCENSETR, 8, 0),
++	GATE_MP1(CK_CSI, "ck_csi", "clk-csi", 0, RCC_OCENSETR, 4, 0),
++	GATE_MP1(CK_HSI, "ck_hsi", "clk-hsi-div", 0, RCC_OCENSETR, 0, 0),
+ 	GATE(CK_LSI, "ck_lsi", "clk-lsi", 0, RCC_RDLSICR, 0, 0),
+ 	GATE(CK_LSE, "ck_lse", "clk-lse", 0, RCC_BDCR, 0, 0),
+ 
 -- 
 1.9.1
