@@ -1,84 +1,41 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 8 Mar 2018 17:23:51 -0600
-Subject: [PATCH v2 3/6] dt-bindings: soc: Add a binding for the Broadcom
- VCHIQ services.
-In-Reply-To: <87lgf2fhn2.fsf@anholt.net>
-References: <20180307185716.17449-1-eric@anholt.net>
- <20180307185716.17449-3-eric@anholt.net>
- <CAL_Jsq+1-9-RGfzPimYwCokEZx1vef_PX5rkp-c8s6fUchg=ag@mail.gmail.com>
- <87lgf2fhn2.fsf@anholt.net>
-Message-ID: <CAL_JsqJTsJfud6a445hu6ENVV6QyBF6f69opTwq1yp_X9oUPAQ@mail.gmail.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 8 Mar 2018 23:27:10 +0000
+Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
+In-Reply-To: <20180308220708.GA29073@bombadil.infradead.org>
+References: <20180307183227.17983-1-toshi.kani@hpe.com>
+ <20180307183227.17983-2-toshi.kani@hpe.com>
+ <20180308040016.GB9082@bombadil.infradead.org>
+ <1520527285.2693.56.camel@hpe.com>
+ <20180308220708.GA29073@bombadil.infradead.org>
+Message-ID: <1520554326.2693.122.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 2:15 PM, Eric Anholt <eric@anholt.net> wrote:
-> Rob Herring <robh+dt@kernel.org> writes:
->
->> On Wed, Mar 7, 2018 at 12:57 PM, Eric Anholt <eric@anholt.net> wrote:
->>> The VCHIQ communication channel can be provided by BCM283x and Capri
->>> SoCs, to communicate with the VPU-side OS services.
->>>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>> ---
->>>
->>> v2: dropped firmware property, added cache-line-size.
->>>
->>>  .../bindings/soc/bcm/brcm,bcm2835-vchiq.txt        | 28 ++++++++++++++++++++++
->>>  1 file changed, 28 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->>> new file mode 100644
->>> index 000000000000..cdef4abc5e47
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->>> @@ -0,0 +1,28 @@
->>> +Broadcom VCHIQ firmware services
->>> +
->>> +Required properties:
->>> +
->>> +- compatible:  Should be "brcm,bcm2835-vchiq"
->>> +- reg:         Physical base address and length of the doorbell register pair
->>> +- interrupts:  The interrupt number
->>> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>> +
->>> +Optional properties:
->>> +
->>> +- cache-line-size:
->>> +               Size of L2 cache lines.  The VPU firmware detects
->>> +                 this property and overrides it with the actual L2
->>> +                 cache line size it's using when loading the
->>> +                 device-tree.  Determines the required alignment of
->>> +                 offsets/sizes of VCHIQ pagelists.  If missing, the
->>> +                 firmware assumes an older kernel using 32-byte
->>> +                 alignment.
->>
->> How is this a VCHIQ property? This is a standard property for cache
->> nodes, but this is not a cache node.
->
-> Because the existing firmware code is choosing a value based on the
-> property's presence in this node.  This is the DT ABI for the firmware
-> that's been shipping for a long time (at least since the 4.9 era).
+On Thu, 2018-03-08 at 14:07 -0800, Matthew Wilcox wrote:
+> On Thu, Mar 08, 2018 at 03:56:30PM +0000, Kani, Toshi wrote:
+> > On Wed, 2018-03-07 at 20:00 -0800, Matthew Wilcox wrote:
+> > > On Wed, Mar 07, 2018 at 11:32:26AM -0700, Toshi Kani wrote:
+> > > > +/**
+> > > > + * pud_free_pmd_page - clear pud entry and free pmd page
+> > > > + *
+> > > > + * Returns 1 on success and 0 on failure (pud not cleared).
+> > > > + */
+> > > > +int pud_free_pmd_page(pud_t *pud)
+> > > > +{
+> > > > +	return pud_none(*pud);
+> > > > +}
+> > > 
+> > > Wouldn't it be clearer if you returned 'bool' instead of 'int' here?
+> > 
+> > I thought about it and decided to use 'int' since all other pud/pmd/pte
+> > interfaces, such as pud_none() above, use 'int'.
+> 
+> These interfaces were introduced before we had bool ... I suspect nobody's
+> taken the time to go through and convert them all.
 
-It's not an ABI if it is not upstream and documented.
+I see.  Since this patchset already changes core, arm and x86, and will
+be back ported to stables.  So, if you do not mind, I'd like to leave it
+consistent with others with 'int', and make the footstep minimum.
 
->> Is it really a problem to just use a fixed maximum alignment? That
->> seems to be good enough for all the rest of the kernel.
->
-> If we can't have this DT property, then it looks like we need the
-> upstream kernel to just use 32, since that's what the firmware will
-> assume in its absence.  Maybe the firmware maintainers can give us a new
-> arg to the mailbox call for setup where we could pass in the value to
-> use (or flag for them to pass their preferred value back to us) so we
-> can avoid DT.
-
-I read thru the discussion on the previous version and skimmed thru
-the code, but still don't really have a grasp on things. If the actual
-cache line size is 64 bytes, but you use 32 things would be pretty
-broken I'd think.
-
-BTW, I'm pretty sure this line is not doing what you want:
-
-static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
-
-Rob
+Thanks,
+-Toshi
