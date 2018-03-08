@@ -1,29 +1,26 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 08 Mar 2018 12:39:43 +0100
-Subject: [PATCH 4/4] ARM: dts: Enable HDMI audio on Snow Chromebook
-In-Reply-To: <20180307172711.15697-4-s.nawrocki@samsung.com>
-References: <20180307172711.15697-1-s.nawrocki@samsung.com>
- <CGME20180307172742epcas2p2c0ef2394412da71b6d0ee172c47c3420@epcas2p2.samsung.com>
- <20180307172711.15697-4-s.nawrocki@samsung.com>
-Message-ID: <00f84b39-3272-72ca-5991-bc0f839a0324@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 08 Mar 2018 12:40:04 +0100
+Subject: [PATCH] reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset
+ control
+In-Reply-To: <CAK7LNAQkq6t7zhaNRGUM7nU4NGBAT3FEQTg0xKXHPZOmBcc-OA@mail.gmail.com>
+References: <20180308080929.30982-1-suzuki.katsuhiro@socionext.com>
+ <CAK7LNAQkq6t7zhaNRGUM7nU4NGBAT3FEQTg0xKXHPZOmBcc-OA@mail.gmail.com>
+Message-ID: <1520509204.2514.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2018 06:27 PM, Sylwester Nawrocki wrote:
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -18,6 +18,14 @@
+On Thu, 2018-03-08 at 17:12 +0900, Masahiro Yamada wrote:
+> 2018-03-08 17:09 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> > Add reset lines for audio subsystem (AIO) on UniPhier
+> > Pro4/Pro5/PXs2 SoCs.
+> > 
+> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> > ---
+> 
+> 
+> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-> +		cpu {
-> +			sound-dai = <&i2s0 0>;
-> +		};
-> +
-> +		codec {
-> +			sound-dai = <&hdmi>, <&max98095 0>;
+Thank you, applied to reset/next.
 
-Oops, I need to change order of codecs on the list, so it matches
-documentation. Will post v2 shortly.
-
--- 
-Thanks,
-Sylwester
+regards
+Philipp
