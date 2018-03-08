@@ -1,87 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Mar 2018 16:27:16 -0600
-Subject: [PATCHv2 4/7] dt-bindings: fpga: add Stratix10 SoC FPGA manager
- binding
-In-Reply-To: <CANk1AXQRsAyFOGnUGcdWa0g0SdWu1PD=osYazj3nXJVq8ErABQ@mail.gmail.com>
-References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
- <1519949975-13548-5-git-send-email-richard.gong@linux.intel.com>
- <20180307194745.657ewa6rtcta6eqm@rob-hp-laptop>
- <CANk1AXS3gbLLy5fvyxcmeSBEaV2LZY9P=M3sOUHUceTgso5YkQ@mail.gmail.com>
- <CAL_JsqLNxsVaMoefYfLi7ow8BjLkipNJwjvXgpEuXZZF8PT6+A@mail.gmail.com>
- <CANk1AXQRsAyFOGnUGcdWa0g0SdWu1PD=osYazj3nXJVq8ErABQ@mail.gmail.com>
-Message-ID: <CAL_JsqKNKZOCGhAJiuVMvYWK-27=AAo63xa5jF-gbezBky1tUQ@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Thu, 08 Mar 2018 16:35:45 -0600
+Subject: [PATCH v2 1/3] signal: Add FPE_FLTUNK si_code for undiagnosable
+ fp exceptions
+In-Reply-To: <1519926248-12591-2-git-send-email-Dave.Martin@arm.com> (Dave
+ Martin's message of "Thu, 1 Mar 2018 17:44:06 +0000")
+References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
+ <1519926248-12591-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <876066nqke.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 9:32 AM, Alan Tull <atull@kernel.org> wrote:
-> On Wed, Mar 7, 2018 at 7:24 PM, Rob Herring <robh@kernel.org> wrote:
->> On Wed, Mar 7, 2018 at 4:20 PM, Alan Tull <atull@kernel.org> wrote:
->>> On Wed, Mar 7, 2018 at 1:47 PM, Rob Herring <robh@kernel.org> wrote:
->>>> On Thu, Mar 01, 2018 at 06:19:32PM -0600, richard.gong at linux.intel.com wrote:
->>>>> From: Alan Tull <atull@kernel.org>
->>>>>
->>>>> Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
->>>>>
->>>>> Signed-off-by: Alan Tull <atull@kernel.org>
->>>>> ---
->>>>> v2: this patch is added in patch set version 2
->>>>> ---
->>>>>  .../devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt  | 10 ++++++++++
->>>>>  1 file changed, 10 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
->>>>> new file mode 100644
->>>>> index 0000000..78de689
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
->>>>> @@ -0,0 +1,10 @@
->>>>> +Intel Stratix10 SoC FPGA Manager
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible : should contain "intel,stratix10-soc-fpga-mgr"
->>>>> +
->>>>> +Example:
->>>>> +
->>>>> +     fpga_mgr: fpga-mgr at 0 {
->>>>> +             compatible = "intel,stratix10-soc-fpga-mgr";
->>>>
->>>> No reg or anything else? Is that because it all goes thru the service
->>>> layer firmware?
->>>
->>> Yes.
->>>
->>> There will be a few more clients of the service layer: QSPI, Crypto
->>> and warm reset.
->>>
->>>> Just get the service layer driver to instantiate a
->>>> device for this driver or get rid of the 2 layers if that's all the
->>>> firmware interface does. DT is not a Linux driver instantiation
->>>> mechanism.
->>>
->>> Right, this should be describing hardware.
->>>
->>> I could add this to the service layer binding:
->>>
->>> firmware {
->>>         svc {
->>>                 compatible = "intel,stratix10-svc";
->>>                 method = "smc";
->>>                 memory-region = <&service_reserved>;
->>>                 fpga-mgr {
->
-> Actually, add a label.
->
->                   fpga_mgr: fpga-mgr {
->
->>>                         compatible = "intel,stratix10-soc-fpga-mgr";
->>
->> Still, why do you need this node? If you don't have any other cross
->> tree connections, then the service layer can instantiate the
->> device(s).
->
-> It's used for the FPGA region to know what mgr can program the region.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Ah yes, that's probably good enough reason.
+> Some architectures cannot always report accurately what kind of
+> floating-point exception triggered a floating-point exception trap.
+>
+> This can occur with fp exceptions occurring on lanes in a vector
+> instruction on arm64 for example.
+>
+> Rather than have every architecture come up with its own way of
+> describing such a condition, this patch adds a common FPE_FLTUNK
+> si_code value to report that an fp exception caused a trap but we
+> cannot be certain which kind of fp exception it was.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Rob
+Reviewed-by: "Eric W. Biederman" <ebiederm@xmission.com>
+
+> --
+>
+> Changes since v1:
+>
+> Reported by James Morse:
+>
+>  * Bump NSIGFPE BUILD_BUG_ON() check for x86 compat.
+>
+>    FPE_FLTUNK does not current have any implications for x86, since it
+>    is not currently used and has no implications for the way siginfo
+>    is populated.
+> ---
+>  arch/x86/kernel/signal_compat.c    | 2 +-
+>  include/uapi/asm-generic/siginfo.h | 3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/x86/kernel/signal_compat.c b/arch/x86/kernel/signal_compat.c
+> index ac057f9..954ad99 100644
+> --- a/arch/x86/kernel/signal_compat.c
+> +++ b/arch/x86/kernel/signal_compat.c
+> @@ -26,7 +26,7 @@ static inline void signal_compat_build_tests(void)
+>  	 * new fields are handled in copy_siginfo_to_user32()!
+>  	 */
+>  	BUILD_BUG_ON(NSIGILL  != 11);
+> -	BUILD_BUG_ON(NSIGFPE  != 13);
+> +	BUILD_BUG_ON(NSIGFPE  != 14);
+>  	BUILD_BUG_ON(NSIGSEGV != 4);
+>  	BUILD_BUG_ON(NSIGBUS  != 5);
+>  	BUILD_BUG_ON(NSIGTRAP != 4);
+
+For other reviewers.  This bug on exists to ensure people remember to
+update the helper functions when new fields are added to struct siginfo.
+As new fields usually come with new si_codes.  There are no fields
+added so this is sufficient.
+
+> diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> index 85dc965..10304de 100644
+> --- a/include/uapi/asm-generic/siginfo.h
+> +++ b/include/uapi/asm-generic/siginfo.h
+> @@ -229,7 +229,8 @@ typedef struct siginfo {
+>  # define __FPE_INVASC	12	/* invalid ASCII digit */
+>  # define __FPE_INVDEC	13	/* invalid decimal digit */
+>  #endif
+> -#define NSIGFPE		13
+> +#define FPE_FLTUNK	14	/* undiagnosed floating-point exception */
+> +#define NSIGFPE		14
+>  
+>  /*
+>   * SIGSEGV si_codes
