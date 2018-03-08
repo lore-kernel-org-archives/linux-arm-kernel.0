@@ -1,105 +1,112 @@
 From: john.garry@huawei.com (John Garry)
-Date: Thu, 8 Mar 2018 18:58:25 +0800
-Subject: [PATCH v3 00/11] perf events patches for improved ARM64 support
-Message-ID: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
+Date: Thu, 8 Mar 2018 18:58:28 +0800
+Subject: [PATCH v3 03/11] perf vendor events: drop support for unused topic
+ directories
+In-Reply-To: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
+References: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
+Message-ID: <1520506716-197429-4-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for some perf events features,
-targeted at ARM64, implemented in a generic fashion.
+Currently a topic subdirectory is supported in the
+pmu-events dir, in the following sample structure:
+/arch/platform/subtopic/mysubtopic.json
 
-The two main features are as follows:
-- support for arch/vendor/platform pmu events directory structure
-   - to support this, topic subdirectory support needs to be dropped
-- support for parsing standard architecture pmu events
+Upto 256 levels of topic subdirectories are supported. So this
+means that JSONs may be located in a topic dir as well as the
+platform dir.
 
-On the back of these, the Cavium ThunderX2, ARM Cortex-A53,
-and HiSilicon hip08 JSONs are relocated/added/updated.
+This topic subdirectory causes problems if we want to add support
+for a vendor dir in the pmu-events structure (in the form
+arch/platform/vendor), in that we cannot differentiate between
+a vendor dir and a topic dir.
 
-In addition, there is a patch to drop mutli-mapfile.csv support and
-also a bugfix in jevents.c for an error code value.
+Since the topic dir feature is not used, drop it so it
+does not block adding vendor subdirectory support.
 
-Note: Patch #5 will conflict with https://lkml.org/lkml/2018/3/7/183
-The simple merge resolution is:
- 0x00000000420f5160,v1,cavium/thunderx2,core
-+0x00000000430f0af0,v1,cavium/thunderx2,core
+Signed-off-by: John Garry <john.garry@huawei.com>
+Acked-by: Jiri Olsa <jolsa@kernel.org>
+---
+NOTE: There was a bug in this code with how add_topic()
+sets topic_level. Also a delimiter could be added in printing
+the "topic" in get_topic().
 
-Differences to v2:
-- Change standard arch event matching to use EventName
-  - update JSONs based on this
-- add review tags from Jiri Olsa
+ tools/perf/pmu-events/jevents.c | 37 ++++++++++---------------------------
+ 1 file changed, 10 insertions(+), 27 deletions(-)
 
-Differences to v1:
-- Address coding issues from Jiri Olsa in adding arch std event
-   support (https://lkml.org/lkml/2018/2/6/501)
-- add patch to drop topic subdirectory support
-- add patch for bug fix in json_events() 
-- add review tags from Jiri Olsa
-
-Differences to RFC:
-- reworked patch for arch standard events
-	- added arch standard event keyword support
-	- use some macros to make the code more condense
-	- use <linux/list_head.h>
-- standardised some function names
-- updated README
-- for patch to support vendor subdir, add check for
-  unknown dirent type
- -add patch to drop mutliple mapfile.csv support
- - dealt with new cortex a53 JSONs
-
-John Garry (11):
-  perf vendor events: drop incomplete multiple mapfile support
-  perf vendor events: fix error code in json_events()
-  perf vendor events: drop support for unused topic directories
-  perf vendor events: add support for pmu events vendor subdirectory
-  perf vendor events arm64: Relocate ThunderX2 JSON to cavium
-    subdirectory
-  perf vendor events arm64: Relocate Cortex A53 JSONs to arm
-    subdirectory
-  perf vendor events: add support for arch standard events
-  perf vendor events arm64: add armv8-recommended.json
-  perf vendor events arm64: fixup ThunderX2 to use recommended events
-  perf vendor events arm64: fixup A53 to use recommended events
-  perf vendor events arm64: add HiSilicon hip08 JSON file
-
- tools/perf/pmu-events/Build                        |   2 +
- tools/perf/pmu-events/README                       |  15 +-
- .../arch/arm64/arm/cortex-a53/branch.json          |  25 ++
- .../pmu-events/arch/arm64/arm/cortex-a53/bus.json  |   8 +
- .../arch/arm64/arm/cortex-a53/cache.json           |  27 ++
- .../arch/arm64/arm/cortex-a53/memory.json          |  12 +
- .../arch/arm64/arm/cortex-a53/other.json           |  28 ++
- .../arch/arm64/arm/cortex-a53/pipeline.json        |  52 +++
- .../pmu-events/arch/arm64/armv8-recommended.json   | 452 +++++++++++++++++++++
- .../arch/arm64/cavium/thunderx2-imp-def.json       |  62 ---
- .../arch/arm64/cavium/thunderx2/core-imp-def.json  |  32 ++
- .../pmu-events/arch/arm64/cortex-a53/branch.json   |  27 --
- .../perf/pmu-events/arch/arm64/cortex-a53/bus.json |  22 -
- .../pmu-events/arch/arm64/cortex-a53/cache.json    |  27 --
- .../pmu-events/arch/arm64/cortex-a53/memory.json   |  22 -
- .../pmu-events/arch/arm64/cortex-a53/other.json    |  32 --
- .../pmu-events/arch/arm64/cortex-a53/pipeline.json |  52 ---
- .../arch/arm64/hisilicon/hip08/core-imp-def.json   | 122 ++++++
- tools/perf/pmu-events/arch/arm64/mapfile.csv       |   5 +-
- tools/perf/pmu-events/jevents.c                    | 287 ++++++++++---
- 20 files changed, 1014 insertions(+), 297 deletions(-)
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/branch.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/bus.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/cache.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/memory.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/other.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/arm/cortex-a53/pipeline.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/armv8-recommended.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/branch.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/bus.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/cache.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/memory.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/other.json
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cortex-a53/pipeline.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/hisilicon/hip08/core-imp-def.json
-
+diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+index edff989..1d02faf 100644
+--- a/tools/perf/pmu-events/jevents.c
++++ b/tools/perf/pmu-events/jevents.c
+@@ -256,25 +256,18 @@ static const char *field_to_perf(struct map *table, char *map, jsmntok_t *val)
+ 	goto out_free;						\
+ } } while (0)
+ 
+-#define TOPIC_DEPTH 256
+-static char *topic_array[TOPIC_DEPTH];
+-static int   topic_level;
++static char *topic;
+ 
+ static char *get_topic(void)
+ {
+-	char *tp_old, *tp = NULL;
++	char *tp;
+ 	int i;
+ 
+-	for (i = 0; i < topic_level + 1; i++) {
+-		int n;
+-
+-		tp_old = tp;
+-		n = asprintf(&tp, "%s%s", tp ?: "", topic_array[i]);
+-		if (n < 0) {
+-			pr_info("%s: asprintf() error %s\n", prog);
+-			return NULL;
+-		}
+-		free(tp_old);
++	/* tp is free'd in process_one_file() */
++	i = asprintf(&tp, "%s", topic);
++	if (i < 0) {
++		pr_info("%s: asprintf() error %s\n", prog);
++		return NULL;
+ 	}
+ 
+ 	for (i = 0; i < (int) strlen(tp); i++) {
+@@ -291,25 +284,15 @@ static char *get_topic(void)
+ 	return tp;
+ }
+ 
+-static int add_topic(int level, char *bname)
++static int add_topic(char *bname)
+ {
+-	char *topic;
+-
+-	level -= 2;
+-
+-	if (level >= TOPIC_DEPTH)
+-		return -EINVAL;
+-
++	free(topic);
+ 	topic = strdup(bname);
+ 	if (!topic) {
+ 		pr_info("%s: strdup() error %s for file %s\n", prog,
+ 				strerror(errno), bname);
+ 		return -ENOMEM;
+ 	}
+-
+-	free(topic_array[topic_level]);
+-	topic_array[topic_level] = topic;
+-	topic_level              = level;
+ 	return 0;
+ }
+ 
+@@ -824,7 +807,7 @@ static int process_one_file(const char *fpath, const struct stat *sb,
+ 		}
+ 	}
+ 
+-	if (level > 1 && add_topic(level, bname))
++	if (level > 1 && add_topic(bname))
+ 		return -ENOMEM;
+ 
+ 	/*
 -- 
 1.9.1
