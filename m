@@ -1,40 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Mar 2018 16:11:59 +0100
-Subject: [PATCH 0/3] ARM: dts: tegra: apalis/colibri updates
-In-Reply-To: <20180210013638.28164-1-marcel@ziswiler.com>
-References: <20180210013638.28164-1-marcel@ziswiler.com>
-Message-ID: <20180308151159.GC13814@ulmo>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 8 Mar 2018 16:13:22 +0100
+Subject: [PATCH 4/4] ARM: sunxi: mc-smp: Split out SoC-specific device
+ node lookup sequence
+In-Reply-To: <20180308150012.19045-5-wens@csie.org>
+References: <20180308150012.19045-1-wens@csie.org>
+ <20180308150012.19045-5-wens@csie.org>
+Message-ID: <20180308151322.pz5p26r6bdyngxok@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 10, 2018 at 02:36:35AM +0100, Marcel Ziswiler wrote:
+On Thu, Mar 08, 2018 at 11:00:12PM +0800, Chen-Yu Tsai wrote:
+> The multi-cluster SMP code maps the address spaces of several hardware
+> control blocks. The device nodes for them are SoC-specific. To help with
+> supporting other SoCs to re-use this code, these bits should be split
+> out to a separate function tied to the enable-method string.
 > 
-> This series fixes the I2C bus frequencies, uses the correct compatible
-> for the RTC and removes an unneeded reg property for Tegra based
-> Toradex Apalis and Colibri modules.
+> This patch splits out and groups the device node lookup sequence, and
+> adds new data structures to have the newly created function tied to
+> the enable method string. This structure can also be used to encode
+> other differences between the SoCs.
 > 
-> 
-> Marcel Ziswiler (3):
->   apalis_t30/tk1, colibri_t20/t30: fix i2c bus frequencies
->   ARM: dts: tegra: apalis/colibri: use correct compatible for rtc
->   ARM: dts: tegra: apalis/colibri: remove unneeded reg property
-> 
->  arch/arm/boot/dts/tegra124-apalis-eval.dts    |  7 +++----
->  arch/arm/boot/dts/tegra124-apalis.dtsi        |  2 +-
->  arch/arm/boot/dts/tegra20-colibri-512.dtsi    | 16 +++++++++++-----
->  arch/arm/boot/dts/tegra30-apalis-eval.dts     |  4 ++--
->  arch/arm/boot/dts/tegra30-apalis.dtsi         |  3 +--
->  arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |  4 ++--
->  arch/arm/boot/dts/tegra30-colibri.dtsi        |  3 +--
->  7 files changed, 21 insertions(+), 18 deletions(-)
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Thierry
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/2c7bd8da/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/09c92a40/attachment.sig>
