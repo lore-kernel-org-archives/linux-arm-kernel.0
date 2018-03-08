@@ -1,14 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu,  8 Mar 2018 11:12:02 -0800
-Subject: [PATCH v5 18/21] nvmem: vf610-ocotp: Do not use "&pdev->dev"
- explicitly
+Date: Thu,  8 Mar 2018 11:12:05 -0800
+Subject: [PATCH v5 21/21] nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
 In-Reply-To: <20180308191205.26943-1-andrew.smirnov@gmail.com>
 References: <20180308191205.26943-1-andrew.smirnov@gmail.com>
-Message-ID: <20180308191205.26943-19-andrew.smirnov@gmail.com>
+Message-ID: <20180308191205.26943-22-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There already a "dev" variable for that. Use it.
+There's "dev" variable for this already. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,22 +23,22 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/vf610-ocotp.c | 3 +--
+ drivers/nvmem/bcm-ocotp.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
-index 5a395ffb2ca8..4662309489db 100644
---- a/drivers/nvmem/vf610-ocotp.c
-+++ b/drivers/nvmem/vf610-ocotp.c
-@@ -223,8 +223,7 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct vf610_ocotp *ocotp_dev;
- 
--	ocotp_dev = devm_kzalloc(&pdev->dev,
--			sizeof(struct vf610_ocotp), GFP_KERNEL);
-+	ocotp_dev = devm_kzalloc(dev, sizeof(struct vf610_ocotp), GFP_KERNEL);
- 	if (!ocotp_dev)
- 		return -ENOMEM;
+diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
+index 24c30fa475cc..4159b3f41d79 100644
+--- a/drivers/nvmem/bcm-ocotp.c
++++ b/drivers/nvmem/bcm-ocotp.c
+@@ -262,8 +262,7 @@ static int bcm_otpc_probe(struct platform_device *pdev)
+ 	else if (of_device_is_compatible(dev->of_node, "brcm,ocotp-v2"))
+ 		priv->map = &otp_map_v2;
+ 	else {
+-		dev_err(&pdev->dev,
+-			"%s otpc config map not defined\n", __func__);
++		dev_err(dev, "%s otpc config map not defined\n", __func__);
+ 		return -EINVAL;
+ 	}
  
 -- 
 2.14.3
