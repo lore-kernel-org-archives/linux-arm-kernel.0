@@ -1,96 +1,112 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 08 Mar 2018 13:48:23 +0800
-Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
-In-Reply-To: <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
-References: <1520261458.33502.10.camel@aosc.io>
- <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
- <1520308623.33502.13.camel@aosc.io>
- <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1520488103.13063.1.camel@aosc.io>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 08 Mar 2018 07:03:25 +0100
+Subject: [alsa-devel] [BUG] Kernel crash on Allwinner H3 due to sound core
+ changes
+In-Reply-To: <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+ <1832733.mujlD9skaR@jernej-laptop>
+ <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <4224437.y2AcdKYxFF@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-03-06?? 17:38 -0600?Bjorn Helgaas???
-> [+cc Marc]
+Hi,
+
+Thank you for looking into it so quickly.
+
+Dne ?etrtek, 08. marec 2018 ob 02:21:02 CET je Kuninori Morimoto napisal(a):
+> Hi Jernej
 > 
-> On Tue, Mar 06, 2018 at 11:57:03AM +0800, Icenowy Zheng wrote:
-> > ? 2018-03-05?? 15:47 -0600?Bjorn Helgaas???
-> > > On Mon, Mar 05, 2018 at 10:50:58PM +0800, Icenowy Zheng wrote:
-> > > > Hi everyone,
-> > > > 
-> > > > I'm trying to implement a driver for the quirky (DW) PCIe RC in
-> > > > the
-> > > > Allwinner H6 SoC.
-> > > > 
-> > > > The quirk is that only the "dbi" space is always mapped, but at
-> > > > the
-> > > > same time only 64KiB of other spaces (config, downstream IO and
-> > > > non-
-> > > > prefetchable memory) are accessible. To access a certain
-> > > > address
-> > > > the
-> > > > high 16-bit of the address (all bus addresses in H6 SoC are 32-
-> > > > bit
-> > > > despite the CPU is 64-bit) needs to be written into the
-> > > > PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI
-> > > > space).
-> > > > So the access to these spaces cannot be processed correctly
-> > > > with
-> > > > just
-> > > > readl/writel, as the existing code does.
-> > > > 
-> > > > Is it possible to workaround this in the PCI subsystem of
-> > > > Linux?
-> > > > 
-> > > > (I have thought a workaround that only maps the current
-> > > > accessible
-> > > > 64KiB with the MMU, and when accessing the non-accessible part,
-> > > > catch
-> > > > the page fault and re-setup the map to the new 64KiB page. But
-> > > > surely
-> > > > it will kill the performance.)
-> > > 
-> > > If you only need to write to PCIE_ADDR_PAGE_CFG for *config*
-> > > accesses,
-> > > this should be easy.  All config accesses go through wrappers
-> > > (pci_read_config_word(), etc) and several host bridge drivers
-> > > have to
-> > > update a register with parts of the config address, e.g.,
-> > > advk_pcie_rd_conf(), mvebu_pcie_hw_rd_conf().
-> > > 
-> > > It sounds like you also need to update PCIE_ADDR_PAGE_CFG for I/O
-> > > port
-> > > accesses.  I/O port accesses do go through a wrapper (inb(),
-> > > etc), so
-> > > it might be possible in principle to intercept these, although
-> > > much
-> > > more difficult than config accesses, because the config accesses
-> > > are
-> > > already set up with per-host bridge hooks, while the I/O port
-> > > accessors are mostly per-arch.
-> > > 
-> > > But if you have to update PCIE_ADDR_PAGE_CFG for memory accesses,
-> > > that's really a problem because drivers are allowed to
-> > > essentially
-> > > read a memory BAR, convert that bus address to a CPU physical
-> > > memory
-> > > address, ioremap() it, then directly access the PCIe memory with
-> > > loads
-> > > and stores.
+> Thank you for your hard work
+> 
+> > I found the issue. Commit be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm:
 > > 
-> > Unfortunately this is the case. All above (config, IO, memory)
-> > needs
-> > PCIE_ADDR_PAGE_CFG update.
+> > replace platform to component") changes struct dmaengine_pcm:
+> >  struct dmaengine_pcm {
+> >  
+> >  	struct dma_chan *chan[SNDRV_PCM_STREAM_LAST + 1];
+> >  	const struct snd_dmaengine_pcm_config *config;
+> > 
+> > -	struct snd_soc_platform platform;
+> > +	struct snd_soc_component component;
+> > 
+> >  	unsigned int flags;
+> >  
+> >  };
+> > 
+> > In snd_dmaengine_pcm_register():
+> > ret = snd_soc_add_component(dev, &pcm->component,
+> > 
+> > 				    &dmaengine_pcm_component, NULL, 0);
+> > 
+> > And now, sun4i-codec first time returns -EPROBE_DEFER since driver for
+> > analog part is not yet loaded. Because of that, all components get
+> > destroyed.
+> > 
+> > snd_dmaengine_pcm_unregister() calls snd_soc_unregister_component() and
+> > that one calls __snd_soc_unregister_component() multiple times (until it
+> > fails).
+> > 
+> > Issue is that __snd_soc_unregister_component() uses kfree() on component
+> > pointer and that naturally can't succed since component was never
+> > kmalloc'ed since it is a part of a bigger structure - struct
+> > dmaengine_pcm.
+> > 
+> > What would be the best fix? Changing struct dmaengine_pcm to have pointer
+> > to a component, so it can be freed?
 > 
-> tango_pcie_probe() has a similar issue.  We don't have a good
-> solution
-> there, so we just live with the fact that the platform will be
-> unreliable.
-
-It's still less quirky than Allwinner H6 PCIe. It's only a config/MMIO
-mux on tango; however on H6 PCIe both config space and MMIO space are
-splitted to many pages. So on H6 if no solution is worked out, it will
-not be unreliable -- it will be unusable instead.
-
+> Ahh.. indeed. Good catch !
+> How about to add such flag ?
+> This is just idea. No tested, No compiled, but can help you ?
 > 
-> Bjorn
+> One note here is that reusing "registered_as_component" flag is
+> not good idea, because it will be removed
+> when platform/codec were removed
+> 
+> ------------------------
+> diff --git a/include/sound/soc.h b/include/sound/soc.h
+> index 1a73232..b9b1b4c 100644
+> --- a/include/sound/soc.h
+> +++ b/include/sound/soc.h
+> @@ -853,6 +853,7 @@ struct snd_soc_component {
+>  	unsigned int ignore_pmdown_time:1; /* pmdown_time is ignored at stop */
+>  	unsigned int registered_as_component:1;
+>  	unsigned int suspended:1; /* is in suspend PM state */
+> +	unsigned int alloced_component:1;
+> 
+>  	struct list_head list;
+>  	struct list_head card_aux_list; /* for auxiliary bound components */
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index c0edac8..0e33bcf 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -3492,6 +3492,7 @@ int snd_soc_register_component(struct device *dev,
+>  	if (!component)
+>  		return -ENOMEM;
+> 
+> +	component->alloced_component = 1;
+>  	return snd_soc_add_component(dev, component, component_driver,
+>  				     dai_drv, num_dai);
+>  }
+> @@ -3523,7 +3524,9 @@ static int __snd_soc_unregister_component(struct
+> device *dev)
+> 
+>  	if (found) {
+>  		snd_soc_component_cleanup(component);
+> -		kfree(component);
+> +
+> +		if (component->alloced_component)
+> +			kfree(component);
+>  	}
+> 
+>  	return found;
+> ------------------------
+
+I tested this patch and there is no crash anymore. If you will send it as a 
+fix, you can add:
+
+Reported-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Tested-by: Jernej Skrabec <jernej.skrabec@siol.net>
+
+Best regards,
+Jernej
