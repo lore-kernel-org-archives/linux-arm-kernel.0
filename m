@@ -1,71 +1,71 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Mar 2018 15:59:14 +0100
-Subject: [PATCH v2] ARM: tegra: fix ulpi regression on tegra20
-In-Reply-To: <1520519485.23006.6.camel@toradex.com>
-References: <20180222143825.1517-1-marcel@ziswiler.com>
- <20180308141501.GH3529@ulmo> <1520519485.23006.6.camel@toradex.com>
-Message-ID: <20180308145914.GA13814@ulmo>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  8 Mar 2018 23:00:10 +0800
+Subject: [PATCH 2/4] ARM: sunxi: mc-smp: Use DT enable-method for sun9i A80 SMP
+In-Reply-To: <20180308150012.19045-1-wens@csie.org>
+References: <20180308150012.19045-1-wens@csie.org>
+Message-ID: <20180308150012.19045-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 02:31:26PM +0000, Marcel Ziswiler wrote:
-> On Thu, 2018-03-08 at 15:15 +0100, Thierry Reding wrote:
-> > On Thu, Feb 22, 2018 at 03:38:25PM +0100, Marcel Ziswiler wrote:
-> > > From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> > > 
-> > > Since commit f8f8f1d04494 ("clk: Don't touch hardware when
-> > > reparenting
-> > > during registration") ULPI has been broken on Tegra20 leading to
-> > > the
-> > > following error message during boot:
-> > > 
-> > > [    1.974698] ulpi_phy_power_on: ulpi write failed
-> > > [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
-> > > [    1.985434] tegra-ehci: probe of c5004000.usb failed with error
-> > > -110
-> > > 
-> > > Debugging through the changes and finally also consulting the TRM
-> > > revealed that rather than the CDEV2 clock off OSC requiring such
-> > > pin
-> > > muxing actually the PLL_P_OUT4 clock is in use. It looks like so
-> > > far it
-> > > just worked by chance of that one having been enabled which
-> > > Stephen's
-> > > commit now changed when reparenting sclk away from pll_p_out4
-> > > leaving
-> > > that one disabled. Fix this by properly assigning the PLL_P_OUT4
-> > > clock
-> > > as the ULPI PHY clock.
-> > > 
-> > > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> > > 
-> > > ---
-> > > 
-> > > Changes in v2:
-> > > - Updated device tree binding documentation as well.
-> > > - CCing Dmitry as well.
-> > > 
-> > >  Documentation/devicetree/bindings/phy/nvidia,tegra20-usb-phy.txt |
-> > > 4 +++-
-> > >  arch/arm/boot/dts/tegra20.dtsi                                   |
-> > > 2 +-
-> > >  2 files changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > Applied, though I've split this into two separate patches, one going
-> > into for-4.17/dt-bindings and the other going into for-4.17/arm/dt.
-> 
-> Thanks, Thierry!
-> 
-> BTW: Do you know what is happening with my T30 USB patch? Is there
-> anything I may do about it?
+Instead of having an early init function check the machine compatible
+and installing multi-cluster SMP support for the A80 if it matches,
+use a new cpu enable-method string. This makes the platform support
+future proof in case anyone manages to add PSCI support.
 
-I just took care of that.
+The original init code for the SMP support is changed into the
+.prepare_cpus callback in the smp_operations structure. Instead of
+panicing when resources are missing like on some platforms, our code
+merely guards against engaging SMP or CPU hotplug and returns an error.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/5f75670d/attachment.sig>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/mach-sunxi/mc_smp.c                   | 21 ++++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index f4a777039f03..76655d0d67c2 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -198,6 +198,7 @@ described below.
+ 			    "actions,s500-smp"
+ 			    "allwinner,sun6i-a31"
+ 			    "allwinner,sun8i-a23"
++			    "allwinner,sun9i-a80-smp"
+ 			    "amlogic,meson8-smp"
+ 			    "amlogic,meson8b-smp"
+ 			    "arm,realview-smp"
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index 9db6c4ed5861..86e90b038555 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -690,7 +690,26 @@ static int __init sunxi_mc_smp_init(void)
+ 	struct resource res;
+ 	int ret;
+ 
+-	if (!of_machine_is_compatible("allwinner,sun9i-a80"))
++	/*
++	 * Don't bother checking the "cpus" node, as an enable-method
++	 * property in that node is undocumented.
++	 */
++	node = of_cpu_device_node_get(0);
++	if (!node)
++		return -ENODEV;
++
++	/*
++	 * We can't actually use the enable-method magic in the kernel.
++	 * Our loopback / trampoline code uses the CPU suspend framework,
++	 * which requires the identity mapping be available. It would not
++	 * yet be available if we used the .init_cpus or .prepare_cpus
++	 * callbacks in smp_operations, which we would use if we were to
++	 * use CPU_METHOD_OF_DECLARE
++	 */
++	ret = of_property_match_string(node, "enable-method",
++				       "allwinner,sun9i-a80-smp");
++	of_node_put(node);
++	if (ret)
+ 		return -ENODEV;
+ 
+ 	if (!sunxi_mc_smp_cpu_table_init())
+-- 
+2.16.2
