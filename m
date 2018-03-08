@@ -1,75 +1,69 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Mar 2018 13:43:50 +0000
-Subject: [PATCH v3 15/22] arm64: capabilities: Change scope of VHE to
- Boot CPU feature
-In-Reply-To: <25d774db-0ebd-b06d-20b5-5e31ede58fa3@arm.com>
-References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-30-suzuki.poulose@arm.com>
- <20180212171727.GL5862@e103592.cambridge.arm.com>
- <25d774db-0ebd-b06d-20b5-5e31ede58fa3@arm.com>
-Message-ID: <20180308134348.GP32331@e103592.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Mar 2018 14:44:26 +0100
+Subject: [PATCH v4 0/7] Initial support for NVIDIA Tegra194
+In-Reply-To: <20180220115812.24108-1-mperttunen@nvidia.com>
+References: <20180220115812.24108-1-mperttunen@nvidia.com>
+Message-ID: <20180308134426.GE3529@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 12:10:22PM +0000, Suzuki K Poulose wrote:
-> On 12/02/18 17:17, Dave Martin wrote:
-> >On Fri, Feb 09, 2018 at 05:54:59PM +0000, Suzuki K Poulose wrote:
-> >>We expect all CPUs to be running at the same EL inside the kernel
-> >>with or without VHE enabled and we have strict checks to ensure
-> >>that any mismatch triggers a kernel panic. If VHE is enabled,
-> >>we use the feature based on the boot CPU and all other CPUs
-> >>should follow. This makes it a perfect candidate for a cpability
-> >
-> >capability
-> >
-> >>based on the boot CPU,  which should be matched by all the CPUs
-> >>(both when is ON and OFF). This saves us some not-so-pretty
-> >>hooks and special code, just for verifying the conflict.
-> >>
-> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>Cc: Dave Martin <dave.martin@arm.com>
-> >>Cc: Will Deacon <will.deacon@arm.com>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>  arch/arm64/include/asm/cpufeature.h |  7 +++++++
-> >>  arch/arm64/include/asm/virt.h       |  6 ------
-> >>  arch/arm64/kernel/cpufeature.c      |  5 +++--
-> >>  arch/arm64/kernel/smp.c             | 38 -------------------------------------
-> >>  4 files changed, 10 insertions(+), 46 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> >>index 5f56a8342065..dfce93f79ae7 100644
-> >>--- a/arch/arm64/include/asm/cpufeature.h
-> >>+++ b/arch/arm64/include/asm/cpufeature.h
-> >>@@ -276,6 +276,13 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
-> >>  	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-> >>  	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
-> >>+/*
-> >>+ * Critical CPU feature used early in the boot based on the boot CPU.
-> >>+ * The feature should be matched by all booting CPU (both miss and hit
-> >>+ * cases).
-> >>+ */
-> >>+#define ARM64_CPUCAP_CRITICAL_BOOT_CPU_FEATURE ARM64_CPUCAP_SCOPE_BOOT_CPU
-> >>+
-> >
-> >Nit: would it be consistent with the uses we already have for the word
-> >"strict" to use that word here?  i.e.,
-> >ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE.
-> >Or do you think that would be more confusing?
+On Tue, Feb 20, 2018 at 01:58:05PM +0200, Mikko Perttunen wrote:
+> Hello everyone,
 > 
-> We don't use the "STRICT" tag anymore. Moreover, I used CRITICAL to indicate
-> that it is special in a way that all the "late" CPUs (in this case all
-> secondaries) should match the "state" of the capability  (i.e, both ON and OFF)
-> as that of the boot CPU. I am OK to change it to STRICT.
+> this series adds initial support for the NVIDIA Tegra194 "Xavier"
+> system-on-chip. Initially UART, I2C, SDMMC, as well as the PMIC
+> are supported, allowing booting to a console.
+> 
+> The changes consist almost completely of the new device trees,
+> however some fixes are required in the BPMP driver to support the
+> new channel layout in Tegra194.
+> 
+> The series has been tested on Tegra186 (Jetson TX2) and Tegra194
+> (P2972).
+> 
+> Cheers,
+> Mikko
+> 
+> Mikko Perttunen (7):
+>   firmware: tegra: Simplify channel management
+>   soc/tegra: Add Tegra194 SoC configuration option
+>   soc/tegra: pmc: Add Tegra194 compatibility string
+>   dt-bindings: tegra: Add missing chips and NVIDIA boards
+>   dt-bindings: tegra: Add documentation for nvidia,tegra194-pmc
+>   arm64: tegra: Add Tegra194 chip device tree
+>   arm64: tegra: Add device tree for the Tegra194 P2972-0000 board
+> 
+>  Documentation/devicetree/bindings/arm/tegra.txt    |  16 +
+>  .../bindings/arm/tegra/nvidia,tegra186-pmc.txt     |   2 +
+>  arch/arm64/boot/dts/nvidia/Makefile                |   1 +
+>  arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     | 248 +++++++++++++++
+>  arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts |  16 +
+>  arch/arm64/boot/dts/nvidia/tegra194.dtsi           | 344 +++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |   1 +
+>  drivers/firmware/tegra/bpmp.c                      | 142 ++++-----
+>  drivers/soc/tegra/Kconfig                          |  10 +
+>  drivers/soc/tegra/pmc.c                            |   1 +
+>  include/dt-bindings/clock/tegra194-clock.h         | 321 +++++++++++++++++++
+>  include/dt-bindings/gpio/tegra194-gpio.h           |  61 ++++
+>  include/dt-bindings/power/tegra194-powergate.h     |  35 +++
+>  include/dt-bindings/reset/tegra194-reset.h         | 152 +++++++++
+>  include/soc/tegra/bpmp.h                           |   4 +-
+>  15 files changed, 1274 insertions(+), 80 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
+>  create mode 100644 include/dt-bindings/clock/tegra194-clock.h
+>  create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
+>  create mode 100644 include/dt-bindings/power/tegra194-powergate.h
+>  create mode 100644 include/dt-bindings/reset/tegra194-reset.h
 
-OK, I think so long as the definition is clear the precise name doesn't
-matter too much.
+Applied, thanks.
 
-I suggest deleting "critical" from the comment though, since that
-suggests a circular definition.  The meaning seems clear(er) without
-it.
-
-[...]
-
-Cheers
----Dave
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/32a269f5/attachment.sig>
