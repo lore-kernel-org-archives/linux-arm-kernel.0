@@ -1,215 +1,71 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu,  8 Mar 2018 15:52:51 +0100
-Subject: [PATCH v2 5/8] mmc: sunxi: Move resources management to separate
- functions
-In-Reply-To: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
-References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
-Message-ID: <ae107f83803778d4e34e43161c4670930c260f62.1520520655.git-series.maxime.ripard@bootlin.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Mar 2018 15:59:14 +0100
+Subject: [PATCH v2] ARM: tegra: fix ulpi regression on tegra20
+In-Reply-To: <1520519485.23006.6.camel@toradex.com>
+References: <20180222143825.1517-1-marcel@ziswiler.com>
+ <20180308141501.GH3529@ulmo> <1520519485.23006.6.camel@toradex.com>
+Message-ID: <20180308145914.GA13814@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've had all our resources management, and especially the clocks and reset
-sequence, done directly as part of the probe.
+On Thu, Mar 08, 2018 at 02:31:26PM +0000, Marcel Ziswiler wrote:
+> On Thu, 2018-03-08 at 15:15 +0100, Thierry Reding wrote:
+> > On Thu, Feb 22, 2018 at 03:38:25PM +0100, Marcel Ziswiler wrote:
+> > > From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > > 
+> > > Since commit f8f8f1d04494 ("clk: Don't touch hardware when
+> > > reparenting
+> > > during registration") ULPI has been broken on Tegra20 leading to
+> > > the
+> > > following error message during boot:
+> > > 
+> > > [    1.974698] ulpi_phy_power_on: ulpi write failed
+> > > [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
+> > > [    1.985434] tegra-ehci: probe of c5004000.usb failed with error
+> > > -110
+> > > 
+> > > Debugging through the changes and finally also consulting the TRM
+> > > revealed that rather than the CDEV2 clock off OSC requiring such
+> > > pin
+> > > muxing actually the PLL_P_OUT4 clock is in use. It looks like so
+> > > far it
+> > > just worked by chance of that one having been enabled which
+> > > Stephen's
+> > > commit now changed when reparenting sclk away from pll_p_out4
+> > > leaving
+> > > that one disabled. Fix this by properly assigning the PLL_P_OUT4
+> > > clock
+> > > as the ULPI PHY clock.
+> > > 
+> > > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > > 
+> > > ---
+> > > 
+> > > Changes in v2:
+> > > - Updated device tree binding documentation as well.
+> > > - CCing Dmitry as well.
+> > > 
+> > >  Documentation/devicetree/bindings/phy/nvidia,tegra20-usb-phy.txt |
+> > > 4 +++-
+> > >  arch/arm/boot/dts/tegra20.dtsi                                   |
+> > > 2 +-
+> > >  2 files changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > Applied, though I've split this into two separate patches, one going
+> > into for-4.17/dt-bindings and the other going into for-4.17/arm/dt.
+> 
+> Thanks, Thierry!
+> 
+> BTW: Do you know what is happening with my T30 USB patch? Is there
+> anything I may do about it?
 
-As we want to implement runtime_pm, we'll obviously want to have that
-moved outside of the probe so that we can call do it in our runtime suspend
-and resume hooks without too much duplication.
+I just took care of that.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/mmc/host/sunxi-mmc.c | 142 ++++++++++++++++++++----------------
- 1 file changed, 82 insertions(+), 60 deletions(-)
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index e4b44c4adb8f..34bc90bc04b2 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -265,6 +265,7 @@ struct sunxi_mmc_cfg {
- };
- 
- struct sunxi_mmc_host {
-+	struct device *dev;
- 	struct mmc_host	*mmc;
- 	struct reset_control *reset;
- 	const struct sunxi_mmc_cfg *cfg;
-@@ -1183,6 +1184,80 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
- 
-+static int sunxi_mmc_enable(struct sunxi_mmc_host *host)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(host->clk_ahb);
-+	if (ret) {
-+		dev_err(dev, "Couldn't enable the bus clocks (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(host->clk_mmc);
-+	if (ret) {
-+		dev_err(host->dev, "Enable mmc clk err %d\n", ret);
-+		goto error_disable_clk_ahb;
-+	}
-+
-+	ret = clk_prepare_enable(host->clk_output);
-+	if (ret) {
-+		dev_err(host->dev, "Enable output clk err %d\n", ret);
-+		goto error_disable_clk_mmc;
-+	}
-+
-+	ret = clk_prepare_enable(host->clk_sample);
-+	if (ret) {
-+		dev_err(host->dev, "Enable sample clk err %d\n", ret);
-+		goto error_disable_clk_output;
-+	}
-+
-+	if (!IS_ERR(host->reset)) {
-+		ret = reset_control_reset(host->reset);
-+		if (ret) {
-+			dev_err(dev, "Couldn't reset the MMC controller (%d)\n",
-+				ret);
-+			goto error_disable_clk_sample;
-+		}
-+	}
-+
-+	/*
-+	 * Sometimes the controller asserts the irq on boot for some reason,
-+	 * make sure the controller is in a sane state before enabling irqs.
-+	 */
-+	ret = sunxi_mmc_reset_host(host);
-+	if (ret)
-+		goto error_assert_reset;
-+
-+	return 0;
-+
-+error_assert_reset:
-+	if (!IS_ERR(host->reset))
-+		reset_control_assert(host->reset);
-+error_disable_clk_sample:
-+	clk_disable_unprepare(host->clk_sample);
-+error_disable_clk_output:
-+	clk_disable_unprepare(host->clk_output);
-+error_disable_clk_mmc:
-+	clk_disable_unprepare(host->clk_mmc);
-+error_disable_clk_ahb:
-+	clk_disable_unprepare(host->clk_ahb);
-+	return ret;
-+}
-+
-+static void sunxi_mmc_disable(struct sunxi_mmc_host *host)
-+{
-+	sunxi_mmc_reset_host(host);
-+
-+	if (!IS_ERR(host->reset))
-+		reset_control_assert(host->reset);
-+
-+	clk_disable_unprepare(host->clk_sample);
-+	clk_disable_unprepare(host->clk_output);
-+	clk_disable_unprepare(host->clk_mmc);
-+	clk_disable_unprepare(host->clk_ahb);
-+}
-+
- static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 				      struct platform_device *pdev)
- {
-@@ -1232,66 +1307,21 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 	if (PTR_ERR(host->reset) == -EPROBE_DEFER)
- 		return PTR_ERR(host->reset);
- 
--	ret = clk_prepare_enable(host->clk_ahb);
--	if (ret) {
--		dev_err(&pdev->dev, "Enable ahb clk err %d\n", ret);
--		return ret;
--	}
--
--	ret = clk_prepare_enable(host->clk_mmc);
--	if (ret) {
--		dev_err(&pdev->dev, "Enable mmc clk err %d\n", ret);
--		goto error_disable_clk_ahb;
--	}
--
--	ret = clk_prepare_enable(host->clk_output);
--	if (ret) {
--		dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
--		goto error_disable_clk_mmc;
--	}
--
--	ret = clk_prepare_enable(host->clk_sample);
--	if (ret) {
--		dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
--		goto error_disable_clk_output;
--	}
--
--	if (!IS_ERR(host->reset)) {
--		ret = reset_control_reset(host->reset);
--		if (ret) {
--			dev_err(&pdev->dev, "reset err %d\n", ret);
--			goto error_disable_clk_sample;
--		}
--	}
--
--	/*
--	 * Sometimes the controller asserts the irq on boot for some reason,
--	 * make sure the controller is in a sane state before enabling irqs.
--	 */
--	ret = sunxi_mmc_reset_host(host);
-+	ret = sunxi_mmc_enable(host);
- 	if (ret)
--		goto error_assert_reset;
-+		return ret;
- 
- 	host->irq = platform_get_irq(pdev, 0);
- 	if (host->irq <= 0) {
- 		ret = -EINVAL;
--		goto error_assert_reset;
-+		goto error_disable_mmc;
- 	}
- 
- 	return devm_request_threaded_irq(&pdev->dev, host->irq, sunxi_mmc_irq,
- 			sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
- 
--error_assert_reset:
--	if (!IS_ERR(host->reset))
--		reset_control_assert(host->reset);
--error_disable_clk_sample:
--	clk_disable_unprepare(host->clk_sample);
--error_disable_clk_output:
--	clk_disable_unprepare(host->clk_output);
--error_disable_clk_mmc:
--	clk_disable_unprepare(host->clk_mmc);
--error_disable_clk_ahb:
--	clk_disable_unprepare(host->clk_ahb);
-+error_disable_mmc:
-+	sunxi_mmc_disable(host);
- 	return ret;
- }
- 
-@@ -1308,6 +1338,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 	}
- 
- 	host = mmc_priv(mmc);
-+	host->dev = &pdev->dev;
- 	host->mmc = mmc;
- 	spin_lock_init(&host->lock);
- 
-@@ -1388,16 +1419,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
- 
- 	mmc_remove_host(mmc);
- 	disable_irq(host->irq);
--	sunxi_mmc_reset_host(host);
--
--	if (!IS_ERR(host->reset))
--		reset_control_assert(host->reset);
--
--	clk_disable_unprepare(host->clk_sample);
--	clk_disable_unprepare(host->clk_output);
--	clk_disable_unprepare(host->clk_mmc);
--	clk_disable_unprepare(host->clk_ahb);
--
-+	sunxi_mmc_disable(host);
- 	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
- 	mmc_free_host(mmc);
- 
--- 
-git-series 0.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/5f75670d/attachment.sig>
