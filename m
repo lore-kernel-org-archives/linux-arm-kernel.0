@@ -1,88 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Mar 2018 11:42:24 +0000
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <5A9DC03B.8020201@codeaurora.org>
-References: <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5A90B77E.8040105@codeaurora.org>
- <20180225143653.peb4quk3ha5h3t5x@salmiak>
- <5A972A7D.9020301@codeaurora.org>
- <20180301114911.fundyuqxtj5klk4e@lakrids.cambridge.arm.com>
- <5A986425.9080007@codeaurora.org>
- <20180302104223.7tpsyhsum7nej237@lakrids.cambridge.arm.com>
- <5A99A3DC.9020400@codeaurora.org>
- <20180305105925.4cjiqejfid7rswe6@lakrids.cambridge.arm.com>
- <5A9DC03B.8020201@codeaurora.org>
-Message-ID: <20180308114223.fsuwyejw4pb3gyoy@lakrids.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 8 Mar 2018 11:48:09 +0000
+Subject: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <CY1PR0201MB0764FB23021F5DC694C7F56DB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-2-git-send-email-jollys@xilinx.com>
+ <778329dd-76a7-0151-26d9-30e87e0c888d@arm.com>
+ <CY1PR0201MB0764FB23021F5DC694C7F56DB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
+Message-ID: <f6a416b7-542f-a3c3-538f-8549cf4e96c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 02:10:03PM -0800, Saravana Kannan wrote:
-> On 03/05/2018 02:59 AM, Mark Rutland wrote:
-> > On Fri, Mar 02, 2018 at 11:19:56AM -0800, Saravana Kannan wrote:
-> > > On 03/02/2018 02:42 AM, Mark Rutland wrote:
-> > > > It's important to note that the DSU PMU's event_init() ensures events
-> > > > are affine to a single CPU, and the perf core code serializes operations
-> > > > on those events via the context lock.
-> > > 
-> > > Ah, I see that now. Thanks!
-> > > 
-> > > > Therefore, two CPUs *won't* try to access the registers simultaneously.
-> > > 
-> > > Right, and this driver seems to be going through a lot of work to make sure
-> > > all events are read in one CPU.
-> > > 
-> > > Do you even have an upstream target where there are multiple DSU's in a
-> > > system?
-> > 
-> > I have no idea, though I do beleive that it's possible for a system to
-> > have multiple DSUs.
-> > 
-> > > If not, we can simplify a ton of this code (no hotplug notifiers, no
-> > > migrating PMUs, no SMP calls, etc) by just adding a spinlock and letting any
-> > > CPU read these DSU counters.
-> > 
-> > Regardless of whether we allow arbitrary CPUs to read the counters,
-> > other logic still needs to be CPU affine, and we'll still need hotplug
-> > notifiers and event migration.
+
+
+On 07/03/18 22:25, Jolly Shah wrote:
+> Hi Sudeep,
 > 
-> If you have to support multiple DSUs in a system, then the need is obvious.
-> But if you don't have to support multiple DSU, it's not obvious to me on why
-> you still need CPU affining or hotplug notifiers. Could you please provide
-> me pointers for general understanding?
 
-There are a number of reasons. From the top of my head:
+[...]
 
-* The perf core relies on the interrupt handler being serialised w.r.t.
-  operations on the relevant perf_event_context and
-  perf_event_cpu_context by way of these being affine to the same CPU.
-  For this to be the case, events *must* be managed on the CPU the
-  interrupt handler is affine to.
+>>> +Examples:
+>>> +	firmware {
+>>> +		zynqmp_firmware: zynqmp-firmware {
+>>> +			compatible = "xlnx,zynqmp-firmware";
+>>> +			method = "smc";
+>>> +		};
+>>> +	};
+>>>
+>>
+>> Do you foresee using SMC/HVC for this firmware even on future platforms?
+>> If not, I suggest to keep the protocol part separate from the transport i.e.
+>> smc/hvc via ATF. It could be replaced with mailbox or some h/w mechanism in
+>> future ?
+>>
+> 
+> We have PSCI and EEMI interfaces exposed to linux from ATF. PSCI is
+> an EEMI client. We do not have current plans to switch to mailbox as it
+> will require 2 communication channels to PMU as PSCI is through ATF.
+> 
 
-* The perf core rotates events on a per-cpu basis. To keep this fair and
-  reasonable, the perf core needs to manage *all* events for a PMU on
-  the same CPU.
-
-* We expose a cpumask to userspace, so that it attempts to open events
-  on a single CPU (and doesn't open redundant events that would result
-  in misleading figures).
-
-  This must be an online CPU for the perf core to allow events to be
-  created, so this must be updated when assocaited CPUs are hotplugged.
-  We must choose *some* arbitrary associated CPU for this.
-
-* If the arbitrarily-chosen CPU is hotplugged out, but other associated
-  CPUs are online, we should keep the events active by choosing another
-  arbitrary associated CPU, and migrating the events (see
-  perf_pmu_migrate_context). Note that we must also fiddle with the
-  interrupt affinity.
-
-* If a hotplug event occurs between userspace reading the cpumask and
-  opening an event, it may try to open events on a CPU that is not the
-  currently arbitrarily chosen CPU. To ameliorate this, in
-  pmu::even_init we re-write event->cpu so long as the CPU was *some*
-  valid CPU.
-
-There might be some other reasons, too...
-
-Thanks,
-Mark.
+OK, but I just saw some bindings that has mailbox interface, honestly
+it's getting too confusing with multiple series on the same thing
+floating and hence I requested to put it together as one series.
+-- 
+Regards,
+Sudeep
