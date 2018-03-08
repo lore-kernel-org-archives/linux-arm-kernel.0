@@ -1,92 +1,41 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  8 Mar 2018 23:00:11 +0800
-Subject: [PATCH 3/4] ARM: dts: sun9i: Add enable-method for SMP support for
- the A80 SoC
-In-Reply-To: <20180308150012.19045-1-wens@csie.org>
-References: <20180308150012.19045-1-wens@csie.org>
-Message-ID: <20180308150012.19045-4-wens@csie.org>
+Date: Thu,  8 Mar 2018 23:00:08 +0800
+Subject: [PATCH 0/4] ARM: sunxi: Clean and improvements for multi-cluster SMP
+Message-ID: <20180308150012.19045-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the enable-method property for SMP support would allow future PSCI
-implementations to override any in-OS support. This is better than just
-matching against the machine compatible, and then having to determine
-whether other methods are available or not.
+Hi,
 
-This adds enable-method properties to all CPU nodes.
+This series is a bit of cleanup and improvement for the new
+multi-cluster SMP code for Allwinner A80 and A83T (soon) SoCs.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+The first patch is just a typo fix.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index b1c86b76ac3c..82a770a5ba46 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -65,6 +65,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control0>;
- 			clock-frequency = <12000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x0>;
- 		};
- 
-@@ -73,6 +74,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control0>;
- 			clock-frequency = <12000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x1>;
- 		};
- 
-@@ -81,6 +83,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control0>;
- 			clock-frequency = <12000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x2>;
- 		};
- 
-@@ -89,6 +92,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control0>;
- 			clock-frequency = <12000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x3>;
- 		};
- 
-@@ -97,6 +101,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control1>;
- 			clock-frequency = <18000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x100>;
- 		};
- 
-@@ -105,6 +110,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control1>;
- 			clock-frequency = <18000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x101>;
- 		};
- 
-@@ -113,6 +119,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control1>;
- 			clock-frequency = <18000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x102>;
- 		};
- 
-@@ -121,6 +128,7 @@
- 			device_type = "cpu";
- 			cci-control-port = <&cci_control1>;
- 			clock-frequency = <18000000>;
-+			enable-method = "allwinner,sun9i-a80-smp";
- 			reg = <0x103>;
- 		};
- 	};
+The second and third patch add the use of the "enable-method" cpu
+property to enable SMP, instead of matching against the machine
+compatible. However, due to how init calls are sequenced, we still
+need to use a platform early_init call.
+
+The last patch splits out parts of the SoC-specific init code, i.e.
+the device node matching parts. This should help with Mylene's work
+on adding support for the A83T.
+
+Please have a look.
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (4):
+  ARM: sunxi: mc-smp: Fix "lookback" typo
+  ARM: sunxi: mc-smp: Use DT enable-method for sun9i A80 SMP
+  ARM: dts: sun9i: Add enable-method for SMP support for the A80 SoC
+  ARM: sunxi: mc-smp: Split out SoC-specific device node lookup sequence
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   1 +
+ arch/arm/boot/dts/sun9i-a80.dtsi               |   8 ++
+ arch/arm/mach-sunxi/mc_smp.c                   | 147 ++++++++++++++++++-------
+ 3 files changed, 115 insertions(+), 41 deletions(-)
+
 -- 
 2.16.2
