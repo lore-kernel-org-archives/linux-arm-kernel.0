@@ -1,23 +1,29 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Mar 2018 16:26:34 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_SND_SOC_WM8962
- explicitly
-In-Reply-To: <1519931336-9710-1-git-send-email-festevam@gmail.com>
-References: <1519931336-9710-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180308082633.GS3217@dragon>
+Date: Thu, 8 Mar 2018 16:30:15 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6: RDU2: Add RAVE SP device
+In-Reply-To: <20180301192007.29278-1-andrew.smirnov@gmail.com>
+References: <20180301192007.29278-1-andrew.smirnov@gmail.com>
+Message-ID: <20180308083014.GT3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 04:08:56PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Mar 01, 2018 at 11:20:06AM -0800, Andrey Smirnov wrote:
+> With MFD and watchdog drivers for RAVE SP device support added by
+> 538ee27290fa ("mfd: Add driver for RAVE Supervisory Processor") and
+> c3bb33345721 ("watchdog: Add RAVE SP watchdog driver") add
+> corresponding DT node for RDU2.
 > 
-> Currently CONFIG_SND_SOC_WM8962 is selected via SND_SOC_IMX_WM8962
-> machine driver option.
-> 
-> SND_SOC_IMX_WM8962 will be removed in the next kernel cycle, so
-> select the codec driver directly so that it can still be used
-> by default via the generic fsl-asoc-card machine driver.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Applied, thanks.
+Applied both, thanks.
