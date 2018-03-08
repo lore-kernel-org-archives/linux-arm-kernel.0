@@ -1,44 +1,52 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu,  8 Mar 2018 11:12:05 -0800
-Subject: [PATCH v5 21/21] nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
-In-Reply-To: <20180308191205.26943-1-andrew.smirnov@gmail.com>
-References: <20180308191205.26943-1-andrew.smirnov@gmail.com>
-Message-ID: <20180308191205.26943-22-andrew.smirnov@gmail.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 8 Mar 2018 19:30:23 +0000
+Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
+In-Reply-To: <20180308180446.GF14918@arm.com>
+References: <20180307183227.17983-1-toshi.kani@hpe.com>
+ <20180307183227.17983-2-toshi.kani@hpe.com>
+ <20180308180446.GF14918@arm.com>
+Message-ID: <1520540118.2693.103.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's "dev" variable for this already. Use it.
+On Thu, 2018-03-08 at 18:04 +0000, Will Deacon wrote:
+ :
+> > diff --git a/lib/ioremap.c b/lib/ioremap.c
+> > index b808a390e4c3..54e5bbaa3200 100644
+> > --- a/lib/ioremap.c
+> > +++ b/lib/ioremap.c
+> > @@ -91,7 +91,8 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+> >  
+> >  		if (ioremap_pmd_enabled() &&
+> >  		    ((next - addr) == PMD_SIZE) &&
+> > -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
+> > +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+> > +		    pmd_free_pte_page(pmd)) {
+> 
+> I find it a bit weird that we're postponing this to the subsequent map. If
+> we want to address the break-before-make issue that was causing a panic on
+> arm64, then I think it would be better to do this on the unmap path to avoid
+> duplicating TLB invalidation.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: cphealy at gmail.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mediatek at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/nvmem/bcm-ocotp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Hi Will,
 
-diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
-index 24c30fa475cc..4159b3f41d79 100644
---- a/drivers/nvmem/bcm-ocotp.c
-+++ b/drivers/nvmem/bcm-ocotp.c
-@@ -262,8 +262,7 @@ static int bcm_otpc_probe(struct platform_device *pdev)
- 	else if (of_device_is_compatible(dev->of_node, "brcm,ocotp-v2"))
- 		priv->map = &otp_map_v2;
- 	else {
--		dev_err(&pdev->dev,
--			"%s otpc config map not defined\n", __func__);
-+		dev_err(dev, "%s otpc config map not defined\n", __func__);
- 		return -EINVAL;
- 	}
- 
--- 
-2.14.3
+Yes, I started looking into doing it the unmap path, but found the
+following issues:
+
+ - The iounmap() path is shared with vunmap().  Since vmap() only
+supports pte mappings, making vunmap() to free pte pages is an overhead
+for regular vmap users as they do not need pte pages freed up.
+ - Checking to see if all entries in a pte page are cleared in the unmap
+path is racy, and serializing this check is expensive.
+ - The unmap path calls free_vmap_area_noflush() to do lazy TLB purges.
+Clearing a pud/pmd entry before the lazy TLB purges needs extra TLB
+purge.
+
+Hence, I decided to postpone and do it in the ioremap path when a
+pud/pmd mapping is set.  The "break" on arm64 happens when you update a
+pmd entry without purging it.  So, the unmap path is not broken.  I
+understand that arm64 may need extra TLB purge in pmd_free_pte_page(),
+but it limits this overhead only when it sets up a pud/pmd mapping.
+
+Thanks,
+-Toshi
