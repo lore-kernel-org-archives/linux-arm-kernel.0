@@ -1,64 +1,122 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 8 Mar 2018 18:01:53 +0100
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <07d4709b-df73-0107-ce0f-5af55e34913e@arm.com>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180308122715.GB21514@amd> <20180308132139.apabmgw4magrp3d7@pali>
- <07d4709b-df73-0107-ce0f-5af55e34913e@arm.com>
-Message-ID: <20180308170153.376gcwwudwkq3gs7@pali>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Mar 2018 17:04:38 +0000
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
+ with the same vintid
+In-Reply-To: <20180308160242.GA1917@lvm>
+References: <20180307124055.13800-1-marc.zyngier@arm.com>
+ <20180307124055.13800-2-marc.zyngier@arm.com>
+ <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
+ <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
+ <20180308160242.GA1917@lvm>
+Message-ID: <86tvtqbis9.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 March 2018 13:35:49 Marc Zyngier wrote:
-> On 08/03/18 13:21, Pali Roh?r wrote:
-> > On Thursday 08 March 2018 13:27:15 Pavel Machek wrote:
-> >> Hi!
-> >>
-> >>> Resent without non-upstream patches.
-> >>>
-> >>> This backport patchset fixed the spectre issue, it's original branch:
-> >>> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-> >>> A few dependency or fixingpatches are also picked up, if they are necessary
-> >>>  and no functional changes.
-> >>>
-> >>> No bug found from kernelci.org and lkft testing. It also could be gotten from:
-> >>>
-> >>> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
-> >>>
-> >>> Comments are appreciated!
-> >>
-> >> Not entirely related to this patched, but... I have few older ARM
-> >> boards here, and Nokia N9000 I really care about.
-> >>
-> >> AFAICT Meltdown is arm64 only?
-> > 
-> > IIRC ARMv7 is not affected by meltdown.
-> > 
-> >> Spectre affects the older boards, too, right? Was there any work done
-> >> on that? cpuinfo says "ARMv7" for N900.
-> > 
-> > I remember that I saw some spectre patches for ARMv7 on LKML.
-
-This is that patch series:
-https://www.spinics.net/lists/arm-kernel/msg632065.html
-
-> > In general for ARMv7 it is problematic as mitigation needs to change IBE
+On Thu, 08 Mar 2018 16:02:42 +0000,
+Christoffer Dall wrote:
 > 
-> Not quite. IBE is part of ACTLR, which is an implementation defined
-> register, so generalizing this statement to "ARMv7" is plain wrong. Case
-> in point: A9, A12/A17 do not need any bit to be set. A8 needs IBE to
-> allow BPIALL to work, A15 needs it for ICIALLUI to perform a BP
-> invalidation.
+> On Thu, Mar 08, 2018 at 10:19:49AM +0000, Marc Zyngier wrote:
+> > On 07/03/18 23:34, Christoffer Dall wrote:
+> > > On Wed, Mar 7, 2018 at 12:40 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > >> The vgic code is trying to be clever when injecting GICv2 SGIs,
+> > >> and will happily populate LRs with the same interrupt number if
+> > >> they come from multiple vcpus (after all, they are distinct
+> > >> interrupt sources).
+> > >>
+> > >> Unfortunately, this is against the letter of the architecture,
+> > >> and the GICv2 architecture spec says "Each valid interrupt stored
+> > >> in the List registers must have a unique VirtualID for that
+> > >> virtual CPU interface.". GICv3 has similar (although slightly
+> > >> ambiguous) restrictions.
+> > >>
+> > >> This results in guests locking up when using GICv2-on-GICv3, for
+> > >> example. The obvious fix is to stop trying so hard, and inject
+> > >> a single vcpu per SGI per guest entry. After all, pending SGIs
+> > >> with multiple source vcpus are pretty rare, and are mostly seen
+> > >> in scenario where the physical CPUs are severely overcomitted.
+> > >>
+> > >> Cc: stable at vger.kernel.org
+> > >> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
+> > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > >> ---
+> > >>  virt/kvm/arm/vgic/vgic.c | 11 +----------
+> > >>  1 file changed, 1 insertion(+), 10 deletions(-)
+> > >>
+> > >> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> > >> index c7c5ef190afa..1f7ff175f47b 100644
+> > >> --- a/virt/kvm/arm/vgic/vgic.c
+> > >> +++ b/virt/kvm/arm/vgic/vgic.c
+> > >> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+> > >>         list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+> > >>                 spin_lock(&irq->irq_lock);
+> > >>
+> > >> -               if (unlikely(vgic_target_oracle(irq) != vcpu))
+> > >> -                       goto next;
+> > >> -
+> > >> -               /*
+> > >> -                * If we get an SGI with multiple sources, try to get
+> > >> -                * them in all at once.
+> > >> -                */
+> > >> -               do {
+> > >> +               if (likely(vgic_target_oracle(irq) == vcpu))
+> > >>                         vgic_populate_lr(vcpu, irq, count++);
+> > > 
+> > > I think we need to change vgic_populate_lr to set the EOI maintenance
+> > > interrupt flag so that when the interrupt is deactivated, if there are
+> > > additional pending sources, we exit the guest and pick up the
+> > > interrupt.
+> > 
+> > Potentially. We need to be careful about about the semantics of EOI MI
+> > with non-level interrupts (see the other thread about EOI signalling).
+> 
+> I'll have a look.
+> 
+> > 
+> > > An alternative would be to set the underflow interrupt, but I don't
+> > > think that would be correct for multiple priorities, because the SGI
+> > > could have a higher priority than other pending interrupts we put in
+> > > the LR.
+> > 
+> > I don't think priorities are the issue (after all, we already sort the
+> > irqs in order of priority). 
+> 
+> Yes, but assume you have three pending interrupts, one SGI from two
+> sources, and one SPI, and assume that the SGI has priority 1 and SPI
+> priority 2 (lower means higher priority), then I think with underflow or
+> the no-pending interrupt flag, we'll deliver the SGI from the first
+> source, and then the SPI, and then exiting to pick up the last SGI from
+> the other source.  That's not how I understand the GIC architecture is
+> supposed to work.  Am I missing something?
 
-Ok, Nokia N900 has Cortex A8.
+No, you do have a point here. I'm so glad this is a v2 only thing.
+
+> 
+> > My worry is that underflow is allowed to
+> > fire if there is one interrupt pending, which implies that you could
+> > end-up in a livelock scenario if you only have one SGI pending with
+> > multiple sources.
+> 
+> Yes, doesn't work, so I think it should be a maintenance interrupt on
+> EOI.
+> 
+> > 
+> > Another possibility would be to use ICH_HCR_EL2.NPIE (GICH_HCR.NPIE on
+> > GICv2), which delivers a a MI if no pending interrupts are present. Once
+> > the SGI has been activated, we're guaranteed to be able to inject a new
+> > pending one.
+> > 
+> > I like the latter, because it doesn't overload the rest of the code with
+> > new semantics. Thoughts?
+> > 
+> 
+> I'm fine with that if I can be proven wrong about the multiple sources
+> and priorities.
+
+I'll have a look at respining this with MI on EOI.
+
+Thanks,
+
+	M.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 195 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/4838585f/attachment.sig>
+Jazz is not dead, it just smell funny.
