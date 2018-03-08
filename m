@@ -1,433 +1,505 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Thu,  8 Mar 2018 18:03:44 +0800
-Subject: [PATCH v4 2/2] ARM: dts: imx: Add basic dts support for imx6sll EVK
- board
-In-Reply-To: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
-References: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1520503424-22985-2-git-send-email-ping.bai@nxp.com>
+Date: Thu,  8 Mar 2018 17:58:03 +0800
+Subject: [PATCH v4 2/2] driver: pinctrl: imx: Add pinctrl driver support for
+ imx6sll
+In-Reply-To: <1520503083-22819-1-git-send-email-ping.bai@nxp.com>
+References: <1520503083-22819-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <1520503083-22819-2-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts file support for imx6sll EVK board.
+Add pinctrl driver support for imx6sll.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
- change v3->v4
- - update the license indentifier
- - remove leading zero of node
- - remove unused pin from hog group
----
- Documentation/devicetree/bindings/arm/fsl.txt |   4 +
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/imx6sll-evk.dts             | 372 ++++++++++++++++++++++++++
- 3 files changed, 378 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
+ changes v2->v3
+ - switch the pinctrl driver to use generic pinconfig based on imx7ulp
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index cdb9dd7..8a1baa2 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
- Required root node properties:
-     - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+ changes v3->v4
+ - remove the unecessary log print
+ - add SION support
+ - update the license identifier to SPDX
+---
+
+ arch/arm/mach-imx/Kconfig                   |   1 +
+ drivers/pinctrl/freescale/Kconfig           |   7 +
+ drivers/pinctrl/freescale/Makefile          |   1 +
+ drivers/pinctrl/freescale/pinctrl-imx6sll.c | 425 ++++++++++++++++++++++++++++
+ 4 files changed, 434 insertions(+)
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6sll.c
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 8e3a618..cb010a0 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -514,6 +514,7 @@ config SOC_IMX6SL
  
-+i.MX6SLL EVK board
-+Required root node properties:
-+    - compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
+ config SOC_IMX6SLL
+ 	bool "i.MX6 SoloLiteLite support"
++	select PINCTRL_IMX6SLL
+ 	select SOC_IMX6
+ 
+ 	help
+diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
+index 4dbc576..b4886ee 100644
+--- a/drivers/pinctrl/freescale/Kconfig
++++ b/drivers/pinctrl/freescale/Kconfig
+@@ -82,6 +82,13 @@ config PINCTRL_IMX6SL
+ 	help
+ 	  Say Y here to enable the imx6sl pinctrl driver
+ 
++config PINCTRL_IMX6SLL
++	bool "IMX6SL pinctrl driver"
++	depends on SOC_IMX6SLL
++	select PINCTRL_IMX
++	help
++	  Say Y here to enable the imx6sl pinctrl driver
 +
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38..28bff8b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -505,6 +505,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- dtb-$(CONFIG_SOC_IMX6SL) += \
- 	imx6sl-evk.dtb \
- 	imx6sl-warp.dtb
-+dtb-$(CONFIG_SOC_IMX6SLL) += \
-+	imx6sll-evk.dtb
- dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-nitrogen6sx.dtb \
- 	imx6sx-sabreauto.dtb \
-diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+ config PINCTRL_IMX6SX
+ 	bool "IMX6SX pinctrl driver"
+ 	depends on SOC_IMX6SX
+diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
+index 19bb9a5..368be8c 100644
+--- a/drivers/pinctrl/freescale/Makefile
++++ b/drivers/pinctrl/freescale/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
+ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6q.o
+ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6dl.o
+ obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
++obj-$(CONFIG_PINCTRL_IMX6SLL)	+= pinctrl-imx6sll.o
+ obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
+ obj-$(CONFIG_PINCTRL_IMX6UL)	+= pinctrl-imx6ul.o
+ obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx6sll.c b/drivers/pinctrl/freescale/pinctrl-imx6sll.c
 new file mode 100644
-index 0000000..892fbec
+index 0000000..d286e30
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6sll-evk.dts
-@@ -0,0 +1,372 @@
-+//SPDX-License-Identifier: (GPL-2.0 OR MIT)
++++ b/drivers/pinctrl/freescale/pinctrl-imx6sll.c
+@@ -0,0 +1,425 @@
++// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017-2018 NXP.
 + *
 + */
 +
-+/dts-v1/;
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinconf-generic.h>
++#include <linux/pinctrl/pinctrl.h>
 +
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "imx6sll.dtsi"
++#include "pinctrl-imx.h"
 +
-+/ {
-+	model = "Freescale i.MX6SLL EVK Board";
-+	compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
++#define BM_PKE		BIT(12)
++#define BM_PUE		BIT(13)
 +
-+	memory at 80000000 {
-+		reg = <0x80000000 0x80000000>;
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
-+	reg_usb_otg1_vbus: reg-usb-otg1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg2_vbus: reg-usb-otg2-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg2_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_aud3v: reg-aud3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wm8962-supply-3v15";
-+		regulator-min-microvolt = <3150000>;
-+		regulator-max-microvolt = <3150000>;
-+		regulator-boot-on;
-+	};
-+
-+	reg_aud4v: reg-aud4v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wm8962-supply-4v2";
-+		regulator-min-microvolt = <4325000>;
-+		regulator-max-microvolt = <4325000>;
-+		regulator-boot-on;
-+	};
-+
-+	reg_lcd: reg-lcd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd-pwr";
-+		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_sd1_vmmc: reg-sd1-vmmc {
-+		compatible = "regulator-fixed";
-+		regulator-name = "SD1_SPWR";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
++enum imx6sll_pads {
++	MX6SLL_PAD_RESERVE0 = 0,
++	MX6SLL_PAD_RESERVE1 = 1,
++	MX6SLL_PAD_RESERVE2 = 2,
++	MX6SLL_PAD_RESERVE3 = 3,
++	MX6SLL_PAD_RESERVE4 = 4,
++	MX6SLL_PAD_WDOG_B = 5,
++	MX6SLL_PAD_REF_CLK_24M = 6,
++	MX6SLL_PAD_REF_CLK_32K = 7,
++	MX6SLL_PAD_PWM1 = 8,
++	MX6SLL_PAD_KEY_COL0 = 9,
++	MX6SLL_PAD_KEY_ROW0 = 10,
++	MX6SLL_PAD_KEY_COL1 = 11,
++	MX6SLL_PAD_KEY_ROW1 = 12,
++	MX6SLL_PAD_KEY_COL2 = 13,
++	MX6SLL_PAD_KEY_ROW2 = 14,
++	MX6SLL_PAD_KEY_COL3 = 15,
++	MX6SLL_PAD_KEY_ROW3 = 16,
++	MX6SLL_PAD_KEY_COL4 = 17,
++	MX6SLL_PAD_KEY_ROW4 = 18,
++	MX6SLL_PAD_KEY_COL5 = 19,
++	MX6SLL_PAD_KEY_ROW5 = 20,
++	MX6SLL_PAD_KEY_COL6 = 21,
++	MX6SLL_PAD_KEY_ROW6 = 22,
++	MX6SLL_PAD_KEY_COL7 = 23,
++	MX6SLL_PAD_KEY_ROW7 = 24,
++	MX6SLL_PAD_EPDC_DATA00 = 25,
++	MX6SLL_PAD_EPDC_DATA01 = 26,
++	MX6SLL_PAD_EPDC_DATA02 = 27,
++	MX6SLL_PAD_EPDC_DATA03 = 28,
++	MX6SLL_PAD_EPDC_DATA04 = 29,
++	MX6SLL_PAD_EPDC_DATA05 = 30,
++	MX6SLL_PAD_EPDC_DATA06 = 31,
++	MX6SLL_PAD_EPDC_DATA07 = 32,
++	MX6SLL_PAD_EPDC_DATA08 = 33,
++	MX6SLL_PAD_EPDC_DATA09 = 34,
++	MX6SLL_PAD_EPDC_DATA10 = 35,
++	MX6SLL_PAD_EPDC_DATA11 = 36,
++	MX6SLL_PAD_EPDC_DATA12 = 37,
++	MX6SLL_PAD_EPDC_DATA13 = 38,
++	MX6SLL_PAD_EPDC_DATA14 = 39,
++	MX6SLL_PAD_EPDC_DATA15 = 40,
++	MX6SLL_PAD_EPDC_SDCLK = 41,
++	MX6SLL_PAD_EPDC_SDLE = 42,
++	MX6SLL_PAD_EPDC_SDOE = 43,
++	MX6SLL_PAD_EPDC_SDSHR = 44,
++	MX6SLL_PAD_EPDC_SDCE0 = 45,
++	MX6SLL_PAD_EPDC_SDCE1 = 46,
++	MX6SLL_PAD_EPDC_SDCE2 = 47,
++	MX6SLL_PAD_EPDC_SDCE3 = 48,
++	MX6SLL_PAD_EPDC_GDCLK = 49,
++	MX6SLL_PAD_EPDC_GDOE = 50,
++	MX6SLL_PAD_EPDC_GDRL = 51,
++	MX6SLL_PAD_EPDC_GDSP = 52,
++	MX6SLL_PAD_EPDC_VCOM0 = 53,
++	MX6SLL_PAD_EPDC_VCOM1 = 54,
++	MX6SLL_PAD_EPDC_BDR0 = 55,
++	MX6SLL_PAD_EPDC_BDR1 = 56,
++	MX6SLL_PAD_EPDC_PWR_CTRL0 = 57,
++	MX6SLL_PAD_EPDC_PWR_CTRL1 = 58,
++	MX6SLL_PAD_EPDC_PWR_CTRL2 = 59,
++	MX6SLL_PAD_EPDC_PWR_CTRL3 = 60,
++	MX6SLL_PAD_EPDC_PWR_COM = 61,
++	MX6SLL_PAD_EPDC_PWR_INT = 62,
++	MX6SLL_PAD_EPDC_PWR_STAT = 63,
++	MX6SLL_PAD_EPDC_PWR_WAKE = 64,
++	MX6SLL_PAD_LCD_CLK = 65,
++	MX6SLL_PAD_LCD_ENABLE = 66,
++	MX6SLL_PAD_LCD_HSYNC = 67,
++	MX6SLL_PAD_LCD_VSYNC = 68,
++	MX6SLL_PAD_LCD_RESET = 69,
++	MX6SLL_PAD_LCD_DATA00 = 70,
++	MX6SLL_PAD_LCD_DATA01 = 71,
++	MX6SLL_PAD_LCD_DATA02 = 72,
++	MX6SLL_PAD_LCD_DATA03 = 73,
++	MX6SLL_PAD_LCD_DATA04 = 74,
++	MX6SLL_PAD_LCD_DATA05 = 75,
++	MX6SLL_PAD_LCD_DATA06 = 76,
++	MX6SLL_PAD_LCD_DATA07 = 77,
++	MX6SLL_PAD_LCD_DATA08 = 78,
++	MX6SLL_PAD_LCD_DATA09 = 79,
++	MX6SLL_PAD_LCD_DATA10 = 80,
++	MX6SLL_PAD_LCD_DATA11 = 81,
++	MX6SLL_PAD_LCD_DATA12 = 82,
++	MX6SLL_PAD_LCD_DATA13 = 83,
++	MX6SLL_PAD_LCD_DATA14 = 84,
++	MX6SLL_PAD_LCD_DATA15 = 85,
++	MX6SLL_PAD_LCD_DATA16 = 86,
++	MX6SLL_PAD_LCD_DATA17 = 87,
++	MX6SLL_PAD_LCD_DATA18 = 88,
++	MX6SLL_PAD_LCD_DATA19 = 89,
++	MX6SLL_PAD_LCD_DATA20 = 90,
++	MX6SLL_PAD_LCD_DATA21 = 91,
++	MX6SLL_PAD_LCD_DATA22 = 92,
++	MX6SLL_PAD_LCD_DATA23 = 93,
++	MX6SLL_PAD_AUD_RXFS = 94,
++	MX6SLL_PAD_AUD_RXC = 95,
++	MX6SLL_PAD_AUD_RXD = 96,
++	MX6SLL_PAD_AUD_TXC = 97,
++	MX6SLL_PAD_AUD_TXFS = 98,
++	MX6SLL_PAD_AUD_TXD = 99,
++	MX6SLL_PAD_AUD_MCLK = 100,
++	MX6SLL_PAD_UART1_RXD = 101,
++	MX6SLL_PAD_UART1_TXD = 102,
++	MX6SLL_PAD_I2C1_SCL = 103,
++	MX6SLL_PAD_I2C1_SDA = 104,
++	MX6SLL_PAD_I2C2_SCL = 105,
++	MX6SLL_PAD_I2C2_SDA = 106,
++	MX6SLL_PAD_ECSPI1_SCLK = 107,
++	MX6SLL_PAD_ECSPI1_MOSI = 108,
++	MX6SLL_PAD_ECSPI1_MISO = 109,
++	MX6SLL_PAD_ECSPI1_SS0 = 110,
++	MX6SLL_PAD_ECSPI2_SCLK = 111,
++	MX6SLL_PAD_ECSPI2_MOSI = 112,
++	MX6SLL_PAD_ECSPI2_MISO = 113,
++	MX6SLL_PAD_ECSPI2_SS0 = 114,
++	MX6SLL_PAD_SD1_CLK = 115,
++	MX6SLL_PAD_SD1_CMD = 116,
++	MX6SLL_PAD_SD1_DATA0 = 117,
++	MX6SLL_PAD_SD1_DATA1 = 118,
++	MX6SLL_PAD_SD1_DATA2 = 119,
++	MX6SLL_PAD_SD1_DATA3 = 120,
++	MX6SLL_PAD_SD1_DATA4 = 121,
++	MX6SLL_PAD_SD1_DATA5 = 122,
++	MX6SLL_PAD_SD1_DATA6 = 123,
++	MX6SLL_PAD_SD1_DATA7 = 124,
++	MX6SLL_PAD_SD2_RESET = 125,
++	MX6SLL_PAD_SD2_CLK = 126,
++	MX6SLL_PAD_SD2_CMD = 127,
++	MX6SLL_PAD_SD2_DATA0 = 128,
++	MX6SLL_PAD_SD2_DATA1 = 129,
++	MX6SLL_PAD_SD2_DATA2 = 130,
++	MX6SLL_PAD_SD2_DATA3 = 131,
++	MX6SLL_PAD_SD2_DATA4 = 132,
++	MX6SLL_PAD_SD2_DATA5 = 133,
++	MX6SLL_PAD_SD2_DATA6 = 134,
++	MX6SLL_PAD_SD2_DATA7 = 135,
++	MX6SLL_PAD_SD3_CLK = 136,
++	MX6SLL_PAD_SD3_CMD = 137,
++	MX6SLL_PAD_SD3_DATA0 = 138,
++	MX6SLL_PAD_SD3_DATA1 = 139,
++	MX6SLL_PAD_SD3_DATA2 = 140,
++	MX6SLL_PAD_SD3_DATA3 = 141,
++	MX6SLL_PAD_GPIO4_IO20 = 142,
++	MX6SLL_PAD_GPIO4_IO21 = 143,
++	MX6SLL_PAD_GPIO4_IO19 = 144,
++	MX6SLL_PAD_GPIO4_IO25 = 145,
++	MX6SLL_PAD_GPIO4_IO18 = 146,
++	MX6SLL_PAD_GPIO4_IO24 = 147,
++	MX6SLL_PAD_GPIO4_IO23 = 148,
++	MX6SLL_PAD_GPIO4_IO17 = 149,
++	MX6SLL_PAD_GPIO4_IO22 = 150,
++	MX6SLL_PAD_GPIO4_IO16 = 151,
++	MX6SLL_PAD_GPIO4_IO26 = 152,
 +};
 +
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+	soc-supply = <&sw1c_reg>;
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx6sll_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE4),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_WDOG_B),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_REF_CLK_24M),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_REF_CLK_32K),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_PWM1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL4),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW4),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL5),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW5),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL6),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW6),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL7),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW7),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA00),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA01),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA02),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA03),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA04),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA05),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA06),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA07),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA08),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA09),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA10),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA11),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA12),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA13),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA14),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA15),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDLE),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDOE),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDSHR),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDCLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDOE),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDRL),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDSP),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_VCOM0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_VCOM1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_BDR0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_BDR1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_COM),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_INT),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_STAT),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_WAKE),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_CLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_ENABLE),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_HSYNC),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_VSYNC),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_RESET),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA00),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA01),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA02),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA03),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA04),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA05),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA06),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA07),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA08),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA09),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA10),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA11),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA12),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA13),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA14),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA15),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA16),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA17),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA18),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA19),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA20),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA21),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA22),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA23),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXFS),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXC),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXC),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXFS),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_MCLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_UART1_RXD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_UART1_TXD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C1_SCL),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C1_SDA),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C2_SCL),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C2_SDA),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_SCLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_MOSI),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_MISO),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_SS0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_SCLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_MOSI),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_MISO),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_SS0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_CLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_CMD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA4),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA5),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA6),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA7),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_RESET),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_CLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_CMD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA4),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA5),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA6),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA7),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_CLK),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_CMD),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA0),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA1),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA2),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA3),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO20),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO21),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO19),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO25),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO18),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO24),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO23),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO17),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO22),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO16),
++	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO26),
 +};
 +
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic: pfuze100 at 8 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
++enum imx6sll_pinconf_param {
++	IMX6SLL_PIN_CONFIG_SPEED = PIN_CONFIG_END + 1,
++	IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,
 +};
 +
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog0>, <&pinctrl_hog1>;
-+
-+	pinctrl_hog0: hog0grp {
-+		pinmux = <
-+			MX6SLL_PAD_KEY_ROW7__GPIO4_IO07
-+			MX6SLL_PAD_GPIO4_IO22__GPIO4_IO22
-+			MX6SLL_PAD_KEY_COL3__GPIO3_IO30
-+			MX6SLL_PAD_KEY_COL4__GPIO4_IO00
-+			MX6SLL_PAD_KEY_COL5__GPIO4_IO02
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x3>;
-+		fsl,pin-speed = <0x1>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_hog1: hog1grp {
-+		pinmux = <
-+			/*
-+			 * Must set the LVE of pad SD2_RESET, otherwise current
-+			 * leakage through eMMC chip will pull high the VCCQ to
-+			 * 2.6v, which will impact SD1 and SD3 SD3.0 voltage switch.
-+			 */
-+			MX6SLL_PAD_SD2_RESET__GPIO4_IO27
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x3>;
-+		fsl,pin-speed = <0x1>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+		fsl,low-voltage-enable = <0x1>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		pinmux = <
-+			MX6SLL_PAD_UART1_TXD__UART1_DCE_TX
-+			MX6SLL_PAD_UART1_RXD__UART1_DCE_RX
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x6>;
-+		fsl,pin-speed = <0x2>;
-+		bias-pull-up = <0x2>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_data: usdhc1datagrp {
-+		pinmux = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x4>;
-+		fsl,pin-speed = <0x1>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_clk: usdhc1clkgrp {
-+		pinmux = <MX6SLL_PAD_SD1_CLK__SD1_CLK>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x4>;
-+		fsl,pin-speed = <0x1>;
-+		bias-pull-down = <0x0>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_data_100mhz: usdhc1datagrp_100mhz {
-+		pinmux = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x4>;
-+		fsl,pin-speed = <0x2>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_clk_100mhz: usdhc1clkgrp_100mhz {
-+		pinmux = < MX6SLL_PAD_SD1_CLK__SD1_CLK>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x4>;
-+		fsl,pin-speed = <0x2>;
-+		bias-pull-down = <0x0>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_data_200mhz: usdhc1datagrp_200mhz {
-+		pinmux = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x5>;
-+		fsl,pin-speed = <0x3>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usdhc1_clk_200mhz: usdhc1clkgrp_200mhz {
-+		pinmux = <MX6SLL_PAD_SD1_CLK__SD1_CLK>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x7>;
-+		fsl,pin-speed = <0x3>;
-+		bias-pull-down = <0x0>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_usbotg1: usbotg1grp {
-+		pinmux = <MX6SLL_PAD_EPDC_PWR_COM__USB_OTG1_ID>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x3>;
-+		fsl,pin-speed = <0x1>;
-+		bias-pull-up = <0x1>;
-+		input-schmitt-enable;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		pinmux = <
-+			MX6SLL_PAD_I2C1_SCL__I2C1_SCL
-+			MX6SLL_PAD_I2C1_SDA__I2C1_SDA
-+		>;
-+		slew-rate = <0x1>;
-+		drive-strength = <0x6>;
-+		fsl,pin-speed = <0x2>;
-+		drive-open-drain;
-+		bias-pull-up = <0x2>;
-+		input-schmitt-enable;
-+		input-enable;
-+	};
++static const struct pinconf_generic_params imx6sll_cfg_params[] = {
++	{
++		.property = "fsl,pin-speed",
++		.param = IMX6SLL_PIN_CONFIG_SPEED,
++	}, {
++		.property = "fsl,low-voltage-enable",
++		.param = IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,
++	},
 +};
 +
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
++static const struct imx_cfg_params_decode imx6sll_cfg_decodes[] = {
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_SLEW_RATE,			0x1, 0),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_STRENGTH,		0x38, 3),
++	IMX_CFG_PARAMS_DECODE(IMX6SLL_PIN_CONFIG_SPEED,			0xc0, 6),
++	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_DRIVE_OPEN_DRAIN,	0x800, 11),
++	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_BIAS_BUS_HOLD,		0x2000, 13),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_UP,			0xc000, 14),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_DOWN,		0xc000, 14),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_INPUT_SCHMITT_ENABLE,		0x10000, 16),
++	IMX_CFG_PARAMS_DECODE(IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,	0x400000, 22),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_INPUT_ENABLE,			0x40000000, 30),
 +};
 +
-+&usdhc1 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc1_data>, <&pinctrl_usdhc1_clk>;
-+	pinctrl-1 = <&pinctrl_usdhc1_data_100mhz>, <&pinctrl_usdhc1_clk_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc1_data_200mhz>, <&pinctrl_usdhc1_clk_200mhz>;
-+	cd-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	vmmc-supply = <&reg_sd1_vmmc>;
-+	status = "okay";
++static void imx6sll_cfg_params_fixup(unsigned long *configs,
++				     unsigned int num_configs,
++				     u32 *raw_config)
++{
++	enum pin_config_param param;
++	u32 param_val;
++	int i;
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		param_val = pinconf_to_config_argument(configs[i]);
++
++		if ((param == PIN_CONFIG_BIAS_BUS_HOLD) ||
++		    (param == PIN_CONFIG_BIAS_PULL_UP) ||
++		    (param == PIN_CONFIG_BIAS_PULL_DOWN)) {
++			/* enable the pull/keeper */
++			*raw_config |= BM_PKE;
++
++			/* enable pull, disable keeper */
++			if ((param == PIN_CONFIG_BIAS_PULL_UP) ||
++			    (param == PIN_CONFIG_BIAS_PULL_DOWN))
++				*raw_config |= BM_PUE;
++
++			return;
++		}
++	}
++}
++
++static const struct imx_pinctrl_soc_info imx6sll_pinctrl_info = {
++	.pins = imx6sll_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx6sll_pinctrl_pads),
++	.gpr_compatible = "fsl,imx6sll-iomuxc-gpr",
++	.generic_pinconf = true,
++	.custom_params = imx6sll_cfg_params,
++	.num_custom_params = ARRAY_SIZE(imx6sll_cfg_params),
++	.decodes = imx6sll_cfg_decodes,
++	.num_decodes = ARRAY_SIZE(imx6sll_cfg_decodes),
++	.fixup = imx6sll_cfg_params_fixup,
 +};
 +
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg1>;
-+	disable-over-current;
-+	srp-disable;
-+	hnp-disable;
-+	adp-disable;
-+	status = "okay";
++static const struct of_device_id imx6sll_pinctrl_of_match[] = {
++	{ .compatible = "fsl,imx6sll-iomuxc", .data = &imx6sll_pinctrl_info, },
++	{ /* sentinel */ }
 +};
 +
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
++static int imx6sll_pinctrl_probe(struct platform_device *pdev)
++{
++	return imx_pinctrl_probe(pdev, &imx6sll_pinctrl_info);
++}
++
++static struct platform_driver imx6sll_pinctrl_driver = {
++	.driver = {
++		.name = "imx6sll-pinctrl",
++		.of_match_table = of_match_ptr(imx6sll_pinctrl_of_match),
++	},
++	.probe = imx6sll_pinctrl_probe,
 +};
++
++static int __init imx6sll_pinctrl_init(void)
++{
++	return platform_driver_register(&imx6sll_pinctrl_driver);
++}
++arch_initcall(imx6sll_pinctrl_init);
 -- 
 1.9.1
