@@ -1,48 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Mar 2018 12:07:45 -0300
-Subject: [PATCH] clk: imx25: set correct parents for ssi ipg clocks
-In-Reply-To: <20180308140851.GA25601@botnar.kaiser.cx>
-References: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
- <CAOMZO5A7W4rbPbZB8ERs518obrg+6F6mDeojkwJaGComFAJB0A@mail.gmail.com>
- <20180308140851.GA25601@botnar.kaiser.cx>
-Message-ID: <CAOMZO5BdBWExt9FvPrfUG74Y62e4EUs6cqFyfVs5JuUtym00hQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 8 Mar 2018 16:08:53 +0100
+Subject: [PATCH 1/4] ARM: sunxi: mc-smp: Fix "lookback" typo
+In-Reply-To: <20180308150012.19045-2-wens@csie.org>
+References: <20180308150012.19045-1-wens@csie.org>
+ <20180308150012.19045-2-wens@csie.org>
+Message-ID: <20180308150853.masskeocuyl5mhp2@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Thu, Mar 08, 2018 at 11:00:09PM +0800, Chen-Yu Tsai wrote:
+> The sunxi_mc_smp_lookback function is modeled after the mcpm_loopback
+> function in the MCPM framework. "lookback" was a typo introduced when
+> the new function was added.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On Thu, Mar 8, 2018 at 11:08 AM, Martin Kaiser <martin@kaiser.cx> wrote:
-> Hi Fabio,
->
-> Thus wrote Fabio Estevam (festevam at gmail.com):
->
->> I get audio working from SSI1, but I guess this is due to the fact
->> that the bootloader enables the SSI clock:
->
->> I have the following in U-Boot:
->
->> /* Enable the clocks */
->> DATA 4 0x53f8000c 0x1fffffff
->> DATA 4 0x53f80010 0xffffffff
->> DATA 4 0x53f80014 0xfdfff
->
-> I'm using the same initial settings.
->
-> Nevertheless, ssi1_ipg_per is disbled after loading the kernel.
->
-> Digging into this a bit more, it turned out that without my patch,
-> clk_disable_unused() recognizes ssi1_ipg_per as unused and disables it.
->
-> If my patch is applied and ssi1_ipg_per is declared as parent of
-> ssi1_ipg, clk_disable_unused() will not disable it and fsl_ssi_startup()
-> will enable both ssi1_ipg_per and ssi1_ipg before playing sound.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-I can get audio to work fine without your patch on a mx25pdk.
+Maxime
 
-In the other i.MX clock drivers we have this same pattern:
-
-clks[IMX6SL_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",     "ipg",
-
-It is not clear to me what is the real issue this patch is trying to fix.
-
-Thanks
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/cf7cb094/attachment.sig>
