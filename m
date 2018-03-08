@@ -1,135 +1,181 @@
-From: loic.poulain@linaro.org (Loic Poulain)
-Date: Thu, 8 Mar 2018 10:14:59 +0100
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <698451580.263856.1520467358497@email.1und1.de>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
- <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
- <438185389.274708.1520422108782@email.1und1.de>
- <03B9ACBE-3ACA-40C4-9DA2-6A57D1AD96E0@holtmann.org>
- <2071508922.276811.1520426568577@email.1und1.de>
- <87sh9bvh3r.fsf@anholt.net>
- <D48AB207-F7F4-46D8-AC65-EC5CF76A6084@holtmann.org>
- <87muzjfr8l.fsf@anholt.net> <698451580.263856.1520467358497@email.1und1.de>
-Message-ID: <CAMZdPi9mTVFOc_MSg_9btM8h3vaynv247jMWPne+jCV1MMYjcA@mail.gmail.com>
+From: shunyong.yang@hxt-semitech.com (Yang, Shunyong)
+Date: Thu, 8 Mar 2018 09:31:36 +0000
+Subject: =?utf-8?B?UmU6IFvmraTpgq7ku7blj6/og73lrZjlnKjpo47pmaldICBSZTogW1JGQyBQ?=
+ =?utf-8?B?QVRDSF0gS1ZNOiBhcm0vYXJtNjQ6IHZnaWM6IGNoYW5nZSBjb25kaXRpb24g?=
+ =?utf-8?Q?for_level_interrupt_resampling?=
+In-Reply-To: <9b3763f2-1dfa-5506-d7f2-93389647111c@redhat.com>
+References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
+ <9b3763f2-1dfa-5506-d7f2-93389647111c@redhat.com>
+Message-ID: <1520501495.2583.19.camel@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi, Eric,
 
-On 8 March 2018 at 01:02, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+First, please let me change?Christoffer's email to?cdall at kernel.org. I
+add more information about my test below, please check.
+
+On Thu, 2018-03-08 at 09:57 +0100, Auger Eric wrote:
 > Hi,
->
->> Eric Anholt <eric@anholt.net> hat am 7. M?rz 2018 um 23:36 geschrieben:
->>
->>
->> Marcel Holtmann <marcel@holtmann.org> writes:
->>
->> > Hi Eric,
->> >
->> >>>>>>>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
->> >>>>>>>>> This allows to automatically insert the bcm43438 to the bluetooth
->> >>>>>>>>> subsystem instead of relying on patched userspace helpers (hciattach).
->> >>>>>>>>>
->> >>>>>>>>> In order to keep a debug UART we need to switch to uart1.
->> >>>>>>>>>
->> >>>>>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> >>>>>>>>> ---
->> >>>>>>>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
->> >>>>>>>>> 1 file changed, 13 insertions(+), 1 deletion(-)
->> >>>>>>>>>
->> >>>>>>>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->> >>>>>>>>> index cf53436..b7f79f1 100644
->> >>>>>>>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->> >>>>>>>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
->> >>>>>>>>> @@ -131,6 +131,18 @@
->> >>>>>>>>>
->> >>>>>>>>> &uart0 {
->> >>>>>>>>>     pinctrl-names = "default";
->> >>>>>>>>> -   pinctrl-0 = <&uart0_gpio14>;
->> >>>>>>>>> +   pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
->> >>>>>>>>> +   status = "okay";
->> >>>>>>>>> +
->> >>>>>>>>> +   bluetooth {
->> >>>>>>>>> +           compatible = "brcm,bcm43438-bt";
->> >>>>>>>>> +           max-speed = <2000000>;
->> >>>>>>>>> +           shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
->> >>>>>>>>> +   };
->> >>>>>>>>> +};
->> >>>>>>>>
->> >>>>>>>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
->> >>>>>>>
->> >>>>>>> Yes, unload and reload works fine.
->> >>>>>>>
->> >>>>>>>> Meaning we are getting back to the 115200 default baud rate on the UART?
->> >>>>>>>
->> >>>>>>> I assume that, because reload works as expected.
->> >>>>>>
->> >>>>>> awesome. That is good news.
->> >>>>>>
->> >>>>>> Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
->> >>>>>
->> >>>>> after applying Loic's patch and the necessary patch for the RPi 3 dts file (see below), i will get this output:
->> >>>>>
->> >>>>> [    4.873246] Bluetooth: HCI UART driver ver 2.3
->> >>>>> [    4.873260] Bluetooth: HCI UART protocol H4 registered
->> >>>>> [    4.873265] Bluetooth: HCI UART protocol Three-wire (H5) registered
->> >>>>> [    4.873751] Bluetooth: HCI UART protocol Broadcom registered
->> >>>>> [    4.877279] uart-pl011 3f201000.serial: no DMA platform data
->> >>>>> [    6.952382] Bluetooth: hci0: command 0xfc18 tx timeout
->> >>>>> [   15.192298] Bluetooth: hci0: BCM: failed to write update baudrate (-110)
->> >>>>> [   15.192312] Bluetooth: hci0: Failed to set baudrate
->> >>>>> [   15.316415] Bluetooth: hci0: BCM: chip id 94
->> >>>>> [   15.318567] Bluetooth: hci0: BCM: features 0x2e
->> >>>>> [   15.341538] Bluetooth: hci0: BCM43430A1
->> >>>>> [   15.341560] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
->> >>>>> [   19.112670] Bluetooth: hci0: BCM (001.002.009) build 0360
->> >>>>> [  274.713732] Bluetooth: hci0: command 0x0c14 tx timeout
->> >>>>> [  274.714085] Bluetooth: hci0: Frame reassembly failed (-84)
->> >>>>> [  317.275941] Bluetooth: hci0: last event is not cmd complete (0x0f)
->> >>>>>
->> >>>>> I don't see these errors on RPi Zero W. Maybe the reason for this is the lack of hardware flowcontrol on RPi 3. Or some of the downstream patches on BlueZ must be adapted for the kernel [1].
->> >>>>>
->> >>>>> Btw the bcm43438 is detected even after unloading and reloading the driver. But the timeout occurs also on driver reload. Reducing the baudrate to 115200 doesn't help here.
->> >>>>
->> >>>> maybe it needs some time after switching the hardware on. Have you tried to sleep for a bit at the end of bcm_gpio_set_power?
->> >>>
->> >>> I will try, but this could also be an "issue" of the gpio expander
->> >>> driver. AFAIK the expander is connected via I2C to the GPU. In case
->> >>> the mailbox reply come before the I2C command has been handled by the
->> >>> GPIO expander, we are running out of sync.
->> >>
->> >> The mailbox command for setting GPIO state is synchronous in terms of
->> >> sending the i2c command to the GPIO expander HW.
->> >
->> > does that mean the driver does this correctly and really waits for the
->> > completion. Or does the GPIO expander might return to quickly and
->> > returns a false sense of GPIO state. I think it would be good a sleep
->> > of 50ms after the GPIO makes a difference. Maybe the GPIO expander
->> > driver needs to take this into account.
->>
->> It seems unlikely that you can get to I2C stop before the GPIO expander
->> HW has changed the state of the output.
->>
->> > Reality is that once the Bluetooth driver toggled the GPIO, it goes
->> > onto initializing the chip. One other reason might be that no device
->> > wakeup GPIO is wired here, that the chip actually needs some time
->> > before it is all good to go.
->>
->> This seems much more likely to me.  The spec for bcm43438 is easily
->> googleable and has a power-on timing diagram.
->
-> after applying this patch [1] the RPi 3 specific probing errors disappear.
->
-> But this is only a quick hack. The proper solution would be to extend hci_h5 in order to support the BCM43438.
->
-> [1] - https://github.com/lategoodbye/rpi-zero/commit/ed5900296dfb7aec7f467477440751e7367a1881
+> 
+> On 08/03/18 08:01, Shunyong Yang wrote:
+> > 
+> > When resampling irqfds is enabled, level interrupt should be
+> > de-asserted when resampling happens. On page 4-47 of GIC v3
+> > specification IHI0069D, it said,
+> > "When the PE acknowledges an SGI, a PPI, or an SPI at the CPU
+> > interface, the IRI changes the status of the interrupt to active
+> > and pending if:
+> > ? It is an edge-triggered interrupt, and another edge has been
+> > detected since the interrupt was acknowledged.
+> > ? It is a level-sensitive interrupt, and the level has not been
+> > deasserted since the interrupt was acknowledged."
+> > 
+> > GIC v2 specification IHI0048B.b has similar description on page
+> > 3-42 for state machine transition.
+> > 
+> > When some VFIO device, like mtty(8250 VFIO mdev emulation driver
+> > in samples/vfio-mdev) triggers a level interrupt, the status
+> > transition in LR is pending-->active-->active and pending.
+> > Then it will wait resampling to de-assert the interrupt.
+> > 
+> > Current design of lr_signals_eoi_mi() will return false if state
+> > in LR is not invalid(Inactive). It causes resampling will not
+> > happen
+> > in mtty case.
+> > 
+> > This will cause interrupt fired continuously to guest even 8250 IIR
+> > has no interrupt. When 8250's interrupt is configured in shared
+> > mode,
+> > it will pass interrupt to other drivers to handle. However, there
+> > is no other driver involved. Then, a "nobody cared" kernel
+> > complaint
+> > occurs.
+> > 
+> > / # cat /dev/ttyS0
+> > [????4.826836] random: crng init done
+> > [????6.373620] irq 41: nobody cared (try booting with the "irqpoll"
+> > option)
+> > [????6.376414] CPU: 0 PID: 1307 Comm: cat Not tainted 4.16.0-rc4 #4
+> > [????6.378927] Hardware name: linux,dummy-virt (DT)
+> > [????6.380876] Call trace:
+> > [????6.381937]??dump_backtrace+0x0/0x180
+> > [????6.383495]??show_stack+0x14/0x1c
+> > [????6.384902]??dump_stack+0x90/0xb4
+> > [????6.386312]??__report_bad_irq+0x38/0xe0
+> > [????6.387944]??note_interrupt+0x1f4/0x2b8
+> > [????6.389568]??handle_irq_event_percpu+0x54/0x7c
+> > [????6.391433]??handle_irq_event+0x44/0x74
+> > [????6.393056]??handle_fasteoi_irq+0x9c/0x154
+> > [????6.394784]??generic_handle_irq+0x24/0x38
+> > [????6.396483]??__handle_domain_irq+0x60/0xb4
+> > [????6.398207]??gic_handle_irq+0x98/0x1b0
+> > [????6.399796]??el1_irq+0xb0/0x128
+> > [????6.401138]??_raw_spin_unlock_irqrestore+0x18/0x40
+> > [????6.403149]??__setup_irq+0x41c/0x678
+> > [????6.404669]??request_threaded_irq+0xe0/0x190
+> > [????6.406474]??univ8250_setup_irq+0x208/0x234
+> > [????6.408250]??serial8250_do_startup+0x1b4/0x754
+> > [????6.410123]??serial8250_startup+0x20/0x28
+> > [????6.411826]??uart_startup.part.21+0x78/0x144
+> > [????6.413633]??uart_port_activate+0x50/0x68
+> > [????6.415328]??tty_port_open+0x84/0xd4
+> > [????6.416851]??uart_open+0x34/0x44
+> > [????6.418229]??tty_open+0xec/0x3c8
+> > [????6.419610]??chrdev_open+0xb0/0x198
+> > [????6.421093]??do_dentry_open+0x200/0x310
+> > [????6.422714]??vfs_open+0x54/0x84
+> > [????6.424054]??path_openat+0x2dc/0xf04
+> > [????6.425569]??do_filp_open+0x68/0xd8
+> > [????6.427044]??do_sys_open+0x16c/0x224
+> > [????6.428563]??SyS_openat+0x10/0x18
+> > [????6.429972]??el0_svc_naked+0x30/0x34
+> > [????6.431494] handlers:
+> > [????6.432479] [<000000000e9fb4bb>] serial8250_interrupt
+> > [????6.434597] Disabling IRQ #41
+> > 
+> > This patch changes the lr state condition in lr_signals_eoi_mi()
+> > from
+> > invalid(Inactive) to active and pending to avoid this.
+> > 
+> > I am not sure about the original design of the condition of
+> > invalid(active). So, This RFC is sent out for comments.
+> > 
+> > Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
+> > Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+> > ---
+> > ?virt/kvm/arm/vgic/vgic-v2.c | 4 ++--
+> > ?virt/kvm/arm/vgic/vgic-v3.c | 4 ++--
+> > ?2 files changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-
+> > v2.c
+> > index e9d840a75e7b..740ee9a5f551 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> > @@ -46,8 +46,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
+> > ?
+> > ?static bool lr_signals_eoi_mi(u32 lr_val)
+> > ?{
+> > -	return !(lr_val & GICH_LR_STATE) && (lr_val & GICH_LR_EOI)
+> > &&
+> > -	???????!(lr_val & GICH_LR_HW);
+> > +	return !((lr_val & GICH_LR_STATE) ^ GICH_LR_STATE) &&
+> > +	???????(lr_val & GICH_LR_EOI) && !(lr_val & GICH_LR_HW);
+> > ?}
+> > ?
+> > ?/*
+> > diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-
+> > v3.c
+> > index 6b329414e57a..43111bba7af9 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v3.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> > @@ -35,8 +35,8 @@ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+> > ?
+> > ?static bool lr_signals_eoi_mi(u64 lr_val)
+> > ?{
+> > -	return !(lr_val & ICH_LR_STATE) && (lr_val & ICH_LR_EOI)
+> > &&
+> > -	???????!(lr_val & ICH_LR_HW);
+> > +	return !((lr_val & ICH_LR_STATE) ^ ICH_LR_STATE) &&
+> > +	???????(lr_val & ICH_LR_EOI) && !(lr_val & ICH_LR_HW);
+> 
+> In general don't we have this state transition
+> 
+> inactive -> pending -> pending + active (1) -> active -> inactive.
+> 
+> In that case won't we lower the virt irq level when folding the LR on
+> Pending + Active state, which is not was we want?
+> 
+> Thanks
+> 
+> Eric
 
-I think this patch is perfectly acceptable, this is an hardware timing
-the driver has to handle. For sure H5 would improve robustness...
+In current code, in my test, when I output LR value of the mtty IRQ 41
+(hwirq = 36) in?vgic_v3_fold_lr_state(). The LR's transition starts
+like following,
 
-Regards,
-Loic
+0-->50a0020000000024-->90a0020000000024-->d0a0020000000024
+
+That is inactive-->pending-->active-->pending + active.
+Then it keep running cyclic pending-->active-->pending + active.
+
+The level interrupt de-assert should happen in following code
+/* Notify fds when the guest EOI'ed a level-triggered IRQ */
+	if (lr_signals_eoi_mi(val) && vgic_valid_spi(vcpu->kvm, intid))
+		kvm_notify_acked_irq(vcpu->kvm, 0,
+				?????intid - VGIC_NR_PRIVATE_IRQS);
+
+But as addressed in commit message, lr_signals_eoi_mi() will return
+false if state in LR is not invalid(inactive), so it has no chance to
+de-assert the level interrupt in my test.?
+
+Thanks.
+Shunyong.
+
+> 
+> > 
+> > ?}
+> > ?
+> > ?void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+> > 
