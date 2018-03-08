@@ -1,118 +1,239 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 8 Mar 2018 17:53:57 +0100
-Subject: [PATCH v2 04/12] clk: stm32mp1: add Source Clocks for PLLs
+Date: Thu, 8 Mar 2018 17:54:01 +0100
+Subject: [PATCH v2 08/12] clk: stm32mp1: add Kernel timers
 In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
 References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1520528045-18330-5-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1520528045-18330-9-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch adds source clocks for PLLs
-This patch also introduces MUX clock API.
+This patch adds Kernel timers.
+This patch adds timers kernel clock.
+Timers are gather into two groups corresponding to the APB bus
+they are attached to.
+Each group has its own prescaler, managed in this patch.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32mp1.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+ drivers/clk/clk-stm32mp1.c | 185 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 185 insertions(+)
 
 diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index 56b738e..47984f3 100644
+index 77d96d9..0470a13 100644
 --- a/drivers/clk/clk-stm32mp1.c
 +++ b/drivers/clk/clk-stm32mp1.c
-@@ -103,6 +103,18 @@
- 
- #define RCC_CLR	0x4
- 
-+static const char * const ref12_parents[] = {
-+	"ck_hsi", "ck_hse"
-+};
-+
-+static const char * const ref3_parents[] = {
-+	"ck_hsi", "ck_hse", "ck_csi"
-+};
-+
-+static const char * const ref4_parents[] = {
-+	"ck_hsi", "ck_hse", "ck_csi"
-+};
-+
- struct clock_config {
- 	u32 id;
- 	const char *name;
-@@ -140,6 +152,14 @@ struct div_cfg {
- 	const struct clk_div_table *table;
- };
- 
-+struct mux_cfg {
-+	u32 reg_off;
-+	u8 shift;
-+	u8 width;
-+	u8 mux_flags;
-+	u32 *table;
-+};
-+
- struct stm32_gate_cfg {
- 	struct gate_cfg		*gate;
- 	const struct clk_ops	*ops;
-@@ -196,6 +216,20 @@ struct stm32_gate_cfg {
- 					     lock);
+@@ -650,6 +650,138 @@ static struct clk_hw *clk_register_pll(struct device *dev, const char *name,
+ 	return hw;
  }
  
-+static struct clk_hw *
-+_clk_hw_register_mux(struct device *dev,
-+		     struct clk_hw_onecell_data *clk_data,
-+		     void __iomem *base, spinlock_t *lock,
-+		     const struct clock_config *cfg)
++/* Kernel Timer */
++struct timer_cker {
++	/* lock the kernel output divider register */
++	spinlock_t *lock;
++	void __iomem *apbdiv;
++	void __iomem *timpre;
++	struct clk_hw hw;
++};
++
++#define to_timer_cker(_hw) container_of(_hw, struct timer_cker, hw)
++
++#define APB_DIV_MASK 0x07
++#define TIM_PRE_MASK 0x01
++
++static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
 +{
-+	struct mux_cfg *mux_cfg = cfg->cfg;
++	struct timer_cker *tim_ker = to_timer_cker(hw);
++	u32 prescaler;
++	unsigned int mult = 0;
 +
-+	return clk_hw_register_mux(dev, cfg->name, cfg->parent_names,
-+				   cfg->num_parents, cfg->flags,
-+				   mux_cfg->reg_off + base, mux_cfg->shift,
-+				   mux_cfg->width, mux_cfg->mux_flags, lock);
++	prescaler = readl_relaxed(tim_ker->apbdiv) & APB_DIV_MASK;
++	if (prescaler < 2)
++		return 1;
++
++	mult = 2;
++
++	if (rate / parent_rate >= 4)
++		mult = 4;
++
++	return mult;
 +}
 +
- /* MP1 Gate clock with set & clear registers */
++static long timer_ker_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *parent_rate)
++{
++	unsigned long factor = __bestmult(hw, rate, *parent_rate);
++
++	return *parent_rate * factor;
++}
++
++static int timer_ker_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct timer_cker *tim_ker = to_timer_cker(hw);
++	unsigned long flags = 0;
++	unsigned long factor = __bestmult(hw, rate, parent_rate);
++	int ret = 0;
++
++	spin_lock_irqsave(tim_ker->lock, flags);
++
++	switch (factor) {
++	case 1:
++		break;
++	case 2:
++		writel_relaxed(0, tim_ker->timpre);
++		break;
++	case 4:
++		writel_relaxed(1, tim_ker->timpre);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++	spin_unlock_irqrestore(tim_ker->lock, flags);
++
++	return ret;
++}
++
++static unsigned long timer_ker_recalc_rate(struct clk_hw *hw,
++					   unsigned long parent_rate)
++{
++	struct timer_cker *tim_ker = to_timer_cker(hw);
++	u32 prescaler, timpre;
++	u32 mul;
++
++	prescaler = readl_relaxed(tim_ker->apbdiv) & APB_DIV_MASK;
++
++	timpre = readl_relaxed(tim_ker->timpre) & TIM_PRE_MASK;
++
++	if (!prescaler)
++		return parent_rate;
++
++	mul = (timpre + 1) * 2;
++
++	return parent_rate * mul;
++}
++
++static const struct clk_ops timer_ker_ops = {
++	.recalc_rate	= timer_ker_recalc_rate,
++	.round_rate	= timer_ker_round_rate,
++	.set_rate	= timer_ker_set_rate,
++
++};
++
++static struct clk_hw *clk_register_cktim(struct device *dev, const char *name,
++					 const char *parent_name,
++					 unsigned long flags,
++					 void __iomem *apbdiv,
++					 void __iomem *timpre,
++					 spinlock_t *lock)
++{
++	struct timer_cker *tim_ker;
++	struct clk_init_data init;
++	struct clk_hw *hw;
++	int err;
++
++	tim_ker = kzalloc(sizeof(*tim_ker), GFP_KERNEL);
++	if (!tim_ker)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &timer_ker_ops;
++	init.flags = flags;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	tim_ker->hw.init = &init;
++	tim_ker->lock = lock;
++	tim_ker->apbdiv = apbdiv;
++	tim_ker->timpre = timpre;
++
++	hw = &tim_ker->hw;
++	err = clk_hw_register(dev, hw);
++
++	if (err) {
++		kfree(tim_ker);
++		return ERR_PTR(err);
++	}
++
++	return hw;
++}
++
+ struct stm32_pll_cfg {
+ 	u32 offset;
+ };
+@@ -665,6 +797,23 @@ struct clk_hw *_clk_register_pll(struct device *dev,
+ 				base + stm_pll_cfg->offset, cfg->flags, lock);
+ }
  
- static int mp1_gate_clk_enable(struct clk_hw *hw)
-@@ -350,6 +384,22 @@ static void mp1_gate_clk_disable(struct clk_hw *hw)
- 	DIV_TABLE(_id, _name, _parent, _flags, _offset, _shift, _width,\
- 		  _div_flags, NULL)
++struct stm32_cktim_cfg {
++	u32 offset_apbdiv;
++	u32 offset_timpre;
++};
++
++static struct clk_hw *_clk_register_cktim(struct device *dev,
++					  struct clk_hw_onecell_data *clk_data,
++					  void __iomem *base, spinlock_t *lock,
++					  const struct clock_config *cfg)
++{
++	struct stm32_cktim_cfg *cktim_cfg = cfg->cfg;
++
++	return clk_register_cktim(dev, cfg->name, cfg->parent_name, cfg->flags,
++				  cktim_cfg->offset_apbdiv + base,
++				  cktim_cfg->offset_timpre + base, lock);
++}
++
+ static struct clk_hw *
+ _clk_stm32_register_gate(struct device *dev,
+ 			 struct clk_hw_onecell_data *clk_data,
+@@ -767,6 +916,23 @@ struct clk_hw *_clk_register_pll(struct device *dev,
+ 	.func		= _clk_register_pll,\
+ }
  
-+#define MUX(_id, _name, _parents, _flags, _offset, _shift, _width, _mux_flags)\
++#define STM32_CKTIM(_name, _parent, _flags, _offset_apbdiv, _offset_timpre)\
 +{\
-+	.id		= _id,\
++	.id		= NO_ID,\
 +	.name		= _name,\
-+	.parent_names	= _parents,\
-+	.num_parents	= ARRAY_SIZE(_parents),\
++	.parent_name	= _parent,\
 +	.flags		= _flags,\
-+	.cfg		=  &(struct mux_cfg) {\
-+		.reg_off	= _offset,\
-+		.shift		= _shift,\
-+		.width		= _width,\
-+		.mux_flags	= _mux_flags,\
++	.cfg		=  &(struct stm32_cktim_cfg) {\
++		.offset_apbdiv = _offset_apbdiv,\
++		.offset_timpre = _offset_timpre,\
 +	},\
-+	.func		= _clk_hw_register_mux,\
++	.func		= _clk_register_cktim,\
 +}
++
++#define STM32_TIM(_id, _name, _parent, _offset_set, _bit_idx)\
++		  GATE_MP1(_id, _name, _parent, CLK_SET_RATE_PARENT,\
++			   _offset_set, _bit_idx, 0)
 +
  /* STM32 GATE */
  #define STM32_GATE(_id, _name, _parent, _flags, _gate)\
  {\
-@@ -392,6 +442,16 @@ static void mp1_gate_clk_disable(struct clk_hw *hw)
- 	GATE(CK_LSE, "ck_lse", "clk-lse", 0, RCC_BDCR, 0, 0),
+@@ -967,6 +1133,25 @@ struct clk_hw *_clk_register_pll(struct device *dev,
  
- 	FIXED_FACTOR(CK_HSE_DIV2, "clk-hse-div2", "ck_hse", 0, 1, 2),
+ 	DIV_TABLE(NO_ID, "pclk5", "ck_axi", CLK_IGNORE_UNUSED, RCC_APB5DIVR, 0,
+ 		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
 +
-+	/* ref clock pll */
-+	MUX(NO_ID, "ref1", ref12_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK12SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
++	/* Kernel Timers */
++	STM32_CKTIM("ck1_tim", "pclk1", 0, RCC_APB1DIVR, RCC_TIMG1PRER),
++	STM32_CKTIM("ck2_tim", "pclk2", 0, RCC_APB2DIVR, RCC_TIMG2PRER),
 +
-+	MUX(NO_ID, "ref3", ref3_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK3SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
-+
-+	MUX(NO_ID, "ref4", ref4_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK4SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
++	STM32_TIM(TIM2_K, "tim2_k", "ck1_tim", RCC_APB1ENSETR, 0),
++	STM32_TIM(TIM3_K, "tim3_k", "ck1_tim", RCC_APB1ENSETR, 1),
++	STM32_TIM(TIM4_K, "tim4_k", "ck1_tim", RCC_APB1ENSETR, 2),
++	STM32_TIM(TIM5_K, "tim5_k", "ck1_tim", RCC_APB1ENSETR, 3),
++	STM32_TIM(TIM6_K, "tim6_k", "ck1_tim", RCC_APB1ENSETR, 4),
++	STM32_TIM(TIM7_K, "tim7_k", "ck1_tim", RCC_APB1ENSETR, 5),
++	STM32_TIM(TIM12_K, "tim12_k", "ck1_tim", RCC_APB1ENSETR, 6),
++	STM32_TIM(TIM13_K, "tim13_k", "ck1_tim", RCC_APB1ENSETR, 7),
++	STM32_TIM(TIM14_K, "tim14_k", "ck1_tim", RCC_APB1ENSETR, 8),
++	STM32_TIM(TIM1_K, "tim1_k", "ck2_tim", RCC_APB2ENSETR, 0),
++	STM32_TIM(TIM8_K, "tim8_k", "ck2_tim", RCC_APB2ENSETR, 1),
++	STM32_TIM(TIM15_K, "tim15_k", "ck2_tim", RCC_APB2ENSETR, 2),
++	STM32_TIM(TIM16_K, "tim16_k", "ck2_tim", RCC_APB2ENSETR, 3),
++	STM32_TIM(TIM17_K, "tim17_k", "ck2_tim", RCC_APB2ENSETR, 4),
  };
  
  struct stm32_clock_match_data {
