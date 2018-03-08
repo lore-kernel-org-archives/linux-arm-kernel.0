@@ -1,93 +1,158 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Mar 2018 11:59:28 +0000
-Subject: [RFC PATCH] arm64: kaslr: Set TCR_EL1.NFD1 when
- CONFIG_RANDOMIZE_BASE=y
-In-Reply-To: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
-References: <1520244528-9649-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180308115925.GO32331@e103592.cambridge.arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 8 Mar 2018 14:02:00 +0200
+Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
+In-Reply-To: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+Message-ID: <20180308120200.wpcjnbglf4x32vrp@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 10:08:48AM +0000, Will Deacon wrote:
-> TCR_EL1.NFD1 was allocated by SVE and ensures that fault-surpressing SVE
+Hi Jacob,
 
-suppressing
-
-> memory accesses (e.g. speculative accesses from a first-fault gather load)
-> which translate via TTBR1_EL1 result in a translation fault if they
-> miss in the TLB when executed from EL0. This mitigates some timing attacks
-> against KASLR, where the kernel address space could otherwise be probed
-> efficiently using the FFR in conjunction with suppressed faults on SVE
-> loads.
-
-To be clear, I might say
-
-	result in a (suppressed) translation fault
-
-(there is no new exception taken here; the effect is only to suppress
-the table walk on TLB miss in these cases).
-
-Cheers
----Dave
-
+On Thu, Mar 08, 2018 at 05:47:50PM +0800, Jacob Chen wrote:
+> This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399 
+> SoC.
 > 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+> Wiki Pages:
+> http://opensource.rock-chips.com/wiki_Rockchip-isp1
 > 
-> Sending as RFC because this doesn't make any difference if kpti is enabled,
-> which is the default with KASLR. It helps if kpti=off is being passed and
-> shouldn't have an impact on performance.
+> The deprecated g_mbus_config op is not dropped in  V6 because i am waiting 
+> tomasz's patches.
+
+Which tree is this series based on? On top of v4.16-rc4 I get the build 
+failure below. The V4L2_BUF_TYPE_META_OUTPUT macro, for example, is not even 
+in media_tree.git.
+
+drivers/media/platform/rockchip/isp1/isp_params.c:1321:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_enum_fmt_meta_out?; did you mean ?vidioc_enum_fmt_meta_cap??
+  .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
+   ^~~~~~~~~~~~~~~~~~~~~~~~
+   vidioc_enum_fmt_meta_cap
+drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: note: (near initialization for ?rkisp1_params_ioctl.vidioc_g_std?)
+drivers/media/platform/rockchip/isp1/isp_params.c:1322:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_g_fmt_meta_out?; did you mean ?vidioc_g_fmt_meta_cap??
+  .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+   ^~~~~~~~~~~~~~~~~~~~~
+   vidioc_g_fmt_meta_cap
+drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_s_std?)
+drivers/media/platform/rockchip/isp1/isp_params.c:1323:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_s_fmt_meta_out?; did you mean ?vidioc_s_fmt_meta_cap??
+  .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+   ^~~~~~~~~~~~~~~~~~~~~
+   vidioc_s_fmt_meta_cap
+drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_querystd?)
+drivers/media/platform/rockchip/isp1/isp_params.c:1324:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_try_fmt_meta_out?; did you mean ?vidioc_try_fmt_meta_cap??
+  .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+   ^~~~~~~~~~~~~~~~~~~~~~~
+   vidioc_try_fmt_meta_cap
+drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: note: (near initialization for ?rkisp1_params_ioctl.vidioc_enum_input?)
+drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_params_init_vb2_queue?:
+drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: error: ?V4L2_BUF_TYPE_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_BUF_TYPE_SDR_OUTPUT??
+  q->type = V4L2_BUF_TYPE_META_OUTPUT;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~
+            V4L2_BUF_TYPE_SDR_OUTPUT
+drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: note: each undeclared identifier is reported only once for each function it appears in
+  CC      drivers/media/platform/rockchip/isp1/mipi_dphy_sy.o
+drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_register_params_vdev?:
+drivers/media/platform/rockchip/isp1/isp_params.c:1507:43: error: ?V4L2_CAP_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_CAP_VBI_OUTPUT??
+  vdev->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_META_OUTPUT;
+                                           ^~~~~~~~~~~~~~~~~~~~
+                                           V4L2_CAP_VBI_OUTPUT
+
+Thanks,
+baruch
+
+> Jacob Chen (12):
+>   media: doc: add document for rkisp1 meta buffer format
+>   media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
+>   media: rkisp1: add Rockchip ISP1 subdev driver
+>   media: rkisp1: add ISP1 statistics driver
+>   media: rkisp1: add ISP1 params driver
+>   media: rkisp1: add capture device driver
+>   media: rkisp1: add rockchip isp1 core driver
+>   dt-bindings: Document the Rockchip ISP1 bindings
+>   dt-bindings: Document the Rockchip MIPI RX D-PHY bindings
+>   ARM: dts: rockchip: add isp node for rk3288
+>   ARM: dts: rockchip: add rx0 mipi-phy for rk3288
+>   MAINTAINERS: add entry for Rockchip ISP1 driver
 > 
->  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
->  arch/arm64/mm/proc.S                   | 9 ++++++++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
+> Jeffy Chen (1):
+>   media: rkisp1: Add user space ABI definitions
 > 
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index cdfe3e657a9e..fd208eac9f2a 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -291,6 +291,7 @@
->  #define TCR_TBI0		(UL(1) << 37)
->  #define TCR_HA			(UL(1) << 39)
->  #define TCR_HD			(UL(1) << 40)
-> +#define TCR_NFD1		(UL(1) << 54)
->  
->  /*
->   * TTBR.
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index c0af47617299..8f074d64b760 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -36,6 +36,12 @@
->  #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
->  #endif
->  
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +#define TCR_KASLR_FLAGS	TCR_NFD1
-> +#else
-> +#define TCR_KASLR_FLAGS	0
-> +#endif
-> +
->  #define TCR_SMP_FLAGS	TCR_SHARED
->  
->  /* PTWs cacheable, inner/outer WBWA */
-> @@ -432,7 +438,8 @@ ENTRY(__cpu_setup)
->  	 * both user and kernel.
->  	 */
->  	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
-> -			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
-> +			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
-> +			TCR_TBI0 | TCR_A1
->  	tcr_set_idmap_t0sz	x10, x9
->  
->  	/*
+> Shunqian Zheng (3):
+>   media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
+>   arm64: dts: rockchip: add isp0 node for rk3399
+>   arm64: dts: rockchip: add rx0 mipi-phy for rk3399
+> 
+> Wen Nuan (1):
+>   ARM: dts: rockchip: Add dts mipi-dphy TXRX1 node for rk3288
+> 
+>  .../devicetree/bindings/media/rockchip-isp1.txt    |   69 +
+>  .../bindings/media/rockchip-mipi-dphy.txt          |   90 +
+>  Documentation/media/uapi/v4l/meta-formats.rst      |    2 +
+>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst   |   20 +
+>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst     |   18 +
+>  MAINTAINERS                                        |   10 +
+>  arch/arm/boot/dts/rk3288.dtsi                      |   33 +
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   25 +
+>  drivers/media/platform/Kconfig                     |   10 +
+>  drivers/media/platform/Makefile                    |    1 +
+>  drivers/media/platform/rockchip/isp1/Makefile      |    8 +
+>  drivers/media/platform/rockchip/isp1/capture.c     | 1751 ++++++++++++++++++++
+>  drivers/media/platform/rockchip/isp1/capture.h     |  167 ++
+>  drivers/media/platform/rockchip/isp1/common.h      |  110 ++
+>  drivers/media/platform/rockchip/isp1/dev.c         |  626 +++++++
+>  drivers/media/platform/rockchip/isp1/dev.h         |   93 ++
+>  drivers/media/platform/rockchip/isp1/isp_params.c  | 1539 +++++++++++++++++
+>  drivers/media/platform/rockchip/isp1/isp_params.h  |   49 +
+>  drivers/media/platform/rockchip/isp1/isp_stats.c   |  508 ++++++
+>  drivers/media/platform/rockchip/isp1/isp_stats.h   |   58 +
+>  .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  868 ++++++++++
+>  .../media/platform/rockchip/isp1/mipi_dphy_sy.h    |   15 +
+>  drivers/media/platform/rockchip/isp1/regs.c        |  239 +++
+>  drivers/media/platform/rockchip/isp1/regs.h        | 1550 +++++++++++++++++
+>  drivers/media/platform/rockchip/isp1/rkisp1.c      | 1177 +++++++++++++
+>  drivers/media/platform/rockchip/isp1/rkisp1.h      |  105 ++
+>  drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
+>  include/uapi/linux/rkisp1-config.h                 |  798 +++++++++
+>  include/uapi/linux/videodev2.h                     |    4 +
+>  29 files changed, 9945 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>  create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
+>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/common.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
+>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
+>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
+>  create mode 100644 include/uapi/linux/rkisp1-config.h
+> 
 > -- 
-> 2.1.4
+> 2.16.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
