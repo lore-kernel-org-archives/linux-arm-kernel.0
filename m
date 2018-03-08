@@ -1,27 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Mar 2018 11:51:45 +0100
-Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
-In-Reply-To: <CAKKbWA5F29HJFOTNfVmt14Qg5rMgrLSsHjY4NQESZL6OKmA95w@mail.gmail.com>
-References: <20180307162430.2664523-1-arnd@arndb.de>
- <20180307162430.2664523-2-arnd@arndb.de>
- <CACPK8XeVMSeQNkPNp1_vms97H_9rMuk1-DzUAc=s-7o=FmVncw@mail.gmail.com>
- <CAKKbWA5F29HJFOTNfVmt14Qg5rMgrLSsHjY4NQESZL6OKmA95w@mail.gmail.com>
-Message-ID: <CAK8P3a3fCRAuBjLXbjzc+1rYJsW90TDN2URZ=sOHvRNB3kyd6Q@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Thu, 8 Mar 2018 18:58:27 +0800
+Subject: [PATCH v3 02/11] perf vendor events: fix error code in json_events()
+In-Reply-To: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
+References: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
+Message-ID: <1520506716-197429-3-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 11:46 AM, Avi Fishman <avifishman70@gmail.com> wrote:
-> So at least replace CACHE_L2X0 with MIGHT_HAVE_CACHE_L2X0 then
-> CACHE_L2X0 will be selected by default and user can still remove it.
+When EXPECT macro fails an assertion, the error code is
+not properly set after the first loop of tokens in function
+json_events().
 
-I looked at the other platforms for this one again, and found that most simply
-select CONFIG_CACHE_L2X0 directly, so we probably want the same here
-after all.
+This is because err is set to the return value from func
+function pointer call, which must be 0 to continue to loop,
+yet it is not reset for for each loop. I assume that this was
+not the intention, so change the code so err is set
+appropriately in EXPECT macro itself.
 
-The ones that use MIGHT_HAVE_CACHE_L2X0 are the platforms
-that have multiple SoCs in one family, and only some of them have an
-L2X0. Is that the case here as well? Usually, the L2X0 is used with
-Cortex-A9 and A5, rarely on older cores, and never on newer
-ones.
+In addition to this, the indention in EXPECT macro is
+tidied. The current indention alludes that the 2 statements
+following the if statement are in the body, which is not
+true.
 
-       Arnd
+Signed-off-by: John Garry <john.garry@huawei.com>
+Acked-by: Jiri Olsa <jolsa@kernel.org>
+---
+ tools/perf/pmu-events/jevents.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+index 9e0a21e..edff989 100644
+--- a/tools/perf/pmu-events/jevents.c
++++ b/tools/perf/pmu-events/jevents.c
+@@ -249,9 +249,10 @@ static const char *field_to_perf(struct map *table, char *map, jsmntok_t *val)
+ 	jsmntok_t *loc = (t);					\
+ 	if (!(t)->start && (t) > tokens)			\
+ 		loc = (t) - 1;					\
+-		pr_err("%s:%d: " m ", got %s\n", fn,		\
+-			json_line(map, loc),			\
+-			json_name(t));				\
++	pr_err("%s:%d: " m ", got %s\n", fn,			\
++	       json_line(map, loc),				\
++	       json_name(t));					\
++	err = -EIO;						\
+ 	goto out_free;						\
+ } } while (0)
+ 
+@@ -416,7 +417,7 @@ int json_events(const char *fn,
+ 		      char *metric_name, char *metric_group),
+ 	  void *data)
+ {
+-	int err = -EIO;
++	int err;
+ 	size_t size;
+ 	jsmntok_t *tokens, *tok;
+ 	int i, j, len;
+-- 
+1.9.1
