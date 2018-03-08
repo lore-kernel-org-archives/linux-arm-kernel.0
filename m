@@ -1,23 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Mar 2018 13:55:55 +0000
-Subject: [PATCH v3 21/22] arm64: Delay enabling hardware DBM feature
-In-Reply-To: <20180308135312.GQ32331@e103592.cambridge.arm.com>
-References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-43-suzuki.poulose@arm.com>
- <20180209185840.GJ5862@e103592.cambridge.arm.com>
- <e8b40320-10d2-6117-ef7f-7bbb46823ffb@arm.com>
- <20180308135312.GQ32331@e103592.cambridge.arm.com>
-Message-ID: <20180308135555.yg6wdrarlpmedmmb@lakrids.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Mar 2018 13:59:02 +0000
+Subject: [PATCH v5 18/23] arm64: KVM: Add epilogue branching to the
+ vector code
+In-Reply-To: <20180301155538.26860-19-marc.zyngier@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-19-marc.zyngier@arm.com>
+Message-ID: <20180308135902.olhvrydbcszjl3ap@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 01:53:13PM +0000, Dave Martin wrote:
-> In practice, we don't race booting of two CPUs against each other
-> IIUC.
+On Thu, Mar 01, 2018 at 03:55:33PM +0000, Marc Zyngier wrote:
+> We are soon going to have to do some extra work in the BP hardening
+> vector slots. Instead of doing that work in the vectors themselves
+> (which would massively reduce the space available to deal with
+> Spectre v2), let's branch to an epilogue where we can do "stuff".
+> 
+> This has a number of consequences:
+> - We need some free registers, so we're spilling x0 and x1 on the
+>   stack
+> - In order to counterbalance this, we branch to the *second* instruction
+>   in the vectors, avoiding the initial store that is already there
+>   (or loading the registers back if we've branched to a panic vector)
+> 
+> This is all controlled by a new capability (ARM64_HARDEN_EL2_VECTORS)
+> which doesn't get enabled yet.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Yup. Today, hotplugs are strictly serialized.
+That's mostly kvm but anyway:
 
-Several things would have to change for parallel hotplug to be feasible.
-
-Thanks,
-Mark.
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
