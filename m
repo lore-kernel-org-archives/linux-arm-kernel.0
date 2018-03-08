@@ -1,122 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Mar 2018 17:04:38 +0000
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
- with the same vintid
-In-Reply-To: <20180308160242.GA1917@lvm>
-References: <20180307124055.13800-1-marc.zyngier@arm.com>
- <20180307124055.13800-2-marc.zyngier@arm.com>
- <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
- <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
- <20180308160242.GA1917@lvm>
-Message-ID: <86tvtqbis9.wl-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Mar 2018 17:11:50 +0000
+Subject: [PATCH v2 1/3] signal: Add FPE_FLTUNK si_code for undiagnosable
+ fp exceptions
+In-Reply-To: <1519926248-12591-2-git-send-email-Dave.Martin@arm.com>
+References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
+ <1519926248-12591-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180308171149.GC14918@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Mar 2018 16:02:42 +0000,
-Christoffer Dall wrote:
-> 
-> On Thu, Mar 08, 2018 at 10:19:49AM +0000, Marc Zyngier wrote:
-> > On 07/03/18 23:34, Christoffer Dall wrote:
-> > > On Wed, Mar 7, 2018 at 12:40 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > >> The vgic code is trying to be clever when injecting GICv2 SGIs,
-> > >> and will happily populate LRs with the same interrupt number if
-> > >> they come from multiple vcpus (after all, they are distinct
-> > >> interrupt sources).
-> > >>
-> > >> Unfortunately, this is against the letter of the architecture,
-> > >> and the GICv2 architecture spec says "Each valid interrupt stored
-> > >> in the List registers must have a unique VirtualID for that
-> > >> virtual CPU interface.". GICv3 has similar (although slightly
-> > >> ambiguous) restrictions.
-> > >>
-> > >> This results in guests locking up when using GICv2-on-GICv3, for
-> > >> example. The obvious fix is to stop trying so hard, and inject
-> > >> a single vcpu per SGI per guest entry. After all, pending SGIs
-> > >> with multiple source vcpus are pretty rare, and are mostly seen
-> > >> in scenario where the physical CPUs are severely overcomitted.
-> > >>
-> > >> Cc: stable at vger.kernel.org
-> > >> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
-> > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > >> ---
-> > >>  virt/kvm/arm/vgic/vgic.c | 11 +----------
-> > >>  1 file changed, 1 insertion(+), 10 deletions(-)
-> > >>
-> > >> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > >> index c7c5ef190afa..1f7ff175f47b 100644
-> > >> --- a/virt/kvm/arm/vgic/vgic.c
-> > >> +++ b/virt/kvm/arm/vgic/vgic.c
-> > >> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
-> > >>         list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-> > >>                 spin_lock(&irq->irq_lock);
-> > >>
-> > >> -               if (unlikely(vgic_target_oracle(irq) != vcpu))
-> > >> -                       goto next;
-> > >> -
-> > >> -               /*
-> > >> -                * If we get an SGI with multiple sources, try to get
-> > >> -                * them in all at once.
-> > >> -                */
-> > >> -               do {
-> > >> +               if (likely(vgic_target_oracle(irq) == vcpu))
-> > >>                         vgic_populate_lr(vcpu, irq, count++);
-> > > 
-> > > I think we need to change vgic_populate_lr to set the EOI maintenance
-> > > interrupt flag so that when the interrupt is deactivated, if there are
-> > > additional pending sources, we exit the guest and pick up the
-> > > interrupt.
-> > 
-> > Potentially. We need to be careful about about the semantics of EOI MI
-> > with non-level interrupts (see the other thread about EOI signalling).
-> 
-> I'll have a look.
-> 
-> > 
-> > > An alternative would be to set the underflow interrupt, but I don't
-> > > think that would be correct for multiple priorities, because the SGI
-> > > could have a higher priority than other pending interrupts we put in
-> > > the LR.
-> > 
-> > I don't think priorities are the issue (after all, we already sort the
-> > irqs in order of priority). 
-> 
-> Yes, but assume you have three pending interrupts, one SGI from two
-> sources, and one SPI, and assume that the SGI has priority 1 and SPI
-> priority 2 (lower means higher priority), then I think with underflow or
-> the no-pending interrupt flag, we'll deliver the SGI from the first
-> source, and then the SPI, and then exiting to pick up the last SGI from
-> the other source.  That's not how I understand the GIC architecture is
-> supposed to work.  Am I missing something?
+Hi Dave,
 
-No, you do have a point here. I'm so glad this is a v2 only thing.
-
+On Thu, Mar 01, 2018 at 05:44:06PM +0000, Dave Martin wrote:
+> Some architectures cannot always report accurately what kind of
+> floating-point exception triggered a floating-point exception trap.
 > 
-> > My worry is that underflow is allowed to
-> > fire if there is one interrupt pending, which implies that you could
-> > end-up in a livelock scenario if you only have one SGI pending with
-> > multiple sources.
+> This can occur with fp exceptions occurring on lanes in a vector
+> instruction on arm64 for example.
 > 
-> Yes, doesn't work, so I think it should be a maintenance interrupt on
-> EOI.
+> Rather than have every architecture come up with its own way of
+> describing such a condition, this patch adds a common FPE_FLTUNK
+> si_code value to report that an fp exception caused a trap but we
+> cannot be certain which kind of fp exception it was.
+
+This looks straightforward to me, but I'll need Acks for the x86 and uapi
+changes if I'm to take this via arm64. I've added some others to CC and
+kept the patch intact below.
+
+Cheers,
+
+Will
+
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > 
-> > 
-> > Another possibility would be to use ICH_HCR_EL2.NPIE (GICH_HCR.NPIE on
-> > GICv2), which delivers a a MI if no pending interrupts are present. Once
-> > the SGI has been activated, we're guaranteed to be able to inject a new
-> > pending one.
-> > 
-> > I like the latter, because it doesn't overload the rest of the code with
-> > new semantics. Thoughts?
-> > 
+> --
 > 
-> I'm fine with that if I can be proven wrong about the multiple sources
-> and priorities.
-
-I'll have a look at respining this with MI on EOI.
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+> Changes since v1:
+> 
+> Reported by James Morse:
+> 
+>  * Bump NSIGFPE BUILD_BUG_ON() check for x86 compat.
+> 
+>    FPE_FLTUNK does not current have any implications for x86, since it
+>    is not currently used and has no implications for the way siginfo
+>    is populated.
+> ---
+>  arch/x86/kernel/signal_compat.c    | 2 +-
+>  include/uapi/asm-generic/siginfo.h | 3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/x86/kernel/signal_compat.c b/arch/x86/kernel/signal_compat.c
+> index ac057f9..954ad99 100644
+> --- a/arch/x86/kernel/signal_compat.c
+> +++ b/arch/x86/kernel/signal_compat.c
+> @@ -26,7 +26,7 @@ static inline void signal_compat_build_tests(void)
+>  	 * new fields are handled in copy_siginfo_to_user32()!
+>  	 */
+>  	BUILD_BUG_ON(NSIGILL  != 11);
+> -	BUILD_BUG_ON(NSIGFPE  != 13);
+> +	BUILD_BUG_ON(NSIGFPE  != 14);
+>  	BUILD_BUG_ON(NSIGSEGV != 4);
+>  	BUILD_BUG_ON(NSIGBUS  != 5);
+>  	BUILD_BUG_ON(NSIGTRAP != 4);
+> diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> index 85dc965..10304de 100644
+> --- a/include/uapi/asm-generic/siginfo.h
+> +++ b/include/uapi/asm-generic/siginfo.h
+> @@ -229,7 +229,8 @@ typedef struct siginfo {
+>  # define __FPE_INVASC	12	/* invalid ASCII digit */
+>  # define __FPE_INVDEC	13	/* invalid decimal digit */
+>  #endif
+> -#define NSIGFPE		13
+> +#define FPE_FLTUNK	14	/* undiagnosed floating-point exception */
+> +#define NSIGFPE		14
+>  
+>  /*
+>   * SIGSEGV si_codes
+> -- 
+> 2.1.4
+> 
