@@ -1,44 +1,83 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 8 Mar 2018 11:44:08 +0100
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <5AA02C26.10803@arm.com>
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com>
- <20180301150144.GA4215@pd.tnic>
- <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
- <20180301223529.GA28811@pd.tnic> <5AA02C26.10803@arm.com>
-Message-ID: <20180308104408.GB21166@pd.tnic>
+From: avifishman70@gmail.com (Avi Fishman)
+Date: Thu, 8 Mar 2018 12:46:16 +0200
+Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
+In-Reply-To: <CACPK8XeVMSeQNkPNp1_vms97H_9rMuk1-DzUAc=s-7o=FmVncw@mail.gmail.com>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <20180307162430.2664523-2-arnd@arndb.de>
+ <CACPK8XeVMSeQNkPNp1_vms97H_9rMuk1-DzUAc=s-7o=FmVncw@mail.gmail.com>
+Message-ID: <CAKKbWA5F29HJFOTNfVmt14Qg5rMgrLSsHjY4NQESZL6OKmA95w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 06:15:02PM +0000, James Morse wrote:
-> Today its just x86 and arm64. arm64 doesn't have a hook to do this. I'm happy to
-> add an empty declaration or leave it under an ifdef until someone complains
-> about any behaviour I missed!
+So at least replace CACHE_L2X0 with MIGHT_HAVE_CACHE_L2X0 then
+CACHE_L2X0 will be selected by default and user can still remove it.
 
-So I did some more staring at the code and I think oops_begin() is
-needed mainly, as you point out, to prevent two oops messages from
-interleaving. And yap, the other stuff with printk() is not true anymore
-because the commit which added oops_begin():
-
-  81e88fdc432a ("ACPI, APEI, Generic Hardware Error Source POLL/IRQ/NMI notification type support")
-
-still saw an NMI-unsafe printk. Which is long taken care of now.
-
-So only the interleaving issue remains.
-
-Which begs the question: how are you guys preventing the interleaving on
-arm64? Because arch/arm64/kernel/traps.c:200 grabs the die_lock too, so
-interleaving can happen on arm64 too, AFAICT.
-
-And by that logic, you should technically grab that lock here too in
-_in_nmi_notify_one().
-
-Or?
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+On Thu, Mar 8, 2018 at 4:12 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Thu, Mar 8, 2018 at 2:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> While looking at the build regression, I noticed that the
+>> platform selects a lot of other Kconfig symbols that it really
+>> should not:
+>>
+>> CPU_V7, ARM_GIC, HAVE_SMP, COMMON_CLK, GENERIC_CLOCKEVENTS,
+>> and CLKDEV_LOOKUP are all implied by ARCH_MULTI_V7, so they
+>> can be dropped.
+>>
+>> CACHE_L2X0, SMP and USB are meant to be user-selectable, we
+>> want to be able to turn those off for testing purposes.
+>>
+>> CPU_USE_DOMAINS looks completely misplaced here, we should not
+>> select that for an ARMv7 platform.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> I had a similar patch queued for sending out. Thanks Arnd.
+>
+> Acked-by: Joel Stanley <joel@jms.id.au>
+>
+> Cheers,
+>
+> Joel
+>
+>> ---
+>>  arch/arm/mach-npcm/Kconfig | 18 ------------------
+>>  1 file changed, 18 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+>> index 2bc6697c8d97..c6a16230e8ef 100644
+>> --- a/arch/arm/mach-npcm/Kconfig
+>> +++ b/arch/arm/mach-npcm/Kconfig
+>> @@ -12,12 +12,6 @@ comment "NPCM7XX CPU type"
+>>  config ARCH_NPCM750
+>>         depends on ARCH_NPCM
+>>         bool "Support for NPCM750 BMC CPU (Poleg)"
+>> -       select CACHE_L2X0
+>> -       select CPU_V7
+>> -       select ARM_GIC
+>> -       select HAVE_SMP
+>> -       select SMP
+>> -       select SMP_ON_UP
+>>         select HAVE_ARM_SCU
+>>         select HAVE_ARM_TWD if SMP
+>>         select ARM_ERRATA_720789
+>> @@ -26,18 +20,6 @@ config ARCH_NPCM750
+>>         select ARM_ERRATA_794072
+>>         select PL310_ERRATA_588369
+>>         select PL310_ERRATA_727915
+>> -       select USB_EHCI_ROOT_HUB_TT
+>> -       select USB_ARCH_HAS_HCD
+>> -       select USB_ARCH_HAS_EHCI
+>> -       select USB_EHCI_HCD
+>> -       select USB_ARCH_HAS_OHCI
+>> -       select USB_OHCI_HCD
+>> -       select USB
+>> -       select FIQ
+>> -       select CPU_USE_DOMAINS
+>> -       select GENERIC_CLOCKEVENTS
+>> -       select CLKDEV_LOOKUP
+>> -       select COMMON_CLK if OF
+>>         select NPCM750_TIMER
+>>         select MFD_SYSCON
+>>         help
+>> --
+>> 2.9.0
+>>
