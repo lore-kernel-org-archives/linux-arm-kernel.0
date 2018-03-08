@@ -1,46 +1,31 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
 Date: Thu,  8 Mar 2018 17:09:29 +0900
-Subject: [PATCH] reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset
- control
-Message-ID: <20180308080929.30982-1-suzuki.katsuhiro@socionext.com>
+Subject: [PATCH] ASoC: uniphier: remove superfluous <linux/mfd/syscon.h>
+ inclusion
+Message-ID: <1520496569-32032-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset lines for audio subsystem (AIO) on UniPhier
-Pro4/Pro5/PXs2 SoCs.
+None of aio-compress.c depends on the syscon header.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- drivers/reset/reset-uniphier.c | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index e8bb023ff15e..0fa23129d343 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -63,6 +63,7 @@ static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
- 	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (Ether, SATA, USB3) */
- 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
- 	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
-+	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
- 	UNIPHIER_RESET_END,
- };
- 
-@@ -72,6 +73,7 @@ static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
- 	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (PCIe, USB3) */
- 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
- 	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
-+	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
- 	UNIPHIER_RESET_END,
- };
- 
-@@ -88,6 +90,7 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- 	UNIPHIER_RESETX(21, 0x2014, 1),		/* USB31-PHY1 */
- 	UNIPHIER_RESETX(28, 0x2014, 12),	/* SATA */
- 	UNIPHIER_RESET(29, 0x2014, 8),		/* SATA-PHY (active high) */
-+	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
- 	UNIPHIER_RESET_END,
- };
- 
+ sound/soc/uniphier/aio-compress.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/sound/soc/uniphier/aio-compress.c b/sound/soc/uniphier/aio-compress.c
+index 4751c8b..4c1027a 100644
+--- a/sound/soc/uniphier/aio-compress.c
++++ b/sound/soc/uniphier/aio-compress.c
+@@ -22,7 +22,6 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+-#include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
 -- 
-2.16.1
+2.7.4
