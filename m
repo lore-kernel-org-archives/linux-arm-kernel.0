@@ -1,234 +1,766 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 8 Mar 2018 13:52:33 -0600
-Subject: [PATCH v7 05/13] ACPI/PPTT: Add Processor Properties Topology
- Table parsing
-In-Reply-To: <CAKv+Gu9LHHwWNcQdNwDvY70+whxH1VDoGNkMhM0E67hE0LDMDA@mail.gmail.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-6-jeremy.linton@arm.com>
- <CAKv+Gu9LHHwWNcQdNwDvY70+whxH1VDoGNkMhM0E67hE0LDMDA@mail.gmail.com>
-Message-ID: <d79975a0-eca7-7bac-b542-9cc78c71361f@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  8 Mar 2018 20:55:56 +0100
+Subject: [PATCH] drm/meson: Add support for DMT modes on HDMI
+Message-ID: <1520538956-17563-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds support for DMT display modes over HDMI.
+The modes timings configurations are from the Amlogic Vendor linux tree
+and tested over multiples monitors.
+Previously only a selected number of CEA modes were supported.
 
-On 03/08/2018 10:39 AM, Ard Biesheuvel wrote:
-> On 28 February 2018 at 22:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
->> ACPI 6.2 adds a new table, which describes how processing units
->> are related to each other in tree like fashion. Caches are
->> also sprinkled throughout the tree and describe the properties
->> of the caches in relation to other caches and processing units.
->>
->> Add the code to parse the cache hierarchy and report the total
->> number of levels of cache for a given core using
->> acpi_find_last_cache_level() as well as fill out the individual
->> cores cache information with cache_setup_acpi() once the
->> cpu_cacheinfo structure has been populated by the arch specific
->> code.
->>
->> An additional patch later in the set adds the ability to report
->> peers in the topology using find_acpi_cpu_topology()
->> to report a unique ID for each processing unit at a given level
->> in the tree. These unique id's can then be used to match related
->> processing units which exist as threads, COD (clusters
->> on die), within a given package, etc.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   drivers/acpi/pptt.c | 488 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 488 insertions(+)
->>   create mode 100644 drivers/acpi/pptt.c
->>
->> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->> new file mode 100644
->> index 000000000000..883e4318c6cd
->> --- /dev/null
->> +++ b/drivers/acpi/pptt.c
-> ...
->> +/* total number of attributes checked by the properties code */
->> +#define PPTT_CHECKED_ATTRIBUTES 4
->> +
->> +/*
->> + * The ACPI spec implies that the fields in the cache structures are used to
->> + * extend and correct the information probed from the hardware. Lets only
->> + * set fields that we determine are VALID.
->> + */
->> +static void update_cache_properties(struct cacheinfo *this_leaf,
->> +                                   struct acpi_pptt_cache *found_cache,
->> +                                   struct acpi_pptt_processor *cpu_node)
->> +{
->> +       int valid_flags = 0;
->> +
->> +       if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
->> +               this_leaf->size = found_cache->size;
->> +               valid_flags++;
->> +       }
->> +       if (found_cache->flags & ACPI_PPTT_LINE_SIZE_VALID) {
->> +               this_leaf->coherency_line_size = found_cache->line_size;
->> +               valid_flags++;
->> +       }
->> +       if (found_cache->flags & ACPI_PPTT_NUMBER_OF_SETS_VALID) {
->> +               this_leaf->number_of_sets = found_cache->number_of_sets;
->> +               valid_flags++;
->> +       }
->> +       if (found_cache->flags & ACPI_PPTT_ASSOCIATIVITY_VALID) {
->> +               this_leaf->ways_of_associativity = found_cache->associativity;
->> +               valid_flags++;
->> +       }
->> +       if (found_cache->flags & ACPI_PPTT_WRITE_POLICY_VALID) {
->> +               switch (found_cache->attributes & ACPI_PPTT_MASK_WRITE_POLICY) {
->> +               case ACPI_PPTT_CACHE_POLICY_WT:
->> +                       this_leaf->attributes = CACHE_WRITE_THROUGH;
->> +                       break;
->> +               case ACPI_PPTT_CACHE_POLICY_WB:
->> +                       this_leaf->attributes = CACHE_WRITE_BACK;
->> +                       break;
->> +               }
->> +       }
->> +       if (found_cache->flags & ACPI_PPTT_ALLOCATION_TYPE_VALID) {
->> +               switch (found_cache->attributes & ACPI_PPTT_MASK_ALLOCATION_TYPE) {
->> +               case ACPI_PPTT_CACHE_READ_ALLOCATE:
->> +                       this_leaf->attributes |= CACHE_READ_ALLOCATE;
->> +                       break;
->> +               case ACPI_PPTT_CACHE_WRITE_ALLOCATE:
->> +                       this_leaf->attributes |= CACHE_WRITE_ALLOCATE;
->> +                       break;
->> +               case ACPI_PPTT_CACHE_RW_ALLOCATE:
->> +               case ACPI_PPTT_CACHE_RW_ALLOCATE_ALT:
->> +                       this_leaf->attributes |=
->> +                               CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE;
->> +                       break;
->> +               }
->> +       }
->> +       /*
->> +        * If the above flags are valid, and the cache type is NOCACHE
->> +        * update the cache type as well.
->> +        */
->> +       if ((this_leaf->type == CACHE_TYPE_NOCACHE) &&
->> +           (valid_flags == PPTT_CHECKED_ATTRIBUTES))
->> +               this_leaf->type = CACHE_TYPE_UNIFIED;
-> 
-> Why do we need the associativity and #sets attributes to be valid in
-> order to set the cache type?
+Only these following modes are supported with these changes:
+ - 640x480 at 60Hz
+ - 800x600 at 60Hz
+ - 1024x768 at 60Hz
+ - 1152x864 at 75Hz
+ - 1280x1024 at 60Hz
+ - 1600x1200 at 60Hz
+ - 1920x1080 at 60Hz
 
-This happened a couple revisions ago because its better to force people 
-to completely populate the attributes in the tables (particularly for 
-nodes we are generating, which is what the _NOCACHE check above is 
-detecting) and leave half of them undefined and therefor exported to 
-user-space in a way which makes the properties unreliable across machines.
+The associated code to handle the clock rates is also added.
 
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/gpu/drm/meson/meson_dw_hdmi.c |  21 +-
+ drivers/gpu/drm/meson/meson_vclk.c    | 219 ++++++++++++++++++++-
+ drivers/gpu/drm/meson/meson_venc.c    | 347 +++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/meson/meson_venc.h    |   1 +
+ 4 files changed, 570 insertions(+), 18 deletions(-)
 
-> 
-> I see how size and line size are rather fundamental properties, but
-> for a system cache, the geometry doesn't really matter.
-
-Originally all of them were required (to avoid having the discussion 
-about which ones were "important"), but Sudeep was of the opinion that 
-these were the "important" ones, I can see his point, and no one else 
-spoke up... So, those are the ones that are required.
-
-
-> 
->> +}
->> +
->> +/*
->> + * Update the kernel cache information for each level of cache
->> + * associated with the given acpi cpu.
->> + */
->> +static void cache_setup_acpi_cpu(struct acpi_table_header *table,
->> +                                unsigned int cpu)
->> +{
->> +       struct acpi_pptt_cache *found_cache;
->> +       struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
->> +       u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
->> +       struct cacheinfo *this_leaf;
->> +       unsigned int index = 0;
->> +       struct acpi_pptt_processor *cpu_node = NULL;
->> +
->> +       while (index < get_cpu_cacheinfo(cpu)->num_leaves) {
->> +               this_leaf = this_cpu_ci->info_list + index;
->> +               found_cache = acpi_find_cache_node(table, acpi_cpu_id,
->> +                                                  this_leaf->type,
->> +                                                  this_leaf->level,
->> +                                                  &cpu_node);
->> +               pr_debug("found = %p %p\n", found_cache, cpu_node);
->> +               if (found_cache)
->> +                       update_cache_properties(this_leaf,
->> +                                               found_cache,
->> +                                               cpu_node);
->> +
->> +               index++;
->> +       }
->> +}
->> +
->> +/**
->> + * acpi_find_last_cache_level() - Determines the number of cache levels for a PE
->> + * @cpu: Kernel logical cpu number
->> + *
->> + * Given a logical cpu number, returns the number of levels of cache represented
->> + * in the PPTT. Errors caused by lack of a PPTT table, or otherwise, return 0
->> + * indicating we didn't find any cache levels.
->> + *
->> + * Return: Cache levels visible to this core.
->> + */
->> +int acpi_find_last_cache_level(unsigned int cpu)
->> +{
->> +       u32 acpi_cpu_id;
->> +       struct acpi_table_header *table;
->> +       int number_of_levels = 0;
->> +       acpi_status status;
->> +
->> +       pr_debug("Cache Setup find last level cpu=%d\n", cpu);
->> +
->> +       acpi_cpu_id = get_acpi_id_for_cpu(cpu);
->> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
->> +       if (ACPI_FAILURE(status)) {
->> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
->> +       } else {
->> +               number_of_levels = acpi_find_cache_levels(table, acpi_cpu_id);
->> +               acpi_put_table(table);
->> +       }
->> +       pr_debug("Cache Setup find last level level=%d\n", number_of_levels);
->> +
->> +       return number_of_levels;
->> +}
->> +
->> +/**
->> + * cache_setup_acpi() - Override CPU cache topology with data from the PPTT
->> + * @cpu: Kernel logical cpu number
->> + *
->> + * Updates the global cache info provided by cpu_get_cacheinfo()
->> + * when there are valid properties in the acpi_pptt_cache nodes. A
->> + * successful parse may not result in any updates if none of the
->> + * cache levels have any valid flags set.  Futher, a unique value is
->> + * associated with each known CPU cache entry. This unique value
->> + * can be used to determine whether caches are shared between cpus.
->> + *
->> + * Return: -ENOENT on failure to find table, or 0 on success
->> + */
->> +int cache_setup_acpi(unsigned int cpu)
->> +{
->> +       struct acpi_table_header *table;
->> +       acpi_status status;
->> +
->> +       pr_debug("Cache Setup ACPI cpu %d\n", cpu);
->> +
->> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
->> +       if (ACPI_FAILURE(status)) {
->> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
->> +               return -ENOENT;
->> +       }
->> +
->> +       cache_setup_acpi_cpu(table, cpu);
->> +       acpi_put_table(table);
->> +
->> +       return status;
->> +}
->> --
->> 2.13.6
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+index 17de3af..fd1d365 100644
+--- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
++++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+@@ -554,12 +554,12 @@ dw_hdmi_mode_valid(struct drm_connector *connector,
+ 		mode->vdisplay, mode->vsync_start,
+ 		mode->vsync_end, mode->vtotal, mode->type, mode->flags);
+ 
+-	/* For now, only accept VIC modes */
+-	if (!vic)
+-		return MODE_BAD;
+-
+-	/* For now, filter by supported VIC modes */
+-	if (!meson_venc_hdmi_supported_vic(vic))
++	/* Check against non-VIC supported modes */
++	if (!vic) {
++		if (!meson_venc_hdmi_supported_mode(mode))
++			return MODE_BAD;
++	/* Check against supported VIC modes */
++	} else if (meson_venc_hdmi_supported_vic(vic))
+ 		return MODE_BAD;
+ 
+ 	vclk_freq = mode->clock;
+@@ -585,9 +585,14 @@ dw_hdmi_mode_valid(struct drm_connector *connector,
+ 
+ 	/* Finally filter by configurable vclk frequencies */
+ 	switch (vclk_freq) {
++	case 25175:
++	case 40000:
+ 	case 54000:
++	case 65000:
+ 	case 74250:
++	case 108000:
+ 	case 148500:
++	case 162000:
+ 	case 297000:
+ 	case 594000:
+ 		return MODE_OK;
+@@ -652,10 +657,6 @@ static void meson_venc_hdmi_encoder_mode_set(struct drm_encoder *encoder,
+ 	DRM_DEBUG_DRIVER("%d:\"%s\" vic %d\n",
+ 			 mode->base.id, mode->name, vic);
+ 
+-	/* Should have been filtered */
+-	if (!vic)
+-		return;
+-
+ 	/* VENC + VENC-DVI Mode setup */
+ 	meson_venc_hdmi_mode_set(priv, vic, mode);
+ 
+diff --git a/drivers/gpu/drm/meson/meson_vclk.c b/drivers/gpu/drm/meson/meson_vclk.c
+index 4767704..f051122 100644
+--- a/drivers/gpu/drm/meson/meson_vclk.c
++++ b/drivers/gpu/drm/meson/meson_vclk.c
+@@ -328,14 +328,24 @@ static void meson_venci_cvbs_clock_config(struct meson_drm *priv)
+ #define MESON_VCLK_HDMI_DDR_54000	2
+ /* 2970 /4 /1 /1 /5 /1  => /1 /2 */
+ #define MESON_VCLK_HDMI_DDR_148500	3
++/* 4028 /4 /4 /1 /5 /2  => /1 /1 */
++#define MESON_VCLK_HDMI_25175		4
++/* 3200 /4 /2 /1 /5 /2  => /1 /1 */
++#define MESON_VCLK_HDMI_40000		5
++/* 5200 /4 /2 /1 /5 /2  => /1 /1 */
++#define MESON_VCLK_HDMI_65000		6
+ /* 2970 /2 /2 /2 /5 /1  => /1 /1 */
+-#define MESON_VCLK_HDMI_74250		4
++#define MESON_VCLK_HDMI_74250		7
++/* 4320 /4 /1 /1 /5 /2  => /1 /1 */
++#define MESON_VCLK_HDMI_108000		8
+ /* 2970 /1 /2 /2 /5 /1  => /1 /1 */
+-#define MESON_VCLK_HDMI_148500		5
++#define MESON_VCLK_HDMI_148500		9
++/* 3240 /2 /1 /1 /5 /2  => /1 /1 */
++#define MESON_VCLK_HDMI_162000		10
+ /* 2970 /1 /1 /1 /5 /2  => /1 /1 */
+-#define MESON_VCLK_HDMI_297000		6
++#define MESON_VCLK_HDMI_297000		11
+ /* 5940 /1 /1 /2 /5 /1  => /1 /1 */
+-#define MESON_VCLK_HDMI_594000		7
++#define MESON_VCLK_HDMI_594000		12
+ 
+ struct meson_vclk_params {
+ 	unsigned int pll_base_freq;
+@@ -401,6 +411,46 @@ struct meson_vclk_params {
+ 		.vid_pll_div = VID_PLL_DIV_5,
+ 		.vclk_div = 1,
+ 	},
++	[MESON_VCLK_HDMI_25175] = {
++		.pll_base_freq = 4028000,
++		.pll_od1 = 4,
++		.pll_od2 = 4,
++		.pll_od3 = 1,
++		.vid_pll_div = VID_PLL_DIV_5,
++		.vclk_div = 2,
++	},
++	[MESON_VCLK_HDMI_40000] = {
++		.pll_base_freq = 3200000,
++		.pll_od1 = 4,
++		.pll_od2 = 2,
++		.pll_od3 = 1,
++		.vid_pll_div = VID_PLL_DIV_5,
++		.vclk_div = 2,
++	},
++	[MESON_VCLK_HDMI_65000] = {
++		.pll_base_freq = 5200000,
++		.pll_od1 = 4,
++		.pll_od2 = 2,
++		.pll_od3 = 1,
++		.vid_pll_div = VID_PLL_DIV_5,
++		.vclk_div = 2,
++	},
++	[MESON_VCLK_HDMI_108000] = {
++		.pll_base_freq = 4320000,
++		.pll_od1 = 4,
++		.pll_od2 = 1,
++		.pll_od3 = 1,
++		.vid_pll_div = VID_PLL_DIV_5,
++		.vclk_div = 2,
++	},
++	[MESON_VCLK_HDMI_162000] = {
++		.pll_base_freq = 3240000,
++		.pll_od1 = 2,
++		.pll_od2 = 1,
++		.pll_od3 = 1,
++		.vid_pll_div = VID_PLL_DIV_5,
++		.vclk_div = 2,
++	},
+ };
+ 
+ static inline unsigned int pll_od_to_reg(unsigned int od)
+@@ -451,6 +501,90 @@ void meson_hdmi_pll_set(struct meson_drm *priv,
+ 						0xFFFF,  0x4e00);
+ 			break;
+ 
++		case 3200000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x58000242);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x0d5c5091);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x801da72c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x71486980);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x00000e55);
++
++			/* unreset */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL,
++						BIT(28), 0);
++
++			/* Poll for lock bit */
++			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
++					val, (val & HDMI_PLL_LOCK), 10, 0);
++
++			/* div_frac */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL2,
++						0xFFFF,  0x4aab);
++			break;
++
++		case 3240000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x58000243);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x0d5c5091);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x801da72c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x71486980);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x00000e55);
++
++			/* unreset */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL,
++						BIT(28), 0);
++
++			/* Poll for lock bit */
++			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
++					val, (val & HDMI_PLL_LOCK), 10, 0);
++
++			/* div_frac */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL2,
++						0xFFFF,  0x4800);
++			break;
++
++		case 3865000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x58000250);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x0d5c5091);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x801da72c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x71486980);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x00000e55);
++
++			/* unreset */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL,
++						BIT(28), 0);
++
++			/* Poll for lock bit */
++			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
++					val, (val & HDMI_PLL_LOCK), 10, 0);
++
++			/* div_frac */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL2,
++						0xFFFF,  0x4855);
++			break;
++
++		case 4028000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x58000253);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x0d5c5091);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x801da72c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x71486980);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x00000e55);
++
++			/* unreset */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL,
++						BIT(28), 0);
++
++			/* Poll for lock bit */
++			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
++					val, (val & HDMI_PLL_LOCK), 10, 0);
++
++			/* div_frac */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL2,
++						0xFFFF,  0x4eab);
++			break;
++
+ 		case 4320000:
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x5800025a);
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
+@@ -485,6 +619,23 @@ void meson_hdmi_pll_set(struct meson_drm *priv,
+ 			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
+ 					val, (val & HDMI_PLL_LOCK), 10, 0);
+ 			break;
++
++		case 5200000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x5800026c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x00000000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x135c5091);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x801da72c);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x71486980);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x00000e55);
++
++			/* unreset */
++			regmap_update_bits(priv->hhi, HHI_HDMI_PLL_CNTL,
++						BIT(28), 0);
++
++			/* Poll for lock bit */
++			regmap_read_poll_timeout(priv->hhi, HHI_HDMI_PLL_CNTL,
++					val, (val & HDMI_PLL_LOCK), 10, 0);
++			break;
+ 		};
+ 	} else if (meson_vpu_is_compatible(priv, "amlogic,meson-gxm-vpu") ||
+ 		   meson_vpu_is_compatible(priv, "amlogic,meson-gxl-vpu")) {
+@@ -498,6 +649,42 @@ void meson_hdmi_pll_set(struct meson_drm *priv,
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
+ 			break;
+ 
++		case 3200000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x40000285);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb155);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x860f30c4);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x0c8e0000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x001fa729);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
++			break;
++
++		case 3240000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x40000287);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x860f30c4);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x0c8e0000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x001fa729);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
++			break;
++
++		case 3865000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x400002a1);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb02b);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x860f30c4);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x0c8e0000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x001fa729);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
++			break;
++
++		case 4028000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x400002a7);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb355);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x860f30c4);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x0c8e0000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x001fa729);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
++			break;
++
+ 		case 4320000:
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x400002b4);
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb000);
+@@ -516,6 +703,15 @@ void meson_hdmi_pll_set(struct meson_drm *priv,
+ 			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
+ 			break;
+ 
++		case 5200000:
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL, 0x400002d8);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL2, 0x800cb2ab);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL3, 0x860f30c4);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL4, 0x0c8e0000);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL5, 0x001fa729);
++			regmap_write(priv->hhi, HHI_HDMI_PLL_CNTL6, 0x01a31500);
++			break;
++
+ 		};
+ 
+ 		/* Reset PLL */
+@@ -590,15 +786,30 @@ void meson_vclk_setup(struct meson_drm *priv, unsigned int target,
+ 		else
+ 			freq = MESON_VCLK_HDMI_DDR_54000;
+ 		break;
++	case 25175:
++		freq = MESON_VCLK_HDMI_25175;
++		break;
++	case 40000:
++		freq = MESON_VCLK_HDMI_40000;
++		break;
++	case 65000:
++		freq = MESON_VCLK_HDMI_65000;
++		break;
+ 	case 74250:
+ 		freq = MESON_VCLK_HDMI_74250;
+ 		break;
++	case 108000:
++		freq = MESON_VCLK_HDMI_108000;
++		break;
+ 	case 148500:
+ 		if (dac_freq != 148500)
+ 			freq = MESON_VCLK_HDMI_DDR_148500;
+ 		else
+ 			freq = MESON_VCLK_HDMI_148500;
+ 		break;
++	case 162000:
++		freq = MESON_VCLK_HDMI_162000;
++		break;
+ 	case 297000:
+ 		freq = MESON_VCLK_HDMI_297000;
+ 		break;
+diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+index 9509017..6e27013 100644
+--- a/drivers/gpu/drm/meson/meson_venc.c
++++ b/drivers/gpu/drm/meson/meson_venc.c
+@@ -697,6 +697,314 @@ union meson_hdmi_venc_mode meson_hdmi_encp_mode_1080p60 = {
+ 	},
+ };
+ 
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_640x480_60 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 0x31f,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 0x90,
++		.havon_end = 0x30f,
++		.vavon_bline = 0x23,
++		.vavon_eline = 0x202,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 0x60,
++		.vso_begin = 0x1e,
++		.vso_end = 0x32,
++		.vso_bline = 0,
++		.vso_eline = 2,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 0x20c,
++	},
++};
++
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_800x600_60 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 0x41f,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 0xD8,
++		.havon_end = 0x3f7,
++		.vavon_bline = 0x1b,
++		.vavon_eline = 0x272,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 0x80,
++		.vso_begin = 0x1e,
++		.vso_end = 0x32,
++		.vso_bline = 0,
++		.vso_eline = 4,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 0x273,
++	},
++};
++
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_1024x768_60 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 1343,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 296,
++		.havon_end = 1319,
++		.vavon_bline = 35,
++		.vavon_eline = 802,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 136,
++		.vso_begin = 30,
++		.vso_end = 50,
++		.vso_bline = 0,
++		.vso_eline = 6,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 805,
++	},
++};
++
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_1152x864_75 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 0x63f,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 0x180,
++		.havon_end = 0x5ff,
++		.vavon_bline = 0x23,
++		.vavon_eline = 0x382,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 0x80,
++		.vso_begin = 0x1e,
++		.vso_end = 0x32,
++		.vso_bline = 0,
++		.vso_eline = 3,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 0x383,
++	},
++};
++
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_1280x1024_60 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 0x697,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 0x168,
++		.havon_end = 0x667,
++		.vavon_bline = 0x29,
++		.vavon_eline = 0x428,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 0x70,
++		.vso_begin = 0x1e,
++		.vso_end = 0x32,
++		.vso_bline = 0,
++		.vso_eline = 3,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 0x429,
++	},
++};
++
++union meson_hdmi_venc_mode meson_hdmi_encp_mode_1600x1200_60 = {
++	.encp = {
++		.dvi_settings = 0x21,
++		.video_mode = 0x4040,
++		.video_mode_adv = 0x18,
++		/* video_prog_mode */
++		/* video_sync_mode */
++		/* video_yc_dly */
++		/* video_rgb_ctrl */
++		/* video_filt_ctrl */
++		/* video_ofld_voav_ofst */
++		/* yfp1_htime */
++		/* yfp2_htime */
++		.max_pxcnt = 0x86f,
++		/* hspuls_begin */
++		/* hspuls_end */
++		/* hspuls_switch */
++		/* vspuls_begin */
++		/* vspuls_end */
++		/* vspuls_bline */
++		/* vspuls_eline */
++		.havon_begin = 0x1f0,
++		.havon_end = 0x82f,
++		.vavon_bline = 0x31,
++		.vavon_eline = 0x4e0,
++		/* eqpuls_begin */
++		/* eqpuls_end */
++		/* eqpuls_bline */
++		/* eqpuls_eline */
++		.hso_begin = 0,
++		.hso_end = 0xc0,
++		.vso_begin = 0x1e,
++		.vso_end = 0x32,
++		.vso_bline = 0,
++		.vso_eline = 3,
++		.vso_eline_present = true,
++		/* sy_val */
++		/* sy2_val */
++		.max_lncnt = 0x4e1,
++	},
++};
++
++struct meson_hdmi_venc_dmt_mode {
++	struct drm_display_mode drm_mode;
++	union meson_hdmi_venc_mode *mode;
++} meson_hdmi_venc_dmt_modes[] = {
++	/* 640x480 at 60Hz */
++	{
++		{ DRM_MODE("640x480", DRM_MODE_TYPE_DRIVER, 25175, 640, 656,
++		  752, 800, 0, 480, 490, 492, 525, 0,
++		  DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
++		&meson_hdmi_encp_mode_640x480_60,
++	},
++	/* 800x600 at 60Hz */
++	{
++		{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 40000, 800, 840,
++		  968, 1056, 0, 600, 601, 605, 628, 0,
++		  DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
++		&meson_hdmi_encp_mode_800x600_60,
++	},
++	/* 1024x768 at 60Hz */
++	{
++		{ DRM_MODE("1024x768", DRM_MODE_TYPE_DRIVER, 65000, 1024,
++		  1048, 1184, 1344, 0, 768, 771, 777, 806, 0,
++		  DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
++		&meson_hdmi_encp_mode_1024x768_60,
++	},
++	/* 1152x864 at 75Hz */
++	{
++		{ DRM_MODE("1152x864", DRM_MODE_TYPE_DRIVER, 108000, 1152,
++		  1216, 1344, 1600, 0, 864, 865, 868, 900, 0,
++		  DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
++		&meson_hdmi_encp_mode_1152x864_75,
++	},
++	/* 1280x1024 at 60Hz */
++	{
++		{ DRM_MODE("1280x1024", DRM_MODE_TYPE_DRIVER, 108000, 1280,
++		  1328, 1440, 1688, 0, 1024, 1025, 1028, 1066, 0,
++		  DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
++		&meson_hdmi_encp_mode_1280x1024_60,
++	},
++	/* 1600x1200 at 60Hz */
++	{
++		{ DRM_MODE("1600x1200", DRM_MODE_TYPE_DRIVER, 162000, 1600,
++		  1664, 1856, 2160, 0, 1200, 1201, 1204, 1250, 0,
++		  DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
++		&meson_hdmi_encp_mode_1600x1200_60,
++	},
++	/* 1920x1080 at 60Hz */
++	{
++		{ DRM_MODE("1920x1080", DRM_MODE_TYPE_DRIVER, 148500, 1920,
++		  2008, 2052, 2200, 0, 1080, 1084, 1089, 1125, 0,
++		  DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
++		&meson_hdmi_encp_mode_1080p60
++	},
++	{ }, /* sentinel */
++};
++
+ struct meson_hdmi_venc_vic_mode {
+ 	unsigned int vic;
+ 	union meson_hdmi_venc_mode *mode;
+@@ -736,6 +1044,20 @@ static unsigned long modulo(unsigned long a, unsigned long b)
+ 		return a;
+ }
+ 
++bool meson_venc_hdmi_supported_mode(const struct drm_display_mode *mode)
++{
++	struct meson_hdmi_venc_dmt_mode *vmode = meson_hdmi_venc_dmt_modes;
++
++	while (vmode->mode) {
++		if (drm_mode_equal(&vmode->drm_mode, mode))
++			return true;
++		vmode++;
++	}
++
++	return false;
++}
++EXPORT_SYMBOL_GPL(meson_venc_hdmi_supported_mode);
++
+ bool meson_venc_hdmi_supported_vic(int vic)
+ {
+ 	struct meson_hdmi_venc_vic_mode *vmode = meson_hdmi_venc_vic_modes;
+@@ -750,6 +1072,20 @@ bool meson_venc_hdmi_supported_vic(int vic)
+ }
+ EXPORT_SYMBOL_GPL(meson_venc_hdmi_supported_vic);
+ 
++static union meson_hdmi_venc_mode
++*meson_venc_hdmi_get_dmt_vmode(const struct drm_display_mode *mode)
++{
++	struct meson_hdmi_venc_dmt_mode *vmode = meson_hdmi_venc_dmt_modes;
++
++	while (vmode->mode) {
++		if (drm_mode_equal(&vmode->drm_mode, mode))
++			return vmode->mode;
++		vmode++;
++	}
++
++	return NULL;
++}
++
+ static union meson_hdmi_venc_mode *meson_venc_hdmi_get_vic_vmode(int vic)
+ {
+ 	struct meson_hdmi_venc_vic_mode *vmode = meson_hdmi_venc_vic_modes;
+@@ -811,10 +1147,13 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
+ 	unsigned int sof_lines;
+ 	unsigned int vsync_lines;
+ 
+-	vmode = meson_venc_hdmi_get_vic_vmode(vic);
++	if (meson_venc_hdmi_supported_vic(vic))
++		vmode = meson_venc_hdmi_get_vic_vmode(vic);
++	else
++		vmode = meson_venc_hdmi_get_dmt_vmode(mode);
+ 	if (!vmode) {
+-		dev_err(priv->dev, "%s: Fatal Error, unsupported vic %d\n",
+-			__func__, vic);
++		dev_err(priv->dev, "%s: Fatal Error, unsupported mode "
++			DRM_MODE_FMT "\n", __func__, DRM_MODE_ARG(mode));
+ 		return;
+ 	}
+ 
+@@ -864,7 +1203,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
+ 		hsync_pixels_venc *= 2;
+ 
+ 	/* Disable VDACs */
+-	writel_bits_relaxed(0x1f, 0x1f,
++	writel_bits_relaxed(0xff, 0xff,
+ 			priv->io_base + _REG(VENC_VDAC_SETTING));
+ 
+ 	writel_relaxed(0, priv->io_base + _REG(ENCI_VIDEO_EN));
+diff --git a/drivers/gpu/drm/meson/meson_venc.h b/drivers/gpu/drm/meson/meson_venc.h
+index a1b96e8..7c18a36 100644
+--- a/drivers/gpu/drm/meson/meson_venc.h
++++ b/drivers/gpu/drm/meson/meson_venc.h
+@@ -58,6 +58,7 @@ struct meson_cvbs_enci_mode {
+ };
+ 
+ /* HDMI Clock parameters */
++bool meson_venc_hdmi_supported_mode(const struct drm_display_mode *mode);
+ bool meson_venc_hdmi_supported_vic(int vic);
+ bool meson_venc_hdmi_venc_repeat(int vic);
+ 
+-- 
+2.7.4
