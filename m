@@ -1,177 +1,234 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu,  8 Mar 2018 16:49:56 -0300
-Subject: [PATCH 21/54] perf pmu: Auto-merge PMU events created by prefix or
- glob match
-In-Reply-To: <20180308195029.14991-1-acme@kernel.org>
-References: <20180308195029.14991-1-acme@kernel.org>
-Message-ID: <20180308195029.14991-22-acme@kernel.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 8 Mar 2018 13:52:33 -0600
+Subject: [PATCH v7 05/13] ACPI/PPTT: Add Processor Properties Topology
+ Table parsing
+In-Reply-To: <CAKv+Gu9LHHwWNcQdNwDvY70+whxH1VDoGNkMhM0E67hE0LDMDA@mail.gmail.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-6-jeremy.linton@arm.com>
+ <CAKv+Gu9LHHwWNcQdNwDvY70+whxH1VDoGNkMhM0E67hE0LDMDA@mail.gmail.com>
+Message-ID: <d79975a0-eca7-7bac-b542-9cc78c71361f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Agustin Vega-Frias <agustinv@codeaurora.org>
+Hi,
 
-Auto-merge for these events was disabled when auto-merging of non-alias
-events was disabled in commit 63ce844 (perf stat: Only auto-merge events
-that are PMU aliases).
+On 03/08/2018 10:39 AM, Ard Biesheuvel wrote:
+> On 28 February 2018 at 22:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> ACPI 6.2 adds a new table, which describes how processing units
+>> are related to each other in tree like fashion. Caches are
+>> also sprinkled throughout the tree and describe the properties
+>> of the caches in relation to other caches and processing units.
+>>
+>> Add the code to parse the cache hierarchy and report the total
+>> number of levels of cache for a given core using
+>> acpi_find_last_cache_level() as well as fill out the individual
+>> cores cache information with cache_setup_acpi() once the
+>> cpu_cacheinfo structure has been populated by the arch specific
+>> code.
+>>
+>> An additional patch later in the set adds the ability to report
+>> peers in the topology using find_acpi_cpu_topology()
+>> to report a unique ID for each processing unit at a given level
+>> in the tree. These unique id's can then be used to match related
+>> processing units which exist as threads, COD (clusters
+>> on die), within a given package, etc.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   drivers/acpi/pptt.c | 488 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 488 insertions(+)
+>>   create mode 100644 drivers/acpi/pptt.c
+>>
+>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>> new file mode 100644
+>> index 000000000000..883e4318c6cd
+>> --- /dev/null
+>> +++ b/drivers/acpi/pptt.c
+> ...
+>> +/* total number of attributes checked by the properties code */
+>> +#define PPTT_CHECKED_ATTRIBUTES 4
+>> +
+>> +/*
+>> + * The ACPI spec implies that the fields in the cache structures are used to
+>> + * extend and correct the information probed from the hardware. Lets only
+>> + * set fields that we determine are VALID.
+>> + */
+>> +static void update_cache_properties(struct cacheinfo *this_leaf,
+>> +                                   struct acpi_pptt_cache *found_cache,
+>> +                                   struct acpi_pptt_processor *cpu_node)
+>> +{
+>> +       int valid_flags = 0;
+>> +
+>> +       if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
+>> +               this_leaf->size = found_cache->size;
+>> +               valid_flags++;
+>> +       }
+>> +       if (found_cache->flags & ACPI_PPTT_LINE_SIZE_VALID) {
+>> +               this_leaf->coherency_line_size = found_cache->line_size;
+>> +               valid_flags++;
+>> +       }
+>> +       if (found_cache->flags & ACPI_PPTT_NUMBER_OF_SETS_VALID) {
+>> +               this_leaf->number_of_sets = found_cache->number_of_sets;
+>> +               valid_flags++;
+>> +       }
+>> +       if (found_cache->flags & ACPI_PPTT_ASSOCIATIVITY_VALID) {
+>> +               this_leaf->ways_of_associativity = found_cache->associativity;
+>> +               valid_flags++;
+>> +       }
+>> +       if (found_cache->flags & ACPI_PPTT_WRITE_POLICY_VALID) {
+>> +               switch (found_cache->attributes & ACPI_PPTT_MASK_WRITE_POLICY) {
+>> +               case ACPI_PPTT_CACHE_POLICY_WT:
+>> +                       this_leaf->attributes = CACHE_WRITE_THROUGH;
+>> +                       break;
+>> +               case ACPI_PPTT_CACHE_POLICY_WB:
+>> +                       this_leaf->attributes = CACHE_WRITE_BACK;
+>> +                       break;
+>> +               }
+>> +       }
+>> +       if (found_cache->flags & ACPI_PPTT_ALLOCATION_TYPE_VALID) {
+>> +               switch (found_cache->attributes & ACPI_PPTT_MASK_ALLOCATION_TYPE) {
+>> +               case ACPI_PPTT_CACHE_READ_ALLOCATE:
+>> +                       this_leaf->attributes |= CACHE_READ_ALLOCATE;
+>> +                       break;
+>> +               case ACPI_PPTT_CACHE_WRITE_ALLOCATE:
+>> +                       this_leaf->attributes |= CACHE_WRITE_ALLOCATE;
+>> +                       break;
+>> +               case ACPI_PPTT_CACHE_RW_ALLOCATE:
+>> +               case ACPI_PPTT_CACHE_RW_ALLOCATE_ALT:
+>> +                       this_leaf->attributes |=
+>> +                               CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE;
+>> +                       break;
+>> +               }
+>> +       }
+>> +       /*
+>> +        * If the above flags are valid, and the cache type is NOCACHE
+>> +        * update the cache type as well.
+>> +        */
+>> +       if ((this_leaf->type == CACHE_TYPE_NOCACHE) &&
+>> +           (valid_flags == PPTT_CHECKED_ATTRIBUTES))
+>> +               this_leaf->type = CACHE_TYPE_UNIFIED;
+> 
+> Why do we need the associativity and #sets attributes to be valid in
+> order to set the cache type?
 
-Non-merging of legacy events is preserved:
+This happened a couple revisions ago because its better to force people 
+to completely populate the attributes in the tables (particularly for 
+nodes we are generating, which is what the _NOCACHE check above is 
+detecting) and leave half of them undefined and therefor exported to 
+user-space in a way which makes the properties unreliable across machines.
 
-    $ perf stat -ag -e cache-misses,cache-misses sleep 1
 
-     Performance counter stats for 'system wide':
+> 
+> I see how size and line size are rather fundamental properties, but
+> for a system cache, the geometry doesn't really matter.
 
-                86,323      cache-misses
-                86,323      cache-misses
+Originally all of them were required (to avoid having the discussion 
+about which ones were "important"), but Sudeep was of the opinion that 
+these were the "important" ones, I can see his point, and no one else 
+spoke up... So, those are the ones that are required.
 
-           1.002623307 seconds time elapsed
 
-But prefix or glob matching auto-merges the events created:
-
-    $ perf stat -a -e l3cache/read-miss/ sleep 1
-
-     Performance counter stats for 'system wide':
-
-                   328      l3cache/read-miss/
-
-           1.002627008 seconds time elapsed
-
-    $ perf stat -a -e l3cache_0_[01]/read-miss/ sleep 1
-
-     Performance counter stats for 'system wide':
-
-                   172      l3cache/read-miss/
-
-           1.002627008 seconds time elapsed
-
-As with events created with aliases, auto-merging can be suppressed with
-the --no-merge option:
-
-    $ perf stat -a -e l3cache/read-miss/ --no-merge sleep 1
-
-     Performance counter stats for 'system wide':
-
-                    67      l3cache/read-miss/
-                    67      l3cache/read-miss/
-                    63      l3cache/read-miss/
-                    60      l3cache/read-miss/
-
-           1.002622192 seconds time elapsed
-
-Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
-Acked-by: Andi Kleen <ak@linux.intel.com>
-Acked-by: Jiri Olsa <jolsa@kernel.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Timur Tabi <timur@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Change-Id: I0a47eed54c05e1982ca964d743b37f50f60c508c
-Link: http://lkml.kernel.org/r/1520345084-42646-4-git-send-email-agustinv at codeaurora.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/Documentation/perf-stat.txt | 14 +++++++++-----
- tools/perf/util/parse-events.c         | 13 +++----------
- tools/perf/util/parse-events.h         |  2 +-
- tools/perf/util/parse-events.y         |  4 ++--
- 4 files changed, 15 insertions(+), 18 deletions(-)
-
-diff --git a/tools/perf/Documentation/perf-stat.txt b/tools/perf/Documentation/perf-stat.txt
-index 628026dbedc5..f15b306be183 100644
---- a/tools/perf/Documentation/perf-stat.txt
-+++ b/tools/perf/Documentation/perf-stat.txt
-@@ -267,11 +267,15 @@ taskset.
- --no-merge::
- Do not merge results from same PMUs.
- 
--When multiple events are created from a single event alias, stat will,
--by default, aggregate the event counts and show the result in a single
--row. This option disables that behavior and shows the individual events
--and counts. Aliases are listed immediately after the Kernel PMU events
--by perf list.
-+When multiple events are created from a single event specification,
-+stat will, by default, aggregate the event counts and show the result
-+in a single row. This option disables that behavior and shows
-+the individual events and counts.
-+
-+Multiple events are created from a single event specification when:
-+1. Prefix or glob matching is used for the PMU name.
-+2. Aliases, which are listed immediately after the Kernel PMU events
-+   by perf list, are used.
- 
- --smi-cost::
- Measure SMI cost if msr/aperf/ and msr/smi/ events are supported.
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index bafc91edcb44..4e80ca320399 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -1217,7 +1217,7 @@ int parse_events_add_numeric(struct parse_events_state *parse_state,
- 			 get_config_name(head_config), &config_terms);
- }
- 
--static int __parse_events_add_pmu(struct parse_events_state *parse_state,
-+int parse_events_add_pmu(struct parse_events_state *parse_state,
- 			 struct list_head *list, char *name,
- 			 struct list_head *head_config, bool auto_merge_stats)
- {
-@@ -1287,13 +1287,6 @@ static int __parse_events_add_pmu(struct parse_events_state *parse_state,
- 	return evsel ? 0 : -ENOMEM;
- }
- 
--int parse_events_add_pmu(struct parse_events_state *parse_state,
--			 struct list_head *list, char *name,
--			 struct list_head *head_config)
--{
--	return __parse_events_add_pmu(parse_state, list, name, head_config, false);
--}
--
- int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 			       char *str, struct list_head **listp)
- {
-@@ -1323,8 +1316,8 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 					return -1;
- 				list_add_tail(&term->list, head);
- 
--				if (!__parse_events_add_pmu(parse_state, list,
--							    pmu->name, head, true)) {
-+				if (!parse_events_add_pmu(parse_state, list,
-+							  pmu->name, head, true)) {
- 					pr_debug("%s -> %s/%s/\n", str,
- 						 pmu->name, alias->str);
- 					ok++;
-diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
-index 88108cd11b4c..5015cfd58277 100644
---- a/tools/perf/util/parse-events.h
-+++ b/tools/perf/util/parse-events.h
-@@ -167,7 +167,7 @@ int parse_events_add_breakpoint(struct list_head *list, int *idx,
- 				void *ptr, char *type, u64 len);
- int parse_events_add_pmu(struct parse_events_state *parse_state,
- 			 struct list_head *list, char *name,
--			 struct list_head *head_config);
-+			 struct list_head *head_config, bool auto_merge_stats);
- 
- int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
- 			       char *str,
-diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-index dedf184b5bed..7afeb80cc39e 100644
---- a/tools/perf/util/parse-events.y
-+++ b/tools/perf/util/parse-events.y
-@@ -232,7 +232,7 @@ PE_NAME opt_event_config
- 		YYABORT;
- 
- 	ALLOC_LIST(list);
--	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
-+	if (parse_events_add_pmu(_parse_state, list, $1, $2, false)) {
- 		struct perf_pmu *pmu = NULL;
- 		int ok = 0;
- 		char *pattern;
-@@ -251,7 +251,7 @@ PE_NAME opt_event_config
- 					free(pattern);
- 					YYABORT;
- 				}
--				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms))
-+				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms, true))
- 					ok++;
- 				parse_events_terms__delete(terms);
- 			}
--- 
-2.14.3
+> 
+>> +}
+>> +
+>> +/*
+>> + * Update the kernel cache information for each level of cache
+>> + * associated with the given acpi cpu.
+>> + */
+>> +static void cache_setup_acpi_cpu(struct acpi_table_header *table,
+>> +                                unsigned int cpu)
+>> +{
+>> +       struct acpi_pptt_cache *found_cache;
+>> +       struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+>> +       u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
+>> +       struct cacheinfo *this_leaf;
+>> +       unsigned int index = 0;
+>> +       struct acpi_pptt_processor *cpu_node = NULL;
+>> +
+>> +       while (index < get_cpu_cacheinfo(cpu)->num_leaves) {
+>> +               this_leaf = this_cpu_ci->info_list + index;
+>> +               found_cache = acpi_find_cache_node(table, acpi_cpu_id,
+>> +                                                  this_leaf->type,
+>> +                                                  this_leaf->level,
+>> +                                                  &cpu_node);
+>> +               pr_debug("found = %p %p\n", found_cache, cpu_node);
+>> +               if (found_cache)
+>> +                       update_cache_properties(this_leaf,
+>> +                                               found_cache,
+>> +                                               cpu_node);
+>> +
+>> +               index++;
+>> +       }
+>> +}
+>> +
+>> +/**
+>> + * acpi_find_last_cache_level() - Determines the number of cache levels for a PE
+>> + * @cpu: Kernel logical cpu number
+>> + *
+>> + * Given a logical cpu number, returns the number of levels of cache represented
+>> + * in the PPTT. Errors caused by lack of a PPTT table, or otherwise, return 0
+>> + * indicating we didn't find any cache levels.
+>> + *
+>> + * Return: Cache levels visible to this core.
+>> + */
+>> +int acpi_find_last_cache_level(unsigned int cpu)
+>> +{
+>> +       u32 acpi_cpu_id;
+>> +       struct acpi_table_header *table;
+>> +       int number_of_levels = 0;
+>> +       acpi_status status;
+>> +
+>> +       pr_debug("Cache Setup find last level cpu=%d\n", cpu);
+>> +
+>> +       acpi_cpu_id = get_acpi_id_for_cpu(cpu);
+>> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
+>> +       if (ACPI_FAILURE(status)) {
+>> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
+>> +       } else {
+>> +               number_of_levels = acpi_find_cache_levels(table, acpi_cpu_id);
+>> +               acpi_put_table(table);
+>> +       }
+>> +       pr_debug("Cache Setup find last level level=%d\n", number_of_levels);
+>> +
+>> +       return number_of_levels;
+>> +}
+>> +
+>> +/**
+>> + * cache_setup_acpi() - Override CPU cache topology with data from the PPTT
+>> + * @cpu: Kernel logical cpu number
+>> + *
+>> + * Updates the global cache info provided by cpu_get_cacheinfo()
+>> + * when there are valid properties in the acpi_pptt_cache nodes. A
+>> + * successful parse may not result in any updates if none of the
+>> + * cache levels have any valid flags set.  Futher, a unique value is
+>> + * associated with each known CPU cache entry. This unique value
+>> + * can be used to determine whether caches are shared between cpus.
+>> + *
+>> + * Return: -ENOENT on failure to find table, or 0 on success
+>> + */
+>> +int cache_setup_acpi(unsigned int cpu)
+>> +{
+>> +       struct acpi_table_header *table;
+>> +       acpi_status status;
+>> +
+>> +       pr_debug("Cache Setup ACPI cpu %d\n", cpu);
+>> +
+>> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
+>> +       if (ACPI_FAILURE(status)) {
+>> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
+>> +               return -ENOENT;
+>> +       }
+>> +
+>> +       cache_setup_acpi_cpu(table, cpu);
+>> +       acpi_put_table(table);
+>> +
+>> +       return status;
+>> +}
+>> --
+>> 2.13.6
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
