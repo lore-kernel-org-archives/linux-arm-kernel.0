@@ -1,54 +1,59 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 8 Mar 2018 13:36:12 +0000
-Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
-In-Reply-To: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
-References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Thu, 8 Mar 2018 10:39:31 -0300
+Subject: [RFC V4] perf, tools: Support wildcards on pmu name in dynamic
+ pmu events
+In-Reply-To: <ae102272a8186f0351363511f4ed07f8@codeaurora.org>
+References: <1520454947-16977-1-git-send-email-agustinv@codeaurora.org>
+ <20180308130358.GC3701@kernel.org>
+ <ae102272a8186f0351363511f4ed07f8@codeaurora.org>
+Message-ID: <20180308133931.GA7273@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/18 14:14, Vladimir Murzin wrote:
-> Hi,
-> 
-> This series adds support for PMSAv8 MPU defined by ARMv8R/M
-> architecture.
-> 
-> Changelog:
-> 
->      v1 -> v2
->         - Included missed patch.
-> 	- Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
-> 	  restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
-> 	  allows us to refer PMSAv8_MINALIGN in linker scripts.
-> 	- Improved and tested XIP support
-> 
->     RFC -> v1
->         - Rebased on v4.16-rc1
-> 	- Added Tested-by for v7M bits from Andras
-> 
-> Thanks!
+Em Thu, Mar 08, 2018 at 08:28:13AM -0500, Agustin Vega-Frias escreveu:
+> On 2018-03-08 08:03, Arnaldo Carvalho de Melo wrote:
+> > Em Wed, Mar 07, 2018 at 03:35:47PM -0500, Agustin Vega-Frias escreveu:
+> > > +++ b/tools/perf/util/parse-events.y
+> > > @@ -8,6 +8,7 @@
+> > > 
+> > >  #define YYDEBUG 1
+> > > 
+> > > +#include <fnmatch.h>
+> > >  #include <linux/compiler.h>
+> > >  #include <linux/list.h>
+> > >  #include <linux/types.h>
+> > > @@ -234,6 +235,10 @@ PE_NAME opt_event_config
+> > >  	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
+> > >  		struct perf_pmu *pmu = NULL;
+> > >  		int ok = 0;
+> > > +		char *pattern;
+> > > +
+> > > +		if (asprintf(&pattern, "%s*", $1) < 0)
+> > > +			YYABORT;
 
-OK for patch tracker?
+> > +               if (asprintf(&pattern, "?(uncore_)%s*", $1) < 0)
 
-Vladimir
+> > I completely overlook that you were using this and thus needed that
+> > extension, duh, thanks for the patience 8-) and for the new patch.
 
-> 
-> Vladimir Murzin (4):
->   ARM: NOMMU: Move PMSAv7 MPU under it's own namespace
->   ARM: NOMMU: Reorganise __setup_mpu
->   ARM: NOMMU: Postpone MPU activation till __after_proc_init
->   ARM: NOMMU: Support PMSAv8 MPU
-> 
->  arch/arm/include/asm/mpu.h        | 112 +++++++++-----
->  arch/arm/include/asm/v7m.h        |  14 +-
->  arch/arm/kernel/asm-offsets.c     |   8 +-
->  arch/arm/kernel/head-nommu.S      | 289 ++++++++++++++++++++++++++++-------
->  arch/arm/kernel/vmlinux-xip.lds.S |   4 +
->  arch/arm/kernel/vmlinux.lds.S     |   7 +
->  arch/arm/mm/Makefile              |   2 +-
->  arch/arm/mm/nommu.c               |  32 ++++
->  arch/arm/mm/pmsa-v7.c             |  59 +++-----
->  arch/arm/mm/pmsa-v8.c             | 307 ++++++++++++++++++++++++++++++++++++++
->  10 files changed, 701 insertions(+), 133 deletions(-)
->  create mode 100644 arch/arm/mm/pmsa-v8.c
-> 
+Further trying to remove my brown paper bag: I thought the '?(...)' type
+of thing would be something _users_ would pass on the perf tool command
+line, not something used by the tool itself, like on the original
+patch.... :-)
+ 
+> NP Arnaldo, thanks for the quick turnaround on these patches :o)
+> Just so I know, since these are my first patches on perf tools,
+> where are perf tools patches queued once acked?
+
+git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
+
+If they are super urgent, then they will go to a different branch,
+perf/urgent, that is targetted for the current merge window, i.e. right
+now:
+
+ perf/core   -> 4.17
+ perf/urgent -> 4.16
+
+Thanks, and keep the patches flowing!
+
+- Arnaldo
