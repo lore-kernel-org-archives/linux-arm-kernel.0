@@ -1,15 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu,  8 Mar 2018 11:12:01 -0800
-Subject: [PATCH v5 17/21] nvmem: rockchip-efuse: Make use of
- of_device_get_match_data()
+Date: Thu,  8 Mar 2018 11:12:02 -0800
+Subject: [PATCH v5 18/21] nvmem: vf610-ocotp: Do not use "&pdev->dev"
+ explicitly
 In-Reply-To: <20180308191205.26943-1-andrew.smirnov@gmail.com>
 References: <20180308191205.26943-1-andrew.smirnov@gmail.com>
-Message-ID: <20180308191205.26943-18-andrew.smirnov@gmail.com>
+Message-ID: <20180308191205.26943-19-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify code a bit by using of_device_get_match_data() instead of
-of_match_device().
+There already a "dev" variable for that. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,36 +24,22 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/vf610-ocotp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index fec6e4c48b9a..ade8848adf82 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -259,11 +259,11 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 5a395ffb2ca8..4662309489db 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -223,8 +223,7 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
  	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct rockchip_efuse_chip *efuse;
--	const struct of_device_id *match;
-+	const void *data;
- 	struct device *dev = &pdev->dev;
+ 	struct vf610_ocotp *ocotp_dev;
  
--	match = of_match_device(dev->driver->of_match_table, dev);
--	if (!match || !match->data) {
-+	data = of_device_get_match_data(dev);
-+	if (!data) {
- 		dev_err(dev, "failed to get match data\n");
- 		return -EINVAL;
- 	}
-@@ -286,7 +286,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
- 				 &econfig.size))
- 		econfig.size = resource_size(res);
--	econfig.reg_read = match->data;
-+	econfig.reg_read = data;
- 	econfig.priv = efuse;
- 	econfig.dev = efuse->dev;
- 	nvmem = devm_nvmem_register(dev, &econfig);
+-	ocotp_dev = devm_kzalloc(&pdev->dev,
+-			sizeof(struct vf610_ocotp), GFP_KERNEL);
++	ocotp_dev = devm_kzalloc(dev, sizeof(struct vf610_ocotp), GFP_KERNEL);
+ 	if (!ocotp_dev)
+ 		return -ENOMEM;
+ 
 -- 
 2.14.3
