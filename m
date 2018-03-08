@@ -1,118 +1,48 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Thu, 8 Mar 2018 14:18:02 +0800
-Subject: [PATCH v9 5/7] arm64: kvm: Introduce KVM_ARM_SET_SERROR_ESR ioctl
-In-Reply-To: <5A85C974.70500@arm.com>
-References: <0184EA26B2509940AA629AE1405DD7F201A9E8EA@DGGEMA503-MBS.china.huawei.com>
- <5A70C5A0.1050600@arm.com> <d1b17dae-9d9c-970a-d164-a41c618d449b@huawei.com>
- <5A7DDDEE.9050306@arm.com> <93d07d3e-8388-7814-d674-538071d84e2a@huawei.com>
- <5A85C974.70500@arm.com>
-Message-ID: <CAMj-D2COh4xDKreZXPHeiJK34mrPqDbHszDWY-fz_SfxTRaHQA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 08 Mar 2018 07:29:11 +0100
+Subject: [PATCH] dt-bindings: exynos: Document #sound-dai-cells property
+ of the HDMI node
+In-Reply-To: <5AA0B59F.3070402@samsung.com>
+References: <CGME20180307171131epcas1p4687ef394d1a0a6d0eb2de2691c977c3f@epcas1p4.samsung.com>
+ <20180307171111.14551-1-s.nawrocki@samsung.com>
+ <5AA0B59F.3070402@samsung.com>
+Message-ID: <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-   sorry for my late response due to chines new year.
+Hi Inki,
 
-2018-02-16 1:55 GMT+08:00 James Morse <james.morse@arm.com>:
-> Hi gengdongjiu,
+On 2018-03-08 05:01, Inki Dae wrote:
+> Hi Sylwester,
 >
-> On 12/02/18 10:19, gengdongjiu wrote:
->> On 2018/2/10 1:44, James Morse wrote:
->>> The point? We can't know what a CPU without the RAS extensions puts in there.
->>>
->>> Why Does this matter? When migrating a pending SError we have to know the
->>> difference between 'use this 64bit value', and 'the CPU will generate it'.
->>> If I make an SError pending with ESR=0 on a CPU with VSESR, I can't migrated to
->>> a system that generates an impdef SError-ESR, because I can't know it will be 0.
->
->> For the target system, before taking the SError, no one can know whether its syndrome value
->> is IMPLEMENTATION DEFINED or architecturally defined.
->
-> For a virtual-SError, the hypervisor knows what it generated. (do I have
-> VSESR_EL2? What did I put in there?).
->
->
->> when the virtual SError is taken, the ESR_ELx.IDS will be updated, then we can know
->> whether the ESR value is impdef or architecturally defined.
->
-> True, the guest can't know anything about a pending virtual SError until it
-> takes it. Why is this a problem?
->
->
->> It seems migration is only allowed only when target system and source system all support
->> RAS extension, because we do not know whether its syndrome is IMPLEMENTATION DEFINED or
->> architecturally defined.
->
-> I don't think Qemu allows migration between hosts with differing guest-ID
-> registers. But we shouldn't depend on this, and we may want to hide the v8.2 RAS
-> features from the guest's ID register, but still use them from the host.
->
-> The way I imagined it working was we would pack the following information into
-> that events struct:
-> {
->         bool serror_pending;
->         bool serror_has_esr;
->         u64  serror_esr;
-> }
+> 2018? 03? 08? 02:11? Sylwester Nawrocki ?(?) ? ?:
+>> The #sound-dai-cells DT property is required to describe link between
+>> the HDMI IP block and the SoC's audio subsystem.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
+>> index 8715ff06c457..6b2a526ec586 100644
+>> --- a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
+>> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
+>> @@ -50,6 +50,9 @@ Required properties for Exynos 5433:
+>>   - clock-names: aliases for above clock specfiers.
+>>   - samsung,sysreg: handle to syscon used to control the system registers.
+>>   
+>> +Optional properties for Exynos 4210, 4212, 5420 and 5433:
+>> + - #sound-dai-cells: should be 0.
+>> +
+> Just trivial question. 'sound-dai-cells' property could affect hdmi driver? I looked into HDMI codec driver but I didn't find relevat code.
+> I mean that if this property never affect HDMI driver then this property would be a dead thing even through this can be declared optionally.
 
-I have used your suggestion struct
+This property is used by ASoC framework when it is building connections
+between all elements of the virtual 'sound card'. It allows generic
+code to find proper driver for the digital audio interface (DAI) object.
 
->
-> The problem I was trying to describe is because there is no value of serror_esr
-> we can use to mean 'Ignore this, I'm a v8.0 CPU'. VSESR_EL2 is a 64bit register,
-> any bits we abuse may get a meaning we want to use in the future.
->
-> When it comes to migration, v8.{0,1} systems can only GET/SET events where
-> serror_has_esr == false, they can't use the serror_esr. On v8.2 systems we
-> should require serror_has_esr to be true.
-yes, I agreed.
-
->
-> If we need to support migration from v8.{0,1} to v8.2, we can make up an impdef
-> serror_esr.
-
-For the Qemu migration, I need to check more the QEMU code.
-
-
-Hi Andrew,
-      I use KVM_GET/SET_VCPU_EVENTS IOCTL to migrate the Serror
-exception status of VM,
-The even struct is shown below:
-
-{
-      bool serror_pending;
-      bool serror_has_esr;
-     u64  serror_esr;
-}
-
-Only when the target machine is armv8.2, it needs to set the
-serror_esr(SError Exception Syndrome Register).
-for the armv8.0,  software can not set the serror_esr(SError Exception
-Syndrome Register).
-so when migration from v8.{0,1} to v8.2, QEMU should make up an impdef
-serror_esr for the v8.2 target.
-can you give me some suggestion how to set that register in the QEMU?
-I do not familar with the QEMU migration.
-Thanks very much.
-
->
-> We will need to decide what KVM does when SET is called but an SError was
-> already pending. 2.5.3 "Multiple SError interrupts" of [0] has something to say.
-
-how about KVM set again to the same VCPU?
-
->
->
-> Happy new year,
-thanks!
-
->
-> James
->
->
-> [0]
-> https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
