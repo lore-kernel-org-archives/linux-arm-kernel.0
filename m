@@ -1,215 +1,149 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Mar 2018 16:39:00 +0000
-Subject: [PATCH v7 05/13] ACPI/PPTT: Add Processor Properties Topology
- Table parsing
-In-Reply-To: <20180228220619.6992-6-jeremy.linton@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-6-jeremy.linton@arm.com>
-Message-ID: <CAKv+Gu9LHHwWNcQdNwDvY70+whxH1VDoGNkMhM0E67hE0LDMDA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 8 Mar 2018 08:41:59 -0800
+Subject: [PATCH v2] arm64/debug: Fix registers on sleeping tasks
+In-Reply-To: <382abcdd-5264-0c0c-282f-d1f52ecff8e3@linaro.org>
+References: <20180305234309.233226-1-dianders@chromium.org>
+ <382abcdd-5264-0c0c-282f-d1f52ecff8e3@linaro.org>
+Message-ID: <CAD=FV=X4_AQFBxWpinDj5F9DUckC02dQ_2QPFQRs34e5_b00bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 February 2018 at 22:06, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> ACPI 6.2 adds a new table, which describes how processing units
-> are related to each other in tree like fashion. Caches are
-> also sprinkled throughout the tree and describe the properties
-> of the caches in relation to other caches and processing units.
->
-> Add the code to parse the cache hierarchy and report the total
-> number of levels of cache for a given core using
-> acpi_find_last_cache_level() as well as fill out the individual
-> cores cache information with cache_setup_acpi() once the
-> cpu_cacheinfo structure has been populated by the arch specific
-> code.
->
-> An additional patch later in the set adds the ability to report
-> peers in the topology using find_acpi_cpu_topology()
-> to report a unique ID for each processing unit at a given level
-> in the tree. These unique id's can then be used to match related
-> processing units which exist as threads, COD (clusters
-> on die), within a given package, etc.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/acpi/pptt.c | 488 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 488 insertions(+)
->  create mode 100644 drivers/acpi/pptt.c
->
-> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-> new file mode 100644
-> index 000000000000..883e4318c6cd
-> --- /dev/null
-> +++ b/drivers/acpi/pptt.c
-...
-> +/* total number of attributes checked by the properties code */
-> +#define PPTT_CHECKED_ATTRIBUTES 4
-> +
-> +/*
-> + * The ACPI spec implies that the fields in the cache structures are used to
-> + * extend and correct the information probed from the hardware. Lets only
-> + * set fields that we determine are VALID.
-> + */
-> +static void update_cache_properties(struct cacheinfo *this_leaf,
-> +                                   struct acpi_pptt_cache *found_cache,
-> +                                   struct acpi_pptt_processor *cpu_node)
-> +{
-> +       int valid_flags = 0;
-> +
-> +       if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
-> +               this_leaf->size = found_cache->size;
-> +               valid_flags++;
-> +       }
-> +       if (found_cache->flags & ACPI_PPTT_LINE_SIZE_VALID) {
-> +               this_leaf->coherency_line_size = found_cache->line_size;
-> +               valid_flags++;
-> +       }
-> +       if (found_cache->flags & ACPI_PPTT_NUMBER_OF_SETS_VALID) {
-> +               this_leaf->number_of_sets = found_cache->number_of_sets;
-> +               valid_flags++;
-> +       }
-> +       if (found_cache->flags & ACPI_PPTT_ASSOCIATIVITY_VALID) {
-> +               this_leaf->ways_of_associativity = found_cache->associativity;
-> +               valid_flags++;
-> +       }
-> +       if (found_cache->flags & ACPI_PPTT_WRITE_POLICY_VALID) {
-> +               switch (found_cache->attributes & ACPI_PPTT_MASK_WRITE_POLICY) {
-> +               case ACPI_PPTT_CACHE_POLICY_WT:
-> +                       this_leaf->attributes = CACHE_WRITE_THROUGH;
-> +                       break;
-> +               case ACPI_PPTT_CACHE_POLICY_WB:
-> +                       this_leaf->attributes = CACHE_WRITE_BACK;
-> +                       break;
-> +               }
-> +       }
-> +       if (found_cache->flags & ACPI_PPTT_ALLOCATION_TYPE_VALID) {
-> +               switch (found_cache->attributes & ACPI_PPTT_MASK_ALLOCATION_TYPE) {
-> +               case ACPI_PPTT_CACHE_READ_ALLOCATE:
-> +                       this_leaf->attributes |= CACHE_READ_ALLOCATE;
-> +                       break;
-> +               case ACPI_PPTT_CACHE_WRITE_ALLOCATE:
-> +                       this_leaf->attributes |= CACHE_WRITE_ALLOCATE;
-> +                       break;
-> +               case ACPI_PPTT_CACHE_RW_ALLOCATE:
-> +               case ACPI_PPTT_CACHE_RW_ALLOCATE_ALT:
-> +                       this_leaf->attributes |=
-> +                               CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE;
-> +                       break;
-> +               }
-> +       }
-> +       /*
-> +        * If the above flags are valid, and the cache type is NOCACHE
-> +        * update the cache type as well.
-> +        */
-> +       if ((this_leaf->type == CACHE_TYPE_NOCACHE) &&
-> +           (valid_flags == PPTT_CHECKED_ATTRIBUTES))
-> +               this_leaf->type = CACHE_TYPE_UNIFIED;
+Hi,
 
-Why do we need the associativity and #sets attributes to be valid in
-order to set the cache type?
-
-I see how size and line size are rather fundamental properties, but
-for a system cache, the geometry doesn't really matter.
-
-> +}
-> +
-> +/*
-> + * Update the kernel cache information for each level of cache
-> + * associated with the given acpi cpu.
-> + */
-> +static void cache_setup_acpi_cpu(struct acpi_table_header *table,
-> +                                unsigned int cpu)
-> +{
-> +       struct acpi_pptt_cache *found_cache;
-> +       struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-> +       u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-> +       struct cacheinfo *this_leaf;
-> +       unsigned int index = 0;
-> +       struct acpi_pptt_processor *cpu_node = NULL;
-> +
-> +       while (index < get_cpu_cacheinfo(cpu)->num_leaves) {
-> +               this_leaf = this_cpu_ci->info_list + index;
-> +               found_cache = acpi_find_cache_node(table, acpi_cpu_id,
-> +                                                  this_leaf->type,
-> +                                                  this_leaf->level,
-> +                                                  &cpu_node);
-> +               pr_debug("found = %p %p\n", found_cache, cpu_node);
-> +               if (found_cache)
-> +                       update_cache_properties(this_leaf,
-> +                                               found_cache,
-> +                                               cpu_node);
-> +
-> +               index++;
-> +       }
-> +}
-> +
-> +/**
-> + * acpi_find_last_cache_level() - Determines the number of cache levels for a PE
-> + * @cpu: Kernel logical cpu number
-> + *
-> + * Given a logical cpu number, returns the number of levels of cache represented
-> + * in the PPTT. Errors caused by lack of a PPTT table, or otherwise, return 0
-> + * indicating we didn't find any cache levels.
-> + *
-> + * Return: Cache levels visible to this core.
-> + */
-> +int acpi_find_last_cache_level(unsigned int cpu)
-> +{
-> +       u32 acpi_cpu_id;
-> +       struct acpi_table_header *table;
-> +       int number_of_levels = 0;
-> +       acpi_status status;
-> +
-> +       pr_debug("Cache Setup find last level cpu=%d\n", cpu);
-> +
-> +       acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
-> +       if (ACPI_FAILURE(status)) {
-> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
-> +       } else {
-> +               number_of_levels = acpi_find_cache_levels(table, acpi_cpu_id);
-> +               acpi_put_table(table);
-> +       }
-> +       pr_debug("Cache Setup find last level level=%d\n", number_of_levels);
-> +
-> +       return number_of_levels;
-> +}
-> +
-> +/**
-> + * cache_setup_acpi() - Override CPU cache topology with data from the PPTT
-> + * @cpu: Kernel logical cpu number
-> + *
-> + * Updates the global cache info provided by cpu_get_cacheinfo()
-> + * when there are valid properties in the acpi_pptt_cache nodes. A
-> + * successful parse may not result in any updates if none of the
-> + * cache levels have any valid flags set.  Futher, a unique value is
-> + * associated with each known CPU cache entry. This unique value
-> + * can be used to determine whether caches are shared between cpus.
-> + *
-> + * Return: -ENOENT on failure to find table, or 0 on success
-> + */
-> +int cache_setup_acpi(unsigned int cpu)
-> +{
-> +       struct acpi_table_header *table;
-> +       acpi_status status;
-> +
-> +       pr_debug("Cache Setup ACPI cpu %d\n", cpu);
-> +
-> +       status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
-> +       if (ACPI_FAILURE(status)) {
-> +               pr_err_once("No PPTT table found, cache topology may be inaccurate\n");
-> +               return -ENOENT;
-> +       }
-> +
-> +       cache_setup_acpi_cpu(table, cpu);
-> +       acpi_put_table(table);
-> +
-> +       return status;
-> +}
-> --
-> 2.13.6
+On Thu, Mar 8, 2018 at 8:19 AM, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
+> On 05/03/18 23:43, Douglas Anderson wrote:
+>>
+>> This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
+>> registers on sleeping tasks") but for arm64.  Nuff said.
+>>
+>> ...well, perhaps I could also add that task_pt_regs are userspace
+>> registers and that's not what kgdb is supposed to be reporting.  We're
+>> supposed to be reporting kernel registers.
+>>
+>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I hacked together a (still very immature) kgdb test suite[1] around the turn
+> of the year. Whilst its not quite solid enough for me to recommend others
+> deploy it except out of curiosity... so I haven't yet started yelling about
+> test suite failures except in the privacy of my own head.
+>
+> However I can confirm that this patch fixes one of the test suite failures I
+> haven't had time to blame allocate yet!
+>
+> So...
+> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+
+Thanks for your testing!  ...I'll have to check out your test suite soon.
+
+
+> BTW is this something that should Cc: stable?
+
+It wouldn't hurt if this made it back to stable on a best-effort
+approach.  The problem has been there since the beginning, so it's not
+like it's fixing a regression that cropped up in a specific version.
+...but it does fix a bug, so probably Cc stable makes sense.  I guess
+I'd leave it up to the maintainer that applies the patch?
+
+
+-Doug<div class="gmail_extra"><br><div class="gmail_quote">On Thu, Mar
+8, 2018 at 8:19 AM, Daniel Thompson <span dir="ltr">&lt;<a
+href="mailto:daniel.thompson@linaro.org"
+target="_blank">daniel.thompson at linaro.org</a>&gt;</span>
+wrote:<br><blockquote class="gmail_quote" style="margin:0 0 0
+.8ex;border-left:1px #ccc solid;padding-left:1ex"><span class="">On
+05/03/18 23:43, Douglas Anderson wrote:<br>
+<blockquote class="gmail_quote" style="margin:0 0 0
+.8ex;border-left:1px #ccc solid;padding-left:1ex">
+This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix<br>
+registers on sleeping tasks") but for arm64.&nbsp; Nuff said.<br>
+<br>
+...well, perhaps I could also add that task_pt_regs are userspace<br>
+registers and that's not what kgdb is supposed to be reporting.&nbsp; We're<br>
+supposed to be reporting kernel registers.<br>
+<br>
+Signed-off-by: Douglas Anderson &lt;<a
+href="mailto:dianders@chromium.org"
+target="_blank">dianders at chromium.org</a>&gt;<br>
+</blockquote>
+<br></span>
+I hacked together a (still very immature) kgdb test suite[1] around
+the turn of the year. Whilst its not quite solid enough for me to
+recommend others deploy it except out of curiosity... so I haven't yet
+started yelling about test suite failures except in the privacy of my
+own head.<br>
+<br>
+However I can confirm that this patch fixes one of the test suite
+failures I haven't had time to blame allocate yet!<br>
+<br>
+So...<br>
+Tested-by: Daniel Thompson &lt;<a
+href="mailto:daniel.thompson@linaro.org"
+target="_blank">daniel.thompson at linaro.org</a>&gt;<br>
+<br>
+BTW is this something that should Cc: stable?<br>
+<br>
+<br>
+Daniel.<br>
+<br>
+[1] <a href="https://github.com/daniel-thompson/kgdbtest"
+rel="noreferrer" target="_blank"
+data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://github.com/daniel-thompson/kgdbtest&amp;source=gmail&amp;ust=1520613443900000&amp;usg=AFQjCNHzh_tGdP65DdFEQo-ofF_LCI5XBQ">https://github.com/daniel-thom<wbr>pson/kgdbtest</a><div
+class="HOEnZb"><div class="h5"><br>
+<br>
+<br>
+<blockquote class="gmail_quote" style="margin:0 0 0
+.8ex;border-left:1px #ccc solid;padding-left:1ex">
+---<br>
+<br>
+Changes in v2:<br>
+- Init cpu_context in one line<br>
+- Explain that task_pt_regs are userspace<br>
+<br>
+&nbsp; arch/arm64/kernel/kgdb.c | 21 ++++++++++++++++-----<br>
+&nbsp; 1 file changed, 16 insertions(+), 5 deletions(-)<br>
+<br>
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c<br>
+index 2122cd187f19..a20de58061a8 100644<br>
+--- a/arch/arm64/kernel/kgdb.c<br>
++++ b/arch/arm64/kernel/kgdb.c<br>
+@@ -138,14 +138,25 @@ int dbg_set_reg(int regno, void *mem, struct
+pt_regs *regs)<br>
+&nbsp; void<br>
+&nbsp; sleeping_thread_to_gdb_regs(un<wbr>signed long *gdb_regs,
+struct task_struct *task)<br>
+&nbsp; {<br>
+-&nbsp; &nbsp; &nbsp; &nbsp;struct pt_regs *thread_regs;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;struct cpu_context *cpu_context =
+&amp;task-&gt;thread.cpu_context;<br>
+&nbsp; &nbsp; &nbsp; &nbsp; /* Initialize to zero */<br>
+&nbsp; &nbsp; &nbsp; &nbsp; memset((char *)gdb_regs, 0, NUMREGBYTES);<br>
+-&nbsp; &nbsp; &nbsp; &nbsp;thread_regs = task_pt_regs(task);<br>
+-&nbsp; &nbsp; &nbsp; &nbsp;memcpy((void *)gdb_regs, (void
+*)thread_regs-&gt;regs, GP_REG_BYTES);<br>
+-&nbsp; &nbsp; &nbsp; &nbsp;/* Special case for PSTATE (check comments
+in asm/kgdb.h for details) */<br>
+-&nbsp; &nbsp; &nbsp; &nbsp;dbg_get_reg(33, gdb_regs + GP_REG_BYTES,
+thread_regs);<br>
++<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[19] = cpu_context-&gt;x19;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[20] = cpu_context-&gt;x20;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[21] = cpu_context-&gt;x21;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[22] = cpu_context-&gt;x22;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[23] = cpu_context-&gt;x23;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[24] = cpu_context-&gt;x24;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[25] = cpu_context-&gt;x25;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[26] = cpu_context-&gt;x26;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[27] = cpu_context-&gt;x27;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[28] = cpu_context-&gt;x28;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[29] = cpu_context-&gt;fp;<br>
++<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[31] = cpu_context-&gt;sp;<br>
++&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[32] = cpu_context-&gt;pc;<br>
+&nbsp; }<br>
+&nbsp; &nbsp; void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)<br>
+<br>
+</blockquote>
+<br>
+</div></div></blockquote></div><br></div>
