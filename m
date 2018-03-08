@@ -1,172 +1,98 @@
 From: john.garry@huawei.com (John Garry)
-Date: Thu, 8 Mar 2018 18:58:30 +0800
-Subject: [PATCH v3 05/11] perf vendor events arm64: Relocate ThunderX2 JSON to
- cavium subdirectory
+Date: Thu, 8 Mar 2018 18:58:34 +0800
+Subject: [PATCH v3 09/11] perf vendor events arm64: fixup ThunderX2 to use
+ recommended events
 In-Reply-To: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
 References: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
-Message-ID: <1520506716-197429-6-git-send-email-john.garry@huawei.com>
+Message-ID: <1520506716-197429-10-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since jevents now supports vendor subdirectory, relocate
-the ThunderX2 JSON to Cavium subdirectory.
+This patch fixes the Cavium ThunderX2 JSON to use event definitions
+from the ARMv8 recommended events.
 
 Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 Signed-off-by: John Garry <john.garry@huawei.com>
 ---
- .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 ----------------------
- .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 62 ++++++++++++++++++++++
- tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +-
- 3 files changed, 63 insertions(+), 63 deletions(-)
- delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+ .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 50 +++++-----------------
+ 1 file changed, 10 insertions(+), 40 deletions(-)
 
-diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
-deleted file mode 100644
-index 2db45c4..0000000
---- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
-+++ /dev/null
-@@ -1,62 +0,0 @@
--[
--    {
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+index 2db45c4..bc03c06 100644
+--- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
++++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+@@ -1,62 +1,32 @@
+ [
+     {
 -        "PublicDescription": "Attributable Level 1 data cache access, read",
 -        "EventCode": "0x40",
 -        "EventName": "l1d_cache_rd",
 -        "BriefDescription": "L1D cache read",
--    },
--    {
++        "ArchStdEvent": "L1D_CACHE_RD",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data cache access, write ",
 -        "EventCode": "0x41",
 -        "EventName": "l1d_cache_wr",
 -        "BriefDescription": "L1D cache write",
--    },
--    {
++        "ArchStdEvent": "L1D_CACHE_WR",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data cache refill, read",
 -        "EventCode": "0x42",
 -        "EventName": "l1d_cache_refill_rd",
 -        "BriefDescription": "L1D cache refill read",
--    },
--    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data cache refill, write",
 -        "EventCode": "0x43",
 -        "EventName": "l1d_cache_refill_wr",
 -        "BriefDescription": "L1D refill write",
--    },
--    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data TLB refill, read",
 -        "EventCode": "0x4C",
 -        "EventName": "l1d_tlb_refill_rd",
 -        "BriefDescription": "L1D tlb refill read",
--    },
--    {
++        "ArchStdEvent": "L1D_TLB_REFILL_RD",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data TLB refill, write",
 -        "EventCode": "0x4D",
 -        "EventName": "l1d_tlb_refill_wr",
 -        "BriefDescription": "L1D tlb refill write",
--    },
--    {
++        "ArchStdEvent": "L1D_TLB_REFILL_WR",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
 -        "EventCode": "0x4E",
 -        "EventName": "l1d_tlb_rd",
 -        "BriefDescription": "L1D tlb read",
--    },
--    {
++        "ArchStdEvent": "L1D_TLB_RD",
+     },
+     {
 -        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
 -        "EventCode": "0x4F",
 -        "EventName": "l1d_tlb_wr",
 -        "BriefDescription": "L1D tlb write",
--    },
--    {
++        "ArchStdEvent": "L1D_TLB_WR",
+     },
+     {
 -        "PublicDescription": "Bus access read",
 -        "EventCode": "0x60",
 -        "EventName": "bus_access_rd",
 -        "BriefDescription": "Bus access read",
--   },
--   {
++        "ArchStdEvent": "BUS_ACCESS_RD",
+    },
+    {
 -        "PublicDescription": "Bus access write",
 -        "EventCode": "0x61",
 -        "EventName": "bus_access_wr",
 -        "BriefDescription": "Bus access write",
--   }
--]
-diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-new file mode 100644
-index 0000000..2db45c4
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-index e61c9ca..952a05c 100644
---- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -12,5 +12,5 @@
- #
- #
- #Family-model,Version,Filename,EventType
--0x00000000420f5160,v1,cavium,core
-+0x00000000420f5160,v1,cavium/thunderx2,core
- 0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
++        "ArchStdEvent": "BUS_ACCESS_WR",
+    }
+ ]
 -- 
 1.9.1
