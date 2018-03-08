@@ -1,116 +1,109 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Mar 2018 15:59:29 +0000
-Subject: [PATCH v7 00/13] Support PPTT for ARM64
-In-Reply-To: <1890b2e2-375e-f44f-c224-8cfa23a0add3@arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <8b5bfd7e-57ea-bb34-85f8-69007a3847e6@arm.com>
- <1890b2e2-375e-f44f-c224-8cfa23a0add3@arm.com>
-Message-ID: <CAKv+Gu__yYX-fFqxyxNk3M=Byvw5798po0Jr=qr3anEWKJ+SMA@mail.gmail.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Thu, 8 Mar 2018 08:02:42 -0800
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
+ with the same vintid
+In-Reply-To: <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
+References: <20180307124055.13800-1-marc.zyngier@arm.com>
+ <20180307124055.13800-2-marc.zyngier@arm.com>
+ <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
+ <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
+Message-ID: <20180308160242.GA1917@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2018 at 18:49, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> On 03/01/2018 06:06 AM, Sudeep Holla wrote:
->>
->> Hi Jeremy,
->>
->> On 28/02/18 22:06, Jeremy Linton wrote:
->>>
->>> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
->>> used to describe the processor and cache topology. Ideally it is
->>> used to extend/override information provided by the hardware, but
->>> right now ARM64 is entirely dependent on firmware provided tables.
->>>
->>> This patch parses the table for the cache topology and CPU topology.
->>> When we enable ACPI/PPTT for arm64 we map the physical_id to the
->>> PPTT node flagged as the physical package by the firmware.
->>> This results in topologies that match what the remainder of the
->>> system expects. To avoid inverted scheduler domains we then
->>> set the MC domain equal to the largest cache within the socket
->>> below the NUMA domain.
->>>
->> I remember reviewing and acknowledging most of the cacheinfo stuff with
->> couple of minor suggestions for v6. I don't see any Acked-by tags in
->> this series and don't know if I need to review/ack any more cacheinfo
->> related patches.
->
->
-> Hi,
->
-> Yes, I didn't put them in because I changed the functionality in 2/13 and
-> there is a bug fix in 5/13. I thought you might want to do a quick diff of
-> the git v6->v7 tree.
->
-> Although given that most of the changes were in response to your comments in
-> v6 I probably should have just put the tags in.
->
+On Thu, Mar 08, 2018 at 10:19:49AM +0000, Marc Zyngier wrote:
+> On 07/03/18 23:34, Christoffer Dall wrote:
+> > On Wed, Mar 7, 2018 at 12:40 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> The vgic code is trying to be clever when injecting GICv2 SGIs,
+> >> and will happily populate LRs with the same interrupt number if
+> >> they come from multiple vcpus (after all, they are distinct
+> >> interrupt sources).
+> >>
+> >> Unfortunately, this is against the letter of the architecture,
+> >> and the GICv2 architecture spec says "Each valid interrupt stored
+> >> in the List registers must have a unique VirtualID for that
+> >> virtual CPU interface.". GICv3 has similar (although slightly
+> >> ambiguous) restrictions.
+> >>
+> >> This results in guests locking up when using GICv2-on-GICv3, for
+> >> example. The obvious fix is to stop trying so hard, and inject
+> >> a single vcpu per SGI per guest entry. After all, pending SGIs
+> >> with multiple source vcpus are pretty rare, and are mostly seen
+> >> in scenario where the physical CPUs are severely overcomitted.
+> >>
+> >> Cc: stable at vger.kernel.org
+> >> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic.c | 11 +----------
+> >>  1 file changed, 1 insertion(+), 10 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> >> index c7c5ef190afa..1f7ff175f47b 100644
+> >> --- a/virt/kvm/arm/vgic/vgic.c
+> >> +++ b/virt/kvm/arm/vgic/vgic.c
+> >> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+> >>         list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+> >>                 spin_lock(&irq->irq_lock);
+> >>
+> >> -               if (unlikely(vgic_target_oracle(irq) != vcpu))
+> >> -                       goto next;
+> >> -
+> >> -               /*
+> >> -                * If we get an SGI with multiple sources, try to get
+> >> -                * them in all at once.
+> >> -                */
+> >> -               do {
+> >> +               if (likely(vgic_target_oracle(irq) == vcpu))
+> >>                         vgic_populate_lr(vcpu, irq, count++);
+> > 
+> > I think we need to change vgic_populate_lr to set the EOI maintenance
+> > interrupt flag so that when the interrupt is deactivated, if there are
+> > additional pending sources, we exit the guest and pick up the
+> > interrupt.
+> 
+> Potentially. We need to be careful about about the semantics of EOI MI
+> with non-level interrupts (see the other thread about EOI signalling).
 
-I get sane output from lstopo when applying these patches and booting
-my Socionext SynQuacer in ACPI mode:
+I'll have a look.
 
-$ lstopo-no-graphics
-Machine (31GB)
-  Package L#0 + L3 L#0 (4096KB)
-    L2 L#0 (256KB)
-      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
-      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
-    L2 L#1 (256KB)
-      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
-      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
-    L2 L#2 (256KB)
-      L1d L#4 (32KB) + L1i L#4 (32KB) + Core L#4 + PU L#4 (P#4)
-      L1d L#5 (32KB) + L1i L#5 (32KB) + Core L#5 + PU L#5 (P#5)
-    L2 L#3 (256KB)
-      L1d L#6 (32KB) + L1i L#6 (32KB) + Core L#6 + PU L#6 (P#6)
-      L1d L#7 (32KB) + L1i L#7 (32KB) + Core L#7 + PU L#7 (P#7)
-    L2 L#4 (256KB)
-      L1d L#8 (32KB) + L1i L#8 (32KB) + Core L#8 + PU L#8 (P#8)
-      L1d L#9 (32KB) + L1i L#9 (32KB) + Core L#9 + PU L#9 (P#9)
-    L2 L#5 (256KB)
-      L1d L#10 (32KB) + L1i L#10 (32KB) + Core L#10 + PU L#10 (P#10)
-      L1d L#11 (32KB) + L1i L#11 (32KB) + Core L#11 + PU L#11 (P#11)
-    L2 L#6 (256KB)
-      L1d L#12 (32KB) + L1i L#12 (32KB) + Core L#12 + PU L#12 (P#12)
-      L1d L#13 (32KB) + L1i L#13 (32KB) + Core L#13 + PU L#13 (P#13)
-    L2 L#7 (256KB)
-      L1d L#14 (32KB) + L1i L#14 (32KB) + Core L#14 + PU L#14 (P#14)
-      L1d L#15 (32KB) + L1i L#15 (32KB) + Core L#15 + PU L#15 (P#15)
-    L2 L#8 (256KB)
-      L1d L#16 (32KB) + L1i L#16 (32KB) + Core L#16 + PU L#16 (P#16)
-      L1d L#17 (32KB) + L1i L#17 (32KB) + Core L#17 + PU L#17 (P#17)
-    L2 L#9 (256KB)
-      L1d L#18 (32KB) + L1i L#18 (32KB) + Core L#18 + PU L#18 (P#18)
-      L1d L#19 (32KB) + L1i L#19 (32KB) + Core L#19 + PU L#19 (P#19)
-    L2 L#10 (256KB)
-      L1d L#20 (32KB) + L1i L#20 (32KB) + Core L#20 + PU L#20 (P#20)
-      L1d L#21 (32KB) + L1i L#21 (32KB) + Core L#21 + PU L#21 (P#21)
-    L2 L#11 (256KB)
-      L1d L#22 (32KB) + L1i L#22 (32KB) + Core L#22 + PU L#22 (P#22)
-      L1d L#23 (32KB) + L1i L#23 (32KB) + Core L#23 + PU L#23 (P#23)
-  HostBridge L#0
-    PCIBridge
-      PCIBridge
-        PCI 1b21:0612
-          Block(Disk) L#0 "sda"
-  HostBridge L#3
-    PCI 10de:128b
-      GPU L#1 "renderD128"
-      GPU L#2 "card0"
-      GPU L#3 "controlD64"
+> 
+> > An alternative would be to set the underflow interrupt, but I don't
+> > think that would be correct for multiple priorities, because the SGI
+> > could have a higher priority than other pending interrupts we put in
+> > the LR.
+> 
+> I don't think priorities are the issue (after all, we already sort the
+> irqs in order of priority). 
 
-So
+Yes, but assume you have three pending interrupts, one SGI from two
+sources, and one SPI, and assume that the SGI has priority 1 and SPI
+priority 2 (lower means higher priority), then I think with underflow or
+the no-pending interrupt flag, we'll deliver the SGI from the first
+source, and then the SPI, and then exiting to pick up the last SGI from
+the other source.  That's not how I understand the GIC architecture is
+supposed to work.  Am I missing something?
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> My worry is that underflow is allowed to
+> fire if there is one interrupt pending, which implies that you could
+> end-up in a livelock scenario if you only have one SGI pending with
+> multiple sources.
 
-*However*, while hacking on the firmware that exposes the table, I
-noticed that a malformed structure (incorrect size) can get the parser
-in an infinite loop, hanging the boot after
+Yes, doesn't work, so I think it should be a maintenance interrupt on
+EOI.
 
-[    8.244281] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-[    8.251780] Serial: AMBA driver
-[    8.255042] msm_serial: driver initialized
-[    8.259752] ACPI PPTT: Cache Setup ACPI cpu 0
-[    8.264121] ACPI PPTT: Looking for data cache
-[    8.268484] ACPI PPTT: Looking for CPU 0's level 1 cache type 0
+> 
+> Another possibility would be to use ICH_HCR_EL2.NPIE (GICH_HCR.NPIE on
+> GICv2), which delivers a a MI if no pending interrupts are present. Once
+> the SGI has been activated, we're guaranteed to be able to inject a new
+> pending one.
+> 
+> I like the latter, because it doesn't overload the rest of the code with
+> new semantics. Thoughts?
+> 
 
-so I guess the parsing code could be made a bit more robust?
+I'm fine with that if I can be proven wrong about the multiple sources
+and priorities.
+
+Thanks,
+-Christoffer
