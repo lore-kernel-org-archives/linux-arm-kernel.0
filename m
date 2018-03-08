@@ -1,310 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Mar 2018 11:54:27 +0000
-Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for level
- interrupt resampling
-In-Reply-To: <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
-References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
- <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
-Message-ID: <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 8 Mar 2018 12:55:03 +0100
+Subject: Question about a quirky (DesignWare) PCIe RC in Allwinner H6
+In-Reply-To: <1520488103.13063.1.camel@aosc.io>
+References: <1520261458.33502.10.camel@aosc.io>
+ <20180305214718.GC255556@bhelgaas-glaptop.roam.corp.google.com>
+ <1520308623.33502.13.camel@aosc.io>
+ <20180306233832.GC33706@bhelgaas-glaptop.roam.corp.google.com>
+ <1520488103.13063.1.camel@aosc.io>
+Message-ID: <bd1b5f52-27db-d323-bde5-926be66e7f58@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 09:49, Marc Zyngier wrote:
-> [updated Christoffer's email address]
-> 
-> Hi Shunyong,
-> 
-> On 08/03/18 07:01, Shunyong Yang wrote:
->> When resampling irqfds is enabled, level interrupt should be
->> de-asserted when resampling happens. On page 4-47 of GIC v3
->> specification IHI0069D, it said,
->> "When the PE acknowledges an SGI, a PPI, or an SPI at the CPU
->> interface, the IRI changes the status of the interrupt to active
->> and pending if:
->> ? It is an edge-triggered interrupt, and another edge has been
->> detected since the interrupt was acknowledged.
->> ? It is a level-sensitive interrupt, and the level has not been
->> deasserted since the interrupt was acknowledged."
->>
->> GIC v2 specification IHI0048B.b has similar description on page
->> 3-42 for state machine transition.
->>
->> When some VFIO device, like mtty(8250 VFIO mdev emulation driver
->> in samples/vfio-mdev) triggers a level interrupt, the status
->> transition in LR is pending-->active-->active and pending.
->> Then it will wait resampling to de-assert the interrupt.
->>
->> Current design of lr_signals_eoi_mi() will return false if state
->> in LR is not invalid(Inactive). It causes resampling will not happen
->> in mtty case.
-> 
-> Let me rephrase this, and tell me if I understood it correctly:
-> 
-> - A level interrupt is injected, activated by the guest (LR state=active)
-> - guest exits, re-enters, (LR state=pending+active)
-> - guest EOIs the interrupt (LR state=pending)
-> - maintenance interrupt
-> - we don't signal the resampling because we're not in an invalid state
-> 
-> Is that correct?
-> 
-> That's an interesting case, because it seems to invalidate some of the 
-> optimization that went in over a year ago.
-> 
-> 096f31c4360f KVM: arm/arm64: vgic: Get rid of MISR and EISR fields
-> b6095b084d87 KVM: arm/arm64: vgic: Get rid of unnecessary save_maint_int_state
-> af0614991ab6 KVM: arm/arm64: vgic: Get rid of unnecessary process_maintenance operation
-> 
-> We could compare the value of the LR before the guest entry with
-> the value at exit time, but we still could miss it if we have a
-> transition such as P+A -> P -> A and assume a long enough propagation
-> delay for the maintenance interrupt (which is very likely).
-> 
-> In essence, we have lost the benefit of EISR, which was to give us a
-> way to deal with asynchronous signalling.
-> 
->>
->> This will cause interrupt fired continuously to guest even 8250 IIR
->> has no interrupt. When 8250's interrupt is configured in shared mode,
->> it will pass interrupt to other drivers to handle. However, there
->> is no other driver involved. Then, a "nobody cared" kernel complaint
->> occurs.
->>
->> / # cat /dev/ttyS0
->> [    4.826836] random: crng init done
->> [    6.373620] irq 41: nobody cared (try booting with the "irqpoll"
->> option)
->> [    6.376414] CPU: 0 PID: 1307 Comm: cat Not tainted 4.16.0-rc4 #4
->> [    6.378927] Hardware name: linux,dummy-virt (DT)
->> [    6.380876] Call trace:
->> [    6.381937]  dump_backtrace+0x0/0x180
->> [    6.383495]  show_stack+0x14/0x1c
->> [    6.384902]  dump_stack+0x90/0xb4
->> [    6.386312]  __report_bad_irq+0x38/0xe0
->> [    6.387944]  note_interrupt+0x1f4/0x2b8
->> [    6.389568]  handle_irq_event_percpu+0x54/0x7c
->> [    6.391433]  handle_irq_event+0x44/0x74
->> [    6.393056]  handle_fasteoi_irq+0x9c/0x154
->> [    6.394784]  generic_handle_irq+0x24/0x38
->> [    6.396483]  __handle_domain_irq+0x60/0xb4
->> [    6.398207]  gic_handle_irq+0x98/0x1b0
->> [    6.399796]  el1_irq+0xb0/0x128
->> [    6.401138]  _raw_spin_unlock_irqrestore+0x18/0x40
->> [    6.403149]  __setup_irq+0x41c/0x678
->> [    6.404669]  request_threaded_irq+0xe0/0x190
->> [    6.406474]  univ8250_setup_irq+0x208/0x234
->> [    6.408250]  serial8250_do_startup+0x1b4/0x754
->> [    6.410123]  serial8250_startup+0x20/0x28
->> [    6.411826]  uart_startup.part.21+0x78/0x144
->> [    6.413633]  uart_port_activate+0x50/0x68
->> [    6.415328]  tty_port_open+0x84/0xd4
->> [    6.416851]  uart_open+0x34/0x44
->> [    6.418229]  tty_open+0xec/0x3c8
->> [    6.419610]  chrdev_open+0xb0/0x198
->> [    6.421093]  do_dentry_open+0x200/0x310
->> [    6.422714]  vfs_open+0x54/0x84
->> [    6.424054]  path_openat+0x2dc/0xf04
->> [    6.425569]  do_filp_open+0x68/0xd8
->> [    6.427044]  do_sys_open+0x16c/0x224
->> [    6.428563]  SyS_openat+0x10/0x18
->> [    6.429972]  el0_svc_naked+0x30/0x34
->> [    6.431494] handlers:
->> [    6.432479] [<000000000e9fb4bb>] serial8250_interrupt
->> [    6.434597] Disabling IRQ #41
->>
->> This patch changes the lr state condition in lr_signals_eoi_mi() from
->> invalid(Inactive) to active and pending to avoid this.
->>
->> I am not sure about the original design of the condition of
->> invalid(active). So, This RFC is sent out for comments.
->>
->> Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
->> Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v2.c | 4 ++--
->>  virt/kvm/arm/vgic/vgic-v3.c | 4 ++--
->>  2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->> index e9d840a75e7b..740ee9a5f551 100644
->> --- a/virt/kvm/arm/vgic/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->> @@ -46,8 +46,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
->>  
->>  static bool lr_signals_eoi_mi(u32 lr_val)
->>  {
->> -	return !(lr_val & GICH_LR_STATE) && (lr_val & GICH_LR_EOI) &&
->> -	       !(lr_val & GICH_LR_HW);
->> +	return !((lr_val & GICH_LR_STATE) ^ GICH_LR_STATE) &&
-> 
-> That feels very wrong. You're now signalling the resampling in both
-> invalid and pending+active, and the latter state doesn't mean you've
-> EOIed anything. You're now over-signalling, and signalling the
-> wrong event.
-> 
->> +	       (lr_val & GICH_LR_EOI) && !(lr_val & GICH_LR_HW);
->>  }
->>  
->>  /*
->> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->> index 6b329414e57a..43111bba7af9 100644
->> --- a/virt/kvm/arm/vgic/vgic-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->> @@ -35,8 +35,8 @@ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
->>  
->>  static bool lr_signals_eoi_mi(u64 lr_val)
->>  {
->> -	return !(lr_val & ICH_LR_STATE) && (lr_val & ICH_LR_EOI) &&
->> -	       !(lr_val & ICH_LR_HW);
->> +	return !((lr_val & ICH_LR_STATE) ^ ICH_LR_STATE) &&
->> +	       (lr_val & ICH_LR_EOI) && !(lr_val & ICH_LR_HW);
->>  }
->>  
->>  void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->>
-> 
-> Assuming I understand the issue correctly, I cannot really see how
-> to solve this without reintroducing EISR, which sucks majorly.
-> 
-> I'll try to cook something shortly and we can all have a good
-> fight about how crap this is.
+On 08/03/2018 06:48, Icenowy Zheng wrote:
 
-Here's what I came up with. I don't really like it, but that's
-the least invasive this I could come up with. Please let me
-know if that helps with your test case. Note that I have only
-boot-tested this on a sample of 1 machine, so I don't expect this
-to be perfect.
+> I'm trying to implement a driver for the quirky (DW) PCIe RC in the
+> Allwinner H6 SoC.
+> 
+> The quirk is that only the "dbi" space is always mapped, but at the 
+> same time only 64KiB of other spaces (config, downstream IO and non- 
+> prefetchable memory) are accessible. To access a certain address the 
+> high 16-bit of the address (all bus addresses in H6 SoC are 32- bit 
+> despite the CPU is 64-bit) needs to be written into the 
+> PCIE_ADDR_PAGE_CFG register (a vendor-defined register in DBI 
+> space). So the access to these spaces cannot be processed correctly 
+> with just readl/writel, as the existing code does.
+> 
+> Is it possible to workaround this in the PCI subsystem of Linux?
 
-Also, any guideline on how to reproduce this would be much appreciated.
-I never used this mdev/mtty thing, so please bear with me.
+I didn't think anyone would come up with something more broken
+than tango's PCIe host bridge...
 
-Thanks,
+It's hard to understand what's going on inside the minds of these
+HW devs. I mean, if the steps required are
 
-	M.
+	WRITE MAGIC CONFIG REG
+	READ/WRITE ADDRESS REG
 
->From 66a7c4cfc1029b0169dd771e196e2876ba3f17b1 Mon Sep 17 00:00:00 2001
-From: Marc Zyngier <marc.zyngier@arm.com>
-Date: Thu, 8 Mar 2018 11:14:06 +0000
-Subject: [PATCH] KVM: arm/arm64: Do not rely on LR state to guess EOI MI
- status
+then the whole operation is clearly not atomic, and bad things happen
+when 2+ operations race.
 
-We so far rely on the LR state to decide whether the guest has
-EOI'd a level interrupt or not. While this looks like a good
-idea on the surface, it leads to a couple of annoying corner
-cases:
+Do they think in terms of single core systems with non-multitasking OS?
+Probably not.
 
-Example 1: (P = Pending, A = Active, MI = Maintenance Interrupt)
-P -> guest IAR -> A -> exit/entry -> P+A -> guest EOI -> P -> MI
+Maybe they think it is not a problem to wrap the operation using a
+mutex? I'll confess I have no idea how bad that is for performance.
+However, that is not an option in Linux, because mem space accesses
+are just plain mmio accesses, and it's not possible to rewrite the
+drivers, even as an out-of-tree patch.
 
-The state is now pending, we've really EOI'd the interrupt, and
-yet lr_signals_eoi_mi() returns false, since the state is not 0.
-The result is that we won't signal anything on the corresponding
-irqfd, which people complain about. Meh.
+I suppose it could be possible to make the first write "magic" in the
+sense that it could "lock" the bus until the second access is performed?
+Sort of like an implicit HW mutex. Actually, tango has explicit HW
+mutexes that work along these lines.
 
-Example 2:
-P+A -> guest EOI -> P -> delayed MI -> guest IAR -> A -> MI fires
+> (I have thought a workaround that only maps the current accessible 
+> 64KiB with the MMU, and when accessing the non-accessible part, 
+> catch the page fault and re-setup the map to the new 64KiB page. But 
+> surely it will kill the performance.)
 
-Same issue: state isn't 0, and nothing happens.
+The implementation might be non-trivial, as well.
 
-The core of the problem is that we can't decide on whether an
-interrupt has been EOId by just looking at the LR if we ever
-want to support the P+A state, as things do change behind our back.
+> [tango is] still less quirky than Allwinner H6 PCIe. It's only a
+> config/MMIO mux on tango; however on H6 PCIe both config space and
+> MMIO space are splitted to many pages. So on H6 if no solution is
+> worked out, it will not be unreliable -- it will be unusable
+> instead.
 
-An alternative to dropping P+A is to bring back our friend EISR,
-which indicates which LRs have generated a MI. Instead of dragging
-the state around like we used to do, use it to clear the EOI bit
-from the in-memory copy, and use that as a predicate to find out
-if it fired or not.
+I have only limited experience, but it seems that many useful PCIe
+adapters require only very little mem address space.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/hyp/vgic-v2-sr.c | 8 ++++++++
- virt/kvm/arm/hyp/vgic-v3-sr.c | 6 ++++++
- virt/kvm/arm/vgic/vgic-v2.c   | 3 +--
- virt/kvm/arm/vgic/vgic-v3.c   | 3 +--
- 4 files changed, 16 insertions(+), 4 deletions(-)
+For example, the USB3 PCIe adapter I tested my implementation with
+requires only 8 KB.
 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 4fe6e797e8b3..475cb2d7fd33 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -43,6 +43,11 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	int i;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-+	u64 eisr;
-+
-+	eisr = readl_relaxed(base + GICH_EISR0);
-+	if (unlikely(used_lrs > 32))
-+		eisr |= (u64)readl_relaxed(base + GICH_EISR1) << 32;
- 
- 	for (i = 0; i < used_lrs; i++) {
- 		if (cpu_if->vgic_elrsr & (1UL << i))
-@@ -50,6 +55,9 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- 		else
- 			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
- 
-+		if ((cpu_if->vgic_lr[i] & GICH_LR_EOI) && !(eisr & (1UL << i)))
-+			cpu_if->vgic_lr[i] &= ~GICH_LR_EOI;
-+
- 		writel_relaxed(0, base + GICH_LR0 + (i * 4));
- 	}
- }
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index b89ce5432214..2ce63d6740b0 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -223,8 +223,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	if (used_lrs) {
- 		int i;
- 		u32 nr_pre_bits;
-+		u32 eisr;
- 
- 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
-+		eisr = read_gicreg(ICH_EISR_EL2);
- 
- 		write_gicreg(0, ICH_HCR_EL2);
- 		val = read_gicreg(ICH_VTR_EL2);
-@@ -236,6 +238,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			else
- 				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
- 
-+			if ((cpu_if->vgic_lr[i] & ICH_LR_EOI) &&
-+			    !(eisr & (1 << i)))
-+				cpu_if->vgic_lr[i] &= ~ICH_LR_EOI;
-+
- 			__gic_v3_set_lr(0, i);
- 		}
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index e9d840a75e7b..0be616e4ee29 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -46,8 +46,7 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
- 
- static bool lr_signals_eoi_mi(u32 lr_val)
- {
--	return !(lr_val & GICH_LR_STATE) && (lr_val & GICH_LR_EOI) &&
--	       !(lr_val & GICH_LR_HW);
-+	return (lr_val & GICH_LR_EOI) && !(lr_val & GICH_LR_HW);
- }
- 
- /*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6b329414e57a..c68352b8ed28 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -35,8 +35,7 @@ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- 
- static bool lr_signals_eoi_mi(u64 lr_val)
- {
--	return !(lr_val & ICH_LR_STATE) && (lr_val & ICH_LR_EOI) &&
--	       !(lr_val & ICH_LR_HW);
-+	return (lr_val & ICH_LR_EOI) && !(lr_val & ICH_LR_HW);
- }
- 
- void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
--- 
-2.14.2
--- 
-Jazz is not dead. It just smells funny...
+01:00.0 USB controller: Renesas Technology Corp. uPD720201 USB 3.0 Host Controller (rev 03) (prog-if 30 [XHCI])
+        Flags: fast devsel
+        Memory at 50400000 (64-bit, non-prefetchable) [size=8K]
+        Capabilities: [50] Power Management version 3
+        Capabilities: [70] MSI: Enable- Count=1/8 Maskable- 64bit+
+        Capabilities: [90] MSI-X: Enable- Count=8 Masked-
+        Capabilities: [a0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [150] Latency Tolerance Reporting
+
+
+Same thing for the following WiFi adapter.
+
+01:00.0 Network controller: Intel Corporation Wireless 7260 (rev bb)
+        Subsystem: Intel Corporation Dual Band Wireless-AC 7260
+        Flags: fast devsel, IRQ 22
+        Memory at 50400000 (64-bit, non-prefetchable) [disabled] [size=8K]
+        Capabilities: [c8] Power Management version 3
+        Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [40] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 48-51-b7-ff-ff-84-69-26
+        Capabilities: [14c] Latency Tolerance Reporting
+        Capabilities: [154] Vendor Specific Information: ID=cafe Rev=1 Len=014 <?>
+
+
+Maybe you can decide that you will support only 64 KB?
+
+Regards.
