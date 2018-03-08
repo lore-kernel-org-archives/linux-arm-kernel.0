@@ -1,67 +1,68 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 08 Mar 2018 11:45:28 -0800
-Subject: [PATCH] amlogic: meson-gx-socinfo: Update soc ids
-In-Reply-To: <37263741-e817-9a48-615e-13c5b1e2cec0@baylibre.com> (Neil
- Armstrong's message of "Thu, 8 Mar 2018 10:36:34 +0100")
-References: <1518620335-17716-1-git-send-email-narmstrong@baylibre.com>
- <1518689694.2883.68.camel@baylibre.com> <7ho9jzgyr2.fsf@baylibre.com>
- <37263741-e817-9a48-615e-13c5b1e2cec0@baylibre.com>
-Message-ID: <7hina6fj1j.fsf@baylibre.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 8 Mar 2018 11:47:50 -0800
+Subject: linux-next on n900: oops in codec_reg_show() when grepping sysfs
+In-Reply-To: <20180308151421.GA13160@amd>
+References: <20180308151421.GA13160@amd>
+Message-ID: <CAGXu5jK1cvTOCT_OZVwk20LCNt6QLEM5CoLBXpT9JaHpwEKeJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> Hi Kevin,
+On Thu, Mar 8, 2018 at 7:14 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
 >
-> On 08/03/2018 02:08, Kevin Hilman wrote:
->> Jerome Brunet <jbrunet@baylibre.com> writes:
->> 
->>> On Wed, 2018-02-14 at 15:58 +0100, Neil Armstrong wrote:
->>>> Updates the Amlogic Meson SoCs IDs for the Armv8 based SoCs.
->>>> It includes the new families and packages.
->>>>
->>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>> ---
->>>>  drivers/soc/amlogic/meson-gx-socinfo.c | 8 ++++++++
->>>>  1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
->>>> index f2d8c3c..a7efe30 100644
->>>> --- a/drivers/soc/amlogic/meson-gx-socinfo.c
->>>> +++ b/drivers/soc/amlogic/meson-gx-socinfo.c
->>>> @@ -33,6 +33,10 @@ static const struct meson_gx_soc_id {
->>>>  	{ "GXL", 0x21 },
->>>>  	{ "GXM", 0x22 },
->>>>  	{ "TXL", 0x23 },
->>>> +	{ "TXLX", 0x24 },
->>>> +	{ "AXG", 0x25 },
->>>> +	{ "GXLX", 0x26 },
->>>> +	{ "TXHD", 0x27 },
->>>>  };
->>>>  
->>>>  static const struct meson_gx_package_id {
->>>> @@ -47,6 +51,10 @@ static const struct meson_gx_package_id {
->>>>  	{ "S905L", 0x21, 0xc0 },
->>>>  	{ "S905M2", 0x21, 0xe0 },
->>>>  	{ "S912", 0x22, 0 },
->>>> +	{ "962X", 0x24, 0x10 },
->>>> +	{ "962E", 0x24, 0x20 },
->>>> +	{ "A113X", 0x25, 0x37 },
->>>> +	{ "A113D", 0x25, 0xd0 },
->>>>  };
->>>>  
->>>>  static inline unsigned int socinfo_to_major(u32 socinfo)
->>>
->>> Tested on my s400 board which, according to the marking, features an AXG A113D.
->>> AXG is detected correctly but the package id read is 0x22 instead of 0xd0.
->> 
->> Neil, can you update accordingly?  Have you seen 0xd0 on other A11x
->> chips?  or is this from the docs?
+> pavel at n900:/sys$ uname -a
+> Linux n900 4.16.0-rc4-next-20180308 #71 Thu Mar 8 15:27:49 CET 2018
+> armv7l GNU/Linux
+> pavel at n900:/sys$ grep -ri fasdfasdf .
 >
-> I got it from the Amlogic lastest Linux and U-boot code.
-> I will set 0x22 and squash the "meson-gx-socinfo: Add package id for S905H" patch, is it ok ?
+> leads to an oops:
+>
+> [ 2278.331878] DSS: context saved
+> [ 2278.820343] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000004
+> [ 2278.828948] pgd = c36040a2
+> [ 2278.831787] [00000004] *pgd=876c4831, *pte=00000000, *ppte=00000000
+> [ 2278.838439] Internal error: Oops: 17 [#1] ARM
+> [ 2278.843017] Modules linked in:
+> [ 2278.846221] CPU: 0 PID: 16337 Comm: grep Tainted: G        W
+> 4.16.0-rc4-next-20180308 #71
+> [ 2278.855529] Hardware name: Nokia RX-51 board
+> [ 2278.860015] PC is at soc_codec_reg_show+0x8/0x19c
+> [ 2278.864959] LR is at codec_reg_show+0x28/0x30
 
-Sure, that's fine.
+Looks like a NULL codec (driver has offsetof of 0x4).
 
-Kevin
+static ssize_t soc_codec_reg_show(struct snd_soc_codec *codec, char *buf,
+                                  size_t count, loff_t pos)
+{
+...
+        loff_t p = 0;
+
+        wordsize = min_bytes_needed(codec->driver->reg_cache_size) * 2;
+        regsize = codec->driver->reg_word_size * 2;
+...
+
+This would paper over it. I have no idea that the lifetime expectation
+are for codec and driver...
+
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index 96c44f6576c9..78ad165ad424 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -137,6 +137,9 @@ static ssize_t soc_codec_reg_show(struct
+snd_soc_codec *codec, char *buf,
+        size_t total = 0;
+        loff_t p = 0;
+
++       if (!codec || !codec->driver)
++               return 0;
++
+        wordsize = min_bytes_needed(codec->driver->reg_cache_size) * 2;
+        regsize = codec->driver->reg_word_size * 2;
+
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
