@@ -1,79 +1,135 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 8 Mar 2018 09:09:02 +0000
-Subject: [PATCH 4/5] dt-bindings: pwm: sunxi: add new compatible strings
-In-Reply-To: <20180308020822.35utrgw3ksoldr24@rob-hp-laptop>
-References: <20180307020719.6675-1-andre.przywara@arm.com>
- <20180307020719.6675-5-andre.przywara@arm.com>
- <20180308020822.35utrgw3ksoldr24@rob-hp-laptop>
-Message-ID: <9431a141-8b9c-9743-0907-8f0720df34a2@arm.com>
+From: loic.poulain@linaro.org (Loic Poulain)
+Date: Thu, 8 Mar 2018 10:14:59 +0100
+Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
+ slave
+In-Reply-To: <698451580.263856.1520467358497@email.1und1.de>
+References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
+ <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
+ <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
+ <648118289.71086.1519593373795@email.1und1.de>
+ <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
+ <438185389.274708.1520422108782@email.1und1.de>
+ <03B9ACBE-3ACA-40C4-9DA2-6A57D1AD96E0@holtmann.org>
+ <2071508922.276811.1520426568577@email.1und1.de>
+ <87sh9bvh3r.fsf@anholt.net>
+ <D48AB207-F7F4-46D8-AC65-EC5CF76A6084@holtmann.org>
+ <87muzjfr8l.fsf@anholt.net> <698451580.263856.1520467358497@email.1und1.de>
+Message-ID: <CAMZdPi9mTVFOc_MSg_9btM8h3vaynv247jMWPne+jCV1MMYjcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stefan,
 
-On 08/03/18 02:08, Rob Herring wrote:
-> On Wed, Mar 07, 2018 at 02:07:18AM +0000, Andre Przywara wrote:
->> The PWM controllers found in the Allwinner A64, H5 and H6 SoCs are fully
->> compatible to the PWM controllers found in the A13 and H3.
-> 
-> If fully compatible, then shouldn't there be a fallback to one of the 
-> existing compatible strings?
-
-Yes, that was the idea. I was already wondering how we would
-differentiate that from "real" compatible strings, but couldn't find
-convincing examples. So should that read:
-
-- compatible: should at least contain be one of:
-    - "allwinner,sun4i-a10-pwm"
-    - "allwinner,sun5i-a10s-pwm"
-    - "allwinner,sun5i-a13-pwm"
-    - "allwinner,sun7i-a20-pwm"
-    - "allwinner,sun8i-h3-pwm"
-  May in addition contain one of:
-    - "allwinner,sun50i-a64-pwm"
-    - "allwinner,sun50i-h5-pwm"
-    - "allwinner,sun50i-h6-pwm"
-
-And this would possibly need to be amended once we need to actually use
-one of those strings (to implement a quirk, for instance)?
-Or is there some other way of reserving those compatible strings, which
-are not expected to be matched in drivers directly?
-
-Cheers,
-Andre.
-
->> Add new compatible strings for those SoCs to the binding document, so
->> that they can be safely used, together with a fallback string
->> (preferably "allwinner,sun5i-a13-pwm").
->> Add add the optionals "resets" property, needed by the H6.
+On 8 March 2018 at 01:02, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi,
+>
+>> Eric Anholt <eric@anholt.net> hat am 7. M?rz 2018 um 23:36 geschrieben:
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  Documentation/devicetree/bindings/pwm/pwm-sun4i.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
->> index 51ff54c8b8ef..b3a127a0e58c 100644
->> --- a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
->> @@ -7,11 +7,17 @@ Required properties:
->>      - "allwinner,sun5i-a13-pwm"
->>      - "allwinner,sun7i-a20-pwm"
->>      - "allwinner,sun8i-h3-pwm"
->> +    - "allwinner,sun50i-a64-pwm"
->> +    - "allwinner,sun50i-h5-pwm"
->> +    - "allwinner,sun50i-h6-pwm"
->>    - reg: physical base address and length of the controller's registers
->>    - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
->>      the cells format.
->>    - clocks: From common clock binding, handle to the parent clock.
->>  
->> +Optional properties:
->> +  - resets: shall be the reset control phandle for the PWM block, if required.
->> +
->>  Example:
->>  
->>  	pwm: pwm at 1c20e00 {
->> -- 
->> 2.14.1
+>> Marcel Holtmann <marcel@holtmann.org> writes:
 >>
+>> > Hi Eric,
+>> >
+>> >>>>>>>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
+>> >>>>>>>>> This allows to automatically insert the bcm43438 to the bluetooth
+>> >>>>>>>>> subsystem instead of relying on patched userspace helpers (hciattach).
+>> >>>>>>>>>
+>> >>>>>>>>> In order to keep a debug UART we need to switch to uart1.
+>> >>>>>>>>>
+>> >>>>>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> >>>>>>>>> ---
+>> >>>>>>>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
+>> >>>>>>>>> 1 file changed, 13 insertions(+), 1 deletion(-)
+>> >>>>>>>>>
+>> >>>>>>>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>> >>>>>>>>> index cf53436..b7f79f1 100644
+>> >>>>>>>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>> >>>>>>>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>> >>>>>>>>> @@ -131,6 +131,18 @@
+>> >>>>>>>>>
+>> >>>>>>>>> &uart0 {
+>> >>>>>>>>>     pinctrl-names = "default";
+>> >>>>>>>>> -   pinctrl-0 = <&uart0_gpio14>;
+>> >>>>>>>>> +   pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
+>> >>>>>>>>> +   status = "okay";
+>> >>>>>>>>> +
+>> >>>>>>>>> +   bluetooth {
+>> >>>>>>>>> +           compatible = "brcm,bcm43438-bt";
+>> >>>>>>>>> +           max-speed = <2000000>;
+>> >>>>>>>>> +           shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
+>> >>>>>>>>> +   };
+>> >>>>>>>>> +};
+>> >>>>>>>>
+>> >>>>>>>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
+>> >>>>>>>
+>> >>>>>>> Yes, unload and reload works fine.
+>> >>>>>>>
+>> >>>>>>>> Meaning we are getting back to the 115200 default baud rate on the UART?
+>> >>>>>>>
+>> >>>>>>> I assume that, because reload works as expected.
+>> >>>>>>
+>> >>>>>> awesome. That is good news.
+>> >>>>>>
+>> >>>>>> Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
+>> >>>>>
+>> >>>>> after applying Loic's patch and the necessary patch for the RPi 3 dts file (see below), i will get this output:
+>> >>>>>
+>> >>>>> [    4.873246] Bluetooth: HCI UART driver ver 2.3
+>> >>>>> [    4.873260] Bluetooth: HCI UART protocol H4 registered
+>> >>>>> [    4.873265] Bluetooth: HCI UART protocol Three-wire (H5) registered
+>> >>>>> [    4.873751] Bluetooth: HCI UART protocol Broadcom registered
+>> >>>>> [    4.877279] uart-pl011 3f201000.serial: no DMA platform data
+>> >>>>> [    6.952382] Bluetooth: hci0: command 0xfc18 tx timeout
+>> >>>>> [   15.192298] Bluetooth: hci0: BCM: failed to write update baudrate (-110)
+>> >>>>> [   15.192312] Bluetooth: hci0: Failed to set baudrate
+>> >>>>> [   15.316415] Bluetooth: hci0: BCM: chip id 94
+>> >>>>> [   15.318567] Bluetooth: hci0: BCM: features 0x2e
+>> >>>>> [   15.341538] Bluetooth: hci0: BCM43430A1
+>> >>>>> [   15.341560] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+>> >>>>> [   19.112670] Bluetooth: hci0: BCM (001.002.009) build 0360
+>> >>>>> [  274.713732] Bluetooth: hci0: command 0x0c14 tx timeout
+>> >>>>> [  274.714085] Bluetooth: hci0: Frame reassembly failed (-84)
+>> >>>>> [  317.275941] Bluetooth: hci0: last event is not cmd complete (0x0f)
+>> >>>>>
+>> >>>>> I don't see these errors on RPi Zero W. Maybe the reason for this is the lack of hardware flowcontrol on RPi 3. Or some of the downstream patches on BlueZ must be adapted for the kernel [1].
+>> >>>>>
+>> >>>>> Btw the bcm43438 is detected even after unloading and reloading the driver. But the timeout occurs also on driver reload. Reducing the baudrate to 115200 doesn't help here.
+>> >>>>
+>> >>>> maybe it needs some time after switching the hardware on. Have you tried to sleep for a bit at the end of bcm_gpio_set_power?
+>> >>>
+>> >>> I will try, but this could also be an "issue" of the gpio expander
+>> >>> driver. AFAIK the expander is connected via I2C to the GPU. In case
+>> >>> the mailbox reply come before the I2C command has been handled by the
+>> >>> GPIO expander, we are running out of sync.
+>> >>
+>> >> The mailbox command for setting GPIO state is synchronous in terms of
+>> >> sending the i2c command to the GPIO expander HW.
+>> >
+>> > does that mean the driver does this correctly and really waits for the
+>> > completion. Or does the GPIO expander might return to quickly and
+>> > returns a false sense of GPIO state. I think it would be good a sleep
+>> > of 50ms after the GPIO makes a difference. Maybe the GPIO expander
+>> > driver needs to take this into account.
+>>
+>> It seems unlikely that you can get to I2C stop before the GPIO expander
+>> HW has changed the state of the output.
+>>
+>> > Reality is that once the Bluetooth driver toggled the GPIO, it goes
+>> > onto initializing the chip. One other reason might be that no device
+>> > wakeup GPIO is wired here, that the chip actually needs some time
+>> > before it is all good to go.
+>>
+>> This seems much more likely to me.  The spec for bcm43438 is easily
+>> googleable and has a power-on timing diagram.
+>
+> after applying this patch [1] the RPi 3 specific probing errors disappear.
+>
+> But this is only a quick hack. The proper solution would be to extend hci_h5 in order to support the BCM43438.
+>
+> [1] - https://github.com/lategoodbye/rpi-zero/commit/ed5900296dfb7aec7f467477440751e7367a1881
+
+I think this patch is perfectly acceptable, this is an hardware timing
+the driver has to handle. For sure H5 would improve robustness...
+
+Regards,
+Loic
