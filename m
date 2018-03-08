@@ -1,87 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Mar 2018 10:19:49 +0000
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
- with the same vintid
-In-Reply-To: <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
-References: <20180307124055.13800-1-marc.zyngier@arm.com>
- <20180307124055.13800-2-marc.zyngier@arm.com>
- <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
-Message-ID: <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  8 Mar 2018 18:21:50 +0800
+Subject: [PATCH v3 0/4] Set name of regmap_config
+Message-ID: <20180308102154.25686-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 23:34, Christoffer Dall wrote:
-> On Wed, Mar 7, 2018 at 12:40 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> The vgic code is trying to be clever when injecting GICv2 SGIs,
->> and will happily populate LRs with the same interrupt number if
->> they come from multiple vcpus (after all, they are distinct
->> interrupt sources).
->>
->> Unfortunately, this is against the letter of the architecture,
->> and the GICv2 architecture spec says "Each valid interrupt stored
->> in the List registers must have a unique VirtualID for that
->> virtual CPU interface.". GICv3 has similar (although slightly
->> ambiguous) restrictions.
->>
->> This results in guests locking up when using GICv2-on-GICv3, for
->> example. The obvious fix is to stop trying so hard, and inject
->> a single vcpu per SGI per guest entry. After all, pending SGIs
->> with multiple source vcpus are pretty rare, and are mostly seen
->> in scenario where the physical CPUs are severely overcomitted.
->>
->> Cc: stable at vger.kernel.org
->> Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic.c | 11 +----------
->>  1 file changed, 1 insertion(+), 10 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index c7c5ef190afa..1f7ff175f47b 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
->> @@ -720,18 +720,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
->>         list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
->>                 spin_lock(&irq->irq_lock);
->>
->> -               if (unlikely(vgic_target_oracle(irq) != vcpu))
->> -                       goto next;
->> -
->> -               /*
->> -                * If we get an SGI with multiple sources, try to get
->> -                * them in all at once.
->> -                */
->> -               do {
->> +               if (likely(vgic_target_oracle(irq) == vcpu))
->>                         vgic_populate_lr(vcpu, irq, count++);
-> 
-> I think we need to change vgic_populate_lr to set the EOI maintenance
-> interrupt flag so that when the interrupt is deactivated, if there are
-> additional pending sources, we exit the guest and pick up the
-> interrupt.
 
-Potentially. We need to be careful about about the semantics of EOI MI
-with non-level interrupts (see the other thread about EOI signalling).
+After 9b947a13e7f6 ("regmap: use debugfs even when no device"), we are
+allowing regmap to create debugfs without a valid device. Some of them
+would end up using "dummy*" as debugfs name.
 
-> An alternative would be to set the underflow interrupt, but I don't
-> think that would be correct for multiple priorities, because the SGI
-> could have a higher priority than other pending interrupts we put in
-> the LR.
+This series try to set names in some regmap_config to avoid that.
 
-I don't think priorities are the issue (after all, we already sort the
-irqs in order of priority). My worry is that underflow is allowed to
-fire if there is one interrupt pending, which implies that you could
-end-up in a livelock scenario if you only have one SGI pending with
-multiple sources.
 
-Another possibility would be to use ICH_HCR_EL2.NPIE (GICH_HCR.NPIE on
-GICv2), which delivers a a MI if no pending interrupts are present. Once
-the SGI has been activated, we're guaranteed to be able to inject a new
-pending one.
+Changes in v3:
+Modify commit message.
 
-I like the latter, because it doesn't overload the rest of the code with
-new semantics. Thoughts?
+Jeffy Chen (4):
+  mfd: syscon: Set name of regmap_config
+  rtc: at91sam9: Pass pdev->dev to regmap_init_mmio()
+  clk: lpc32xx: Set name of regmap_config
+  ARM: rockchip: Set name of regmap_config
 
-	M.
+ arch/arm/mach-rockchip/platsmp.c | 1 +
+ drivers/clk/nxp/clk-lpc32xx.c    | 1 +
+ drivers/mfd/syscon.c             | 1 +
+ drivers/rtc/rtc-at91sam9.c       | 2 +-
+ 4 files changed, 4 insertions(+), 1 deletion(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
