@@ -1,62 +1,89 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 8 Mar 2018 17:54:04 +0100
-Subject: [PATCH v2 11/12] clk: stm32mp1: add MCO clocks
+Date: Thu, 8 Mar 2018 17:53:54 +0100
+Subject: [PATCH v2 01/12] dt-bindings: Document STM32MP1 Reset Clock
+ Controller (RCC) bindings
 In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
 References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1520528045-18330-12-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1520528045-18330-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Two micro-controller clock output (MCO) pins are available:
-MCO1 and MCO2.
-For each output, it is possible to select a clock source.
-The selected clock can be divided thanks to configurable
-prescaler.
+The RCC block is responsible of the management of the clock and reset
+generation for the complete circuit.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32mp1.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ .../devicetree/bindings/clock/st,stm32mp1-rcc.txt  | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
 
-diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index 51e3e76..b3a6ec4 100644
---- a/drivers/clk/clk-stm32mp1.c
-+++ b/drivers/clk/clk-stm32mp1.c
-@@ -252,6 +252,14 @@
- 	"off", "ck_lse", "ck_lsi", "ck_hse_rtc"
- };
- 
-+static const char * const mco1_src[] = {
-+	"ck_hsi", "ck_hse", "ck_csi", "ck_lsi", "ck_lse"
-+};
+diff --git a/Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+new file mode 100644
+index 0000000..fb9495e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+@@ -0,0 +1,60 @@
++STMicroelectronics STM32 Peripheral Reset Clock Controller
++==========================================================
 +
-+static const char * const mco2_src[] = {
-+	"ck_mpu", "ck_axi", "ck_mcu", "pll4_p", "ck_hse", "ck_hsi"
-+};
++The RCC IP is both a reset and a clock controller.
 +
- static const struct clk_div_table axi_div_table[] = {
- 	{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 4 },
- 	{ 4, 4 }, { 5, 4 }, { 6, 4 }, { 7, 4 },
-@@ -1960,6 +1968,18 @@ enum {
- 		  _MUX(RCC_BDCR, 16, 2, 0),
- 		  _NO_DIV),
- 
-+	/* MCO clocks */
-+	COMPOSITE(CK_MCO1, "ck_mco1", mco1_src, CLK_OPS_PARENT_ENABLE |
-+		  CLK_SET_RATE_NO_REPARENT,
-+		  _GATE(RCC_MCO1CFGR, 12, 0),
-+		  _MUX(RCC_MCO1CFGR, 0, 3, 0),
-+		  _DIV(RCC_MCO1CFGR, 4, 4, 0, NULL)),
++RCC makes also power management (resume/supend and wakeup interrupt).
 +
-+	COMPOSITE(CK_MCO2, "ck_mco2", mco2_src, CLK_OPS_PARENT_ENABLE |
-+		  CLK_SET_RATE_NO_REPARENT,
-+		  _GATE(RCC_MCO2CFGR, 12, 0),
-+		  _MUX(RCC_MCO2CFGR, 0, 3, 0),
-+		  _DIV(RCC_MCO2CFGR, 4, 4, 0, NULL)),
- };
- 
- struct stm32_clock_match_data {
++Please also refer to reset.txt for common reset controller binding usage.
++
++Please also refer to clock-bindings.txt for common clock controller
++binding usage.
++
++
++Required properties:
++- compatible: "st,stm32mp1-rcc", "syscon"
++- reg: should be register base and length as documented in the datasheet
++- #clock-cells: 1, device nodes should specify the clock in their
++  "clocks" property, containing a phandle to the clock device node,
++  an index specifying the clock to use.
++- #reset-cells: Shall be 1
++- interrupts: Should contain a general interrupt line and a interrupt line
++  to the wake-up of processor (CSTOP).
++
++Example:
++	rcc: rcc at 50000000 {
++		compatible = "st,stm32mp1-rcc", "syscon";
++		reg = <0x50000000 0x1000>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>,
++			     <GIC_SPI 145 IRQ_TYPE_NONE>;
++	};
++
++Specifying clocks
++=================
++
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/stm32mp1-clks.h header and can be used in device
++tree sources.
++
++Specifying softreset control of devices
++=======================================
++
++Device nodes should specify the reset channel required in their "resets"
++property, containing a phandle to the reset device node and an index specifying
++which channel to use.
++The index is the bit number within the RCC registers bank, starting from RCC
++base address.
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register.
++
++For example on STM32MP1, for LTDC reset:
++ ltdc = APB4_RSTSETR_offset / 4 * 32 + LTDC_bit_offset
++      = 0x180 / 4 * 32 + 0 = 3072
++
++The list of valid indices for STM32MP1 is available in:
++include/dt-bindings/reset-controller/stm32mp1-resets.h
++
++This file implements defines like:
++#define LTDC_R	3072
 -- 
 1.9.1
