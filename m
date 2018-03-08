@@ -1,83 +1,21 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 8 Mar 2018 16:19:31 +0000
-Subject: [PATCH v2] arm64/debug: Fix registers on sleeping tasks
-In-Reply-To: <20180305234309.233226-1-dianders@chromium.org>
-References: <20180305234309.233226-1-dianders@chromium.org>
-Message-ID: <382abcdd-5264-0c0c-282f-d1f52ecff8e3@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2018 08:24:46 -0800
+Subject: Nokia N900: insecure W+X mapping at 0xd0050000
+In-Reply-To: <20180308142818.GA9439@amd>
+References: <20180308142818.GA9439@amd>
+Message-ID: <20180308162446.GK5799@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/18 23:43, Douglas Anderson wrote:
-> This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
-> registers on sleeping tasks") but for arm64.  Nuff said.
-> 
-> ...well, perhaps I could also add that task_pt_regs are userspace
-> registers and that's not what kgdb is supposed to be reporting.  We're
-> supposed to be reporting kernel registers.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+* Pavel Machek <pavel@ucw.cz> [180308 06:29]:
+> Insecure W+X mappings, who cares about those? I have 7 pages...
 
-I hacked together a (still very immature) kgdb test suite[1] around the 
-turn of the year. Whilst its not quite solid enough for me to recommend 
-others deploy it except out of curiosity... so I haven't yet started 
-yelling about test suite failures except in the privacy of my own head.
+Is this with CONFIG_DEBUG_WX=y?
 
-However I can confirm that this patch fixes one of the test suite 
-failures I haven't had time to blame allocate yet!
+My guess is that it's for mapping the PM assembly to SRAM. This
+is already fixed for am335x that is using drivers/misc/sram*.c.
+I think omap2 - omap4 still need fixing if this is the culprit.
 
-So...
-Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Regards,
 
-BTW is this something that should Cc: stable?
-
-
-Daniel.
-
-[1] https://github.com/daniel-thompson/kgdbtest
-
-
-> ---
-> 
-> Changes in v2:
-> - Init cpu_context in one line
-> - Explain that task_pt_regs are userspace
-> 
->   arch/arm64/kernel/kgdb.c | 21 ++++++++++++++++-----
->   1 file changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index 2122cd187f19..a20de58061a8 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -138,14 +138,25 @@ int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
->   void
->   sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
->   {
-> -	struct pt_regs *thread_regs;
-> +	struct cpu_context *cpu_context = &task->thread.cpu_context;
->   
->   	/* Initialize to zero */
->   	memset((char *)gdb_regs, 0, NUMREGBYTES);
-> -	thread_regs = task_pt_regs(task);
-> -	memcpy((void *)gdb_regs, (void *)thread_regs->regs, GP_REG_BYTES);
-> -	/* Special case for PSTATE (check comments in asm/kgdb.h for details) */
-> -	dbg_get_reg(33, gdb_regs + GP_REG_BYTES, thread_regs);
-> +
-> +	gdb_regs[19] = cpu_context->x19;
-> +	gdb_regs[20] = cpu_context->x20;
-> +	gdb_regs[21] = cpu_context->x21;
-> +	gdb_regs[22] = cpu_context->x22;
-> +	gdb_regs[23] = cpu_context->x23;
-> +	gdb_regs[24] = cpu_context->x24;
-> +	gdb_regs[25] = cpu_context->x25;
-> +	gdb_regs[26] = cpu_context->x26;
-> +	gdb_regs[27] = cpu_context->x27;
-> +	gdb_regs[28] = cpu_context->x28;
-> +	gdb_regs[29] = cpu_context->fp;
-> +
-> +	gdb_regs[31] = cpu_context->sp;
-> +	gdb_regs[32] = cpu_context->pc;
->   }
->   
->   void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
-> 
+Tony
