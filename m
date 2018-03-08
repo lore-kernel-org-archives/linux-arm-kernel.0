@@ -1,44 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Mar 2018 12:24:40 +0000
-Subject: [PATCH v3 09/22] arm64: capabilities: Split the processing of
- errata work arounds
-In-Reply-To: <20180209181834.GG5862@e103592.cambridge.arm.com>
-References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-19-suzuki.poulose@arm.com>
- <20180209181834.GG5862@e103592.cambridge.arm.com>
-Message-ID: <b5b90236-7734-2c05-65fd-57fcbe732b6c@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 8 Mar 2018 13:27:15 +0100
+Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
+In-Reply-To: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
+Message-ID: <20180308122715.GB21514@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/18 18:18, Dave Martin wrote:
-> On Fri, Feb 09, 2018 at 05:54:48PM +0000, Suzuki K Poulose wrote:
->> Right now we run through the errata workarounds check on all boot
->> active CPUs, with SCOPE_ALL. This doesn't help with detecting the
->> errata's with a SYSTEM_SCOPE. While nobody uses it, let us clean
->> this up in preparation for merging capability handling.
-> 
-> errata; and SCOPE_SYSTEM (if I'm being pedantic)
-> 
-> To make it clearer this this is adding support for new behaviour rather
-> than changing old behaviour, perhaps change "This doesn't help ...
-> While nobody uses it ..." to something like:
-> 
-> "This wouldn't help for detecting erratum workarounds with SCOPE_SYSTEM.
-> There are none yet, but we plan to introduce some: let us clean this up
-> so that such workarounds can be detected and enabled correctly."
+Hi!
 
-Fixed
-
->>
->> So, we run the checks with SCOPE_LOCAL_CPU on all CPUs and SCOPE_SYSTEM
->> checks are run only once after all the boot time CPUs are active.
->>
->> Cc: Dave Martin <dave.martin@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Resent without non-upstream patches.
 > 
-> Otherwise,
+> This backport patchset fixed the spectre issue, it's original branch:
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+> A few dependency or fixingpatches are also picked up, if they are necessary
+>  and no functional changes.
 > 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> No bug found from kernelci.org and lkft testing. It also could be gotten from:
+> 
+> git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
+> 
+> Comments are appreciated!
 
-Thanks
-Suzuki
+Not entirely related to this patched, but... I have few older ARM
+boards here, and Nokia N9000 I really care about.
+
+AFAICT Meltdown is arm64 only?
+
+Spectre affects the older boards, too, right? Was there any work done
+on that? cpuinfo says "ARMv7" for N900.
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/cc1438e6/attachment.sig>
