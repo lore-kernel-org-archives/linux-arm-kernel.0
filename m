@@ -1,71 +1,92 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  8 Mar 2018 23:00:10 +0800
-Subject: [PATCH 2/4] ARM: sunxi: mc-smp: Use DT enable-method for sun9i A80 SMP
+Date: Thu,  8 Mar 2018 23:00:11 +0800
+Subject: [PATCH 3/4] ARM: dts: sun9i: Add enable-method for SMP support for
+ the A80 SoC
 In-Reply-To: <20180308150012.19045-1-wens@csie.org>
 References: <20180308150012.19045-1-wens@csie.org>
-Message-ID: <20180308150012.19045-3-wens@csie.org>
+Message-ID: <20180308150012.19045-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having an early init function check the machine compatible
-and installing multi-cluster SMP support for the A80 if it matches,
-use a new cpu enable-method string. This makes the platform support
-future proof in case anyone manages to add PSCI support.
+Using the enable-method property for SMP support would allow future PSCI
+implementations to override any in-OS support. This is better than just
+matching against the machine compatible, and then having to determine
+whether other methods are available or not.
 
-The original init code for the SMP support is changed into the
-.prepare_cpus callback in the smp_operations structure. Instead of
-panicing when resources are missing like on some platforms, our code
-merely guards against engaging SMP or CPU hotplug and returns an error.
+This adds enable-method properties to all CPU nodes.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt |  1 +
- arch/arm/mach-sunxi/mc_smp.c                   | 21 ++++++++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index f4a777039f03..76655d0d67c2 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -198,6 +198,7 @@ described below.
- 			    "actions,s500-smp"
- 			    "allwinner,sun6i-a31"
- 			    "allwinner,sun8i-a23"
-+			    "allwinner,sun9i-a80-smp"
- 			    "amlogic,meson8-smp"
- 			    "amlogic,meson8b-smp"
- 			    "arm,realview-smp"
-diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index 9db6c4ed5861..86e90b038555 100644
---- a/arch/arm/mach-sunxi/mc_smp.c
-+++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -690,7 +690,26 @@ static int __init sunxi_mc_smp_init(void)
- 	struct resource res;
- 	int ret;
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index b1c86b76ac3c..82a770a5ba46 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -65,6 +65,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control0>;
+ 			clock-frequency = <12000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x0>;
+ 		};
  
--	if (!of_machine_is_compatible("allwinner,sun9i-a80"))
-+	/*
-+	 * Don't bother checking the "cpus" node, as an enable-method
-+	 * property in that node is undocumented.
-+	 */
-+	node = of_cpu_device_node_get(0);
-+	if (!node)
-+		return -ENODEV;
-+
-+	/*
-+	 * We can't actually use the enable-method magic in the kernel.
-+	 * Our loopback / trampoline code uses the CPU suspend framework,
-+	 * which requires the identity mapping be available. It would not
-+	 * yet be available if we used the .init_cpus or .prepare_cpus
-+	 * callbacks in smp_operations, which we would use if we were to
-+	 * use CPU_METHOD_OF_DECLARE
-+	 */
-+	ret = of_property_match_string(node, "enable-method",
-+				       "allwinner,sun9i-a80-smp");
-+	of_node_put(node);
-+	if (ret)
- 		return -ENODEV;
+@@ -73,6 +74,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control0>;
+ 			clock-frequency = <12000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x1>;
+ 		};
  
- 	if (!sunxi_mc_smp_cpu_table_init())
+@@ -81,6 +83,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control0>;
+ 			clock-frequency = <12000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x2>;
+ 		};
+ 
+@@ -89,6 +92,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control0>;
+ 			clock-frequency = <12000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x3>;
+ 		};
+ 
+@@ -97,6 +101,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control1>;
+ 			clock-frequency = <18000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x100>;
+ 		};
+ 
+@@ -105,6 +110,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control1>;
+ 			clock-frequency = <18000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x101>;
+ 		};
+ 
+@@ -113,6 +119,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control1>;
+ 			clock-frequency = <18000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x102>;
+ 		};
+ 
+@@ -121,6 +128,7 @@
+ 			device_type = "cpu";
+ 			cci-control-port = <&cci_control1>;
+ 			clock-frequency = <18000000>;
++			enable-method = "allwinner,sun9i-a80-smp";
+ 			reg = <0x103>;
+ 		};
+ 	};
 -- 
 2.16.2
