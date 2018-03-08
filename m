@@ -1,55 +1,93 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 08 Mar 2018 15:50:33 +0900
-Subject: [PATCH] dt-bindings: exynos: Document #sound-dai-cells property
- of the HDMI node
-In-Reply-To: <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
-References: <CGME20180307171131epcas1p4687ef394d1a0a6d0eb2de2691c977c3f@epcas1p4.samsung.com>
- <20180307171111.14551-1-s.nawrocki@samsung.com>
- <5AA0B59F.3070402@samsung.com>
- <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
-Message-ID: <5AA0DD39.3040108@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Mar 2018 07:02:49 +0000
+Subject: arm crypto .S_shipped files sometimes get rebuilt randomly
+In-Reply-To: <CAK7LNARDPOaLyvcijXe5VX3hJhxzS-R5hdbk310bRUuZwQFMmw@mail.gmail.com>
+References: <1520450729.13685.19.camel@nxp.com>
+ <CAK7LNARDPOaLyvcijXe5VX3hJhxzS-R5hdbk310bRUuZwQFMmw@mail.gmail.com>
+Message-ID: <CAKv+Gu9bWQyUwxgS1Vvp8U__Wg-4Tby2vKvOozsp9RA41Wo6SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-2018? 03? 08? 15:29? Marek Szyprowski ?(?) ? ?:
-> Hi Inki,
-> 
-> On 2018-03-08 05:01, Inki Dae wrote:
->> Hi Sylwester,
+On 8 March 2018 at 05:00, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+> 2018-03-08 4:25 GMT+09:00 Leonard Crestez <leonard.crestez@nxp.com>:
+>> Hello,
 >>
->> 2018? 03? 08? 02:11? Sylwester Nawrocki ?(?) ? ?:
->>> The #sound-dai-cells DT property is required to describe link between
->>> the HDMI IP block and the SoC's audio subsystem.
->>>
->>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> ---
->>>   Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 3 +++
->>>   1 file changed, 3 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
->>> index 8715ff06c457..6b2a526ec586 100644
->>> --- a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
->>> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
->>> @@ -50,6 +50,9 @@ Required properties for Exynos 5433:
->>>   - clock-names: aliases for above clock specfiers.
->>>   - samsung,sysreg: handle to syscon used to control the system registers.
->>>   +Optional properties for Exynos 4210, 4212, 5420 and 5433:
->>> + - #sound-dai-cells: should be 0.
->>> +
->> Just trivial question. 'sound-dai-cells' property could affect hdmi driver? I looked into HDMI codec driver but I didn't find relevat code.
->> I mean that if this property never affect HDMI driver then this property would be a dead thing even through this can be declared optionally.
-> 
-> This property is used by ASoC framework when it is building connections
-> between all elements of the virtual 'sound card'. It allows generic
-> code to find proper driver for the digital audio interface (DAI) object.
+>> I am using a toolchain with a broken/old version of perl which doesn't
+>> include integer.pm and I noticed it triggers occasional build failures
+>> on arch/arm64/crypto/sha512-core.S_shipped. Workarounds are easy, but
+>> if the purpose of the .S_shipped is to avoid the need to have all
+>> dependencies on the build machine then something went wrong?
+>>
+>> This was introduced by commit 7918ecef073f ("crypto: arm64/sha2 -
+>> integrate OpenSSL implementations of SHA256/SHA512"). The makefile
+>> rules are not terribly complicated:
+>>
+>> quiet_cmd_perlasm = PERLASM $@
+>>       cmd_perlasm = $(PERL) $(<) void $(@)
+>>
+>> $(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
+>>         $(call cmd,perlasm)
+>>
+>> If a decision to rerun the rule is made based on their relative
+>> timestamps but both .S_shipped and sha512-armv8.pl are included in git
+>> then won't the result be essentially random, depending on file checkout
+>> order?
+>>
 
-I also assumed that some place of ASoC framework checks this property. For this I looked into HDMI codec driver(sound/soc/codecs/hdmi-codec.c) and relevant interfaces of ASoC framework.
-But I couldn't find it. :( Could you let me know which code of ASoC framework checks this? I saw this property only in 'snd_soc_of_get_dai_name' and 'snd_soc_of_get_dai_link_codecs' functions but seems these functions aren't called by the HDMI codec driver.
+I agree with your analysis, although  I never see these spurious
+rebuilds of these files.
 
-Thanks,
-Inki Dae
+>> I see random success/failure by just running something like the
+>> following multiple times:
+>>         rm -rf arch/arm64/crypto
+>>         git co -f arch/arm64/crypto
+>>         make -- arch/arm64/crypto/
+>>
+>> A reasonable fix might be to simply drop .S_shipped and require a
+>> functional recent version of perl. Then if it fails it will fail
+>> reliably.
+>>
+>
+> Indeed, this Makefile is weird.
+> We have two choices.
+>
+>
+> [1] If we intend to generate
+> sha{256,512}-core.S from the perl script during the build,
+> this should be:
+>
+> $(obj)/sha512-core.S: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+>
+> $(obj)/sha512-core.S: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+>
+>
+> [2] If we want to check-in _shipped files
+> and avoid running perl during the build,
+> we can surround unnecessary rules with if-conditional, like
+>
+>
+> if REGENERATE_ARM64_SHA
+> $(src)/sha256-core.S_shipped: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+>
+> $(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+> endif
+>
+>
+> Set REGENERATE_ARM64_SHA=1 from the command line
+> only when you need to update the _shipped files.
+>
+> This is what commit 7373f4f83c71d50f0aece6d94309ab7fde42180f did.
+>
+>
+>
+>
+> Recently, Kconfig switched to [1].
+> So, flex and bison are required to build the kernel.
+>
 
-> 
-> Best regards
+I would prefer option [1], but only if it is already documented
+somewhere that Perl is a build time dependency.
