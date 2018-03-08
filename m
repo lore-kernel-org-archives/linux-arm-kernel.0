@@ -1,13 +1,13 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Thu,  8 Mar 2018 17:34:56 +0800
-Subject: [PATCH v4 2/3] ARM: debug: Add low level debug support for imx6sll
+Date: Thu,  8 Mar 2018 17:34:57 +0800
+Subject: [PATCH v4 3/3] driver: clocksource: add gpt timer for imx6sll
 In-Reply-To: <1520501697-22202-1-git-send-email-ping.bai@nxp.com>
 References: <1520501697-22202-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1520501697-22202-2-git-send-email-ping.bai@nxp.com>
+Message-ID: <1520501697-22202-3-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add low level debug support for i.MX6SLL.
+Add gpt timer support for i.MX6SLL.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
@@ -18,71 +18,17 @@ change v2->v3:
 change v3->v4:
  - no
 ---
- arch/arm/Kconfig.debug            |  9 +++++++++
- arch/arm/include/debug/imx-uart.h | 10 ++++++++++
- 2 files changed, 19 insertions(+)
+ drivers/clocksource/timer-imx-gpt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 78a6470..2197239 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -451,6 +451,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on i.MX6SL.
- 
-+	config DEBUG_IMX6SLL_UART
-+		bool "i.MX6SLL Debug UART"
-+		depends on SOC_IMX6SLL
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX6SLL.
-+
- 	config DEBUG_IMX6SX_UART
- 		bool "i.MX6SX Debug UART"
- 		depends on SOC_IMX6SX
-@@ -1429,6 +1436,7 @@ config DEBUG_IMX_UART_PORT
- 						DEBUG_IMX53_UART || \
- 						DEBUG_IMX6Q_UART || \
- 						DEBUG_IMX6SL_UART || \
-+						DEBUG_IMX6SLL_UART || \
- 						DEBUG_IMX6SX_UART || \
- 						DEBUG_IMX6UL_UART || \
- 						DEBUG_IMX7D_UART
-@@ -1483,6 +1491,7 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART || \
-+				 DEBUG_IMX6SLL_UART || \
- 				 DEBUG_IMX6SX_UART || \
- 				 DEBUG_IMX6UL_UART || \
- 				 DEBUG_IMX7D_UART
-diff --git a/arch/arm/include/debug/imx-uart.h b/arch/arm/include/debug/imx-uart.h
-index bce58e9..24e60ce 100644
---- a/arch/arm/include/debug/imx-uart.h
-+++ b/arch/arm/include/debug/imx-uart.h
-@@ -81,6 +81,14 @@
- #define IMX6SL_UART_BASE_ADDR(n) IMX6SL_UART##n##_BASE_ADDR
- #define IMX6SL_UART_BASE(n)	IMX6SL_UART_BASE_ADDR(n)
- 
-+#define IMX6SLL_UART1_BASE_ADDR 0x02020000
-+#define IMX6SLL_UART2_BASE_ADDR 0x02024000
-+#define IMX6SLL_UART3_BASE_ADDR 0x02034000
-+#define IMX6SLL_UART4_BASE_ADDR 0x02018000
-+#define IMX6SLL_UART5_BASE_ADDR 0x021f4000
-+#define IMX6SLL_UART_BASE_ADDR(n) IMX6SLL_UART##n##_BASE_ADDR
-+#define IMX6SLL_UART_BASE(n)	IMX6SLL_UART_BASE_ADDR(n)
-+
- #define IMX6SX_UART1_BASE_ADDR	0x02020000
- #define IMX6SX_UART2_BASE_ADDR	0x021e8000
- #define IMX6SX_UART3_BASE_ADDR	0x021ec000
-@@ -133,6 +141,8 @@
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6Q)
- #elif defined(CONFIG_DEBUG_IMX6SL_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SL)
-+#elif defined(CONFIG_DEBUG_IMX6SLL_UART)
-+#define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SLL)
- #elif defined(CONFIG_DEBUG_IMX6SX_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SX)
- #elif defined(CONFIG_DEBUG_IMX6UL_UART)
+diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
+index 6ec6d79..57b7eab 100644
+--- a/drivers/clocksource/timer-imx-gpt.c
++++ b/drivers/clocksource/timer-imx-gpt.c
+@@ -557,3 +557,4 @@ static int __init imx6dl_timer_init_dt(struct device_node *np)
+ TIMER_OF_DECLARE(imx6dl_timer, "fsl,imx6dl-gpt", imx6dl_timer_init_dt);
+ TIMER_OF_DECLARE(imx6sl_timer, "fsl,imx6sl-gpt", imx6dl_timer_init_dt);
+ TIMER_OF_DECLARE(imx6sx_timer, "fsl,imx6sx-gpt", imx6dl_timer_init_dt);
++TIMER_OF_DECLARE(imx6sll_timer, "fsl,imx6sll-gpt", imx6dl_timer_init_dt);
 -- 
 1.9.1
