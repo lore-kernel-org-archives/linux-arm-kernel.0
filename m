@@ -1,57 +1,42 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Thu, 8 Mar 2018 13:14:38 -0700
-Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <20180307050624.GR23018@vireshk-i7>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
- <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
- <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
- <20180306042656.GJ23018@vireshk-i7>
- <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
- <20180307050624.GR23018@vireshk-i7>
-Message-ID: <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 8 Mar 2018 12:15:22 -0800
+Subject: [PATCH] ASoC: cygnus: remove redundant assignment to pointer 'res'
+In-Reply-To: <20180308133249.22032-1-colin.king@canonical.com>
+References: <20180308133249.22032-1-colin.king@canonical.com>
+Message-ID: <576fbe04-bef0-171d-a1eb-40c6cbb2874e@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 10:36:24AM +0530, Viresh Kumar wrote:
-> On 06-03-18, 08:37, Jordan Crouse wrote:
-> > I'll try to explain but I might need Stephen or some of the other folks to jump
-> > in and save me.
-> 
-> Maybe you should start using his kernel.org address then ? :)
-> 
-> > On sdm845 there are shared power resources controlled by the RPMh which is
-> > programed by a series of commands from the regulator driver; but in the case
-> > of the GPU the votes are passed to the GMU (graphics management unit) which
-> > communicates with the RPMh on behalf of the GPU.
-> > 
-> > In order to construct the RPMh vote we need first need a voltage level that we
-> > can look up in a database. qcom,arc-level is the voltage level associated with
-> > a specific OPP.
-> > 
-> > I had previously been abusing this with opp-microvolt but that was wrong for
-> > obvious reasons and then Stephen pointed out that this would be a better way.
-> 
-> Glad that you shared that :)
-> 
-> A solution is already in progress for that and is partially merged as
-> well.
-> 
-> Look for "performance_state" in genpd and OPP cores (already merged),
-> followed by this series here:
-> 
-> https://lkml.kernel.org/r/cover.1513926033.git.viresh.kumar at linaro.org
+Looks good.
 
-It seems to me that performance_state has a direct relationship with genpd
-which is good for CPU votes but in this case, we're just passing along raw data
-to an independent microcontroller. The 'qcom,arc-level' is used to construct
-the actual values that the GMU will program into the RPMh. Since these are
-informational (from the CPU perspective) rather than functional I feel like
-that using performance_state for this would be as hacky as using opp-microvolt
-or something else.
 
-Jordan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+On 18-03-08 05:32 AM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> The pointer res is being initialized with a value that is never read
+> and re-assigned immediately after, hence the initialization is redundant
+> and can be removed.
+>
+> Cleans up clang warning:
+> sound/soc/bcm/cygnus-ssp.c:1284:19: warning: Value stored to 'res'
+> during its initialization is never read
+>
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Acked-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>   sound/soc/bcm/cygnus-ssp.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+> index abafadc0b534..b733f1446353 100644
+> --- a/sound/soc/bcm/cygnus-ssp.c
+> +++ b/sound/soc/bcm/cygnus-ssp.c
+> @@ -1281,7 +1281,7 @@ static int cygnus_ssp_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev = &pdev->dev;
+>   	struct device_node *child_node;
+> -	struct resource *res = pdev->resource;
+> +	struct resource *res;
+>   	struct cygnus_audio *cygaud;
+>   	int err = -EINVAL;
+>   	int node_count;
