@@ -1,30 +1,40 @@
-From: brice.goglin@gmail.com (Brice Goglin)
-Date: Thu, 8 Mar 2018 21:41:17 +0100
-Subject: [PATCH v7 13/13] arm64: topology: divorce MC scheduling domain
- from core_siblings
-In-Reply-To: <20180307130623.GK4589@e105550-lin.cambridge.arm.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-14-jeremy.linton@arm.com>
- <20180301155216.GI4589@e105550-lin.cambridge.arm.com>
- <5d6bf4cf-2f6d-d123-f17f-d47d8e74c16c@arm.com>
- <20180306160721.GJ4589@e105550-lin.cambridge.arm.com>
- <8ac3567c-9fd8-4b0c-121c-287a027b5156@arm.com>
- <20180307130623.GK4589@e105550-lin.cambridge.arm.com>
-Message-ID: <d6497158-c58f-4fd4-4613-699fb2af7a61@gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 8 Mar 2018 21:49:41 +0100
+Subject: [PATCH v3 2/4] rtc: at91sam9: Pass pdev->dev to regmap_init_mmio()
+In-Reply-To: <20180308102154.25686-3-jeffy.chen@rock-chips.com>
+References: <20180308102154.25686-1-jeffy.chen@rock-chips.com>
+ <20180308102154.25686-3-jeffy.chen@rock-chips.com>
+Message-ID: <20180308204941.GK20370@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/03/2018 at 18:21:52 +0800, Jeffy Chen wrote:
+> Otherwise it would use "dummy*" to create regmap debugfs dir.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v3: None
+> 
+>  drivers/rtc/rtc-at91sam9.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 7418a763ce52..0d6a17a77841 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -402,7 +402,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  		if (IS_ERR(gpbr))
+>  			return PTR_ERR(gpbr);
+>  
+> -		rtc->gpbr = regmap_init_mmio(NULL, gpbr,
+> +		rtc->gpbr = regmap_init_mmio(&pdev->dev, gpbr,
+>  					     &gpbr_regmap_config);
 
-> Is there a good reason for diverging instead of adjusting the
-> core_sibling mask? On x86 the core_siblings mask is defined by the last
-> level cache span so they don't have this issue. 
+This would be misleading as the gpbr is not directly related to the rtc.
 
-No. core_siblings is defined as the list of cores that have the same
-physical_package_id (see the doc of sysfs topology files), and LLC can
-be smaller than that.
-Example with E5v3 with cluster-on-die (two L3 per package, core_siblings
-is twice larger than L3 cpumap):
-https://www.open-mpi.org/projects/hwloc/lstopo/images/2XeonE5v3.v1.11.png
-On AMD EPYC, you even have up to 8 LLC per package.
 
-Brice
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
