@@ -1,41 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Mar 2018 16:07:23 +0100
-Subject: [PATCH 0/4] dt/bindings & ARM: dts: tegra: updates
-In-Reply-To: <20180210013326.27771-1-marcel@ziswiler.com>
-References: <20180210013326.27771-1-marcel@ziswiler.com>
-Message-ID: <20180308150723.GB13814@ulmo>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 8 Mar 2018 12:07:45 -0300
+Subject: [PATCH] clk: imx25: set correct parents for ssi ipg clocks
+In-Reply-To: <20180308140851.GA25601@botnar.kaiser.cx>
+References: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
+ <CAOMZO5A7W4rbPbZB8ERs518obrg+6F6mDeojkwJaGComFAJB0A@mail.gmail.com>
+ <20180308140851.GA25601@botnar.kaiser.cx>
+Message-ID: <CAOMZO5BdBWExt9FvPrfUG74Y62e4EUs6cqFyfVs5JuUtym00hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 10, 2018 at 02:33:21AM +0100, Marcel Ziswiler wrote:
-> 
-> This series fixes the Tegra GMI controller DT/bindings example, a few
-> IRQ type definitions, removes some invalid uses of rsvd1 pin muxes on
-> Beaver and removes a duplicate pcie-1 node on Venice2.
-> 
-> 
-> Marcel Ziswiler (4):
->   dt/bindings: fix binding examples for tegra gmi controller
->   ARM: dts: tegra: use proper irq type definitions
->   ARM: dts: tegra: beaver: remove invalid uses of rsvd1
->   ARM: dts: tegra: venice2: remove duplicate pcie-1 node
-> 
->  .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt |  6 ++--
->  arch/arm/boot/dts/tegra114-dalmore.dts             |  2 +-
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  2 +-
->  arch/arm/boot/dts/tegra124-venice2.dts             |  9 ++----
->  arch/arm/boot/dts/tegra30-apalis.dtsi              |  4 +--
->  arch/arm/boot/dts/tegra30-beaver.dts               | 32 +++++++++++-----------
->  arch/arm/boot/dts/tegra30-colibri-eval-v3.dts      |  2 +-
->  7 files changed, 25 insertions(+), 32 deletions(-)
+Hi Martin,
 
-Applied, thanks.
+On Thu, Mar 8, 2018 at 11:08 AM, Martin Kaiser <martin@kaiser.cx> wrote:
+> Hi Fabio,
+>
+> Thus wrote Fabio Estevam (festevam at gmail.com):
+>
+>> I get audio working from SSI1, but I guess this is due to the fact
+>> that the bootloader enables the SSI clock:
+>
+>> I have the following in U-Boot:
+>
+>> /* Enable the clocks */
+>> DATA 4 0x53f8000c 0x1fffffff
+>> DATA 4 0x53f80010 0xffffffff
+>> DATA 4 0x53f80014 0xfdfff
+>
+> I'm using the same initial settings.
+>
+> Nevertheless, ssi1_ipg_per is disbled after loading the kernel.
+>
+> Digging into this a bit more, it turned out that without my patch,
+> clk_disable_unused() recognizes ssi1_ipg_per as unused and disables it.
+>
+> If my patch is applied and ssi1_ipg_per is declared as parent of
+> ssi1_ipg, clk_disable_unused() will not disable it and fsl_ssi_startup()
+> will enable both ssi1_ipg_per and ssi1_ipg before playing sound.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/ba9934ae/attachment.sig>
+I can get audio to work fine without your patch on a mx25pdk.
+
+In the other i.MX clock drivers we have this same pattern:
+
+clks[IMX6SL_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",     "ipg",
+
+It is not clear to me what is the real issue this patch is trying to fix.
+
+Thanks
