@@ -1,46 +1,48 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 8 Mar 2018 14:21:39 +0100
-Subject: [PATCH 00/45] arm Spectre fix backport review for LTS 4.9
-In-Reply-To: <20180308122715.GB21514@amd>
-References: <1519908862-11425-1-git-send-email-alex.shi@linaro.org>
- <20180308122715.GB21514@amd>
-Message-ID: <20180308132139.apabmgw4magrp3d7@pali>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Thu, 08 Mar 2018 08:28:13 -0500
+Subject: [RFC V4] perf, tools: Support wildcards on pmu name in dynamic
+ pmu events
+In-Reply-To: <20180308130358.GC3701@kernel.org>
+References: <1520454947-16977-1-git-send-email-agustinv@codeaurora.org>
+ <20180308130358.GC3701@kernel.org>
+Message-ID: <ae102272a8186f0351363511f4ed07f8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 March 2018 13:27:15 Pavel Machek wrote:
-> Hi!
+On 2018-03-08 08:03, Arnaldo Carvalho de Melo wrote:
+> Em Wed, Mar 07, 2018 at 03:35:47PM -0500, Agustin Vega-Frias escreveu:
+>> +++ b/tools/perf/util/parse-events.y
+>> @@ -8,6 +8,7 @@
+>> 
+>>  #define YYDEBUG 1
+>> 
+>> +#include <fnmatch.h>
+>>  #include <linux/compiler.h>
+>>  #include <linux/list.h>
+>>  #include <linux/types.h>
+>> @@ -234,6 +235,10 @@ PE_NAME opt_event_config
+>>  	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
+>>  		struct perf_pmu *pmu = NULL;
+>>  		int ok = 0;
+>> +		char *pattern;
+>> +
+>> +		if (asprintf(&pattern, "%s*", $1) < 0)
+>> +			YYABORT;
 > 
-> > Resent without non-upstream patches.
-> > 
-> > This backport patchset fixed the spectre issue, it's original branch:
-> > https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-> > A few dependency or fixingpatches are also picked up, if they are necessary
-> >  and no functional changes.
-> > 
-> > No bug found from kernelci.org and lkft testing. It also could be gotten from:
-> > 
-> > git://git.linaro.org/kernel/linux-linaro-stable.git v4.9-spectre-upstream-only
-> > 
-> > Comments are appreciated!
+> +               if (asprintf(&pattern, "?(uncore_)%s*", $1) < 0)
 > 
-> Not entirely related to this patched, but... I have few older ARM
-> boards here, and Nokia N9000 I really care about.
+> I completely overlook that you were using this and thus needed that
+> extension, duh, thanks for the patience 8-) and for the new patch.
 > 
-> AFAICT Meltdown is arm64 only?
 
-IIRC ARMv7 is not affected by meltdown.
+NP Arnaldo, thanks for the quick turnaround on these patches :o)
+Just so I know, since these are my first patches on perf tools,
+where are perf tools patches queued once acked?
 
-> Spectre affects the older boards, too, right? Was there any work done
-> on that? cpuinfo says "ARMv7" for N900.
-
-I remember that I saw some spectre patches for ARMv7 on LKML.
-
-In general for ARMv7 it is problematic as mitigation needs to change IBE
-bit which is not possible on OMAP HS devices. But for Nokia N900 there
-is special code which do it via smc instruction (function
-rx51_secure_update_aux_cr(), see also nokia_n900_legacy_init()).
+Thanks!
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
