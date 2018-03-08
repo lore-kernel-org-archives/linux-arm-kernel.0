@@ -1,61 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Mar 2018 19:20:00 -0600
-Subject: [PATCH 2/3] dt-bindings: clock: Add bindings for ZynqMP clock
- driver
-In-Reply-To: <DM2PR0201MB0767031248A9F773620722FDB8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
-References: <1519856861-31384-1-git-send-email-jollys@xilinx.com>
- <1519856861-31384-3-git-send-email-jollys@xilinx.com>
- <20180306014549.6t3ae5adzc3cpi5v@rob-hp-laptop>
- <DM2PR0201MB0767031248A9F773620722FDB8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
-Message-ID: <CAL_JsqKUC47xB5O2Y6c3efVCjJY=V+XO3xyLTU9rNia40bdZkg@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 8 Mar 2018 01:21:02 +0000
+Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
+In-Reply-To: <1832733.mujlD9skaR@jernej-laptop>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+ <20180302124050.GF6255@sirena.org.uk>
+ <26212674.B0xcQEiVyd@jernej-laptop>
+ <1832733.mujlD9skaR@jernej-laptop>
+Message-ID: <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2018 at 4:47 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
-> Hi Rob,
->
->
->> -----Original Message-----
->> From: Rob Herring [mailto:robh at kernel.org]
->> Sent: Monday, March 05, 2018 5:46 PM
->> To: Jolly Shah <JOLLYS@xilinx.com>
->> Cc: mturquette at baylibre.com; sboyd at codeaurora.org;
->> michal.simek at xilinx.com; mark.rutland at arm.com; linux-clk at vger.kernel.org;
->> devicetree at vger.kernel.org; Shubhrajyoti Datta <shubhraj@xilinx.com>; linux-
->> kernel at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>; Rajan Vaja
->> <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 2/3] dt-bindings: clock: Add bindings for ZynqMP clock
->> driver
->>
->> On Wed, Feb 28, 2018 at 02:27:40PM -0800, Jolly Shah wrote:
->> > Add documentation to describe Xilinx ZynqMP clock driver bindings.
->> >
->> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
->> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
->> > Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
->> > ---
 
->> > +95         dpll_post_src
->> > +96         vpll_int
->> > +97         vpll_pre_src
->> > +98         vpll_half
->> > +99         vpll_int_mux
->> > +100                vpll_post_src
->> > +101                can0_mio
->> > +102                can1_mio
->> > +
->> > +Example:
->> > +
->> > +clk: clk {
->> > +   #clock-cells = <1>;
->> > +   compatible = "xlnx,zynqmp-clk";
->>
->> How do you control the clocks?
->
-> Clocks are controlled by a dedicated platform management controller. Above clock ids are used to identify clocks between master and PMU.
+Hi Jernej
 
-What is the interface to the "platform management controller"? Because
-you have no registers, I'm guessing a firmware interface? If so, then
-just define the firmware node as a clock provider.
+Thank you for your hard work
 
-Rob
+> I found the issue. Commit be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: 
+> replace platform to component") changes struct dmaengine_pcm:
+> 
+>  struct dmaengine_pcm {
+>  	struct dma_chan *chan[SNDRV_PCM_STREAM_LAST + 1];
+>  	const struct snd_dmaengine_pcm_config *config;
+> -	struct snd_soc_platform platform;
+> +	struct snd_soc_component component;
+>  	unsigned int flags;
+>  };
+> 
+> In snd_dmaengine_pcm_register():
+> ret = snd_soc_add_component(dev, &pcm->component,
+> 				    &dmaengine_pcm_component, NULL, 0);
+> 
+> And now, sun4i-codec first time returns -EPROBE_DEFER since driver for analog 
+> part is not yet loaded. Because of that, all components get destroyed.
+> 
+> snd_dmaengine_pcm_unregister() calls snd_soc_unregister_component() and that 
+> one calls __snd_soc_unregister_component() multiple times (until it fails).
+> 
+> Issue is that __snd_soc_unregister_component() uses kfree() on component 
+> pointer and that naturally can't succed since component was never kmalloc'ed 
+> since it is a part of a bigger structure - struct dmaengine_pcm.
+> 
+> What would be the best fix? Changing struct dmaengine_pcm to have pointer to a 
+> component, so it can be freed?
+
+Ahh.. indeed. Good catch !
+How about to add such flag ?
+This is just idea. No tested, No compiled, but can help you ?
+
+One note here is that reusing "registered_as_component" flag is
+not good idea, because it will be removed
+when platform/codec were removed
+
+------------------------
+diff --git a/include/sound/soc.h b/include/sound/soc.h
+index 1a73232..b9b1b4c 100644
+--- a/include/sound/soc.h
++++ b/include/sound/soc.h
+@@ -853,6 +853,7 @@ struct snd_soc_component {
+ 	unsigned int ignore_pmdown_time:1; /* pmdown_time is ignored at stop */
+ 	unsigned int registered_as_component:1;
+ 	unsigned int suspended:1; /* is in suspend PM state */
++	unsigned int alloced_component:1;
+ 
+ 	struct list_head list;
+ 	struct list_head card_aux_list; /* for auxiliary bound components */
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index c0edac8..0e33bcf 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -3492,6 +3492,7 @@ int snd_soc_register_component(struct device *dev,
+ 	if (!component)
+ 		return -ENOMEM;
+ 
++	component->alloced_component = 1;
+ 	return snd_soc_add_component(dev, component, component_driver,
+ 				     dai_drv, num_dai);
+ }
+@@ -3523,7 +3524,9 @@ static int __snd_soc_unregister_component(struct device *dev)
+ 
+ 	if (found) {
+ 		snd_soc_component_cleanup(component);
+-		kfree(component);
++
++		if (component->alloced_component)
++			kfree(component);
+ 	}
+ 
+ 	return found;
+------------------------
