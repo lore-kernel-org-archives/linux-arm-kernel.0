@@ -1,53 +1,44 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 8 Mar 2018 17:54:03 +0100
-Subject: [PATCH v2 10/12] clk: stm32mp1: add RTC clock
-In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1520528045-18330-11-git-send-email-gabriel.fernandez@st.com>
+Date: Thu, 8 Mar 2018 17:53:53 +0100
+Subject: [PATCH v2 00/12] Introduce STM32MP1 clock driver
+Message-ID: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch adds the RTC clock.
+v2:
+  - Don't use MFD, use existing binding of STM32 RCC.
+  - Rework Peripheral and Kernel clocks
+  - cosmetic changes
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32mp1.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+This patch-set introduces clock driver for STM32MP157 based on Arm Cortex-A7.
+The driver patch is split in several patches (by kind of clock) to facilitate
+code reviewing.
 
-diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index b5379a2..51e3e76 100644
---- a/drivers/clk/clk-stm32mp1.c
-+++ b/drivers/clk/clk-stm32mp1.c
-@@ -248,6 +248,10 @@
- 	"ck_dsi_phy", "pll4_p"
- };
- 
-+static const char * const rtc_src[] = {
-+	"off", "ck_lse", "ck_lsi", "ck_hse_rtc"
-+};
-+
- static const struct clk_div_table axi_div_table[] = {
- 	{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 4 },
- 	{ 4, 4 }, { 5, 4 }, { 6, 4 }, { 7, 4 },
-@@ -1945,6 +1949,17 @@ enum {
- 		  _NO_GATE,
- 		  _MMUX(M_ETHCK),
- 		  _DIV(RCC_ETHCKSELR, 4, 4, CLK_DIVIDER_ALLOW_ZERO, NULL)),
-+
-+	/* RTC clock */
-+	DIV(NO_ID, "ck_hse_rtc", "ck_hse", 0, RCC_RTCDIVR, 0, 7,
-+	    CLK_DIVIDER_ALLOW_ZERO),
-+
-+	COMPOSITE(RTC, "ck_rtc", rtc_src, CLK_OPS_PARENT_ENABLE |
-+		   CLK_SET_RATE_PARENT,
-+		  _GATE(RCC_BDCR, 20, 0),
-+		  _MUX(RCC_BDCR, 16, 2, 0),
-+		  _NO_DIV),
-+
- };
- 
- struct stm32_clock_match_data {
+Gabriel Fernandez (12):
+  dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings
+  clk: stm32mp1: Introduce STM32MP1 clock driver
+  clk: stm32mp1: add MP1 gate for hse/hsi/csi oscillators
+  clk: stm32mp1: add Source Clocks for PLLs
+  clk: stm32mp1: add PLL clocks
+  clk: stm32mp1: add Post-dividers for PLL
+  clk: stm32mp1: add Sub System clocks
+  clk: stm32mp1: add Kernel timers
+  clk: stm32mp1: add Peripheral & Kernel Clocks
+  clk: stm32mp1: add RTC clock
+  clk: stm32mp1: add MCO clocks
+  clk: stm32mp1: add Debug clocks
+
+ .../devicetree/bindings/clock/st,stm32mp1-rcc.txt  |   60 +
+ drivers/clk/Kconfig                                |    6 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-stm32mp1.c                         | 2117 ++++++++++++++++++++
+ include/dt-bindings/clock/stm32mp1-clks.h          |  254 +++
+ 5 files changed, 2438 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+ create mode 100644 drivers/clk/clk-stm32mp1.c
+ create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
+
 -- 
 1.9.1
