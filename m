@@ -1,181 +1,168 @@
-From: shunyong.yang@hxt-semitech.com (Yang, Shunyong)
-Date: Thu, 8 Mar 2018 09:31:36 +0000
-Subject: =?utf-8?B?UmU6IFvmraTpgq7ku7blj6/og73lrZjlnKjpo47pmaldICBSZTogW1JGQyBQ?=
- =?utf-8?B?QVRDSF0gS1ZNOiBhcm0vYXJtNjQ6IHZnaWM6IGNoYW5nZSBjb25kaXRpb24g?=
- =?utf-8?Q?for_level_interrupt_resampling?=
-In-Reply-To: <9b3763f2-1dfa-5506-d7f2-93389647111c@redhat.com>
-References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
- <9b3763f2-1dfa-5506-d7f2-93389647111c@redhat.com>
-Message-ID: <1520501495.2583.19.camel@hxt-semitech.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Thu,  8 Mar 2018 17:34:55 +0800
+Subject: [PATCH v4 1/3] ARM: imx: Add basic msl support for imx6sll
+Message-ID: <1520501697-22202-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Eric,
+Add basic MSL support for i.MX6SLL.
 
-First, please let me change?Christoffer's email to?cdall at kernel.org. I
-add more information about my test below, please check.
+The i.MX 6SoloLiteLite application processors are NXP's latest
+additions to a growing family of multimedia-focused products
+offering high-performance processing optimized for lowest power
+consumption. The i.MX 6SoloLiteLite processors feature NXP's advanced
+implementation of the ARM Cortex-A9 core, which can be interfaced
+with LPDDR3 and LPDDR2 DRAM memory devices.
 
-On Thu, 2018-03-08 at 09:57 +0100, Auger Eric wrote:
-> Hi,
-> 
-> On 08/03/18 08:01, Shunyong Yang wrote:
-> > 
-> > When resampling irqfds is enabled, level interrupt should be
-> > de-asserted when resampling happens. On page 4-47 of GIC v3
-> > specification IHI0069D, it said,
-> > "When the PE acknowledges an SGI, a PPI, or an SPI at the CPU
-> > interface, the IRI changes the status of the interrupt to active
-> > and pending if:
-> > ? It is an edge-triggered interrupt, and another edge has been
-> > detected since the interrupt was acknowledged.
-> > ? It is a level-sensitive interrupt, and the level has not been
-> > deasserted since the interrupt was acknowledged."
-> > 
-> > GIC v2 specification IHI0048B.b has similar description on page
-> > 3-42 for state machine transition.
-> > 
-> > When some VFIO device, like mtty(8250 VFIO mdev emulation driver
-> > in samples/vfio-mdev) triggers a level interrupt, the status
-> > transition in LR is pending-->active-->active and pending.
-> > Then it will wait resampling to de-assert the interrupt.
-> > 
-> > Current design of lr_signals_eoi_mi() will return false if state
-> > in LR is not invalid(Inactive). It causes resampling will not
-> > happen
-> > in mtty case.
-> > 
-> > This will cause interrupt fired continuously to guest even 8250 IIR
-> > has no interrupt. When 8250's interrupt is configured in shared
-> > mode,
-> > it will pass interrupt to other drivers to handle. However, there
-> > is no other driver involved. Then, a "nobody cared" kernel
-> > complaint
-> > occurs.
-> > 
-> > / # cat /dev/ttyS0
-> > [????4.826836] random: crng init done
-> > [????6.373620] irq 41: nobody cared (try booting with the "irqpoll"
-> > option)
-> > [????6.376414] CPU: 0 PID: 1307 Comm: cat Not tainted 4.16.0-rc4 #4
-> > [????6.378927] Hardware name: linux,dummy-virt (DT)
-> > [????6.380876] Call trace:
-> > [????6.381937]??dump_backtrace+0x0/0x180
-> > [????6.383495]??show_stack+0x14/0x1c
-> > [????6.384902]??dump_stack+0x90/0xb4
-> > [????6.386312]??__report_bad_irq+0x38/0xe0
-> > [????6.387944]??note_interrupt+0x1f4/0x2b8
-> > [????6.389568]??handle_irq_event_percpu+0x54/0x7c
-> > [????6.391433]??handle_irq_event+0x44/0x74
-> > [????6.393056]??handle_fasteoi_irq+0x9c/0x154
-> > [????6.394784]??generic_handle_irq+0x24/0x38
-> > [????6.396483]??__handle_domain_irq+0x60/0xb4
-> > [????6.398207]??gic_handle_irq+0x98/0x1b0
-> > [????6.399796]??el1_irq+0xb0/0x128
-> > [????6.401138]??_raw_spin_unlock_irqrestore+0x18/0x40
-> > [????6.403149]??__setup_irq+0x41c/0x678
-> > [????6.404669]??request_threaded_irq+0xe0/0x190
-> > [????6.406474]??univ8250_setup_irq+0x208/0x234
-> > [????6.408250]??serial8250_do_startup+0x1b4/0x754
-> > [????6.410123]??serial8250_startup+0x20/0x28
-> > [????6.411826]??uart_startup.part.21+0x78/0x144
-> > [????6.413633]??uart_port_activate+0x50/0x68
-> > [????6.415328]??tty_port_open+0x84/0xd4
-> > [????6.416851]??uart_open+0x34/0x44
-> > [????6.418229]??tty_open+0xec/0x3c8
-> > [????6.419610]??chrdev_open+0xb0/0x198
-> > [????6.421093]??do_dentry_open+0x200/0x310
-> > [????6.422714]??vfs_open+0x54/0x84
-> > [????6.424054]??path_openat+0x2dc/0xf04
-> > [????6.425569]??do_filp_open+0x68/0xd8
-> > [????6.427044]??do_sys_open+0x16c/0x224
-> > [????6.428563]??SyS_openat+0x10/0x18
-> > [????6.429972]??el0_svc_naked+0x30/0x34
-> > [????6.431494] handlers:
-> > [????6.432479] [<000000000e9fb4bb>] serial8250_interrupt
-> > [????6.434597] Disabling IRQ #41
-> > 
-> > This patch changes the lr state condition in lr_signals_eoi_mi()
-> > from
-> > invalid(Inactive) to active and pending to avoid this.
-> > 
-> > I am not sure about the original design of the condition of
-> > invalid(active). So, This RFC is sent out for comments.
-> > 
-> > Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
-> > Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
-> > ---
-> > ?virt/kvm/arm/vgic/vgic-v2.c | 4 ++--
-> > ?virt/kvm/arm/vgic/vgic-v3.c | 4 ++--
-> > ?2 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-
-> > v2.c
-> > index e9d840a75e7b..740ee9a5f551 100644
-> > --- a/virt/kvm/arm/vgic/vgic-v2.c
-> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> > @@ -46,8 +46,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
-> > ?
-> > ?static bool lr_signals_eoi_mi(u32 lr_val)
-> > ?{
-> > -	return !(lr_val & GICH_LR_STATE) && (lr_val & GICH_LR_EOI)
-> > &&
-> > -	???????!(lr_val & GICH_LR_HW);
-> > +	return !((lr_val & GICH_LR_STATE) ^ GICH_LR_STATE) &&
-> > +	???????(lr_val & GICH_LR_EOI) && !(lr_val & GICH_LR_HW);
-> > ?}
-> > ?
-> > ?/*
-> > diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-
-> > v3.c
-> > index 6b329414e57a..43111bba7af9 100644
-> > --- a/virt/kvm/arm/vgic/vgic-v3.c
-> > +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> > @@ -35,8 +35,8 @@ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-> > ?
-> > ?static bool lr_signals_eoi_mi(u64 lr_val)
-> > ?{
-> > -	return !(lr_val & ICH_LR_STATE) && (lr_val & ICH_LR_EOI)
-> > &&
-> > -	???????!(lr_val & ICH_LR_HW);
-> > +	return !((lr_val & ICH_LR_STATE) ^ ICH_LR_STATE) &&
-> > +	???????(lr_val & ICH_LR_EOI) && !(lr_val & ICH_LR_HW);
-> 
-> In general don't we have this state transition
-> 
-> inactive -> pending -> pending + active (1) -> active -> inactive.
-> 
-> In that case won't we lower the virt irq level when folding the LR on
-> Pending + Active state, which is not was we want?
-> 
-> Thanks
-> 
-> Eric
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+---
+ change from v1->v2:
+ - no
+ change from v2->v3:
+ - no
+ change from v3->v4:
+ - fix build warning
+---
+ arch/arm/mach-imx/Kconfig          |  7 +++++++
+ arch/arm/mach-imx/Makefile         |  1 +
+ arch/arm/mach-imx/cpu.c            |  3 +++
+ arch/arm/mach-imx/cpuidle-imx6sl.c |  7 +++++--
+ arch/arm/mach-imx/mach-imx6sl.c    | 10 ++++++++--
+ arch/arm/mach-imx/mxc.h            |  6 ++++++
+ 6 files changed, 30 insertions(+), 4 deletions(-)
 
-In current code, in my test, when I output LR value of the mtty IRQ 41
-(hwirq = 36) in?vgic_v3_fold_lr_state(). The LR's transition starts
-like following,
-
-0-->50a0020000000024-->90a0020000000024-->d0a0020000000024
-
-That is inactive-->pending-->active-->pending + active.
-Then it keep running cyclic pending-->active-->pending + active.
-
-The level interrupt de-assert should happen in following code
-/* Notify fds when the guest EOI'ed a level-triggered IRQ */
-	if (lr_signals_eoi_mi(val) && vgic_valid_spi(vcpu->kvm, intid))
-		kvm_notify_acked_irq(vcpu->kvm, 0,
-				?????intid - VGIC_NR_PRIVATE_IRQS);
-
-But as addressed in commit message, lr_signals_eoi_mi() will return
-false if state in LR is not invalid(inactive), so it has no chance to
-de-assert the level interrupt in my test.?
-
-Thanks.
-Shunyong.
-
-> 
-> > 
-> > ?}
-> > ?
-> > ?void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-> > 
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 782699e..8e3a618 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -512,6 +512,13 @@ config SOC_IMX6SL
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloLite processor.
+ 
++config SOC_IMX6SLL
++	bool "i.MX6 SoloLiteLite support"
++	select SOC_IMX6
++
++	help
++	  This enables support for Freescale i.MX6 SoloLiteLite processor.
++
+ config SOC_IMX6SX
+ 	bool "i.MX6 SoloX support"
+ 	select PINCTRL_IMX6SX
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8ff7105..c5caecb 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -78,6 +78,7 @@ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ endif
+ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
++obj-$(CONFIG_SOC_IMX6SLL) += mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index d4e55f2..32969f3 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -135,6 +135,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6ULL:
+ 		soc_id = "i.MX6ULL";
+ 		break;
++	case MXC_CPU_IMX6SLL:
++		soc_id = "i.MX6SLL";
++		break;
+ 	case MXC_CPU_IMX7D:
+ 		soc_id = "i.MX7D";
+ 		break;
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
+index 8d866fb..124f982 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sl.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
+@@ -11,6 +11,7 @@
+ #include <asm/cpuidle.h>
+ 
+ #include "common.h"
++#include "hardware.h"
+ #include "cpuidle.h"
+ 
+ static int imx6sl_enter_wait(struct cpuidle_device *dev,
+@@ -21,9 +22,11 @@ static int imx6sl_enter_wait(struct cpuidle_device *dev,
+ 	 * Software workaround for ERR005311, see function
+ 	 * description for details.
+ 	 */
+-	imx6sl_set_wait_clk(true);
++	if (cpu_is_imx6sl())
++		imx6sl_set_wait_clk(true);
+ 	cpu_do_idle();
+-	imx6sl_set_wait_clk(false);
++	if (cpu_is_imx6sl())
++		imx6sl_set_wait_clk(false);
+ 	imx6_set_lpm(WAIT_CLOCKED);
+ 
+ 	return index;
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 0408490..462ed9c 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -17,6 +17,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
++#include "hardware.h"
+ #include "cpuidle.h"
+ 
+ static void __init imx6sl_fec_init(void)
+@@ -54,7 +55,8 @@ static void __init imx6sl_init_machine(void)
+ 
+ 	of_platform_default_populate(NULL, NULL, parent);
+ 
+-	imx6sl_fec_init();
++	if (cpu_is_imx6sl())
++		imx6sl_fec_init();
+ 	imx_anatop_init();
+ 	imx6sl_pm_init();
+ }
+@@ -66,11 +68,15 @@ static void __init imx6sl_init_irq(void)
+ 	imx_init_l2cache();
+ 	imx_src_init();
+ 	irqchip_init();
+-	imx6_pm_ccm_init("fsl,imx6sl-ccm");
++	if (cpu_is_imx6sl())
++		imx6_pm_ccm_init("fsl,imx6sl-ccm");
++	else
++		imx6_pm_ccm_init("fsl,imx6sll-ccm");
+ }
+ 
+ static const char * const imx6sl_dt_compat[] __initconst = {
+ 	"fsl,imx6sl",
++	"fsl,imx6sll",
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index e00d626..026e2ca 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -40,6 +40,7 @@
+ #define MXC_CPU_IMX6Q		0x63
+ #define MXC_CPU_IMX6UL		0x64
+ #define MXC_CPU_IMX6ULL		0x65
++#define MXC_CPU_IMX6SLL		0x67
+ #define MXC_CPU_IMX7D		0x72
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+@@ -79,6 +80,11 @@ static inline bool cpu_is_imx6ull(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
+ }
+ 
++static inline bool cpu_is_imx6sll(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6SLL;
++}
++
+ static inline bool cpu_is_imx6q(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+-- 
+1.9.1
