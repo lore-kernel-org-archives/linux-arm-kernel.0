@@ -1,64 +1,118 @@
-From: andreas@kemnade.info (Andreas Kemnade)
-Date: Thu, 8 Mar 2018 07:16:44 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20180118064736.GH3286@localhost>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost> <20180109184347.28ba0a6e@aktux>
- <20180112144647.GA5992@localhost>
- <20180112194022.7da1e726@kemnade.info>
- <20180118064736.GH3286@localhost>
-Message-ID: <20180308071459.310d0ba2@aktux>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Thu, 8 Mar 2018 14:18:02 +0800
+Subject: [PATCH v9 5/7] arm64: kvm: Introduce KVM_ARM_SET_SERROR_ESR ioctl
+In-Reply-To: <5A85C974.70500@arm.com>
+References: <0184EA26B2509940AA629AE1405DD7F201A9E8EA@DGGEMA503-MBS.china.huawei.com>
+ <5A70C5A0.1050600@arm.com> <d1b17dae-9d9c-970a-d164-a41c618d449b@huawei.com>
+ <5A7DDDEE.9050306@arm.com> <93d07d3e-8388-7814-d674-538071d84e2a@huawei.com>
+ <5A85C974.70500@arm.com>
+Message-ID: <CAMj-D2COh4xDKreZXPHeiJK34mrPqDbHszDWY-fz_SfxTRaHQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi James,
+   sorry for my late response due to chines new year.
 
-On Thu, 18 Jan 2018 17:47:36 +1100
-Johan Hovold <johan@kernel.org> wrote:
+2018-02-16 1:55 GMT+08:00 James Morse <james.morse@arm.com>:
+> Hi gengdongjiu,
+>
+> On 12/02/18 10:19, gengdongjiu wrote:
+>> On 2018/2/10 1:44, James Morse wrote:
+>>> The point? We can't know what a CPU without the RAS extensions puts in there.
+>>>
+>>> Why Does this matter? When migrating a pending SError we have to know the
+>>> difference between 'use this 64bit value', and 'the CPU will generate it'.
+>>> If I make an SError pending with ESR=0 on a CPU with VSESR, I can't migrated to
+>>> a system that generates an impdef SError-ESR, because I can't know it will be 0.
+>
+>> For the target system, before taking the SError, no one can know whether its syndrome value
+>> is IMPLEMENTATION DEFINED or architecturally defined.
+>
+> For a virtual-SError, the hypervisor knows what it generated. (do I have
+> VSESR_EL2? What did I put in there?).
+>
+>
+>> when the virtual SError is taken, the ESR_ELx.IDS will be updated, then we can know
+>> whether the ESR value is impdef or architecturally defined.
+>
+> True, the guest can't know anything about a pending virtual SError until it
+> takes it. Why is this a problem?
+>
+>
+>> It seems migration is only allowed only when target system and source system all support
+>> RAS extension, because we do not know whether its syndrome is IMPLEMENTATION DEFINED or
+>> architecturally defined.
+>
+> I don't think Qemu allows migration between hosts with differing guest-ID
+> registers. But we shouldn't depend on this, and we may want to hide the v8.2 RAS
+> features from the guest's ID register, but still use them from the host.
+>
+> The way I imagined it working was we would pack the following information into
+> that events struct:
+> {
+>         bool serror_pending;
+>         bool serror_has_esr;
+>         u64  serror_esr;
+> }
 
-[...]
-> > 
-> > So to avoid having hardware information spread all over the table at least
-> > these information would need to be in devicetree. But that also all feels
-> > like a hack and hard to maintain.  
-> 
-> Having the device described in the device tree is certainly desirable,
-> not least for chip identification. And with a GPS framework in the
-> kernel with a well-defined interface, implementing power management
-> would be straight forward.
-> 
-Hmm, devicetree without in-kernel drivers, do we have anything like that
-somewhere? I thought that was a big no-go. But maybe I am wrong.
+I have used your suggestion struct
 
-> I'm just not convinced that the proposed tty interface is the right
-> interface for this. User space would still rely on gpsd for the GPS
-> protocols, and would also ultimately be managing power by killing gpsd
-> or whatever daemon that would otherwise be holding the port open.
-> 
-> Something like the generic power sequences that has been discussed
-> elsewhere might be a better fit for this if all you want to do is power
-> on and off on port open and close (and on suspend/resume). There really
-> isn't anything GPS-specific in the current proposal (besides the
-> suggested tty-device name).
+>
+> The problem I was trying to describe is because there is no value of serror_esr
+> we can use to mean 'Ignore this, I'm a v8.0 CPU'. VSESR_EL2 is a 64bit register,
+> any bits we abuse may get a meaning we want to use in the future.
+>
+> When it comes to migration, v8.{0,1} systems can only GET/SET events where
+> serror_has_esr == false, they can't use the serror_esr. On v8.2 systems we
+> should require serror_has_esr to be true.
+yes, I agreed.
 
-So a bit like that mmc-powerseq stuff we already have?
-> 
-> But sure, that wouldn't be sufficient to deal with the
-> unknown-power-state problem with the device in question.
-> 
-Maybe there could be a kind of active flag set by the tty if
-there is traffic, so that active flag could be used in these
-power sequence stuff? But then again the tty layer has to be extended
-which would probably also cause a lot of ruffled feathers.
+>
+> If we need to support migration from v8.{0,1} to v8.2, we can make up an impdef
+> serror_esr.
 
-Regards,
-Andreas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/d10e2282/attachment.sig>
+For the Qemu migration, I need to check more the QEMU code.
+
+
+Hi Andrew,
+      I use KVM_GET/SET_VCPU_EVENTS IOCTL to migrate the Serror
+exception status of VM,
+The even struct is shown below:
+
+{
+      bool serror_pending;
+      bool serror_has_esr;
+     u64  serror_esr;
+}
+
+Only when the target machine is armv8.2, it needs to set the
+serror_esr(SError Exception Syndrome Register).
+for the armv8.0,  software can not set the serror_esr(SError Exception
+Syndrome Register).
+so when migration from v8.{0,1} to v8.2, QEMU should make up an impdef
+serror_esr for the v8.2 target.
+can you give me some suggestion how to set that register in the QEMU?
+I do not familar with the QEMU migration.
+Thanks very much.
+
+>
+> We will need to decide what KVM does when SET is called but an SError was
+> already pending. 2.5.3 "Multiple SError interrupts" of [0] has something to say.
+
+how about KVM set again to the same VCPU?
+
+>
+>
+> Happy new year,
+thanks!
+
+>
+> James
+>
+>
+> [0]
+> https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
