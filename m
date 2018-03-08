@@ -1,80 +1,58 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 8 Mar 2018 17:38:00 +0900
-Subject: [PATCH] clk: uniphier: add Pro4/Pro5/PXs2 audio system clock
-In-Reply-To: <20180308082332.31063-1-suzuki.katsuhiro@socionext.com>
-References: <20180308082332.31063-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNARo_yGJW+OqLvoDUZgztxT+dr7W3xNvvEiQjZRzEtF03w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 8 Mar 2018 09:40:51 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a7795: sort subnodes of the
+ cpu node
+In-Reply-To: <CAMuHMdUnpvF0TXW9FaoYTe-dTQ9prDNmHa6OkbZbww-m7wav_A@mail.gmail.com>
+References: <20180307094046.4907-1-horms+renesas@verge.net.au>
+ <20180307094046.4907-3-horms+renesas@verge.net.au>
+ <CAMuHMdUnpvF0TXW9FaoYTe-dTQ9prDNmHa6OkbZbww-m7wav_A@mail.gmail.com>
+Message-ID: <20180308084051.ikrjqzv63sc2qv5w@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-08 17:23 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> Add clock for audio subsystem (AIO) on UniPhier
-> Pro4/Pro5/PXs2 SoCs.
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
+On Wed, Mar 07, 2018 at 10:49:47AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Mar 7, 2018 at 10:40 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Sort subnodes of the cpu node alphanumerically.
+> >
+> > This is part of an ongoing effort to provide consistent node
+> > order in the DT of Renesas SoCs to improve maintainability.
+> >
+> > This should not have any run-time effect.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Thanks for your patch!
+> 
+> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > @@ -34,6 +34,50 @@
+> >                 #address-cells = <1>;
+> >                 #size-cells = <0>;
+> >
+> > +               a53_0: cpu at 100 {
+> > +                       compatible = "arm,cortex-a53", "arm,armv8";
+> > +                       reg = <0x100>;
+> > +                       device_type = "cpu";
+> > +                       power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
+> > +                       next-level-cache = <&L2_CA53>;
+> > +                       enable-method = "psci";
+> > +                       clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
+> > +                       operating-points-v2 = <&cluster1_opp>;
+> > +               };
+> 
+> [...]
+> 
+> >                 a57_0: cpu at 0 {
+> >                         compatible = "arm,cortex-a57", "arm,armv8";
+> >                         reg = <0x0>;
+> 
+> Given the CPU nodes do have reg properties and unit addresses, shouldn't
+> they be sorted by these values, instead of alphabetically?
 
+Thanks, I agree.
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-
-
->  drivers/clk/uniphier/clk-uniphier-sys.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
-> index d244e724e198..06c5269f63f5 100644
-> --- a/drivers/clk/uniphier/clk-uniphier-sys.c
-> +++ b/drivers/clk/uniphier/clk-uniphier-sys.c
-> @@ -57,6 +57,14 @@
->  #define UNIPHIER_PRO4_SYS_CLK_USB3(idx, ch)                            \
->         UNIPHIER_CLK_GATE("usb3" #ch, (idx), NULL, 0x2104, 16 + (ch))
->
-> +#define UNIPHIER_PRO4_SYS_CLK_AIO(idx)                                 \
-> +       UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 8),            \
-> +       UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2104, 13)
-> +
-> +#define UNIPHIER_PRO5_SYS_CLK_AIO(idx)                                 \
-> +       UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 12),           \
-> +       UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2104, 13)
-> +
->  #define UNIPHIER_LD11_SYS_CLK_AIO(idx)                                 \
->         UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 10),           \
->         UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2108, 0)
-> @@ -104,6 +112,7 @@ const struct uniphier_clk_data uniphier_pro4_sys_clk_data[] = {
->         UNIPHIER_PRO4_SYS_CLK_GIO(12),                  /* Ether, SATA, USB3 */
->         UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
->         UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
-> +       UNIPHIER_PRO4_SYS_CLK_AIO(40),
->         { /* sentinel */ }
->  };
->
-> @@ -132,6 +141,7 @@ const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
->         UNIPHIER_PRO4_SYS_CLK_GIO(12),                          /* PCIe, USB3 */
->         UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
->         UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
-> +       UNIPHIER_PRO5_SYS_CLK_AIO(40),
->         { /* sentinel */ }
->  };
->
-> @@ -149,6 +159,7 @@ const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[] = {
->         /* The document mentions 0x2104 bit 18, but not functional */
->         UNIPHIER_CLK_GATE("usb30-phy", 16, NULL, 0x2104, 19),
->         UNIPHIER_CLK_GATE("usb31-phy", 20, NULL, 0x2104, 20),
-> +       UNIPHIER_PRO5_SYS_CLK_AIO(40),
->         { /* sentinel */ }
->  };
->
-> --
-> 2.16.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+It looks like the nodes are already sorted according to that order
+so I withdraw this patch.
