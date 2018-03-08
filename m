@@ -1,112 +1,59 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 08 Mar 2018 07:03:25 +0100
-Subject: [alsa-devel] [BUG] Kernel crash on Allwinner H3 due to sound core
- changes
-In-Reply-To: <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
-References: <2424862.oPtAVTfrB9@jernej-laptop>
- <1832733.mujlD9skaR@jernej-laptop>
- <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <4224437.y2AcdKYxFF@jernej-laptop>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 8 Mar 2018 11:36:24 +0530
+Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
+ based tachometer
+In-Reply-To: <f7818e4c-17b6-c58b-3424-85749bb9c1cc@roeck-us.net>
+References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
+ <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
+ <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
+ <2510b525-ec36-b49d-5a62-81f335c0d10d@nvidia.com>
+ <cfe0d0ce-3a89-bad0-85ba-6edf1135d2dc@roeck-us.net>
+ <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
+ <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
+ <62ba7f67-5a99-51ab-1214-eb68ebb7e642@roeck-us.net>
+ <952cb50e-d9a0-ae5e-d9f6-d1ce268f0384@nvidia.com>
+ <f7818e4c-17b6-c58b-3424-85749bb9c1cc@roeck-us.net>
+Message-ID: <5bffef40-a4a7-5f7d-a448-b2a381c57822@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Thank you for looking into it so quickly.
 
-Dne ?etrtek, 08. marec 2018 ob 02:21:02 CET je Kuninori Morimoto napisal(a):
-> Hi Jernej
-> 
-> Thank you for your hard work
-> 
-> > I found the issue. Commit be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm:
-> > 
-> > replace platform to component") changes struct dmaengine_pcm:
-> >  struct dmaengine_pcm {
-> >  
-> >  	struct dma_chan *chan[SNDRV_PCM_STREAM_LAST + 1];
-> >  	const struct snd_dmaengine_pcm_config *config;
-> > 
-> > -	struct snd_soc_platform platform;
-> > +	struct snd_soc_component component;
-> > 
-> >  	unsigned int flags;
-> >  
-> >  };
-> > 
-> > In snd_dmaengine_pcm_register():
-> > ret = snd_soc_add_component(dev, &pcm->component,
-> > 
-> > 				    &dmaengine_pcm_component, NULL, 0);
-> > 
-> > And now, sun4i-codec first time returns -EPROBE_DEFER since driver for
-> > analog part is not yet loaded. Because of that, all components get
-> > destroyed.
-> > 
-> > snd_dmaengine_pcm_unregister() calls snd_soc_unregister_component() and
-> > that one calls __snd_soc_unregister_component() multiple times (until it
-> > fails).
-> > 
-> > Issue is that __snd_soc_unregister_component() uses kfree() on component
-> > pointer and that naturally can't succed since component was never
-> > kmalloc'ed since it is a part of a bigger structure - struct
-> > dmaengine_pcm.
-> > 
-> > What would be the best fix? Changing struct dmaengine_pcm to have pointer
-> > to a component, so it can be freed?
-> 
-> Ahh.. indeed. Good catch !
-> How about to add such flag ?
-> This is just idea. No tested, No compiled, but can help you ?
-> 
-> One note here is that reusing "registered_as_component" flag is
-> not good idea, because it will be removed
-> when platform/codec were removed
-> 
-> ------------------------
-> diff --git a/include/sound/soc.h b/include/sound/soc.h
-> index 1a73232..b9b1b4c 100644
-> --- a/include/sound/soc.h
-> +++ b/include/sound/soc.h
-> @@ -853,6 +853,7 @@ struct snd_soc_component {
->  	unsigned int ignore_pmdown_time:1; /* pmdown_time is ignored at stop */
->  	unsigned int registered_as_component:1;
->  	unsigned int suspended:1; /* is in suspend PM state */
-> +	unsigned int alloced_component:1;
-> 
->  	struct list_head list;
->  	struct list_head card_aux_list; /* for auxiliary bound components */
-> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-> index c0edac8..0e33bcf 100644
-> --- a/sound/soc/soc-core.c
-> +++ b/sound/soc/soc-core.c
-> @@ -3492,6 +3492,7 @@ int snd_soc_register_component(struct device *dev,
->  	if (!component)
->  		return -ENOMEM;
-> 
-> +	component->alloced_component = 1;
->  	return snd_soc_add_component(dev, component, component_driver,
->  				     dai_drv, num_dai);
->  }
-> @@ -3523,7 +3524,9 @@ static int __snd_soc_unregister_component(struct
-> device *dev)
-> 
->  	if (found) {
->  		snd_soc_component_cleanup(component);
-> -		kfree(component);
-> +
-> +		if (component->alloced_component)
-> +			kfree(component);
->  	}
-> 
->  	return found;
-> ------------------------
+On Wednesday 07 March 2018 07:50 PM, Guenter Roeck wrote:
+> On 03/07/2018 01:47 AM, Rajkumar Rampelli wrote:
+>>
+>>>
+>>> While I am not opposed to ABI changes, the merits of those would 
+>>> need to be
+>>> discussed on the mailing list. But replacing "fan1_input" with "rpm" is
+>>> not an acceptable ABI change, even if it may measure something that 
+>>> turns
+>>> but isn't a fan.
+>>>
+>>> If this _is_ in fact supposed to be used for something else but 
+>>> fans, we
+>>> would have to discuss what that might be, and if hwmon is the 
+>>> appropriate
+>>> subsystem to measure and report it. This does to some degree lead 
+>>> back to
+>>> my concern of having the "fan" part of this patch series in the pwm 
+>>> core.
+>>> I am still not sure if that makes sense.
+>>>
+>>> Thanks,
+>>> Guenter
+>> I am planning to add tachometer support in pwm-fan.c driver 
+>> (drivers/hwmon/) instead of adding new generic-pwm-tachometer.c 
+>> driver. Measuring RPM value will be done in pwm-fan driver itself 
+>> using pwm capture feature and will add new sysfs attributes under 
+>> this driver to report rpm value of fan.
+>
+> There is an existing attribute to report the RPM of fans. It is called 
+> fan[1..n]_input.
+>
+> "replacing "fan1_input" with "rpm" is not an acceptable ABI change"
+>
+> Preemptive NACK.
 
-I tested this patch and there is no crash anymore. If you will send it as a 
-fix, you can add:
-
-Reported-by: Jernej Skrabec <jernej.skrabec@siol.net>
-Tested-by: Jernej Skrabec <jernej.skrabec@siol.net>
-
-Best regards,
-Jernej
+The RPM is measured speed via PWM signal capture  which is output from fan.
+So should we have the fan[1..n]_output_rpm?
