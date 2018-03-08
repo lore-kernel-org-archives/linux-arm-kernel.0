@@ -1,113 +1,51 @@
 From: jacobchen110@gmail.com (Jacob Chen)
-Date: Thu, 8 Mar 2018 17:59:44 +0800
-Subject: [PATCH v5 02/16] media: doc: add document for rkisp1 meta buffer
- format
-In-Reply-To: <CAFLEztR1XyFMS_Gf-qT7vs9OHipeBfuXQ7mXJoCBDyBSvTWUag@mail.gmail.com>
+Date: Thu, 8 Mar 2018 18:00:45 +0800
+Subject: [PATCH v5 03/16] media: rkisp1: Add user space ABI definitions
+In-Reply-To: <d98ac356-a482-f26f-fd6b-6142281d99c3@xs4all.nl>
 References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
- <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
- <917c22c0-773e-5fe5-5625-86678f7c8521@xs4all.nl>
- <CAFLEztR1XyFMS_Gf-qT7vs9OHipeBfuXQ7mXJoCBDyBSvTWUag@mail.gmail.com>
-Message-ID: <CAFLEztSPXP6DsyZAiwS8j4-g4Qxjuku_9wfrOYs1o-0w=s5Wpg@mail.gmail.com>
+ <1514533978-20408-4-git-send-email-zhengsq@rock-chips.com>
+ <d98ac356-a482-f26f-fd6b-6142281d99c3@xs4all.nl>
+Message-ID: <CAFLEztSsg+EW97AN93gd-rx7A1bNwfHK5e9MpLnem40ATnfsrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Hans,
 
-2018-02-06 22:27 GMT+08:00 Hans Verkuil <hverkuil@xs4all.nl>:
+2018-02-07 20:00 GMT+08:00 Hans Verkuil <hverkuil@xs4all.nl>:
 > On 12/29/17 08:52, Shunqian Zheng wrote:
->> From: Jacob Chen <jacob2.chen@rock-chips.com>
+>> From: Jeffy Chen <jeffy.chen@rock-chips.com>
 >>
->> This commit add docuemnt for rkisp1 meta buffer format
->>
->> Signed-off-by: Jacob Chen <jacob-chen@rock-chips.com>
->> ---
->>  Documentation/media/uapi/v4l/meta-formats.rst          |  2 ++
->>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst       | 17 +++++++++++++++++
->>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst         | 18 ++++++++++++++++++
->>  3 files changed, 37 insertions(+)
->>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
->>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
->>
->> diff --git a/Documentation/media/uapi/v4l/meta-formats.rst b/Documentation/media/uapi/v4l/meta-formats.rst
->> index 01e24e3..1b82814 100644
->> --- a/Documentation/media/uapi/v4l/meta-formats.rst
->> +++ b/Documentation/media/uapi/v4l/meta-formats.rst
->> @@ -14,3 +14,5 @@ These formats are used for the :ref:`metadata` interface only.
->>
->>      pixfmt-meta-vsp1-hgo
->>      pixfmt-meta-vsp1-hgt
->> +    pixfmt-meta-rkisp1-params
->> +    pixfmt-meta-rkisp1-stat
->> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
->> new file mode 100644
->> index 0000000..ed344d4
->> --- /dev/null
->> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
->> @@ -0,0 +1,17 @@
->> +.. -*- coding: utf-8; mode: rst -*-
->> +
->> +.. _v4l2-meta-fmt-rkisp1-params:
->> +
->> +*******************************
->> +V4L2_META_FMT_RK_ISP1_PARAMS
->> +*******************************
->> +
->> +Rockchip ISP1 Parameters Data
->> +
->> +Description
->> +===========
->> +
->> +This format describes input parameters for the Rockchip ISP1.
->> +
->> +The data use c-struct :c:type:`rkisp1_isp_params_cfg`, which is defined in
->> +the ``linux/rkisp1-config.h`` header file, See it for details.
+>> Add the header for userspace
 >
-> One more question: does the ISP produce a reasonable picture if it doesn't
-> receive these params? If not (i.e. you always need to provide params), then
-> I think you should provide a default rkisp1_isp_params_cfg struct that
-> can be used as a template for application writers.
+> General note: I saw four cases where this documentation referred to the
+> datasheet. Three comments on that:
 >
-> Perhaps it can be part of the driver as the initial params config.
->
-> I think even if the ISP does work without params it is still worthwhile
-> doing this. The params are complex and having an example on how to initialize
-> it would be helpful.
+> 1) You don't say which datasheet.
+> 2) I assume the datasheet is under NDA?
+
+This datasheet can't be got by customers, even under NDA.
+
+> 3) You do need to give enough information so a reasonable default can be
+>    used. I mentioned in an earlier review that creating an initial params
+>    struct that can be used as a templete would be helpful (or even
+>    required), and that would be a good place to put such defaults.
 >
 
-The ISP don't need a default rkisp1_isp_params_cfg to produce picture,
-those params just effect image quality and stats data.
+It don't need a default config
+For applcation writers, they can just init it with zero data, and only
+set value for the part they concerned.
 
-The params are not very complex.
-They consist of multiple modules and each of modules can be
-enabled/disable/updated individually.
+As for ABI, i have checked there is no mismatches.
+Those structures is 32 bit aligned both in 64bit/32bit env, since
+there is no 64bit value.
+"__attribute__ ((packed))" can avoid mismatches happen when we add a
+64bit value to those structures.
+
+As robin said, enums and bools are not guaranteed to be consistent
+between different compiler, so it's a potential risk.
+I have replace bools with unsigned char and enums with unsigned int.
+
 
 > Regards,
 >
 >         Hans
->
->> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
->> new file mode 100644
->> index 0000000..5ecc403
->> --- /dev/null
->> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
->> @@ -0,0 +1,18 @@
->> +.. -*- coding: utf-8; mode: rst -*-
->> +
->> +.. _v4l2-meta-fmt-rkisp1-stat:
->> +
->> +*******************************
->> +V4L2_META_FMT_RK_ISP1_STAT_3A
->> +*******************************
->> +
->> +Rockchip ISP1 Statistics Data
->> +
->> +Description
->> +===========
->> +
->> +This format describes image color statistics information generated by the Rockchip
->> +ISP1.
->> +
->> +The data use c-struct :c:type:`rkisp1_stat_buffer`, which is defined in
->> +the ``linux/cifisp_stat.h`` header file, See it for details.
->>
->
