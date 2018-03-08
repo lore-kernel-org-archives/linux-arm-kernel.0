@@ -1,49 +1,46 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 8 Mar 2018 09:08:47 +0100
-Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
-In-Reply-To: <20180307183227.17983-2-toshi.kani@hpe.com>
-References: <20180307183227.17983-1-toshi.kani@hpe.com>
- <20180307183227.17983-2-toshi.kani@hpe.com>
-Message-ID: <20180308080847.dvwd3w6wuhwsg3qo@gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Thu,  8 Mar 2018 17:09:29 +0900
+Subject: [PATCH] reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset
+ control
+Message-ID: <20180308080929.30982-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add reset lines for audio subsystem (AIO) on UniPhier
+Pro4/Pro5/PXs2 SoCs.
 
-* Toshi Kani <toshi.kani@hpe.com> wrote:
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ drivers/reset/reset-uniphier.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> On architectures with CONFIG_HAVE_ARCH_HUGE_VMAP set, ioremap()
-> may create pud/pmd mappings.  Kernel panic was observed on arm64
-> systems with Cortex-A75 in the following steps as described by
-> Hanjun Guo.
-> 
-> 1. ioremap a 4K size, valid page table will build,
-> 2. iounmap it, pte0 will set to 0;
-> 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
->    then set the a new value for pmd;
-> 4. pte0 is leaked;
-> 5. CPU may meet exception because the old pmd is still in TLB,
->    which will lead to kernel panic.
-> 
-> This panic is not reproducible on x86.  INVLPG, called from iounmap,
-> purges all levels of entries associated with purged address on x86.
-
-Where does x86 iounmap() do that?
-
-> x86 still has memory leak.
-> Add two interfaces, pud_free_pmd_page() and pmd_free_pte_page(),
-> which clear a given pud/pmd entry and free up a page for the lower
-> level entries.
-> 
-> This patch implements their stub functions on x86 and arm64, which
-> work as workaround.
-
-At minimum the ordering of the patches is very confusing: why don't you introduce 
-the new methods in patch #1, and then use them in patch #2?
-
-Also please double check the coding style of your patches, there's a number of 
-obvious problems of outright bad patterns and also cases where you clearly don't 
-try to follow the (correct) style of existing code.
-
-Thanks,
-
-	Ingo
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index e8bb023ff15e..0fa23129d343 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -63,6 +63,7 @@ static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (Ether, SATA, USB3) */
+ 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
+ 	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
++	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+@@ -72,6 +73,7 @@ static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (PCIe, USB3) */
+ 	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
+ 	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
++	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+@@ -88,6 +90,7 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(21, 0x2014, 1),		/* USB31-PHY1 */
+ 	UNIPHIER_RESETX(28, 0x2014, 12),	/* SATA */
+ 	UNIPHIER_RESET(29, 0x2014, 8),		/* SATA-PHY (active high) */
++	UNIPHIER_RESETX(40, 0x2000, 13),	/* AIO */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+-- 
+2.16.1
