@@ -1,240 +1,281 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Thu, 8 Mar 2018 17:44:54 +0000
-Subject: [PATCH 27/37] iommu/arm-smmu-v3: Register fault workqueue
-In-Reply-To: <20180212183352.22730-28-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-28-jean-philippe.brucker@arm.com>
-Message-ID: <20180308184454.00000b4e@huawei.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 8 Mar 2018 18:54:12 +0100
+Subject: [PATCH v5 22/23] arm64: KVM: Allow mapping of vectors outside of
+ the RAM region
+In-Reply-To: <20180301155538.26860-23-marc.zyngier@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-23-marc.zyngier@arm.com>
+Message-ID: <20180308175412.rd63nkceqjg2yrcv@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Feb 2018 18:33:42 +0000
-Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
-
-> When using PRI or Stall, the PRI or event handler enqueues faults into the
-> core fault queue. Register it based on the SMMU features.
+On Thu, Mar 01, 2018 at 03:55:37PM +0000, Marc Zyngier wrote:
+> We're now ready to map our vectors in weird and wonderful locations.
+> On enabling ARM64_HARDEN_EL2_VECTORS, a vector slots gets allocated
+> if this hasn't been already done via ARM64_HARDEN_BRANCH_PREDICTOR
+> and gets mapped outside of the normal RAM region, next to the
+> idmap.
 > 
-> When the core stops using a PASID, it notifies the SMMU to flush all
-> instances of this PASID from the PRI queue. Add a way to flush the PRI and
-> event queue. PRI and event thread now take a spinlock while processing the
-> queue. The flush handler takes this lock to inspect the queue state.
-> We avoid livelock, where the SMMU adds fault to the queue faster than we
-> can consume them, by incrementing a 'batch' number on every cycle so the
-> flush handler only has to wait a complete cycle (two batch increments.)
+> That way, being able to obtain VBAR_EL2 doesn't reveal the mapping
+> of the rest of the hypervisor code.
 > 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-I think you have a potential incorrect free issue... See inline.
-
-Jonathan
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/iommu/Kconfig       |   1 +
->  drivers/iommu/arm-smmu-v3.c | 103 +++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 103 insertions(+), 1 deletion(-)
+>  Documentation/arm64/memory.txt   |  3 +-
+>  arch/arm64/Kconfig               | 16 ++++++++
+>  arch/arm64/include/asm/kvm_mmu.h | 81 ++++++++++++++++++++++++++++++++++------
+>  arch/arm64/include/asm/mmu.h     |  5 ++-
+>  arch/arm64/kernel/Makefile       |  4 +-
+>  arch/arm64/kvm/va_layout.c       |  3 ++
+>  6 files changed, 96 insertions(+), 16 deletions(-)
 > 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index d434f7085dc2..d79c68754bb9 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -354,6 +354,7 @@ config ARM_SMMU_V3
->  	depends on ARM64
->  	select IOMMU_API
->  	select IOMMU_SVA
-> +	select IOMMU_FAULT
->  	select IOMMU_IO_PGTABLE_LPAE
->  	select ARM_SMMU_V3_CONTEXT
->  	select GENERIC_MSI_IRQ_DOMAIN
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 8528704627b5..c5b3a43becaf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -494,6 +494,10 @@ struct arm_smmu_queue {
+> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+> index c58cc5dbe667..c5dab30d3389 100644
+> --- a/Documentation/arm64/memory.txt
+> +++ b/Documentation/arm64/memory.txt
+> @@ -90,7 +90,8 @@ When using KVM without the Virtualization Host Extensions, the
+>  hypervisor maps kernel pages in EL2 at a fixed (and potentially
+>  random) offset from the linear mapping. See the kern_hyp_va macro and
+>  kvm_update_va_mask function for more details. MMIO devices such as
+> -GICv2 gets mapped next to the HYP idmap page.
+> +GICv2 gets mapped next to the HYP idmap page, as do vectors when
+> +ARM64_HARDEN_EL2_VECTORS is selected for particular CPUs.
 >  
->  	u32 __iomem			*prod_reg;
->  	u32 __iomem			*cons_reg;
+>  When using KVM with the Virtualization Host Extensions, no additional
+>  mappings are created, since the host kernel runs directly in EL2.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7381eeb7ef8e..e6be4393aaad 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -904,6 +904,22 @@ config HARDEN_BRANCH_PREDICTOR
+>  
+>  	  If unsure, say Y.
+>  
+> +config HARDEN_EL2_VECTORS
+> +	bool "Harden EL2 vector mapping against system register leak" if EXPERT
+> +	default y
+> +	help
+> +	  Speculation attacks against some high-performance processors can
+> +	  be used to leak privileged information such as the vector base
+> +	  register, resulting in a potential defeat of the EL2 layout
+> +	  randomization.
 > +
-> +	/* Event and PRI */
-> +	u64				batch;
-> +	wait_queue_head_t		wq;
->  };
->  
->  struct arm_smmu_cmdq {
-> @@ -610,6 +614,9 @@ struct arm_smmu_device {
->  
->  	/* IOMMU core code handle */
->  	struct iommu_device		iommu;
+> +	  This config option will map the vectors to a fixed location,
+> +	  independent of the EL2 code mapping, so that revealing VBAR_EL2
+> +	  to an attacker does no give away any extra information. This
+> +	  only gets enabled on affected CPUs.
 > +
-> +	/* Notifier for the fault queue */
-> +	struct notifier_block		faultq_nb;
->  };
->  
->  /* SMMU private data for each master */
-> @@ -1247,14 +1254,23 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
->  static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
->  {
->  	int i;
-> +	int num_handled = 0;
->  	struct arm_smmu_device *smmu = dev;
->  	struct arm_smmu_queue *q = &smmu->evtq.q;
-> +	size_t queue_size = 1 << q->max_n_shift;
->  	u64 evt[EVTQ_ENT_DWORDS];
->  
-> +	spin_lock(&q->wq.lock);
->  	do {
->  		while (!queue_remove_raw(q, evt)) {
->  			u8 id = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
->  
-> +			if (++num_handled == queue_size) {
-> +				q->batch++;
-> +				wake_up_locked(&q->wq);
-> +				num_handled = 0;
-> +			}
+> +	  If unsure, say Y.
 > +
->  			dev_info(smmu->dev, "event 0x%02x received:\n", id);
->  			for (i = 0; i < ARRAY_SIZE(evt); ++i)
->  				dev_info(smmu->dev, "\t0x%016llx\n",
-> @@ -1272,6 +1288,11 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
->  
->  	/* Sync our overflow flag, as we believe we're up to speed */
->  	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
-> +
-> +	q->batch++;
-> +	wake_up_locked(&q->wq);
-> +	spin_unlock(&q->wq.lock);
-> +
->  	return IRQ_HANDLED;
+>  menuconfig ARMV8_DEPRECATED
+>  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+>  	depends on COMPAT
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 3da9e5aea936..433d13d0c271 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -360,33 +360,90 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>  	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
 >  }
 >  
-> @@ -1315,13 +1336,24 @@ static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
->  
->  static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
->  {
-> +	int num_handled = 0;
->  	struct arm_smmu_device *smmu = dev;
->  	struct arm_smmu_queue *q = &smmu->priq.q;
-> +	size_t queue_size = 1 << q->max_n_shift;
->  	u64 evt[PRIQ_ENT_DWORDS];
->  
-> +	spin_lock(&q->wq.lock);
->  	do {
-> -		while (!queue_remove_raw(q, evt))
-> +		while (!queue_remove_raw(q, evt)) {
-> +			spin_unlock(&q->wq.lock);
->  			arm_smmu_handle_ppr(smmu, evt);
-> +			spin_lock(&q->wq.lock);
-> +			if (++num_handled == queue_size) {
-> +				q->batch++;
-> +				wake_up_locked(&q->wq);
-> +				num_handled = 0;
-> +			}
-> +		}
->  
->  		if (queue_sync_prod(q) == -EOVERFLOW)
->  			dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
-> @@ -1329,9 +1361,65 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
->  
->  	/* Sync our overflow flag, as we believe we're up to speed */
->  	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
-> +
-> +	q->batch++;
-> +	wake_up_locked(&q->wq);
-> +	spin_unlock(&q->wq.lock);
-> +
->  	return IRQ_HANDLED;
->  }
->  
+> -#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
+> +     defined(CONFIG_HARDEN_EL2_VECTORS))
 > +/*
-> + * arm_smmu_flush_queue - wait until all events/PPRs currently in the queue have
-> + * been consumed.
+> + * EL2 vectors can be mapped and rerouted in a number of ways,
+> + * depending on the kernel configuration and CPU present:
 > + *
-> + * Wait until the queue thread finished a batch, or until the queue is empty.
-> + * Note that we don't handle overflows on q->batch. If it occurs, just wait for
-> + * the queue to be empty.
+> + * - If the CPU has the ARM64_HARDEN_BRANCH_PREDICTOR cap, the
+> + *   hardening sequence is placed in one of the vector slots, which is
+> + *   executed before jumping to the real vectors.
+> + *
+> + * - If the CPU has both the ARM64_HARDEN_EL2_VECTORS and BP
+> + *   hardening, the slot containing the hardening sequence is mapped
+> + *   next to the idmap page, and executed before jumping to the real
+> + *   vectors.
+> + *
+> + * - If the CPU only has ARM64_HARDEN_EL2_VECTORS, then an empty slot
+> + *   is selected, mapped next to the idmap page, and executed before
+> + *   jumping to the real vectors.
+> + *
+> + * Note that ARM64_HARDEN_EL2_VECTORS is somewhat incompatible with
+> + * VHE, as we don't have hypervisor-specific mappings. If the system
+> + * is VHE and yet selects this capability, it will be ignored.
 > + */
-> +static int arm_smmu_flush_queue(struct arm_smmu_device *smmu,
-> +				struct arm_smmu_queue *q, const char *name)
-> +{
-> +	int ret;
-> +	u64 batch;
-> +
-> +	spin_lock(&q->wq.lock);
-> +	if (queue_sync_prod(q) == -EOVERFLOW)
-> +		dev_err(smmu->dev, "%s overflow detected -- requests lost\n", name);
-> +
-> +	batch = q->batch;
-> +	ret = wait_event_interruptible_locked(q->wq, queue_empty(q) ||
-> +					      q->batch >= batch + 2);
-> +	spin_unlock(&q->wq.lock);
-> +
-> +	return ret;
-> +}
-> +
-> +static int arm_smmu_flush_queues(struct notifier_block *nb,
-> +				 unsigned long action, void *data)
-> +{
-> +	struct arm_smmu_device *smmu = container_of(nb, struct arm_smmu_device,
-> +						    faultq_nb);
-> +	struct device *dev = data;
-> +	struct arm_smmu_master_data *master = NULL;
-> +
-> +	if (dev)
-> +		master = dev->iommu_fwspec->iommu_priv;
-> +
-> +	if (master) {
-> +		/* TODO: add support for PRI and Stall */
-> +		return 0;
-> +	}
-> +
-> +	/* No target device, flush all queues. */
-> +	if (smmu->features & ARM_SMMU_FEAT_STALLS)
-> +		arm_smmu_flush_queue(smmu, &smmu->evtq.q, "evtq");
-> +	if (smmu->features & ARM_SMMU_FEAT_PRI)
-> +		arm_smmu_flush_queue(smmu, &smmu->priq.q, "priq");
-> +
-> +	return 0;
-> +}
-> +
->  static int arm_smmu_device_disable(struct arm_smmu_device *smmu);
+>  #include <asm/mmu.h>
 >  
->  static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
-> @@ -2288,6 +2376,10 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
->  		     << Q_BASE_LOG2SIZE_SHIFT;
+> +extern void *__kvm_bp_vect_base;
+> +extern int __kvm_harden_el2_vector_slot;
+> +
+>  static inline void *kvm_get_hyp_vector(void)
+>  {
+>  	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
+> -	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
+> +	int slot = -1;
+> +
+> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn)
+> +		slot = data->hyp_vectors_slot;
+> +
+> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS) &&
+> +	    !has_vhe() && slot == -1)
+> +		slot = __kvm_harden_el2_vector_slot;
 >  
->  	q->prod = q->cons = 0;
+> -	if (data->fn) {
+> -		vect = __bp_harden_hyp_vecs_start +
+> -		       data->hyp_vectors_slot * SZ_2K;
+> +	if (slot != -1) {
+> +		void *vect;
+>  
+>  		if (!has_vhe())
+> -			vect = lm_alias(vect);
+> +			vect = __kvm_bp_vect_base;
+> +		else
+> +			vect = __bp_harden_hyp_vecs_start;
+> +		vect += slot * SZ_2K;
 > +
-> +	init_waitqueue_head(&q->wq);
-> +	q->batch = 0;
-> +
->  	return 0;
+> +		return vect;
+>  	}
+>  
+> -	vect = kern_hyp_va(vect);
+> -	return vect;
+> +	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
 >  }
->  
-> @@ -3168,6 +3260,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
-> +		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
-> +		ret = iommu_fault_queue_register(&smmu->faultq_nb);
-Here you register only if this smmu supports stalls or pri which is fine, but
-see the unregister path.
 
+I had trouble reading the above function. How about something like?
+(Assuming I got the logic right.)
+
+ static inline void *kvm_get_hyp_vector(void)
+ {
+        struct bp_hardening_data *data = arm64_get_bp_hardening_data();
+        void *vect = kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
+        int slot = -1;
+
+        if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn) {
+                vect = __bp_harden_hyp_vecs_start;
+                slot = data->hyp_vectors_slot;
+        }
+
+        if (!has_vhe() && cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
+                vect = __kvm_bp_vect_base;
+                if (slot == -1)
+                        slot = __kvm_harden_el2_vector_slot;
+        }
+
+        if (slot != -1)
+                vect += slot * SZ_2K;
+
+        return vect;
+ }
+
+>  
+> +/*  This is only called on a !VHE system */
+>  static inline int kvm_map_vectors(void)
+>  {
+> -	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
+> -				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
+> -				   PAGE_HYP_EXEC);
+> -}
+> +	phys_addr_t vect_pa = virt_to_phys(__bp_harden_hyp_vecs_start);
+> +	unsigned long size = __bp_harden_hyp_vecs_end - __bp_harden_hyp_vecs_start;
+
+nit: We only use these expressions once, so could probably do away with
+the variables. Or the variables could be tucked into the block they're
+used in below.
+
+> +
+> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR)) {
+
+Moving the create_hyp_mappings() under this cap check looks like a fix
+that could be posted separately?
+
+> +		int ret;
+> +
+> +		ret = create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
+> +					  kvm_ksym_ref(__bp_harden_hyp_vecs_end),
+> +					  PAGE_HYP_EXEC);
+> +
 > +		if (ret)
 > +			return ret;
+> +
+> +		__kvm_bp_vect_base = kvm_ksym_ref(__bp_harden_hyp_vecs_start);
+> +		__kvm_bp_vect_base = kern_hyp_va(__kvm_bp_vect_base);
 > +	}
 > +
->  	/* And we're up. Go go go! */
->  	ret = iommu_device_sysfs_add(&smmu->iommu, dev, NULL,
->  				     "smmu3.%pa", &ioaddr);
-> @@ -3210,6 +3309,8 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
+> +		__kvm_harden_el2_vector_slot = atomic_inc_return(&arm64_el2_vector_last_slot);
+
+If I understood the logic in the above function correctly, then we won't
+be using this slot when we have the ARM64_HARDEN_BRANCH_PREDICTOR cap.
+Should we even bother allocating it when we don't intend to use it?
+
+> +		BUG_ON(__kvm_harden_el2_vector_slot >= BP_HARDEN_EL2_SLOTS);
+> +		return create_hyp_exec_mappings(vect_pa, size,
+> +						&__kvm_bp_vect_base);
+> +	}
+>  
+> +	return 0;
+> +}
+>  #else
+>  static inline void *kvm_get_hyp_vector(void)
 >  {
->  	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index 3baf010fe883..0b0cc69031c1 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -51,10 +51,12 @@ struct bp_hardening_data {
+>  	bp_hardening_cb_t	fn;
+>  };
 >  
-> +	iommu_fault_queue_unregister(&smmu->faultq_nb);
-
-Here you unregister from the fault queue unconditionally.  That is mostly
-safe but it seems to decrement and potentially destroy the work queue that
-is in use by another smmu instance that does support page faulting.
-
+> -#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
+> +     defined(CONFIG_HARDEN_EL2_VECTORS))
+>  extern char __bp_harden_hyp_vecs_start[], __bp_harden_hyp_vecs_end[];
+>  extern atomic_t arm64_el2_vector_last_slot;
+>  
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+>  DECLARE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>  
+>  static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+> @@ -81,6 +83,7 @@ static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+>  
+>  static inline void arm64_apply_bp_hardening(void)	{ }
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+> +#endif  /* CONFIG_HARDEN_BRANCH_PREDICTOR || CONFIG_HARDEN_EL2_VECTORS */
+>  
+>  extern void paging_init(void);
+>  extern void bootmem_init(void);
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index b87541360f43..e7fc471c91a6 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -54,8 +54,8 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+>  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+>  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+>  
+> -ifeq ($(CONFIG_KVM),y)
+> -arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
+> +ifneq ($(filter y,$(CONFIG_HARDEN_BRANCH_PREDICTOR) $(CONFIG_HARDEN_EL2_VECTORS)),)
+> +arm64-obj-$(CONFIG_KVM)			+= bpi.o
+>  endif
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/ probes/
+> diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+> index 7ef3d920c8d4..5d17bb50287c 100644
+> --- a/arch/arm64/kvm/va_layout.c
+> +++ b/arch/arm64/kvm/va_layout.c
+> @@ -153,6 +153,9 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
+>  	}
+>  }
+>  
+> +void *__kvm_bp_vect_base;
+> +int __kvm_harden_el2_vector_slot;
 > +
->  	arm_smmu_device_disable(smmu);
->  
->  	return 0;
+>  void kvm_patch_vector_branch(struct alt_instr *alt,
+>  			     __le32 *origptr, __le32 *updptr, int nr_inst)
+>  {
+> -- 
+> 2.14.2
+>
+
+Thanks,
+drew
