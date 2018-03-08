@@ -1,59 +1,64 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 8 Mar 2018 11:36:24 +0530
-Subject: [PATCH 05/10] hwmon: generic-pwm-tachometer: Add generic PWM
- based tachometer
-In-Reply-To: <f7818e4c-17b6-c58b-3424-85749bb9c1cc@roeck-us.net>
-References: <1519196339-9377-1-git-send-email-rrajk@nvidia.com>
- <1519196339-9377-6-git-send-email-rrajk@nvidia.com>
- <5172edff-fe29-7ed1-f0d2-b0359ea2c24d@roeck-us.net>
- <2510b525-ec36-b49d-5a62-81f335c0d10d@nvidia.com>
- <cfe0d0ce-3a89-bad0-85ba-6edf1135d2dc@roeck-us.net>
- <2628eff2-dd33-34f4-a7e1-cfe46ef88a3f@nvidia.com>
- <4556a8d2-947d-72c4-2962-3167afb53978@kapsi.fi>
- <62ba7f67-5a99-51ab-1214-eb68ebb7e642@roeck-us.net>
- <952cb50e-d9a0-ae5e-d9f6-d1ce268f0384@nvidia.com>
- <f7818e4c-17b6-c58b-3424-85749bb9c1cc@roeck-us.net>
-Message-ID: <5bffef40-a4a7-5f7d-a448-b2a381c57822@nvidia.com>
+From: andreas@kemnade.info (Andreas Kemnade)
+Date: Thu, 8 Mar 2018 07:16:44 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <20180118064736.GH3286@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost> <20180109184347.28ba0a6e@aktux>
+ <20180112144647.GA5992@localhost>
+ <20180112194022.7da1e726@kemnade.info>
+ <20180118064736.GH3286@localhost>
+Message-ID: <20180308071459.310d0ba2@aktux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, 18 Jan 2018 17:47:36 +1100
+Johan Hovold <johan@kernel.org> wrote:
 
-On Wednesday 07 March 2018 07:50 PM, Guenter Roeck wrote:
-> On 03/07/2018 01:47 AM, Rajkumar Rampelli wrote:
->>
->>>
->>> While I am not opposed to ABI changes, the merits of those would 
->>> need to be
->>> discussed on the mailing list. But replacing "fan1_input" with "rpm" is
->>> not an acceptable ABI change, even if it may measure something that 
->>> turns
->>> but isn't a fan.
->>>
->>> If this _is_ in fact supposed to be used for something else but 
->>> fans, we
->>> would have to discuss what that might be, and if hwmon is the 
->>> appropriate
->>> subsystem to measure and report it. This does to some degree lead 
->>> back to
->>> my concern of having the "fan" part of this patch series in the pwm 
->>> core.
->>> I am still not sure if that makes sense.
->>>
->>> Thanks,
->>> Guenter
->> I am planning to add tachometer support in pwm-fan.c driver 
->> (drivers/hwmon/) instead of adding new generic-pwm-tachometer.c 
->> driver. Measuring RPM value will be done in pwm-fan driver itself 
->> using pwm capture feature and will add new sysfs attributes under 
->> this driver to report rpm value of fan.
->
-> There is an existing attribute to report the RPM of fans. It is called 
-> fan[1..n]_input.
->
-> "replacing "fan1_input" with "rpm" is not an acceptable ABI change"
->
-> Preemptive NACK.
+[...]
+> > 
+> > So to avoid having hardware information spread all over the table at least
+> > these information would need to be in devicetree. But that also all feels
+> > like a hack and hard to maintain.  
+> 
+> Having the device described in the device tree is certainly desirable,
+> not least for chip identification. And with a GPS framework in the
+> kernel with a well-defined interface, implementing power management
+> would be straight forward.
+> 
+Hmm, devicetree without in-kernel drivers, do we have anything like that
+somewhere? I thought that was a big no-go. But maybe I am wrong.
 
-The RPM is measured speed via PWM signal capture  which is output from fan.
-So should we have the fan[1..n]_output_rpm?
+> I'm just not convinced that the proposed tty interface is the right
+> interface for this. User space would still rely on gpsd for the GPS
+> protocols, and would also ultimately be managing power by killing gpsd
+> or whatever daemon that would otherwise be holding the port open.
+> 
+> Something like the generic power sequences that has been discussed
+> elsewhere might be a better fit for this if all you want to do is power
+> on and off on port open and close (and on suspend/resume). There really
+> isn't anything GPS-specific in the current proposal (besides the
+> suggested tty-device name).
+
+So a bit like that mmc-powerseq stuff we already have?
+> 
+> But sure, that wouldn't be sufficient to deal with the
+> unknown-power-state problem with the device in question.
+> 
+Maybe there could be a kind of active flag set by the tty if
+there is traffic, so that active flag could be used in these
+power sequence stuff? But then again the tty layer has to be extended
+which would probably also cause a lot of ruffled feathers.
+
+Regards,
+Andreas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180308/d10e2282/attachment.sig>
