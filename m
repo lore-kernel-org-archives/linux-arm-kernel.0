@@ -1,29 +1,52 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 8 Mar 2018 08:41:15 +0100
-Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
-In-Reply-To: <HE1PR0401MB24251E99564CAA526F719ECCE6D90@HE1PR0401MB2425.eurprd04.prod.outlook.com>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
- <20180305150814.GA15918@lst.de>
- <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
- <20180305183938.GB20086@lst.de>
- <1729ae21-d08c-b413-51a3-f22c394b388d@arm.com>
- <HE1PR0401MB24251E99564CAA526F719ECCE6D90@HE1PR0401MB2425.eurprd04.prod.outlook.com>
-Message-ID: <20180308074115.GB15748@lst.de>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  8 Mar 2018 15:42:26 +0800
+Subject: [PATCH v5 3/3] arm64: dts: rockchip: kevin: Avoid wakeup when
+ inserting the pen
+In-Reply-To: <20180308073213.8419-1-jeffy.chen@rock-chips.com>
+References: <20180308073213.8419-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180308074226.18974-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 04:41:56AM +0000, Nipun Gupta wrote:
-> Sorry for asking a trivial question - looking into dma_configure() I see that
-> PCI is used in the start and the end of the API.
-> In the end part pci_put_host_bridge_device() is called.
-> So are two bus callbacks something like 'dma_config_start' & 'dma_config_end'
-> will be required where the former one will return "dma_dev"?
+Add wakeup event action for Pen Insert gpio key, to avoid wakeup when
+inserting the pen.
 
-I'd just use dma_configure as the callback.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
-Currently the of_dma_configure and acpi_dma_configure are only used
-for PCI anyway, as no one else sets a non-NULL dma dev.   For fsl-mc
-I suspect only of_dma_configure is relevanet, so just call that directly.
-If at some point we get enough busses with either OF or ACPI we could
-create a helper called from ->dma_configure for that.
+Changes in v5: None
+Changes in v4:
+Include dt-binding gpio-keys.h
+
+Changes in v3: None
+Changes in v2:
+Specify wakeup event action instead of irq trigger type as Brian
+suggested.
+
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 191a6bcb1704..89126dbe5d91 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -44,6 +44,7 @@
+ 
+ /dts-v1/;
+ #include "rk3399-gru.dtsi"
++#include <dt-bindings/input/gpio-keys.h>
+ #include <dt-bindings/input/linux-event-codes.h>
+ 
+ /*
+@@ -134,6 +135,8 @@
+ 		gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+ 		linux,code = <SW_PEN_INSERTED>;
+ 		linux,input-type = <EV_SW>;
++		/* Wakeup only when ejecting */
++		wakeup-event-action = <EV_ACT_DEASSERTED>;
+ 		wakeup-source;
+ 	};
+ };
+-- 
+2.11.0
