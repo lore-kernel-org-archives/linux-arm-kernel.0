@@ -1,43 +1,57 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  8 Mar 2018 22:35:40 +0100
-Subject: [PATCH] arm64: defconfig: enable Rockchip io-domain driver
-Message-ID: <20180308213540.4309-1-enric.balletbo@collabora.com>
+From: jaz@semihalf.com (Grzegorz Jaszczyk)
+Date: Thu, 8 Mar 2018 23:06:06 +0100
+Subject: [PATCH] arm64: kdump: fix interrupt handling done during
+ machine_crash_shutdown
+In-Reply-To: <20180302165739.dc726v3yf2mxli3u@lakrids.cambridge.arm.com>
+References: <1519837260-30662-1-git-send-email-jaz@semihalf.com>
+ <20180228171647.6t4dabntujcb5kon@lakrids.cambridge.arm.com>
+ <ba0c6804-51a3-f36e-a67e-20ce84961451@arm.com>
+ <CAH76GKO8oYVN+H4pvd6NTGc0u8AD7JMSJCYEJzNtdsAJm5L_9w@mail.gmail.com>
+ <20180302120556.xujh3hoy44y7ouz7@lakrids.cambridge.arm.com>
+ <CAH76GKNw=irEY8BjhkaMnKm5m6AeCz8ZN67vrWSC6ByBmMMh8g@mail.gmail.com>
+ <20180302131545.q2vf6uc3yofofqdb@lakrids.cambridge.arm.com>
+ <CAH76GKOe=+WTrw8QEJ43+fyEfRPuo7+ds8VNoMCUqSNBMtxkyg@mail.gmail.com>
+ <20180302164411.fxdx72ttz7livz2e@lakrids.cambridge.arm.com>
+ <20180302165739.dc726v3yf2mxli3u@lakrids.cambridge.arm.com>
+Message-ID: <CAH76GKP5Abx3ty1jVfesd_BjOKaQLaNs0e_W06LBanWDAPS0gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner justified pretty well the change in commit e330eb86ba0
-'ARM: multi_v7_defconfig: enable Rockchip io-domain driver'. This change
-is also needed for arm64 rockchip boards, so, do the same for arm64.
+2018-03-02 17:57 GMT+01:00 Mark Rutland <mark.rutland@arm.com>:
+>> > > Do you see this for a panic() in *any* interrupt handler?
+>> >
+>> > I only test with this two interrupt handlers: watchdog and i2c but I
+>> > think it will behave the same with others - I can try with other if
+>> > you want, any suggestion which? Maybe with some PPI interrupt instead?
 
-The io-domain driver is necessary to notify the soc about voltages
-changes happening on supplying regulators. Probably the most important
-user right now is the mmc tuning code, where the soc needs to get
-notified when the voltage is dropped to the 1.8V point.
+I was able to reproduce it from other interrupts handler (UART, I2C,
+timer and watchdog) no difference if it is PPI or SPI interrupt. I
+also reproduce this issue with GICv3. But again it only happens when
+eoimode = 0.
+>> > >
+>> > > Can you trigger the issue with magic-sysrq c, for example?
+>> >
+>> > There is no problem when I trigger it via 'echo c >
+>> > /proc/sysrq-trigger' - it works well all the time. The problem appears
+>> > only, when the kexec/kdump procedure is triggered from interrupt
+>> > context
+>>
+>> I'd meant that you'd send sysrq + c over serial, rather than writing to
+>> /proc/sysrq-trigger. That way, the panic will be in the context of the
+>> UART IRQ handler.
+>>
+>> If that shows the issue, that's ilikely to be the easiest way for
+>> someone else to reproduce and investigate this.
 
-As this option is necessary to successfully tune UHS cards etc, it
-should get built in. Otherwise, tunning will fail with,
+Yes it can be triggered by sending sysrq + c and indeed it is the
+easiest way to reproduce it.
+>
+> FWIW, having just given this a go on my Juno R1 with v4.16-rc3
+> defconfig, the UART IRQs work fine in the crash kernel. That crash
+> happened in IRQ context:
 
-   dwmmc_rockchip fe320000.dwmmc: All phases bad!
-   mmc0: tuning execution failed: -5
+I think that by default Juno uses eoimode = 1, did you try it when
+eoimode was forced to be 0? Only eoimode = 0 triggers the issue.
 
-Cc: Heiko St?bner <heiko@sntech.de>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ba859709c2d4..d65d53b1ff77 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -313,6 +313,8 @@ CONFIG_GPIO_XGENE_SB=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_MAX77620=y
-+CONFIG_POWER_AVS=y
-+CONFIG_ROCKCHIP_IODOMAIN=y
- CONFIG_POWER_RESET_MSM=y
- CONFIG_POWER_RESET_XGENE=y
- CONFIG_POWER_RESET_SYSCON=y
--- 
-2.16.1
+Thank you,
+Grzegorz
