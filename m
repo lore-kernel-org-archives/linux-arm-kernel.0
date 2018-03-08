@@ -1,18 +1,80 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Mar 2018 16:36:28 +0800
-Subject: [PATCH V6 1/2] ARM: dts: imx7s: add temperature monitor support
-In-Reply-To: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
-References: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180308083627.GV3217@dragon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 8 Mar 2018 17:38:00 +0900
+Subject: [PATCH] clk: uniphier: add Pro4/Pro5/PXs2 audio system clock
+In-Reply-To: <20180308082332.31063-1-suzuki.katsuhiro@socionext.com>
+References: <20180308082332.31063-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAK7LNARo_yGJW+OqLvoDUZgztxT+dr7W3xNvvEiQjZRzEtF03w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 09:59:29AM +0800, Anson Huang wrote:
-> Add i.MX7 temperature monitor support.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+2018-03-08 17:23 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> Add clock for audio subsystem (AIO) on UniPhier
+> Pro4/Pro5/PXs2 SoCs.
+>
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> ---
 
-Applied this dts patch, thanks.
+
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+
+>  drivers/clk/uniphier/clk-uniphier-sys.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
+> index d244e724e198..06c5269f63f5 100644
+> --- a/drivers/clk/uniphier/clk-uniphier-sys.c
+> +++ b/drivers/clk/uniphier/clk-uniphier-sys.c
+> @@ -57,6 +57,14 @@
+>  #define UNIPHIER_PRO4_SYS_CLK_USB3(idx, ch)                            \
+>         UNIPHIER_CLK_GATE("usb3" #ch, (idx), NULL, 0x2104, 16 + (ch))
+>
+> +#define UNIPHIER_PRO4_SYS_CLK_AIO(idx)                                 \
+> +       UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 8),            \
+> +       UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2104, 13)
+> +
+> +#define UNIPHIER_PRO5_SYS_CLK_AIO(idx)                                 \
+> +       UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 12),           \
+> +       UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2104, 13)
+> +
+>  #define UNIPHIER_LD11_SYS_CLK_AIO(idx)                                 \
+>         UNIPHIER_CLK_FACTOR("aio-io200m", -1, "spll", 1, 10),           \
+>         UNIPHIER_CLK_GATE("aio", (idx), "aio-io200m", 0x2108, 0)
+> @@ -104,6 +112,7 @@ const struct uniphier_clk_data uniphier_pro4_sys_clk_data[] = {
+>         UNIPHIER_PRO4_SYS_CLK_GIO(12),                  /* Ether, SATA, USB3 */
+>         UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
+>         UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
+> +       UNIPHIER_PRO4_SYS_CLK_AIO(40),
+>         { /* sentinel */ }
+>  };
+>
+> @@ -132,6 +141,7 @@ const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
+>         UNIPHIER_PRO4_SYS_CLK_GIO(12),                          /* PCIe, USB3 */
+>         UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
+>         UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
+> +       UNIPHIER_PRO5_SYS_CLK_AIO(40),
+>         { /* sentinel */ }
+>  };
+>
+> @@ -149,6 +159,7 @@ const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[] = {
+>         /* The document mentions 0x2104 bit 18, but not functional */
+>         UNIPHIER_CLK_GATE("usb30-phy", 16, NULL, 0x2104, 19),
+>         UNIPHIER_CLK_GATE("usb31-phy", 20, NULL, 0x2104, 20),
+> +       UNIPHIER_PRO5_SYS_CLK_AIO(40),
+>         { /* sentinel */ }
+>  };
+>
+> --
+> 2.16.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
