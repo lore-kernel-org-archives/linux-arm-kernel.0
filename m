@@ -1,78 +1,46 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 8 Mar 2018 12:42:12 +1030
-Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
-In-Reply-To: <20180307162430.2664523-2-arnd@arndb.de>
-References: <20180307162430.2664523-1-arnd@arndb.de>
- <20180307162430.2664523-2-arnd@arndb.de>
-Message-ID: <CACPK8XeVMSeQNkPNp1_vms97H_9rMuk1-DzUAc=s-7o=FmVncw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 08 Mar 2018 11:25:38 +0900
+Subject: [PATCH] clk: samsung: exynos5420: Add CLK_SET_RATE_PARENT flag
+ to mout_mau_epll_clk
+In-Reply-To: <20180307164656.12194-1-s.nawrocki@samsung.com>
+References: <CGME20180307164708epcas1p27e6599e85617f559c5c4c8eb92a70a47@epcas1p2.samsung.com>
+ <20180307164656.12194-1-s.nawrocki@samsung.com>
+Message-ID: <5AA09F22.2070903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 2:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> While looking at the build regression, I noticed that the
-> platform selects a lot of other Kconfig symbols that it really
-> should not:
->
-> CPU_V7, ARM_GIC, HAVE_SMP, COMMON_CLK, GENERIC_CLOCKEVENTS,
-> and CLKDEV_LOOKUP are all implied by ARCH_MULTI_V7, so they
-> can be dropped.
->
-> CACHE_L2X0, SMP and USB are meant to be user-selectable, we
-> want to be able to turn those off for testing purposes.
->
-> CPU_USE_DOMAINS looks completely misplaced here, we should not
-> select that for an ARMv7 platform.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Sylwester,
 
-I had a similar patch queued for sending out. Thanks Arnd.
-
-Acked-by: Joel Stanley <joel@jms.id.au>
-
-Cheers,
-
-Joel
-
+On 2018? 03? 08? 01:46, Sylwester Nawrocki wrote:
+> This allows changing the EPLL output frequency through the audio subsystem
+> clock tree leaf clocks. This change is needed to support audio on the HDMI
+> interface on Peach-Pi(t) Chromebook.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > ---
->  arch/arm/mach-npcm/Kconfig | 18 ------------------
->  1 file changed, 18 deletions(-)
->
-> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
-> index 2bc6697c8d97..c6a16230e8ef 100644
-> --- a/arch/arm/mach-npcm/Kconfig
-> +++ b/arch/arm/mach-npcm/Kconfig
-> @@ -12,12 +12,6 @@ comment "NPCM7XX CPU type"
->  config ARCH_NPCM750
->         depends on ARCH_NPCM
->         bool "Support for NPCM750 BMC CPU (Poleg)"
-> -       select CACHE_L2X0
-> -       select CPU_V7
-> -       select ARM_GIC
-> -       select HAVE_SMP
-> -       select SMP
-> -       select SMP_ON_UP
->         select HAVE_ARM_SCU
->         select HAVE_ARM_TWD if SMP
->         select ARM_ERRATA_720789
-> @@ -26,18 +20,6 @@ config ARCH_NPCM750
->         select ARM_ERRATA_794072
->         select PL310_ERRATA_588369
->         select PL310_ERRATA_727915
-> -       select USB_EHCI_ROOT_HUB_TT
-> -       select USB_ARCH_HAS_HCD
-> -       select USB_ARCH_HAS_EHCI
-> -       select USB_EHCI_HCD
-> -       select USB_ARCH_HAS_OHCI
-> -       select USB_OHCI_HCD
-> -       select USB
-> -       select FIQ
-> -       select CPU_USE_DOMAINS
-> -       select GENERIC_CLOCKEVENTS
-> -       select CLKDEV_LOOKUP
-> -       select COMMON_CLK if OF
->         select NPCM750_TIMER
->         select MFD_SYSCON
->         help
-> --
-> 2.9.0
->
+>  drivers/clk/samsung/clk-exynos5420.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 8c050ff63536..1f204ba37f0f 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -621,7 +621,8 @@ static const struct samsung_mux_clock exynos5420_mux_clks[] __initconst = {
+>  
+>  	MUX(CLK_MOUT_MX_MSPLL_CCORE, "mout_mx_mspll_ccore",
+>  			mout_group5_5800_p, SRC_TOP7, 16, 2),
+> -	MUX(0, "mout_mau_epll_clk", mout_mau_epll_clk_p, SRC_TOP7, 20, 2),
+> +	MUX_F(0, "mout_mau_epll_clk", mout_mau_epll_clk_p, SRC_TOP7, 20, 2,
+> +	      CLK_SET_RATE_PARENT, 0),
+>  
+>  	MUX(0, "mout_fimd1", mout_group3_p, SRC_DISP10, 4, 1),
+>  };
+> 
+
+Looks good to me.
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
