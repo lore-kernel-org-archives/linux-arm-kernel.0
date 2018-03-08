@@ -1,52 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Mar 2018 15:34:18 +0000
-Subject: [PATCH v2 0/2] PCI: armada8k: Fix clock resource for Armada 7K/8K
-In-Reply-To: <20180228163530.25389-1-gregory.clement@bootlin.com>
-References: <20180228163530.25389-1-gregory.clement@bootlin.com>
-Message-ID: <20180308153418.GA2780@e107981-ln.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 8 Mar 2018 12:35:52 -0300
+Subject: [PATCH v4 2/2] ARM: dts: imx: Add basic dts support for imx6sll
+ EVK board
+In-Reply-To: <1520503424-22985-2-git-send-email-ping.bai@nxp.com>
+References: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
+ <1520503424-22985-2-git-send-email-ping.bai@nxp.com>
+Message-ID: <CAOMZO5AgPAgUZfd3NWa5QvyF3DcmeB06pms16aZ34sk6894TWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 28, 2018 at 05:35:28PM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> This short series fixes the way the clocks are used for the PCIe host
-> controller embedded in the Marvell Armada 7K/8K SoCs. On these SoCs a
-> second one is needed in order to clock the registers. It was not
-> noticed until now because we relied on the bootloader and also because
-> the clock driver was wrong.
-> 
-> Thanks to this fix, it would be possible to fix the clock driver
-> without introducing a regression.
-> 
-> The first patch is just a small cleanup found when I wrote the main
-> patch.
-> 
-> Changelog:
-> v1 -> v2:
-> 
->  - Removed a unneeded new line in the binding documentation, pointed
->    by Thomas Petazzoni.
-> 
->  - Added a new line in driver code, pointed by Thomas Petazzoni.
-> 
->  - Managed the failure of clk_prepare_enable for the clk_reg in a
->    separate case, pointed by Thomas Petazzoni.
-> 
->  - Simplified the -EPROBE_DEFER case for the clk_reg, suggested by
->    Russell King
-> 
->  - Added backed the line getting the reg clock that disappeared in the
->    first version.
-> 
-> Gregory CLEMENT (2):
->   PCI: armada8k: Remove useless test before clk_disable_unprepare
->   PCI: armada8k: Fix clock resource by adding a register clock
-> 
->  .../devicetree/bindings/pci/pci-armada8k.txt        |  5 ++++-
->  drivers/pci/dwc/pcie-armada8k.c                     | 21 +++++++++++++++++----
->  2 files changed, 21 insertions(+), 5 deletions(-)
+On Thu, Mar 8, 2018 at 7:03 AM, Bai Ping <ping.bai@nxp.com> wrote:
 
-Applied to pci/armada8k for v4.17, thank you.
+> +&iomuxc {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_hog0>, <&pinctrl_hog1>;
+> +
+> +       pinctrl_hog0: hog0grp {
+> +               pinmux = <
+> +                       MX6SLL_PAD_KEY_ROW7__GPIO4_IO07
+> +                       MX6SLL_PAD_GPIO4_IO22__GPIO4_IO22
+> +                       MX6SLL_PAD_KEY_COL3__GPIO3_IO30
+> +                       MX6SLL_PAD_KEY_COL4__GPIO4_IO00
+> +                       MX6SLL_PAD_KEY_COL5__GPIO4_IO02
+> +               >;
+> +               slew-rate = <0x1>;
+> +               drive-strength = <0x3>;
+> +               fsl,pin-speed = <0x1>;
+> +               bias-pull-up = <0x1>;
+> +               input-schmitt-enable;
+> +       };
 
-Lorenzo
+Please use the old style for pinctrl.
