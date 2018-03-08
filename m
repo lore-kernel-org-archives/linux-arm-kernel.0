@@ -1,106 +1,45 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Mar 2018 10:52:19 +0900
-Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <b64d77c1-c80f-1bd9-a599-3027424ec667@samsung.com>
-References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
- <20180227071134.28063-1-a.hajda@samsung.com>
- <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
- <5A9F4A7D.9020409@samsung.com> <5A9F6F29.5020501@samsung.com>
- <b64d77c1-c80f-1bd9-a599-3027424ec667@samsung.com>
-Message-ID: <5AA09753.7060308@samsung.com>
+Date: Thu, 08 Mar 2018 10:55:06 +0900
+Subject: [PATCH] clk: samsung: exynos5420: Add more entries to EPLL rate
+ table
+In-Reply-To: <20180307164656.12194-2-s.nawrocki@samsung.com>
+References: <20180307164656.12194-1-s.nawrocki@samsung.com>
+ <CGME20180307164733epcas1p3695c022315be8d2839ac9e88016e3a76@epcas1p3.samsung.com>
+ <20180307164656.12194-2-s.nawrocki@samsung.com>
+Message-ID: <5AA097FA.5070704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej, Archit,
-
-On 2018? 03? 07? 20:13, Andrzej Hajda wrote:
-> Hi Chanwoo, Archit,
+On 2018? 03? 08? 01:46, Sylwester Nawrocki wrote:
+> Adding these EPLL output frequency entries allows to support all required
+> audio sample rates on the CODEC and the HDMI interface on Peach-Pit
+> Chromebook.
 > 
-> On 07.03.2018 05:48, Chanwoo Choi wrote:
->> On 2018? 03? 07? 11:12, Chanwoo Choi wrote:
->>> Hi Rob and Andrzej,
->>>
->>> On 2018? 03? 06? 21:53, Andrzej Hajda wrote:
->>>> Hi Rob, Chanwoo, Krzysztof,
->>>>
->>>>
->>>> On 27.02.2018 08:11, Andrzej Hajda wrote:
->>>>> Hi,
->>>>>
->>>>> Thanks for reviews of previous iterations.
->>>>>
->>>>> This patchset introduces USB physical connector bindings, together with
->>>>> working example.
->>>>> I have removed RFC prefix - the patchset seems to be heading
->>>>> to a happy end :)
->>>>>
->>>>> v5: fixed extra parenthesis in dts, renamed extcon function.
->>>>> v4: improved binding descriptions, added missing reg in dts.
->>>>> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
->>>>>     example.
->>>>> v2: I have addressed comments by Rob and Laurent, thanks 
->>>>>
->>>>> Changes in datail are described in the patches.
->>>>>
->>>>> Regards
->>>>> Andrzej
->>>>>
->>>>>
->>>>> Andrzej Hajda (5):
->>>>>   dt-bindings: add bindings for USB physical connector
->>>>>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
->>>>>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
->>>>>   arm64: dts: exynos: add OF graph between MHL and USB connector
->>>>>   extcon: add possibility to get extcon device by OF node
->>>>>
->>>>> Maciej Purski (1):
->>>>>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
->>>> It looks like all patches received R-B or acks (I forgot add Krzysztof's
->>>> acks for dts part).
->>>> Now I have a question how to merge them.
->>>> The only functional dependency is between bridge and extcon, and from
->>>> the formal PoV bindings should be merged 1st.
->>>> I can merge it:
->>>> 1. All patches via drm-misc tree.
->>>> 2. All patches except dts via drm-misc, and Krzysztof will merge dts via
->>>> samsung-soc tree.
->>>>
->>>> Is it OK, for all? Better ideas?
->>> Krzysztof picked the dts patches. I'll make the immutable branch based on v4.16-rc1
->>> and apply them except for dts patchs. And I'll send the immutable branch to Rob and Andrzej.
->>>
->>>
->> I made the immutable branch[1] as following: If you agree, I'll send pull request.
->> [1] https://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git/log/?h=ib-extcon-drm-dt-v4.17
->>
->> Or you can make the immutable branch and send pull request to Rob and me.
->>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> It seems you took v5 instead of v6 version of extcon patch.
-
-My mistake. I picked v6 and made the new immutable branch.
-After Archit confirm it, I'll send pull request.
-
-> 
-> Beside it I am OK with your immutable branch, Archit is it OK to do it
-> this way in drm-misc?
-> 
-> 
-> Regards
-> 
-> Andrzej
-> 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 1f204ba37f0f..f2607cb97a97 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -1360,8 +1360,11 @@ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
+>  	PLL_36XX_RATE(180633609U, 301, 5, 3, 3671),
+>  	PLL_36XX_RATE(131072006U, 131, 3, 3, 4719),
+>  	PLL_36XX_RATE(100000000U, 200, 3, 4, 0),
+> +	PLL_36XX_RATE( 73728000U, 98, 2, 4, 19923),
+> +	PLL_36XX_RATE( 67737602U, 90, 2, 4, 20762),
+>  	PLL_36XX_RATE( 65536003U, 131, 3, 4, 4719),
+>  	PLL_36XX_RATE( 49152000U, 197, 3, 5, -25690),
+> +	PLL_36XX_RATE( 45158401U, 90, 3, 4, 20762),
+>  	PLL_36XX_RATE( 32768001U, 131, 3, 5, 4719),
+>  };
+>  
 > 
 
+Looks good to me.
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
 -- 
 Best Regards,
