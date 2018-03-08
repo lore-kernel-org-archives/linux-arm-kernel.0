@@ -1,58 +1,33 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Mar 2018 09:40:51 +0100
-Subject: [PATCH 2/3] arm64: dts: renesas: r8a7795: sort subnodes of the
- cpu node
-In-Reply-To: <CAMuHMdUnpvF0TXW9FaoYTe-dTQ9prDNmHa6OkbZbww-m7wav_A@mail.gmail.com>
-References: <20180307094046.4907-1-horms+renesas@verge.net.au>
- <20180307094046.4907-3-horms+renesas@verge.net.au>
- <CAMuHMdUnpvF0TXW9FaoYTe-dTQ9prDNmHa6OkbZbww-m7wav_A@mail.gmail.com>
-Message-ID: <20180308084051.ikrjqzv63sc2qv5w@verge.net.au>
+Date: Thu, 8 Mar 2018 09:43:36 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a7795: Add IPMMU-PV1 device node
+In-Reply-To: <TY1PR06MB09925629ADC09D1DA9FE43E6D8D80@TY1PR06MB0992.apcprd06.prod.outlook.com>
+References: <20180306093430.12486-1-horms+renesas@verge.net.au>
+ <TY1PR06MB09925629ADC09D1DA9FE43E6D8D80@TY1PR06MB0992.apcprd06.prod.outlook.com>
+Message-ID: <20180308084335.xnrr7ym6y2uaygte@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 10:49:47AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Wed, Mar 07, 2018 at 11:55:16AM +0000, Yoshihiro Shimoda wrote:
+> Hi Simon-san,
 > 
-> On Wed, Mar 7, 2018 at 10:40 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Sort subnodes of the cpu node alphanumerically.
-> >
-> > This is part of an ongoing effort to provide consistent node
-> > order in the DT of Renesas SoCs to improve maintainability.
-> >
-> > This should not have any run-time effect.
-> >
+> > From: Simon Horman, Sent: Tuesday, March 6, 2018 6:35 PM
+> > 
+> > Add r8a7795 IPMMU-PV1 and keep it disabled by default.
+> > 
+> > This device is not present in r8a7795 ES1.x and
+> > is removed from the DT of those SoCs.
+> > 
+> > This corrects an omission in
+> > 3b7e7848f0e8 ("arm64: dts: renesas: r8a7795: Add IPMMU device nodes")
+> > 
+> > This does not have any runtime effect.
+> > 
+> > Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Thanks for your patch!
+> Thank you for the patch!
 > 
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > @@ -34,6 +34,50 @@
-> >                 #address-cells = <1>;
-> >                 #size-cells = <0>;
-> >
-> > +               a53_0: cpu at 100 {
-> > +                       compatible = "arm,cortex-a53", "arm,armv8";
-> > +                       reg = <0x100>;
-> > +                       device_type = "cpu";
-> > +                       power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
-> > +                       next-level-cache = <&L2_CA53>;
-> > +                       enable-method = "psci";
-> > +                       clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
-> > +                       operating-points-v2 = <&cluster1_opp>;
-> > +               };
-> 
-> [...]
-> 
-> >                 a57_0: cpu at 0 {
-> >                         compatible = "arm,cortex-a57", "arm,armv8";
-> >                         reg = <0x0>;
-> 
-> Given the CPU nodes do have reg properties and unit addresses, shouldn't
-> they be sorted by these values, instead of alphabetically?
+> Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Thanks, I agree.
-
-It looks like the nodes are already sorted according to that order
-so I withdraw this patch.
+Thanks, applied.
