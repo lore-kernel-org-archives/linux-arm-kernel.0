@@ -1,92 +1,71 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Mar 2018 13:53:13 +0000
-Subject: [PATCH v3 21/22] arm64: Delay enabling hardware DBM feature
-In-Reply-To: <e8b40320-10d2-6117-ef7f-7bbb46823ffb@arm.com>
-References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-43-suzuki.poulose@arm.com>
- <20180209185840.GJ5862@e103592.cambridge.arm.com>
- <e8b40320-10d2-6117-ef7f-7bbb46823ffb@arm.com>
-Message-ID: <20180308135312.GQ32331@e103592.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Mar 2018 13:54:26 +0000
+Subject: [PATCH v4 5/5] arm64/kernel: enable A53 erratum #8434319 handling
+ at runtime
+In-Reply-To: <20180308134907.66ztteiu6kv6q3wn@lakrids.cambridge.arm.com>
+References: <20180306171535.25681-1-ard.biesheuvel@linaro.org>
+ <20180306171535.25681-6-ard.biesheuvel@linaro.org>
+ <20180308134512.GA18452@arm.com>
+ <CAKv+Gu_4xYW=kc3WGmMpneUqboasdJNFAZ19oCOws9=wgADz7Q@mail.gmail.com>
+ <20180308134907.66ztteiu6kv6q3wn@lakrids.cambridge.arm.com>
+Message-ID: <CAKv+Gu9a8pWdhN4PjN2t0dSpiocQfWhvr_jioxmhU2iJRSfV7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 05:39:09PM +0000, Suzuki K Poulose wrote:
-> On 09/02/18 18:58, Dave Martin wrote:
-> >On Fri, Feb 09, 2018 at 05:55:12PM +0000, Suzuki K Poulose wrote:
-> >>We enable hardware DBM bit in a capable CPU, very early in the
-> >>boot via __cpu_setup. This doesn't give us a flexibility of
-> >>optionally disable the feature, as the clearing the bit
-> >>is a bit costly as the TLB can cache the settings. Instead,
-> >>we delay enabling the feature until the CPU is brought up
-> >>into the kernel. We use the feature capability mechanism
-> >>to handle it.
-> >>
-> >>The hardware DBM is a non-conflicting feature. i.e, the kernel
-> >>can safely run with a mix of CPUs with some using the feature
-> >>and the others don't. So, it is safe for a late CPU to have
-> >>this capability and enable it, even if the active CPUs don't.
-> >>
-> >>To get this handled properly by the infrastructure, we
-> >>unconditionally set the capability and only enable it
-> >>on CPUs which really have the feature. Also, we print the
-> >>feature detection from the "matches" call back to make sure
-> >>we don't mislead the user when none of the CPUs could use the
-> >>feature.
-> >>
-> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>Cc: Dave Martin <dave.martin@arm.com>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>Changes since V2
-> >>  - Print the feature detection message only when at least one CPU
-> >>    is actually using it.
-> 
-> 
-> >>+static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
-> >>+		       int __unused)
-> >>+{
-> >>+	static bool detected = false;
-> >>+	/*
-> >>+	 * DBM is a non-conflicting feature. i.e, the kernel can safely
-> >>+	 * run a mix of CPUs with and without the feature. So, we
-> >>+	 * unconditionally enable the capability to allow any late CPU
-> >>+	 * to use the feature. We only enable the control bits on the
-> >>+	 * CPU, if it actually supports.
-> >>+	 *
-> >>+	 * We have to make sure we print the "feature" detection only
-> >>+	 * when at least one CPU actually uses it. So check if this CPU
-> >>+	 * can actually use it and print the message exactly once.
-> >>+	 *
-> >>+	 * This is safe as all CPUs (including secondary CPUs - due to the
-> >>+	 * LOCAL_CPU scope - and the hotplugged CPUs - via verification)
-> >>+	 * goes through the "matches" check exactly once. Also if a CPU
-> >>+	 * matches the criteria, it is guaranteed that the CPU will turn
-> >>+	 * the DBM on, as the capability is unconditionally enabled.
-> >>+	 */
-> >>+	if (!detected && cpu_can_use_dbm(cap)) {
-> >>+		detected = true;
-> >>+		pr_info("detected feature: Hardware dirty bit management\n");
-> >>+	}
-> >
-> >Can we just do
-> >
-> >	if (cpu_can_use_dbm(cap))
-> >		pr_info_once(...);
-> >
-> >Then we can get rid of "detected".
-> 
-> The reason for open coding is the cost of cpu_can_use_dbm() with
-> addition of black listed CPUs in the next patch in the series.
+On 8 March 2018 at 13:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Mar 08, 2018 at 01:46:34PM +0000, Ard Biesheuvel wrote:
+>> On 8 March 2018 at 13:45, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Mar 06, 2018 at 05:15:35PM +0000, Ard Biesheuvel wrote:
+>> >> Omit patching of ADRP instruction at module load time if the current
+>> >> CPUs are not susceptible to the erratum.
+>> >
+>> > [...]
+>> >
+>> >> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+>> >> index 534bf1d47119..1a583ccace00 100644
+>> >> --- a/arch/arm64/kernel/module-plts.c
+>> >> +++ b/arch/arm64/kernel/module-plts.c
+>> >> @@ -158,7 +158,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+>> >>                       break;
+>> >>               case R_AARCH64_ADR_PREL_PG_HI21_NC:
+>> >>               case R_AARCH64_ADR_PREL_PG_HI21:
+>> >> -                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
+>> >> +                     if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
+>> >> +                         !cpus_have_const_cap(ARM64_WORKAROUND_843419))
+>> >>                               break;
+>> >>
+>> >>                       /*
+>> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+>> >> index 89217704944e..47b40aaa1a5d 100644
+>> >> --- a/arch/arm64/kernel/module.c
+>> >> +++ b/arch/arm64/kernel/module.c
+>> >> @@ -201,6 +201,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
+>> >>  static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
+>> >>  {
+>> >>       if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
+>> >> +         !cpus_have_const_cap(ARM64_WORKAROUND_843419) ||
+>> >
+>> > Mind if I drop the IS_ENABLED check here and in the hunk above? The
+>> > const_cap check along should be sufficient, no?
+>> >
+>>
+>> Without the IS_ENABLED() check, the code will always be present in the
+>> object file.
+>>
+>> I have no strong preference either way, though.
+>
+> As with other case, perhaps fold this into a helper in
+> <asm/cpufeature.h> ?
+>
+> static inline bool system_needs_arm64_workaround_843419()
+> {
+>         return (IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
+>                 cpus_have_const_cap(ARM64_WORKAROUND_843419))
+> }
+>
+> ... then use the inverse in the cases above.
+>
 
-Oh, I see.  Yes, that makes sense.
-
-There's obvious raciness here, but I guess pr_info_once() doesn't defend
-against that either.  In practice, we don't race booting of two CPUs
-against each other IIUC.
-
-If you really like you could make detected __read_mostly like
-printk_once() does, but that's no big deal if this is not on a hot path
-(and probably not even then).
-
-Cheers
----Dave
+I'm fine with adding a helper, but
+'system_needs_arm64_workaround_843419' is a bit misleading, given that
+it returns false if the system needs it but support is compiled out.
