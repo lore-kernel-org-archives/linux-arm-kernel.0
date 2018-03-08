@@ -1,42 +1,113 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Thu,  8 Mar 2018 17:48:06 +0800
-Subject: [PATCH v6 16/17] arm64: dts: rockchip: add rx0 mipi-phy for rk3399
-In-Reply-To: <20180308094807.9443-1-jacob-chen@iotwrt.com>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
-Message-ID: <20180308094807.9443-17-jacob-chen@iotwrt.com>
+From: jacobchen110@gmail.com (Jacob Chen)
+Date: Thu, 8 Mar 2018 17:59:44 +0800
+Subject: [PATCH v5 02/16] media: doc: add document for rkisp1 meta buffer
+ format
+In-Reply-To: <CAFLEztR1XyFMS_Gf-qT7vs9OHipeBfuXQ7mXJoCBDyBSvTWUag@mail.gmail.com>
+References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
+ <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
+ <917c22c0-773e-5fe5-5625-86678f7c8521@xs4all.nl>
+ <CAFLEztR1XyFMS_Gf-qT7vs9OHipeBfuXQ7mXJoCBDyBSvTWUag@mail.gmail.com>
+Message-ID: <CAFLEztSPXP6DsyZAiwS8j4-g4Qxjuku_9wfrOYs1o-0w=s5Wpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunqian Zheng <zhengsq@rock-chips.com>
+Hi Hans,
 
-It's a Designware MIPI D-PHY, used for ISP0 in rk3399.
+2018-02-06 22:27 GMT+08:00 Hans Verkuil <hverkuil@xs4all.nl>:
+> On 12/29/17 08:52, Shunqian Zheng wrote:
+>> From: Jacob Chen <jacob2.chen@rock-chips.com>
+>>
+>> This commit add docuemnt for rkisp1 meta buffer format
+>>
+>> Signed-off-by: Jacob Chen <jacob-chen@rock-chips.com>
+>> ---
+>>  Documentation/media/uapi/v4l/meta-formats.rst          |  2 ++
+>>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst       | 17 +++++++++++++++++
+>>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst         | 18 ++++++++++++++++++
+>>  3 files changed, 37 insertions(+)
+>>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>>
+>> diff --git a/Documentation/media/uapi/v4l/meta-formats.rst b/Documentation/media/uapi/v4l/meta-formats.rst
+>> index 01e24e3..1b82814 100644
+>> --- a/Documentation/media/uapi/v4l/meta-formats.rst
+>> +++ b/Documentation/media/uapi/v4l/meta-formats.rst
+>> @@ -14,3 +14,5 @@ These formats are used for the :ref:`metadata` interface only.
+>>
+>>      pixfmt-meta-vsp1-hgo
+>>      pixfmt-meta-vsp1-hgt
+>> +    pixfmt-meta-rkisp1-params
+>> +    pixfmt-meta-rkisp1-stat
+>> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>> new file mode 100644
+>> index 0000000..ed344d4
+>> --- /dev/null
+>> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>> @@ -0,0 +1,17 @@
+>> +.. -*- coding: utf-8; mode: rst -*-
+>> +
+>> +.. _v4l2-meta-fmt-rkisp1-params:
+>> +
+>> +*******************************
+>> +V4L2_META_FMT_RK_ISP1_PARAMS
+>> +*******************************
+>> +
+>> +Rockchip ISP1 Parameters Data
+>> +
+>> +Description
+>> +===========
+>> +
+>> +This format describes input parameters for the Rockchip ISP1.
+>> +
+>> +The data use c-struct :c:type:`rkisp1_isp_params_cfg`, which is defined in
+>> +the ``linux/rkisp1-config.h`` header file, See it for details.
+>
+> One more question: does the ISP produce a reasonable picture if it doesn't
+> receive these params? If not (i.e. you always need to provide params), then
+> I think you should provide a default rkisp1_isp_params_cfg struct that
+> can be used as a template for application writers.
+>
+> Perhaps it can be part of the driver as the initial params config.
+>
+> I think even if the ISP does work without params it is still worthwhile
+> doing this. The params are complex and having an example on how to initialize
+> it would be helpful.
+>
 
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+The ISP don't need a default rkisp1_isp_params_cfg to produce picture,
+those params just effect image quality and stats data.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 14ed016f2fdd..d18ab8f56ef2 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1308,6 +1308,16 @@
- 			status = "disabled";
- 		};
- 
-+		mipi_dphy_rx0: mipi-dphy-rx0 {
-+			compatible = "rockchip,rk3399-mipi-dphy";
-+			clocks = <&cru SCLK_MIPIDPHY_REF>,
-+				<&cru SCLK_DPHY_RX0_CFG>,
-+				<&cru PCLK_VIO_GRF>;
-+			clock-names = "dphy-ref", "dphy-cfg", "grf";
-+			power-domains = <&power RK3399_PD_VIO>;
-+			status = "disabled";
-+		};
-+
- 		u2phy0: usb2-phy at e450 {
- 			compatible = "rockchip,rk3399-usb2phy";
- 			reg = <0xe450 0x10>;
--- 
-2.16.1
+The params are not very complex.
+They consist of multiple modules and each of modules can be
+enabled/disable/updated individually.
+
+> Regards,
+>
+>         Hans
+>
+>> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>> new file mode 100644
+>> index 0000000..5ecc403
+>> --- /dev/null
+>> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>> @@ -0,0 +1,18 @@
+>> +.. -*- coding: utf-8; mode: rst -*-
+>> +
+>> +.. _v4l2-meta-fmt-rkisp1-stat:
+>> +
+>> +*******************************
+>> +V4L2_META_FMT_RK_ISP1_STAT_3A
+>> +*******************************
+>> +
+>> +Rockchip ISP1 Statistics Data
+>> +
+>> +Description
+>> +===========
+>> +
+>> +This format describes image color statistics information generated by the Rockchip
+>> +ISP1.
+>> +
+>> +The data use c-struct :c:type:`rkisp1_stat_buffer`, which is defined in
+>> +the ``linux/cifisp_stat.h`` header file, See it for details.
+>>
+>
