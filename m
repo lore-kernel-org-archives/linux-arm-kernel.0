@@ -1,149 +1,80 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 8 Mar 2018 08:41:59 -0800
-Subject: [PATCH v2] arm64/debug: Fix registers on sleeping tasks
-In-Reply-To: <382abcdd-5264-0c0c-282f-d1f52ecff8e3@linaro.org>
-References: <20180305234309.233226-1-dianders@chromium.org>
- <382abcdd-5264-0c0c-282f-d1f52ecff8e3@linaro.org>
-Message-ID: <CAD=FV=X4_AQFBxWpinDj5F9DUckC02dQ_2QPFQRs34e5_b00bQ@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 08 Mar 2018 17:42:52 +0100
+Subject: [PATCH] ARM: dts: Enable HDMI audio support on exynos5800-peach-pi
+References: <CGME20180308164308epcas1p2ca9ecc14b6dd68492456d41f2215267c@epcas1p2.samsung.com>
+Message-ID: <20180308164252.1252-1-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds new cpu, codec subnodes according to the updated
+"google,snow-audio-max98091" DT bindings and the I2S clock tree
+configuration so sound on the HDMI interface can be also supported.
 
-On Thu, Mar 8, 2018 at 8:19 AM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
-> On 05/03/18 23:43, Douglas Anderson wrote:
->>
->> This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix
->> registers on sleeping tasks") but for arm64.  Nuff said.
->>
->> ...well, perhaps I could also add that task_pt_regs are userspace
->> registers and that's not what kgdb is supposed to be reporting.  We're
->> supposed to be reporting kernel registers.
->>
->> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->
->
-> I hacked together a (still very immature) kgdb test suite[1] around the turn
-> of the year. Whilst its not quite solid enough for me to recommend others
-> deploy it except out of curiosity... so I haven't yet started yelling about
-> test suite failures except in the privacy of my own head.
->
-> However I can confirm that this patch fixes one of the test suite failures I
-> haven't had time to blame allocate yet!
->
-> So...
-> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
 
-Thanks for your testing!  ...I'll have to check out your test suite soon.
+NOTE:
+I couldn't test this patch as I have no access to Peach-pi Chromebook.
+I think it shoudn't be applied unless some acutally tests it.
 
+ arch/arm/boot/dts/exynos5800-peach-pi.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-> BTW is this something that should Cc: stable?
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 0029ec27819c..0a4766e0484e 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/maxim,max77802.h>
+ #include <dt-bindings/regulator/maxim,max77802.h>
++#include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos5800.dtsi"
+ #include "exynos5420-cpus.dtsi"
 
-It wouldn't hurt if this made it back to stable on a best-effort
-approach.  The problem has been there since the beginning, so it's not
-like it's fixing a regression that cropped up in a specific version.
-...but it does fix a bug, so probably Cc stable makes sense.  I guess
-I'd leave it up to the maintainer that applies the patch?
+@@ -89,6 +90,14 @@
+ 		samsung,model = "Peach-Pi-I2S-MAX98091";
+ 		samsung,i2s-controller = <&i2s0>;
+ 		samsung,audio-codec = <&max98091>;
++
++		cpu {
++			sound-dai = <&i2s0 0>;
++		};
++
++		codec {
++			sound-dai = <&max98091>, <&hdmi>;
++		};
+ 	};
 
+ 	usb300_vbus_reg: regulator-usb300 {
+@@ -145,6 +154,11 @@
+ 	vdd-supply = <&ldo9_reg>;
+ };
 
--Doug<div class="gmail_extra"><br><div class="gmail_quote">On Thu, Mar
-8, 2018 at 8:19 AM, Daniel Thompson <span dir="ltr">&lt;<a
-href="mailto:daniel.thompson@linaro.org"
-target="_blank">daniel.thompson at linaro.org</a>&gt;</span>
-wrote:<br><blockquote class="gmail_quote" style="margin:0 0 0
-.8ex;border-left:1px #ccc solid;padding-left:1ex"><span class="">On
-05/03/18 23:43, Douglas Anderson wrote:<br>
-<blockquote class="gmail_quote" style="margin:0 0 0
-.8ex;border-left:1px #ccc solid;padding-left:1ex">
-This is the equivalent of commit 001bf455d206 ("ARM: 8428/1: kgdb: Fix<br>
-registers on sleeping tasks") but for arm64.&nbsp; Nuff said.<br>
-<br>
-...well, perhaps I could also add that task_pt_regs are userspace<br>
-registers and that's not what kgdb is supposed to be reporting.&nbsp; We're<br>
-supposed to be reporting kernel registers.<br>
-<br>
-Signed-off-by: Douglas Anderson &lt;<a
-href="mailto:dianders@chromium.org"
-target="_blank">dianders at chromium.org</a>&gt;<br>
-</blockquote>
-<br></span>
-I hacked together a (still very immature) kgdb test suite[1] around
-the turn of the year. Whilst its not quite solid enough for me to
-recommend others deploy it except out of curiosity... so I haven't yet
-started yelling about test suite failures except in the privacy of my
-own head.<br>
-<br>
-However I can confirm that this patch fixes one of the test suite
-failures I haven't had time to blame allocate yet!<br>
-<br>
-So...<br>
-Tested-by: Daniel Thompson &lt;<a
-href="mailto:daniel.thompson@linaro.org"
-target="_blank">daniel.thompson at linaro.org</a>&gt;<br>
-<br>
-BTW is this something that should Cc: stable?<br>
-<br>
-<br>
-Daniel.<br>
-<br>
-[1] <a href="https://github.com/daniel-thompson/kgdbtest"
-rel="noreferrer" target="_blank"
-data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://github.com/daniel-thompson/kgdbtest&amp;source=gmail&amp;ust=1520613443900000&amp;usg=AFQjCNHzh_tGdP65DdFEQo-ofF_LCI5XBQ">https://github.com/daniel-thom<wbr>pson/kgdbtest</a><div
-class="HOEnZb"><div class="h5"><br>
-<br>
-<br>
-<blockquote class="gmail_quote" style="margin:0 0 0
-.8ex;border-left:1px #ccc solid;padding-left:1ex">
----<br>
-<br>
-Changes in v2:<br>
-- Init cpu_context in one line<br>
-- Explain that task_pt_regs are userspace<br>
-<br>
-&nbsp; arch/arm64/kernel/kgdb.c | 21 ++++++++++++++++-----<br>
-&nbsp; 1 file changed, 16 insertions(+), 5 deletions(-)<br>
-<br>
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c<br>
-index 2122cd187f19..a20de58061a8 100644<br>
---- a/arch/arm64/kernel/kgdb.c<br>
-+++ b/arch/arm64/kernel/kgdb.c<br>
-@@ -138,14 +138,25 @@ int dbg_set_reg(int regno, void *mem, struct
-pt_regs *regs)<br>
-&nbsp; void<br>
-&nbsp; sleeping_thread_to_gdb_regs(un<wbr>signed long *gdb_regs,
-struct task_struct *task)<br>
-&nbsp; {<br>
--&nbsp; &nbsp; &nbsp; &nbsp;struct pt_regs *thread_regs;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;struct cpu_context *cpu_context =
-&amp;task-&gt;thread.cpu_context;<br>
-&nbsp; &nbsp; &nbsp; &nbsp; /* Initialize to zero */<br>
-&nbsp; &nbsp; &nbsp; &nbsp; memset((char *)gdb_regs, 0, NUMREGBYTES);<br>
--&nbsp; &nbsp; &nbsp; &nbsp;thread_regs = task_pt_regs(task);<br>
--&nbsp; &nbsp; &nbsp; &nbsp;memcpy((void *)gdb_regs, (void
-*)thread_regs-&gt;regs, GP_REG_BYTES);<br>
--&nbsp; &nbsp; &nbsp; &nbsp;/* Special case for PSTATE (check comments
-in asm/kgdb.h for details) */<br>
--&nbsp; &nbsp; &nbsp; &nbsp;dbg_get_reg(33, gdb_regs + GP_REG_BYTES,
-thread_regs);<br>
-+<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[19] = cpu_context-&gt;x19;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[20] = cpu_context-&gt;x20;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[21] = cpu_context-&gt;x21;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[22] = cpu_context-&gt;x22;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[23] = cpu_context-&gt;x23;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[24] = cpu_context-&gt;x24;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[25] = cpu_context-&gt;x25;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[26] = cpu_context-&gt;x26;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[27] = cpu_context-&gt;x27;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[28] = cpu_context-&gt;x28;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[29] = cpu_context-&gt;fp;<br>
-+<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[31] = cpu_context-&gt;sp;<br>
-+&nbsp; &nbsp; &nbsp; &nbsp;gdb_regs[32] = cpu_context-&gt;pc;<br>
-&nbsp; }<br>
-&nbsp; &nbsp; void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)<br>
-<br>
-</blockquote>
-<br>
-</div></div></blockquote></div><br></div>
++&clock_audss {
++	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>;
++	assigned-clock-parents = <&clock CLK_FOUT_EPLL>;
++};
++
+ &cpu0 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+@@ -609,6 +623,7 @@
+ 		pinctrl-0 = <&max98091_irq>;
+ 		clocks = <&pmu_system_controller 0>;
+ 		clock-names = "mclk";
++		#sound-dai-cells = <0>;
+ 	};
+
+ 	light-sensor at 44 {
+@@ -661,6 +676,8 @@
+ };
+
+ &i2s0 {
++	assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
++	assigned-clock-parents = <&clock_audss EXYNOS_I2S_BUS>;
+ 	status = "okay";
+ };
+
+--
+2.14.2
