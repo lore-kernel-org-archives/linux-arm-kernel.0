@@ -1,63 +1,43 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 8 Mar 2018 10:36:34 +0100
-Subject: [PATCH] amlogic: meson-gx-socinfo: Update soc ids
-In-Reply-To: <7ho9jzgyr2.fsf@baylibre.com>
-References: <1518620335-17716-1-git-send-email-narmstrong@baylibre.com>
- <1518689694.2883.68.camel@baylibre.com> <7ho9jzgyr2.fsf@baylibre.com>
-Message-ID: <37263741-e817-9a48-615e-13c5b1e2cec0@baylibre.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Thu,  8 Mar 2018 17:47:22 +0800
+Subject: [PATCH v4 1/4] driver: clk: imx: Add CLK_IS_CRITICAL flag for busy
+ divider and busy mux
+Message-ID: <1520502445-22576-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+The busy divider and busy mux is actually used by the system critical clocks,
+so add 'CLK_IS_CRITICAL' to clocks registered with these two type.
 
-On 08/03/2018 02:08, Kevin Hilman wrote:
-> Jerome Brunet <jbrunet@baylibre.com> writes:
-> 
->> On Wed, 2018-02-14 at 15:58 +0100, Neil Armstrong wrote:
->>> Updates the Amlogic Meson SoCs IDs for the Armv8 based SoCs.
->>> It includes the new families and packages.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  drivers/soc/amlogic/meson-gx-socinfo.c | 8 ++++++++
->>>  1 file changed, 8 insertions(+)
->>>
->>> diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
->>> index f2d8c3c..a7efe30 100644
->>> --- a/drivers/soc/amlogic/meson-gx-socinfo.c
->>> +++ b/drivers/soc/amlogic/meson-gx-socinfo.c
->>> @@ -33,6 +33,10 @@ static const struct meson_gx_soc_id {
->>>  	{ "GXL", 0x21 },
->>>  	{ "GXM", 0x22 },
->>>  	{ "TXL", 0x23 },
->>> +	{ "TXLX", 0x24 },
->>> +	{ "AXG", 0x25 },
->>> +	{ "GXLX", 0x26 },
->>> +	{ "TXHD", 0x27 },
->>>  };
->>>  
->>>  static const struct meson_gx_package_id {
->>> @@ -47,6 +51,10 @@ static const struct meson_gx_package_id {
->>>  	{ "S905L", 0x21, 0xc0 },
->>>  	{ "S905M2", 0x21, 0xe0 },
->>>  	{ "S912", 0x22, 0 },
->>> +	{ "962X", 0x24, 0x10 },
->>> +	{ "962E", 0x24, 0x20 },
->>> +	{ "A113X", 0x25, 0x37 },
->>> +	{ "A113D", 0x25, 0xd0 },
->>>  };
->>>  
->>>  static inline unsigned int socinfo_to_major(u32 socinfo)
->>
->> Tested on my s400 board which, according to the marking, features an AXG A113D.
->> AXG is detected correctly but the package id read is 0x22 instead of 0xd0.
-> 
-> Neil, can you update accordingly?  Have you seen 0xd0 on other A11x
-> chips?  or is this from the docs?
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+---
+ change from V3->v4:
+ - fix a typo in commit log
+---
+ drivers/clk/imx/clk-busy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I got it from the Amlogic lastest Linux and U-boot code.
-I will set 0x22 and squash the "meson-gx-socinfo: Add package id for S905H" patch, is it ok ?
-
-> 
-> Kevin
-> 
+diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
+index 6df3389..9903652 100644
+--- a/drivers/clk/imx/clk-busy.c
++++ b/drivers/clk/imx/clk-busy.c
+@@ -101,7 +101,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_busy_divider_ops;
+-	init.flags = CLK_SET_RATE_PARENT;
++	init.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+ 
+@@ -175,7 +175,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_busy_mux_ops;
+-	init.flags = 0;
++	init.flags = CLK_IS_CRITICAL;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+ 
+-- 
+1.9.1
