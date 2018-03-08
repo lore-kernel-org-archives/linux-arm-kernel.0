@@ -1,52 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Mar 2018 20:08:22 -0600
-Subject: [PATCH 4/5] dt-bindings: pwm: sunxi: add new compatible strings
-In-Reply-To: <20180307020719.6675-5-andre.przywara@arm.com>
-References: <20180307020719.6675-1-andre.przywara@arm.com>
- <20180307020719.6675-5-andre.przywara@arm.com>
-Message-ID: <20180308020822.35utrgw3ksoldr24@rob-hp-laptop>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 8 Mar 2018 12:42:12 +1030
+Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
+In-Reply-To: <20180307162430.2664523-2-arnd@arndb.de>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <20180307162430.2664523-2-arnd@arndb.de>
+Message-ID: <CACPK8XeVMSeQNkPNp1_vms97H_9rMuk1-DzUAc=s-7o=FmVncw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 02:07:18AM +0000, Andre Przywara wrote:
-> The PWM controllers found in the Allwinner A64, H5 and H6 SoCs are fully
-> compatible to the PWM controllers found in the A13 and H3.
+On Thu, Mar 8, 2018 at 2:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> While looking at the build regression, I noticed that the
+> platform selects a lot of other Kconfig symbols that it really
+> should not:
+>
+> CPU_V7, ARM_GIC, HAVE_SMP, COMMON_CLK, GENERIC_CLOCKEVENTS,
+> and CLKDEV_LOOKUP are all implied by ARCH_MULTI_V7, so they
+> can be dropped.
+>
+> CACHE_L2X0, SMP and USB are meant to be user-selectable, we
+> want to be able to turn those off for testing purposes.
+>
+> CPU_USE_DOMAINS looks completely misplaced here, we should not
+> select that for an ARMv7 platform.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-If fully compatible, then shouldn't there be a fallback to one of the 
-existing compatible strings?
+I had a similar patch queued for sending out. Thanks Arnd.
 
-> Add new compatible strings for those SoCs to the binding document, so
-> that they can be safely used, together with a fallback string
-> (preferably "allwinner,sun5i-a13-pwm").
-> Add add the optionals "resets" property, needed by the H6.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Joel Stanley <joel@jms.id.au>
+
+Cheers,
+
+Joel
+
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-sun4i.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-> index 51ff54c8b8ef..b3a127a0e58c 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
-> @@ -7,11 +7,17 @@ Required properties:
->      - "allwinner,sun5i-a13-pwm"
->      - "allwinner,sun7i-a20-pwm"
->      - "allwinner,sun8i-h3-pwm"
-> +    - "allwinner,sun50i-a64-pwm"
-> +    - "allwinner,sun50i-h5-pwm"
-> +    - "allwinner,sun50i-h6-pwm"
->    - reg: physical base address and length of the controller's registers
->    - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
->      the cells format.
->    - clocks: From common clock binding, handle to the parent clock.
->  
-> +Optional properties:
-> +  - resets: shall be the reset control phandle for the PWM block, if required.
-> +
->  Example:
->  
->  	pwm: pwm at 1c20e00 {
-> -- 
-> 2.14.1
-> 
+>  arch/arm/mach-npcm/Kconfig | 18 ------------------
+>  1 file changed, 18 deletions(-)
+>
+> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+> index 2bc6697c8d97..c6a16230e8ef 100644
+> --- a/arch/arm/mach-npcm/Kconfig
+> +++ b/arch/arm/mach-npcm/Kconfig
+> @@ -12,12 +12,6 @@ comment "NPCM7XX CPU type"
+>  config ARCH_NPCM750
+>         depends on ARCH_NPCM
+>         bool "Support for NPCM750 BMC CPU (Poleg)"
+> -       select CACHE_L2X0
+> -       select CPU_V7
+> -       select ARM_GIC
+> -       select HAVE_SMP
+> -       select SMP
+> -       select SMP_ON_UP
+>         select HAVE_ARM_SCU
+>         select HAVE_ARM_TWD if SMP
+>         select ARM_ERRATA_720789
+> @@ -26,18 +20,6 @@ config ARCH_NPCM750
+>         select ARM_ERRATA_794072
+>         select PL310_ERRATA_588369
+>         select PL310_ERRATA_727915
+> -       select USB_EHCI_ROOT_HUB_TT
+> -       select USB_ARCH_HAS_HCD
+> -       select USB_ARCH_HAS_EHCI
+> -       select USB_EHCI_HCD
+> -       select USB_ARCH_HAS_OHCI
+> -       select USB_OHCI_HCD
+> -       select USB
+> -       select FIQ
+> -       select CPU_USE_DOMAINS
+> -       select GENERIC_CLOCKEVENTS
+> -       select CLKDEV_LOOKUP
+> -       select COMMON_CLK if OF
+>         select NPCM750_TIMER
+>         select MFD_SYSCON
+>         help
+> --
+> 2.9.0
+>
