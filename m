@@ -1,90 +1,23 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 8 Mar 2018 01:21:02 +0000
-Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
-In-Reply-To: <1832733.mujlD9skaR@jernej-laptop>
-References: <2424862.oPtAVTfrB9@jernej-laptop>
- <20180302124050.GF6255@sirena.org.uk>
- <26212674.B0xcQEiVyd@jernej-laptop>
- <1832733.mujlD9skaR@jernej-laptop>
-Message-ID: <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Mar 2018 17:22:17 -0800
+Subject: [PATCH] ARM64: dts: amlogic: Convert to new-style SPDX license
+ identifiers
+In-Reply-To: <1519731033-28025-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Tue, 27 Feb 2018 12:30:33 +0100")
+References: <1519731033-28025-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7h4llrgy46.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Hi Jernej
+> Move the SPDX-License-Identifier lines to the top and drop the
+> license splat.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Thank you for your hard work
+Applied to v4.17/dt64,
 
-> I found the issue. Commit be7ee5f32a9a ("ASoC: soc-generic-dmaengine-pcm: 
-> replace platform to component") changes struct dmaengine_pcm:
-> 
->  struct dmaengine_pcm {
->  	struct dma_chan *chan[SNDRV_PCM_STREAM_LAST + 1];
->  	const struct snd_dmaengine_pcm_config *config;
-> -	struct snd_soc_platform platform;
-> +	struct snd_soc_component component;
->  	unsigned int flags;
->  };
-> 
-> In snd_dmaengine_pcm_register():
-> ret = snd_soc_add_component(dev, &pcm->component,
-> 				    &dmaengine_pcm_component, NULL, 0);
-> 
-> And now, sun4i-codec first time returns -EPROBE_DEFER since driver for analog 
-> part is not yet loaded. Because of that, all components get destroyed.
-> 
-> snd_dmaengine_pcm_unregister() calls snd_soc_unregister_component() and that 
-> one calls __snd_soc_unregister_component() multiple times (until it fails).
-> 
-> Issue is that __snd_soc_unregister_component() uses kfree() on component 
-> pointer and that naturally can't succed since component was never kmalloc'ed 
-> since it is a part of a bigger structure - struct dmaengine_pcm.
-> 
-> What would be the best fix? Changing struct dmaengine_pcm to have pointer to a 
-> component, so it can be freed?
+Thanks for the cleanup,
 
-Ahh.. indeed. Good catch !
-How about to add such flag ?
-This is just idea. No tested, No compiled, but can help you ?
-
-One note here is that reusing "registered_as_component" flag is
-not good idea, because it will be removed
-when platform/codec were removed
-
-------------------------
-diff --git a/include/sound/soc.h b/include/sound/soc.h
-index 1a73232..b9b1b4c 100644
---- a/include/sound/soc.h
-+++ b/include/sound/soc.h
-@@ -853,6 +853,7 @@ struct snd_soc_component {
- 	unsigned int ignore_pmdown_time:1; /* pmdown_time is ignored at stop */
- 	unsigned int registered_as_component:1;
- 	unsigned int suspended:1; /* is in suspend PM state */
-+	unsigned int alloced_component:1;
- 
- 	struct list_head list;
- 	struct list_head card_aux_list; /* for auxiliary bound components */
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index c0edac8..0e33bcf 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -3492,6 +3492,7 @@ int snd_soc_register_component(struct device *dev,
- 	if (!component)
- 		return -ENOMEM;
- 
-+	component->alloced_component = 1;
- 	return snd_soc_add_component(dev, component, component_driver,
- 				     dai_drv, num_dai);
- }
-@@ -3523,7 +3524,9 @@ static int __snd_soc_unregister_component(struct device *dev)
- 
- 	if (found) {
- 		snd_soc_component_cleanup(component);
--		kfree(component);
-+
-+		if (component->alloced_component)
-+			kfree(component);
- 	}
- 
- 	return found;
-------------------------
+Kevin
