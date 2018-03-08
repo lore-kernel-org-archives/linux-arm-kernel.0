@@ -1,131 +1,84 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 8 Mar 2018 01:02:38 +0100 (CET)
-Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero-w: Add bcm43438 serial
- slave
-In-Reply-To: <87muzjfr8l.fsf@anholt.net>
-References: <1519567855-26105-1-git-send-email-stefan.wahren@i2se.com>
- <1519567855-26105-4-git-send-email-stefan.wahren@i2se.com>
- <84F7E645-59B4-4618-8C91-A5CD654E16A6@holtmann.org>
- <648118289.71086.1519593373795@email.1und1.de>
- <9D6209F2-5389-4F4E-844D-6A8683044F88@holtmann.org>
- <438185389.274708.1520422108782@email.1und1.de>
- <03B9ACBE-3ACA-40C4-9DA2-6A57D1AD96E0@holtmann.org>
- <2071508922.276811.1520426568577@email.1und1.de>
- <87sh9bvh3r.fsf@anholt.net>
- <D48AB207-F7F4-46D8-AC65-EC5CF76A6084@holtmann.org>
- <87muzjfr8l.fsf@anholt.net>
-Message-ID: <698451580.263856.1520467358497@email.1und1.de>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 8 Mar 2018 09:05:02 +0800
+Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
+ architecutres
+In-Reply-To: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+Message-ID: <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[Cc Andrew]
 
-> Eric Anholt <eric@anholt.net> hat am 7. M?rz 2018 um 23:36 geschrieben:
+On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
+> This is a preparatory patch set for adding kexec_file support on arm64.
+> 
+> It was originally included in a arm64 patch set[1], but Philipp is also
+> working on their kexec_file support on s390[2] and some changes are now
+> conflicting.
+> 
+> So these common parts were extracted and put into a separate patch set for
+> better integration. What's more, my original patch#4 was split into a few
+> small chunks for easier review after Dave's comment.
+> 
+> As such, the resulting code is basically identical with my original, and
+> the only *visible* differences are:
+>   * renamings of _kexec_kernel_image_probe() and
+>     _kimage_file_post_load_cleanup()
+>   * change one of types of arguments at prepare_elf64_headers()
+> Those, unfortunately, require a couple of trivial changes on the rest
+> (#1, #6 to #13) of my arm64 kexec_file patch set[1].
+> 
+> Patch#1 allows making a use of purgatory optional, particularly useful
+> for arm64.
+> Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
+> verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
+> Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
+> exclude_mem_range(), to be made best re-use of.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
+> [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
 > 
 > 
-> Marcel Holtmann <marcel@holtmann.org> writes:
+> Changes in v2 (Mar 6, 2018)
+> * use IS_ENABLED() instead of #ifdef's in kexec_calculate_store_digests() 
+> * rename _kexec_kernel_*() and make them static for now except for
+>   kexec_image_probe_default() which is actually used by arch(powerpc) code
+>   (Note: kexec_image_post_load_cleanup_default() will also be exported by
+>   arm64 patches.)
+> * change a type of kernel_map in prepare_elf64_headers() to "int"
+> * check for a total number of system ram regions in full_up_crash_elf_data()
+>   and use vzalloc() instead of vmalloc()
 > 
-> > Hi Eric,
-> >
-> >>>>>>>>> Add BCM43438 (bluetooth) as a serdev slave device of uart0 (pl011/ttyAMA0).
-> >>>>>>>>> This allows to automatically insert the bcm43438 to the bluetooth
-> >>>>>>>>> subsystem instead of relying on patched userspace helpers (hciattach).
-> >>>>>>>>> 
-> >>>>>>>>> In order to keep a debug UART we need to switch to uart1.
-> >>>>>>>>> 
-> >>>>>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >>>>>>>>> ---
-> >>>>>>>>> arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 14 +++++++++++++-
-> >>>>>>>>> 1 file changed, 13 insertions(+), 1 deletion(-)
-> >>>>>>>>> 
-> >>>>>>>>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-> >>>>>>>>> index cf53436..b7f79f1 100644
-> >>>>>>>>> --- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-> >>>>>>>>> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-> >>>>>>>>> @@ -131,6 +131,18 @@
-> >>>>>>>>> 
-> >>>>>>>>> &uart0 {
-> >>>>>>>>> 	pinctrl-names = "default";
-> >>>>>>>>> -	pinctrl-0 = <&uart0_gpio14>;
-> >>>>>>>>> +	pinctrl-0 = <&uart0_gpio32 &uart0_ctsrts_gpio30>;
-> >>>>>>>>> +	status = "okay";
-> >>>>>>>>> +
-> >>>>>>>>> +	bluetooth {
-> >>>>>>>>> +		compatible = "brcm,bcm43438-bt";
-> >>>>>>>>> +		max-speed = <2000000>;
-> >>>>>>>>> +		shutdown-gpios = <&gpio 45 GPIO_ACTIVE_HIGH>;
-> >>>>>>>>> +	};
-> >>>>>>>>> +};
-> >>>>>>>> 
-> >>>>>>>> is the shutdown GPIO working as expected with this hardware. So even module unload and reload works fine?
-> >>>>>>> 
-> >>>>>>> Yes, unload and reload works fine. 
-> >>>>>>> 
-> >>>>>>>> Meaning we are getting back to the 115200 default baud rate on the UART?
-> >>>>>>> 
-> >>>>>>> I assume that, because reload works as expected. 
-> >>>>>> 
-> >>>>>> awesome. That is good news.
-> >>>>>> 
-> >>>>>> Since you said that the GPIO expander driver for the RPi 3 has been accepted, did you test it there as well? If so, then it would be good to get a patch that also provides shutdown-gpios for RPi 3.
-> >>>>> 
-> >>>>> after applying Loic's patch and the necessary patch for the RPi 3 dts file (see below), i will get this output:
-> >>>>> 
-> >>>>> [    4.873246] Bluetooth: HCI UART driver ver 2.3
-> >>>>> [    4.873260] Bluetooth: HCI UART protocol H4 registered
-> >>>>> [    4.873265] Bluetooth: HCI UART protocol Three-wire (H5) registered
-> >>>>> [    4.873751] Bluetooth: HCI UART protocol Broadcom registered
-> >>>>> [    4.877279] uart-pl011 3f201000.serial: no DMA platform data
-> >>>>> [    6.952382] Bluetooth: hci0: command 0xfc18 tx timeout
-> >>>>> [   15.192298] Bluetooth: hci0: BCM: failed to write update baudrate (-110)
-> >>>>> [   15.192312] Bluetooth: hci0: Failed to set baudrate
-> >>>>> [   15.316415] Bluetooth: hci0: BCM: chip id 94
-> >>>>> [   15.318567] Bluetooth: hci0: BCM: features 0x2e
-> >>>>> [   15.341538] Bluetooth: hci0: BCM43430A1
-> >>>>> [   15.341560] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
-> >>>>> [   19.112670] Bluetooth: hci0: BCM (001.002.009) build 0360
-> >>>>> [  274.713732] Bluetooth: hci0: command 0x0c14 tx timeout
-> >>>>> [  274.714085] Bluetooth: hci0: Frame reassembly failed (-84)
-> >>>>> [  317.275941] Bluetooth: hci0: last event is not cmd complete (0x0f)
-> >>>>> 
-> >>>>> I don't see these errors on RPi Zero W. Maybe the reason for this is the lack of hardware flowcontrol on RPi 3. Or some of the downstream patches on BlueZ must be adapted for the kernel [1].
-> >>>>> 
-> >>>>> Btw the bcm43438 is detected even after unloading and reloading the driver. But the timeout occurs also on driver reload. Reducing the baudrate to 115200 doesn't help here.
-> >>>> 
-> >>>> maybe it needs some time after switching the hardware on. Have you tried to sleep for a bit at the end of bcm_gpio_set_power?
-> >>> 
-> >>> I will try, but this could also be an "issue" of the gpio expander
-> >>> driver. AFAIK the expander is connected via I2C to the GPU. In case
-> >>> the mailbox reply come before the I2C command has been handled by the
-> >>> GPIO expander, we are running out of sync.
-> >> 
-> >> The mailbox command for setting GPIO state is synchronous in terms of
-> >> sending the i2c command to the GPIO expander HW.
-> >
-> > does that mean the driver does this correctly and really waits for the
-> > completion. Or does the GPIO expander might return to quickly and
-> > returns a false sense of GPIO state. I think it would be good a sleep
-> > of 50ms after the GPIO makes a difference. Maybe the GPIO expander
-> > driver needs to take this into account.
+> AKASHI Takahiro (7):
+>   kexec_file: make an use of purgatory optional
+>   kexec_file,x86,powerpc: factor out kexec_file_ops functions
+>   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
+>   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
+>   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
+>   x86: kexec_file: clean up prepare_elf64_headers()
+>   kexec_file, x86: move re-factored code to generic side
 > 
-> It seems unlikely that you can get to I2C stop before the GPIO expander
-> HW has changed the state of the output.
+>  arch/powerpc/Kconfig                        |   3 +
+>  arch/powerpc/include/asm/kexec.h            |   2 +-
+>  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
+>  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
+>  arch/x86/Kconfig                            |   3 +
+>  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
+>  arch/x86/kernel/crash.c                     | 334 ++++++----------------------
+>  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
+>  arch/x86/kernel/machine_kexec_64.c          |  45 +---
+>  include/linux/kexec.h                       |  32 ++-
+>  kernel/kexec_file.c                         | 240 +++++++++++++++++++-
+>  11 files changed, 338 insertions(+), 366 deletions(-)
 > 
-> > Reality is that once the Bluetooth driver toggled the GPIO, it goes
-> > onto initializing the chip. One other reason might be that no device
-> > wakeup GPIO is wired here, that the chip actually needs some time
-> > before it is all good to go.
+> -- 
+> 2.16.2
 > 
-> This seems much more likely to me.  The spec for bcm43438 is easily
-> googleable and has a power-on timing diagram.
 
-after applying this patch [1] the RPi 3 specific probing errors disappear.
+AKASHI, thanks for another update, looks good to me:
 
-But this is only a quick hack. The proper solution would be to extend hci_h5 in order to support the BCM43438.
+Acked-by: Dave Young <dyoung@redhat.com>
 
-[1] - https://github.com/lategoodbye/rpi-zero/commit/ed5900296dfb7aec7f467477440751e7367a1881
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+Dave
