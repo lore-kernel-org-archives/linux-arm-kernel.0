@@ -1,55 +1,44 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Thu, 8 Mar 2018 16:38:32 +0100
-Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
-In-Reply-To: <20180308161135.1f3d3d18@karo-electronics.de>
-References: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
- <20180308161135.1f3d3d18@karo-electronics.de>
-Message-ID: <20180308153832.GA28454@botnar.kaiser.cx>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 8 Mar 2018 15:56:30 +0000
+Subject: [PATCH 1/2] mm/vmalloc: Add interfaces to free unused page table
+In-Reply-To: <20180308040016.GB9082@bombadil.infradead.org>
+References: <20180307183227.17983-1-toshi.kani@hpe.com>
+ <20180307183227.17983-2-toshi.kani@hpe.com>
+ <20180308040016.GB9082@bombadil.infradead.org>
+Message-ID: <1520527285.2693.56.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+On Wed, 2018-03-07 at 20:00 -0800, Matthew Wilcox wrote:
+> On Wed, Mar 07, 2018 at 11:32:26AM -0700, Toshi Kani wrote:
+> > +/**
+> > + * pud_free_pmd_page - clear pud entry and free pmd page
+> > + *
+> > + * Returns 1 on success and 0 on failure (pud not cleared).
+> > + */
+> > +int pud_free_pmd_page(pud_t *pud)
+> > +{
+> > +	return pud_none(*pud);
+> > +}
+> 
+> Wouldn't it be clearer if you returned 'bool' instead of 'int' here?
 
-Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
+I thought about it and decided to use 'int' since all other pud/pmd/pte
+interfaces, such as pud_none() above, use 'int'.
 
-> > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > index 9725705..cf70df2 100644
-> > --- a/arch/arm/boot/dts/imx25.dtsi
-> > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > @@ -269,6 +269,7 @@
-> >  				dmas = <&sdma 24 1 0>,
-> >  				       <&sdma 25 1 0>;
-> >  				dma-names = "rx", "tx";
-> > +				fsl,fifo-depth = <15>;
-> >  				status = "disabled";
-> >  			};
+> Also you didn't document the pud parameter, nor use the approved form
+> for documenting the return type, nor the calling context.  So I would
+> have written it out like this:
+> 
+> /**
+>  * pud_free_pmd_page - Clear pud entry and free pmd page.
+>  * @pud: Pointer to a PUD.
+>  *
+>  * Context: Caller should hold mmap_sem write-locked.
+>  * Return: %true if clearing the entry succeeded.
+>  */
 
-> > @@ -329,6 +330,7 @@
-> >  				dmas = <&sdma 28 1 0>,
-> >  				       <&sdma 29 1 0>;
-> >  				dma-names = "rx", "tx";
-> > +				fsl,fifo-depth = <15>;
-> >  				status = "disabled";
-> >  			};
+Will do.
 
-> You are changing the global .dtsi file. Did you test this change with
-> all devices that are affected by it?
-
-I changed the hardware description of the imx25 SSI to match the
-reference manual.
-
-I did test this change on an imx25 board with audio playback. This uses
-the SSI description I modified. I verified that the driver is actually
-taking the modified setting into account and that this causes no
-problems.
-
-As of today, this setting is used by the fsl_ssi driver to set the fifo
-water level for dma requests.
-
-Of course, I don't have access to the enitre range of supported imx25
-boards and I don't think this is required for submitting patches.
-
-Do you have any indication why this patch should not be merged?
-
-Best regards,
-Martin
+Thanks!
+-Toshi
