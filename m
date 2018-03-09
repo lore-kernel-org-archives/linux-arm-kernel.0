@@ -1,143 +1,89 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:06:47 +0800
-Subject: [PATCH 04/39] arm64: move TASK_* definitions to <asm/processor.h>
+Date: Fri,  9 Mar 2018 17:06:50 +0800
+Subject: [PATCH 07/39] arm64: Use pointer masking to limit uaccess speculation
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-5-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-8-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yury Norov <ynorov@caviumnetworks.com>
+From: Robin Murphy <robin.murphy@arm.com>
 
-commit eef94a3d09aab upstream.
+commit 4d8efc2d5ee4 upstream.
 
-ILP32 series [1] introduces the dependency on <asm/is_compat.h> for
-TASK_SIZE macro. Which in turn requires <asm/thread_info.h>, and
-<asm/thread_info.h> include <asm/memory.h>, giving a circular dependency,
-because TASK_SIZE is currently located in <asm/memory.h>.
+Similarly to x86, mitigate speculation past an access_ok() check by
+masking the pointer against the address limit before use.
 
-In other architectures, TASK_SIZE is defined in <asm/processor.h>, and
-moving TASK_SIZE there fixes the problem.
+Even if we don't expect speculative writes per se, it is plausible that
+a CPU may still speculate at least as far as fetching a cache line for
+writing, hence we also harden put_user() and clear_user() for peace of
+mind.
 
-Discussion: https://patchwork.kernel.org/patch/9929107/
-
-[1] https://github.com/norov/linux/tree/ilp32-next
-
-CC: Will Deacon <will.deacon@arm.com>
-CC: Laura Abbott <labbott@redhat.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/memory.h    | 17 -----------------
- arch/arm64/include/asm/processor.h | 23 +++++++++++++++++++++--
- arch/arm64/kernel/entry.S          |  2 +-
- 3 files changed, 22 insertions(+), 20 deletions(-)
+ arch/arm64/include/asm/uaccess.h | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 853953cd1f08..1af98f8660a4 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -43,10 +43,6 @@
-  *		 (VA_BITS - 1))
-  * VA_BITS - the maximum number of bits for virtual addresses.
-  * VA_START - the first kernel virtual address.
-- * TASK_SIZE - the maximum size of a user space task.
-- * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-- * The module space lives between the addresses given by TASK_SIZE
-- * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
-@@ -56,19 +52,6 @@
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
--#define TASK_SIZE_64		(UL(1) << VA_BITS)
--
--#ifdef CONFIG_COMPAT
--#define TASK_SIZE_32		UL(0x100000000)
--#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
--				TASK_SIZE_32 : TASK_SIZE_64)
--#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
--				TASK_SIZE_32 : TASK_SIZE_64)
--#else
--#define TASK_SIZE		TASK_SIZE_64
--#endif /* CONFIG_COMPAT */
--
--#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index c625cc5531fc..75363d723262 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -121,6 +121,26 @@ static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
+ #define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
+ #define user_addr_max			get_fs
  
- /*
-  * Physical vs virtual RAM address space conversion.  These are
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index d08559528927..12d5b2b97f04 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -19,6 +19,10 @@
- #ifndef __ASM_PROCESSOR_H
- #define __ASM_PROCESSOR_H
- 
-+#define TASK_SIZE_64		(UL(1) << VA_BITS)
-+
-+#ifndef __ASSEMBLY__
-+
- /*
-  * Default implementation of macro that returns current
-  * instruction pointer ("program counter").
-@@ -35,7 +39,22 @@
- #include <asm/ptrace.h>
- #include <asm/types.h>
- 
--#ifdef __KERNEL__
 +/*
-+ * TASK_SIZE - the maximum size of a user space task.
-+ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
++ * Sanitise a uaccess pointer such that it becomes NULL if above the
++ * current addr_limit.
 + */
-+#ifdef CONFIG_COMPAT
-+#define TASK_SIZE_32		UL(0x100000000)
-+#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-+				TASK_SIZE_32 : TASK_SIZE_64)
-+#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-+				TASK_SIZE_32 : TASK_SIZE_64)
-+#else
-+#define TASK_SIZE		TASK_SIZE_64
-+#endif /* CONFIG_COMPAT */
++#define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
++static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
++{
++	void __user *safe_ptr;
 +
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
++	asm volatile(
++	"	bics	xzr, %1, %2\n"
++	"	csel	%0, %1, xzr, eq\n"
++	: "=&r" (safe_ptr)
++	: "r" (ptr), "r" (current_thread_info()->addr_limit)
++	: "cc");
 +
- #define STACK_TOP_MAX		TASK_SIZE_64
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
-@@ -47,7 +66,6 @@
++	csdb();
++	return safe_ptr;
++}
++
+ /*
+  * The "__xxx" versions of the user access functions do not verify the address
+  * space - it must have been done previously with a separate "access_ok()"
+@@ -193,7 +213,7 @@ do {									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
+-		__get_user((x), __p) :					\
++		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
+ 		((x) = 0, -EFAULT);					\
+ })
  
- extern phys_addr_t arm64_dma_phys_limit;
- #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
--#endif /* __KERNEL__ */
+@@ -259,7 +279,7 @@ do {									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
+-		__put_user((x), __p) :					\
++		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
+ 		-EFAULT;						\
+ })
  
- struct debug_info {
- 	/* Have we suspended stepping by a debugger? */
-@@ -188,4 +206,5 @@ static inline void spin_lock_prefetch(const void *x)
+@@ -297,7 +317,7 @@ static inline unsigned long __must_check copy_in_user(void __user *to, const voi
+ static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
+ {
+ 	if (access_ok(VERIFY_WRITE, to, n))
+-		n = __clear_user(to, n);
++		n = __clear_user(__uaccess_mask_ptr(to), n);
+ 	return n;
+ }
  
- int cpu_enable_pan(void *__unused);
- 
-+#endif /* __ASSEMBLY__ */
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index dccd0c2e9023..fbb4fdd370b9 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -27,7 +27,7 @@
- #include <asm/cpufeature.h>
- #include <asm/errno.h>
- #include <asm/esr.h>
--#include <asm/memory.h>
-+#include <asm/processor.h>
- #include <asm/thread_info.h>
- #include <asm/asm-uaccess.h>
- #include <asm/unistd.h>
 -- 
 2.16.2.440.gc6284da
