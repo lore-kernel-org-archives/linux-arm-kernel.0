@@ -1,57 +1,70 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:10 +0000
-Subject: [PATCH 16/25] nvmem: snvs_lpgpr: Convert commas to semicolons
-In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-17-srinivas.kandagatla@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Mar 2018 15:03:09 +0000
+Subject: [RFC PATCH 2/6] arm64: untag user addresses in copy_from_user
+ and others
+In-Reply-To: <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
+Message-ID: <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
+On Fri, Mar 09, 2018 at 03:02:00PM +0100, Andrey Konovalov wrote:
+> copy_from_user (and a few other similar functions) are used to copy data
+> from user memory into the kernel memory or vice versa. Since a user can
+> provided a tagged pointer to one of the syscalls that use copy_from_user,
+> we need to correctly handle such pointers.
 
-Looks like commas were accidentally used where semicolons were
-supposed to be. Fix that.
+I don't think it makes sense to do this in the low-level uaccess
+primitives, given we're going to have to untag pointers before common
+code can use them, e.g. for comparisons against TASK_SIZE or
+user_addr_max().
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: cphealy at gmail.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mediatek at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+I think we'll end up with subtle bugs unless we consistently untag
+pointers before we get to uaccess primitives. If core code does untag
+pointers, then it's redundant to do so here.
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index cb471d5e8e86..92e1e41d128e 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->priv = priv;
- 	cfg->name = dev_name(dev);
- 	cfg->dev = dev;
--	cfg->stride = 4,
--	cfg->word_size = 4,
--	cfg->size = 4,
--	cfg->owner = THIS_MODULE,
--	cfg->reg_read  = snvs_lpgpr_read,
--	cfg->reg_write = snvs_lpgpr_write,
-+	cfg->stride = 4;
-+	cfg->word_size = 4;
-+	cfg->size = 4;
-+	cfg->owner = THIS_MODULE;
-+	cfg->reg_read  = snvs_lpgpr_read;
-+	cfg->reg_write = snvs_lpgpr_write;
- 
- 	nvmem = devm_nvmem_register(dev, cfg);
- 
--- 
-2.15.1
+Thanks,
+Mark.
+
+> 
+> Do this by untagging user pointers in access_ok and in __uaccess_mask_ptr.
+> 
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> ---
+>  arch/arm64/include/asm/uaccess.h | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 2d6451cbaa86..24a221678fe3 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -105,7 +105,8 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
+>  #define untagged_addr(addr)		\
+>  	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
+>  
+> -#define access_ok(type, addr, size)	__range_ok(addr, size)
+> +#define access_ok(type, addr, size)	\
+> +	__range_ok(untagged_addr(addr), size)
+>  #define user_addr_max			get_fs
+>  
+>  #define _ASM_EXTABLE(from, to)						\
+> @@ -238,12 +239,15 @@ static inline void uaccess_enable_not_uao(void)
+>  /*
+>   * Sanitise a uaccess pointer such that it becomes NULL if above the
+>   * current addr_limit.
+> + * Also untag user pointers that have the top byte tag set.
+>   */
+>  #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
+>  static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+>  {
+>  	void __user *safe_ptr;
+>  
+> +	ptr = untagged_addr(ptr);
+> +
+>  	asm volatile(
+>  	"	bics	xzr, %1, %2\n"
+>  	"	csel	%0, %1, xzr, eq\n"
+> -- 
+> 2.16.2.395.g2e18187dfd-goog
+> 
