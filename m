@@ -1,53 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Mar 2018 18:40:19 +0000
-Subject: [GIT PULL] arm64 fixes for 4.16-rc5
-Message-ID: <20180309184014.xeczrjhn5no77s7j@armageddon.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri,  9 Mar 2018 10:44:16 -0800
+Subject: [PATCH v3 5/6] staging: vc04_services: Mark the "DT bindings" job
+ done.
+In-Reply-To: <20180309184417.23368-1-eric@anholt.net>
+References: <20180309184417.23368-1-eric@anholt.net>
+Message-ID: <20180309184417.23368-5-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Now we just need to get the other drivers merged and finish the style
+cleanups/garbage collecting so we can get out of staging.
 
-Please pull the arm64 fixes below. Thanks.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
 
-The following changes since commit 4a3928c6f8a53fa1aed28ccba227742486e8ddcb:
+v2-3: no changes
 
-  Linux 4.16-rc3 (2018-02-25 18:50:41 -0800)
+ drivers/staging/vc04_services/interface/vchi/TODO | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to e21da1c992007594d391e7b301779cf30f438691:
-
-  arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery (2018-03-09 17:52:07 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- The SMCCC firmware interface for the spectre variant 2 mitigation has
-  been updated to allow the discovery of whether the CPU needs the
-  workaround. This pull request relaxes the kernel check on the return
-  value from firmware.
-
-- Fix the commit allowing changing from global to non-global page table
-  entries which inadvertently disallowed other safe attribute changes.
-
-- Fix sleeping in atomic during the arm_perf_teardown_cpu() code.
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: mm: fix thinko in non-global page table attribute check
-
-Marc Zyngier (1):
-      arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
-
-Will Deacon (1):
-      arm_pmu: Use disable_irq_nosync when disabling SPI in CPU teardown hook
-
- arch/arm64/kernel/cpu_errata.c | 4 ++--
- arch/arm64/mm/mmu.c            | 8 ++++----
- drivers/perf/arm_pmu.c         | 2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/staging/vc04_services/interface/vchi/TODO b/drivers/staging/vc04_services/interface/vchi/TODO
+index df93154b1aa6..46b20a1961a2 100644
+--- a/drivers/staging/vc04_services/interface/vchi/TODO
++++ b/drivers/staging/vc04_services/interface/vchi/TODO
+@@ -1,9 +1,4 @@
+-1) Write a DT binding doc and get the corresponding DT node merged to
+-   bcm2835.
+-
+-This will let the driver probe when enabled.
+-
+-2) Import drivers using VCHI.
++1) Import drivers using VCHI.
+ 
+ VCHI is just a tool to let drivers talk to the firmware.  Here are
+ some of the ones we want:
+@@ -26,7 +21,7 @@ some of the ones we want:
+   to manage these buffers as dmabufs so that we can zero-copy import
+   camera images into vc4 for rendering/display.
+ 
+-3) Garbage-collect unused code
++2) Garbage-collect unused code
+ 
+ One of the reasons this driver wasn't upstreamed previously was that
+ there's a lot code that got built that's probably unnecessary these
 -- 
-Catalin
+2.16.2
