@@ -1,104 +1,166 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 08 Mar 2018 15:59:04 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180102112533.13640-9-suzuki.poulose@arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
-Message-ID: <5AA1CE48.5030203@codeaurora.org>
+From: megi@xff.cz (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Fri, 9 Mar 2018 01:13:14 +0100
+Subject: [linux-sunxi] [PATCH v3 06/16] drm/sun4i: Release exclusive
+ clock lock when disabling TCON
+In-Reply-To: <3764594.86uYqsI6mN@jernej-laptop>
+References: <20180301213442.16677-1-jernej.skrabec@siol.net>
+ <20180301213442.16677-7-jernej.skrabec@siol.net>
+ <20180308224717.a6ieadihwh7u5rbu@core.my.home>
+ <3764594.86uYqsI6mN@jernej-laptop>
+Message-ID: <20180309001314.bu3zcv5gyqsc52fx@core.my.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
-> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
-> The DSU integrates one or more cores with an L3 memory system, control
-> logic, and external interfaces to form a multicore cluster. The PMU
-> allows counting the various events related to L3, SCU etc, along with
-> providing a cycle counter.
->
-> The PMU can be accessed via system registers, which are common
-> to the cores in the same cluster. The PMU registers follow the
-> semantics of the ARMv8 PMU, mostly, with the exception that
-> the counters record the cluster wide events.
->
-> This driver is mostly based on the ARMv8 and CCI PMU drivers.
-> The driver only supports ARM64 at the moment. It can be extended
-> to support ARM32 by providing register accessors like we do in
-> arch/arm64/include/arm_dsu_pmu.h.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since V9:
->   - Rely on cpuhp callback for probing the PMU.
->   - Clear the overflow mask whenever the first CPU is brought up.
->   - Remove dsu_pmu_get_online_cpu(), which is not needed anymore.
->   - Flip the order of context migration and setting the active CPU.
->
-> Changes since V8:
->   - Include required header files (Mark Rutland)
->   - Remove Kconfig dependency on PERF_EVENTS (Mark Rutland)
->   - Fix typo in event name, bus_acesss => bus_access (Mark Rutland)
->   - Use find_first_zero_bit instead of find_next_zero_bit (Mark Rutland)
->   - Change order of checks in dsu_pmu_event_init (Mark Rutland)
->   - Allow lazy initialisation of DSU PMU to handle cases where CPUs
->     may be brought up later (e.g, maxcpus=N)- Mark Rutland.
->   - Clear the interrupt overflow status upon initialisation (Mark Rutland)
->   - Change the CPU check to "associated_cpus" from "active_cpus",
->     as when we migrate the perf context we will access the DSU
->     from two different CPUs (source and destination).
->   - Fill in the "module" field for the PMU to prevent the module unload
->     when the PMU is active.
-> Changes since V6:
->   - Address comments from Jonathan
->   - Add Reviewed-by tags from Jonathan
-> Changes since V5:
->   - Address comments on V5 by Mark.
->   - Use IRQ_NOBALANCING for IRQ handler
->   - Don't expose events which could be unimplemented.
->   - Get rid of dsu_pmu_event_supported and allow raw event
->     code to be used without validating whether it is supported.
->   - Rename "supported_cpus" mask to "associated_cpus"
->   - Add Documentation for the PMU driver
->   - Don't disable IRQ for dsu_pmu_{enable/disable}_counters
->   - Use consistent return codes for validate_event/group calls.
->   - Check PERF_ATTACH_TASK flag in event_init.
->   - Allow missing CPUs in dsu_pmu_dt_get_cpus, to handle cases
->     where kernel could have capped nr_cpus.
->   - Cleanup sanity checking for the CPU before accessing DSU
->   - Reject events with counting CPU not associated with the DSU.
-> Changes since V4:
->   - Reflect the changed generic helper for mapping CPU id
-> Changes since V2:
->   - Cleanup dsu_pmu_device_probe error handling.
->   - Fix event validate_group to invert the result check of validate_event
->   - Return errors if we failed to parse CPUs in the DSU.
->   - Add MODULE_DEVICE_TABLE entry
->   - Use hlist_entry_safe for converting cpuhp_node to dsu_pmu.
-> ---
->   Documentation/perf/arm_dsu_pmu.txt   |  28 ++
->   arch/arm64/include/asm/arm_dsu_pmu.h | 129 ++++++
->   drivers/perf/Kconfig                 |   9 +
->   drivers/perf/Makefile                |   1 +
->   drivers/perf/arm_dsu_pmu.c           | 843 +++++++++++++++++++++++++++++++++++
->   5 files changed, 1010 insertions(+)
->   create mode 100644 Documentation/perf/arm_dsu_pmu.txt
->   create mode 100644 arch/arm64/include/asm/arm_dsu_pmu.h
->   create mode 100644 drivers/perf/arm_dsu_pmu.c
->
+Hi Jernej,
 
-Looking at the code, I didn't see any specific handling of cluster power 
-collapse. AFAIK, the HW counters do not retain config (what event they 
-are counting) or value (the current count) across power collapse. 
-Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers 
-to handle that?
+On Thu, Mar 08, 2018 at 11:57:40PM +0100, Jernej ?krabec wrote:
+> Hi,
+> 
+> Dne ?etrtek, 08. marec 2018 ob 23:47:17 CET je Ond?ej Jirman napisal(a):
+> > Hi,
+> > 
+> > On Thu, Mar 01, 2018 at 10:34:32PM +0100, Jernej Skrabec wrote:
+> > > Currently exclusive TCON clock lock is never released, which, for
+> > > example, prevents changing resolution on HDMI.
+> > > 
+> > > In order to fix that, release clock when disabling TCON. TCON is always
+> > > disabled first before new mode is set.
+> > > 
+> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > > ---
+> > > 
+> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 1d714c06ec9d..7f6c4125c89f
+> > > 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > @@ -102,10 +102,12 @@ static void sun4i_tcon_channel_set_status(struct
+> > > sun4i_tcon *tcon, int channel,> 
+> > >  		return;
+> > >  	
+> > >  	}
+> > > 
+> > > -	if (enabled)
+> > > +	if (enabled) {
+> > > 
+> > >  		clk_prepare_enable(clk);
+> > > 
+> > > -	else
+> > > +	} else {
+> > > +		clk_rate_exclusive_put(clk);
+> > > 
+> > >  		clk_disable_unprepare(clk);
+> > > 
+> > > +	}
+> > > 
+> > >  }
+> > 
+> > At least in the linux-next/master I can't see clk_rate_exclusive_get call:
+> > 
+> 
+> It is in drm-misc/drm-misc-fixes:
+> https://cgit.freedesktop.org/drm/drm-misc/commit/?h=drm-misc-fixes&id=79d103a565d16b1893d990b2ee5e0fe71767759f
+> 
+> My patch is also applied in same branch, so there should be no issues while 
+> merging all those branches.
+> 
+> linux-next doesn't have either patches currently: https://git.kernel.org/pub/
+> scm/linux/kernel/git/next/linux-next.git/log/drivers/gpu/drm/sun4i
+> 
+> This is issue only if you manually apply one patch without the other.
 
-Thanks,
-Saravana
+I have (and had) both patches applied. There's perhaps some code path,
+where sun4i_tcon_channel_set_status(..., false) is called in unbalanced
+way with regards to clk_set_rate_exclusive().
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The issue occurs when starting Xorg. But Xorg works fine.
+
+regards,
+  o.
+
+> Best regards,
+> Jernej
+> 
+> > $ git grep 'exclusive' linux-next/master -- drivers/gpu/drm/sun4i
+> > 
+> > linux-next/master:sun4i_hdmi.h:    * On sun5i the threshold is exclusive,
+> > i.e. does not include, linux-next/master:sun4i_tcon.c:          
+> > clk_rate_exclusive_put(clk); linux-next/master:sun4i_tcon.c:  
+> > clk_set_rate_exclusive(tcon->dclk, mode->crtc_clock * 1000);
+> > linux-next/master:sun4i_tcon.c:   clk_set_rate_exclusive(tcon->sclk1,
+> > mode->crtc_clock * 1000);
+> > 
+> > and the kernel complains too:
+> > 
+> > [  841.915161] ------------[ cut here ]------------
+> > [  841.915187] WARNING: CPU: 0 PID: 273 at
+> > /workspace/megous.com/orangepi-pc/linux-4.16/drivers/clk/clk.c:608
+> > clk_rate_exclusive_put+0x48/0x4c [  841.915194] CPU: 0 PID: 273 Comm: Xorg
+> > Not tainted 4.16.0-rc4-00268-gbac2ecf73ed0 #13 [  841.915196] Hardware
+> > name: Allwinner sun8i Family
+> > [  841.915217] [<c0228440>] (unwind_backtrace) from [<c0225b90>]
+> > (show_stack+0x10/0x14) [  841.915228] [<c0225b90>] (show_stack) from
+> > [<c0b094bc>] (dump_stack+0x88/0x9c) [  841.915237] [<c0b094bc>]
+> > (dump_stack) from [<c0240294>] (__warn+0xd4/0xf0) [  841.915244]
+> > [<c0240294>] (__warn) from [<c0240380>] (warn_slowpath_null+0x40/0x48) [ 
+> > 841.915250] [<c0240380>] (warn_slowpath_null) from [<c0619b6c>]
+> > (clk_rate_exclusive_put+0x48/0x4c) [  841.915261] [<c0619b6c>]
+> > (clk_rate_exclusive_put) from [<c0694624>]
+> > (sun4i_tcon_set_status+0x178/0x2f0) [  841.915269] [<c0694624>]
+> > (sun4i_tcon_set_status) from [<c06930c0>]
+> > (sun4i_crtc_atomic_disable+0x7c/0xe4) [  841.915279] [<c06930c0>]
+> > (sun4i_crtc_atomic_disable) from [<c06637fc>]
+> > (drm_atomic_helper_commit_modeset_disables+0x390/0x46c) [  841.915288]
+> > [<c06637fc>] (drm_atomic_helper_commit_modeset_disables) from [<c0664df4>]
+> > (drm_atomic_helper_commit_tail_rpm+0x18/0x64) [  841.915295] [<c0664df4>]
+> > (drm_atomic_helper_commit_tail_rpm) from [<c0664da8>]
+> > (commit_tail+0x40/0x6c) [  841.915302] [<c0664da8>] (commit_tail) from
+> > [<c06652b0>] (drm_atomic_helper_commit+0xbc/0x128) [  841.915311]
+> > [<c06652b0>] (drm_atomic_helper_commit) from [<c0668d40>]
+> > (restore_fbdev_mode_atomic+0x100/0x1fc) [  841.915319] [<c0668d40>]
+> > (restore_fbdev_mode_atomic) from [<c0668f1c>]
+> > (drm_fb_helper_dpms+0x50/0x130) [  841.915328] [<c0668f1c>]
+> > (drm_fb_helper_dpms) from [<c0669e9c>] (drm_fb_helper_blank+0x54/0x90) [ 
+> > 841.915337] [<c0669e9c>] (drm_fb_helper_blank) from [<c06088cc>]
+> > (fb_blank+0x54/0xa8) [  841.915343] [<c06088cc>] (fb_blank) from
+> > [<c0608c80>] (do_fb_ioctl+0x360/0x62c) [  841.915351] [<c0608c80>]
+> > (do_fb_ioctl) from [<c0362648>] (do_vfs_ioctl+0x9c/0x774) [  841.915358]
+> > [<c0362648>] (do_vfs_ioctl) from [<c0362d54>] (SyS_ioctl+0x34/0x58) [ 
+> > 841.915364] [<c0362d54>] (SyS_ioctl) from [<c0201120>]
+> > (ret_fast_syscall+0x0/0x4c) [  841.915368] Exception stack(0xe5fc5fa8 to
+> > 0xe5fc5ff0)
+> > [  841.915373] 5fa0:                   00674f10 00675460 0000000b 00004611
+> > 00000001 00000000 [  841.915379] 5fc0: 00674f10 00675460 00000001 00000036
+> > 00650474 00000000 006504a4 00675df8 [  841.915382] 5fe0: b61a502c be8acb2c
+> > b6192c38 b6b152ec
+> > [  841.915386] ---[ end trace fa81b956197707f8 ]---
+> > 
+> > It looks like clk_rate_exclusive_put inside sun4i_tcon_channel_set_status is
+> > called without first calling some function that would call
+> > clk_set_rate_exclusive, leading to unbalanced get/put calls.
+> > 
+> > regards,
+> >   o.
+> > 
+> > >  static void sun4i_tcon_lvds_set_status(struct sun4i_tcon *tcon,
+> > > 
+> > > --
+> > > 2.16.2
+> > > 
+> > > --
+> > > You received this message because you are subscribed to the Google Groups
+> > > "linux-sunxi" group. To unsubscribe from this group and stop receiving
+> > > emails from it, send an email to
+> > > linux-sunxi+unsubscribe at googlegroups.com. For more options, visit
+> > > https://groups.google.com/d/optout.
+> 
+> 
+> 
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
