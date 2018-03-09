@@ -1,33 +1,33 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 9 Mar 2018 17:00:19 +0100
-Subject: [PATCH v2 0/3] mfd/abx500-core: Adjustments for eight function
- implementations
-In-Reply-To: <c5d9751e-3ae8-0b66-821a-0e7f45bb8e1c@users.sourceforge.net>
-References: <c5d9751e-3ae8-0b66-821a-0e7f45bb8e1c@users.sourceforge.net>
-Message-ID: <6c8ff539-9e9d-635b-22a8-df8100ac8156@users.sourceforge.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Mar 2018 16:09:19 +0000
+Subject: [PATCH] arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
+In-Reply-To: <CAKv+Gu9vhS-CmyCMm8arYE0rgAPwKqXHnG7JDmSzW=vhwAYDMw@mail.gmail.com>
+References: <20180309154050.30656-1-marc.zyngier@arm.com>
+ <CAKv+Gu9vhS-CmyCMm8arYE0rgAPwKqXHnG7JDmSzW=vhwAYDMw@mail.gmail.com>
+Message-ID: <7e59ba1c-c6dd-5d71-d163-99a674b4762b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
+On 09/03/18 15:55, Ard Biesheuvel wrote:
+> On 9 March 2018 at 15:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> A recent update to the ARM SMCCC ARCH_WORKAROUND_1 specification
+>> allows firmware to return a non zero, positive value to describe
+>> that although the mitigation is implemented at the higher exception
+>> level, the CPU on which the call is made is not affected.
+>>
+>> Let's relax the check on the return value from ARCH_WORKAROUND_1
+>> so that we only error out if the returned value is negative.
+>>
+>> Fixes: b092201e0020 ("arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support")
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> OK, so this means the current code running on new firmware will
+> erroneously assume that the mitigation is not implemented or needed if
+> it, say, happens to run on the A53 cluster on Juno?
 
-Three update suggestions were taken into account
-from static source code analysis.
+Yup, that's the problem. To my knowledge, there is no such firmware in
+the wild, as the spec has just been published.
 
-Markus Elfring (3):
-  Delete an error message for a failed memory allocation
-    in abx500_register_ops()
-  Improve two size determinations in abx500_register_ops()
-  Adjust 14 checks for null pointers
-
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
-
-v2:
-Lee Jones requested a resend for these patches. The changes were rebased
-on source files from Linux next-20180308.
-
- drivers/mfd/abx500-core.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
-
+	M.
 -- 
-2.15.1
+Jazz is not dead. It just smells funny...
