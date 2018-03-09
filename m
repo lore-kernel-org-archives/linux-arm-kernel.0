@@ -1,72 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Mar 2018 09:41:52 +0000
-Subject: [PATCH v3 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <93864477-75bb-3f73-1d06-03d128b04f94@nokia.com>
-References: <20180309084151.2379-1-alexander.sverdlin@nokia.com>
- <20180309084151.2379-3-alexander.sverdlin@nokia.com>
- <CAKv+Gu87oP4Bxn_XkQkc2zf8GXLhoRkWBkUr5N0KMdyMfq1GMg@mail.gmail.com>
- <93864477-75bb-3f73-1d06-03d128b04f94@nokia.com>
-Message-ID: <CAKv+Gu8BxDdF1V9g_c44p8Dj=WH5VVpyD5GyHs=N_jeP4Epc+w@mail.gmail.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Fri, 9 Mar 2018 10:25:39 +0100
+Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
+In-Reply-To: <20180309093738.7cd5fded@karo-electronics.de>
+References: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
+ <20180308161135.1f3d3d18@karo-electronics.de>
+ <20180308153832.GA28454@botnar.kaiser.cx>
+ <20180309093738.7cd5fded@karo-electronics.de>
+Message-ID: <20180309092539.GA5798@botnar.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 March 2018 at 08:54, Alexander Sverdlin
-<alexander.sverdlin@nokia.com> wrote:
-> Hello Ard!
->
-> On 09/03/18 09:50, Ard Biesheuvel wrote:
->>> +static u32 fixed_plts[] = {
->>> +       FTRACE_ADDR,
->>> +       MCOUNT_ADDR,
->>> +#ifdef CONFIG_OLD_MCOUNT
->>> +       (unsigned long)ftrace_caller_old,
->>> +       (unsigned long)mcount,
->>> +#endif
->>> +};
->>> +
->> Do we need this stuff in the PLT loader if ftrace is disabled?
->
-> You are right, it probably would not even build w/o FTRACE.
-> I'll fix it, thanks for looking into this!
->
+Hi Lothar,
 
-Also, perhaps you can make the array const (after you put #ifdef's
-around all entries)
+Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
 
->>>  static bool in_init(const struct module *mod, unsigned long loc)
->>>  {
->>>         return loc - (u32)mod->init_layout.base < mod->init_layout.size;
->>> @@ -31,26 +41,43 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->>>  {
->>>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->>>                                                           &mod->arch.init;
->>> +       int idx;
->>> +       struct plt_entries *plt;
->>> +
->>> +       /* Pre-allocate entries in the first plt */
->>> +       if (!pltsec->plt_count) {
->>> +               plt = (struct plt_entries *)pltsec->plt->sh_addr;
->>> +               for (idx = 0; idx < ARRAY_SIZE(plt->ldr); ++idx)
->>> +                       plt->ldr[idx] = PLT_ENT_LDR;
->>> +               memcpy(plt->lit, fixed_plts, sizeof(fixed_plts));
->>> +               pltsec->plt_count = ARRAY_SIZE(fixed_plts);
->>> +               /*
->>> +                * cache the address,
->>> +                * ELF header is available only during module load
->>> +                */
->>> +               pltsec->plt_ent = plt;
->>> +       }
->>> +       plt = pltsec->plt_ent;
->>>
->>> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
->>> -       int idx = 0;
->>> +       idx = ARRAY_SIZE(fixed_plts);
->>> +       while (idx)
->>> +               if (plt->lit[--idx] == val)
->>> +                       return (u32)&plt->ldr[idx];
->>>
+> On Thu, 8 Mar 2018 16:38:32 +0100 Martin Kaiser wrote:
+> > Hi Lothar,
 
-... and put all this handling in a helper function that only gets
-called if ARRAY_SIZE() > 0
+> > Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
 
-AFAICT, that should allow you to leave the rest unchanged.
+> > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> > > > index 9725705..cf70df2 100644
+> > > > --- a/arch/arm/boot/dts/imx25.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx25.dtsi
+> > > > @@ -269,6 +269,7 @@
+> > > >  				dmas = <&sdma 24 1 0>,
+> > > >  				       <&sdma 25 1 0>;
+> > > >  				dma-names = "rx", "tx";
+> > > > +				fsl,fifo-depth = <15>;
+> > > >  				status = "disabled";
+> > > >  			};
+
+> > > > @@ -329,6 +330,7 @@
+> > > >  				dmas = <&sdma 28 1 0>,
+> > > >  				       <&sdma 29 1 0>;
+> > > >  				dma-names = "rx", "tx";
+> > > > +				fsl,fifo-depth = <15>;
+> > > >  				status = "disabled";
+> > > >  			};
+
+> > > You are changing the global .dtsi file. Did you test this change with
+> > > all devices that are affected by it?
+
+> > I changed the hardware description of the imx25 SSI to match the
+> > reference manual.
+
+> > I did test this change on an imx25 board with audio playback. This uses
+> > the SSI description I modified. I verified that the driver is actually
+> > taking the modified setting into account and that this causes no
+> > problems.
+
+> > As of today, this setting is used by the fsl_ssi driver to set the fifo
+> > water level for dma requests.
+
+> > Of course, I don't have access to the enitre range of supported imx25
+> > boards and I don't think this is required for submitting patches.
+
+> > Do you have any indication why this patch should not be merged?
+
+> Usually patches should not willy-nilly change the behaviour of existing
+> configurations unless they fix any real life bugs.
+
+We both made our points, let the maintainer decide what to do with the
+patch.
+
+Thanks & Best regards,
+
+   Martin
