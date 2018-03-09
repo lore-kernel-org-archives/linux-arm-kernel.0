@@ -1,29 +1,43 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 9 Mar 2018 14:59:00 +0100
-Subject: [PATCH v6 06/17] media: rkisp1: add ISP1 statistics driver
-In-Reply-To: <20180308094807.9443-7-jacob-chen@iotwrt.com>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <20180308094807.9443-7-jacob-chen@iotwrt.com>
-Message-ID: <afc8a814-be1b-39ce-73b7-a40ebc216d63@xs4all.nl>
+From: peng.hao2@zte.com.cn (Peng Hao)
+Date: Sat, 10 Mar 2018 06:15:03 +0800
+Subject: [PATCH] KVM:arm/arm64: dcache need be coherent unconditionally
+Message-ID: <1520633703-15121-1-git-send-email-peng.hao2@zte.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 10:47, Jacob Chen wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
-> 
-> Add the capture video driver for rockchip isp1 statistics block.
-> 
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
-> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-> Signed-off-by: Yichong Zhong <zyc@rock-chips.com>
-> Signed-off-by: Jacob Chen <cc@rock-chips.com>
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Signed-off-by: Allon Huang <allon.huang@rock-chips.com>
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+For emulation devices just like vga, keeping coherent dcache between
+guest and host timely is needed.
+Now the display of vnc-viewer will not update continuously and the
+patch can fix up.
 
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+---
+ virt/kvm/arm/mmu.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Regards,
-
-	Hans
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ec62d1c..4a28395e 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+ 
+-		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(pfn, PMD_SIZE);
++		clean_dcache_guest_page(pfn, PMD_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+@@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			mark_page_dirty(kvm, gfn);
+ 		}
+ 
+-		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(pfn, PAGE_SIZE);
++		clean_dcache_guest_page(pfn, PAGE_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+-- 
+1.8.3.1
