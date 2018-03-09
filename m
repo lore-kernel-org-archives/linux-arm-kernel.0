@@ -1,65 +1,41 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 9 Mar 2018 08:47:12 -0700
-Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <4fd61bd2-757b-ef30-a07f-ed74af031ff5@codeaurora.org>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
- <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
- <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
- <20180306042656.GJ23018@vireshk-i7>
- <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
- <20180307050624.GR23018@vireshk-i7>
- <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
- <20180309034332.GO6842@vireshk-i7>
- <4fd61bd2-757b-ef30-a07f-ed74af031ff5@codeaurora.org>
-Message-ID: <20180309154711.GB10589@jcrouse-lnx.qualcomm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 9 Mar 2018 15:42:31 +0000
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.17
+Message-ID: <5AA2AB67.7070106@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 03:49:00PM +0530, Rajendra Nayak wrote:
-> Hey Jordan/Viresh,
-> 
-> On 03/09/2018 09:13 AM, Viresh Kumar wrote:
-> > On 08-03-18, 13:14, Jordan Crouse wrote:
-> >> It seems to me that performance_state has a direct relationship with genpd
-> >> which is good for CPU votes but in this case, we're just passing along raw data
-> >> to an independent microcontroller. The 'qcom,arc-level' is used to construct
-> >> the actual values that the GMU will program into the RPMh. Since these are
-> > 
-> > The "genpd" here is created specially for this RPM. The performance-state thing
-> > is designed to solve this very specific problem of qualcomm SoCs and there is no
-> > way we are going to add another property for this now.
-> > 
-> >> informational (from the CPU perspective) rather than functional I feel like
-> >> that using performance_state for this would be as hacky as using opp-microvolt
-> >> or something else.
-> > 
-> > There is some WIP stuff here Rajendra is testing currently.
-> 
-> What I am doing is a powerdomain driver to communicate magic values from
-> CPU to rpmh, looks like we need another one to communicate from CPU to
-> GMU now :)
-> 
-> A few things,
-> * someone will need to map these larger magic values into something that
-> rpmh would understand (between 0 to 15 on the sdm845), thats done by
-> reading the command db level maps. Is this done by GMU?
+Hi Arnd, Hi Olof, Hi Kevin,
 
-It is done by the GPU - we take the magic values, construct them into other
-magic values and send them to the GMU. As far as I know we are the only other
-in-kernel client of cmd-db other than the regulator(s).
+Please help to pull the following changes.
+Thanks!
 
-> * are these communicated just once for every OPP at init/boot, or for
-> every OPP switch?
+Best Regards,
+Wei
 
-Just once at init.
+---
 
-> * whats the communication mechanism we use between CPU and GMU?
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Shared memory queues inspired by Venus HFI.
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Jordan
+are available in the Git repository at:
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.17
+
+for you to fetch changes up to 5fc990703e8663b00741f6f86990d33093510302:
+
+  arm64: defconfig: enable IOSCHED_DEADLINE (2018-03-02 15:35:34 +0000)
+
+----------------------------------------------------------------
+ARM64: hisilicon: defconfig updates for 4.17
+
+- Enable deadline IO scheduler to improve the performnace for some
+usecaese without changing the default IO scheduler
+
+----------------------------------------------------------------
+John Garry (1):
+      arm64: defconfig: enable IOSCHED_DEADLINE
+
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
