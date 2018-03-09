@@ -1,66 +1,54 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:46:55 +0000
-Subject: [PATCH 01/25] nvmem: Document struct nvmem_config
-In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-2-srinivas.kandagatla@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Mar 2018 14:55:47 +0000
+Subject: [RFC PATCH 0/6] arm64: untag user pointers passed to the kernel
+In-Reply-To: <cover.1520600533.git.andreyknvl@google.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+Message-ID: <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
+Hi,
 
-Add a simple description of struct nvmem_config and its fields.
+[trimming Ccs]
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: cphealy at gmail.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mediatek at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- include/linux/nvmem-provider.h | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+On Fri, Mar 09, 2018 at 03:01:58PM +0100, Andrey Konovalov wrote:
+> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+> tags into the top byte of each pointer. Userspace programs (such as
+> HWASan, a memory debugging tool [1]) might use this feature and pass
+> tagged user pointers to the kernel through syscalls or other interfaces.
+> 
+> This patch makes a few of the kernel interfaces accept tagged user
+> pointers. The kernel is already able to handle user faults with tagged
+> pointers and has the untagged_addr macro, which this patchset reuses.
+> 
+> We're not trying to cover all possible ways the kernel accepts user
+> pointers in one patchset, so this one should be considered as a start.
+> It would be nice to learn about the interfaces that I missed though.
 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 497706f5adca..a39f76ff2ccd 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -22,6 +22,28 @@ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
- typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
- 				 void *val, size_t bytes);
- 
-+/**
-+ * struct nvmem_config - NVMEM device configuration
-+ *
-+ * @dev:	Parent device.
-+ * @name:	Optional name.
-+ * @id:		Optional device ID used in full name. Ignored if name is NULL.
-+ * @owner:	Pointer to exporter module. Used for refcounting.
-+ * @cells:	Optional array of pre-defined NVMEM cells.
-+ * @ncells:	Number of elements in cells.
-+ * @read_only:	Device is read-only.
-+ * @root_only:	Device is accessibly to root only.
-+ * @reg_read:	Callback to read data.
-+ * @reg_write:	Callback to write data.
-+ * @size:	Device size.
-+ * @word_size:	Minimum read/write access granularity.
-+ * @stride:	Minimum read/write access stride.
-+ * @priv:	User context passed to read/write callbacks.
-+ *
-+ * Note: A default "nvmem<id>" name will be assigned to the device if
-+ * no name is specified in its configuration. In such case "<id>" is
-+ * generated with ida_simple_get() and provided id field is ignored.
-+ */
- struct nvmem_config {
- 	struct device		*dev;
- 	const char		*name;
--- 
-2.15.1
+There are many ways that user pointers can be passed to the kernel, and
+I'm not sure that it's feasible to catch them all, especially as user
+pointers are often passed in data structures (e.g. iovecs) rather than
+direct syscall arguments.
+
+If we *really* want the kernel to support taking tagged addresses, anything
+with a __user annotation (or cast to something with a __user annotation)
+requires tag removal somewhere in the kernel.
+
+It looks like there are plenty uapi structures and syscalls to look at:
+
+[mark at lakrids:~/src/linux]% git grep __user -- include/uapi | wc -l
+216
+[mark at lakrids:~/src/linux]% git grep __user | grep SYSCALL_DEFINE | wc -l
+308
+
+... in addition to special syscalls like ioctl which multiplex a number
+of operations with different arguments, where the tag stripping would
+have to occur elsewhere (e.g. in particular drivers).
+
+I also wonder if we ever write any of these pointers back to userspace
+memory. If so, we have a nasty ABI problem, since we'll have to marshal
+the original tag along with the pointer, to ensure userspace pointer
+comparisons continue to work.
+
+Thanks,
+Mark.
