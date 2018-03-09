@@ -1,69 +1,60 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:20 +0100
-Subject: [PATCH v5 29/36] drm/rockchip: analogix_dp: Do not call Analogix code
- before bind
+Date: Fri,  9 Mar 2018 23:23:17 +0100
+Subject: [PATCH v5 26/36] drm/bridge: analogix_dp: Properly disable aux chan
+ retries on rockchip
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-30-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-27-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+From: Douglas Anderson <dianders@chromium.org>
 
-Driver callbacks, such as system suspend or resume can be called any
-time, specifically they can be called before the component bind
-callback. Let's use dp->adp pointer as a safeguard and skip calling
-Analogix entry points if it is an ERR_PTR().
+The comments in analogix_dp_init_aux() claim that we're disabling aux
+channel retries, but then right below it for Rockchip it sets them to
+3.  If we actually need 3 retries for Rockchip then we could adjust
+the comment, but it seems more likely that we want the same retry
+behavior across all platforms.
 
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: ?? ? <wzz@rock-chips.com>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 23317a2269e1..6d45d62466b3 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -368,6 +368,8 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
- 	analogix_dp_unbind(dp->adp);
- 	rockchip_drm_psr_unregister(&dp->encoder);
- 	dp->encoder.funcs->destroy(&dp->encoder);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index 58e8a28e99aa..a5f2763d72e4 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -481,15 +481,16 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
+ 
+ 	analogix_dp_reset_aux(dp);
+ 
+-	/* Disable AUX transaction H/W retry */
++	/* AUX_BIT_PERIOD_EXPECTED_DELAY doesn't apply to Rockchip IP */
+ 	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type))
+-		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
+-		      AUX_HW_RETRY_COUNT_SEL(3) |
+-		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++		reg = 0;
+ 	else
+-		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
+-		      AUX_HW_RETRY_COUNT_SEL(0) |
+-		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3);
 +
-+	dp->adp = ERR_PTR(-ENODEV);
- }
- 
- static const struct component_ops rockchip_dp_component_ops = {
-@@ -391,6 +393,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	dp->dev = dev;
-+	dp->adp = ERR_PTR(-ENODEV);
- 	dp->plat_data.panel = panel;
- 
- 	ret = rockchip_dp_of_probe(dp);
-@@ -414,6 +417,9 @@ static int rockchip_dp_suspend(struct device *dev)
- {
- 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
- 
-+	if (IS_ERR(dp->adp))
-+		return 0;
++	/* Disable AUX transaction H/W retry */
++	reg |= AUX_HW_RETRY_COUNT_SEL(0) |
++	       AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
 +
- 	return analogix_dp_suspend(dp->adp);
- }
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
  
-@@ -421,6 +427,9 @@ static int rockchip_dp_resume(struct device *dev)
- {
- 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
- 
-+	if (IS_ERR(dp->adp))
-+		return 0;
-+
- 	return analogix_dp_resume(dp->adp);
- }
- #endif
+ 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
 -- 
 2.16.1
