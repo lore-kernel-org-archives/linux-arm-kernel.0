@@ -1,107 +1,129 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:22:53 +0100
-Subject: [PATCH v5 02/36] drm/rockchip: Remove analogix psr worker
+Date: Fri,  9 Mar 2018 23:22:54 +0100
+Subject: [PATCH v5 03/36] drm/bridge: analogix_dp: Don't change psr while
+ bridge is disabled
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-3-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-4-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Paul <seanpaul@chromium.org>
+From: zain wang <wzz@rock-chips.com>
 
-Now that the spinlocks and timers are gone, we can remove the psr
-worker located in rockchip's analogix driver and do the enable/disable
-directly. This should simplify the code and remove races on disable.
+There is a race between AUX CH bring-up and enabling bridge which will
+cause link training to fail. To avoid hitting it, don't change psr state
+while enabling the bridge.
 
-Cc: ?? ? <wzz@rock-chips.com>
-Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Cc: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: zain wang <wzz@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+[seanpaul fixed up the commit message a bit and renamed *_supported to *_enabled]
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 31 ++-----------------------
- 1 file changed, 2 insertions(+), 29 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 15 ++++++++-------
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 +-
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  2 +-
+ include/drm/bridge/analogix_dp.h                   |  2 +-
+ 4 files changed, 11 insertions(+), 10 deletions(-)
 
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index e738aa6de1af..ee00d3d920e0 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -98,18 +98,18 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ 	return 0;
+ }
+ 
+-int analogix_dp_psr_supported(struct analogix_dp_device *dp)
++int analogix_dp_psr_enabled(struct analogix_dp_device *dp)
+ {
+ 
+-	return dp->psr_support;
++	return dp->psr_enable;
+ }
+-EXPORT_SYMBOL_GPL(analogix_dp_psr_supported);
++EXPORT_SYMBOL_GPL(analogix_dp_psr_enabled);
+ 
+ int analogix_dp_enable_psr(struct analogix_dp_device *dp)
+ {
+ 	struct edp_vsc_psr psr_vsc;
+ 
+-	if (!dp->psr_support)
++	if (!dp->psr_enable)
+ 		return 0;
+ 
+ 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+@@ -131,7 +131,7 @@ int analogix_dp_disable_psr(struct analogix_dp_device *dp)
+ 	struct edp_vsc_psr psr_vsc;
+ 	int ret;
+ 
+-	if (!dp->psr_support)
++	if (!dp->psr_enable)
+ 		return 0;
+ 
+ 	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+@@ -871,8 +871,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 	/* Enable video */
+ 	analogix_dp_start_video(dp);
+ 
+-	dp->psr_support = analogix_dp_detect_sink_psr(dp);
+-	if (dp->psr_support)
++	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
++	if (dp->psr_enable)
+ 		analogix_dp_enable_sink_psr(dp);
+ }
+ 
+@@ -1117,6 +1117,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+ 	if (ret)
+ 		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+ 
++	dp->psr_enable = false;
+ 	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+ }
+ 
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index b039b28d8fcc..e135a42cb19e 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -170,7 +170,7 @@ struct analogix_dp_device {
+ 	int			dpms_mode;
+ 	int			hpd_gpio;
+ 	bool                    force_hpd;
+-	bool			psr_support;
++	bool			psr_enable;
+ 
+ 	struct mutex		panel_lock;
+ 	bool			panel_is_modeset;
 diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 7d76ff47028d..36334839a3f8 100644
+index 36334839a3f8..3e8bf79bea58 100644
 --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -71,10 +71,6 @@ struct rockchip_dp_device {
- 	struct regmap            *grf;
- 	struct reset_control     *rst;
- 
--	struct work_struct	 psr_work;
--	struct mutex             psr_lock;
--	unsigned int             psr_state;
--
- 	const struct rockchip_dp_chip_data *data;
- 
- 	struct analogix_dp_device *adp;
-@@ -84,28 +80,13 @@ struct rockchip_dp_device {
- static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
- {
+@@ -82,7 +82,7 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
  	struct rockchip_dp_device *dp = to_dp(encoder);
-+	int ret;
+ 	int ret;
  
- 	if (!analogix_dp_psr_supported(dp->adp))
+-	if (!analogix_dp_psr_supported(dp->adp))
++	if (!analogix_dp_psr_enabled(dp->adp))
  		return;
  
  	DRM_DEV_DEBUG(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+index 711fff9b6803..e9a1116d2f8e 100644
+--- a/include/drm/bridge/analogix_dp.h
++++ b/include/drm/bridge/analogix_dp.h
+@@ -41,7 +41,7 @@ struct analogix_dp_plat_data {
+ 			 struct drm_connector *);
+ };
  
--	mutex_lock(&dp->psr_lock);
--	if (enabled)
--		dp->psr_state = EDP_VSC_PSR_STATE_ACTIVE;
--	else
--		dp->psr_state = ~EDP_VSC_PSR_STATE_ACTIVE;
--
--	schedule_work(&dp->psr_work);
--	mutex_unlock(&dp->psr_lock);
--}
--
--static void analogix_dp_psr_work(struct work_struct *work)
--{
--	struct rockchip_dp_device *dp =
--				container_of(work, typeof(*dp), psr_work);
--	int ret;
--
- 	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
- 					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
- 	if (ret) {
-@@ -113,12 +94,10 @@ static void analogix_dp_psr_work(struct work_struct *work)
- 		return;
- 	}
+-int analogix_dp_psr_supported(struct analogix_dp_device *dp);
++int analogix_dp_psr_enabled(struct analogix_dp_device *dp);
+ int analogix_dp_enable_psr(struct analogix_dp_device *dp);
+ int analogix_dp_disable_psr(struct analogix_dp_device *dp);
  
--	mutex_lock(&dp->psr_lock);
--	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
-+	if (enabled)
- 		analogix_dp_enable_psr(dp->adp);
- 	else
- 		analogix_dp_disable_psr(dp->adp);
--	mutex_unlock(&dp->psr_lock);
- }
- 
- static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
-@@ -135,8 +114,6 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
- 	struct rockchip_dp_device *dp = to_dp(plat_data);
- 	int ret;
- 
--	cancel_work_sync(&dp->psr_work);
--
- 	ret = clk_prepare_enable(dp->pclk);
- 	if (ret < 0) {
- 		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
-@@ -355,10 +332,6 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
- 	dp->plat_data.power_off = rockchip_dp_powerdown;
- 	dp->plat_data.get_modes = rockchip_dp_get_modes;
- 
--	mutex_init(&dp->psr_lock);
--	dp->psr_state = ~EDP_VSC_PSR_STATE_ACTIVE;
--	INIT_WORK(&dp->psr_work, analogix_dp_psr_work);
--
- 	ret = rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
- 	if (ret < 0)
- 		goto err_cleanup_encoder;
 -- 
 2.16.1
