@@ -1,207 +1,97 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:22 +0800
-Subject: [PATCH 39/39] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
-References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-40-alex.shi@linaro.org>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 9 Mar 2018 10:20:20 +0100
+Subject: [PATCH v5 0/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <5AA09753.7060308@samsung.com>
+References: <CGME20180227071137eucas1p104aeeb0fd926fe985e250174d9d65b2e@eucas1p1.samsung.com>
+ <20180227071134.28063-1-a.hajda@samsung.com>
+ <c4a773b6-a24e-4e72-3cc4-ebafeac232c1@samsung.com>
+ <5A9F4A7D.9020409@samsung.com> <5A9F6F29.5020501@samsung.com>
+ <b64d77c1-c80f-1bd9-a599-3027424ec667@samsung.com>
+ <5AA09753.7060308@samsung.com>
+Message-ID: <984d5c86-f647-5228-7494-63faf4dec3d3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi Chanwoo,
 
-commit b092201e0020 upstream.
+On 08.03.2018 02:52, Chanwoo Choi wrote:
+> Hi Andrzej, Archit,
+>
+> On 2018? 03? 07? 20:13, Andrzej Hajda wrote:
+>> Hi Chanwoo, Archit,
+>>
+>> On 07.03.2018 05:48, Chanwoo Choi wrote:
+>>> On 2018? 03? 07? 11:12, Chanwoo Choi wrote:
+>>>> Hi Rob and Andrzej,
+>>>>
+>>>> On 2018? 03? 06? 21:53, Andrzej Hajda wrote:
+>>>>> Hi Rob, Chanwoo, Krzysztof,
+>>>>>
+>>>>>
+>>>>> On 27.02.2018 08:11, Andrzej Hajda wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> Thanks for reviews of previous iterations.
+>>>>>>
+>>>>>> This patchset introduces USB physical connector bindings, together with
+>>>>>> working example.
+>>>>>> I have removed RFC prefix - the patchset seems to be heading
+>>>>>> to a happy end :)
+>>>>>>
+>>>>>> v5: fixed extra parenthesis in dts, renamed extcon function.
+>>>>>> v4: improved binding descriptions, added missing reg in dts.
+>>>>>> v3: Separate binding for Samsung 11-pin connector, added full-blown USB-C
+>>>>>>     example.
+>>>>>> v2: I have addressed comments by Rob and Laurent, thanks 
+>>>>>>
+>>>>>> Changes in datail are described in the patches.
+>>>>>>
+>>>>>> Regards
+>>>>>> Andrzej
+>>>>>>
+>>>>>>
+>>>>>> Andrzej Hajda (5):
+>>>>>>   dt-bindings: add bindings for USB physical connector
+>>>>>>   dt-bindings: add bindings for Samsung micro-USB 11-pin connector
+>>>>>>   arm64: dts: exynos: add micro-USB connector node to TM2 platforms
+>>>>>>   arm64: dts: exynos: add OF graph between MHL and USB connector
+>>>>>>   extcon: add possibility to get extcon device by OF node
+>>>>>>
+>>>>>> Maciej Purski (1):
+>>>>>>   drm/bridge/sii8620: use micro-USB cable detection logic to detect MHL
+>>>>> It looks like all patches received R-B or acks (I forgot add Krzysztof's
+>>>>> acks for dts part).
+>>>>> Now I have a question how to merge them.
+>>>>> The only functional dependency is between bridge and extcon, and from
+>>>>> the formal PoV bindings should be merged 1st.
+>>>>> I can merge it:
+>>>>> 1. All patches via drm-misc tree.
+>>>>> 2. All patches except dts via drm-misc, and Krzysztof will merge dts via
+>>>>> samsung-soc tree.
+>>>>>
+>>>>> Is it OK, for all? Better ideas?
+>>>> Krzysztof picked the dts patches. I'll make the immutable branch based on v4.16-rc1
+>>>> and apply them except for dts patchs. And I'll send the immutable branch to Rob and Andrzej.
+>>>>
+>>>>
+>>> I made the immutable branch[1] as following: If you agree, I'll send pull request.
+>>> [1] https://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git/log/?h=ib-extcon-drm-dt-v4.17
+>>>
+>>> Or you can make the immutable branch and send pull request to Rob and me.
+>>>
+>> It seems you took v5 instead of v6 version of extcon patch.
+> My mistake. I picked v6 and made the new immutable branch.
+> After Archit confirm it, I'll send pull request.
+>
 
-Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
-It is lovely. Really.
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
----
- arch/arm64/kernel/bpi.S        | 44 ++++++++++-----------
- arch/arm64/kernel/cpu_errata.c | 70 +++++++++++++++++++++++++++-------
- 2 files changed, 77 insertions(+), 37 deletions(-)
+Lets just queue all patches (except dts) via extcon branch (thanks
+Daniel for advice), without making immutable branch.
+It seems to be a simplest acceptable approach.
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index dec95bd82e31..dc4eb154e33b 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <linux/arm-smccc.h>
- 
- .macro ventry target
- 	.rept 31
-@@ -53,27 +54,22 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	vectors __kvm_hyp_vector
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
--ENTRY(__psci_hyp_bp_inval_start)
--	sub	sp, sp, #(8 * 18)
--	stp	x16, x17, [sp, #(16 * 0)]
--	stp	x14, x15, [sp, #(16 * 1)]
--	stp	x12, x13, [sp, #(16 * 2)]
--	stp	x10, x11, [sp, #(16 * 3)]
--	stp	x8, x9, [sp, #(16 * 4)]
--	stp	x6, x7, [sp, #(16 * 5)]
--	stp	x4, x5, [sp, #(16 * 6)]
--	stp	x2, x3, [sp, #(16 * 7)]
--	stp	x0, x1, [sp, #(16 * 8)]
--	mov	x0, #0x84000000
--	smc	#0
--	ldp	x16, x17, [sp, #(16 * 0)]
--	ldp	x14, x15, [sp, #(16 * 1)]
--	ldp	x12, x13, [sp, #(16 * 2)]
--	ldp	x10, x11, [sp, #(16 * 3)]
--	ldp	x8, x9, [sp, #(16 * 4)]
--	ldp	x6, x7, [sp, #(16 * 5)]
--	ldp	x4, x5, [sp, #(16 * 6)]
--	ldp	x2, x3, [sp, #(16 * 7)]
--	ldp	x0, x1, [sp, #(16 * 8)]
--	add	sp, sp, #(8 * 18)
--ENTRY(__psci_hyp_bp_inval_end)
-+
-+.macro smccc_workaround_1 inst
-+	sub	sp, sp, #(8 * 4)
-+	stp	x2, x3, [sp, #(8 * 0)]
-+	stp	x0, x1, [sp, #(8 * 2)]
-+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	\inst	#0
-+	ldp	x2, x3, [sp, #(8 * 0)]
-+	ldp	x0, x1, [sp, #(8 * 2)]
-+	add	sp, sp, #(8 * 4)
-+.endm
-+
-+ENTRY(__smccc_workaround_1_smc_start)
-+	smccc_workaround_1	smc
-+ENTRY(__smccc_workaround_1_smc_end)
-+
-+ENTRY(__smccc_workaround_1_hvc_start)
-+	smccc_workaround_1	hvc
-+ENTRY(__smccc_workaround_1_hvc_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 3adbbce7334c..734e817c0ca4 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -36,7 +36,10 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- #ifdef CONFIG_KVM
--extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-+extern char __smccc_workaround_1_smc_start[];
-+extern char __smccc_workaround_1_smc_end[];
-+extern char __smccc_workaround_1_hvc_start[];
-+extern char __smccc_workaround_1_hvc_end[];
- 
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
-@@ -79,8 +82,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
- }
- #else
--#define __psci_hyp_bp_inval_start	NULL
--#define __psci_hyp_bp_inval_end		NULL
-+#define __smccc_workaround_1_smc_start		NULL
-+#define __smccc_workaround_1_smc_end		NULL
-+#define __smccc_workaround_1_hvc_start		NULL
-+#define __smccc_workaround_1_hvc_end		NULL
- 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
-@@ -104,17 +109,56 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
- 
-+#include <uapi/linux/psci.h>
-+#include <linux/arm-smccc.h>
- #include <linux/psci.h>
- 
--static int enable_psci_bp_hardening(void *data)
-+static void call_smc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static void call_hvc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static int enable_smccc_arch_workaround_1(void *data)
- {
- 	const struct arm64_cpu_capabilities *entry = data;
-+	bp_hardening_cb_t cb;
-+	void *smccc_start, *smccc_end;
-+	struct arm_smccc_res res;
-+
-+	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
-+		return 0;
-+
-+	switch (psci_ops.conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+		if (res.a0)
-+			return 0;
-+		cb = call_hvc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_hvc_start;
-+		smccc_end = __smccc_workaround_1_hvc_end;
-+		break;
-+
-+	case PSCI_CONDUIT_SMC:
-+		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+		if (res.a0)
-+			return 0;
-+		cb = call_smc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_smc_start;
-+		smccc_end = __smccc_workaround_1_smc_end;
-+		break;
-+
-+	default:
-+		return 0;
-+	}
- 
--	if (psci_ops.get_version)
--		install_bp_hardening_cb(entry,
--				       (bp_hardening_cb_t)psci_ops.get_version,
--				       __psci_hyp_bp_inval_start,
--				       __psci_hyp_bp_inval_end);
-+	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
- 
- 	return 0;
- }
-@@ -198,22 +242,22 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- #endif
- 	{
--- 
-2.16.2.440.gc6284da
+You can add my ack to sii8620 bridge patch (as bridge maintainer), to
+fulfill process requirements.
+
+Regards
+Andrzej
