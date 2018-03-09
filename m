@@ -1,60 +1,93 @@
-From: eugenis@google.com (Evgenii Stepanov)
-Date: Fri, 9 Mar 2018 09:42:29 -0800
-Subject: [RFC PATCH 3/6] mm, arm64: untag user addresses in memory syscalls
-In-Reply-To: <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
- <20180309155315.4x44sbp3darractt@armageddon.cambridge.arm.com>
- <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
-Message-ID: <CAFKCwrgPEhBEbXn95ugxVuxHw7UTiQWuo3+HJ_t7UBG69fbUcw@mail.gmail.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 9 Mar 2018 10:42:47 -0700
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <152061592175.13890.6455929815877326231@swboyd.mtv.corp.google.com>
+References: <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+ <20180307050624.GR23018@vireshk-i7>
+ <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+ <20180309034332.GO6842@vireshk-i7>
+ <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
+ <152061592175.13890.6455929815877326231@swboyd.mtv.corp.google.com>
+Message-ID: <20180309174246.GD10589@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 9:31 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> On Fri, Mar 9, 2018 at 4:53 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Fri, Mar 09, 2018 at 03:02:01PM +0100, Andrey Konovalov wrote:
->>> Memory subsystem syscalls accept user addresses as arguments, but don't use
->>> copy_from_user and other similar functions, so we need to handle this case
->>> separately.
->>>
->>> Untag user pointers passed to madvise, mbind, get_mempolicy, mincore,
->>> mlock, mlock2, brk, mmap_pgoff, old_mmap, munmap, remap_file_pages,
->>> mprotect, pkey_mprotect, mremap and msync.
->>>
->>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
->>
->> Please keep the cc list small (maybe linux-arch, linux-arm-kernel) as
->> I'm sure some lists would consider this spam.
->
-> OK.
->
->>
->>>  mm/madvise.c   | 2 ++
->>>  mm/mempolicy.c | 6 ++++++
->>>  mm/mincore.c   | 2 ++
->>>  mm/mlock.c     | 5 +++++
->>>  mm/mmap.c      | 9 +++++++++
->>>  mm/mprotect.c  | 2 ++
->>>  mm/mremap.c    | 2 ++
->>>  mm/msync.c     | 3 +++
->>
->> I'm not yet convinced these functions need to allow tagged pointers.
->> They are not doing memory accesses but rather dealing with the memory
->> range, hence an untagged pointer is better suited. There is probably a
->> reason why the "start" argument is "unsigned long" vs "void __user *"
->> (in the kernel, not the man page).
->
-> So that would make the user to untag pointers before passing to these syscalls.
->
-> Evgeniy, would that be possible to untag pointers in HWASan before
-> using memory subsystem syscalls? Is there a reason for untagging them
-> in the kernel?
+On Fri, Mar 09, 2018 at 09:18:41AM -0800, Stephen Boyd wrote:
+> (I wrote an email that seems to have been lost)
+> 
+> Quoting Jordan Crouse (2018-03-09 08:03:55)
+> > On Fri, Mar 09, 2018 at 09:13:32AM +0530, Viresh Kumar wrote:
+> > > On 08-03-18, 13:14, Jordan Crouse wrote:
+> > > > It seems to me that performance_state has a direct relationship with genpd
+> > > > which is good for CPU votes but in this case, we're just passing along raw data
+> > > > to an independent microcontroller. The 'qcom,arc-level' is used to construct
+> > > > the actual values that the GMU will program into the RPMh. Since these are
+> > > 
+> > > The "genpd" here is created specially for this RPM. The performance-state thing
+> > > is designed to solve this very specific problem of qualcomm SoCs and there is no
+> > > way we are going to add another property for this now.
+> > > 
+> > > > informational (from the CPU perspective) rather than functional I feel like
+> > > > that using performance_state for this would be as hacky as using opp-microvolt
+> > > > or something else.
+> > > 
+> > > There is some WIP stuff here Rajendra is testing currently.
+> > > 
+> > > ssh://git at git.linaro.org/people/viresh.kumar/mylinux.git opp/genpd/qcom
+> > > 
+> > > Please have a talk with Rajendra who can help you understand on how this can be
+> > > used for GPUs.
+> > 
+> > I don't think we are understanding each other. The GMU is a separate
+> > microcontroller. It is given a magic number (actually a combination of magic
+> > numbers) that it then uses to directly interact with the other hardware to make
+> > the vote. The only responsibility that the CPU has is to construct that magic
+> > number (once, at init) and send it across when asked.
+> > 
+> > Looking at the sdhc code from the testing tree it makes perfect sense
+> > that you have a device that needs to eventually do a RPMh vote from the CPU and
+> > so the 'required-opp' and performance state come together to do the right thing.
+> > This is good code.
+> > 
+> > None of this is true for the GPU. The CPU never votes for the GPU so there 
+> > isn't any need to connect it to the power domain drivers. Even if you did
+> > there isn't any current mechanism for the rpmpd driver to pass the right magic
+> > number to the GPU driver which is what it really needs.
+> > 
+> > I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
+> > then thats just a naming dispute. We still need a way for the GPU to query the
+> > magic values.
+> > 
+> 
+> Agreed. Forcing genpd and set_performance_state APIs on GMU doesn't make
+> any sense if the GMU is doing it all itself.
+> 
+> The binding should be the same between sdhc and GMU if they're actually
+> talking about the same thing though. I think they are, because I suspect
+> GMU needs to translate the human reasonable value of qcom,corner into
+> the hardware qcom,arc-level value to write into it's hardware so the GMU
+> can auto-transition performance states. If I'm wrong, then
+> qcom,arc-level needs to be created alongside of qcom,corner because
+> they're different number spaces.
 
-Generally, no. It's possible to intercept a libc call using symbol
-interposition, but I don't know how to rewrite arguments of a raw
-system call other than through ptrace, and that creates more problems
-than it solves.
+I think the value that we're discussing here is the RPMh voltage level which we
+translate into the qcom,arc-level(s). I'm not sure how that matches up with
+qcom,corner.
 
-AFAIU, it's valid for a program to pass an address obtained from
-malloc or, better, posix_memalign to an mm syscall like mprotect().
-These arguments are pointers from the userspace point of view.
+> BTW, it's qcom,corner and not qcom-corner right?
+
+http://git.linaro.org/people/viresh.kumar/mylinux.git/commit/?h=opp/genpd/qcom&id=7586600b3bf3f8e79ce9198922fad7d4aa5b3f8d
+
++					qcom-corner = <1>;
+
+shrug?
+
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
