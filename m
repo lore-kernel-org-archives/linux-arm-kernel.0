@@ -1,75 +1,42 @@
 From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 09 Mar 2018 11:35:55 +0900
-Subject: [PATCH] dt-bindings: exynos: Document #sound-dai-cells property
- of the HDMI node
-In-Reply-To: <e3e1c628-d88f-6fb4-171e-a49c7ee38135@samsung.com>
-References: <CGME20180307171131epcas1p4687ef394d1a0a6d0eb2de2691c977c3f@epcas1p4.samsung.com>
- <20180307171111.14551-1-s.nawrocki@samsung.com>
- <5AA0B59F.3070402@samsung.com>
- <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
- <5AA0DD39.3040108@samsung.com>
- <9f1e8619-974d-cd07-79c3-c6d9a4dc0f97@samsung.com>
- <5AA0F10D.9010602@samsung.com>
- <e3e1c628-d88f-6fb4-171e-a49c7ee38135@samsung.com>
-Message-ID: <5AA1F30B.8010607@samsung.com>
+Date: Fri, 09 Mar 2018 11:40:27 +0900
+Subject: [PATCH 1/4] ARM: dts: exynos5250: Add #sound-dai-cells property
+ to hdmi device node
+In-Reply-To: <20180307172711.15697-1-s.nawrocki@samsung.com>
+References: <CGME20180307172723epcas1p1b8879bb555737cab7406a172b7d13a56@epcas1p1.samsung.com>
+ <20180307172711.15697-1-s.nawrocki@samsung.com>
+Message-ID: <5AA1F41B.5080104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sylwester,
 
-2018? 03? 08? 20:22? Sylwester Nawrocki ?(?) ? ?:
-> Hi Inki,
+2018? 03? 08? 02:27? Sylwester Nawrocki ?(?) ? ?:
+> This property is required for specifying link between the HDMI IP block
+> and the SoC's audio subsystem.
 > 
-> Cc: alsa-devel at alsa-project.org
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> On 03/08/2018 09:15 AM, Inki Dae wrote:
->> By the way, it seems 'sound-dai-cells' property never affect Exynos4210/4212> 5420/5433. It seems that even through ALSA TM2 audio driver(tm2_wm5110.c) 
->> exists the driver never check the property.
->>
->> However, this patch adds below description.
->>
->> "Optional properties for Exynos 4210, 4212, 5420 and 5433"
->>
->> Is there a possibility for other boards based on Exynos4210/4212/5420/5433 
->> SoC to use this property later?
-> 
-> All these SoCs have the HDMI IP block which has one input DAI, connected 
-> internally over I2S bus with the IS2 controller.
-> 
-> I think there is no advantage in limiting ourselves now only to SoC's 
-> for which we currently rely on that DT property in current kernel code, 
-> just to update this documentation later when we actually put the property 
-> in dts files.
-> 
-> In case of exynos5420 we already require #sound-dai-cells for Odroid and
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 56626d1a4235..71d2ede118e3 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -700,6 +700,7 @@
+>  					"sclk_hdmiphy", "mout_hdmi";
+>  			samsung,syscon-phandle = <&pmu_system_controller>;
+>  			phy = <&hdmiphy>;
+> +			#sound-dai-cells = <0>;
 
-Maybe exynos5422? Odroid XU3/4 use Exynos5422.
- 
-> I have also a patch for exynos5420-peach-pit board which will need it as 
-> well.
-> 
-> As far as exynos4210 and exynos4212 are concerned it's a matter of adding
-> support for Odroid-U3, then we will also need this property because
-> we are going to use "multi-codec" (HDMI and external I2S0 pins for CODEC
-> are wired in parallel).
-> 
-> In case of exynos5433 it just happens that the code in current driver 
-> doesn't require #sound-dai-cells property - one of the reasons I made it
-> this way was to avoid dependency on dts, but it doesn't imply we should 
-> describe the HW in DT incompletely. Once the property is in dtbs we can 
-> update the driver to use more generic code, instead of open coding things.
-> 
-
-Good idea.
-
-> Actually I have forgotten to add also exynos5250 to the list.
-
-Seems that '#sound-dai-cells' is required mandatorily in case of Exynos5422 because Odroid XU3/4 Audio driver checks this property, and the driver returns error if the property doesn't exist in its device tree.
-And if other SoCs - Exynos4210/4212/5250/5420/5433 - require this property with additional driver works later then this property would also be required mandatorily for them not optionally. In this case we may need to modify the description again.
-
-So my opinion is to add only the description required mandatorily if I understood correctly.
+This patch adds this property to hdmi device node which is bound by HDMI driver of Exynos DRM. As we talked about this at other email thread, seems this property is required mandatorily for Odroid XU3/4 board which uses Exynos5422.
+There may be something I'm missing so could you let me know how this property is required?
 
 Thanks,
 Inki Dae
 
+>  			status = "disabled";
+>  		};
+>  
 > 
