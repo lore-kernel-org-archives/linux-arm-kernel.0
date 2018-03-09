@@ -1,107 +1,207 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 9 Mar 2018 17:06:49 -0600
-Subject: Nokia N900: refcount_t underflow, use after free
-In-Reply-To: <20180309221834.GA15476@amd>
-References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
- <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com> <20180308185046.GA22796@amd>
- <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
- <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com> <20180309221834.GA15476@amd>
-Message-ID: <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Mar 2018 17:14:33 -0600
+Subject: [PATCH v2 1/4] dt-bindings: mfd: Add Gateworks System Controller
+ bindings
+In-Reply-To: <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
+References: <1520287361-12569-1-git-send-email-tharvey@gateworks.com>
+ <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <20180309231433.tmlfy6vwbkvopmwd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 04:18 PM, Pavel Machek wrote:
-> On Fri 2018-03-09 16:13:36, Suman Anna wrote:
->> On 03/09/2018 06:08 AM, Robin Murphy wrote:
->>> On 08/03/18 18:50, Pavel Machek wrote:
->>>> Hi!
->>>>
->>>>>> * Pavel Machek <pavel@ucw.cz> [180308 14:31]:
->>>>>>> Hi!
->>>>>>>
->>>>>>> I'm getting this warning... Has anyone seen/debugged that before?
->>>>>>> Unfortunately the backtrace does not seem to be too useful :-(.
->>>>>>
->>>>>> Adding Suman to Cc, as it points to arm_iommu_release_mapping().
->>>>>
->>>>> Hmm, we need to find out if the failure paths in isp_probe() are
->>>>> mismatched, or if this is coming from some mismatch between the OMAP
->>>>> IOMMU driver and the DMA plumbing. AFAIK, the cleanup paths in this
->>>>
->>>> Well, camera only started to work on N900 pretty recently. Let me add
->>>> some debug printks...
->>>>
->>>> Camera does not work in 4.16.0-rc4-next-20180308-dirty.
->>>>
->>>> I see this. It looks like problem in isp error paths, indeed:
->>>
->>> Well, there certainly seems to be an obvious bug wherein
->>> isp_detach_iommu() just releases the mapping directly without calling
->>> arm_iommu_detach_device() to balance the equivalent attach. That can't
->>> be helping.
->>
->> Indeed, I have been able to reproduce the same warning using a
->> standalone test module, and the missing arm_iommu_detach_device() is
->> causing the warning after probe (during failure path) or during
->> remove.
+On Mon, Mar 05, 2018 at 02:02:38PM -0800, Tim Harvey wrote:
+> This patch adds documentation of device-tree bindings for the
+> Gateworks System Controller (GSC).
 > 
-> Ok do you have an idea how to fix the isp error paths? Untested patch
-> would be fine... But it seems that you know what needs to be fixed and
-> I don't.
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/gsc.txt | 159 ++++++++++++++++++++++++++
+>  1 file changed, 159 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/gsc.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/mfd/gsc.txt b/Documentation/devicetree/bindings/mfd/gsc.txt
+> new file mode 100644
+> index 0000000..fe5d114
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/gsc.txt
+> @@ -0,0 +1,159 @@
+> +Gateworks System Controller multi-function device
+> +
+> +The GSC is a Multifunction I2C slave device with the following submodules:
+> +- WDT
+> +- GPIO
+> +- Pushbutton controller
+> +- HWMON
+> +
+> +Required properties:
+> +- compatible : Must be "gw,gsc_v1", "gw,gsc_v2", "gw,gsc_v3"
 
-OK, see if the following fixes the issue for you, only build tested.
+s/_/-/
 
-8< ---------------------
->From bac9a48fb646dc51f2030d676a0dbe3298c3b134 Mon Sep 17 00:00:00 2001
-From: Suman Anna <s-anna@ti.com>
-Date: Fri, 9 Mar 2018 16:39:59 -0600
-Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+> +- reg: I2C address of the device
+> +- interrupts: interrupt triggered by GSC_IRQ# signal
+> +- interrupt-parent: Interrupt controller GSC is connected to
+> +- #interrupt-cells: should be <1>, index of the interrupt within the
+> +  controller, in accordance with the "one cell" variant of
+> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
+> +
+> +Optional nodes:
+> +* watchdog:
+> +The GSC provides a Watchdog monitor which can power cycle the board's
+> +primary power supply on most board models when tripped.
+> +
+> +Required properties:
+> +- compatible: must be "gw,gsc-watchdog"
+> +
+> +* input:
+> +The GSC provides an input device capable of dispatching Linux Input events
 
-The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-ARM DMA backend. The current code creates a dma_iommu_mapping and
-attaches this to the ISP device, but never detaches the mapping in
-either the probe failure paths or the driver remove path resulting
-in an unbalanced mapping refcount and a memory leak. Fix this properly.
+Linux details that are not relevant to the binding.
 
-Reported-by: Pavel Machek <pavel@ucw.cz>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- drivers/media/platform/omap3isp/isp.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+> +for user pushbutton events, tamper switch events, etc.
+> +
+> +Required properties:
+> +- compatible: must be "gw,gsc-input"
+> +
+> +* hwmon:
+> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
+> +temperature and/or voltage monitoring.
+> +
+> +Required properties:
+> +- compatible: must be "gw,gsc-hwmon"
+> +
+> +Example:
+> +
+> +	gsc: gsc at 20 {
+> +		compatible = "gw,gsc_v2";
+> +		reg = <0x20>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <4 GPIO_ACTIVE_LOW>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +
+> +		gsc_input {
 
-diff --git a/drivers/media/platform/omap3isp/isp.c
-b/drivers/media/platform/omap3isp/isp.c
-index 8eb000e3d8fd..c7d667bfc2af 100644
---- a/drivers/media/platform/omap3isp/isp.c
-+++ b/drivers/media/platform/omap3isp/isp.c
-@@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct
-isp_device *isp)
+input {
 
- static void isp_detach_iommu(struct isp_device *isp)
- {
-+       arm_iommu_detach_device(isp->dev);
-        arm_iommu_release_mapping(isp->mapping);
-        isp->mapping = NULL;
- }
-@@ -1971,13 +1972,15 @@ static int isp_attach_iommu(struct isp_device *isp)
-        ret = arm_iommu_attach_device(isp->dev, mapping);
-        if (ret < 0) {
-                dev_err(isp->dev, "failed to attach device to VA
-mapping\n");
--               goto error;
-+               goto error_attach;
-        }
+> +			compatible = "gw,gsc-input";
+> +		};
+> +
+> +		gsc_watchdog {
 
-        return 0;
+watchdog {
 
-+error_attach:
-+       arm_iommu_release_mapping(isp->mapping);
-+       isp->mapping = NULL;
- error:
--       isp_detach_iommu(isp);
-        return ret;
- }
+> +			compatible = "gw,gsc-watchdog";
+> +		};
+> +
+> +		gsc_hwmon {
 
--- 
-2.16.2
+hwmon {
+
+> +			compatible = "gw,gsc-hwmon";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			hwmon at 0 { /* A0: Board Temperature */
+> +				type = <0>;
+
+Not documented.
+
+> +				reg = <0x00>;
+> +				label = "temp";
+> +			};
+> +
+> +			hwmon at 1 { /* A1: Input Voltage */
+> +				type = <1>;
+> +				reg = <0x02>;
+> +				label = "Vin";
+> +			};
+> +
+> +			hwmon at 2 { /* A2: 5P0 */
+> +				type = <1>;
+> +				reg = <0x0b>;
+> +				label = "5P0";
+> +			};
+> +
+> +			hwmon at 4 { /* A4: 0-5V input */
+> +				type = <1>;
+> +				reg = <0x14>;
+> +				label = "ANL0";
+> +			};
+> +
+> +			hwmon at 5 { /* A5: 2P5 PCIe/GigE */
+> +				type = <1>;
+> +				reg = <0x23>;
+> +				label = "2P5";
+> +			};
+> +
+> +			hwmon at 6 { /* A6: 1P8 Aud/Vid */
+> +				type = <1>;
+> +				reg = <0x1d>;
+> +				label = "1P8";
+> +			};
+> +
+> +			hwmon at 7 { /* A7: GPS */
+> +				type = <1>;
+> +				reg = <0x26>;
+> +				label = "GPS";
+> +			};
+> +
+> +			hwmon at 12 { /* A12: VDD_CORE */
+> +				type = <1>;
+> +				reg = <0x3>;
+> +				label = "VDD_CORE";
+> +			};
+> +
+> +			hwmon at 13 { /* A13: VDD_SOC */
+> +				type = <1>;
+> +				reg = <0x11>;
+> +				label = "VDD_SOC";
+> +			};
+> +
+> +			hwmon at 14 { /* A14: 1P0 PCIe SW */
+> +				type = <1>;
+> +				reg = <0x20>;
+> +				label = "1P0";
+> +			};
+> +
+> +			hwmon at 15 { /* fan0 */
+> +				type = <2>;
+> +				reg = <0x2c>;
+> +				label = "fan_50p";
+> +			};
+> +
+> +			hwmon at 16 { /* fan1 */
+> +				type = <2>;
+> +				reg = <0x2e>;
+> +				label = "fan_60p";
+> +			};
+> +
+> +			hwmon at 17 { /* fan2 */
+> +				type = <2>;
+> +				reg = <0x30>;
+> +				label = "fan_70p";
+> +			};
+> +
+> +			hwmon at 18 { /* fan3 */
+> +				type = <2>;
+> +				reg = <0x32>;
+> +				label = "fan_80p";
+> +			};
+> +
+> +			hwmon at 19 { /* fan4 */
+> +				type = <2>;
+> +				reg = <0x34>;
+> +				label = "fan_90p";
+> +			};
+> +
+> +			hwmon at 20 { /* fan5 */
+> +				type = <2>;
+> +				reg = <0x36>;
+> +				label = "fan_100p";
+> +			};
+> +		};
+> +	};
+> -- 
+> 2.7.4
+> 
