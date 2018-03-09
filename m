@@ -1,70 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Mar 2018 15:03:09 +0000
-Subject: [RFC PATCH 2/6] arm64: untag user addresses in copy_from_user
- and others
-In-Reply-To: <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
-Message-ID: <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Fri,  9 Mar 2018 14:47:05 +0000
+Subject: [PATCH 11/25] nvmem: meson-efuse: Convert to use devm_nvmem_register()
+In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-12-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 03:02:00PM +0100, Andrey Konovalov wrote:
-> copy_from_user (and a few other similar functions) are used to copy data
-> from user memory into the kernel memory or vice versa. Since a user can
-> provided a tagged pointer to one of the syscalls that use copy_from_user,
-> we need to correctly handle such pointers.
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-I don't think it makes sense to do this in the low-level uaccess
-primitives, given we're going to have to untag pointers before common
-code can use them, e.g. for comparisons against TASK_SIZE or
-user_addr_max().
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
-I think we'll end up with subtle bugs unless we consistently untag
-pointers before we get to uaccess primitives. If core code does untag
-pointers, then it's redundant to do so here.
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/meson-efuse.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-Thanks,
-Mark.
-
-> 
-> Do this by untagging user pointers in access_ok and in __uaccess_mask_ptr.
-> 
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/include/asm/uaccess.h | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 2d6451cbaa86..24a221678fe3 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -105,7 +105,8 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
->  #define untagged_addr(addr)		\
->  	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
->  
-> -#define access_ok(type, addr, size)	__range_ok(addr, size)
-> +#define access_ok(type, addr, size)	\
-> +	__range_ok(untagged_addr(addr), size)
->  #define user_addr_max			get_fs
->  
->  #define _ASM_EXTABLE(from, to)						\
-> @@ -238,12 +239,15 @@ static inline void uaccess_enable_not_uao(void)
->  /*
->   * Sanitise a uaccess pointer such that it becomes NULL if above the
->   * current addr_limit.
-> + * Also untag user pointers that have the top byte tag set.
->   */
->  #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
->  static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
->  {
->  	void __user *safe_ptr;
->  
-> +	ptr = untagged_addr(ptr);
-> +
->  	asm volatile(
->  	"	bics	xzr, %1, %2\n"
->  	"	csel	%0, %1, xzr, eq\n"
-> -- 
-> 2.16.2.395.g2e18187dfd-goog
-> 
+diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
+index a43c68f90937..71823d1403c5 100644
+--- a/drivers/nvmem/meson-efuse.c
++++ b/drivers/nvmem/meson-efuse.c
+@@ -60,25 +60,13 @@ static int meson_efuse_probe(struct platform_device *pdev)
+ 	econfig.reg_read = meson_efuse_read;
+ 	econfig.size = size;
+ 
+-	nvmem = nvmem_register(&econfig);
+-	if (IS_ERR(nvmem))
+-		return PTR_ERR(nvmem);
++	nvmem = devm_nvmem_register(&pdev->dev, &econfig);
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+-	return 0;
+-}
+-
+-static int meson_efuse_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
++	return PTR_ERR_OR_ZERO(nvmem);
+ }
+ 
+ static struct platform_driver meson_efuse_driver = {
+ 	.probe = meson_efuse_probe,
+-	.remove = meson_efuse_remove,
+ 	.driver = {
+ 		.name = "meson-efuse",
+ 		.of_match_table = meson_efuse_match,
+-- 
+2.15.1
