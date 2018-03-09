@@ -1,142 +1,97 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 09 Mar 2018 15:25:22 +0100
-Subject: [PATCH 5/9] media: platform: Add Sunxi Cedrus decoder driver
-In-Reply-To: <20180309135702.pk4webt7xnj7lrza@flea>
-References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
- <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
- <20180309135702.pk4webt7xnj7lrza@flea>
-Message-ID: <1520605522.15946.14.camel@bootlin.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 9 Mar 2018 19:57:04 +0530
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for
+ ThunderX2 B0
+In-Reply-To: <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
+References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
+ <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+ <20180307143832.GJ3701@kernel.org>
+ <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+ <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
+ <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
+Message-ID: <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnaldo,
 
-On Fri, 2018-03-09 at 14:57 +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Fri, Mar 09, 2018 at 11:14:41AM +0100, Paul Kocialkowski wrote:
-> > +/*
-> > + * mem2mem callbacks
-> > + */
-> > +
-> > +void job_abort(void *priv)
-> > +{}
-> 
-> Is that still needed?
+can you please pull-in this patch?
 
-It looks like we need a dummy callback here, the v4l2_m2m_init function
-puts a hard requirement on it.
+On Thu, Mar 8, 2018 at 9:44 AM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
+> On Thu, Mar 8, 2018 at 12:01 AM, William Cohen <wcohen@redhat.com> wrote:
+>> On 03/07/2018 12:35 PM, Ganapatrao Kulkarni wrote:
+>>> Hi Will Cohen,
+>>>
+>>> On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
+>>> <acme@kernel.org> wrote:
+>>>> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
+>>>>> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
+>>>>>> There is MIDR change on ThunderX2 B0, adding an entry to mapfile
+>>>>>> to enable JSON events for B0.
+>>>>>>
+>>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>>
+>>>> Ganapatrao, can you please take this in consideration and if agreeing
+>>>> send a v2 patch?
+>>>>
+>>>> With that I can add an Acked-by: wcohen, Right?
+>>>>
+>>>> - Arnaldo
+>>>>>> ---
+>>>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
+>>>>>>  1 file changed, 1 insertion(+)
+>>>>>>
+>>>>>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>>>> index e61c9ca..93c5d14 100644
+>>>>>> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>>>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>>>> @@ -13,4 +13,5 @@
+>>>>>>  #
+>>>>>>  #Family-model,Version,Filename,EventType
+>>>>>>  0x00000000420f5160,v1,cavium,core
+>>>>>> +0x00000000430f0af0,v1,cavium,core
+>>>>>>  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
+>>>>>>
+>>>>>
+>>>>> Hi,
+>>>>> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
+>>>
+>>> for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
+>>> are ignored/dont-care.
+>>
+>> Thanks for pointing that out.  See the code masking out those bits in linux/toos/perf/arch/util/header.c. For the ppc64 it just copies the equivalent of the MIDR including the revision bits. Thus, the need for regular expression matching to avoid having to create a new entry for each revision.
+>
+> It is same for arm64 too, there is no need to add an entry for every
+> revision change,  need to add when part number changes.
+> This patch is not intended to add entry for revision change, the fact
+> of the matter is that, there  is complete MIDR change (vulcan to
+> thunderx2) in B0.
+> as per current arm64
+> implementation(.tools/perf/arch/arm64/util/header.c), it is not
+> required to have any dontcare marking in mapfile for revision/variant
+> bits.
+>
+> thanks
+> Ganapat
+>
+>>
+>> -Will
+>>
+>>>
+>>>>>
+>>>>> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
+>>>>>
+>>>>>
+>>>>> -Will Cohen
+>>>>
+>>>
+>>> thanks
+>>> Ganapat
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
 
-The feature is definitely not used for now, but maybe this could be
-hooked to aborting the matching request? It was probably designed for
-the case where the driver handles a queue of jobs on its own (that's how
-it's used in vim2m) and such an internal queue is perhaps irrelevant
-when using the request API (and fences later).
-
-> > +/*
-> > + * device_run() - prepares and starts processing
-> > + */
-> > +void device_run(void *priv)
-> > +{
-> 
-> This function (and the one above) should probably made static. Or at
-> least if you can't, they should have a much more specific name in
-> order not to conflict with anything from the core.
-
-Good point, let's go for static. Since these are passed as function
-pointers, it shouldn't be a problem.
-
-> > +	/*
-> > +	 * The VPU is only able to handle bus addresses so we have
-> > to subtract
-> > +	 * the RAM offset to the physcal addresses
-> > +	 */
-> > +	in_buf     -= PHYS_OFFSET;
-> > +	out_luma   -= PHYS_OFFSET;
-> > +	out_chroma -= PHYS_OFFSET;
-> 
-> You should take care of that by putting it in the dma_pfn_offset field
-> of the struct device (at least before we come up with something
-> better).
-> 
-> You'll then be able to use the dma_addr_t directly without modifying
-> it.
-
-Definitely!
-
-> > +	vpu->syscon = syscon_regmap_lookup_by_phandle(vpu->dev-
-> > >of_node,
-> > +						      "syscon");
-> > +	if (IS_ERR(vpu->syscon)) {
-> > +		vpu->syscon = NULL;
-> > +	} else {
-> > +		regmap_write_bits(vpu->syscon,
-> > SYSCON_SRAM_CTRL_REG0,
-> > +				  SYSCON_SRAM_C1_MAP_VE,
-> > +				  SYSCON_SRAM_C1_MAP_VE);
-> > +	}
-> 
-> This should be using our SRAM controller driver (and API), see
-> Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> include/linux/soc/sunxi/sunxi_sram.h
-
-I'll look into that.
-
-> > +	ret = clk_prepare_enable(vpu->ahb_clk);
-> > +	if (ret) {
-> > +		dev_err(vpu->dev, "could not enable ahb clock\n");
-> > +		return -EFAULT;
-> > +	}
-> > +	ret = clk_prepare_enable(vpu->mod_clk);
-> > +	if (ret) {
-> > +		clk_disable_unprepare(vpu->ahb_clk);
-> > +		dev_err(vpu->dev, "could not enable mod clock\n");
-> > +		return -EFAULT;
-> > +	}
-> > +	ret = clk_prepare_enable(vpu->ram_clk);
-> > +	if (ret) {
-> > +		clk_disable_unprepare(vpu->mod_clk);
-> > +		clk_disable_unprepare(vpu->ahb_clk);
-> > +		dev_err(vpu->dev, "could not enable ram clock\n");
-> > +		return -EFAULT;
-> > +	}
-> 
-> Ideally, this should be using runtime_pm to manage the device power
-> state, and disable it when not used.
-
-I'll add that to my tasks list. I suppose we shouldn't make this a
-priority for now, but this is definitely good to have.
-
-> > +	reset_control_assert(vpu->rstc);
-> > +	reset_control_deassert(vpu->rstc);
-> 
-> You can use reset_control_reset here
-
-Noted!
-
-> > +	return 0;
-> > +}
-> > +
-> > +void sunxi_cedrus_hw_remove(struct sunxi_cedrus_dev *vpu)
-> > +{
-> > +	clk_disable_unprepare(vpu->ram_clk);
-> > +	clk_disable_unprepare(vpu->mod_clk);
-> > +	clk_disable_unprepare(vpu->ahb_clk);
-> 
-> The device is not put back into reset here
-
-Good catch, thanks!
-
-Cheers,
-
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/36053b68/attachment.sig>
+thanks
+Ganapat
