@@ -1,100 +1,63 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 9 Mar 2018 17:03:26 +0100
-Subject: [PATCH v2 03/17 3/3] mfd: abx500-core: Adjust 14 checks for null
- pointers
-In-Reply-To: <6c8ff539-9e9d-635b-22a8-df8100ac8156@users.sourceforge.net>
-References: <c5d9751e-3ae8-0b66-821a-0e7f45bb8e1c@users.sourceforge.net>
- <6c8ff539-9e9d-635b-22a8-df8100ac8156@users.sourceforge.net>
-Message-ID: <2f3c512b-cd17-beb3-152a-23513f13279f@users.sourceforge.net>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 9 Mar 2018 09:03:55 -0700
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180309034332.GO6842@vireshk-i7>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+ <20180307050624.GR23018@vireshk-i7>
+ <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+ <20180309034332.GO6842@vireshk-i7>
+Message-ID: <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 8 Mar 2018 12:50:12 +0100
+On Fri, Mar 09, 2018 at 09:13:32AM +0530, Viresh Kumar wrote:
+> On 08-03-18, 13:14, Jordan Crouse wrote:
+> > It seems to me that performance_state has a direct relationship with genpd
+> > which is good for CPU votes but in this case, we're just passing along raw data
+> > to an independent microcontroller. The 'qcom,arc-level' is used to construct
+> > the actual values that the GMU will program into the RPMh. Since these are
+> 
+> The "genpd" here is created specially for this RPM. The performance-state thing
+> is designed to solve this very specific problem of qualcomm SoCs and there is no
+> way we are going to add another property for this now.
+> 
+> > informational (from the CPU perspective) rather than functional I feel like
+> > that using performance_state for this would be as hacky as using opp-microvolt
+> > or something else.
+> 
+> There is some WIP stuff here Rajendra is testing currently.
+> 
+> ssh://git at git.linaro.org/people/viresh.kumar/mylinux.git opp/genpd/qcom
+> 
+> Please have a talk with Rajendra who can help you understand on how this can be
+> used for GPUs.
 
-The script ?checkpatch.pl? pointed information out like the following.
+I don't think we are understanding each other. The GMU is a separate
+microcontroller. It is given a magic number (actually a combination of magic
+numbers) that it then uses to directly interact with the other hardware to make
+the vote. The only responsibility that the CPU has is to construct that magic
+number (once, at init) and send it across when asked.
 
-Comparison to NULL could be written ?
+Looking at the sdhc code from the testing tree it makes perfect sense
+that you have a device that needs to eventually do a RPMh vote from the CPU and
+so the 'required-opp' and performance state come together to do the right thing.
+This is good code.
 
-Thus fix the affected source code places.
+None of this is true for the GPU. The CPU never votes for the GPU so there 
+isn't any need to connect it to the power domain drivers. Even if you did
+there isn't any current mechanism for the rpmpd driver to pass the right magic
+number to the GPU driver which is what it really needs.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
+I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
+then thats just a naming dispute. We still need a way for the GPU to query the
+magic values.
 
-v2:
-Lee Jones requested a resend for this patch. The change was rebased
-on source files from Linux next-20180308.
-
- drivers/mfd/abx500-core.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-index 17176e91cbd0..f282d39a5917 100644
---- a/drivers/mfd/abx500-core.c
-+++ b/drivers/mfd/abx500-core.c
-@@ -65,7 +65,7 @@ int abx500_set_register_interruptible(struct device *dev, u8 bank, u8 reg,
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->set_register != NULL))
-+	if (ops && ops->set_register)
- 		return ops->set_register(dev, bank, reg, value);
- 	else
- 		return -ENOTSUPP;
-@@ -78,7 +78,7 @@ int abx500_get_register_interruptible(struct device *dev, u8 bank, u8 reg,
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->get_register != NULL))
-+	if (ops && ops->get_register)
- 		return ops->get_register(dev, bank, reg, value);
- 	else
- 		return -ENOTSUPP;
-@@ -91,7 +91,7 @@ int abx500_get_register_page_interruptible(struct device *dev, u8 bank,
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->get_register_page != NULL))
-+	if (ops && ops->get_register_page)
- 		return ops->get_register_page(dev, bank,
- 			first_reg, regvals, numregs);
- 	else
-@@ -105,7 +105,7 @@ int abx500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->mask_and_set_register != NULL))
-+	if (ops && ops->mask_and_set_register)
- 		return ops->mask_and_set_register(dev, bank,
- 			reg, bitmask, bitvalues);
- 	else
-@@ -118,7 +118,7 @@ int abx500_get_chip_id(struct device *dev)
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->get_chip_id != NULL))
-+	if (ops && ops->get_chip_id)
- 		return ops->get_chip_id(dev);
- 	else
- 		return -ENOTSUPP;
-@@ -130,7 +130,7 @@ int abx500_event_registers_startup_state_get(struct device *dev, u8 *event)
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->event_registers_startup_state_get != NULL))
-+	if (ops && ops->event_registers_startup_state_get)
- 		return ops->event_registers_startup_state_get(dev, event);
- 	else
- 		return -ENOTSUPP;
-@@ -142,7 +142,7 @@ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq)
- 	struct abx500_ops *ops;
- 
- 	lookup_ops(dev->parent, &ops);
--	if ((ops != NULL) && (ops->startup_irq_enabled != NULL))
-+	if (ops && ops->startup_irq_enabled)
- 		return ops->startup_irq_enabled(dev, irq);
- 	else
- 		return -ENOTSUPP;
+Jordan
 -- 
-2.16.2
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
