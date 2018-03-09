@@ -1,178 +1,92 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu,  8 Mar 2018 22:20:54 -0500
-Subject: [PATCH 1/7] ARM: linker script: factor out some common definitions
- between XIP and non-XIP
+Date: Thu,  8 Mar 2018 22:20:57 -0500
+Subject: [PATCH 4/7] ARM: linker script: factor out unwinding table sections
 In-Reply-To: <20180309032100.31039-1-nicolas.pitre@linaro.org>
 References: <20180309032100.31039-1-nicolas.pitre@linaro.org>
-Message-ID: <20180309032100.31039-2-nicolas.pitre@linaro.org>
+Message-ID: <20180309032100.31039-5-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lots of duplications between vmlinux.lds.S and vmlinux-xip.lds.S.
-This may lead to one file being updated but not the other. For example,
-SOFTIRQENTRY_TEXT and HYPERVISOR_TEXT were missing from the XIP version.
-
-This creates vmlinux.lds.h where a bunch of common defines are moved.
-
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kernel/vmlinux-xip.lds.S | 35 +++-------------------------------
- arch/arm/kernel/vmlinux.lds.S     | 38 +------------------------------------
- arch/arm/kernel/vmlinux.lds.h     | 40 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+), 69 deletions(-)
- create mode 100644 arch/arm/kernel/vmlinux.lds.h
+ arch/arm/kernel/vmlinux-xip.lds.S | 15 +--------------
+ arch/arm/kernel/vmlinux.lds.S     | 15 +--------------
+ arch/arm/kernel/vmlinux.lds.h     | 14 ++++++++++++++
+ 3 files changed, 16 insertions(+), 28 deletions(-)
 
 diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 12b87591eb..0a8922b616 100644
+index 4ddb547b19..65048708e4 100644
 --- a/arch/arm/kernel/vmlinux-xip.lds.S
 +++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -15,38 +15,7 @@
- #include <asm/memory.h>
- #include <asm/page.h>
+@@ -66,20 +66,7 @@ SECTIONS
+ 	}
  
--#define PROC_INFO							\
--	. = ALIGN(4);							\
--	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
--	*(.proc.info.init)						\
--	VMLINUX_SYMBOL(__proc_info_end) = .;
--
--#define IDMAP_TEXT							\
--	ALIGN_FUNCTION();						\
--	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
--	*(.idmap.text)							\
--	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
--	. = ALIGN(PAGE_SIZE);						\
--	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
--	*(.hyp.idmap.text)						\
--	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
--
--#ifdef CONFIG_HOTPLUG_CPU
--#define ARM_CPU_DISCARD(x)
--#define ARM_CPU_KEEP(x)		x
--#else
--#define ARM_CPU_DISCARD(x)	x
--#define ARM_CPU_KEEP(x)
--#endif
--
--#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
--	defined(CONFIG_GENERIC_BUG)
--#define ARM_EXIT_KEEP(x)	x
--#define ARM_EXIT_DISCARD(x)
--#else
--#define ARM_EXIT_KEEP(x)
--#define ARM_EXIT_DISCARD(x)	x
--#endif
-+#include "vmlinux.lds.h"
+ #ifdef CONFIG_ARM_UNWIND
+-	/*
+-	 * Stack unwinding tables
+-	 */
+-	. = ALIGN(8);
+-	.ARM.unwind_idx : {
+-		__start_unwind_idx = .;
+-		*(.ARM.exidx*)
+-		__stop_unwind_idx = .;
+-	}
+-	.ARM.unwind_tab : {
+-		__start_unwind_tab = .;
+-		*(.ARM.extab*)
+-		__stop_unwind_tab = .;
+-	}
++	ARM_UNWIND_SECTIONS
+ #endif
  
- OUTPUT_ARCH(arm)
- ENTRY(stext)
-@@ -100,10 +69,12 @@ SECTIONS
- 			*(.entry.text)
- 			__entry_text_end = .;
- 			IRQENTRY_TEXT
-+			SOFTIRQENTRY_TEXT
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			CPUIDLE_TEXT
- 			LOCK_TEXT
-+			HYPERVISOR_TEXT
- 			KPROBES_TEXT
- 			*(.gnu.warning)
- 			*(.glue_7)
+ 	NOTES
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 84a1ae3ce4..6a6eb483d9 100644
+index a02a96c651..3b375d8ccb 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -15,43 +15,7 @@
- #include <asm/page.h>
- #include <asm/pgtable.h>
+@@ -74,20 +74,7 @@ SECTIONS
+ 	}
  
--#define PROC_INFO							\
--	. = ALIGN(4);							\
--	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
--	*(.proc.info.init)						\
--	VMLINUX_SYMBOL(__proc_info_end) = .;
--
--#define HYPERVISOR_TEXT							\
--	VMLINUX_SYMBOL(__hyp_text_start) = .;				\
--	*(.hyp.text)							\
--	VMLINUX_SYMBOL(__hyp_text_end) = .;
--
--#define IDMAP_TEXT							\
--	ALIGN_FUNCTION();						\
--	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
--	*(.idmap.text)							\
--	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
--	. = ALIGN(PAGE_SIZE);						\
--	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
--	*(.hyp.idmap.text)						\
--	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
--
--#ifdef CONFIG_HOTPLUG_CPU
--#define ARM_CPU_DISCARD(x)
--#define ARM_CPU_KEEP(x)		x
--#else
--#define ARM_CPU_DISCARD(x)	x
--#define ARM_CPU_KEEP(x)
--#endif
--
--#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
--	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
--#define ARM_EXIT_KEEP(x)	x
--#define ARM_EXIT_DISCARD(x)
--#else
--#define ARM_EXIT_KEEP(x)
--#define ARM_EXIT_DISCARD(x)	x
--#endif
-+#include "vmlinux.lds.h"
+ #ifdef CONFIG_ARM_UNWIND
+-	/*
+-	 * Stack unwinding tables
+-	 */
+-	. = ALIGN(8);
+-	.ARM.unwind_idx : {
+-		__start_unwind_idx = .;
+-		*(.ARM.exidx*)
+-		__stop_unwind_idx = .;
+-	}
+-	.ARM.unwind_tab : {
+-		__start_unwind_tab = .;
+-		*(.ARM.extab*)
+-		__stop_unwind_tab = .;
+-	}
++	ARM_UNWIND_SECTIONS
+ #endif
  
- OUTPUT_ARCH(arm)
- ENTRY(stext)
+ 	NOTES
 diff --git a/arch/arm/kernel/vmlinux.lds.h b/arch/arm/kernel/vmlinux.lds.h
-new file mode 100644
-index 0000000000..0a86e8a111
---- /dev/null
+index 0ef86d75a0..566a7b42a0 100644
+--- a/arch/arm/kernel/vmlinux.lds.h
 +++ b/arch/arm/kernel/vmlinux.lds.h
-@@ -0,0 +1,40 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
+@@ -78,3 +78,17 @@
+ 		. = ALIGN(4);						\
+ 		*(.got)			/* Global offset table */	\
+ 		ARM_CPU_KEEP(PROC_INFO)
 +
-+#ifdef CONFIG_HOTPLUG_CPU
-+#define ARM_CPU_DISCARD(x)
-+#define ARM_CPU_KEEP(x)		x
-+#else
-+#define ARM_CPU_DISCARD(x)	x
-+#define ARM_CPU_KEEP(x)
-+#endif
-+
-+#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-+	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
-+#define ARM_EXIT_KEEP(x)	x
-+#define ARM_EXIT_DISCARD(x)
-+#else
-+#define ARM_EXIT_KEEP(x)
-+#define ARM_EXIT_DISCARD(x)	x
-+#endif
-+
-+#define PROC_INFO							\
-+		. = ALIGN(4);						\
-+		VMLINUX_SYMBOL(__proc_info_begin) = .;			\
-+		*(.proc.info.init)					\
-+		VMLINUX_SYMBOL(__proc_info_end) = .;
-+
-+#define HYPERVISOR_TEXT							\
-+		VMLINUX_SYMBOL(__hyp_text_start) = .;			\
-+		*(.hyp.text)						\
-+		VMLINUX_SYMBOL(__hyp_text_end) = .;
-+
-+#define IDMAP_TEXT							\
-+		ALIGN_FUNCTION();					\
-+		VMLINUX_SYMBOL(__idmap_text_start) = .;			\
-+		*(.idmap.text)						\
-+		VMLINUX_SYMBOL(__idmap_text_end) = .;			\
-+		. = ALIGN(PAGE_SIZE);					\
-+		VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;		\
-+		*(.hyp.idmap.text)					\
-+		VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-+
++/* Stack unwinding tables */
++#define ARM_UNWIND_SECTIONS						\
++	. = ALIGN(8);							\
++	.ARM.unwind_idx : {						\
++		__start_unwind_idx = .;					\
++		*(.ARM.exidx*)						\
++		__stop_unwind_idx = .;					\
++	}								\
++	.ARM.unwind_tab : {						\
++		__start_unwind_tab = .;					\
++		*(.ARM.extab*)						\
++		__stop_unwind_tab = .;					\
++	}
 -- 
 2.14.3
