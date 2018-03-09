@@ -1,31 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Mar 2018 15:58:09 +0000
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <20180309143415.GB4194@kernel.org>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
- <20180307143832.GJ3701@kernel.org>
- <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
- <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
- <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
- <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
- <20180309143415.GB4194@kernel.org>
-Message-ID: <20180309155808.GP15537@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Mar 2018 15:58:29 +0000
+Subject: [RFC PATCH 2/6] arm64: untag user addresses in copy_from_user
+ and others
+In-Reply-To: <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
+ <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
+Message-ID: <20180309155829.2fzgevhsxj3gnyly@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 11:34:15AM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Fri, Mar 09, 2018 at 07:57:04PM +0530, Ganapatrao Kulkarni escreveu:
-> > Hi Arnaldo,
-> > 
-> > can you please pull-in this patch?
+On Fri, Mar 09, 2018 at 03:03:09PM +0000, Mark Rutland wrote:
+> On Fri, Mar 09, 2018 at 03:02:00PM +0100, Andrey Konovalov wrote:
+> > copy_from_user (and a few other similar functions) are used to copy data
+> > from user memory into the kernel memory or vice versa. Since a user can
+> > provided a tagged pointer to one of the syscalls that use copy_from_user,
+> > we need to correctly handle such pointers.
 > 
-> So everybody is Ok with this? Can I have some Acked-by: from subject
-> matter experts?
+> I don't think it makes sense to do this in the low-level uaccess
+> primitives, given we're going to have to untag pointers before common
+> code can use them, e.g. for comparisons against TASK_SIZE or
+> user_addr_max().
+> 
+> I think we'll end up with subtle bugs unless we consistently untag
+> pointers before we get to uaccess primitives. If core code does untag
+> pointers, then it's redundant to do so here.
 
-The original patch looks fine to me:
+A quick "hack" below clears the tag on syscall entry (where the argument
+is a __user pointer). However, we still have cases in core code where
+the pointer is read from a structure or even passed as an unsigned long
+as part of a command + argument (like in ptrace).
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+The "hack":
 
-Will
+---------------------------------8<--------------------------
+>From 6df503651f73c923d91eb695e56f977ddcc52d43 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Tue, 6 Feb 2018 17:54:05 +0000
+Subject: [PATCH] arm64: Allow user pointer tags to be passed into the kernel
+
+The current tagged pointer ABI disallows the top byte of a user pointer
+to be non-zero when invoking a syscall. This patch allows such pointer
+to be passed into the kernel and the kernel will mask them out
+automatically. Page-based syscall ABI (mmap, mprotect, madvise etc.)
+expect the pointer tag to be 0 (see include/linux/syscalls.h for the ABI
+functions taking __user pointers).
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/unistd.h | 9 +++++++++
+ include/linux/syscalls.h        | 2 ++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index a0baa9af5487..cd68ad969e3a 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -53,3 +53,12 @@
+ #endif
+ 
+ #define NR_syscalls (__NR_syscalls)
++
++/* copied from arch/s390/ */
++#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p( \
++				typeof(0?(__force t)0:0ULL), u64))
++/* sign-extend bit 55 to mask out the pointer tag */
++#define __SC_CAST(t, a)						\
++	(__TYPE_IS_PTR(t)					\
++		? (__force t)((__s64)((__u64)a << 8) >> 8)	\
++		: (__force t)a)
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index a78186d826d7..279497207a31 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -105,7 +105,9 @@ union bpf_attr;
+ #define __TYPE_IS_UL(t)	(__TYPE_AS(t, 0UL))
+ #define __TYPE_IS_LL(t) (__TYPE_AS(t, 0LL) || __TYPE_AS(t, 0ULL))
+ #define __SC_LONG(t, a) __typeof(__builtin_choose_expr(__TYPE_IS_LL(t), 0LL, 0L)) a
++#ifndef __SC_CAST
+ #define __SC_CAST(t, a)	(__force t) a
++#endif
+ #define __SC_ARGS(t, a)	a
+ #define __SC_TEST(t, a) (void)BUILD_BUG_ON_ZERO(!__TYPE_IS_LL(t) && sizeof(t) > sizeof(long))
+ 
+-- 
+Catalin
