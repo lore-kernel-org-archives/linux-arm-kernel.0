@@ -1,149 +1,141 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Fri, 9 Mar 2018 23:03:33 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: Add missing SYS-DMAC2 dmas
-In-Reply-To: <1520518205-23351-1-git-send-email-geert+renesas@glider.be>
-References: <1520518205-23351-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180309220333.GM2205@bigcity.dyn.berto.se>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Fri, 9 Mar 2018 17:05:30 -0500
+Subject: [PATCH v2] ARM: dts: BCM5301X: Add support for Linksys EA9500
+In-Reply-To: <88e9d209-c45e-0e8f-53ce-4705d0b7e3c2@gmail.com>
+References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+ <20180302194155.50808-1-npcomplete13@gmail.com>
+ <88e9d209-c45e-0e8f-53ce-4705d0b7e3c2@gmail.com>
+Message-ID: <20180309220530.nz2qkuipjqabus5h@osboxes>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Date: Fri, 9 Mar 2018 16:56:11 -0500
+From: Vivek Unune <npcomplete13@gmail.com>
+To: Florian Fainelli <f.fainelli@gmail.com>
+Cc: hauke at hauke-m.de, zajec5 at gmail.com, jonmason at broadcom.com,
+	bcm-kernel-feedback-list at broadcom.com, robh+dt at kernel.org,
+	mark.rutland at arm.com, linux at armlinux.org.uk,
+	linux-arm-kernel at lists.infradead.org, devicetree at vger.kernel.org,
+	linux-kernel at vger.kernel.org, Jon Mason <jon.mason@broadcom.com>
+Subject: Re: [PATCH v2] ARM: dts: BCM5301X: Add support for Linksys EA9500
+Message-ID: <20180309215611.ip7uvnpwfkfwfmx3@osboxes>
+References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+ <20180302194155.50808-1-npcomplete13@gmail.com>
+ <88e9d209-c45e-0e8f-53ce-4705d0b7e3c2@gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <88e9d209-c45e-0e8f-53ce-4705d0b7e3c2@gmail.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 
-Thanks for your patch.
+Hi Florian,
 
-On 2018-03-08 15:10:05 +0100, Geert Uytterhoeven wrote:
-> On R-Car H3, on-chip peripheral modules that can make use of DMA are
-> wired to either SYS-DMAC0 only, or to both SYS-DMAC1 and SYS-DMAC2.
+On Fri, Mar 09, 2018 at 11:17:21AM -0800, Florian Fainelli wrote:
 > 
-> Add the missing DMA properties pointing to SYS-DMAC2 for HSCIF[0-2],
-> SCIF[015], and I2C[0-2].  These were initially left out because early
-> firmware versions prohibited using SYS-DMAC2.  This restriction has been
-> lifted in IPL and Secure Monitor Rev1.0.6 (released on Feb 25, 2016).
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Glad you got it working finally! Out of curiosity, I am assuming you
+> have Broadcom tags enabled on the internal switch and disabled on the
+> external BCM53125 switch, is that correct?
 
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+No, I did not enable tagging, as I thought this might have undesired effect
+with internal switch enabled and external disabled. I understand that
+BCM53125 needs additional plumbing and it's tagging is disabled in mainline.
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 45 +++++++++++++++++++-------------
->  1 file changed, 27 insertions(+), 18 deletions(-)
+> >  
+> >  #include "bcm47094.dtsi"
+> > -#include "bcm5301x-nand-cs0-bch8.dtsi"
+> > +#include "bcm5301x-nand-cs0-bch1.dtsi"
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index 0648fe451d097f4e..849c2c7ff101c202 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -1076,8 +1076,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x31>, <&dmac1 0x30>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
-> +			       <&dmac2 0x31>, <&dmac2 0x30>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 520>;
->  			status = "disabled";
-> @@ -1093,8 +1094,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x33>, <&dmac1 0x32>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
-> +			       <&dmac2 0x33>, <&dmac2 0x32>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 519>;
->  			status = "disabled";
-> @@ -1110,8 +1112,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x35>, <&dmac1 0x34>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
-> +			       <&dmac2 0x35>, <&dmac2 0x34>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 518>;
->  			status = "disabled";
-> @@ -1222,8 +1225,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x51>, <&dmac1 0x50>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
-> +			       <&dmac2 0x51>, <&dmac2 0x50>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 207>;
->  			status = "disabled";
-> @@ -1238,8 +1242,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x53>, <&dmac1 0x52>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
-> +			       <&dmac2 0x53>, <&dmac2 0x52>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 206>;
->  			status = "disabled";
-> @@ -1302,8 +1307,9 @@
->  				 <&cpg CPG_CORE R8A7795_CLK_S3D1>,
->  				 <&scif_clk>;
->  			clock-names = "fck", "brg_int", "scif_clk";
-> -			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
-> +			       <&dmac2 0x5b>, <&dmac2 0x5a>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 202>;
->  			status = "disabled";
-> @@ -1335,8 +1341,9 @@
->  			clocks = <&cpg CPG_MOD 931>;
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 931>;
-> -			dmas = <&dmac1 0x91>, <&dmac1 0x90>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x91>, <&dmac1 0x90>,
-> +			       <&dmac2 0x91>, <&dmac2 0x90>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			i2c-scl-internal-delay-ns = <110>;
->  			status = "disabled";
->  		};
-> @@ -1351,8 +1358,9 @@
->  			clocks = <&cpg CPG_MOD 930>;
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 930>;
-> -			dmas = <&dmac1 0x93>, <&dmac1 0x92>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x93>, <&dmac1 0x92>,
-> +			       <&dmac2 0x93>, <&dmac2 0x92>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			i2c-scl-internal-delay-ns = <6>;
->  			status = "disabled";
->  		};
-> @@ -1367,8 +1375,9 @@
->  			clocks = <&cpg CPG_MOD 929>;
->  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->  			resets = <&cpg 929>;
-> -			dmas = <&dmac1 0x95>, <&dmac1 0x94>;
-> -			dma-names = "tx", "rx";
-> +			dmas = <&dmac1 0x95>, <&dmac1 0x94>,
-> +			       <&dmac2 0x95>, <&dmac2 0x94>;
-> +			dma-names = "tx", "rx", "tx", "rx";
->  			i2c-scl-internal-delay-ns = <6>;
->  			status = "disabled";
->  		};
-> -- 
-> 2.7.4
+> This sounds like an independent bugfix, can you submit that separately?
+
+Will do.
+
+> > +
+> > +		port at 5 {
+> > +			reg = <5>;
+> > +			ethernet = <&gmac0>;
+> > +			label = "cpu";
+> > +
+> > +			fixed-link {
+> > +				speed = <1000>;
+> > +				full-duplex;
+> > +			};
+> > +		};
+> > +
+> > +		port at 7 {
+> > +			reg = <7>;
+> > +			ethernet = <&gmac1>;
+> > +			label = "cpu";
+> > +
+> > +			fixed-link {
+> > +				speed = <1000>;
+> > +				full-duplex;
+> > +			};
+> > +		};
+> > +
+> > +		port at 8 {
+> > +			reg = <8>;
+> > +			ethernet = <&gmac2>;
+> > +			label = "cpu";
+> > +
+> > +			fixed-link {
+> > +				speed = <1000>;
+> > +				full-duplex;
+> > +			};
+> > +		};
+> 
+> None of this is wrong, but DSA effectively will take the first port
+> specified with a "cpu" label and declare it as the one and only CPU port
+> it supports. If the architecture on Northstar is similar to what is done
+> on Northstar Plus, port 5 can be either internal or external PHY, port 7
+> is indeed gmac1, and port 8 is connected to the flow accelerator, which
+> should be in "bypass" mode by default. We can always change that later
+> on if we have to anyway.
+
+>From what I understand from the source is that gmac0 and gmac1 in NorthStar
+are connected to FA while gmac2 is connected to port8
+Although I could be completely wrong :)
+
+Snippet from GPL source [1]:
+
+ * A typical GMAC configuration is:
+ *   GMAC#0 - port#5 - fwd0 <---> wl0 (radio 0) on CPU core0
+ *   GMAC#1 - port#7 - fwd1 <---> wl1 (radio 1) on CPU core1
+ *
+ *   GMAC#2 - port#8 - eth0 <--- vlan1 ---> br0
+
+Note: EA9500 has three radios, fwd0 is connected to even numbered radios
+While odd numbered radios are connected to fwd1. Also, fw0,fw1 and eth0
+listed above are devices created by the factory firmware.
+
+> > +
+> > +		sw0_p0: port at 0 {
+> 
+> switch0port0 would be a nicer label and unit name to use.
+> 
+> 
+> Similarly, this would be better with switch1port8?
+
+Will do.
+
+
+> >  
+> > -/ {
+> > -	usb3_phy: usb3-phy {
+> > -		compatible = "brcm,ns-bx-usb3-phy";
+> > -	};
+> > +&usb3_phy {
+> > +	compatible = "brcm,ns-bx-usb3-phy";
+> >  };
+> 
+> I would probably create a separate commit which explains why yuo are
+> relocating the USB 3.0 PHY into the mdiomux node, and then only add
+> support for the EA9500 model.
 > 
 
--- 
-Regards,
-Niklas S?derlund
+Will do.
+
+Thanks,
+
+Vivek
+
+[1] https://github.com/RMerl/asuswrt-merlin/blob/master/release/src-rt-7.x.main/src/include/hndfwd.h
