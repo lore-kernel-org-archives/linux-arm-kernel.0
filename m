@@ -1,97 +1,30 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 9 Mar 2018 19:57:04 +0530
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
- <20180307143832.GJ3701@kernel.org>
- <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
- <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
- <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
-Message-ID: <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Mar 2018 15:27:24 +0100
+Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
+ kernel memory overwrite attempt detected" on QNAP NAS (ARM)
+In-Reply-To: <1520589187.923608.1297117744.23E3098C@webmail.messagingengine.com>
+References: <20180304204115.GD21710@lunn.ch>
+ <151652931598.757.4527606947579667082.reportbug@massive.lan>
+ <20180305142846.GJ25189@lunn.ch>
+ <1520265474.2408.8.camel@debian.org>
+ <1520297697.4117371.1292731088.7BEDFAAE@webmail.messagingengine.com>
+ <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
+ <20180307133611.GC18030@lunn.ch>
+ <1520455769.3085111.1295233032.3B89F103@webmail.messagingengine.com>
+ <20180307222722.GH1326@lunn.ch>
+ <1520589187.923608.1297117744.23E3098C@webmail.messagingengine.com>
+Message-ID: <20180309142724.GD27783@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+> > Hi Menno
+> > 
+> > Could you also try linux-image-4.14.0-3-marvell from sid?
+> 
+> Can do. Should I just use the kernel packages from sid or update the whole system to sid?
 
-can you please pull-in this patch?
+Hi Menno
 
-On Thu, Mar 8, 2018 at 9:44 AM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
-> On Thu, Mar 8, 2018 at 12:01 AM, William Cohen <wcohen@redhat.com> wrote:
->> On 03/07/2018 12:35 PM, Ganapatrao Kulkarni wrote:
->>> Hi Will Cohen,
->>>
->>> On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
->>> <acme@kernel.org> wrote:
->>>> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
->>>>> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
->>>>>> There is MIDR change on ThunderX2 B0, adding an entry to mapfile
->>>>>> to enable JSON events for B0.
->>>>>>
->>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>>>
->>>> Ganapatrao, can you please take this in consideration and if agreeing
->>>> send a v2 patch?
->>>>
->>>> With that I can add an Acked-by: wcohen, Right?
->>>>
->>>> - Arnaldo
->>>>>> ---
->>>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
->>>>>>  1 file changed, 1 insertion(+)
->>>>>>
->>>>>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>>>> index e61c9ca..93c5d14 100644
->>>>>> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>>>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>>>> @@ -13,4 +13,5 @@
->>>>>>  #
->>>>>>  #Family-model,Version,Filename,EventType
->>>>>>  0x00000000420f5160,v1,cavium,core
->>>>>> +0x00000000430f0af0,v1,cavium,core
->>>>>>  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
->>>>>>
->>>>>
->>>>> Hi,
->>>>> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
->>>
->>> for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
->>> are ignored/dont-care.
->>
->> Thanks for pointing that out.  See the code masking out those bits in linux/toos/perf/arch/util/header.c. For the ppc64 it just copies the equivalent of the MIDR including the revision bits. Thus, the need for regular expression matching to avoid having to create a new entry for each revision.
->
-> It is same for arm64 too, there is no need to add an entry for every
-> revision change,  need to add when part number changes.
-> This patch is not intended to add entry for revision change, the fact
-> of the matter is that, there  is complete MIDR change (vulcan to
-> thunderx2) in B0.
-> as per current arm64
-> implementation(.tools/perf/arch/arm64/util/header.c), it is not
-> required to have any dontcare marking in mapfile for revision/variant
-> bits.
->
-> thanks
-> Ganapat
->
->>
->> -Will
->>
->>>
->>>>>
->>>>> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
->>>>>
->>>>>
->>>>> -Will Cohen
->>>>
->>>
->>> thanks
->>> Ganapat
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+The kernel packages should be sufficient.
 
-thanks
-Ganapat
+    Andrew
