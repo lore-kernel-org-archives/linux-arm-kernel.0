@@ -1,10 +1,9 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:00 +0000
-Subject: [PATCH 06/25] nvmem: uniphier-efuse: Convert to use
- devm_nvmem_register()
+Date: Fri,  9 Mar 2018 14:47:01 +0000
+Subject: [PATCH 07/25] nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-7-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-8-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,28 +27,28 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/uniphier-efuse.c | 16 ++--------------
+ drivers/nvmem/snvs_lpgpr.c | 16 ++--------------
  1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
-index be11880a1358..271f0b2ff86a 100644
---- a/drivers/nvmem/uniphier-efuse.c
-+++ b/drivers/nvmem/uniphier-efuse.c
-@@ -60,20 +60,9 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
- 	econfig.size = resource_size(res);
- 	econfig.priv = priv;
- 	econfig.dev = dev;
--	nvmem = nvmem_register(&econfig);
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index e5c2a4a17f03..cb471d5e8e86 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -117,20 +117,9 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->reg_read  = snvs_lpgpr_read,
+ 	cfg->reg_write = snvs_lpgpr_write,
+ 
+-	nvmem = nvmem_register(cfg);
 -	if (IS_ERR(nvmem))
 -		return PTR_ERR(nvmem);
-+	nvmem = devm_nvmem_register(dev, &econfig);
++	nvmem = devm_nvmem_register(dev, cfg);
  
 -	platform_set_drvdata(pdev, nvmem);
 -
 -	return 0;
 -}
 -
--static int uniphier_efuse_remove(struct platform_device *pdev)
+-static int snvs_lpgpr_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
@@ -57,14 +56,14 @@ index be11880a1358..271f0b2ff86a 100644
 +	return PTR_ERR_OR_ZERO(nvmem);
  }
  
- static const struct of_device_id uniphier_efuse_of_match[] = {
-@@ -84,7 +73,6 @@ MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
+ static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+@@ -143,7 +132,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
  
- static struct platform_driver uniphier_efuse_driver = {
- 	.probe = uniphier_efuse_probe,
--	.remove = uniphier_efuse_remove,
+ static struct platform_driver snvs_lpgpr_driver = {
+ 	.probe	= snvs_lpgpr_probe,
+-	.remove	= snvs_lpgpr_remove,
  	.driver = {
- 		.name = "uniphier-efuse",
- 		.of_match_table = uniphier_efuse_of_match,
+ 		.name	= "snvs_lpgpr",
+ 		.of_match_table = snvs_lpgpr_dt_ids,
 -- 
 2.15.1
