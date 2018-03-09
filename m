@@ -1,84 +1,113 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 9 Mar 2018 15:38:57 +0200
-Subject: [linux-sunxi] [PATCH 6/9] sunxi-cedrus: Add device tree binding
- document
-In-Reply-To: <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 9 Mar 2018 14:57:02 +0100
+Subject: [PATCH 5/9] media: platform: Add Sunxi Cedrus decoder driver
+In-Reply-To: <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
 References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
- <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
-Message-ID: <20180309133857.GA20392@solar>
+ <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
+Message-ID: <20180309135702.pk4webt7xnj7lrza@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 11:14:42AM +0100, Paul Kocialkowski wrote:
-> From: Florent Revest <florent.revest@free-electrons.com>
-> 
-> Device Tree bindings for the Allwinner's video engine
-> 
-> Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
-> ---
->  .../devicetree/bindings/media/sunxi-cedrus.txt     | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-> new file mode 100644
-> index 000000000000..138581113c49
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-> @@ -0,0 +1,44 @@
-> +Device-Tree bindings for SUNXI video engine found in sunXi SoC family
-> +
-> +Required properties:
-> +- compatible	    : "allwinner,sun4i-a10-video-engine";
-> +- memory-region     : DMA pool for buffers allocation;
-> +- clocks	    : list of clock specifiers, corresponding to
-> +		      entries in clock-names property;
-> +- clock-names	    : should contain "ahb", "mod" and "ram" entries;
-> +- resets	    : phandle for reset;
-> +- interrupts	    : should contain VE interrupt number;
-> +- reg		    : should contain register base and length of VE.
-> +
-> +Example:
-> +
-> +reserved-memory {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
-> +
-> +	ve_reserved: cma {
-> +		compatible = "shared-dma-pool";
-> +		reg = <0x43d00000 0x9000000>;
-> +		no-map;
-> +		linux,cma-default;
-> +	};
-> +};
-> +
-> +video-engine {
-> +	compatible = "allwinner,sun4i-a10-video-engine";
-> +	memory-region = <&ve_reserved>;
-> +
-> +	clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
-> +		 <&dram_gates 0>;
+Hi,
 
-This should be updated to sunxi-ng clocks:
+On Fri, Mar 09, 2018 at 11:14:41AM +0100, Paul Kocialkowski wrote:
+> +/*
+> + * mem2mem callbacks
+> + */
+> +
+> +void job_abort(void *priv)
+> +{}
 
-clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>, <&ccu CLK_DRAM_VE>;
+Is that still needed?
 
-> +	clock-names = "ahb", "mod", "ram";
+> +/*
+> + * device_run() - prepares and starts processing
+> + */
+> +void device_run(void *priv)
+> +{
+
+This function (and the one above) should probably made static. Or at
+least if you can't, they should have a much more specific name in
+order not to conflict with anything from the core.
+
+
+> +	/*
+> +	 * The VPU is only able to handle bus addresses so we have to subtract
+> +	 * the RAM offset to the physcal addresses
+> +	 */
+> +	in_buf     -= PHYS_OFFSET;
+> +	out_luma   -= PHYS_OFFSET;
+> +	out_chroma -= PHYS_OFFSET;
+
+You should take care of that by putting it in the dma_pfn_offset field
+of the struct device (at least before we come up with something
+better).
+
+You'll then be able to use the dma_addr_t directly without modifying it.
+
+> +	vpu->syscon = syscon_regmap_lookup_by_phandle(vpu->dev->of_node,
+> +						      "syscon");
+> +	if (IS_ERR(vpu->syscon)) {
+> +		vpu->syscon = NULL;
+> +	} else {
+> +		regmap_write_bits(vpu->syscon, SYSCON_SRAM_CTRL_REG0,
+> +				  SYSCON_SRAM_C1_MAP_VE,
+> +				  SYSCON_SRAM_C1_MAP_VE);
+> +	}
+
+This should be using our SRAM controller driver (and API), see
+Documentation/devicetree/bindings/sram/sunxi-sram.txt
+include/linux/soc/sunxi/sunxi_sram.h
+
+> +	ret = clk_prepare_enable(vpu->ahb_clk);
+> +	if (ret) {
+> +		dev_err(vpu->dev, "could not enable ahb clock\n");
+> +		return -EFAULT;
+> +	}
+> +	ret = clk_prepare_enable(vpu->mod_clk);
+> +	if (ret) {
+> +		clk_disable_unprepare(vpu->ahb_clk);
+> +		dev_err(vpu->dev, "could not enable mod clock\n");
+> +		return -EFAULT;
+> +	}
+> +	ret = clk_prepare_enable(vpu->ram_clk);
+> +	if (ret) {
+> +		clk_disable_unprepare(vpu->mod_clk);
+> +		clk_disable_unprepare(vpu->ahb_clk);
+> +		dev_err(vpu->dev, "could not enable ram clock\n");
+> +		return -EFAULT;
+> +	}
+
+Ideally, this should be using runtime_pm to manage the device power
+state, and disable it when not used.
+
+> +	reset_control_assert(vpu->rstc);
+> +	reset_control_deassert(vpu->rstc);
+
+You can use reset_control_reset here
+
+> +	return 0;
+> +}
 > +
-> +	assigned-clocks = <&ccu CLK_VE>;
-> +	assigned-clock-rates = <320000000>;
-> +
-> +	resets = <&ccu RST_VE>;
-> +
-> +	interrupts = <53>;
-> +
-> +	reg = <0x01c0e000 4096>;
-> +};
-> -- 
-> 2.16.2
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> +void sunxi_cedrus_hw_remove(struct sunxi_cedrus_dev *vpu)
+> +{
+> +	clk_disable_unprepare(vpu->ram_clk);
+> +	clk_disable_unprepare(vpu->mod_clk);
+> +	clk_disable_unprepare(vpu->ahb_clk);
+
+The device is not put back into reset here
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/be9f2bc9/attachment-0001.sig>
