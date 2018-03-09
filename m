@@ -1,31 +1,82 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri,  9 Mar 2018 15:27:20 +0900
-Subject: [PATCH] net: ethernet: ave: enable Rx drop interrupt
-Message-ID: <1520576840-17566-1-git-send-email-hayashi.kunihiko@socionext.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Fri, 09 Mar 2018 07:33:33 +0100
+Subject: [alsa-devel] [BUG] Kernel crash on Allwinner H3 due to sound core
+ changes
+In-Reply-To: <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+ <20180308111348.GB6019@sirena.org.uk>
+ <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <2477367.T7DEPNfgqC@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables AVE_GI_RXDROP interrupt factor. This factor indicates
-depletion of Rx descriptors and the handler counts the number
-of dropped packets.
+Hi,
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- drivers/net/ethernet/socionext/sni_ave.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Dne petek, 09. marec 2018 ob 00:49:18 CET je Kuninori Morimoto napisal(a):
+> Hi Mark,Jernej
+> 
+> > > Ahh.. indeed. Good catch !
+> > > How about to add such flag ?
+> > > This is just idea. No tested, No compiled, but can help you ?
+> > 
+> > I think this makes sense as a patch.  We might want to disallow
+> > allocating components as part of a bigger struct so everything is more
+> > consistent but that's a bigger thing.
+> 
+> (snip)
+> 
+> > I tested this patch and there is no crash anymore. If you will send it as
+> > a
+> > fix, you can add:
+> > 
+> > Reported-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > Tested-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> 
+> previous my patch used new flag (= .alloced_component),
+> but I think it is not good idea.
+> And I noticed that snd_soc_add_component() is
+> also calling kfree(component) (= has same bug).
+> 
+> So how about below one ?
+> I want to post it instead of previous.
+> 
+> # I will go to ELC next week, thus posting patch will be
+> # 2weeks later
+> 
+> ------------
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index c0edac8..4a8de23 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -3476,7 +3476,6 @@ int snd_soc_add_component(struct device *dev,
+>  err_cleanup:
+>  	snd_soc_component_cleanup(component);
+>  err_free:
+> -	kfree(component);
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(snd_soc_add_component);
+> @@ -3488,7 +3487,7 @@ int snd_soc_register_component(struct device *dev,
+>  {
+>  	struct snd_soc_component *component;
+> 
+> -	component = kzalloc(sizeof(*component), GFP_KERNEL);
+> +	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
+>  	if (!component)
+>  		return -ENOMEM;
+> 
+> @@ -3523,7 +3522,6 @@ static int __snd_soc_unregister_component(struct
+> device *dev)
+> 
+>  	if (found) {
+>  		snd_soc_component_cleanup(component);
+> -		kfree(component);
+>  	}
+> 
+>  	return found;
 
-diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
-index b247707..043eb55 100644
---- a/drivers/net/ethernet/socionext/sni_ave.c
-+++ b/drivers/net/ethernet/socionext/sni_ave.c
-@@ -1349,7 +1349,7 @@ static int ave_open(struct net_device *ndev)
- 	val |= AVE_IIRQC_EN0 | (AVE_INTM_COUNT << 16);
- 	writel(val, priv->base + AVE_IIRQC);
- 
--	val = AVE_GI_RXIINT | AVE_GI_RXOVF | AVE_GI_TX;
-+	val = AVE_GI_RXIINT | AVE_GI_RXOVF | AVE_GI_TX | AVE_GI_RXDROP;
- 	ave_irq_restore(ndev, val);
- 
- 	napi_enable(&priv->napi_rx);
--- 
-2.7.4
+That patch also prevents the crash, so you can add my tested-by and reported-
+by tags for this patch too.
+
+Best regards,
+Jernej
