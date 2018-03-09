@@ -1,16 +1,17 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:13 +0000
-Subject: [PATCH 19/25] nvmem: rockchip-efuse: Do not use "&pdev->dev"
- explicitly
+Date: Fri,  9 Mar 2018 14:47:00 +0000
+Subject: [PATCH 06/25] nvmem: uniphier-efuse: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-20-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-7-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-There's "dev" variable for this already. Use it.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -27,38 +28,43 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/uniphier-efuse.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index ade8848adf82..b3b0b648be62 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -268,21 +268,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
+index be11880a1358..271f0b2ff86a 100644
+--- a/drivers/nvmem/uniphier-efuse.c
++++ b/drivers/nvmem/uniphier-efuse.c
+@@ -60,20 +60,9 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
+ 	econfig.size = resource_size(res);
+ 	econfig.priv = priv;
+ 	econfig.dev = dev;
+-	nvmem = nvmem_register(&econfig);
+-	if (IS_ERR(nvmem))
+-		return PTR_ERR(nvmem);
++	nvmem = devm_nvmem_register(dev, &econfig);
  
--	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
- 	if (!efuse)
- 		return -ENOMEM;
+-	platform_set_drvdata(pdev, nvmem);
+-
+-	return 0;
+-}
+-
+-static int uniphier_efuse_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
++	return PTR_ERR_OR_ZERO(nvmem);
+ }
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	efuse->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
+ static const struct of_device_id uniphier_efuse_of_match[] = {
+@@ -84,7 +73,6 @@ MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
  
--	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	efuse->clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(efuse->clk))
- 		return PTR_ERR(efuse->clk);
- 
--	efuse->dev = &pdev->dev;
-+	efuse->dev = dev;
- 	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
- 				 &econfig.size))
- 		econfig.size = resource_size(res);
+ static struct platform_driver uniphier_efuse_driver = {
+ 	.probe = uniphier_efuse_probe,
+-	.remove = uniphier_efuse_remove,
+ 	.driver = {
+ 		.name = "uniphier-efuse",
+ 		.of_match_table = uniphier_efuse_of_match,
 -- 
 2.15.1
