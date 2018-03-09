@@ -1,136 +1,143 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:06:48 +0800
-Subject: [PATCH 05/39] arm64: Make USER_DS an inclusive limit
+Date: Fri,  9 Mar 2018 17:06:47 +0800
+Subject: [PATCH 04/39] arm64: move TASK_* definitions to <asm/processor.h>
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-6-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-5-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+From: Yury Norov <ynorov@caviumnetworks.com>
 
-Commit 51369e398d0d upstream.
+commit eef94a3d09aab upstream.
 
-Currently, USER_DS represents an exclusive limit while KERNEL_DS is
-inclusive. In order to do some clever trickery for speculation-safe
-masking, we need them both to behave equivalently - there aren't enough
-bits to make KERNEL_DS exclusive, so we have precisely one option. This
-also happens to correct a longstanding false negative for a range
-ending on the very top byte of kernel memory.
+ILP32 series [1] introduces the dependency on <asm/is_compat.h> for
+TASK_SIZE macro. Which in turn requires <asm/thread_info.h>, and
+<asm/thread_info.h> include <asm/memory.h>, giving a circular dependency,
+because TASK_SIZE is currently located in <asm/memory.h>.
 
-Mark Rutland points out that we've actually got the semantics of
-addresses vs. segments muddled up in most of the places we need to
-amend, so shuffle the {USER,KERNEL}_DS definitions around such that we
-can correct those properly instead of just pasting "-1"s everywhere.
+In other architectures, TASK_SIZE is defined in <asm/processor.h>, and
+moving TASK_SIZE there fixes the problem.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Discussion: https://patchwork.kernel.org/patch/9929107/
+
+[1] https://github.com/norov/linux/tree/ilp32-next
+
+CC: Will Deacon <will.deacon@arm.com>
+CC: Laura Abbott <labbott@redhat.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/include/asm/processor.h |  3 ++
- arch/arm64/include/asm/uaccess.h   | 45 +++++++++++++++++-------------
+ arch/arm64/include/asm/memory.h    | 17 -----------------
+ arch/arm64/include/asm/processor.h | 23 +++++++++++++++++++++--
  arch/arm64/kernel/entry.S          |  2 +-
- 3 files changed, 30 insertions(+), 20 deletions(-)
+ 3 files changed, 22 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 853953cd1f08..1af98f8660a4 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -43,10 +43,6 @@
+  *		 (VA_BITS - 1))
+  * VA_BITS - the maximum number of bits for virtual addresses.
+  * VA_START - the first kernel virtual address.
+- * TASK_SIZE - the maximum size of a user space task.
+- * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+- * The module space lives between the addresses given by TASK_SIZE
+- * and PAGE_OFFSET - it must be within 128MB of the kernel text.
+  */
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+@@ -56,19 +52,6 @@
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+-#define TASK_SIZE_64		(UL(1) << VA_BITS)
+-
+-#ifdef CONFIG_COMPAT
+-#define TASK_SIZE_32		UL(0x100000000)
+-#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
+-				TASK_SIZE_32 : TASK_SIZE_64)
+-#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+-				TASK_SIZE_32 : TASK_SIZE_64)
+-#else
+-#define TASK_SIZE		TASK_SIZE_64
+-#endif /* CONFIG_COMPAT */
+-
+-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+ 
+ /*
+  * Physical vs virtual RAM address space conversion.  These are
 diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 12d5b2b97f04..c49597ae529d 100644
+index d08559528927..12d5b2b97f04 100644
 --- a/arch/arm64/include/asm/processor.h
 +++ b/arch/arm64/include/asm/processor.h
-@@ -21,6 +21,9 @@
+@@ -19,6 +19,10 @@
+ #ifndef __ASM_PROCESSOR_H
+ #define __ASM_PROCESSOR_H
  
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
- 
-+#define KERNEL_DS	UL(-1)
-+#define USER_DS		(TASK_SIZE_64 - 1)
++#define TASK_SIZE_64		(UL(1) << VA_BITS)
 +
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 829fa6d3e561..c625cc5531fc 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -56,10 +56,7 @@ struct exception_table_entry
- 
- extern int fixup_exception(struct pt_regs *regs);
- 
--#define KERNEL_DS	(-1UL)
- #define get_ds()	(KERNEL_DS)
--
--#define USER_DS		TASK_SIZE_64
- #define get_fs()	(current_thread_info()->addr_limit)
- 
- static inline void set_fs(mm_segment_t fs)
-@@ -87,22 +84,32 @@ static inline void set_fs(mm_segment_t fs)
-  * Returns 1 if the range is valid, 0 otherwise.
-  *
-  * This is equivalent to the following test:
-- * (u65)addr + (u65)size <= current->addr_limit
-- *
-- * This needs 65-bit arithmetic.
-+ * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
-  */
--#define __range_ok(addr, size)						\
--({									\
--	unsigned long __addr = (unsigned long __force)(addr);		\
--	unsigned long flag, roksum;					\
--	__chk_user_ptr(addr);						\
--	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
--		: "=&r" (flag), "=&r" (roksum)				\
--		: "1" (__addr), "Ir" (size),				\
--		  "r" (current_thread_info()->addr_limit)		\
--		: "cc");						\
--	flag;								\
--})
-+static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
-+{
-+	unsigned long limit = current_thread_info()->addr_limit;
++#ifndef __ASSEMBLY__
 +
-+	__chk_user_ptr(addr);
-+	asm volatile(
-+	// A + B <= C + 1 for all A,B,C, in four easy steps:
-+	// 1: X = A + B; X' = X % 2^64
-+	"	adds	%0, %0, %2\n"
-+	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
-+	"	csel	%1, xzr, %1, hi\n"
-+	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
-+	//    to compensate for the carry flag being set in step 4. For
-+	//    X > 2^64, X' merely has to remain nonzero, which it does.
-+	"	csinv	%0, %0, xzr, cc\n"
-+	// 4: For X < 2^64, this gives us X' - C - 1 <= 0, where the -1
-+	//    comes from the carry in being clear. Otherwise, we are
-+	//    testing X' - C == 0, subject to the previous adjustments.
-+	"	sbcs	xzr, %0, %1\n"
-+	"	cset	%0, ls\n"
-+	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
+ /*
+  * Default implementation of macro that returns current
+  * instruction pointer ("program counter").
+@@ -35,7 +39,22 @@
+ #include <asm/ptrace.h>
+ #include <asm/types.h>
+ 
+-#ifdef __KERNEL__
++/*
++ * TASK_SIZE - the maximum size of a user space task.
++ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
++ */
++#ifdef CONFIG_COMPAT
++#define TASK_SIZE_32		UL(0x100000000)
++#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
++				TASK_SIZE_32 : TASK_SIZE_64)
++#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
++				TASK_SIZE_32 : TASK_SIZE_64)
++#else
++#define TASK_SIZE		TASK_SIZE_64
++#endif /* CONFIG_COMPAT */
 +
-+	return addr;
-+}
++#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
++
+ #define STACK_TOP_MAX		TASK_SIZE_64
+ #ifdef CONFIG_COMPAT
+ #define AARCH32_VECTORS_BASE	0xffff0000
+@@ -47,7 +66,6 @@
  
- /*
-  * When dealing with data aborts, watchpoints, or instruction traps we may end
-@@ -111,7 +118,7 @@ static inline void set_fs(mm_segment_t fs)
-  */
- #define untagged_addr(addr)		sign_extend64(addr, 55)
+ extern phys_addr_t arm64_dma_phys_limit;
+ #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
+-#endif /* __KERNEL__ */
  
--#define access_ok(type, addr, size)	__range_ok(addr, size)
-+#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
- #define user_addr_max			get_fs
+ struct debug_info {
+ 	/* Have we suspended stepping by a debugger? */
+@@ -188,4 +206,5 @@ static inline void spin_lock_prefetch(const void *x)
  
- /*
+ int cpu_enable_pan(void *__unused);
+ 
++#endif /* __ASSEMBLY__ */
+ #endif /* __ASM_PROCESSOR_H */
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index fbb4fdd370b9..274898465a3f 100644
+index dccd0c2e9023..fbb4fdd370b9 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -99,7 +99,7 @@
- 	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
- 	ldr	x20, [tsk, #TI_ADDR_LIMIT]
- 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
--	mov	x20, #TASK_SIZE_64
-+	mov	x20, #USER_DS
- 	str	x20, [tsk, #TI_ADDR_LIMIT]
- 	.endif /* \el == 0 */
- 	mrs	x22, elr_el1
+@@ -27,7 +27,7 @@
+ #include <asm/cpufeature.h>
+ #include <asm/errno.h>
+ #include <asm/esr.h>
+-#include <asm/memory.h>
++#include <asm/processor.h>
+ #include <asm/thread_info.h>
+ #include <asm/asm-uaccess.h>
+ #include <asm/unistd.h>
 -- 
 2.16.2.440.gc6284da
