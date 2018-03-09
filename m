@@ -1,54 +1,58 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 09 Mar 2018 18:22:49 +0100
-Subject: [PATCH v3 5/6] ARM: dts: exynos: Enable HDMI audio support on
- exynos5420-peach-pit
+Date: Fri, 09 Mar 2018 18:22:50 +0100
+Subject: [PATCH v3 6/6] ARM: dts: exynos: Enable HDMI audio support on
+ exynos5800-peach-pi
 In-Reply-To: <20180309172250.23019-1-s.nawrocki@samsung.com>
 References: <20180309172250.23019-1-s.nawrocki@samsung.com>
- <CGME20180309172442epcas2p16d82d119fea8471383ccacee501c539a@epcas2p1.samsung.com>
-Message-ID: <20180309172250.23019-5-s.nawrocki@samsung.com>
+ <CGME20180309172450epcas1p2b845a521afbadc81da991330bdbc588c@epcas1p2.samsung.com>
+Message-ID: <20180309172250.23019-6-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds new cpu, codec subnodes according to the updated
-"google,snow-audio-max98090" DT bindings and the I2S clock tree
-configuration so sound on the HDMI interface can also be supported.
+"google,snow-audio-max98091" DT bindings and the I2S clock tree
+configuration so sound on the HDMI interface can be also supported.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
+NOTE:
+I couldn't test this patch as I have no access to Peach-pi Chromebook.
+I think it shouldn't be applied unless someone actually tests it.
+
 Changes since v1:
  - edited commit summary line.
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 17 +++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts | 17 +++++++++++++++++
  1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 5a76ed77dda1..244f0091c21f 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -11,6 +11,7 @@
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 0029ec27819c..0a4766e0484e 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -14,6 +14,7 @@
  #include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/clock/maxim,max77802.h>
  #include <dt-bindings/regulator/maxim,max77802.h>
 +#include <dt-bindings/sound/samsung-i2s.h>
- #include "exynos5420.dtsi"
+ #include "exynos5800.dtsi"
  #include "exynos5420-cpus.dtsi"
  
-@@ -86,6 +87,14 @@
- 		samsung,model = "Peach-Pit-I2S-MAX98090";
+@@ -89,6 +90,14 @@
+ 		samsung,model = "Peach-Pi-I2S-MAX98091";
  		samsung,i2s-controller = <&i2s0>;
- 		samsung,audio-codec = <&max98090>;
+ 		samsung,audio-codec = <&max98091>;
 +
 +		cpu {
 +			sound-dai = <&i2s0 0>;
 +		};
 +
 +		codec {
-+			sound-dai = <&max98090>, <&hdmi>;
++			sound-dai = <&max98091>, <&hdmi>;
 +		};
  	};
  
  	usb300_vbus_reg: regulator-usb300 {
-@@ -142,6 +151,11 @@
+@@ -145,6 +154,11 @@
  	vdd-supply = <&ldo9_reg>;
  };
  
@@ -60,15 +64,15 @@ index 5a76ed77dda1..244f0091c21f 100644
  &cpu0 {
  	cpu-supply = <&buck2_reg>;
  };
-@@ -606,6 +620,7 @@
- 		pinctrl-0 = <&max98090_irq>;
+@@ -609,6 +623,7 @@
+ 		pinctrl-0 = <&max98091_irq>;
  		clocks = <&pmu_system_controller 0>;
  		clock-names = "mclk";
 +		#sound-dai-cells = <0>;
  	};
  
  	light-sensor at 44 {
-@@ -690,6 +705,8 @@
+@@ -661,6 +676,8 @@
  };
  
  &i2s0 {
