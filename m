@@ -1,21 +1,48 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:11 +0100
-Subject: [PATCH v5 20/36] drm/bridge: analogix_dp: Don't use
- ANALOGIX_DP_PLL_CTL to control pll
+Date: Fri,  9 Mar 2018 23:23:15 +0100
+Subject: [PATCH v5 24/36] drm/bridge: analogix_dp: Reorder
+ plat_data->power_off to happen sooner
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-21-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-25-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Douglas Anderson <dianders@chromium.org>
 
-There is no register named ANALOGIX_DP_PLL_CTL in Rockchip edp phy reg
-list.  We should use BIT_4 in ANALOGIX_DP_PD to control the pll power
-instead of ANALOGIX_DP_PLL_CTL.
+The current user of the analogix power_off is "analogix_dp-rockchip".
+That driver does this:
+- deactivate PSR
+- turn off a clock
 
-Cc: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: zain wang <wzz@rock-chips.com>
+Both of these things (especially deactive PSR) should be done before
+we turn the PHY power off and turn off analog power.  Let's move the
+callback up.
+
+Note that without this patch (and with
+https://patchwork.kernel.org/patch/9553349/ [seanpaul: this patch was
+not applied, but it seems like the race can still occur]), I experienced
+an error in reboot testing where one thread was at:
+
+  rockchip_drm_psr_deactivate
+  rockchip_dp_powerdown
+  analogix_dp_bridge_disable
+  drm_bridge_disable
+
+...and the other thread was at:
+
+  analogix_dp_send_psr_spd
+  analogix_dp_enable_psr
+  analogix_dp_psr_set
+  psr_flush_handler
+
+The flush handler thread was finding AUX channel errors and eventually
+reported "Failed to apply PSR", where I had a kgdb breakpoint. Presumably
+the device would have eventually given up and shut down anyway, but it
+seems better to fix the order to be more correct.
+
+Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
@@ -23,41 +50,28 @@ Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 7b7fd227e1f9..02ab1aaa9993 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -230,16 +230,20 @@ enum pll_status analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp)
- void analogix_dp_set_pll_power_down(struct analogix_dp_device *dp, bool enable)
- {
- 	u32 reg;
-+	u32 mask = DP_PLL_PD;
-+	u32 pd_addr = ANALOGIX_DP_PLL_CTL;
- 
--	if (enable) {
--		reg = readl(dp->reg_base + ANALOGIX_DP_PLL_CTL);
--		reg |= DP_PLL_PD;
--		writel(reg, dp->reg_base + ANALOGIX_DP_PLL_CTL);
--	} else {
--		reg = readl(dp->reg_base + ANALOGIX_DP_PLL_CTL);
--		reg &= ~DP_PLL_PD;
--		writel(reg, dp->reg_base + ANALOGIX_DP_PLL_CTL);
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type)) {
-+		pd_addr = ANALOGIX_DP_PD;
-+		mask = RK_PLL_PD;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 37b16643f14c..eaf93cbd47a8 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -1337,12 +1337,13 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
  	}
-+
-+	reg = readl(dp->reg_base + pd_addr);
-+	if (enable)
-+		reg |= mask;
-+	else
-+		reg &= ~mask;
-+	writel(reg, dp->reg_base + pd_addr);
- }
  
- void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 	disable_irq(dp->irq);
+-	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
+-	phy_power_off(dp->phy);
+ 
+ 	if (dp->plat_data->power_off)
+ 		dp->plat_data->power_off(dp->plat_data);
+ 
++	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
++	phy_power_off(dp->phy);
++
+ 	clk_disable_unprepare(dp->clock);
+ 
+ 	pm_runtime_put_sync(dp->dev);
 -- 
 2.16.1
