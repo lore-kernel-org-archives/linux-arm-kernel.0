@@ -1,109 +1,236 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 9 Mar 2018 16:18:14 +0900
-Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
- architecutres
-In-Reply-To: <20180309064412.GA5327@dhcp-128-65.nay.redhat.com>
-References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
- <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
- <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
- <20180309064412.GA5327@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180309071813.GE25863@linaro.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 9 Mar 2018 08:29:32 +0100
+Subject: [GIT PULL 00/54] perf/core improvements and fixes
+In-Reply-To: <20180308195029.14991-1-acme@kernel.org>
+References: <20180308195029.14991-1-acme@kernel.org>
+Message-ID: <20180309072932.nphzr4smyxzupzbt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
 
-On Fri, Mar 09, 2018 at 02:44:12PM +0800, Dave Young wrote:
-> On 03/09/18 at 02:02pm, Dave Young wrote:
-> > On 03/08/18 at 09:05am, Dave Young wrote:
-> > > [Cc Andrew]
-> > > 
-> > > On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
-> > > > This is a preparatory patch set for adding kexec_file support on arm64.
-> > > > 
-> > > > It was originally included in a arm64 patch set[1], but Philipp is also
-> > > > working on their kexec_file support on s390[2] and some changes are now
-> > > > conflicting.
-> > > > 
-> > > > So these common parts were extracted and put into a separate patch set for
-> > > > better integration. What's more, my original patch#4 was split into a few
-> > > > small chunks for easier review after Dave's comment.
-> > > > 
-> > > > As such, the resulting code is basically identical with my original, and
-> > > > the only *visible* differences are:
-> > > >   * renamings of _kexec_kernel_image_probe() and
-> > > >     _kimage_file_post_load_cleanup()
-> > > >   * change one of types of arguments at prepare_elf64_headers()
-> > > > Those, unfortunately, require a couple of trivial changes on the rest
-> > > > (#1, #6 to #13) of my arm64 kexec_file patch set[1].
-> > > > 
-> > > > Patch#1 allows making a use of purgatory optional, particularly useful
-> > > > for arm64.
-> > > > Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
-> > > > verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
-> > > > Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
-> > > > exclude_mem_range(), to be made best re-use of.
-> > > > 
-> > > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
-> > > > [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
-> > > > 
-> > > > 
-> > > > Changes in v2 (Mar 6, 2018)
-> > > > * use IS_ENABLED() instead of #ifdef's in kexec_calculate_store_digests() 
-> > > > * rename _kexec_kernel_*() and make them static for now except for
-> > > >   kexec_image_probe_default() which is actually used by arch(powerpc) code
-> > > >   (Note: kexec_image_post_load_cleanup_default() will also be exported by
-> > > >   arm64 patches.)
-> > > > * change a type of kernel_map in prepare_elf64_headers() to "int"
-> > > > * check for a total number of system ram regions in full_up_crash_elf_data()
-> > > >   and use vzalloc() instead of vmalloc()
-> > > > 
-> > > > AKASHI Takahiro (7):
-> > > >   kexec_file: make an use of purgatory optional
-> > > >   kexec_file,x86,powerpc: factor out kexec_file_ops functions
-> > > >   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
-> > > >   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
-> > > >   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
-> > > >   x86: kexec_file: clean up prepare_elf64_headers()
-> > > >   kexec_file, x86: move re-factored code to generic side
-> > > > 
-> > > >  arch/powerpc/Kconfig                        |   3 +
-> > > >  arch/powerpc/include/asm/kexec.h            |   2 +-
-> > > >  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
-> > > >  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
-> > > >  arch/x86/Kconfig                            |   3 +
-> > > >  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
-> > > >  arch/x86/kernel/crash.c                     | 334 ++++++----------------------
-> > > >  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
-> > > >  arch/x86/kernel/machine_kexec_64.c          |  45 +---
-> > > >  include/linux/kexec.h                       |  32 ++-
-> > > >  kernel/kexec_file.c                         | 240 +++++++++++++++++++-
-> > > >  11 files changed, 338 insertions(+), 366 deletions(-)
-> > > > 
-> > > > -- 
-> > > > 2.16.2
-> > > > 
-> > > 
-> > > AKASHI, thanks for another update, looks good to me:
-> > > 
-> > > Acked-by: Dave Young <dyoung@redhat.com>
-> > 
-> > Hold on the ack, during today's tests kexec kernel can not boot, it
-> > hangs early.  Will see if it is caused by this series and come back
-> > later.
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+
+> Hi Ingo,
 > 
-> AKASHI, it seems the first patch causes the hang, can you take a look?
+> 	Please consider pulling,
+> 
+> - Arnaldo
+> 
+> Test results at the end of this message, as usual.
+> 
+> The following changes since commit 3f986eefc89c528bf2d398a6dc3637b743a7139e:
+> 
+>   Merge branch 'perf/urgent' into perf/core, to resolve conflict (2018-03-07 09:23:12 +0100)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-4.17-20180308
+> 
+> for you to fetch changes up to 2427b432e63b4b911100f717c48289195b7a7d62:
+> 
+>   perf tools: Update quipper information (2018-03-08 11:30:54 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/core improvements and fixes:
+> 
+> - Support to display the IPC/Cycle in 'annotate' TUI, for systems
+>   where this info can be obtained, like Intel's >= Skylake (Jin Yao)
+> 
+> - Support wildcards on PMU name in dynamic PMU events (Agustin Vega-Frias)
+> 
+> - Display pmu name when printing unmerged events in stat (Agustin Vega-Frias)
+> 
+> - Auto-merge PMU events created by prefix or glob match (Agustin Vega-Frias)
+> 
+> - Fix s390 'call' operations target function annotation (Thomas Richter)
+> 
+> - Handle s390 PC relative load and store instruction in the augmented
+>   'annotate', code, used so far in the TUI modes of 'perf report' and
+>   'perf annotate' (Thomas Richter)
+> 
+> - Provide libtraceevent with a kernel symbol resolver, so that
+>   symbols in tracepoint fields can be resolved when showing them in
+>   tools such as 'perf report' (Wang YanQing)
+> 
+> - Refactor the cgroups code to look more like other code in tools/perf,
+>   using cgroup__{put,get} for refcount operations instead of its
+>   open-coded equivalent, breaking larger functions, etc (Arnaldo Carvalho de Melo)
+> 
+> - Implement support for the -G/--cgroup target in 'perf trace', allowing
+>   strace like tracing (plus other events, backtraces, etc) for cgroups
+>   (Arnaldo Carvalho de Melo)
+> 
+> - Update thread shortname in 'perf sched map' when the thread's COMM
+>   changes (Changbin Du)
+> 
+> - refcount 'struct mem_info', for better sharing it over several
+>   users, avoid duplicating structs and fixing crashes related to
+>   use after free (Jiri Olsa)
+> 
+> - Display perf.data version, offsets in 'perf report --header' (Jiri Olsa)
+> 
+> - Record the machine's memory topology information in a perf.data
+>   feature section, to be used by tools such as 'perf c2c' (Jiri Olsa)
+> 
+> - Fix output of forced groups in the header for 'perf report' --stdio
+>   and --tui (Jiri Olsa)
+> 
+> - Better support llvm, clang, cxx make tests in the build process (Jiri Olsa)
+> 
+> - Streamline the 'struct perf_mmap' methods, storing some info in the
+>   struct instead of passing it via various methods, shortening its
+>   signatures (Kan Liang)
+> 
+> - Update the quipper perf.data parser library site information (Stephane Eranian)
+> 
+> - Correct perf's man pages title markers for asciidoctor (Takashi Iwai)
+> 
+> - Intel PT fixes and refactorings paving the way for implementing
+>   support for AUX area sampling (Adrian Hunter)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Adrian Hunter (13):
+>       perf record: Combine some auxtrace initialization into a single function
+>       perf auxtrace: Add missing parameters from kernel-doc comments
+>       perf auxtrace: Rename some buffer-queuing functions
+>       perf auxtrace: Make auxtrace_queues__add_buffer() return buffer_ptr
+>       perf intel-pt: Fix overlap detection to identify consecutive buffers correctly
+>       perf intel-pt: Fix sync_switch
+>       perf intel-pt: Fix error recovery from missing TIP packet
+>       perf intel-pt: Fix timestamp following overflow
+>       perf intel-pt/bts: In auxtrace_record__init_intel() evlist is never NULL
+>       perf intel-pt: Get rid of intel_pt_use_buffer_pid_tid()
+>       perf intel-pt: Tidy old_buffer handling in intel_pt_get_trace()
+>       perf intel-pt: Remove a check for sampling mode
+>       perf intel-pt: Adjust overlap-checking to support sampling mode
+> 
+> Agustin Vega-Frias (3):
+>       perf pmu: Support wildcards on pmu name in dynamic pmu events
+>       perf pmu: Display pmu name when printing unmerged events in stat
+>       perf pmu: Auto-merge PMU events created by prefix or glob match
+> 
+> Arnaldo Carvalho de Melo (11):
+>       perf cgroup: Remove misplaced __maybe_unused
+>       perf cgroup: Rename 'struct cgroup_sel' to 'struct cgroup'
+>       perf cgroup: Introduce cgroup__delete()
+>       perf cgroup: Rename close_cgroup() to cgroup__put()
+>       perf cgroup: Introduce cgroup__get()
+>       perf cgroup: Introduce find_cgroup() method
+>       perf cgroup: Introduce cgroup__new() out of open coded equivalent
+>       perf cgroup: Add evlist__findnew_cgroup()
+>       perf cgroup: Add evlist__add_default_cgroup()
+>       perf cgroup: Make the cgroup name be const char *
+>       perf trace: Support setting cgroups as targets
+> 
+> Changbin Du (2):
+>       perf sched: Move thread::shortname to thread_runtime
+>       perf sched map: Re-annotate shortname if thread comm changed
+> 
+> Jin Yao (1):
+>       perf annotate: Support to display the IPC/Cycle in TUI mode
+> 
+> Jiri Olsa (11):
+>       perf report: Fix the output for stdio events list
+>       perf report: Display perf.data header info
+>       perf record: Move machine variable down the function
+>       perf record: Remove progname from struct record
+>       perf tools: Add refcnt into struct mem_info
+>       perf c2c: Use mem_info refcnt logic
+>       perf tools: Add MEM_TOPOLOGY feature to perf data file
+>       perf tools: Update tags with .cpp files
+>       perf build: Add llvm/clang/cxx make tests into FEATURE_TESTS_EXTRA
+>       perf build: Add llvm/clang make targets to FILES
+>       perf build: Force llvm/clang test compile output to .make.output
+> 
+> Kan Liang (8):
+>       perf evlist: Store 'overwrite' in struct perf_mmap
+>       perf mmap: Store mmap scope in struct perf_mmap()
+>       perf mmap: Use the stored scope data in perf_mmap__push()
+>       perf mmap: Use the stored data in perf_mmap__read_event()
+>       perf mmap: Use stored 'overwrite' in perf_mmap__consume()
+>       perf mmap: Simplify perf_mmap__consume()
+>       perf mmap: Simplify perf_mmap__read_event()
+>       perf mmap: Simplify perf_mmap__read_init()
+> 
+> Stephane Eranian (1):
+>       perf tools: Update quipper information
+> 
+> Takashi Iwai (1):
+>       perf tools: Correct title markers for asciidoctor
+> 
+> Thomas Richter (2):
+>       perf annotate: Fix s390 target function disassembly
+>       perf annotate: Handle s390 PC relative load and store instruction.
+> 
+> Wang YanQing (1):
+>       perf report: Provide libtraceevent with a kernel symbol resolver
+> 
+>  tools/build/Makefile.feature                       |   6 +-
+>  tools/build/feature/Makefile                       |  14 +-
+>  tools/include/linux/bitmap.h                       |   2 +-
+>  tools/perf/Documentation/perf-data.txt             |   2 +-
+>  tools/perf/Documentation/perf-ftrace.txt           |   2 +-
+>  tools/perf/Documentation/perf-kallsyms.txt         |   2 +-
+>  tools/perf/Documentation/perf-list.txt             |   8 +-
+>  tools/perf/Documentation/perf-sched.txt            |   2 +-
+>  tools/perf/Documentation/perf-script-perl.txt      |   2 +-
+>  tools/perf/Documentation/perf-stat.txt             |  17 ++
+>  tools/perf/Documentation/perf-trace.txt            |  25 ++
+>  tools/perf/Documentation/perf.data-file-format.txt |   7 +-
+>  tools/perf/Makefile.perf                           |   6 +-
+>  tools/perf/arch/s390/annotate/instructions.c       | 116 +++++++-
+>  tools/perf/arch/x86/tests/perf-time-to-tsc.c       |   7 +-
+>  tools/perf/arch/x86/util/auxtrace.c                |  14 +-
+>  tools/perf/builtin-annotate.c                      |  88 +++++-
+>  tools/perf/builtin-c2c.c                           |  24 +-
+>  tools/perf/builtin-kvm.c                           |   9 +-
+>  tools/perf/builtin-record.c                        |  45 +--
+>  tools/perf/builtin-report.c                        |  26 +-
+>  tools/perf/builtin-sched.c                         | 133 ++++++---
+>  tools/perf/builtin-stat.c                          |  29 +-
+>  tools/perf/builtin-top.c                           |   7 +-
+>  tools/perf/builtin-trace.c                         |  57 +++-
+>  tools/perf/tests/backward-ring-buffer.c            |   5 +-
+>  tools/perf/tests/bpf.c                             |   5 +-
+>  tools/perf/tests/code-reading.c                    |   7 +-
+>  tools/perf/tests/keep-tracking.c                   |   7 +-
+>  tools/perf/tests/mmap-basic.c                      |   7 +-
+>  tools/perf/tests/openat-syscall-tp-fields.c        |   7 +-
+>  tools/perf/tests/perf-record.c                     |   7 +-
+>  tools/perf/tests/sw-clock.c                        |   7 +-
+>  tools/perf/tests/switch-tracking.c                 |   7 +-
+>  tools/perf/tests/task-exit.c                       |   7 +-
+>  tools/perf/ui/browsers/hists.c                     |   5 +-
+>  tools/perf/util/annotate.c                         |   2 +-
+>  tools/perf/util/auxtrace.c                         |  37 ++-
+>  tools/perf/util/auxtrace.h                         |   2 +
+>  tools/perf/util/cgroup.c                           | 111 +++++---
+>  tools/perf/util/cgroup.h                           |  13 +-
+>  tools/perf/util/env.h                              |   9 +
+>  tools/perf/util/evlist.c                           |   8 +-
+>  tools/perf/util/evsel.c                            |  23 +-
+>  tools/perf/util/evsel.h                            |   6 +-
+>  tools/perf/util/header.c                           | 312 ++++++++++++++++++++-
+>  tools/perf/util/header.h                           |   1 +
+>  tools/perf/util/hist.c                             |   4 +-
+>  .../perf/util/intel-pt-decoder/intel-pt-decoder.c  |  64 ++---
+>  .../perf/util/intel-pt-decoder/intel-pt-decoder.h  |   2 +-
+>  tools/perf/util/intel-pt.c                         | 110 ++++----
+>  tools/perf/util/machine.c                          |   2 +-
+>  tools/perf/util/mmap.c                             |  63 ++---
+>  tools/perf/util/mmap.h                             |  16 +-
+>  tools/perf/util/parse-events.c                     |  21 +-
+>  tools/perf/util/parse-events.h                     |   2 +-
+>  tools/perf/util/parse-events.l                     |   2 +-
+>  tools/perf/util/parse-events.y                     |  18 +-
+>  tools/perf/util/python.c                           |   7 +-
+>  tools/perf/util/symbol.c                           |  22 ++
+>  tools/perf/util/symbol.h                           |  19 +-
+>  tools/perf/util/thread.h                           |   1 -
+>  62 files changed, 1197 insertions(+), 401 deletions(-)
 
-Sure, but can you first tell me specifics about what you have observed?
+Pulled, thanks a lot Arnaldo!
 
-Thanks,
--Takahiro AKASHI
-
-
-> > 
-> > > 
-> > > Thanks
-> > > Dave
-> > 
-> > Thanks
-> > Dave
+	Ingo
