@@ -1,26 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Mar 2018 13:48:24 +0000
-Subject: [GIT PULL] ACPI IORT updates for v4.17
-In-Reply-To: <20180308115425.GA31267@e107981-ln.cambridge.arm.com>
-References: <20180308115425.GA31267@e107981-ln.cambridge.arm.com>
-Message-ID: <20180309134823.GF15537@arm.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 9 Mar 2018 15:38:57 +0200
+Subject: [linux-sunxi] [PATCH 6/9] sunxi-cedrus: Add device tree binding
+ document
+In-Reply-To: <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
+References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
+ <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
+Message-ID: <20180309133857.GA20392@solar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 11:54:25AM +0000, Lorenzo Pieralisi wrote:
-> Jia He (1):
->       ACPI/IORT: Remove linker section for IORT entries again
+On Fri, Mar 09, 2018 at 11:14:42AM +0100, Paul Kocialkowski wrote:
+> From: Florent Revest <florent.revest@free-electrons.com>
 > 
-> Lorenzo Pieralisi (2):
->       ACPI/IORT: Remove temporary iort_get_id_mapping_index() ACPICA guard
->       ACPI/IORT: Remove obsolete ACPI_IORT_SMMU_V3_CAVIUM_CN99XX define
+> Device Tree bindings for the Allwinner's video engine
 > 
->  drivers/acpi/arm64/iort.c         | 12 ------------
->  include/asm-generic/vmlinux.lds.h |  1 -
->  2 files changed, 13 deletions(-)
+> Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
+> ---
+>  .../devicetree/bindings/media/sunxi-cedrus.txt     | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> new file mode 100644
+> index 000000000000..138581113c49
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> @@ -0,0 +1,44 @@
+> +Device-Tree bindings for SUNXI video engine found in sunXi SoC family
+> +
+> +Required properties:
+> +- compatible	    : "allwinner,sun4i-a10-video-engine";
+> +- memory-region     : DMA pool for buffers allocation;
+> +- clocks	    : list of clock specifiers, corresponding to
+> +		      entries in clock-names property;
+> +- clock-names	    : should contain "ahb", "mod" and "ram" entries;
+> +- resets	    : phandle for reset;
+> +- interrupts	    : should contain VE interrupt number;
+> +- reg		    : should contain register base and length of VE.
+> +
+> +Example:
+> +
+> +reserved-memory {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +
+> +	ve_reserved: cma {
+> +		compatible = "shared-dma-pool";
+> +		reg = <0x43d00000 0x9000000>;
+> +		no-map;
+> +		linux,cma-default;
+> +	};
+> +};
+> +
+> +video-engine {
+> +	compatible = "allwinner,sun4i-a10-video-engine";
+> +	memory-region = <&ve_reserved>;
+> +
+> +	clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
+> +		 <&dram_gates 0>;
 
-Nice diffstat! ;)
+This should be updated to sunxi-ng clocks:
 
-I'll pull this into for-next/core.
+clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>, <&ccu CLK_DRAM_VE>;
 
-Will
+> +	clock-names = "ahb", "mod", "ram";
+> +
+> +	assigned-clocks = <&ccu CLK_VE>;
+> +	assigned-clock-rates = <320000000>;
+> +
+> +	resets = <&ccu RST_VE>;
+> +
+> +	interrupts = <53>;
+> +
+> +	reg = <0x01c0e000 4096>;
+> +};
+> -- 
+> 2.16.2
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
