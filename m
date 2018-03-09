@@ -1,67 +1,35 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 9 Mar 2018 15:39:49 +0000
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.17
-Message-ID: <5AA2AAC5.2000806@hisilicon.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 09 Mar 2018 16:40:16 +0100
+Subject: [PATCH v2] dt-bindings: exynos: Document #sound-dai-cells property
+ of the HDMI node
+References: <CGME20180309154029epcas1p280472548d1aa86daafceb405b10f1589@epcas1p2.samsung.com>
+Message-ID: <20180309154016.15562-1-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+The #sound-dai-cells DT property is required to describe link between
+the HDMI IP block and the SoC's audio subsystem.
 
-Please help to pull the following changes.
-Thanks!
-
-Best Regards,
-Wei
-
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
+Changes since v2:
+ - the property has been moved to "Required properties" paragraph,
+   I didn't add Rob's Reviewed-by due to this change
+---
+ Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
+index 8715ff06c457..ecb2899f4451 100644
+--- a/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
++++ b/Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt
+@@ -16,6 +16,7 @@ Required properties:
+ - ddc: phandle to the hdmi ddc node
+ - phy: phandle to the hdmi phy node
+ - samsung,syscon-phandle: phandle for system controller node for PMU.
++- #sound-dai-cells: should be 0.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.17
-
-for you to fetch changes up to 928c4a5ce8684d2c8a37543b3361cfc12d83b167:
-
-  arm64: dts: Hi3660: Remove 'CPU_NAP' idle state (2018-03-02 16:19:44 +0000)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.17
-
-- Add XGE CPLD control support for hip07 SoC
-- Disable the SMMU on hip06 and hip07 SoCs becuase of
-  the hardware limitation
-- Enable HS200 mode for the MMC controller on hi6220 hikey board
-- Remove "cooling-{min|max}-level" this kind unused properties
-  for hi6220 SoC
-- Add watchdog node for hi6220 SoC
-- Remove "CPU_NAP" idle state on hikey960 board since it is
-  not stable and useless with the updated firmware
-
-----------------------------------------------------------------
-Dmitry Shmidt (1):
-      arm64: dts: hi6220: enable watchdog
-
-Huazhong Tan (1):
-      arm64: dts: hisi: add hns-dsaf cpld control for the hip07 SoC
-
-Leo Yan (1):
-      arm64: dts: Hi3660: Remove 'CPU_NAP' idle state
-
-Shameerali Kolothum Thodi (1):
-      arm64: dts: hisi: Disable hisilicon smmu node on hip06/hip07
-
-Viresh Kumar (1):
-      ARM64: dts: hi6220: Remove "cooling-{min|max}-level" for CPU nodes
-
-oscardagrach (1):
-      arm64: dts: hikey: Enable HS200 mode on eMMC
-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi      | 32 ++-------------
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  2 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 10 ++++-
- arch/arm64/boot/dts/hisilicon/hip06.dtsi       | 56 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hip07.dtsi       | 33 +++++++++++++++
- 5 files changed, 103 insertions(+), 30 deletions(-)
+ Required properties for Exynos 4210, 4212, 5420 and 5433:
+ - clocks: list of clock IDs from SoC clock driver.
+--
+2.14.2
