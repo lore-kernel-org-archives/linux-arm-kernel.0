@@ -1,41 +1,79 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 09 Mar 2018 17:49:07 +0100
-Subject: [PATCH] mailmap:  Update email address for Gregory CLEMENT
-In-Reply-To: <20180227170425.30510-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Tue, 27 Feb 2018 18:04:25 +0100")
-References: <20180227170425.30510-1-gregory.clement@bootlin.com>
-Message-ID: <87tvtp2nzw.fsf@bootlin.com>
+Date: Fri, 09 Mar 2018 17:50:14 +0100
+Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for
+ the uart nodes
+In-Reply-To: <20180301131819.10790-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Thu, 1 Mar 2018 14:18:19 +0100")
+References: <20180301131819.10790-1-gregory.clement@bootlin.com>
+Message-ID: <87po4d2ny1.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
  
- On mar., f?vr. 27 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+ On jeu., mars 01 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-> As now Free Electrons is Bootlin.
+> This extra clock is needed to access the registers of the UARTs used on
+> CP110 component of the Armada 7K/8K SoCs.
 >
 > Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
-Applied on mvebu/fixes
+Applied on mvebu/dt64
 
 Gregory
 
 > ---
->  .mailmap | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 16 ++++++++++++----
+>  1 file changed, 12 insertions(+), 4 deletions(-)
 >
-> diff --git a/.mailmap b/.mailmap
-> index e18cab73e209..a2ce89a456c2 100644
-> --- a/.mailmap
-> +++ b/.mailmap
-> @@ -62,6 +62,7 @@ Frank Zago <fzago@systemfabricworks.com>
->  Greg Kroah-Hartman <greg@echidna.(none)>
->  Greg Kroah-Hartman <gregkh@suse.de>
->  Greg Kroah-Hartman <greg@kroah.com>
-> +Gregory CLEMENT <gregory.clement@bootlin.com> <gregory.clement@free-electrons.com>
->  Henk Vergonet <Henk.Vergonet@gmail.com>
->  Henrik Kretzschmar <henne@nachtwindheim.de>
->  Henrik Rydberg <rydberg@bitmath.org>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index d3f422f8f086..355bb295e4d9 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -303,7 +303,9 @@
+>  			reg-shift = <2>;
+>  			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
+>  			reg-io-width = <1>;
+> -			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			clock-names = "baudclk", "apb_pclk";
+> +			clocks = <&CP110_LABEL(clk) 1 21>,
+> +				 <&CP110_LABEL(clk) 1 17>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -313,7 +315,9 @@
+>  			reg-shift = <2>;
+>  			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
+>  			reg-io-width = <1>;
+> -			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			clock-names = "baudclk", "apb_pclk";
+> +			clocks = <&CP110_LABEL(clk) 1 21>,
+> +				 <&CP110_LABEL(clk) 1 17>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -323,7 +327,9 @@
+>  			reg-shift = <2>;
+>  			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
+>  			reg-io-width = <1>;
+> -			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			clock-names = "baudclk", "apb_pclk";
+> +			clocks = <&CP110_LABEL(clk) 1 21>,
+> +				 <&CP110_LABEL(clk) 1 17>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -333,7 +339,9 @@
+>  			reg-shift = <2>;
+>  			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
+>  			reg-io-width = <1>;
+> -			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			clock-names = "baudclk", "apb_pclk";
+> +			clocks = <&CP110_LABEL(clk) 1 21>,
+> +				 <&CP110_LABEL(clk) 1 17>;
+>  			status = "disabled";
+>  		};
+>  
 > -- 
 > 2.16.1
 >
