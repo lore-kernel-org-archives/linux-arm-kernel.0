@@ -1,87 +1,167 @@
-From: lmark@codeaurora.org (Liam Mark)
-Date: Thu, 8 Mar 2018 16:45:14 -0800 (PST)
-Subject: [RFC] android: ion: How to properly clean caches for uncached
- allocations
-In-Reply-To: <b1479541-13bd-85ea-f9c7-25264c91f9b9@redhat.com>
-References: <alpine.DEB.2.02.1802282111320.22860@lmark-linux.qualcomm.com>
- <b1479541-13bd-85ea-f9c7-25264c91f9b9@redhat.com>
-Message-ID: <alpine.DEB.2.02.1803081635170.20592@lmark-linux.qualcomm.com>
+From: jacobchen110@gmail.com (Jacob Chen)
+Date: Fri, 9 Mar 2018 08:53:57 +0800
+Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
+In-Reply-To: <20180308120200.wpcjnbglf4x32vrp@tarshish>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+ <20180308120200.wpcjnbglf4x32vrp@tarshish>
+Message-ID: <CAFLEztTokSaXJuN8Ls0BpAEuFdTC+Viwn6PGxC=TC6vZAs+w3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Mar 2018, Laura Abbott wrote:
+Hi Baruch,
 
-> On 02/28/2018 09:18 PM, Liam Mark wrote:
-> > The issue:
-> > 
-> > Currently in ION if you allocate uncached memory it is possible that there
-> > are still dirty lines in the cache.  And often these dirty lines in the
-> > cache are the zeros which were meant to clear out any sensitive kernel
-> > data.
-> > 
-> > What this means is that if you allocate uncached memory from ION, and then
-> > subsequently write to that buffer (using the uncached mapping you are
-> > provided by ION) then the data you have written could be corrupted at some
-> > point in the future if a dirty line is evicted from the cache.
-> > 
-> > Also this means there is a potential security issue.  If an un-privileged
-> > userspace user allocated uncached memory (for example from the system heap)
-> > and then if they were to read from that buffer (through the un-cached
-> > mapping they are provided by ION), and if some of the zeros which were
-> > written to that memory are still in the cache then this un-privileged
-> > userspace user could read potentially sensitive kernel data.
-> 
-> For the use case you are describing we don't actually need the
-> memory to be non-cached until it comes time to do the dma mapping.
-> Here's a proposal to shoot holes in:
-> 
-> - Before any dma_buf attach happens, all mmap mappings are cached
-> - At the time attach happens, we shoot down any existing userspace
-> mappings, do the dma_map with appropriate flags to clean the pages
-> and then allow remapping to userspace as uncached. Really this
-> looks like a variation on the old Ion faulting code which I removed
-> except it's for uncached buffers instead of cached buffers.
-> 
+2018-03-08 20:02 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
+> Hi Jacob,
+>
+> On Thu, Mar 08, 2018 at 05:47:50PM +0800, Jacob Chen wrote:
+>> This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399
+>> SoC.
+>>
+>> Wiki Pages:
+>> http://opensource.rock-chips.com/wiki_Rockchip-isp1
+>>
+>> The deprecated g_mbus_config op is not dropped in  V6 because i am waiting
+>> tomasz's patches.
+>
+> Which tree is this series based on? On top of v4.16-rc4 I get the build
+> failure below. The V4L2_BUF_TYPE_META_OUTPUT macro, for example, is not even
+> in media_tree.git.
+>
 
-Thanks Laura, I will take a look to see if I can think of any concerns.
+This series is based on v4.16-rc4 with below patch.
+https://patchwork.kernel.org/patch/9792001/
 
-Initial thoughts.
-- What about any kernel mappings (kmap/vmap) the client has made?
 
-- I guess it would be tempting to only do this behavior for memory that 
-came from buddy (as opposed to the pool since it should be clean), but we 
-would need to be careful that no pages sneak into the pool without being 
-cleaned (example: client allocs then frees without ever call 
-dma_buf_attach).
-
-> Potential problems:
-> - I'm not 100% about the behavior here if the attaching device
-> is already dma_coherent. I also consider uncached mappings
-> enough of a device specific optimization that you shouldn't
-> do them unless you know it's needed.
-
-I don't believe we want to allow uncached memory to be dma mapped by an 
-io-coherent device and this is something I would like to eventually block.
-
-Since there is always a kernel cached mapping for ION uncached memory then 
-speculative access could still be putting lines in the cache, so when an 
-io-coherent device tries to read this uncached memory its snoop into the 
-cache could find one of these 'stale' clean cache lines and end up using 
-stale data. 
-Agree?
-
-> - The locking/sequencing with userspace could be tricky
-> since userspace may not like us ripping mappings out from
-> underneath if it's trying to access.
-
-Perhaps delay this work to the dma_map_attachment call since when the data 
-is dma mapped the CPU shouldn't be accessing it? 
-
-Or worst case perhaps fail all map attempts to uncached memory until the 
-memory has been dma mapped (and cleaned) at least once?
-
-Thanks,
-Liam
-
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> drivers/media/platform/rockchip/isp1/isp_params.c:1321:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_enum_fmt_meta_out?; did you mean ?vidioc_enum_fmt_meta_cap??
+>   .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
+>    ^~~~~~~~~~~~~~~~~~~~~~~~
+>    vidioc_enum_fmt_meta_cap
+> drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
+>                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: note: (near initialization for ?rkisp1_params_ioctl.vidioc_g_std?)
+> drivers/media/platform/rockchip/isp1/isp_params.c:1322:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_g_fmt_meta_out?; did you mean ?vidioc_g_fmt_meta_cap??
+>   .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>    ^~~~~~~~~~~~~~~~~~~~~
+>    vidioc_g_fmt_meta_cap
+> drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_s_std?)
+> drivers/media/platform/rockchip/isp1/isp_params.c:1323:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_s_fmt_meta_out?; did you mean ?vidioc_s_fmt_meta_cap??
+>   .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>    ^~~~~~~~~~~~~~~~~~~~~
+>    vidioc_s_fmt_meta_cap
+> drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_querystd?)
+> drivers/media/platform/rockchip/isp1/isp_params.c:1324:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_try_fmt_meta_out?; did you mean ?vidioc_try_fmt_meta_cap??
+>   .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>    ^~~~~~~~~~~~~~~~~~~~~~~
+>    vidioc_try_fmt_meta_cap
+> drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
+>                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: note: (near initialization for ?rkisp1_params_ioctl.vidioc_enum_input?)
+> drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_params_init_vb2_queue?:
+> drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: error: ?V4L2_BUF_TYPE_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_BUF_TYPE_SDR_OUTPUT??
+>   q->type = V4L2_BUF_TYPE_META_OUTPUT;
+>             ^~~~~~~~~~~~~~~~~~~~~~~~~
+>             V4L2_BUF_TYPE_SDR_OUTPUT
+> drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: note: each undeclared identifier is reported only once for each function it appears in
+>   CC      drivers/media/platform/rockchip/isp1/mipi_dphy_sy.o
+> drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_register_params_vdev?:
+> drivers/media/platform/rockchip/isp1/isp_params.c:1507:43: error: ?V4L2_CAP_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_CAP_VBI_OUTPUT??
+>   vdev->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_META_OUTPUT;
+>                                            ^~~~~~~~~~~~~~~~~~~~
+>                                            V4L2_CAP_VBI_OUTPUT
+>
+> Thanks,
+> baruch
+>
+>> Jacob Chen (12):
+>>   media: doc: add document for rkisp1 meta buffer format
+>>   media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
+>>   media: rkisp1: add Rockchip ISP1 subdev driver
+>>   media: rkisp1: add ISP1 statistics driver
+>>   media: rkisp1: add ISP1 params driver
+>>   media: rkisp1: add capture device driver
+>>   media: rkisp1: add rockchip isp1 core driver
+>>   dt-bindings: Document the Rockchip ISP1 bindings
+>>   dt-bindings: Document the Rockchip MIPI RX D-PHY bindings
+>>   ARM: dts: rockchip: add isp node for rk3288
+>>   ARM: dts: rockchip: add rx0 mipi-phy for rk3288
+>>   MAINTAINERS: add entry for Rockchip ISP1 driver
+>>
+>> Jeffy Chen (1):
+>>   media: rkisp1: Add user space ABI definitions
+>>
+>> Shunqian Zheng (3):
+>>   media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
+>>   arm64: dts: rockchip: add isp0 node for rk3399
+>>   arm64: dts: rockchip: add rx0 mipi-phy for rk3399
+>>
+>> Wen Nuan (1):
+>>   ARM: dts: rockchip: Add dts mipi-dphy TXRX1 node for rk3288
+>>
+>>  .../devicetree/bindings/media/rockchip-isp1.txt    |   69 +
+>>  .../bindings/media/rockchip-mipi-dphy.txt          |   90 +
+>>  Documentation/media/uapi/v4l/meta-formats.rst      |    2 +
+>>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst   |   20 +
+>>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst     |   18 +
+>>  MAINTAINERS                                        |   10 +
+>>  arch/arm/boot/dts/rk3288.dtsi                      |   33 +
+>>  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   25 +
+>>  drivers/media/platform/Kconfig                     |   10 +
+>>  drivers/media/platform/Makefile                    |    1 +
+>>  drivers/media/platform/rockchip/isp1/Makefile      |    8 +
+>>  drivers/media/platform/rockchip/isp1/capture.c     | 1751 ++++++++++++++++++++
+>>  drivers/media/platform/rockchip/isp1/capture.h     |  167 ++
+>>  drivers/media/platform/rockchip/isp1/common.h      |  110 ++
+>>  drivers/media/platform/rockchip/isp1/dev.c         |  626 +++++++
+>>  drivers/media/platform/rockchip/isp1/dev.h         |   93 ++
+>>  drivers/media/platform/rockchip/isp1/isp_params.c  | 1539 +++++++++++++++++
+>>  drivers/media/platform/rockchip/isp1/isp_params.h  |   49 +
+>>  drivers/media/platform/rockchip/isp1/isp_stats.c   |  508 ++++++
+>>  drivers/media/platform/rockchip/isp1/isp_stats.h   |   58 +
+>>  .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  868 ++++++++++
+>>  .../media/platform/rockchip/isp1/mipi_dphy_sy.h    |   15 +
+>>  drivers/media/platform/rockchip/isp1/regs.c        |  239 +++
+>>  drivers/media/platform/rockchip/isp1/regs.h        | 1550 +++++++++++++++++
+>>  drivers/media/platform/rockchip/isp1/rkisp1.c      | 1177 +++++++++++++
+>>  drivers/media/platform/rockchip/isp1/rkisp1.h      |  105 ++
+>>  drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
+>>  include/uapi/linux/rkisp1-config.h                 |  798 +++++++++
+>>  include/uapi/linux/videodev2.h                     |    4 +
+>>  29 files changed, 9945 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
+>>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+>>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/common.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
+>>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
+>>  create mode 100644 include/uapi/linux/rkisp1-config.h
+>>
+>> --
+>> 2.16.1
+>>
+>
+> --
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
