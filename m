@@ -1,68 +1,76 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 9 Mar 2018 10:06:33 +0000
-Subject: [PATCH v2 1/2] arm64: Relax constraints on ID feature bits
-In-Reply-To: <20180308171140.GA14918@arm.com>
-References: <20180207142106.10716-1-suzuki.poulose@arm.com>
- <20180226180517.GG26147@arm.com>
- <1a293722-60ff-0e6f-0c57-b257a2880741@arm.com>
- <20180308171140.GA14918@arm.com>
-Message-ID: <0ae1fcd3-f0c0-75b5-431c-492dfb759598@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 9 Mar 2018 11:09:24 +0100
+Subject: [PATCH] arm: dts: nes: add Nintendo NES Classic Edition support
+In-Reply-To: <20180309103453.56e41ba8@xps13>
+References: <20180307164336.32359-1-miquel.raynal@bootlin.com>
+ <20180309082656.kglipdyu3knfq4ga@flea.lan>
+ <20180309095814.5ea40afe@xps13>
+ <20180309091038.6jxuymerx5lgnh3y@flea.lan>
+ <20180309103453.56e41ba8@xps13>
+Message-ID: <20180309100924.jg5jo64cmpb4523q@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 17:11, Will Deacon wrote:
-> On Wed, Mar 07, 2018 at 03:11:31PM +0000, Suzuki K Poulose wrote:
->> On 26/02/18 18:05, Will Deacon wrote:
->>> On Wed, Feb 07, 2018 at 02:21:05PM +0000, Suzuki K Poulose wrote:
-
-
->>>> ---
->>>> Changes since v1:
->>>>   - Make ID_AA64MMFR1_EL1:LOR/HPD, ID_AA64MMFR1_EL1:LSM non-strict
->>>>     as they aren't used by the kernel.
->>>>   - Added comments around different fields.
->>>>   - Make ID_AA64MMFR2:CNP non-strict, as we could decide to use it
->>>>     only when it is available on all the CPUs.
->>>
->>> This does mean we need to be careful when adding support for a new feature
->>> because the cpufeature code is no longer guaranteeing homogeneity. I can't
->>> see how we can detect this, so I suppose we'll just need to be careful to
->>> pick this up during review.
->>>
->>> It's also a bit nasty that older kernels won't shout about mismatched
->>> features but a new kernel might.
->>
->> That is not correct. It is the opposite. The new kernel won't shout about
->> mismatched features, where the old kernel complains.
+On Fri, Mar 09, 2018 at 10:34:53AM +0100, Miquel Raynal wrote:
+> > > > We want to support the default setup, and not require some hackery to
+> > > > be done. It will thus be some OTG / peripheral mode, most likely with
+> > > > an ID pin somewhere.
 > 
-> What I mean is, with your patches applied, it's likely that the kernel won't
-> shout about mismatched features. If we ever change something in future that
-> results in us requiring STRICT matching (perhaps supporting a new version of
-> a feature), then we're introducing a taint which wasn't there before. Maybe
-> not a big deal, but I'm not sold on the rationale for this patch.
-> 
->> I have a slight concern that this means
->>> integration problems might slip through the cracks when a design is
->>> validating against an older kernel.
->>>
->>> Finally, there's still the problem that some features cannot be
->>> enabled/disabled by the kernel and we can end up in a position where a
->>> user application might SIGILL only on some CPUs if it's using an instruction
->>> that isn't supported across the whole system. I think that sort of
->>> configuration *does* warrant the current sanity check message/taint; afaict
->>> we still go ahead and use the safe value, clobbering things like the hwcap,
->>> but we should draw attention to the fact that userspace might crash if it's
->>> trying to probe for these instructions using traps.
->>
->> The FTR_STRICT only affects whether we should issue a WARNING and TAINT the kernel
->> if there is a mismatch. It doesn't affect the "safe" value calculation. So,
->> I don't understand how the above situation can be triggered by this change.
-> 
-> I'm saying that I think the taint is justified.
+> I would really appreciate to let the comment because with this kind of
+> boards, almost everything is hackery. Think about the SD card support.
+> Pins are there, but nothing is wired on it. However we still want to
+> let these pins available for it.
 
-Ok. I am OK with dropping this patch for now. If there is a demand for this
-change, we could always look at it in the future. I will send the updated 8.4
-HWCAP patch.
+I disagree here. That kind of information in the device tree is
+neither easily discoverable nor comprehensive.
 
-Cheers
-Suzuki
+The chance for a regular user to think about going to look to the
+device tree for that kind of informations is leaning towards 0. And
+you cannot even describe fully the modifications that need to be done
+to achieve that.
+
+These infos should belong in the wiki, with images, pictures, whatever
+is needed, and not in the device tree.
+
+> I can drop the mode = "host" property though.
+> 
+> > On Fri, Mar 09, 2018 at 09:58:14AM +0100, Miquel Raynal wrote:
+> > > > Since you tested on a SuperNES Classic, I think you should also create
+> > > > a new DT (possibly include it) with a compatible of its own.
+> > > > 
+> > > > That way, if we ever find some differences, it will be easy to deal
+> > > > with them.  
+> > > 
+> > > So, what you would prefer is:
+> > > 1/ Move this entire DTS but the usb_otg node into a
+> > > "sun8i-r16-nintendo-nes.dtsi"
+> > > 2/ Include that DTSI from a
+> > > "sun8i-r16-nintendo-super-nes-classic-edition.dts" that would add the
+> > > usb_otg node as it is above.  
+> > 
+> > My remark had nothing to do with USB OTG.
+> 
+> OK, sorry.
+> 
+> > You can just create a DT
+> > called sun8i-r16-nintendo-nes-classic.dts, and then create another one
+> > call sun8i-r16-nintendo-supernes-classic.dts that would include the
+> > former, only overriding the compatible.
+> 
+> And being almost empty then?
+
+Yep, in the best scenario. But we're also preparing for the worst :)
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/59ffe530/attachment-0001.sig>
