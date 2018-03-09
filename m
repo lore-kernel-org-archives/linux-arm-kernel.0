@@ -1,82 +1,55 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:11 +0800
-Subject: [PATCH 28/39] ARM: 8479/2: add implementation for arm-smccc
+Date: Fri,  9 Mar 2018 17:07:10 +0800
+Subject: [PATCH 27/39] ARM: 8478/2: arm/arm64: add arm-smccc
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-29-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-28-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jens Wiklander <jens.wiklander@linaro.org>
 
-commit b329f95d70f3f955093e9a2b18ac1ed3587a8f73 upstream.
+commit 98dd64f34f47ce19b388d9015f767f48393a81eb upstream.
 
-Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC for
-architectures that may support arm-smccc. It's the responsibility of the
-caller to know if the SMC instruction is supported by the platform.
+Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
+SMC or HVC instruction. It's the responsibility of the caller to know if
+the SMC instruction is supported by the platform.
 
-Reviewed-by: Lars Persson <lars.persson@axis.com>
+This patch doesn't provide an implementation of the declared functions.
+Later patches will bring in implementations and set
+CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/Kconfig             |  1 +
- arch/arm/kernel/Makefile     |  2 ++
- arch/arm/kernel/armksyms.c   |  6 ++++
- arch/arm/kernel/smccc-call.S | 62 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 71 insertions(+)
- create mode 100644 arch/arm/kernel/smccc-call.S
+ drivers/firmware/Kconfig  |   3 ++
+ include/linux/arm-smccc.h | 105 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
+ create mode 100644 include/linux/arm-smccc.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569a11ee..36b9490a9b8b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -37,6 +37,7 @@ config ARM
- 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_TRACEHOOK
-+	select HAVE_ARM_SMCCC if CPU_V7
- 	select HAVE_BPF_JIT
- 	select HAVE_CC_STACKPROTECTOR
- 	select HAVE_CONTEXT_TRACKING
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 3c789496297f..599c950468fc 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -91,4 +91,6 @@ obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index cf478fe6b335..49a3a1185bb6 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -173,6 +173,9 @@ config QCOM_SCM_64
+ 	def_bool y
+ 	depends on QCOM_SCM && ARM64
  
-+obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o
++config HAVE_ARM_SMCCC
++	bool
 +
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index f89811fb9a55..7e45f69a0ddc 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -16,6 +16,7 @@
- #include <linux/syscalls.h>
- #include <linux/uaccess.h>
- #include <linux/io.h>
-+#include <linux/arm-smccc.h>
- 
- #include <asm/checksum.h>
- #include <asm/ftrace.h>
-@@ -175,3 +176,8 @@ EXPORT_SYMBOL(__gnu_mcount_nc);
- EXPORT_SYMBOL(__pv_phys_pfn_offset);
- EXPORT_SYMBOL(__pv_offset);
- #endif
-+
-+#ifdef CONFIG_HAVE_ARM_SMCCC
-+EXPORT_SYMBOL(arm_smccc_smc);
-+EXPORT_SYMBOL(arm_smccc_hvc);
-+#endif
-diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
+ source "drivers/firmware/broadcom/Kconfig"
+ source "drivers/firmware/google/Kconfig"
+ source "drivers/firmware/efi/Kconfig"
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
 new file mode 100644
-index 000000000000..2e48b674aab1
+index 000000000000..632dbb45a110
 --- /dev/null
-+++ b/arch/arm/kernel/smccc-call.S
-@@ -0,0 +1,62 @@
++++ b/include/linux/arm-smccc.h
+@@ -0,0 +1,105 @@
 +/*
 + * Copyright (c) 2015, Linaro Limited
 + *
@@ -90,54 +63,97 @@ index 000000000000..2e48b674aab1
 + * GNU General Public License for more details.
 + *
 + */
++#ifndef __LINUX_ARM_SMCCC_H
++#define __LINUX_ARM_SMCCC_H
++
++/*
++ * This file provides common defines for ARM SMC Calling Convention as
++ * specified in
++ * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
++ */
++
++#define ARM_SMCCC_STD_CALL		0
++#define ARM_SMCCC_FAST_CALL		1
++#define ARM_SMCCC_TYPE_SHIFT		31
++
++#define ARM_SMCCC_SMC_32		0
++#define ARM_SMCCC_SMC_64		1
++#define ARM_SMCCC_CALL_CONV_SHIFT	30
++
++#define ARM_SMCCC_OWNER_MASK		0x3F
++#define ARM_SMCCC_OWNER_SHIFT		24
++
++#define ARM_SMCCC_FUNC_MASK		0xFFFF
++
++#define ARM_SMCCC_IS_FAST_CALL(smc_val)	\
++	((smc_val) & (ARM_SMCCC_FAST_CALL << ARM_SMCCC_TYPE_SHIFT))
++#define ARM_SMCCC_IS_64(smc_val) \
++	((smc_val) & (ARM_SMCCC_SMC_64 << ARM_SMCCC_CALL_CONV_SHIFT))
++#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
++#define ARM_SMCCC_OWNER_NUM(smc_val) \
++	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
++
++#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
++	(((type) << ARM_SMCCC_TYPE_SHIFT) | \
++	((calling_convention) << ARM_SMCCC_CALL_CONV_SHIFT) | \
++	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
++	((func_num) & ARM_SMCCC_FUNC_MASK))
++
++#define ARM_SMCCC_OWNER_ARCH		0
++#define ARM_SMCCC_OWNER_CPU		1
++#define ARM_SMCCC_OWNER_SIP		2
++#define ARM_SMCCC_OWNER_OEM		3
++#define ARM_SMCCC_OWNER_STANDARD	4
++#define ARM_SMCCC_OWNER_TRUSTED_APP	48
++#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
++#define ARM_SMCCC_OWNER_TRUSTED_OS	50
++#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
++
++#ifndef __ASSEMBLY__
 +#include <linux/linkage.h>
-+
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
-+#include <asm/unwind.h>
-+
-+	/*
-+	 * Wrap c macros in asm macros to delay expansion until after the
-+	 * SMCCC asm macro is expanded.
-+	 */
-+	.macro SMCCC_SMC
-+	__SMC(0)
-+	.endm
-+
-+	.macro SMCCC_HVC
-+	__HVC(0)
-+	.endm
-+
-+	.macro SMCCC instr
-+UNWIND(	.fnstart)
-+	mov	r12, sp
-+	push	{r4-r7}
-+UNWIND(	.save	{r4-r7})
-+	ldm	r12, {r4-r7}
-+	\instr
-+	pop	{r4-r7}
-+	ldr	r12, [sp, #(4 * 4)]
-+	stm	r12, {r0-r3}
-+	bx	lr
-+UNWIND(	.fnend)
-+	.endm
-+
-+/*
-+ * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++#include <linux/types.h>
++/**
++ * struct arm_smccc_res - Result from SMC/HVC call
++ * @a0-a3 result values from registers 0 to 3
 + */
-+ENTRY(arm_smccc_smc)
-+	SMCCC SMCCC_SMC
-+ENDPROC(arm_smccc_smc)
++struct arm_smccc_res {
++	unsigned long a0;
++	unsigned long a1;
++	unsigned long a2;
++	unsigned long a3;
++};
 +
-+/*
-+ * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++/**
++ * arm_smccc_smc() - make SMC calls
++ * @a0-a7: arguments passed in registers 0 to 7
++ * @res: result values from registers 0 to 3
++ *
++ * This function is used to make SMC calls following SMC Calling Convention.
++ * The content of the supplied param are copied to registers 0 to 7 prior
++ * to the SMC instruction. The return values are updated with the content
++ * from register 0 to 3 on return from the SMC instruction.
 + */
-+ENTRY(arm_smccc_hvc)
-+	SMCCC SMCCC_HVC
-+ENDPROC(arm_smccc_hvc)
++asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
++			unsigned long a2, unsigned long a3, unsigned long a4,
++			unsigned long a5, unsigned long a6, unsigned long a7,
++			struct arm_smccc_res *res);
++
++/**
++ * arm_smccc_hvc() - make HVC calls
++ * @a0-a7: arguments passed in registers 0 to 7
++ * @res: result values from registers 0 to 3
++ *
++ * This function is used to make HVC calls following SMC Calling
++ * Convention.  The content of the supplied param are copied to registers 0
++ * to 7 prior to the HVC instruction. The return values are updated with
++ * the content from register 0 to 3 on return from the HVC instruction.
++ */
++asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
++			unsigned long a2, unsigned long a3, unsigned long a4,
++			unsigned long a5, unsigned long a6, unsigned long a7,
++			struct arm_smccc_res *res);
++
++#endif /*__ASSEMBLY__*/
++#endif /*__LINUX_ARM_SMCCC_H*/
 -- 
 2.16.2.440.gc6284da
