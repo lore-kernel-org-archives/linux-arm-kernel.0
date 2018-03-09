@@ -1,182 +1,207 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:21 +0800
-Subject: [PATCH 38/39] arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
+Date: Fri,  9 Mar 2018 17:07:22 +0800
+Subject: [PATCH 39/39] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-39-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-40-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit f2d3b2e8759a upstream.
+commit b092201e0020 upstream.
 
-One of the major improvement of SMCCC v1.1 is that it only clobbers
-the first 4 registers, both on 32 and 64bit. This means that it
-becomes very easy to provide an inline version of the SMC call
-primitive, and avoid performing a function call to stash the
-registers that would otherwise be clobbered by SMCCC v1.0.
+Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+It is lovely. Really.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- include/linux/arm-smccc.h | 141 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 141 insertions(+)
+ arch/arm64/kernel/bpi.S        | 44 ++++++++++-----------
+ arch/arm64/kernel/cpu_errata.c | 70 +++++++++++++++++++++++++++-------
+ 2 files changed, 77 insertions(+), 37 deletions(-)
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index e857670a8e01..453e850e6017 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -124,5 +124,146 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
- 			unsigned long a5, unsigned long a6, unsigned long a7,
- 			struct arm_smccc_res *res);
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index dec95bd82e31..dc4eb154e33b 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -17,6 +17,7 @@
+  */
  
-+/* SMCCC v1.1 implementation madness follows */
-+#ifdef CONFIG_ARM64
+ #include <linux/linkage.h>
++#include <linux/arm-smccc.h>
+ 
+ .macro ventry target
+ 	.rept 31
+@@ -53,27 +54,22 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	vectors __kvm_hyp_vector
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+-ENTRY(__psci_hyp_bp_inval_start)
+-	sub	sp, sp, #(8 * 18)
+-	stp	x16, x17, [sp, #(16 * 0)]
+-	stp	x14, x15, [sp, #(16 * 1)]
+-	stp	x12, x13, [sp, #(16 * 2)]
+-	stp	x10, x11, [sp, #(16 * 3)]
+-	stp	x8, x9, [sp, #(16 * 4)]
+-	stp	x6, x7, [sp, #(16 * 5)]
+-	stp	x4, x5, [sp, #(16 * 6)]
+-	stp	x2, x3, [sp, #(16 * 7)]
+-	stp	x0, x1, [sp, #(16 * 8)]
+-	mov	x0, #0x84000000
+-	smc	#0
+-	ldp	x16, x17, [sp, #(16 * 0)]
+-	ldp	x14, x15, [sp, #(16 * 1)]
+-	ldp	x12, x13, [sp, #(16 * 2)]
+-	ldp	x10, x11, [sp, #(16 * 3)]
+-	ldp	x8, x9, [sp, #(16 * 4)]
+-	ldp	x6, x7, [sp, #(16 * 5)]
+-	ldp	x4, x5, [sp, #(16 * 6)]
+-	ldp	x2, x3, [sp, #(16 * 7)]
+-	ldp	x0, x1, [sp, #(16 * 8)]
+-	add	sp, sp, #(8 * 18)
+-ENTRY(__psci_hyp_bp_inval_end)
 +
-+#define SMCCC_SMC_INST	"smc	#0"
-+#define SMCCC_HVC_INST	"hvc	#0"
++.macro smccc_workaround_1 inst
++	sub	sp, sp, #(8 * 4)
++	stp	x2, x3, [sp, #(8 * 0)]
++	stp	x0, x1, [sp, #(8 * 2)]
++	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_1
++	\inst	#0
++	ldp	x2, x3, [sp, #(8 * 0)]
++	ldp	x0, x1, [sp, #(8 * 2)]
++	add	sp, sp, #(8 * 4)
++.endm
 +
-+#elif defined(CONFIG_ARM)
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
++ENTRY(__smccc_workaround_1_smc_start)
++	smccc_workaround_1	smc
++ENTRY(__smccc_workaround_1_smc_end)
 +
-+#define SMCCC_SMC_INST	__SMC(0)
-+#define SMCCC_HVC_INST	__HVC(0)
++ENTRY(__smccc_workaround_1_hvc_start)
++	smccc_workaround_1	hvc
++ENTRY(__smccc_workaround_1_hvc_end)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 3adbbce7334c..734e817c0ca4 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -36,7 +36,10 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
+ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+ 
+ #ifdef CONFIG_KVM
+-extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
++extern char __smccc_workaround_1_smc_start[];
++extern char __smccc_workaround_1_smc_end[];
++extern char __smccc_workaround_1_hvc_start[];
++extern char __smccc_workaround_1_hvc_end[];
+ 
+ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+ 				const char *hyp_vecs_end)
+@@ -79,8 +82,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	spin_unlock(&bp_lock);
+ }
+ #else
+-#define __psci_hyp_bp_inval_start	NULL
+-#define __psci_hyp_bp_inval_end		NULL
++#define __smccc_workaround_1_smc_start		NULL
++#define __smccc_workaround_1_smc_end		NULL
++#define __smccc_workaround_1_hvc_start		NULL
++#define __smccc_workaround_1_hvc_end		NULL
+ 
+ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 				      const char *hyp_vecs_start,
+@@ -104,17 +109,56 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+ }
+ 
++#include <uapi/linux/psci.h>
++#include <linux/arm-smccc.h>
+ #include <linux/psci.h>
+ 
+-static int enable_psci_bp_hardening(void *data)
++static void call_smc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
 +
-+#endif
++static void call_hvc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
 +
-+#define ___count_args(_0, _1, _2, _3, _4, _5, _6, _7, _8, x, ...) x
++static int enable_smccc_arch_workaround_1(void *data)
+ {
+ 	const struct arm64_cpu_capabilities *entry = data;
++	bp_hardening_cb_t cb;
++	void *smccc_start, *smccc_end;
++	struct arm_smccc_res res;
 +
-+#define __count_args(...)						\
-+	___count_args(__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
++	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
++		return 0;
 +
-+#define __constraint_write_0						\
-+	"+r" (r0), "=&r" (r1), "=&r" (r2), "=&r" (r3)
-+#define __constraint_write_1						\
-+	"+r" (r0), "+r" (r1), "=&r" (r2), "=&r" (r3)
-+#define __constraint_write_2						\
-+	"+r" (r0), "+r" (r1), "+r" (r2), "=&r" (r3)
-+#define __constraint_write_3						\
-+	"+r" (r0), "+r" (r1), "+r" (r2), "+r" (r3)
-+#define __constraint_write_4	__constraint_write_3
-+#define __constraint_write_5	__constraint_write_4
-+#define __constraint_write_6	__constraint_write_5
-+#define __constraint_write_7	__constraint_write_6
++	switch (psci_ops.conduit) {
++	case PSCI_CONDUIT_HVC:
++		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++		if (res.a0)
++			return 0;
++		cb = call_hvc_arch_workaround_1;
++		smccc_start = __smccc_workaround_1_hvc_start;
++		smccc_end = __smccc_workaround_1_hvc_end;
++		break;
 +
-+#define __constraint_read_0
-+#define __constraint_read_1
-+#define __constraint_read_2
-+#define __constraint_read_3
-+#define __constraint_read_4	"r" (r4)
-+#define __constraint_read_5	__constraint_read_4, "r" (r5)
-+#define __constraint_read_6	__constraint_read_5, "r" (r6)
-+#define __constraint_read_7	__constraint_read_6, "r" (r7)
++	case PSCI_CONDUIT_SMC:
++		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++		if (res.a0)
++			return 0;
++		cb = call_smc_arch_workaround_1;
++		smccc_start = __smccc_workaround_1_smc_start;
++		smccc_end = __smccc_workaround_1_smc_end;
++		break;
 +
-+#define __declare_arg_0(a0, res)					\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register unsigned long r1 asm("r1");				\
-+	register unsigned long r2 asm("r2");				\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_1(a0, a1, res)					\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register unsigned long r2 asm("r2");				\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_2(a0, a1, a2, res)				\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register typeof(a2)    r2 asm("r2") = a2;			\
-+	register unsigned long r3 asm("r3")
-+
-+#define __declare_arg_3(a0, a1, a2, a3, res)				\
-+	struct arm_smccc_res   *___res = res;				\
-+	register u32           r0 asm("r0") = a0;			\
-+	register typeof(a1)    r1 asm("r1") = a1;			\
-+	register typeof(a2)    r2 asm("r2") = a2;			\
-+	register typeof(a3)    r3 asm("r3") = a3
-+
-+#define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
-+	__declare_arg_3(a0, a1, a2, a3, res);				\
-+	register typeof(a4) r4 asm("r4") = a4
-+
-+#define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
-+	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
-+	register typeof(a5) r5 asm("r5") = a5
-+
-+#define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
-+	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
-+	register typeof(a6) r6 asm("r6") = a6
-+
-+#define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
-+	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
-+	register typeof(a7) r7 asm("r7") = a7
-+
-+#define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
-+#define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
-+
-+#define ___constraints(count)						\
-+	: __constraint_write_ ## count					\
-+	: __constraint_read_ ## count					\
-+	: "memory"
-+#define __constraints(count)	___constraints(count)
-+
-+/*
-+ * We have an output list that is not necessarily used, and GCC feels
-+ * entitled to optimise the whole sequence away. "volatile" is what
-+ * makes it stick.
-+ */
-+#define __arm_smccc_1_1(inst, ...)					\
-+	do {								\
-+		__declare_args(__count_args(__VA_ARGS__), __VA_ARGS__);	\
-+		asm volatile(inst "\n"					\
-+			     __constraints(__count_args(__VA_ARGS__)));	\
-+		if (___res)						\
-+			*___res = (typeof(*___res)){r0, r1, r2, r3};	\
-+	} while (0)
-+
-+/*
-+ * arm_smccc_1_1_smc() - make an SMCCC v1.1 compliant SMC call
-+ *
-+ * This is a variadic macro taking one to eight source arguments, and
-+ * an optional return structure.
-+ *
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This macro is used to make SMC calls following SMC Calling Convention v1.1.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the SMC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the SMC instruction if not NULL.
-+ */
-+#define arm_smccc_1_1_smc(...)	__arm_smccc_1_1(SMCCC_SMC_INST, __VA_ARGS__)
-+
-+/*
-+ * arm_smccc_1_1_hvc() - make an SMCCC v1.1 compliant HVC call
-+ *
-+ * This is a variadic macro taking one to eight source arguments, and
-+ * an optional return structure.
-+ *
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This macro is used to make HVC calls following SMC Calling Convention v1.1.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the HVC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the HVC instruction if not NULL.
-+ */
-+#define arm_smccc_1_1_hvc(...)	__arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
-+
- #endif /*__ASSEMBLY__*/
- #endif /*__LINUX_ARM_SMCCC_H*/
++	default:
++		return 0;
++	}
+ 
+-	if (psci_ops.get_version)
+-		install_bp_hardening_cb(entry,
+-				       (bp_hardening_cb_t)psci_ops.get_version,
+-				       __psci_hyp_bp_inval_start,
+-				       __psci_hyp_bp_inval_end);
++	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
+ 
+ 	return 0;
+ }
+@@ -198,22 +242,22 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+-		.enable = enable_psci_bp_hardening,
++		.enable = enable_smccc_arch_workaround_1,
+ 	},
+ #endif
+ 	{
 -- 
 2.16.2.440.gc6284da
