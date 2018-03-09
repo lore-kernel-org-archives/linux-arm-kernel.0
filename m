@@ -1,62 +1,67 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 9 Mar 2018 09:37:38 +0100
-Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
-In-Reply-To: <20180308153832.GA28454@botnar.kaiser.cx>
-References: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
- <20180308161135.1f3d3d18@karo-electronics.de>
- <20180308153832.GA28454@botnar.kaiser.cx>
-Message-ID: <20180309093738.7cd5fded@karo-electronics.de>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Fri,  9 Mar 2018 09:41:50 +0100
+Subject: [PATCH v3 1/2] ARM: PLT: Move struct plt_entries definition to header
+In-Reply-To: <20180309084151.2379-1-alexander.sverdlin@nokia.com>
+References: <20180309084151.2379-1-alexander.sverdlin@nokia.com>
+Message-ID: <20180309084151.2379-2-alexander.sverdlin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+No functional change, later it will be re-used in several files.
 
-On Thu, 8 Mar 2018 16:38:32 +0100 Martin Kaiser wrote:
-> Hi Lothar,
-> 
-> Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
-> 
-> > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > > index 9725705..cf70df2 100644
-> > > --- a/arch/arm/boot/dts/imx25.dtsi
-> > > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > > @@ -269,6 +269,7 @@
-> > >  				dmas = <&sdma 24 1 0>,
-> > >  				       <&sdma 25 1 0>;
-> > >  				dma-names = "rx", "tx";
-> > > +				fsl,fifo-depth = <15>;
-> > >  				status = "disabled";
-> > >  			};
-> 
-> > > @@ -329,6 +330,7 @@
-> > >  				dmas = <&sdma 28 1 0>,
-> > >  				       <&sdma 29 1 0>;
-> > >  				dma-names = "rx", "tx";
-> > > +				fsl,fifo-depth = <15>;
-> > >  				status = "disabled";
-> > >  			};
-> 
-> > You are changing the global .dtsi file. Did you test this change with
-> > all devices that are affected by it?
-> 
-> I changed the hardware description of the imx25 SSI to match the
-> reference manual.
-> 
-> I did test this change on an imx25 board with audio playback. This uses
-> the SSI description I modified. I verified that the driver is actually
-> taking the modified setting into account and that this causes no
-> problems.
-> 
-> As of today, this setting is used by the fsl_ssi driver to set the fifo
-> water level for dma requests.
-> 
-> Of course, I don't have access to the enitre range of supported imx25
-> boards and I don't think this is required for submitting patches.
-> 
-> Do you have any indication why this patch should not be merged?
-> 
-Usually patches should not willy-nilly change the behaviour of existing
-configurations unless they fix any real life bugs.
+Change-Id: Icfa32669b3582d713b3ad680c25620d3d4844bdd
+Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+---
+ arch/arm/include/asm/module.h | 9 +++++++++
+ arch/arm/kernel/module-plts.c | 9 ---------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-
-Lothar Wa?mann
+diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+index 89ad059..6996405 100644
+--- a/arch/arm/include/asm/module.h
++++ b/arch/arm/include/asm/module.h
+@@ -19,6 +19,15 @@ enum {
+ };
+ #endif
+ 
++#define PLT_ENT_STRIDE		L1_CACHE_BYTES
++#define PLT_ENT_COUNT		(PLT_ENT_STRIDE / sizeof(u32))
++#define PLT_ENT_SIZE		(sizeof(struct plt_entries) / PLT_ENT_COUNT)
++
++struct plt_entries {
++	u32	ldr[PLT_ENT_COUNT];
++	u32	lit[PLT_ENT_COUNT];
++};
++
+ struct mod_plt_sec {
+ 	struct elf32_shdr	*plt;
+ 	int			plt_count;
+diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+index 3d0c2e4..f272711 100644
+--- a/arch/arm/kernel/module-plts.c
++++ b/arch/arm/kernel/module-plts.c
+@@ -14,10 +14,6 @@
+ #include <asm/cache.h>
+ #include <asm/opcodes.h>
+ 
+-#define PLT_ENT_STRIDE		L1_CACHE_BYTES
+-#define PLT_ENT_COUNT		(PLT_ENT_STRIDE / sizeof(u32))
+-#define PLT_ENT_SIZE		(sizeof(struct plt_entries) / PLT_ENT_COUNT)
+-
+ #ifdef CONFIG_THUMB2_KERNEL
+ #define PLT_ENT_LDR		__opcode_to_mem_thumb32(0xf8dff000 | \
+ 							(PLT_ENT_STRIDE - 4))
+@@ -26,11 +22,6 @@
+ 						    (PLT_ENT_STRIDE - 8))
+ #endif
+ 
+-struct plt_entries {
+-	u32	ldr[PLT_ENT_COUNT];
+-	u32	lit[PLT_ENT_COUNT];
+-};
+-
+ static bool in_init(const struct module *mod, unsigned long loc)
+ {
+ 	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
+-- 
+2.4.6
