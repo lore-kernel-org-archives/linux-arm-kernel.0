@@ -1,78 +1,58 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri,  9 Mar 2018 10:44:13 -0800
-Subject: [PATCH v3 2/6] staging: vc04_services: Remove cache-line-size
- property (v3)
-In-Reply-To: <20180309184417.23368-1-eric@anholt.net>
-References: <20180309184417.23368-1-eric@anholt.net>
-Message-ID: <20180309184417.23368-2-eric@anholt.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 9 Mar 2018 18:50:05 +0000
+Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
+In-Reply-To: <HE1PR0401MB2425871215B13AD0EFDCA5C3E6DE0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
+ <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
+ <20180305150814.GA15918@lst.de>
+ <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
+ <20180305183938.GB20086@lst.de>
+ <1729ae21-d08c-b413-51a3-f22c394b388d@arm.com>
+ <HE1PR0401MB24251E99564CAA526F719ECCE6D90@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+ <20180308074115.GB15748@lst.de>
+ <HE1PR0401MB2425871215B13AD0EFDCA5C3E6DE0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+Message-ID: <579b3df0-f78b-3c77-7a8a-9cd69848f1af@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's been tempting to replace this with (L1) cache_line_size(), but
-that's really not what the value is about.  It's about coordinating
-the condition for the pagelist fragment behavior between the two
-sides.  However, the property was not accepted for the upstream DT
-binding, so we have to use the firmware's fallback value.
+On 09/03/18 18:29, Nipun Gupta wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Christoph Hellwig [mailto:hch at lst.de]
+>> Sent: Thursday, March 08, 2018 13:11
+>>
+>> On Tue, Mar 06, 2018 at 04:41:56AM +0000, Nipun Gupta wrote:
+>>> Sorry for asking a trivial question - looking into dma_configure() I see that
+>>> PCI is used in the start and the end of the API.
+>>> In the end part pci_put_host_bridge_device() is called.
+>>> So are two bus callbacks something like 'dma_config_start' &
+>> 'dma_config_end'
+>>> will be required where the former one will return "dma_dev"?
+>>
+>> I'd just use dma_configure as the callback.
+> 
+> This would be a decent stuff.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+Yes, the PCI version should end up looking a lot like the old 
+pci_dma_configure() used to, before everything got pulled together.
 
-v2: Kept the property but added documentation.
-v3: Remove the DT property again, more documentation.
+>> Currently the of_dma_configure and acpi_dma_configure are only used
+>> for PCI anyway, as no one else sets a non-NULL dma dev.
+> 
+> My understanding is that even the platform bus uses the of_dma_configure
+> and probably acpi_dma_configure too. So platform bus may also need the
+> callback implemented. Please correct me if my understanding is wrong.
 
- .../interface/vchiq_arm/vchiq_2835_arm.c             | 20 +++++++++++---------
- .../interface/vchiq_arm/vchiq_pagelist.h             |  1 -
- 2 files changed, 11 insertions(+), 10 deletions(-)
+Indeed, platform and AMBA will want an implementation to dispatch 
+between {of,acpi}_dma_configre() per the current logic. Host1x doesn't 
+seem to care about ACPI so probably wants its own just calling 
+of_dma_configure().
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-index b59ef14890aa..afdd3e944f3f 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-@@ -77,7 +77,17 @@ struct vchiq_pagelist_info {
- };
- 
- static void __iomem *g_regs;
--static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
-+/* This value is the size of the L2 cache lines as understood by the
-+ * VPU firmware, which determines the required alignment of the
-+ * offsets/sizes in pagelists.
-+ *
-+ * Modern VPU firmware looks for a DT "cache-line-size" property in
-+ * the VCHIQ node and will overwrite it with the actual L2 cache size,
-+ * which the kernel must then respect.  That property was rejected
-+ * upstream, so we have to use the VPU firmware's compatibility value
-+ * of 32.
-+ */
-+static unsigned int g_cache_line_size = 32;
- static unsigned int g_fragments_size;
- static char *g_fragments_base;
- static char *g_free_fragments;
-@@ -117,14 +127,6 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- 	if (err < 0)
- 		return err;
- 
--	err = of_property_read_u32(dev->of_node, "cache-line-size",
--				   &g_cache_line_size);
--
--	if (err) {
--		dev_err(dev, "Missing cache-line-size property\n");
--		return -ENODEV;
--	}
--
- 	g_fragments_size = 2 * g_cache_line_size;
- 
- 	/* Allocate space for the channels in coherent memory */
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-index a6c5f7cc78f0..bec411061554 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
-@@ -34,7 +34,6 @@
- #ifndef VCHIQ_PAGELIST_H
- #define VCHIQ_PAGELIST_H
- 
--#define CACHE_LINE_SIZE 32
- #define PAGELIST_WRITE 0
- #define PAGELIST_READ 1
- #define PAGELIST_READ_WITH_FRAGMENTS 2
--- 
-2.16.2
+> I will submit the patch with 'dma_configure' callback implemented for
+> the busses shortly.
+
+Cheers - I've been trying to find some time to take a look myself, but 
+having something to review instead would certainly be easier :)
+
+Robin.
