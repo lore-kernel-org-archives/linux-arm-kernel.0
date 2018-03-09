@@ -1,41 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Mar 2018 15:53:16 +0000
-Subject: [RFC PATCH 3/6] mm, arm64: untag user addresses in memory syscalls
-In-Reply-To: <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
-Message-ID: <20180309155315.4x44sbp3darractt@armageddon.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 9 Mar 2018 15:55:34 +0000
+Subject: [PATCH] arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
+In-Reply-To: <20180309154050.30656-1-marc.zyngier@arm.com>
+References: <20180309154050.30656-1-marc.zyngier@arm.com>
+Message-ID: <CAKv+Gu9vhS-CmyCMm8arYE0rgAPwKqXHnG7JDmSzW=vhwAYDMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 03:02:01PM +0100, Andrey Konovalov wrote:
-> Memory subsystem syscalls accept user addresses as arguments, but don't use
-> copy_from_user and other similar functions, so we need to handle this case
-> separately.
-> 
-> Untag user pointers passed to madvise, mbind, get_mempolicy, mincore,
-> mlock, mlock2, brk, mmap_pgoff, old_mmap, munmap, remap_file_pages,
-> mprotect, pkey_mprotect, mremap and msync.
-> 
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+On 9 March 2018 at 15:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> A recent update to the ARM SMCCC ARCH_WORKAROUND_1 specification
+> allows firmware to return a non zero, positive value to describe
+> that although the mitigation is implemented at the higher exception
+> level, the CPU on which the call is made is not affected.
+>
+> Let's relax the check on the return value from ARCH_WORKAROUND_1
+> so that we only error out if the returned value is negative.
+>
+> Fixes: b092201e0020 ("arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support")
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Please keep the cc list small (maybe linux-arch, linux-arm-kernel) as
-I'm sure some lists would consider this spam.
+OK, so this means the current code running on new firmware will
+erroneously assume that the mitigation is not implemented or needed if
+it, say, happens to run on the A53 cluster on Juno?
 
->  mm/madvise.c   | 2 ++
->  mm/mempolicy.c | 6 ++++++
->  mm/mincore.c   | 2 ++
->  mm/mlock.c     | 5 +++++
->  mm/mmap.c      | 9 +++++++++
->  mm/mprotect.c  | 2 ++
->  mm/mremap.c    | 2 ++
->  mm/msync.c     | 3 +++
-
-I'm not yet convinced these functions need to allow tagged pointers.
-They are not doing memory accesses but rather dealing with the memory
-range, hence an untagged pointer is better suited. There is probably a
-reason why the "start" argument is "unsigned long" vs "void __user *"
-(in the kernel, not the man page).
-
--- 
-Catalin
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 07823595b7f0..91428426bf26 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -178,7 +178,7 @@ static int enable_smccc_arch_workaround_1(void *data)
+>         case PSCI_CONDUIT_HVC:
+>                 arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>                                   ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+> -               if (res.a0)
+> +               if ((int)res.a0 < 0)
+>                         return 0;
+>                 cb = call_hvc_arch_workaround_1;
+>                 smccc_start = __smccc_workaround_1_hvc_start;
+> @@ -188,7 +188,7 @@ static int enable_smccc_arch_workaround_1(void *data)
+>         case PSCI_CONDUIT_SMC:
+>                 arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>                                   ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+> -               if (res.a0)
+> +               if ((int)res.a0 < 0)
+>                         return 0;
+>                 cb = call_smc_arch_workaround_1;
+>                 smccc_start = __smccc_workaround_1_smc_start;
+> --
+> 2.14.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
