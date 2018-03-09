@@ -1,568 +1,896 @@
-From: shunyong.yang@hxt-semitech.com (Yang, Shunyong)
-Date: Fri, 9 Mar 2018 03:14:18 +0000
-Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for
- level interrupt resampling
-In-Reply-To: <cf815673-e20e-c1e1-2d79-2f47261b2412@redhat.com>
-References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
- <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
- <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com> <20180308161900.GC1917@lvm>
- <86r2oubho3.wl-marc.zyngier@arm.com>
- <cf815673-e20e-c1e1-2d79-2f47261b2412@redhat.com>
-Message-ID: <1520565257.2583.57.camel@hxt-semitech.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 9 Mar 2018 11:15:04 +0800
+Subject: [PATCH v4 1/2] ARM: dts: imx: Add basic dtsi file for imx6sll
+In-Reply-To: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
+References: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <20180309031503.GF3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Eric, Marc and Christoffer,
+Looks pretty good, except that we should follow device tree
+specification recommendation to name device as much as possible.
 
-On Thu, 2018-03-08 at 19:12 +0100, Auger Eric wrote:
-> Hi Marc, Christoffer,
+https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.2
+
+On Thu, Mar 08, 2018 at 06:03:43PM +0800, Bai Ping wrote:
+> diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
+> new file mode 100644
+> index 0000000..3fb1156
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6sll.dtsi
+> @@ -0,0 +1,806 @@
+> +//SPDX-License-Identifier: (GPL-2.0 OR MIT)
+
+There should be space right after //
+
+> +/*
+> + * Copyright 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017-2018 NXP.
+> + *
+> + */
+> +
+> +#include <dt-bindings/clock/imx6sll-clock.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "imx6sll-pinfunc.h"
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	aliases {
+> +		gpio0 = &gpio1;
+> +		gpio1 = &gpio2;
+> +		gpio2 = &gpio3;
+> +		gpio3 = &gpio4;
+> +		gpio4 = &gpio5;
+> +		gpio5 = &gpio6;
+> +		i2c0 = &i2c1;
+> +		i2c1 = &i2c2;
+> +		i2c2 = &i2c3;
+> +		mmc0 = &usdhc1;
+> +		mmc1 = &usdhc2;
+> +		mmc2 = &usdhc3;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +		serial4 = &uart5;
+> +		spi0 = &ecspi1;
+> +		spi1 = &ecspi2;
+> +		spi3 = &ecspi3;
+> +		spi4 = &ecspi4;
+> +		usbphy0 = &usbphy1;
+> +		usbphy1 = &usbphy2;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			reg = <0>;
+> +			next-level-cache = <&L2>;
+> +			operating-points = <
+> +				/* kHz    uV */
+> +				996000  1225000
+> +				792000  1175000
+> +				396000  1075000
+> +				198000	975000
+> +			>;
+> +			fsl,soc-operating-points = <
+> +				/* ARM kHz      SOC-PU uV */
+> +				996000          1225000
+> +				792000          1175000
+> +				396000          1175000
+> +				198000		1175000
+> +			>;
+> +			clock-latency = <61036>; /* two CLK32 periods */
+> +			fsl,low-power-run;
+
+What is this?
+
+> +			clocks = <&clks IMX6SLL_CLK_ARM>,
+> +				 <&clks IMX6SLL_CLK_PLL2_PFD2>,
+> +				 <&clks IMX6SLL_CLK_STEP>,
+> +				 <&clks IMX6SLL_CLK_PLL1_SW>,
+> +				 <&clks IMX6SLL_CLK_PLL1_SYS>,
+> +				 <&clks IMX6SLL_CLK_PLL1>,
+> +				 <&clks IMX6SLL_PLL1_BYPASS>,
+> +				 <&clks IMX6SLL_PLL1_BYPASS_SRC>;
+> +			clock-names = "arm", "pll2_pfd2_396m", "step",
+> +				      "pll1_sw", "pll1_sys", "pll1", "pll1_bypass",
+> +				      "pll1_bypass_src";
+> +		};
+> +	};
+> +
+> +	intc: interrupt-controller at a01000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x00a01000 0x1000>,
+> +		      <0x00a00100 0x100>;
+> +		interrupt-parent = <&intc>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+As requested by DT maintainer, please drop this container node and give
+an unique name for each fixed-clock, something like:
+
+	clock-xxx {
+		...
+	};
+
+You may want to refer to how Lucas did it for i.MX8QM.
+
+> +
+> +		ckil: clock at 0 {
+> +			compatible = "fixed-clock";
+> +			reg = <0>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <32768>;
+> +			clock-output-names = "ckil";
+> +		};
+> +
+> +		osc: clock at 1 {
+> +			compatible = "fixed-clock";
+> +			reg = <1>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +			clock-output-names = "osc";
+> +		};
+> +
+> +		ipp_di0: clock at 2 {
+> +			compatible = "fixed-clock";
+> +			reg = <2>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <0>;
+> +			clock-output-names = "ipp_di0";
+> +		};
+> +
+> +		ipp_di1: clock at 3 {
+> +			compatible = "fixed-clock";
+> +			reg = <3>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <0>;
+> +			clock-output-names = "ipp_di1";
+> +		};
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		interrupt-parent = <&gpc>;
+> +		ranges;
+> +
+> +		ocram: sram at 900000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x00900000 0x20000>;
+> +		};
+> +
+> +		L2: l2-cache at a02000 {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0x00a02000 0x1000>;
+> +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+> +			cache-unified;
+> +			cache-level = <2>;
+> +			arm,tag-latency = <4 2 3>;
+> +			arm,data-latency = <4 2 3>;
+> +		};
+> +
+> +		aips1: aips-bus at 2000000 {
+> +			compatible = "fsl,aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x02000000 0x100000>;
+> +			ranges;
+> +
+> +			spba: spba-bus at 2000000 {
+> +				compatible = "fsl,spba-bus", "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = <0x02000000 0x40000>;
+> +				ranges;
+> +
+> +				spdif: spdif at 2004000 {
+> +					compatible = "fsl,imx6sl-spdif", "fsl,imx35-spdif";
+> +					reg = <0x02004000 0x4000>;
+> +					interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 14 18 0>, <&sdma 15 18 0>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_SPDIF_GCLK>,
+> +						 <&clks IMX6SLL_CLK_OSC>,
+> +						 <&clks IMX6SLL_CLK_SPDIF>,
+> +						 <&clks IMX6SLL_CLK_DUMMY>,
+> +						 <&clks IMX6SLL_CLK_DUMMY>,
+> +						 <&clks IMX6SLL_CLK_DUMMY>,
+> +						 <&clks IMX6SLL_CLK_IPG>,
+> +						 <&clks IMX6SLL_CLK_DUMMY>,
+> +						 <&clks IMX6SLL_CLK_DUMMY>,
+> +						 <&clks IMX6SLL_CLK_SPBA>;
+> +					clock-names = "core", "rxtx0",
+> +						      "rxtx1", "rxtx2",
+> +						      "rxtx3", "rxtx4",
+> +						      "rxtx5", "rxtx6",
+> +						      "rxtx7", "dma";
+> +					status = "disabled";
+> +				};
+> +
+> +				ecspi1: ecspi at 2008000 {
+
+s/ecspi/spi for node name.
+
+> +					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
+> +					reg = <0x02008000 0x4000>;
+> +					interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_ECSPI1>,
+> +						 <&clks IMX6SLL_CLK_ECSPI1>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				ecspi2: ecspi at 200c000 {
+> +					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
+> +					reg = <0x0200c000 0x4000>;
+> +					interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_ECSPI2>,
+> +						 <&clks IMX6SLL_CLK_ECSPI2>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				ecspi3: ecspi at 2010000 {
+> +					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
+> +					reg = <0x02010000 0x4000>;
+> +					interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_ECSPI3>,
+> +						 <&clks IMX6SLL_CLK_ECSPI3>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				ecspi4: ecspi at 2014000 {
+> +					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
+> +					reg = <0x02014000 0x4000>;
+> +					interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_ECSPI4>,
+> +						 <&clks IMX6SLL_CLK_ECSPI4>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				uart4: serial at 2018000 {
+> +					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +					reg = <0x02018000 0x4000>;
+> +					interrupts =<GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 31 4 0>, <&sdma 32 4 0>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_UART4_IPG>,
+> +						 <&clks IMX6SLL_CLK_UART4_SERIAL>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				uart1: serial at 2020000 {
+> +					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +					reg = <0x02020000 0x4000>;
+> +					interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 25 4 0>, <&sdma 26 4 0>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_UART1_IPG>,
+> +						 <&clks IMX6SLL_CLK_UART1_SERIAL>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				uart2: serial at 2024000 {
+> +					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +					reg = <0x02024000 0x4000>;
+> +					interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
+> +					dma-names = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_UART2_IPG>,
+> +						 <&clks IMX6SLL_CLK_UART2_SERIAL>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +
+> +				ssi1: ssi at 2028000 {
+
+ssi-controller
+
+> +					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
+> +					reg = <0x02028000 0x4000>;
+> +					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 37 22 0>, <&sdma 38 22 0>;
+> +					dma-names = "rx", "tx";
+> +					fsl,fifo-depth = <15>;
+> +					clocks = <&clks IMX6SLL_CLK_SSI1_IPG>,
+> +						 <&clks IMX6SLL_CLK_SSI1>;
+> +					clock-names = "ipg", "baud";
+> +					status = "disabled";
+> +				};
+> +
+> +				ssi2: ssi2 at 202c000 {
+
+Drop 2 from node name.
+
+> +					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
+> +					reg = <0x0202c000 0x4000>;
+> +					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 41 22 0>, <&sdma 42 22 0>;
+> +					dma-names = "rx", "tx";
+> +					fsl,fifo-depth = <15>;
+> +					clocks = <&clks IMX6SLL_CLK_SSI2_IPG>,
+> +						 <&clks IMX6SLL_CLK_SSI2>;
+> +					clock-names = "ipg", "baud";
+> +					status = "disabled";
+> +				};
+> +
+> +				ssi3: ssi at 2030000 {
+> +					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
+> +					reg = <0x02030000 0x4000>;
+> +					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 45 22 0>, <&sdma 46 22 0>;
+> +					dma-names = "rx", "tx";
+> +					fsl,fifo-depth = <15>;
+> +					clocks = <&clks IMX6SLL_CLK_SSI3_IPG>,
+> +						 <&clks IMX6SLL_CLK_SSI3>;
+> +					clock-names = "ipg", "baud";
+> +					status = "disabled";
+> +				};
+> +
+> +				uart3: serial at 2034000 {
+> +					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +					reg = <0x02034000 0x4000>;
+> +					interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +					dmas = <&sdma 29 4 0>, <&sdma 30 4 0>;
+> +					dma-name = "rx", "tx";
+> +					clocks = <&clks IMX6SLL_CLK_UART3_IPG>,
+> +						 <&clks IMX6SLL_CLK_UART3_SERIAL>;
+> +					clock-names = "ipg", "per";
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+> +			pwm1: pwm at 2080000 {
+> +				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
+> +				reg = <0x02080000 0x4000>;
+> +				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_PWM1>,
+> +					 <&clks IMX6SLL_CLK_PWM1>;
+> +				clock-names = "ipg", "per";
+> +				#pwm-cells = <2>;
+> +			};
+> +
+> +			pwm2: pwm at 2084000 {
+> +				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
+> +				reg = <0x02084000 0x4000>;
+> +				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_PWM2>,
+> +					 <&clks IMX6SLL_CLK_PWM2>;
+> +				clock-names = "ipg", "per";
+> +				#pwm-cells = <2>;
+> +			};
+> +
+> +			pwm3: pwm at 2088000 {
+> +				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
+> +				reg = <0x02088000 0x4000>;
+> +				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_PWM3>,
+> +					 <&clks IMX6SLL_CLK_PWM3>;
+> +				clock-names = "ipg", "per";
+> +				#pwm-cells = <2>;
+> +			};
+> +
+> +			pwm4: pwm at 208c000 {
+> +				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
+> +				reg = <0x0208c000 0x4000>;
+> +				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_PWM4>,
+> +					 <&clks IMX6SLL_CLK_PWM4>;
+> +				clock-names = "ipg", "per";
+> +				#pwm-cells = <2>;
+> +			};
+> +
+> +			gpt1: gpt at 2098000 {
+
+timer
+
+> +				compatible = "fsl,imx6sll-gpt";
+> +				reg = <0x02098000 0x4000>;
+> +				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_GPT_BUS>,
+> +					 <&clks IMX6SLL_CLK_GPT_SERIAL>;
+> +				clock-names = "ipg", "per";
+> +			};
+> +
+> +			gpio1: gpio at 209c000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x0209c000 0x4000>;
+> +				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio2: gpio at 20a0000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x020a0000 0x4000>;
+> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio3: gpio at 20a4000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x020a4000 0x4000>;
+> +				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio4: gpio at 20a8000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x020a8000 0x4000>;
+> +				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio5: gpio at 20ac000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x020ac000 0x4000>;
+> +				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio6: gpio at 20b0000 {
+> +				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
+> +				reg = <0x020b0000 0x4000>;
+> +				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			kpp: kpp at 20b8000 {
+
+s/kpp/keypad for node name.
+
+> +				compatible = "fsl,imx6sll-kpp", "fsl,imx21-kpp";
+> +				reg = <0x020b8000 0x4000>;
+> +				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_KPP>;
+> +				status = "disabled";
+> +			};
+> +
+> +			wdog1: wdog at 20bc000 {
+
+s/wdog/watchdog for node name.
+
+> +				compatible = "fsl,imx6sll-wdt", "fsl,imx21-wdt";
+> +				reg = <0x020bc000 0x4000>;
+> +				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_WDOG1>;
+> +			};
+> +
+> +			wdog2: wdog at 20c0000 {
+> +				compatible = "fsl,imx6sll-wdt", "fsl,imx21-wdt";
+> +				reg = <0x020c0000 0x4000>;
+> +				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_WDOG2>;
+> +				status = "disabled";
+> +			};
+> +
+> +			clks: clock-controller at 20c4000 {
+> +				compatible = "fsl,imx6sll-ccm";
+> +				reg = <0x020c4000 0x4000>;
+> +				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+> +				#clock-cells = <1>;
+> +				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
+> +				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
+> +
+> +				assigned-clocks = <&clks IMX6SLL_CLK_PERCLK_SEL>;
+> +				assigned-clock-parents = <&clks IMX6SLL_CLK_OSC>;
+> +			};
+> +
+> +			anatop: anatop at 20c8000 {
+> +				compatible = "fsl,imx6sll-anatop",
+> +					     "fsl,imx6q-anatop",
+> +					     "syscon", "simple-bus";
+> +				reg = <0x020c8000 0x4000>;
+> +				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				reg_3p0: regulator-3p0 at 20c8120 {
+> +					compatible = "fsl,anatop-regulator";
+> +					reg = <0x20c8120>;
+> +					regulator-name = "vdd3p0";
+> +					regulator-min-microvolt = <2625000>;
+> +					regulator-max-microvolt = <3400000>;
+> +					anatop-reg-offset = <0x120>;
+> +					anatop-vol-bit-shift = <8>;
+> +					anatop-vol-bit-width = <5>;
+> +					anatop-min-bit-val = <0>;
+> +					anatop-min-voltage = <2625000>;
+> +					anatop-max-voltage = <3400000>;
+> +					anatop-enable-bit = <0>;
+> +				};
+> +			};
+> +
+> +			tempmon: tempmon {
+
+s/tempmon/temperature-sensor for node name.
+
+> +				compatible = "fsl,imx6sll-tempmon", "fsl,imx6sx-tempmon";
+> +				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+> +				fsl,tempmon = <&anatop>;
+> +				fsl,tempmon-data = <&ocotp>;
+> +				clocks = <&clks IMX6SLL_CLK_PLL3_USB_OTG>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbphy1: usbphy at 20c9000 {
+
+s/usbphy/usb-phy for node name.
+
+> +				compatible = "fsl,imx6sll-usbphy", "fsl,imx6ul-usbphy",
+> +						"fsl,imx23-usbphy";
+> +				reg = <0x020c9000 0x1000>;
+> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USBPHY1>;
+> +				phy-3p0-supply = <&reg_3p0>;
+> +				fsl,anatop = <&anatop>;
+> +			};
+> +
+> +			usbphy2: usbphy at 20ca000 {
+> +				compatible = "fsl,imx6sll-usbphy", "fsl,imx6ul-usbphy",
+> +						"fsl,imx23-usbphy";
+> +				reg = <0x020ca000 0x1000>;
+> +				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USBPHY2>;
+> +				phy-reg_3p0-supply = <&reg_3p0>;
+> +				fsl,anatop = <&anatop>;
+> +			};
+> +
+> +			snvs: snvs at 20cc000 {
+> +				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+> +				reg = <0x020cc000 0x4000>;
+> +
+> +				snvs_rtc: snvs-rtc-lp {
+> +					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> +					regmap = <&snvs>;
+> +					offset = <0x34>;
+> +					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +
+> +				snvs_poweroff: snvs-poweroff {
+> +					compatible = "syscon-poweroff";
+> +					regmap = <&snvs>;
+> +					offset = <0x38>;
+> +					mask = <0x61>;
+> +				};
+> +
+> +				snvs_pwrkey: snvs-powerkey {
+> +					compatible = "fsl,sec-v4.0-pwrkey";
+> +					regmap = <&snvs>;
+> +					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+> +					linux,keycode = <KEY_POWER>;
+> +					wakeup-source;
+> +				};
+> +			};
+> +
+> +			epit1: epit at 20d0000 {
+> +				reg = <0x020d0000 0x4000>;
+> +				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			epit2: epit at 20d4000 {
+> +				reg = <0x020d4000 0x4000>;
+> +				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+
+No compatible, so unused?
+
+> +
+> +			src: src at 20d8000 {
+
+reset-controller
+
+> +				compatible = "fsl,imx6sll-src";
+> +				reg = <0x020d8000 0x4000>;
+> +				interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+> +				#reset-cells = <1>;
+> +			};
+> +
+> +			gpc: gpc at 20dc000 {
+
+interrupt-controller
+
+> +				compatible = "fsl,imx6sll-gpc", "fsl,imx6q-gpc";
+> +				reg = <0x020dc000 0x4000>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <3>;
+> +				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-parent = <&intc>;
+> +				fsl,mf-mix-wakeup-irq = <0x7c00000 0x7d00 0x0 0x1400640>;
+
+What is this?
+
+> +			};
+> +
+> +			iomuxc: iomuxc at 20e0000 {
+> +				compatible = "fsl,imx6sll-iomuxc";
+> +				reg = <0x020e0000 0x4000>;
+> +			};
+> +
+> +			gpr: iomuxc-gpr at 20e4000 {
+> +				compatible = "fsl,imx6sll-iomuxc-gpr",
+> +					     "fsl,imx6q-iomuxc-gpr", "syscon";
+> +				reg = <0x020e4000 0x4000>;
+> +			};
+> +
+> +			csi: csi at 20e8000 {
+> +				compatible = "fsl,imx6sll-csi", "fsl,imx6s-csi";
+> +				reg = <0x020e8000 0x4000>;
+> +				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_DUMMY>,
+> +					 <&clks IMX6SLL_CLK_CSI>,
+> +					 <&clks IMX6SLL_CLK_DUMMY>;
+> +				clock-names = "disp-axi", "csi_mclk", "disp_dcic";
+> +				status = "disabled";
+> +			};
+> +
+> +			sdma: sdma at 20ec000 {
+
+dma-controller
+
+> +				compatible = "fsl,imx6sll-sdma", "fsl,imx35-sdma";
+> +				reg = <0x020ec000 0x4000>;
+> +				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_SDMA>,
+> +					 <&clks IMX6SLL_CLK_SDMA>;
+> +				clock-names = "ipg", "ahb";
+> +				#dma-cells = <3>;
+> +				iram = <&ocram>;
+> +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+> +			};
+> +
+> +			lcdif: lcdif at 20f8000 {
+
+lcd-controller
+
+> +				compatible = "fsl,imx6sll-lcdif", "fsl,imx28-lcdif";
+> +				reg = <0x020f8000 0x4000>;
+> +				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_LCDIF_PIX>,
+> +					 <&clks IMX6SLL_CLK_LCDIF_APB>,
+> +					 <&clks IMX6SLL_CLK_DUMMY>;
+> +				clock-names = "pix", "axi", "disp_axi";
+> +				status = "disabled";
+> +			};
+> +
+> +			dcp: dcp at 20fc000 {
+> +				compatible = "fsl,imx6sl-dcp";
+> +				reg = <0x020fc000 0x4000>;
+> +				interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_DCP>;
+> +				clock-names = "dcp";
+> +			};
+> +		};
+> +
+> +		aips2: aips-bus at 2100000 {
+> +			compatible = "fsl,aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x02100000 0x100000>;
+> +			ranges;
+> +
+> +			usbotg1: usb at 2184000 {
+> +				compatible = "fsl,imx6sll-usb", "fsl,imx6ul-usb",
+> +						"fsl,imx27-usb";
+> +				reg = <0x02184000 0x200>;
+> +				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USBOH3>;
+> +				fsl,usbphy = <&usbphy1>;
+> +				fsl,usbmisc = <&usbmisc 0>;
+> +				fsl,anatop = <&anatop>;
+> +				ahb-burst-config = <0x0>;
+> +				tx-burst-size-dword = <0x10>;
+> +				rx-burst-size-dword = <0x10>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbotg2: usb at 2184200 {
+> +				compatible = "fsl,imx6sll-usb", "fsl,imx6ul-usb",
+> +						"fsl,imx27-usb";
+> +				reg = <0x02184200 0x200>;
+> +				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USBOH3>;
+> +				fsl,usbphy = <&usbphy2>;
+> +				fsl,usbmisc = <&usbmisc 1>;
+> +				ahb-burst-config = <0x0>;
+> +				tx-burst-size-dword = <0x10>;
+> +				rx-burst-size-dword = <0x10>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbmisc: usbmisc at 2184800 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx6sll-usbmisc", "fsl,imx6ul-usbmisc",
+> +						"fsl,imx6q-usbmisc";
+> +				reg = <0x02184800 0x200>;
+> +			};
+> +
+> +			usdhc1: usdhc at 2190000 {
+
+s/usdhc/mmc for node name.
+
+> +				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
+> +				reg = <0x02190000 0x4000>;
+> +				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USDHC1>,
+> +					 <&clks IMX6SLL_CLK_USDHC1>,
+> +					 <&clks IMX6SLL_CLK_USDHC1>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				bus-width = <4>;
+> +				fsl,tuning-step = <2>;
+> +				fsl,tuning-start-tap = <20>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc2: usdhc at 2194000 {
+> +				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
+> +				reg = <0x02194000 0x4000>;
+> +				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USDHC2>,
+> +					 <&clks IMX6SLL_CLK_USDHC2>,
+> +					 <&clks IMX6SLL_CLK_USDHC2>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				bus-width = <4>;
+> +				fsl,tuning-step = <2>;
+> +				fsl,tuning-start-tap = <20>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc3: usdhc at 2198000 {
+> +				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
+> +				reg = <0x02198000 0x4000>;
+> +				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_USDHC3>,
+> +					 <&clks IMX6SLL_CLK_USDHC3>,
+> +					 <&clks IMX6SLL_CLK_USDHC3>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				bus-width = <4>;
+> +				fsl,tuning-step = <2>;
+> +				fsl,tuning-start-tap = <20>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c1: i2c at 21a0000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fs,imx6sll-i2c", "fsl,imx21-i2c";
+> +				reg = <0x021a0000 0x4000>;
+> +				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_I2C1>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c2: i2c at 21a4000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx6sll-i2c", "fsl,imx21-i2c";
+> +				reg = <0x021a4000 0x4000>;
+> +				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_I2C2>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c3: i2c at 21a8000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx6sll-i2c", "fsl,imx21-i2c";
+> +				reg = <0x021a8000 0x4000>;
+> +				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SLL_CLK_I2C3>;
+> +				status = "disabled";
+> +			};
+> +
+> +			romcp at 21ac000 {
+> +				compatible = "fsl,imx6sll-romcp", "syscon";
+> +				reg = <0x021ac000 0x4000>;
+> +			};
+> +
+> +			mmdc: mmdc at 21b0000 {
+
+memory-controller
+
+Shawn
+
+> +				compatible = "fsl,imx6sll-mmdc", "fsl,imx6q-mmdc";
+> +				reg = <0x021b0000 0x4000>;
+> +			};
+> +
+> +			rngb: rngb at 21b4000 {
+> +				reg = <0x021b4000 0x4000>;
+> +				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks =  <&clks IMX6SLL_CLK_DUMMY>;
+> +			};
+> +
+> +			ocotp: ocotp-ctrl at 21bc000 {
+> +				compatible = "fsl,imx6sll-ocotp", "syscon";
+> +				reg = <0x021bc000 0x4000>;
+> +				clocks = <&clks IMX6SLL_CLK_OCOTP>;
+> +			};
+> +
+> +			snvs_gpr: snvs-gpr at 21c4000 {
+> +				reg = <0x021c4000 0x10000>;
+> +			};
+> +
+> +			iomuxc_snvs: iomuxc-snvs at 21c8000 {
+> +				reg = <0x021c8000 0x10000>;
+> +			};
+> +
+> +			audmux: audmux at 21d8000 {
+> +				compatible = "fsl,imx6sll-audmux", "fsl,imx31-audmux";
+> +				reg = <0x021d8000 0x4000>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart5: serial at 21f4000 {
+> +				compatible = "fsl,imx6sll-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
+> +				reg = <0x021f4000 0x4000>;
+> +				interrupts =<GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+> +				dmas = <&sdma 33 4 0>, <&sdma 34 4 0>;
+> +				dma-names = "rx", "tx";
+> +				clocks = <&clks IMX6SLL_CLK_UART5_IPG>,
+> +					 <&clks IMX6SLL_CLK_UART5_SERIAL>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
 > 
-> On 08/03/18 18:28, Marc Zyngier wrote:
-> > 
-> > On Thu, 08 Mar 2018 16:19:00 +0000,
-> > Christoffer Dall wrote:
-> > > 
-> > > 
-> > > On Thu, Mar 08, 2018 at 11:54:27AM +0000, Marc Zyngier wrote:
-> > > > 
-> > > > On 08/03/18 09:49, Marc Zyngier wrote:
-> > > > > 
-> > > > > [updated Christoffer's email address]
-> > > > > 
-> > > > > Hi Shunyong,
-> > > > > 
-> > > > > On 08/03/18 07:01, Shunyong Yang wrote:
-> > > > > > 
-> > > > > > When resampling irqfds is enabled, level interrupt should
-> > > > > > be
-> > > > > > de-asserted when resampling happens. On page 4-47 of GIC v3
-> > > > > > specification IHI0069D, it said,
-> > > > > > "When the PE acknowledges an SGI, a PPI, or an SPI at the
-> > > > > > CPU
-> > > > > > interface, the IRI changes the status of the interrupt to
-> > > > > > active
-> > > > > > and pending if:
-> > > > > > ? It is an edge-triggered interrupt, and another edge has
-> > > > > > been
-> > > > > > detected since the interrupt was acknowledged.
-> > > > > > ? It is a level-sensitive interrupt, and the level has not
-> > > > > > been
-> > > > > > deasserted since the interrupt was acknowledged."
-> > > > > > 
-> > > > > > GIC v2 specification IHI0048B.b has similar description on
-> > > > > > page
-> > > > > > 3-42 for state machine transition.
-> > > > > > 
-> > > > > > When some VFIO device, like mtty(8250 VFIO mdev emulation
-> > > > > > driver
-> > > > > > in samples/vfio-mdev) triggers a level interrupt, the
-> > > > > > status
-> > > > > > transition in LR is pending-->active-->active and pending.
-> > > > > > Then it will wait resampling to de-assert the interrupt.
-> > > > > > 
-> > > > > > Current design of lr_signals_eoi_mi() will return false if
-> > > > > > state
-> > > > > > in LR is not invalid(Inactive). It causes resampling will
-> > > > > > not happen
-> > > > > > in mtty case.
-> > > > > Let me rephrase this, and tell me if I understood it
-> > > > > correctly:
-> > > > > 
-> > > > > - A level interrupt is injected, activated by the guest (LR
-> > > > > state=active)
-> > > > > - guest exits, re-enters, (LR state=pending+active)
-> > > > > - guest EOIs the interrupt (LR state=pending)
-> > > > > - maintenance interrupt
-> > > > > - we don't signal the resampling because we're not in an
-> > > > > invalid state
-> > > > > 
-> > > > > Is that correct?
-> > > > > 
-> > > > > That's an interesting case, because it seems to invalidate
-> > > > > some of the?
-> > > > > optimization that went in over a year ago.
-> > > > > 
-> > > > > 096f31c4360f KVM: arm/arm64: vgic: Get rid of MISR and EISR
-> > > > > fields
-> > > > > b6095b084d87 KVM: arm/arm64: vgic: Get rid of unnecessary
-> > > > > save_maint_int_state
-> > > > > af0614991ab6 KVM: arm/arm64: vgic: Get rid of unnecessary
-> > > > > process_maintenance operation
-> > > > > 
-> > > > > We could compare the value of the LR before the guest entry
-> > > > > with
-> > > > > the value at exit time, but we still could miss it if we have
-> > > > > a
-> > > > > transition such as P+A -> P -> A and assume a long enough
-> > > > > propagation
-> > > > > delay for the maintenance interrupt (which is very likely).
-> > > > > 
-> > > > > In essence, we have lost the benefit of EISR, which was to
-> > > > > give us a
-> > > > > way to deal with asynchronous signalling.
-> > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > This will cause interrupt fired continuously to guest even
-> > > > > > 8250 IIR
-> > > > > > has no interrupt. When 8250's interrupt is configured in
-> > > > > > shared mode,
-> > > > > > it will pass interrupt to other drivers to handle. However,
-> > > > > > there
-> > > > > > is no other driver involved. Then, a "nobody cared" kernel
-> > > > > > complaint
-> > > > > > occurs.
-> > > > > > 
-> > > > > > / # cat /dev/ttyS0
-> > > > > > [????4.826836] random: crng init done
-> > > > > > [????6.373620] irq 41: nobody cared (try booting with the
-> > > > > > "irqpoll"
-> > > > > > option)
-> > > > > > [????6.376414] CPU: 0 PID: 1307 Comm: cat Not tainted
-> > > > > > 4.16.0-rc4 #4
-> > > > > > [????6.378927] Hardware name: linux,dummy-virt (DT)
-> > > > > > [????6.380876] Call trace:
-> > > > > > [????6.381937]??dump_backtrace+0x0/0x180
-> > > > > > [????6.383495]??show_stack+0x14/0x1c
-> > > > > > [????6.384902]??dump_stack+0x90/0xb4
-> > > > > > [????6.386312]??__report_bad_irq+0x38/0xe0
-> > > > > > [????6.387944]??note_interrupt+0x1f4/0x2b8
-> > > > > > [????6.389568]??handle_irq_event_percpu+0x54/0x7c
-> > > > > > [????6.391433]??handle_irq_event+0x44/0x74
-> > > > > > [????6.393056]??handle_fasteoi_irq+0x9c/0x154
-> > > > > > [????6.394784]??generic_handle_irq+0x24/0x38
-> > > > > > [????6.396483]??__handle_domain_irq+0x60/0xb4
-> > > > > > [????6.398207]??gic_handle_irq+0x98/0x1b0
-> > > > > > [????6.399796]??el1_irq+0xb0/0x128
-> > > > > > [????6.401138]??_raw_spin_unlock_irqrestore+0x18/0x40
-> > > > > > [????6.403149]??__setup_irq+0x41c/0x678
-> > > > > > [????6.404669]??request_threaded_irq+0xe0/0x190
-> > > > > > [????6.406474]??univ8250_setup_irq+0x208/0x234
-> > > > > > [????6.408250]??serial8250_do_startup+0x1b4/0x754
-> > > > > > [????6.410123]??serial8250_startup+0x20/0x28
-> > > > > > [????6.411826]??uart_startup.part.21+0x78/0x144
-> > > > > > [????6.413633]??uart_port_activate+0x50/0x68
-> > > > > > [????6.415328]??tty_port_open+0x84/0xd4
-> > > > > > [????6.416851]??uart_open+0x34/0x44
-> > > > > > [????6.418229]??tty_open+0xec/0x3c8
-> > > > > > [????6.419610]??chrdev_open+0xb0/0x198
-> > > > > > [????6.421093]??do_dentry_open+0x200/0x310
-> > > > > > [????6.422714]??vfs_open+0x54/0x84
-> > > > > > [????6.424054]??path_openat+0x2dc/0xf04
-> > > > > > [????6.425569]??do_filp_open+0x68/0xd8
-> > > > > > [????6.427044]??do_sys_open+0x16c/0x224
-> > > > > > [????6.428563]??SyS_openat+0x10/0x18
-> > > > > > [????6.429972]??el0_svc_naked+0x30/0x34
-> > > > > > [????6.431494] handlers:
-> > > > > > [????6.432479] [<000000000e9fb4bb>] serial8250_interrupt
-> > > > > > [????6.434597] Disabling IRQ #41
-> > > > > > 
-> > > > > > This patch changes the lr state condition in
-> > > > > > lr_signals_eoi_mi() from
-> > > > > > invalid(Inactive) to active and pending to avoid this.
-> > > > > > 
-> > > > > > I am not sure about the original design of the condition of
-> > > > > > invalid(active). So, This RFC is sent out for comments.
-> > > > > > 
-> > > > > > Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
-> > > > > > Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.co
-> > > > > > m>
-> > > > > > ---
-> > > > > > ?virt/kvm/arm/vgic/vgic-v2.c | 4 ++--
-> > > > > > ?virt/kvm/arm/vgic/vgic-v3.c | 4 ++--
-> > > > > > ?2 files changed, 4 insertions(+), 4 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/virt/kvm/arm/vgic/vgic-v2.c
-> > > > > > b/virt/kvm/arm/vgic/vgic-v2.c
-> > > > > > index e9d840a75e7b..740ee9a5f551 100644
-> > > > > > --- a/virt/kvm/arm/vgic/vgic-v2.c
-> > > > > > +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> > > > > > @@ -46,8 +46,8 @@ void vgic_v2_set_underflow(struct
-> > > > > > kvm_vcpu *vcpu)
-> > > > > > ?
-> > > > > > ?static bool lr_signals_eoi_mi(u32 lr_val)
-> > > > > > ?{
-> > > > > > -	return !(lr_val & GICH_LR_STATE) && (lr_val &
-> > > > > > GICH_LR_EOI) &&
-> > > > > > -	???????!(lr_val & GICH_LR_HW);
-> > > > > > +	return !((lr_val & GICH_LR_STATE) ^ GICH_LR_STATE)
-> > > > > > &&
-> > > > > That feels very wrong. You're now signalling the resampling
-> > > > > in both
-> > > > > invalid and pending+active, and the latter state doesn't mean
-> > > > > you've
-> > > > > EOIed anything. You're now over-signalling, and signalling
-> > > > > the
-> > > > > wrong event.
-
-I am using XOR GICH_LR_STATE(0b'11), so only 0b'11(P&A) will be
-signaled. Other state will be false.
-And I am curious why the EOI bit in LR indicate the end of interrupt
-regardless of the state? Please bear with me as I am a newbie in this
-part.
-
-> > > > > 
-> > > > > > 
-> > > > > > +	???????(lr_val & GICH_LR_EOI) && !(lr_val &
-> > > > > > GICH_LR_HW);
-> > > > > > ?}
-> > > > > > ?
-> > > > > > ?/*
-> > > > > > diff --git a/virt/kvm/arm/vgic/vgic-v3.c
-> > > > > > b/virt/kvm/arm/vgic/vgic-v3.c
-> > > > > > index 6b329414e57a..43111bba7af9 100644
-> > > > > > --- a/virt/kvm/arm/vgic/vgic-v3.c
-> > > > > > +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> > > > > > @@ -35,8 +35,8 @@ void vgic_v3_set_underflow(struct
-> > > > > > kvm_vcpu *vcpu)
-> > > > > > ?
-> > > > > > ?static bool lr_signals_eoi_mi(u64 lr_val)
-> > > > > > ?{
-> > > > > > -	return !(lr_val & ICH_LR_STATE) && (lr_val &
-> > > > > > ICH_LR_EOI) &&
-> > > > > > -	???????!(lr_val & ICH_LR_HW);
-> > > > > > +	return !((lr_val & ICH_LR_STATE) ^ ICH_LR_STATE)
-> > > > > > &&
-> > > > > > +	???????(lr_val & ICH_LR_EOI) && !(lr_val &
-> > > > > > ICH_LR_HW);
-> > > > > > ?}
-> > > > > > ?
-> > > > > > ?void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-> > > > > > 
-> > > > > Assuming I understand the issue correctly, I cannot really
-> > > > > see how
-> > > > > to solve this without reintroducing EISR, which sucks
-> > > > > majorly.
-> > > > > 
-> > > > > I'll try to cook something shortly and we can all have a good
-> > > > > fight about how crap this is.
-> > > > Here's what I came up with. I don't really like it, but that's
-> > > > the least invasive this I could come up with. Please let me
-> > > > know if that helps with your test case. Note that I have only
-> > > > boot-tested this on a sample of 1 machine, so I don't expect
-> > > > this
-> > > > to be perfect.
-> > > > 
-> > > > Also, any guideline on how to reproduce this would be much
-> > > > appreciated.
-> > > > I never used this mdev/mtty thing, so please bear with me.
-> > > > 
-> > > > Thanks,
-> > > > 
-> > > > 	M.
-
-The mdev/mtty documentation is at?Documentation/vfio-mediated-
-device.txt. It docmented how to enable mtty device.
-And support for "vfio-pci,sysfsdev" should be availabe in your qemu
-version (I compiled the latest version).
-Following is my commond to run qemu with mdev support,
-"qemu-system-aarch64 -m 1024 -cpu host -M virt,gic_version=3 -nographic
-\
--kernel /home/yangsy/up-kvm/arch/arm64/boot/Image.gz \
--initrd /home/yangsy/kvm/ramdisk/initrd.img \
--netdev user,id=eth0 -device virtio-net-device,netdev=eth0 -enable-kvm
-\
--append "root=/dev/ram rdinit=/sbin/init" \
--device vfio-pci,sysfsdev=/sys/bus/mdev/devices/83b8f4f2-509f-382f-
-3c1e-e6bfe0fa1001
-"
-For just test this vgic case, type "cat /dev/ttyS0" in guest. But if
-test read/write multiple bytes, please apply following patch also
-https://patchwork.kernel.org/patch/10267039/
-
-> > > > 
-> > > > From 66a7c4cfc1029b0169dd771e196e2876ba3f17b1 Mon Sep 17
-> > > > 00:00:00 2001
-> > > > From: Marc Zyngier <marc.zyngier@arm.com>
-> > > > Date: Thu, 8 Mar 2018 11:14:06 +0000
-> > > > Subject: [PATCH] KVM: arm/arm64: Do not rely on LR state to
-> > > > guess EOI MI
-> > > > ?status
-> > > > 
-> > > > We so far rely on the LR state to decide whether the guest has
-> > > > EOI'd a level interrupt or not. While this looks like a good
-> > > > idea on the surface, it leads to a couple of annoying corner
-> > > > cases:
-> > > > 
-> > > > Example 1: (P = Pending, A = Active, MI = Maintenance
-> > > > Interrupt)
-> > > > P -> guest IAR -> A -> exit/entry -> P+A -> guest EOI -> P ->
-> > > > MI
-> > > Do we really get an EOI maintenance interrupt here???Reading the
-> > > MISR
-> > > and EISR descriptions make me thing this is not the case...
-> Hum yes in EISR it is said that ICH_LR.State = 0b00!
-> > 
-> > 
-> > Yeah, it looks like I always want EISR to do what I want, and not
-> > to
-> > do what it does. Man, this thing is such a piece of crap.
-> > 
-> > OK, scratch that. We need to do it without the help of the HW.
-
-If?convenient, maybe we can get something from HW gus. :-)
-
-Hi, Marc,
-
-Do you need me to test the patch you posted for EISR? As it seems there
-are some things need more discussion.
-
-> > 
-> > > 
-> > > > 
-> > > > The state is now pending, we've really EOI'd the interrupt, and
-> > > > yet lr_signals_eoi_mi() returns false, since the state is not
-> > > > 0.
-> > > > The result is that we won't signal anything on the
-> > > > corresponding
-> > > > irqfd, which people complain about. Meh.
-> > > So the core of the problem is that when we've entered the guest
-> > > with
-> > > PENDING+ACTIVE and when we exit (for some reason) we don't signal
-> > > the
-> > > resamplefd, right???The solution seems to me that we don't ever
-> > > do
-> > > PENDING+ACTIVE if you need to resample after each
-> > > deactivate.??What
-> > > would be the point of appending a pending state that you only
-> > > know to be
-> > > valid after a resample anyway?
-> > The question is then to identify that a given source needs to be
-> > signalled back to VFIO. Calling into the eventfd code on the hot
-> > path
-> > is pretty horrid (I'm not sure if we can really call into this with
-> > interrupts disabled, for example).
-> > 
-> > > 
-> > > 
-> > > > 
-> > > > 
-> > > > Example 2:
-> > > > P+A -> guest EOI -> P -> delayed MI -> guest IAR -> A -> MI
-> > > > fires
-> > > We could be more clever and do the following calculation on every
-> > > exit:
-> > > 
-> > > If you enter with P, and exit with either A or 0, then signal.
-> > > 
-> > > If you enter with P+A, and you exit with either P, A, or 0, then
-> > > signal.
-> > > 
-> > > Wouldn't that also solve it???(Although I have a feeling you'd
-> > > miss some
-> > > exits in this case).
-> > I'd be more confident if we did forbid P+A for such interrupts
-> > altogether, as they really feel like another kind of HW interrupt.
-> the LR P+A looks strange to me too. all the more so it may cause the
-> same IRQ to be acked twice?
-> 
-> P -> A -> 0 (resample). Doesn't our issue come from the fact we
-> reinject
-> the P in LR until the line level is deasserted?
-> > 
-> > 
-> > Eric: Is there any way to get a callback from the eventfd code to
-> > flag
-> > a given irq as requiring a notification on EOI?
-> bool kvm_irq_has_notifier(struct kvm *kvm, unsigned irqchip, unsigned
-> pin) was used in the past. I think it does what you want.
-> 
-> Thanks
-> 
-> Eric
-> > 
-> > 
-> > Thanks,
-> > 
-> > 	M.
-> > 
-
-I have added some logs to compare level interrupt between pl011(hwirq =
-33) and mtty (hwirq = 36). In mtty case, vgic_queue_irq_unlock() is
-called twice. But only called once in pl011.
-
-following is the log,
-===Without my patch===
-###PL011###
-
-<4>[??180.598266] kvm_vgic_inject_irq 453 irq:33 enabled:1 config:1
-latch:0 level:1
-<4>[??180.604460] ##vgic_queue_irq_unlock 388 irq->intid:33 enable:1
-level:1
-<4>[??180.604540] ==>90a0020000000021(active)
-<4>[??180.614878] ==>d0a0020000000021(P&A)
-<4>[??180.618415] kvm_vgic_inject_irq 453 irq:33 enabled:1 config:1
-latch:0 level:0
-<4>[??180.625508] ==>90a0020000000021(active)
-<4>[??180.629343] ==>10a0020000000021(inactive)
-
-###mtty-vfio###
-<4>[??223.123329] kvm_vgic_inject_irq 453 irq:36 enabled:0 config:1
-latch:0 level:1
-<4>[??223.129736] ##vgic_queue_irq_unlock 388 irq->intid:36 enable:1
-level:1
-<4>[??223.136027] ==>50a0020000000024(pending)
-<4>[??223.139954] ##vgic_queue_irq_unlock 388 irq->intid:36 enable:1
-level:1
-<4>[??223.146460] ==>90a0020000000024(active)
-<4>[??223.150273] ==>d0a0020000000024(P&A)
-<4>[??223.153827] ==>90a0020000000024(active)
-<4>[??223.157668] ==>d0a0020000000024(P&A)
-...........cyclic...
-
-I rembered in some tests the state change is cyclic P->A->P&A. But it
-seems I cannot reproduce it. Is output LR state
-in?kvm_vgic_inject_irq() reliable?
-
-===With my patch===
-###PL011###
-<4>[??114.798528] kvm_vgic_inject_irq 453 irq:33 enabled:1 config:1
-latch:0 level:1
-<4>[??114.804743] ##vgic_queue_irq_unlock 388 irq->intid:33 enable:1
-level:1
-<4>[??114.804796] ==>90a0020000000021(active)
-<4>[??114.815077] ==>d0a0020000000021(P&A)
-<4>[??114.818628] kvm_vgic_inject_irq 453 irq:33 enabled:1 config:1
-latch:0 level:0
-<4>[??114.825726] ==>90a0020000000021(active)
-<4>[??114.829560] ==>10a0020000000021(inactive)
-
-###mtty-vfio###
-
-<4>[??161.579083] kvm_vgic_inject_irq 453 irq:36 enabled:0 config:1
-latch:0 level:1
-<4>[??161.585419] ##vgic_queue_irq_unlock 388 irq->intid:36 enable:1
-level:1
-<4>[??161.591780] ==>50a0020000000024(pending)
-<4>[??161.595708] ##vgic_queue_irq_unlock 388 irq->intid:36 enable:1
-level:1
-<4>[??161.602204] ==>90a0020000000024(active)
-<4>[??161.606023] ==>d0a0020000000024(P&A)
-<4>[??161.609561] kvm_vgic_inject_irq 453 irq:36 enabled:1 config:1
-latch:0 level:0
-<4>[??161.616693] ==>10a0020000000024(inactive)
-<4>[??161.620745] kvm_vgic_inject_irq 453 irq:36 enabled:1 config:1
-latch:0 level:1
-<4>[??161.627800] ##vgic_queue_irq_unlock 388 irq->intid:36 enable:1
-level:1
-<4>[??161.627849] ==>90a0020000000024(active)
-<4>[??161.640076] ==>d0a0020000000024(P&A)
-<4>[??161.642689] kvm_vgic_inject_irq 453 irq:36 enabled:1 config:1
-latch:0 level:0
-<4>[??161.649822] ==>10a0020000000024(inactive)
-
-
-Following is the test patch,
-
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-old mode 100644
-new mode 100755
-index 6b329414e57a..00fb83b11f43
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -26,6 +26,9 @@
-?static bool common_trap;
-?static bool gicv4_enable;
-?
-+int monitor_irq = 36;
-+module_param(monitor_irq, int, S_IRUGO | S_IWUSR);
-+
-?void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-?{
-?	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -39,6 +42,8 @@ static bool lr_signals_eoi_mi(u64 lr_val)
-?	???????!(lr_val & ICH_LR_HW);
-?}
-?
-+u64 last_val = 0;
-+
-?void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-?{
-?	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -46,6 +51,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-?	u32 model = vcpu->kvm->arch.vgic.vgic_model;
-?	int lr;
-?	unsigned long flags;
-+	char *str[]={"inactive", "pending", "active", "P&A"};
-?
-?	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
-?
-@@ -60,6 +66,13 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
-?			intid = val & GICH_LR_VIRTUALID;
-?
-?		/* Notify fds when the guest EOI'ed a level-triggered
-IRQ */
-+		if (intid == monitor_irq) {
-+			if (last_val != val) {
-+				printk("==>%llx(%s)\n", val, str[(val
->> 62) & 0x03 ]);
-+				last_val = val;
-+			}
-+		}
-+
-?		if (lr_signals_eoi_mi(val) && vgic_valid_spi(vcpu-
->kvm, intid))
-?			kvm_notify_acked_irq(vcpu->kvm, 0,
-?					?????intid - VGIC
-_NR_PRIVATE_IRQS);
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-old mode 100644
-new mode 100755
-index 07126a3b1908..9c284623ea23
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -31,6 +31,8 @@
-?#define DEBUG_SPINLOCK_BUG_ON(p)
-?#endif
-?
-+extern int monitor_irq;
-+
-?struct vgic_global kvm_vgic_global_state __ro_after_init = {
-?	.gicv3_cpuif = STATIC_KEY_FALSE_INIT,
-?};
-@@ -381,6 +383,12 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct
-vgic_irq *irq,
-?	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
-?	kvm_vcpu_kick(vcpu);
-?
-+	if (irq->intid == monitor_irq) {
-+		printk("##%s %d irq->intid:%d enable:%d level:%d\n",
-+			__func__, __LINE__, irq->intid,
-+			irq->enabled, irq->line_level);
-+		//dump_stack();
-+	}
-?	return true;
-?}
-?
-@@ -401,6 +409,9 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct
-vgic_irq *irq,
-? * level-sensitive interrupts.??You can think of the level parameter
-as 1
-? * being HIGH and 0 being LOW and all devices being active-HIGH.
-? */
-+
-+bool monitor_vm_entry_start = false;
-+
-?int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int
-intid,
-?			bool level, void *owner)
-?{
-@@ -437,6 +448,13 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int
-cpuid, unsigned int intid,
-?	else
-?		irq->pending_latch = true;
-?
-+	if (irq->intid == monitor_irq) {
-+		printk("%s %d irq:%d enabled:%d config:%d latch:%d
-level:%d\n",
-+			__func__, __LINE__, irq->intid, irq->enabled,
-irq->config,
-+			irq->pending_latch, irq->line_level);
-+		monitor_vm_entry_start = true;
-+	}
-+
-?	vgic_queue_irq_unlock(kvm, irq, flags);
-?	vgic_put_irq(kvm, irq);
-
-Thanks.
-Shunyong.
