@@ -1,66 +1,67 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:00 +0800
-Subject: [PATCH 17/39] arm64: entry: Apply BP hardening for suspicious
- interrupts from EL0
+Date: Fri,  9 Mar 2018 17:06:53 +0800
+Subject: [PATCH 10/39] arm64: futex: Mask __user pointers prior to dereference
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-18-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-11-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-commit 30d88c0e3ace upstream.
+commit 91b2d3442f6a upstream.
 
-It is possible to take an IRQ from EL0 following a branch to a kernel
-address in such a way that the IRQ is prioritised over the instruction
-abort. Whilst an attacker would need to get the stars to align here,
-it might be sufficient with enough calibration so perform BP hardening
-in the rare case that we see a kernel address in the ELR when handling
-an IRQ from EL0.
+The arm64 futex code has some explicit dereferencing of user pointers
+where performing atomic operations in response to a futex command. This
+patch uses masking to limit any speculative futex operations to within
+the user address space.
 
-Reported-by: Dan Hettena <dhettena@nvidia.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/entry.S | 5 +++++
- arch/arm64/mm/fault.c     | 6 ++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/include/asm/futex.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index bc62f8d2c981..3ee3a026ba04 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -582,6 +582,11 @@ el0_irq_naked:
- #endif
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index 5f3ab8c1db55..27eebc6f6976 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -53,13 +53,14 @@
+ 	: "memory")
  
- 	ct_user_exit
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	tbz	x22, #55, 1f
-+	bl	do_el0_irq_bp_hardening
-+1:
-+#endif
- 	irq_handler
+ static inline int
+-futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
++futex_atomic_op_inuser (int encoded_op, u32 __user *_uaddr)
+ {
+ 	int op = (encoded_op >> 28) & 7;
+ 	int cmp = (encoded_op >> 24) & 15;
+ 	int oparg = (encoded_op << 8) >> 20;
+ 	int cmparg = (encoded_op << 20) >> 20;
+ 	int oldval = 0, ret, tmp;
++	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
  
- #ifdef CONFIG_TRACE_IRQFLAGS
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index b1f084dd7b6d..54008a6cc0df 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -534,6 +534,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	arm64_notify_die("", regs, &info, esr);
+ 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
+ 		oparg = 1 << oparg;
+@@ -111,15 +112,17 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
  }
  
-+asmlinkage void __exception do_el0_irq_bp_hardening(void)
-+{
-+	/* PC has already been checked in entry.S */
-+	arm64_apply_bp_hardening();
-+}
-+
- asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
- 						   unsigned int esr,
- 						   struct pt_regs *regs)
+ static inline int
+-futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
+ 			      u32 oldval, u32 newval)
+ {
+ 	int ret = 0;
+ 	u32 val, tmp;
++	u32 __user *uaddr;
+ 
+-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
+ 		return -EFAULT;
+ 
++	uaddr = __uaccess_mask_ptr(_uaddr);
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+ ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ "	prfm	pstl1strm, %2\n"
 -- 
 2.16.2.440.gc6284da
