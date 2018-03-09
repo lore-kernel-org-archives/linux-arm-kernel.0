@@ -1,93 +1,63 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 9 Mar 2018 10:42:47 -0700
-Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <152061592175.13890.6455929815877326231@swboyd.mtv.corp.google.com>
-References: <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
- <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
- <20180306042656.GJ23018@vireshk-i7>
- <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
- <20180307050624.GR23018@vireshk-i7>
- <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
- <20180309034332.GO6842@vireshk-i7>
- <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
- <152061592175.13890.6455929815877326231@swboyd.mtv.corp.google.com>
-Message-ID: <20180309174246.GD10589@jcrouse-lnx.qualcomm.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 9 Mar 2018 23:15:16 +0530
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for
+ ThunderX2 B0
+In-Reply-To: <20180309173316.GF8347@kernel.org>
+References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
+ <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+ <20180307143832.GJ3701@kernel.org>
+ <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+ <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
+ <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
+ <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
+ <20180309143415.GB4194@kernel.org> <20180309155808.GP15537@arm.com>
+ <20180309173316.GF8347@kernel.org>
+Message-ID: <CAKTKpr7AQQVQKpQyeDObXvgq1Cps7K7STW2TngjFmOjmCRXQWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 09:18:41AM -0800, Stephen Boyd wrote:
-> (I wrote an email that seems to have been lost)
-> 
-> Quoting Jordan Crouse (2018-03-09 08:03:55)
-> > On Fri, Mar 09, 2018 at 09:13:32AM +0530, Viresh Kumar wrote:
-> > > On 08-03-18, 13:14, Jordan Crouse wrote:
-> > > > It seems to me that performance_state has a direct relationship with genpd
-> > > > which is good for CPU votes but in this case, we're just passing along raw data
-> > > > to an independent microcontroller. The 'qcom,arc-level' is used to construct
-> > > > the actual values that the GMU will program into the RPMh. Since these are
-> > > 
-> > > The "genpd" here is created specially for this RPM. The performance-state thing
-> > > is designed to solve this very specific problem of qualcomm SoCs and there is no
-> > > way we are going to add another property for this now.
-> > > 
-> > > > informational (from the CPU perspective) rather than functional I feel like
-> > > > that using performance_state for this would be as hacky as using opp-microvolt
-> > > > or something else.
-> > > 
-> > > There is some WIP stuff here Rajendra is testing currently.
-> > > 
-> > > ssh://git at git.linaro.org/people/viresh.kumar/mylinux.git opp/genpd/qcom
-> > > 
-> > > Please have a talk with Rajendra who can help you understand on how this can be
-> > > used for GPUs.
-> > 
-> > I don't think we are understanding each other. The GMU is a separate
-> > microcontroller. It is given a magic number (actually a combination of magic
-> > numbers) that it then uses to directly interact with the other hardware to make
-> > the vote. The only responsibility that the CPU has is to construct that magic
-> > number (once, at init) and send it across when asked.
-> > 
-> > Looking at the sdhc code from the testing tree it makes perfect sense
-> > that you have a device that needs to eventually do a RPMh vote from the CPU and
-> > so the 'required-opp' and performance state come together to do the right thing.
-> > This is good code.
-> > 
-> > None of this is true for the GPU. The CPU never votes for the GPU so there 
-> > isn't any need to connect it to the power domain drivers. Even if you did
-> > there isn't any current mechanism for the rpmpd driver to pass the right magic
-> > number to the GPU driver which is what it really needs.
-> > 
-> > I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
-> > then thats just a naming dispute. We still need a way for the GPU to query the
-> > magic values.
-> > 
-> 
-> Agreed. Forcing genpd and set_performance_state APIs on GMU doesn't make
-> any sense if the GMU is doing it all itself.
-> 
-> The binding should be the same between sdhc and GMU if they're actually
-> talking about the same thing though. I think they are, because I suspect
-> GMU needs to translate the human reasonable value of qcom,corner into
-> the hardware qcom,arc-level value to write into it's hardware so the GMU
-> can auto-transition performance states. If I'm wrong, then
-> qcom,arc-level needs to be created alongside of qcom,corner because
-> they're different number spaces.
+Hi Arnaldo,
 
-I think the value that we're discussing here is the RPMh voltage level which we
-translate into the qcom,arc-level(s). I'm not sure how that matches up with
-qcom,corner.
+On Fri, Mar 9, 2018 at 11:03 PM, Arnaldo Carvalho de Melo
+<arnaldo.melo@gmail.com> wrote:
+> Em Fri, Mar 09, 2018 at 03:58:09PM +0000, Will Deacon escreveu:
+>> On Fri, Mar 09, 2018 at 11:34:15AM -0300, Arnaldo Carvalho de Melo wrote:
+>> > Em Fri, Mar 09, 2018 at 07:57:04PM +0530, Ganapatrao Kulkarni escreveu:
+>> > > Hi Arnaldo,
+>> > >
+>> > > can you please pull-in this patch?
+>> >
+>> > So everybody is Ok with this? Can I have some Acked-by: from subject
+>> > matter experts?
+>>
+>> The original patch looks fine to me:
+>>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Ok, so, as John mentioned in another message in his thread, this
+> conflicts with a series he sent and that Ganapatrao acked and I already
+> applied, I looked at it and think this patch should turn into the patch
+> at the end of this message, which I'm applying with the commit log
+> message in the original patch in this thread, Ack?
 
-> BTW, it's qcom,corner and not qcom-corner right?
+>
+> - Arnaldo
+>
+> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> index 8f11aeb003a9..624e8cae6e86 100644
+> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> @@ -13,5 +13,5 @@
+>  #
+>  #Family-model,Version,Filename,EventType
+>  0x00000000410fd03[[:xdigit:]],v1,arm/cortex-a53,core
+> -0x00000000420f5160,v1,cavium/thunderx2,core
+> +0x00000000430f0af0,v1,cavium/thunderx2,core
+>  0x00000000480fd010,v1,hisilicon/hip08,core
 
-http://git.linaro.org/people/viresh.kumar/mylinux.git/commit/?h=opp/genpd/qcom&id=7586600b3bf3f8e79ce9198922fad7d4aa5b3f8d
+please do not delete existing entry,  add additional entry.
+> +0x00000000430f0af0,v1,cavium/thunderx2,core
 
-+					qcom-corner = <1>;
 
-shrug?
-
-Jordan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+thanks
+Ganapat
