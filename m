@@ -1,27 +1,52 @@
 From: ping.bai@nxp.com (Jacky Bai)
-Date: Fri, 9 Mar 2018 05:00:45 +0000
-Subject: [PATCH v4 1/4] driver: clk: imx: Add CLK_IS_CRITICAL flag for
- busy divider and busy mux
-In-Reply-To: <20180309023136.GD3217@dragon>
+Date: Fri, 9 Mar 2018 05:01:23 +0000
+Subject: [PATCH v4 4/4] driver: clk: imx: add clock driver for imx6sll
+In-Reply-To: <20180309024513.GE3217@dragon>
 References: <1520502445-22576-1-git-send-email-ping.bai@nxp.com>
- <20180309023136.GD3217@dragon>
-Message-ID: <HE1PR04MB311302F75DB42DEB034EF61F87DE0@HE1PR04MB3113.eurprd04.prod.outlook.com>
+ <1520502445-22576-4-git-send-email-ping.bai@nxp.com>
+ <20180309024513.GE3217@dragon>
+Message-ID: <HE1PR04MB3113EF8891AECF0E0922E6C687DE0@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v4 1/4] driver: clk: imx: Add CLK_IS_CRITICAL flag for busy
-> divider and busy mux
+> Subject: Re: [PATCH v4 4/4] driver: clk: imx: add clock driver for imx6sll
 > 
-> On Thu, Mar 08, 2018 at 05:47:22PM +0800, Bai Ping wrote:
-> > The busy divider and busy mux is actually used by the system critical
-> > clocks, so add 'CLK_IS_CRITICAL' to clocks registered with these two type.
-> >
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> On Thu, Mar 08, 2018 at 05:47:25PM +0800, Bai Ping wrote:
+> > diff --git a/drivers/clk/imx/clk-imx6sll.c
+> > b/drivers/clk/imx/clk-imx6sll.c new file mode 100644 index
+> > 0000000..e938db5
+> > --- /dev/null
+> > +++ b/drivers/clk/imx/clk-imx6sll.c
+> > @@ -0,0 +1,344 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017-2018 NXP.
+> > + */
+> > +
+> > +#include <dt-bindings/clock/imx6sll-clock.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/clkdev.h>
+> > +#include <linux/err.h>
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/types.h>
+> > +
+> > +#include "clk.h"
+> > +
+> > +#define CCM_ANALOG_PLL_BYPASS		(0x1 << 16)
+> > +#define BM_CCM_CCDR_MMDC_CH0_MASK	(0x2 << 16)
+> > +#define CCDR				0x4
 > 
-> "clk: imx: ..." for patch prefix is good enough.
-> 
+> We agreed to remove this define, right?
 
-OK, will be updated in V5.
-
+Sorry, this is missed, will correct it.
 Jacky
+
+> 
 > Shawn
+> 
+> > +#define xPLL_CLR(offset)		(offset + 0x8)
