@@ -1,126 +1,107 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:19 +0100
-Subject: [PATCH v5 28/36] drm/bridge: analogix_dp: Split the platform-specific
- poweron in two parts
-In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-29-enric.balletbo@collabora.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 10 Mar 2018 00:01:24 +0100
+Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
+In-Reply-To: <20180309222821.GA16973@kroah.com>
+References: <20180309221220.GA15272@amd>
+ <20180309222821.GA16973@kroah.com>
+Message-ID: <20180309230124.GA17721@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+Hi!
 
-Some of the platform-specific stuff in rockchip_dp_poweron() needs to
-happen before the generic code.  Some needs to happen after.  Let's
-split the callback in two.
+> > Hmm. Looks like there's a lot of fun to be had with sysfs.
+> > 
+> > 
+> > pavel at n900:~$ uname -a
+> > Linux n900 4.16.0-rc4-59690-g7f84626-dirty #543 Thu Mar 8 19:53:30 CET
+> > 2018 armv7l GNU/Linux
+> > 
+> > [  306.402496] bq2415x: command Timer reset
+> > [  312.761322] adp1653 2-0030: Read Addr:03 Val:00 ok
+> > [  313.264129] Unable to handle kernel NULL pointer dereference at
+> > virtual address 00000
+> > 000
+> > [  313.272308] pgd = 01336620
+> > [  313.275146] [00000000] *pgd=800af831, *pte=00000000, *ppte=00000000
+> > [  313.281463] Internal error: Oops: 80000007 [#1] ARM
+> > [  313.286376] Modules linked in:
+> > [  313.289459] CPU: 0 PID: 3584 Comm: grep Tainted: G        W
+> > 4.16.0-rc4-59690-g
+> > 7f84626-dirty #543
+> > [  313.298919] Hardware name: Nokia RX-51 board
+> > [  313.303222] PC is at   (null)
+> > [  313.306213] LR is at iio_ev_state_show+0x38/0x54
+> > [  313.310852] pc : [<00000000>]    lr : [<c05d69c0>]    psr: a0000013
+> > [  313.317169] sp : c7b47e70  ip : c087bb24  fp : 00000001
+> > [  313.322418] r10: cb19e000  r9 : c0857220  r8 : 00001000
+> > [  313.327667] r7 : 00000fff  r6 : cb711c80  r5 : cb19e000  r4 :
+> > 00000000
+> > [  313.334228] r3 : 00000001  r2 : 00000000  r1 : c087b4dc  r0 :
+> > ce584800
+> > [  313.340789] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+> > Segment none
+> > [  313.347991] Control: 10c5387d  Table: 87bec019  DAC: 00000051
+> > [  313.353759] Process grep (pid: 3584, stack limit = 0xc4e45eab)
+> > [  313.359619] Stack: (0xc7b47e70 to 0xc7b48000)
+> > [  313.364013] 7e60:                                     c05d6988
+> > cb711b00 ce585c00 c0450d68
+> > [  313.471038] [<c05d69c0>] (iio_ev_state_show) from [<c0450d68>]
+> > (dev_attr_show+0x1c/0x4c)
+> > [  313.479187] [<c0450d68>] (dev_attr_show) from [<c023f934>]
+> > (sysfs_kf_seq_show+0x90/0x108)
+> > [  313.487426] [<c023f934>] (sysfs_kf_seq_show) from [<c023e2f8>]
+> > (kernfs_seq_show+0x24/0x28)
+> > [  313.495758] [<c023e2f8>] (kernfs_seq_show) from [<c01fc954>]
+> > (seq_read+0x1dc/0x500)
+> > [  313.503479] [<c01fc954>] (seq_read) from [<c01d9f80>]
+> > (__vfs_read+0x2c/0x120)
+> > [  313.510681] [<c01d9f80>] (__vfs_read) from [<c01da0fc>]
+> > (vfs_read+0x88/0x114)
+> > [  313.517852] [<c01da0fc>] (vfs_read) from [<c01da584>]
+> > (SyS_read+0x40/0x8c)
+> > [  313.524780] [<c01da584>] (SyS_read) from [<c0101000>]
+> > (ret_fast_syscall+0x0/0x54)
+> > [  313.532318] Exception stack(0xc7b47fa8 to 0xc7b47ff0)
+> > [  313.537414] 7fa0:                   00035330 00042000 00000003
+> > 00042000 00008000 00008000
+> > 
+> 
+> What file are you opening to cause this?
 
-Specifically we can't start doing PSR work until _after_ the whole
-controller is up, so don't set the enable until the end.
+Strace says:
 
-Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
-[seanpaul added exynos change]
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
-Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
+openat(7, "in_intensity_both_thresh_rising_en",
+> > O_RDONLY|O_LARGEFILE|O_NOFOLLOW) = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=4096, ...}) = 0
+ioctl(3, SNDCTL_TMR_TIMEBASE or TCGETS, 0xbe83b714) = -1 ENOTTY
+> > (Inappropriate ioctl for device)
+read(3,
+Message from syslogd at localhost at Mar  9 23:54:39 ...
+ kernel:[ 3097.357696] Internal error: Oops: 80000007 [#2] ARM
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  7 +++++--
- drivers/gpu/drm/exynos/exynos_dp.c                 |  2 +-
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 12 ++++++++++--
- include/drm/bridge/analogix_dp.h                   |  3 ++-
- 4 files changed, 18 insertions(+), 6 deletions(-)
+So that would be:
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index eaf93cbd47a8..c527019daaa6 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -1260,8 +1260,8 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
- 		goto out_dp_clk_pre;
- 	}
- 
--	if (dp->plat_data->power_on)
--		dp->plat_data->power_on(dp->plat_data);
-+	if (dp->plat_data->power_on_start)
-+		dp->plat_data->power_on_start(dp->plat_data);
- 
- 	phy_power_on(dp->phy);
- 
-@@ -1286,6 +1286,9 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
- 		goto out_dp_init;
- 	}
- 
-+	if (dp->plat_data->power_on_end)
-+		dp->plat_data->power_on_end(dp->plat_data);
-+
- 	enable_irq(dp->irq);
- 	return 0;
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
-index 964831dab102..86330f396784 100644
---- a/drivers/gpu/drm/exynos/exynos_dp.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp.c
-@@ -162,7 +162,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
- 	dp->drm_dev = drm_dev;
- 
- 	dp->plat_data.dev_type = EXYNOS_DP;
--	dp->plat_data.power_on = exynos_dp_poweron;
-+	dp->plat_data.power_on_start = exynos_dp_poweron;
- 	dp->plat_data.power_off = exynos_dp_poweroff;
- 	dp->plat_data.attach = exynos_dp_bridge_attach;
- 	dp->plat_data.get_modes = exynos_dp_get_modes;
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index b3f46ed24cdc..23317a2269e1 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -109,7 +109,7 @@ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
- 	return 0;
- }
- 
--static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
-+static int rockchip_dp_poweron_start(struct analogix_dp_plat_data *plat_data)
- {
- 	struct rockchip_dp_device *dp = to_dp(plat_data);
- 	int ret;
-@@ -127,6 +127,13 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
- 		return ret;
- 	}
- 
-+	return ret;
-+}
-+
-+static int rockchip_dp_poweron_end(struct analogix_dp_plat_data *plat_data)
-+{
-+	struct rockchip_dp_device *dp = to_dp(plat_data);
-+
- 	return rockchip_drm_psr_activate(&dp->encoder);
- }
- 
-@@ -330,7 +337,8 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
- 	dp->plat_data.encoder = &dp->encoder;
- 
- 	dp->plat_data.dev_type = dp->data->chip_type;
--	dp->plat_data.power_on = rockchip_dp_poweron;
-+	dp->plat_data.power_on_start = rockchip_dp_poweron_start;
-+	dp->plat_data.power_on_end = rockchip_dp_poweron_end;
- 	dp->plat_data.power_off = rockchip_dp_powerdown;
- 	dp->plat_data.get_modes = rockchip_dp_get_modes;
- 
-diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
-index e9a1116d2f8e..475b706b49de 100644
---- a/include/drm/bridge/analogix_dp.h
-+++ b/include/drm/bridge/analogix_dp.h
-@@ -33,7 +33,8 @@ struct analogix_dp_plat_data {
- 	struct drm_connector *connector;
- 	bool skip_connector;
- 
--	int (*power_on)(struct analogix_dp_plat_data *);
-+	int (*power_on_start)(struct analogix_dp_plat_data *);
-+	int (*power_on_end)(struct analogix_dp_plat_data *);
- 	int (*power_off)(struct analogix_dp_plat_data *);
- 	int (*attach)(struct analogix_dp_plat_data *, struct drm_bridge *,
- 		      struct drm_connector *);
+./devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1/events/in_intensity_both_thresh_rising_en
+
+And indeed, manually cat-ing that file reproduces the problem.
+
+pavel at n900:/sys/devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1$
+cat name
+tsl2563
+
+I can not find tsl2563 in MAINTAINERS, file is
+./drivers/iio/light/tsl2563.c . I added few people pointed by git log.
+
+Best regards,
+									Pavel
 -- 
-2.16.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180310/c2308a48/attachment.sig>
