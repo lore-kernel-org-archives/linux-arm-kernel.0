@@ -1,9 +1,9 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri,  9 Mar 2018 16:43:49 +0800
-Subject: [RESEND PATCH v4 2/4] rtc: at91sam9: Set name of regmap_config
+Date: Fri,  9 Mar 2018 16:43:50 +0800
+Subject: [RESEND PATCH v4 3/4] clk: lpc32xx: Set name of regmap_config
 In-Reply-To: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
 References: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180309084351.32009-3-jeffy.chen@rock-chips.com>
+Message-ID: <20180309084351.32009-4-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,21 @@ having a valid name will end up using "dummy*" to create debugfs dir.
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
-Changes in v4:
-Not to use rtc dev to init regmap, the gpbr is not directly related to
-the rtc.
-
+Changes in v4: None
 Changes in v3: None
 
- drivers/rtc/rtc-at91sam9.c | 1 +
+ drivers/clk/nxp/clk-lpc32xx.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 7418a763ce52..ee71e647fd43 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -349,6 +349,7 @@ static const struct rtc_class_ops at91_rtc_ops = {
- };
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index f5d815f577e0..a2a0a7f3bc57 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -67,6 +67,7 @@
+ #define LPC32XX_USB_CLK_STS		0xF8
  
- static const struct regmap_config gpbr_regmap_config = {
-+	.name = "gpbr",
+ static struct regmap_config lpc32xx_scb_regmap_config = {
++	.name = "lpc32xx-scb",
  	.reg_bits = 32,
  	.val_bits = 32,
  	.reg_stride = 4,
