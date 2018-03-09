@@ -1,82 +1,121 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:06:55 +0800
-Subject: [PATCH 12/39] arm64: Move post_ttbr_update_workaround to C code
+Date: Fri,  9 Mar 2018 17:06:58 +0800
+Subject: [PATCH 15/39] arm64: KVM: Use per-CPU vector when BP hardening is
+ enabled
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-13-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-16-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 95e3de3590e3 upstream.
+commit 6840bdd73d07 upstream
 
-We will soon need to invoke a CPU-specific function pointer after changing
-page tables, so move post_ttbr_update_workaround out into C code to make
-this possible.
+Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
+BTW, lts 4.4 has no feature ARM64_HAS_VIRT_HOST_EXTN, so no change for this.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/mm/context.c | 10 ++++++++++
- arch/arm64/mm/proc.S    | 14 +++-----------
- 2 files changed, 13 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 10 +++++++++
+ arch/arm/kvm/arm.c               |  8 ++++++-
+ arch/arm64/include/asm/kvm_mmu.h | 36 ++++++++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index e87f53ff5f58..b901cb964a08 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -25,6 +25,7 @@
- #include <asm/cpufeature.h>
- #include <asm/mmu_context.h>
- #include <asm/tlbflush.h>
-+#include <asm/alternative.h>
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 23d5cad56ddc..9b32b13a91ba 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -272,6 +272,16 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 				       pgd_t *merged_hyp_pgd,
+ 				       unsigned long hyp_idmap_start) { }
  
- static u32 asid_bits;
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-@@ -185,6 +186,15 @@ switch_mm_fastpath:
- 	cpu_switch_mm(mm->pgd, mm);
- }
- 
-+/* Errata workaround post TTBRx_EL1 update. */
-+asmlinkage void post_ttbr_update_workaround(void)
++static inline void *kvm_get_hyp_vector(void)
 +{
-+	asm(ALTERNATIVE("nop; nop; nop",
-+			"ic iallu; dsb nsh; isb",
-+			ARM64_WORKAROUND_CAVIUM_27456,
-+			CONFIG_CAVIUM_ERRATUM_27456));
++	return __kvm_hyp_vector;
 +}
 +
- static int asids_init(void)
- {
- 	int fld = cpuid_feature_extract_field(read_cpuid(ID_AA64MMFR0_EL1), 4);
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 18201e9e8cc7..dc678aed63ec 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -139,19 +139,11 @@ ENTRY(cpu_do_switch_mm)
- 	bfi	x0, x1, #48, #16		// set the ASID
- 	msr	ttbr0_el1, x0			// set TTBR0
- 	isb
--alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
--	ret
--	nop
--	nop
--	nop
--alternative_else
--	ic	iallu
--	dsb	nsh
--	isb
--	ret
--alternative_endif
-+	b	post_ttbr_update_workaround	// Back to C code...
- ENDPROC(cpu_do_switch_mm)
- 
-+	.pushsection ".idmap.text", "ax"
++static inline int kvm_map_vectors(void)
++{
++	return 0;
++}
 +
- 	.section ".text.init", #alloc, #execinstr
+ #endif	/* !__ASSEMBLY__ */
  
- /*
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d7bef2144760..dc8b5943985c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -967,7 +967,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+-	vector_ptr = (unsigned long)__kvm_hyp_vector;
++	vector_ptr = (unsigned long)kvm_get_hyp_vector();
+ 
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 
+@@ -1065,6 +1065,12 @@ static int init_hyp_mode(void)
+ 		goto out_free_mappings;
+ 	}
+ 
++	err = kvm_map_vectors();
++	if (err) {
++		kvm_err("Cannot map vectors\n");
++		goto out_err;
++	}
++
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 819b21a9851c..0b33258cd8ac 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -301,5 +301,41 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 	merged_hyp_pgd[idmap_idx] = __pgd(__pa(boot_hyp_pgd) | PMD_TYPE_TABLE);
+ }
+ 
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++#include <asm/mmu.h>
++
++static inline void *kvm_get_hyp_vector(void)
++{
++	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
++	void *vect = __kvm_hyp_vector;
++
++	if (data->fn) {
++		vect = __bp_harden_hyp_vecs_start +
++		       data->hyp_vectors_slot * SZ_2K;
++
++		vect = lm_alias(vect);
++	}
++
++	return vect;
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return create_hyp_mappings(__bp_harden_hyp_vecs_start,
++				   __bp_harden_hyp_vecs_end);
++}
++
++#else
++static inline void *kvm_get_hyp_vector(void)
++{
++	return __kvm_hyp_vector;
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return 0;
++}
++#endif
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
 -- 
 2.16.2.440.gc6284da
