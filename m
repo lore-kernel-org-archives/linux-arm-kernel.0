@@ -1,40 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Mar 2018 14:21:05 +0000
-Subject: [PATCH v3] arm64: signal: Ensure si_code is valid for all fault
- signalsy
-In-Reply-To: <20180309134818.GE15537@arm.com>
-References: <1520530865-26554-1-git-send-email-Dave.Martin@arm.com>
- <20180309134818.GE15537@arm.com>
-Message-ID: <20180309142105.GS32331@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Mar 2018 14:21:29 +0000
+Subject: [PATCH] KVM:arm/arm64: dcache need be coherent unconditionally
+In-Reply-To: <1520633703-15121-1-git-send-email-peng.hao2@zte.com.cn>
+References: <1520633703-15121-1-git-send-email-peng.hao2@zte.com.cn>
+Message-ID: <90dba814-2aa3-e0e3-9021-4c349c9f9165@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 01:48:19PM +0000, Will Deacon wrote:
-> Hi Dave,
+On 09/03/18 22:15, Peng Hao wrote:
+> For emulation devices just like vga, keeping coherent dcache between
+> guest and host timely is needed.
+> Now the display of vnc-viewer will not update continuously and the
+> patch can fix up.
 > 
-> Thanks for resending this one separately -- I'll pick it up for 4.17.
-> Just a minor thing:
+> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> ---
+>  virt/kvm/arm/mmu.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
-> On Thu, Mar 08, 2018 at 05:41:05PM +0000, Dave Martin wrote:
-> > Changes since v2:
-> > 
-> >  * Rebased to v4.16-rc4.
-> > 
-> >  * Split out the SIGFPE related changes (which impact core/x86 code)
-> >    into a separate series.
-> > 
-> > Original blurb:
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index ec62d1c..4a28395e 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  			kvm_set_pfn_dirty(pfn);
+>  		}
+>  
+> -		if (fault_status != FSC_PERM)
+> -			clean_dcache_guest_page(pfn, PMD_SIZE);
+> +		clean_dcache_guest_page(pfn, PMD_SIZE);
+>  
+>  		if (exec_fault) {
+>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  			mark_page_dirty(kvm, gfn);
+>  		}
+>  
+> -		if (fault_status != FSC_PERM)
+> -			clean_dcache_guest_page(pfn, PAGE_SIZE);
+> +		clean_dcache_guest_page(pfn, PAGE_SIZE);
+>  
+>  		if (exec_fault) {
+>  			new_pte = kvm_s2pte_mkexec(new_pte);
 > 
-> In future, please put this sort of stuff ^^ after the '---', otherwise I
-> have to manually remove it from the commit message when committing and
-> one day I'll end up forgetting.
 
-Oops, yes, just trim that off.  I'd moved that changelog from the
-tearoff to the top of the "cover letter" for reviewer convenience,
-but guess what, there's no cover letter now I've split this patch by
-itself.
+I'm sorry, but I have to NAK this.
 
-[removes face from palm]
+You're papering over the fundamental issue that you're accessing a
+cacheable alias of a non cacheable memory. The architecture is very
+clear about why this doesn't work, and KVM implements the architecture.
 
-Cheers
----Dave
+If you want this to work, map your VGA device as cacheable, add cache
+maintenance to QEMU, or use another frame-buffer emulation that doesn't
+require such a gack.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
