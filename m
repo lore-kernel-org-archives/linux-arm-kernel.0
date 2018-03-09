@@ -1,64 +1,38 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Mar 2018 12:44:01 -0800
-Subject: [PATCH v3 3/6] dt-bindings: soc: Add a binding for the Broadcom
- VCHIQ services. (v3)
-In-Reply-To: <1683748924.258615.1520627491004@email.1und1.de>
-References: <20180309184417.23368-1-eric@anholt.net>
- <20180309184417.23368-3-eric@anholt.net>
- <1683748924.258615.1520627491004@email.1und1.de>
-Message-ID: <87a7vhvv1q.fsf@anholt.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 9 Mar 2018 13:00:57 -0800
+Subject: [PATCH v5 3/4] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <20180222061208.2031-4-rnayak@codeaurora.org>
+References: <20180222061208.2031-1-rnayak@codeaurora.org>
+ <20180222061208.2031-4-rnayak@codeaurora.org>
+Message-ID: <CAD=FV=X6X+4J8KkKo+CNDF3a1_LP1CGzBDrVvBzXx9OdyYP+Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Hi,
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 9. M?rz 2018 um 19:44 geschrieben:
->> 
->> 
->> The VCHIQ communication channel can be provided by BCM283x and Capri
->> SoCs, to communicate with the VPU-side OS services.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->> 
->> v2: VCHI->VCHIQ, dropped firmware property, added cache-line-size
->> v3: Dropped cache-line-size, s/vchi@/mailbox@/
->> 
->>  .../devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt   | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->> new file mode 100644
->> index 000000000000..8dd7b3a7de65
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
->> @@ -0,0 +1,16 @@
->> +Broadcom VCHIQ firmware services
->> +
->> +Required properties:
->> +
->> +- compatible:	Should be "brcm,bcm2835-vchiq"
->> +- reg:		Physical base address and length of the doorbell register pair
->> +- interrupts:	The interrupt number
->> +		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->> +
->> +Example:
->> +
->> +mailbox at 7e00b840 {
->
-> just a question: do you think this is future-proof to claim the doorbell for VCHIQ?
+On Wed, Feb 21, 2018 at 10:12 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> +               gcc: clock-controller at 100000 {
+> +                       compatible = "qcom,gcc-sdm845";
+> +                       reg = <0x100000 0x1f0000>;
+> +                       #clock-cells = <1>;
+> +                       #reset-cells = <1>;
+> +               };
 
-There are 4 and this is the only one used so far, so it seems terribly
-unlikely to get reused.  If the firmware did for some reason decide to
-reuse it for something else, they'd surely go override the DT like they
-have in the past.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/ccf9d466/attachment.sig>
+Seems like we need "#power-domain-cells = <1>;" in the gcc node.
+
+It is true that the property is listed as "optional" in the bindings,
+but we certainly know that the
+"include/dt-bindings/clock/qcom,gcc-sdm845.h" that's posted [1]
+contains several defines ending in "_GDSC" and once we start
+referencing those we'll need "#power-domain-cells".  Seems like we
+should just have it from the beginning.
+
+NOTE: IMHO adding "#power-domain-cells" could be done as a follow-on
+patch, but since (I think) this series still hasn't landed I guess we
+could just send up v6?
+
+[1] https://patchwork.kernel.org/patch/10267093/
+
+
+-Doug
