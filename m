@@ -1,63 +1,50 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Fri, 09 Mar 2018 09:56:20 -0800 (PST)
-Subject: Make set_handle_irq and handle_arch_irq generic, v3
-In-Reply-To: <alpine.DEB.2.21.1803091113460.1364@nanos.tec.linutronix.de>
-Message-ID: <mhng-df44504d-acc2-4ef9-9660-9959298ae26c@palmer-si-x1c4>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 9 Mar 2018 18:57:07 +0100
+Subject: [RFC PATCH 2/6] arm64: untag user addresses in copy_from_user and
+ others
+In-Reply-To: <20180309155829.2fzgevhsxj3gnyly@armageddon.cambridge.arm.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
+ <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
+ <20180309155829.2fzgevhsxj3gnyly@armageddon.cambridge.arm.com>
+Message-ID: <CAAeHK+zuooh=of9GCLd4UF3TCpFsxd1ECzVhKZ-W7BEG6=rtsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 09 Mar 2018 02:20:12 PST (-0800), tglx at linutronix.de wrote:
-> On Wed, 7 Mar 2018, Palmer Dabbelt wrote:
->
->> This is my third version of this patch set, but the original cover
->> letter is still the most relevant description I can come up with.
+On Fri, Mar 9, 2018 at 4:58 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Mar 09, 2018 at 03:03:09PM +0000, Mark Rutland wrote:
+>> On Fri, Mar 09, 2018 at 03:02:00PM +0100, Andrey Konovalov wrote:
+>> > copy_from_user (and a few other similar functions) are used to copy data
+>> > from user memory into the kernel memory or vice versa. Since a user can
+>> > provided a tagged pointer to one of the syscalls that use copy_from_user,
+>> > we need to correctly handle such pointers.
 >>
->>     This patch set has been sitting around for a while, but it got a bit lost
->>     in the shuffle.  In RISC-V land we currently couple do_IRQ (the C entry
->>     point for interrupt handling) to our first-level interrupt controller.
->>     While this isn't completely crazy (as the first-level interrupt controller
->>     is specified by the ISA), it is a bit awkward.
+>> I don't think it makes sense to do this in the low-level uaccess
+>> primitives, given we're going to have to untag pointers before common
+>> code can use them, e.g. for comparisons against TASK_SIZE or
+>> user_addr_max().
 >>
->>     This patch set decouples our trap handler from our first-level IRQ chip
->>     driver by copying what a handful of other architectures are doing.  This
->>     does add an additional load to the interrupt handling path, but there's a
->>     handful of performance problems in there that I've been meaning to look at
->>     so I don't mind adding another one for now.  The advantage is that our
->>     irqchip driver is decoupled from our arch port, at least at compile time.
->>
->> I've build tested this with defconfigs on all the modified architectures
->> after both patch 1 and 5.  I've left the old acks in for the later
->> patches as the patch set has changed very little since I last submitted
->> it.
->
-> This looks sensible. We have two options for getting this merged:
->
-> 1)   I'll take the whole lot through tip/irq/core
->
-> 2)   I'll apply patch 1/N to a special branch in tip. That branch will contain
->      only this commit on top of 4.16-rc4 and can be pulled by the relevant
->      architecture maintainers, so they can apply their architecture specific
->      patches.
+>> I think we'll end up with subtle bugs unless we consistently untag
+>> pointers before we get to uaccess primitives. If core code does untag
+>> pointers, then it's redundant to do so here.
 
-Option 1 seems like the lowest overhead, as that way we don't need to sequence
-the patches between multiple trees.  If all the other arch maintianers are OK
-with it then that works for me.  The 0-day robot found a new build warning on
-openrisc.  I was plannning on submitting a v4 with this fix in it
+There are two different approaches to untagging the user pointers that I see:
 
-    diff --git a/arch/openrisc/include/asm/irq.h b/arch/openrisc/include/asm/irq.h
-    index d9eee0a2b7b4..eb612b1865d2 100644
-    --- a/arch/openrisc/include/asm/irq.h
-    +++ b/arch/openrisc/include/asm/irq.h
-    @@ -24,6 +24,4 @@
-    
-     #define NO_IRQ         (-1)
-    
-    -extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
-    -
-     #endif /* __ASM_OPENRISC_IRQ_H__ */
+1. Untag user pointers right after they are passed to the kernel.
 
-I can submit a v4, or you can just grab it from
+While this might be possible for pointers that are passed to syscalls
+as arguments (Catalin's "hack"), this leaves user pointers, that are
+embedded into for example structs that are passed to the kernel. Since
+there's no specification of the interface between user space and the
+kernel, different kernel parts handle user pointers differently and I
+don't see an easy way to cover them all.
 
-    https://git.kernel.org/pub/scm/linux/kernel/git/palmer/linux.git/log/?h=review-irq-1-cleanup
+2. Untag user pointers where they are used in the kernel.
 
-Thanks!
+Although there's no specification on the interface between the user
+space and the kernel, the kernel still has to use one of a few
+specific ways to access user data (copy_from_user, etc.). So the idea
+here is to add untagging into them. This patchset mostly takes this
+approach (with the exception of memory subsystem syscalls).
+
+If there's a better approach, I'm open to suggestions.
