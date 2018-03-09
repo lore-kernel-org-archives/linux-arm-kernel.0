@@ -1,376 +1,64 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 9 Mar 2018 11:17:21 -0800
-Subject: [PATCH v2] ARM: dts: BCM5301X: Add support for Linksys EA9500
-In-Reply-To: <20180302194155.50808-1-npcomplete13@gmail.com>
-References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
- <20180302194155.50808-1-npcomplete13@gmail.com>
-Message-ID: <88e9d209-c45e-0e8f-53ce-4705d0b7e3c2@gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Mar 2018 21:31:30 +0100 (CET)
+Subject: [PATCH v3 3/6] dt-bindings: soc: Add a binding for the Broadcom
+ VCHIQ services. (v3)
+In-Reply-To: <20180309184417.23368-3-eric@anholt.net>
+References: <20180309184417.23368-1-eric@anholt.net>
+ <20180309184417.23368-3-eric@anholt.net>
+Message-ID: <1683748924.258615.1520627491004@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Hi Eric,
 
-On 03/02/2018 11:41 AM, Vivek Unune wrote:
-> Hardware Info
-> -------------
+> Eric Anholt <eric@anholt.net> hat am 9. M?rz 2018 um 19:44 geschrieben:
 > 
-> Processor	- Broadcom BCM4709C0KFEBG dual-core @ 1.4 GHz
-> Switch		- BCM53012 in BCM4709C0KFEBG & external BCM53125
-> DDR3 RAM	- 256 MB
-> Flash		- 128 MB (Toshiba TC58BVG0S3HTA00)
-> 2.4GHz		- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-> Power Amp	- Skyworks SE2623L 2.4 GHz power amp (x4)
-> 5GHz x 2	- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-> Power Amp	- PLX Technology PEX8603 3-lane, 3-port PCIe switch
-> Ports		- 8 Ports, 1 WAN Ports
-> Antennas	- 8 Antennas
-> Serial Port	- @J6 [GND,TX,RX] (VCC NC)    115200 8n1
 > 
-> Tested with OpenWrt built with DSA driver and Kernel v4.14
+> The VCHIQ communication channel can be provided by BCM283x and Capri
+> SoCs, to communicate with the VPU-side OS services.
 > 
-> Note:
-> 
-> "make sure that port 0 of the internal switch is not accidentally
-> configured back to untagged since that would cause problem when
-> terminating the VLAN tag on the SW side." - Florian Fainelli [1]
-> 
-> This can be ensured by running following command in OpenWrt:
-> 
-> bridge vlan add vid 1 dev extsw pvid tagged
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg590992.html
-
-Glad you got it working finally! Out of curiosity, I am assuming you
-have Broadcom tags enabled on the internal switch and disabled on the
-external BCM53125 switch, is that correct?
-
-Just a few nits below.
-
-> 
-> Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
-> Changes in v2:
->  - Properly define mdio mux, internal mdio, external mdio, mii bus
->  - Now we define usb3 phy as a mdio node connected to internal mdio,
->    thanks to work done by Rafa? Mi?ecki on the bcm usb3 phy mdio driver
->  - Define external SW as a mdio-mii node connected to external mdio
-> ---
->  arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 239 +++++++++++++++++++++++-
->  arch/arm/boot/dts/bcm47094.dtsi                 |   6 +-
->  arch/arm/boot/dts/bcm5301x.dtsi                 |  55 +++++-
->  3 files changed, 288 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-> index b6750f7..5f53207 100644
-> --- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-> +++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-> @@ -7,7 +7,7 @@
->  /dts-v1/;
->  
->  #include "bcm47094.dtsi"
-> -#include "bcm5301x-nand-cs0-bch8.dtsi"
-> +#include "bcm5301x-nand-cs0-bch1.dtsi"
+> v2: VCHI->VCHIQ, dropped firmware property, added cache-line-size
+> v3: Dropped cache-line-size, s/vchi@/mailbox@/
+> 
+>  .../devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt   | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
+> new file mode 100644
+> index 000000000000..8dd7b3a7de65
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
+> @@ -0,0 +1,16 @@
+> +Broadcom VCHIQ firmware services
+> +
+> +Required properties:
+> +
+> +- compatible:	Should be "brcm,bcm2835-vchiq"
+> +- reg:		Physical base address and length of the doorbell register pair
+> +- interrupts:	The interrupt number
+> +		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+> +
+> +Example:
+> +
+> +mailbox at 7e00b840 {
 
-This sounds like an independent bugfix, can you submit that separately?
+just a question: do you think this is future-proof to claim the doorbell for VCHIQ?
 
->  
->  / {
->  	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
-> @@ -32,5 +32,242 @@
->  			linux,code = <KEY_WPS_BUTTON>;
->  			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
->  		};
-> +
-> +		rfkill {
-> +				label = "WiFi";
-> +				linux,code = <KEY_RFKILL>;
-> +				gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		reset {
-> +				label = "Reset";
-> +				linux,code = <KEY_RESTART>;
-> +				gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		wps {
-> +			label = "bcm53xx:white:wps";
-> +			gpios = <&chipcommon 22 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		usb2 {
-> +			label = "bcm53xx:green:usb2";
-> +			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
-> +			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-> +			linux,default-trigger = "usbport";
-> +		};
-> +
-> +		usb3 {
-> +			label = "bcm53xx:green:usb3";
-> +			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-> +			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-> +					  <&xhci_port1>;
-> +			linux,default-trigger = "usbport";
-> +		};
-> +
-> +		power {
-> +			label = "bcm53xx:white:power";
-> +			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		wifi-disabled {
-> +			label = "bcm53xx:amber:wifi-disabled";
-> +			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		wifi-enabled {
-> +			label = "bcm53xx:white:wifi-enabled";
-> +			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar1 {
-> +			label = "bcm53xx:white:bluebar1";
-> +			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar2 {
-> +			label = "bcm53xx:white:bluebar2";
-> +			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar3 {
-> +			label = "bcm53xx:white:bluebar3";
-> +			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		bluebar4 {
-> +			label = "bcm53xx:white:bluebar4";
-> +			gpios = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar5 {
-> +			label = "bcm53xx:white:bluebar5";
-> +			gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar6 {
-> +			label = "bcm53xx:white:bluebar6";
-> +			gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar7 {
-> +			label = "bcm53xx:white:bluebar7";
-> +			gpios = <&chipcommon 21 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		bluebar8 {
-> +			label = "bcm53xx:white:bluebar8";
-> +			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
+Stefan
+
+> +	compatible = "brcm,bcm2835-vchiq";
+> +	reg = <0x7e00b840 0xf>;
+> +	interrupts = <0 2>;
 > +};
-> +
-> +&usb2 {
-> +	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-> +};
-> +
-> +&usb3 {
-> +	vcc-gpio = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
-> +};
-> +
-> +&mdio_mii_mux {
-> +	status = "okay";
-> +};
-> +
-> +&mdio_ext {
-> +	status = "okay";
-> +};
-> +
-> +&srab {
-> +	compatible = "brcm,bcm53012-srab", "brcm,bcm5301x-srab";
-> +	status = "okay";
-> +	dsa,member = <0 0>;
- > +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 1 {
-> +			reg = <1>;
-> +			label = "lan7";
-> +		};
-> +
-> +		port at 2 {
-> +			reg = <2>;
-> +			label = "lan4";
-> +		};
-> +
-> +		port at 3 {
-> +			reg = <3>;
-> +			label = "lan8";
-> +		};
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +			label = "wan";
-> +		};
-> +
-> +		port at 5 {
-> +			reg = <5>;
-> +			ethernet = <&gmac0>;
-> +			label = "cpu";
-> +
-> +			fixed-link {
-> +				speed = <1000>;
-> +				full-duplex;
-> +			};
-> +		};
-> +
-> +		port at 7 {
-> +			reg = <7>;
-> +			ethernet = <&gmac1>;
-> +			label = "cpu";
-> +
-> +			fixed-link {
-> +				speed = <1000>;
-> +				full-duplex;
-> +			};
-> +		};
-> +
-> +		port at 8 {
-> +			reg = <8>;
-> +			ethernet = <&gmac2>;
-> +			label = "cpu";
-> +
-> +			fixed-link {
-> +				speed = <1000>;
-> +				full-duplex;
-> +			};
-> +		};
-
-None of this is wrong, but DSA effectively will take the first port
-specified with a "cpu" label and declare it as the one and only CPU port
-it supports. If the architecture on Northstar is similar to what is done
-on Northstar Plus, port 5 can be either internal or external PHY, port 7
-is indeed gmac1, and port 8 is connected to the flow accelerator, which
-should be in "bypass" mode by default. We can always change that later
-on if we have to anyway.
-
-> +
-> +		sw0_p0: port at 0 {
-
-switch0port0 would be a nicer label and unit name to use.
-
-> +			reg = <0>;
-> +			label = "extsw";
-> +
-> +			fixed-link {
-> +				speed = <1000>;
-> +				full-duplex;
-> +			};
-> +		};
->  	};
->  };
-> +
-> +&mdio_mii {
-> +	status = "okay";
-> +
-> +		switch at 0  {
-> +			compatible = "brcm,bcm53125";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reset-gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
-> +			reset-names = "robo_reset";
-> +			reg = <0>;
-> +			dsa,member = <1 0>;
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				port at 0 {
-> +					reg = <0>;
-> +					label = "lan1";
-> +				};
-> +
-> +				port at 1 {
-> +					reg = <1>;
-> +					label = "lan5";
-> +				};
-> +
-> +				port at 2 {
-> +					reg = <2>;
-> +					label = "lan2";
-> +				};
-> +
-> +				port at 3 {
-> +					reg = <3>;
-> +					label = "lan6";
-> +				};
-> +
-> +				port at 4 {
-> +					reg = <4>;
-> +					label = "lan3";
-> +				};
-> +
-> +				sw1_p8: port at 8 {
-
-Similarly, this would be better with switch1port8?
-
-> +					reg = <8>;
-> +					ethernet = <&sw0_p0>;
-> +					label = "cpu";
-> +
-> +					fixed-link {
-> +						speed = <1000>;
-> +						full-duplex;
-> +					};
-> +				};
-> +			};
-> +		};
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-> index 4840a78..8f3ec57 100644
-> --- a/arch/arm/boot/dts/bcm47094.dtsi
-> +++ b/arch/arm/boot/dts/bcm47094.dtsi
-> @@ -6,10 +6,8 @@
->  
->  #include "bcm4708.dtsi"
->  
-> -/ {
-> -	usb3_phy: usb3-phy {
-> -		compatible = "brcm,ns-bx-usb3-phy";
-> -	};
-> +&usb3_phy {
-> +	compatible = "brcm,ns-bx-usb3-phy";
->  };
-
-I would probably create a separate commit which explains why yuo are
-relocating the USB 3.0 PHY into the mdiomux node, and then only add
-support for the EA9500 model.
-
->  
->  &uart0 {
-> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-> index 9a076c4..9e4386a 100644
-> --- a/arch/arm/boot/dts/bcm5301x.dtsi
-> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-> @@ -154,13 +154,6 @@
->  		clock-names = "phy-ref-clk";
->  	};
->  
-> -	usb3_phy: usb3-phy {
-> -		compatible = "brcm,ns-ax-usb3-phy";
-> -		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
-> -		reg-names = "dmp", "ccb-mii";
-> -		#phy-cells = <0>;
-> -	};
-
-Same here.
---
-Florian
+> -- 
+> 2.16.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
