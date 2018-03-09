@@ -1,36 +1,38 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri,  9 Mar 2018 09:51:42 +0800
-Subject: [PATCH v4 0/4] Set name of regmap_config
-Message-ID: <20180309015146.8297-1-jeffy.chen@rock-chips.com>
+Date: Fri,  9 Mar 2018 09:51:44 +0800
+Subject: [PATCH v4 2/4] rtc: at91sam9: Set name of regmap_config
+In-Reply-To: <20180309015146.8297-1-jeffy.chen@rock-chips.com>
+References: <20180309015146.8297-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180309015146.8297-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We are now allowing to register debugfs without a valid device, and not
+having a valid name will end up using "dummy*" to create debugfs dir.
 
-After 9b947a13e7f6 ("regmap: use debugfs even when no device"), we are
-allowing regmap to create debugfs without a valid device. Some of them
-would end up using "dummy*" as debugfs name.
-
-This series try to set names in some regmap_config to avoid that.
-
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
 Changes in v4:
 Not to use rtc dev to init regmap, the gpbr is not directly related to
 the rtc.
 
-Changes in v3:
-Modify commit message.
+Changes in v3: None
 
-Jeffy Chen (4):
-  mfd: syscon: Set name of regmap_config
-  rtc: at91sam9: Set name of regmap_config
-  clk: lpc32xx: Set name of regmap_config
-  ARM: rockchip: Set name of regmap_config
+ drivers/rtc/rtc-at91sam9.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/mach-rockchip/platsmp.c | 1 +
- drivers/clk/nxp/clk-lpc32xx.c    | 1 +
- drivers/mfd/syscon.c             | 1 +
- drivers/rtc/rtc-at91sam9.c       | 1 +
- 4 files changed, 4 insertions(+)
-
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 7418a763ce52..ee71e647fd43 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -349,6 +349,7 @@ static const struct rtc_class_ops at91_rtc_ops = {
+ };
+ 
+ static const struct regmap_config gpbr_regmap_config = {
++	.name = "gpbr",
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = 4,
 -- 
 2.11.0
