@@ -1,45 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Mar 2018 15:40:50 +0000
-Subject: [PATCH] arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
-Message-ID: <20180309154050.30656-1-marc.zyngier@arm.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 9 Mar 2018 08:47:12 -0700
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <4fd61bd2-757b-ef30-a07f-ed74af031ff5@codeaurora.org>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+ <20180307050624.GR23018@vireshk-i7>
+ <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+ <20180309034332.GO6842@vireshk-i7>
+ <4fd61bd2-757b-ef30-a07f-ed74af031ff5@codeaurora.org>
+Message-ID: <20180309154711.GB10589@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent update to the ARM SMCCC ARCH_WORKAROUND_1 specification
-allows firmware to return a non zero, positive value to describe
-that although the mitigation is implemented at the higher exception
-level, the CPU on which the call is made is not affected.
+On Fri, Mar 09, 2018 at 03:49:00PM +0530, Rajendra Nayak wrote:
+> Hey Jordan/Viresh,
+> 
+> On 03/09/2018 09:13 AM, Viresh Kumar wrote:
+> > On 08-03-18, 13:14, Jordan Crouse wrote:
+> >> It seems to me that performance_state has a direct relationship with genpd
+> >> which is good for CPU votes but in this case, we're just passing along raw data
+> >> to an independent microcontroller. The 'qcom,arc-level' is used to construct
+> >> the actual values that the GMU will program into the RPMh. Since these are
+> > 
+> > The "genpd" here is created specially for this RPM. The performance-state thing
+> > is designed to solve this very specific problem of qualcomm SoCs and there is no
+> > way we are going to add another property for this now.
+> > 
+> >> informational (from the CPU perspective) rather than functional I feel like
+> >> that using performance_state for this would be as hacky as using opp-microvolt
+> >> or something else.
+> > 
+> > There is some WIP stuff here Rajendra is testing currently.
+> 
+> What I am doing is a powerdomain driver to communicate magic values from
+> CPU to rpmh, looks like we need another one to communicate from CPU to
+> GMU now :)
+> 
+> A few things,
+> * someone will need to map these larger magic values into something that
+> rpmh would understand (between 0 to 15 on the sdm845), thats done by
+> reading the command db level maps. Is this done by GMU?
 
-Let's relax the check on the return value from ARCH_WORKAROUND_1
-so that we only error out if the returned value is negative.
+It is done by the GPU - we take the magic values, construct them into other
+magic values and send them to the GMU. As far as I know we are the only other
+in-kernel client of cmd-db other than the regulator(s).
 
-Fixes: b092201e0020 ("arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support")
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/cpu_errata.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> * are these communicated just once for every OPP at init/boot, or for
+> every OPP switch?
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 07823595b7f0..91428426bf26 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -178,7 +178,7 @@ static int enable_smccc_arch_workaround_1(void *data)
- 	case PSCI_CONDUIT_HVC:
- 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--		if (res.a0)
-+		if ((int)res.a0 < 0)
- 			return 0;
- 		cb = call_hvc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_hvc_start;
-@@ -188,7 +188,7 @@ static int enable_smccc_arch_workaround_1(void *data)
- 	case PSCI_CONDUIT_SMC:
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--		if (res.a0)
-+		if ((int)res.a0 < 0)
- 			return 0;
- 		cb = call_smc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_smc_start;
+Just once at init.
+
+> * whats the communication mechanism we use between CPU and GMU?
+
+Shared memory queues inspired by Venus HFI.
+
+Jordan
+
 -- 
-2.14.2
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
