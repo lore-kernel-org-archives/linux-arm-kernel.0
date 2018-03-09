@@ -1,138 +1,55 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:04 +0800
-Subject: [PATCH 21/39] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
+Date: Fri,  9 Mar 2018 17:07:05 +0800
+Subject: [PATCH 22/39] arm64: KVM: Increment PC after handling an SMC trap
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-22-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-23-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit aa6acde65e03 upstream.
+commit f5115e8869e1 upstream.
 
-Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
-and can theoretically be attacked by malicious code.
+When handling an SMC trap, the "preferred return address" is set
+to that of the SMC, and not the next PC (which is a departure from
+the behaviour of an SMC that isn't trapped).
 
-This patch implements a PSCI-based mitigation for these CPUs when available.
-The call into firmware will invalidate the branch predictor state, preventing
-any malicious entries from affecting other victim contexts.
+Increment PC in the handler, as the guest is otherwise forever
+stuck...
 
-Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
+Fixes: acfb3b883f6d ("arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls")
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/bpi.S        | 24 +++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c | 42 ++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ arch/arm64/kvm/handle_exit.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 06a931eb2673..dec95bd82e31 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	vectors __kvm_hyp_vector
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
-+ENTRY(__psci_hyp_bp_inval_start)
-+	sub	sp, sp, #(8 * 18)
-+	stp	x16, x17, [sp, #(16 * 0)]
-+	stp	x14, x15, [sp, #(16 * 1)]
-+	stp	x12, x13, [sp, #(16 * 2)]
-+	stp	x10, x11, [sp, #(16 * 3)]
-+	stp	x8, x9, [sp, #(16 * 4)]
-+	stp	x6, x7, [sp, #(16 * 5)]
-+	stp	x4, x5, [sp, #(16 * 6)]
-+	stp	x2, x3, [sp, #(16 * 7)]
-+	stp	x0, x1, [sp, #(16 * 8)]
-+	mov	x0, #0x84000000
-+	smc	#0
-+	ldp	x16, x17, [sp, #(16 * 0)]
-+	ldp	x14, x15, [sp, #(16 * 1)]
-+	ldp	x12, x13, [sp, #(16 * 2)]
-+	ldp	x10, x11, [sp, #(16 * 3)]
-+	ldp	x8, x9, [sp, #(16 * 4)]
-+	ldp	x6, x7, [sp, #(16 * 5)]
-+	ldp	x4, x5, [sp, #(16 * 6)]
-+	ldp	x2, x3, [sp, #(16 * 7)]
-+	ldp	x0, x1, [sp, #(16 * 8)]
-+	add	sp, sp, #(8 * 18)
-+ENTRY(__psci_hyp_bp_inval_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index b84a93e8c8bd..3adbbce7334c 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -36,6 +36,8 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 5295aef7c8f0..c43e0e100c11 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -51,7 +51,16 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
- #ifdef CONFIG_KVM
-+extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-+
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  {
-@@ -77,6 +79,9 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
++	/*
++	 * "If an SMC instruction executed at Non-secure EL1 is
++	 * trapped to EL2 because HCR_EL2.TSC is 1, the exception is a
++	 * Trap exception, not a Secure Monitor Call exception [...]"
++	 *
++	 * We need to advance the PC after the trap, as it would
++	 * otherwise return to the same address...
++	 */
+ 	vcpu_set_reg(vcpu, 0, ~0UL);
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+ 	return 1;
  }
- #else
-+#define __psci_hyp_bp_inval_start	NULL
-+#define __psci_hyp_bp_inval_end		NULL
-+
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
- 				      const char *hyp_vecs_end)
-@@ -98,6 +103,21 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
  
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
-+
-+#include <linux/psci.h>
-+
-+static int enable_psci_bp_hardening(void *data)
-+{
-+	const struct arm64_cpu_capabilities *entry = data;
-+
-+	if (psci_ops.get_version)
-+		install_bp_hardening_cb(entry,
-+				       (bp_hardening_cb_t)psci_ops.get_version,
-+				       __psci_hyp_bp_inval_start,
-+				       __psci_hyp_bp_inval_end);
-+
-+	return 0;
-+}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 
- #define MIDR_RANGE(model, min, max) \
-@@ -173,6 +193,28 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_RANGE(MIDR_THUNDERX, 0x00,
- 			   (1 << MIDR_VARIANT_SHIFT) | 1),
- 	},
-+#endif
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-+		.enable = enable_psci_bp_hardening,
-+	},
- #endif
- 	{
- 	}
 -- 
 2.16.2.440.gc6284da
