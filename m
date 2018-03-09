@@ -1,42 +1,45 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 09 Mar 2018 11:40:27 +0900
-Subject: [PATCH 1/4] ARM: dts: exynos5250: Add #sound-dai-cells property
- to hdmi device node
-In-Reply-To: <20180307172711.15697-1-s.nawrocki@samsung.com>
-References: <CGME20180307172723epcas1p1b8879bb555737cab7406a172b7d13a56@epcas1p1.samsung.com>
- <20180307172711.15697-1-s.nawrocki@samsung.com>
-Message-ID: <5AA1F41B.5080104@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 9 Mar 2018 10:45:14 +0800
+Subject: [PATCH v4 4/4] driver: clk: imx: add clock driver for imx6sll
+In-Reply-To: <1520502445-22576-4-git-send-email-ping.bai@nxp.com>
+References: <1520502445-22576-1-git-send-email-ping.bai@nxp.com>
+ <1520502445-22576-4-git-send-email-ping.bai@nxp.com>
+Message-ID: <20180309024513.GE3217@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Thu, Mar 08, 2018 at 05:47:25PM +0800, Bai Ping wrote:
+> diff --git a/drivers/clk/imx/clk-imx6sll.c b/drivers/clk/imx/clk-imx6sll.c
+> new file mode 100644
+> index 0000000..e938db5
+> --- /dev/null
+> +++ b/drivers/clk/imx/clk-imx6sll.c
+> @@ -0,0 +1,344 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017-2018 NXP.
+> + */
+> +
+> +#include <dt-bindings/clock/imx6sll-clock.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/types.h>
+> +
+> +#include "clk.h"
+> +
+> +#define CCM_ANALOG_PLL_BYPASS		(0x1 << 16)
+> +#define BM_CCM_CCDR_MMDC_CH0_MASK	(0x2 << 16)
+> +#define CCDR				0x4
 
-2018? 03? 08? 02:27? Sylwester Nawrocki ?(?) ? ?:
-> This property is required for specifying link between the HDMI IP block
-> and the SoC's audio subsystem.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 56626d1a4235..71d2ede118e3 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -700,6 +700,7 @@
->  					"sclk_hdmiphy", "mout_hdmi";
->  			samsung,syscon-phandle = <&pmu_system_controller>;
->  			phy = <&hdmiphy>;
-> +			#sound-dai-cells = <0>;
+We agreed to remove this define, right?
 
-This patch adds this property to hdmi device node which is bound by HDMI driver of Exynos DRM. As we talked about this at other email thread, seems this property is required mandatorily for Odroid XU3/4 board which uses Exynos5422.
-There may be something I'm missing so could you let me know how this property is required?
+Shawn
 
-Thanks,
-Inki Dae
-
->  			status = "disabled";
->  		};
->  
-> 
+> +#define xPLL_CLR(offset)		(offset + 0x8)
