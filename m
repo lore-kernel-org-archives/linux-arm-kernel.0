@@ -1,62 +1,94 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 9 Mar 2018 07:54:43 +0200
-Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
-In-Reply-To: <CAFLEztT4XJ9QnvLciv62dFCfj-y7Kynd2R8HpVxXeUXObvp3GQ@mail.gmail.com>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <20180308120200.wpcjnbglf4x32vrp@tarshish>
- <CAFLEztTokSaXJuN8Ls0BpAEuFdTC+Viwn6PGxC=TC6vZAs+w3g@mail.gmail.com>
- <20180309040903.hhkhylvs6q6lvqjy@tarshish>
- <CAFLEztT4XJ9QnvLciv62dFCfj-y7Kynd2R8HpVxXeUXObvp3GQ@mail.gmail.com>
-Message-ID: <20180309055443.edcj2uvbc2s6bcoy@tarshish>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 9 Mar 2018 14:02:54 +0800
+Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
+ architecutres
+In-Reply-To: <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
+References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+ <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
-
-On Fri, Mar 09, 2018 at 01:05:28PM +0800, Jacob Chen wrote:
-> 2018-03-09 12:09 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
-> > On Fri, Mar 09, 2018 at 08:53:57AM +0800, Jacob Chen wrote:
-> >> 2018-03-08 20:02 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
-> >> > On Thu, Mar 08, 2018 at 05:47:50PM +0800, Jacob Chen wrote:
-> >> >> This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399
-> >> >> SoC.
-> >> >>
-> >> >> Wiki Pages:
-> >> >> http://opensource.rock-chips.com/wiki_Rockchip-isp1
-> >> >>
-> >> >> The deprecated g_mbus_config op is not dropped in  V6 because i am waiting
-> >> >> tomasz's patches.
-> >> >
-> >> > Which tree is this series based on? On top of v4.16-rc4 I get the build
-> >> > failure below. The V4L2_BUF_TYPE_META_OUTPUT macro, for example, is not even
-> >> > in media_tree.git.
-> >>
-> >> This series is based on v4.16-rc4 with below patch.
-> >> https://patchwork.kernel.org/patch/9792001/
-> >
-> > This patch does not apply on v4.16-rc4. I also tried v2 of this patch with the
-> > same result:
-> >
-> >   https://patchwork.linuxtv.org/patch/44682/
+On 03/08/18 at 09:05am, Dave Young wrote:
+> [Cc Andrew]
 > 
-> It need resolve merge conflict.
+> On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
+> > This is a preparatory patch set for adding kexec_file support on arm64.
+> > 
+> > It was originally included in a arm64 patch set[1], but Philipp is also
+> > working on their kexec_file support on s390[2] and some changes are now
+> > conflicting.
+> > 
+> > So these common parts were extracted and put into a separate patch set for
+> > better integration. What's more, my original patch#4 was split into a few
+> > small chunks for easier review after Dave's comment.
+> > 
+> > As such, the resulting code is basically identical with my original, and
+> > the only *visible* differences are:
+> >   * renamings of _kexec_kernel_image_probe() and
+> >     _kimage_file_post_load_cleanup()
+> >   * change one of types of arguments at prepare_elf64_headers()
+> > Those, unfortunately, require a couple of trivial changes on the rest
+> > (#1, #6 to #13) of my arm64 kexec_file patch set[1].
+> > 
+> > Patch#1 allows making a use of purgatory optional, particularly useful
+> > for arm64.
+> > Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
+> > verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
+> > Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
+> > exclude_mem_range(), to be made best re-use of.
+> > 
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
+> > [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
+> > 
+> > 
+> > Changes in v2 (Mar 6, 2018)
+> > * use IS_ENABLED() instead of #ifdef's in kexec_calculate_store_digests() 
+> > * rename _kexec_kernel_*() and make them static for now except for
+> >   kexec_image_probe_default() which is actually used by arch(powerpc) code
+> >   (Note: kexec_image_post_load_cleanup_default() will also be exported by
+> >   arm64 patches.)
+> > * change a type of kernel_map in prepare_elf64_headers() to "int"
+> > * check for a total number of system ram regions in full_up_crash_elf_data()
+> >   and use vzalloc() instead of vmalloc()
+> > 
+> > AKASHI Takahiro (7):
+> >   kexec_file: make an use of purgatory optional
+> >   kexec_file,x86,powerpc: factor out kexec_file_ops functions
+> >   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
+> >   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
+> >   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
+> >   x86: kexec_file: clean up prepare_elf64_headers()
+> >   kexec_file, x86: move re-factored code to generic side
+> > 
+> >  arch/powerpc/Kconfig                        |   3 +
+> >  arch/powerpc/include/asm/kexec.h            |   2 +-
+> >  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
+> >  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
+> >  arch/x86/Kconfig                            |   3 +
+> >  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
+> >  arch/x86/kernel/crash.c                     | 334 ++++++----------------------
+> >  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
+> >  arch/x86/kernel/machine_kexec_64.c          |  45 +---
+> >  include/linux/kexec.h                       |  32 ++-
+> >  kernel/kexec_file.c                         | 240 +++++++++++++++++++-
+> >  11 files changed, 338 insertions(+), 366 deletions(-)
+> > 
+> > -- 
+> > 2.16.2
+> > 
 > 
-> > Can you push your series to a public git repo branch?
+> AKASHI, thanks for another update, looks good to me:
 > 
-> Sure, I have push it to my github.
-> https://github.com/wzyy2/linux/tree/4.16-rc4
+> Acked-by: Dave Young <dyoung@redhat.com>
+
+Hold on the ack, during today's tests kexec kernel can not boot, it
+hangs early.  Will see if it is caused by this series and come back
+later.
+
 > 
-> This commit might be a bit of a mess
-> https://github.com/wzyy2/linux/commit/ff68323c4804adc10f64836ea1be172c54a9d6c6
+> Thanks
+> Dave
 
-Thanks. This is very helpful.
-
-I'm mostly interested in the tinkerboard, so the DT bits in your tree are also 
-useful.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Thanks
+Dave
