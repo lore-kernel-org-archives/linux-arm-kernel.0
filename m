@@ -1,87 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Mar 2018 15:58:29 +0000
-Subject: [RFC PATCH 2/6] arm64: untag user addresses in copy_from_user
- and others
-In-Reply-To: <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <d681c0dee907ee5cc55d313e2f843237c6087bf0.1520600533.git.andreyknvl@google.com>
- <20180309150309.4sue2zj6teehx6e3@lakrids.cambridge.arm.com>
-Message-ID: <20180309155829.2fzgevhsxj3gnyly@armageddon.cambridge.arm.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 9 Mar 2018 17:01:35 +0100
+Subject: [PATCH v2 01/17 1/3] mfd: abx500-core: Delete an error message for a
+ failed memory allocation in abx500_register_ops()
+In-Reply-To: <6c8ff539-9e9d-635b-22a8-df8100ac8156@users.sourceforge.net>
+References: <c5d9751e-3ae8-0b66-821a-0e7f45bb8e1c@users.sourceforge.net>
+ <6c8ff539-9e9d-635b-22a8-df8100ac8156@users.sourceforge.net>
+Message-ID: <4948c6d9-af42-8c95-af38-fc448a8e25a2@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 03:03:09PM +0000, Mark Rutland wrote:
-> On Fri, Mar 09, 2018 at 03:02:00PM +0100, Andrey Konovalov wrote:
-> > copy_from_user (and a few other similar functions) are used to copy data
-> > from user memory into the kernel memory or vice versa. Since a user can
-> > provided a tagged pointer to one of the syscalls that use copy_from_user,
-> > we need to correctly handle such pointers.
-> 
-> I don't think it makes sense to do this in the low-level uaccess
-> primitives, given we're going to have to untag pointers before common
-> code can use them, e.g. for comparisons against TASK_SIZE or
-> user_addr_max().
-> 
-> I think we'll end up with subtle bugs unless we consistently untag
-> pointers before we get to uaccess primitives. If core code does untag
-> pointers, then it's redundant to do so here.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 8 Mar 2018 11:44:33 +0100
 
-A quick "hack" below clears the tag on syscall entry (where the argument
-is a __user pointer). However, we still have cases in core code where
-the pointer is read from a structure or even passed as an unsigned long
-as part of a command + argument (like in ptrace).
+Omit an extra message for a memory allocation failure in this function.
 
-The "hack":
+This issue was detected by using the Coccinelle software.
 
----------------------------------8<--------------------------
->From 6df503651f73c923d91eb695e56f977ddcc52d43 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Tue, 6 Feb 2018 17:54:05 +0000
-Subject: [PATCH] arm64: Allow user pointer tags to be passed into the kernel
-
-The current tagged pointer ABI disallows the top byte of a user pointer
-to be non-zero when invoking a syscall. This patch allows such pointer
-to be passed into the kernel and the kernel will mask them out
-automatically. Page-based syscall ABI (mmap, mprotect, madvise etc.)
-expect the pointer tag to be 0 (see include/linux/syscalls.h for the ABI
-functions taking __user pointers).
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/include/asm/unistd.h | 9 +++++++++
- include/linux/syscalls.h        | 2 ++
- 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index a0baa9af5487..cd68ad969e3a 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -53,3 +53,12 @@
- #endif
- 
- #define NR_syscalls (__NR_syscalls)
+v2:
+Lee Jones requested a resend for this patch. The change was rebased
+on source files from Linux next-20180308.
+
+ drivers/mfd/abx500-core.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
+index 0d3846a4767c..c8c9d41abcaa 100644
+--- a/drivers/mfd/abx500-core.c
++++ b/drivers/mfd/abx500-core.c
+@@ -40,10 +40,9 @@ int abx500_register_ops(struct device *dev, struct abx500_ops *ops)
+ 	dev_entry = devm_kzalloc(dev,
+ 				 sizeof(struct abx500_device_entry),
+ 				 GFP_KERNEL);
+-	if (!dev_entry) {
+-		dev_err(dev, "register_ops kzalloc failed");
++	if (!dev_entry)
+ 		return -ENOMEM;
+-	}
 +
-+/* copied from arch/s390/ */
-+#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p( \
-+				typeof(0?(__force t)0:0ULL), u64))
-+/* sign-extend bit 55 to mask out the pointer tag */
-+#define __SC_CAST(t, a)						\
-+	(__TYPE_IS_PTR(t)					\
-+		? (__force t)((__s64)((__u64)a << 8) >> 8)	\
-+		: (__force t)a)
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index a78186d826d7..279497207a31 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -105,7 +105,9 @@ union bpf_attr;
- #define __TYPE_IS_UL(t)	(__TYPE_AS(t, 0UL))
- #define __TYPE_IS_LL(t) (__TYPE_AS(t, 0LL) || __TYPE_AS(t, 0ULL))
- #define __SC_LONG(t, a) __typeof(__builtin_choose_expr(__TYPE_IS_LL(t), 0LL, 0L)) a
-+#ifndef __SC_CAST
- #define __SC_CAST(t, a)	(__force t) a
-+#endif
- #define __SC_ARGS(t, a)	a
- #define __SC_TEST(t, a) (void)BUILD_BUG_ON_ZERO(!__TYPE_IS_LL(t) && sizeof(t) > sizeof(long))
+ 	dev_entry->dev = dev;
+ 	memcpy(&dev_entry->ops, ops, sizeof(struct abx500_ops));
  
 -- 
-Catalin
+2.16.2
