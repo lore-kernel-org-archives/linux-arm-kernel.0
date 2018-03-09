@@ -1,136 +1,163 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Mar 2018 13:06:55 -0800
-Subject: [PATCH RFC 2/3] nvmem: add driver for Raspberry Pi OTP
-In-Reply-To: <1520602328-28972-3-git-send-email-stefan.wahren@i2se.com>
-References: <1520602328-28972-1-git-send-email-stefan.wahren@i2se.com>
- <1520602328-28972-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87tvtpgdqo.fsf@anholt.net>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Fri,  9 Mar 2018 23:09:51 +0200
+Subject: [PATCH v4 0/7] Introduce on-chip interconnect API
+Message-ID: <20180309210958.16672-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a lot
+of data flowing through the on-chip interconnects. These interconnect buses
+could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-> This patch brings read-only support for the Raspberry Pi Customer OTP.
-> The driver accesses the OTP via the mailbox property interface
-> provided by the VPU firmware.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/nvmem/Kconfig           |  10 +++
->  drivers/nvmem/Makefile          |   2 +
->  drivers/nvmem/raspberrypi-otp.c | 138 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 150 insertions(+)
->  create mode 100644 drivers/nvmem/raspberrypi-otp.c
->
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index ff505af..76b8af3 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -175,4 +175,14 @@ config NVMEM_SNVS_LPGPR
->  	  This driver can also be built as a module. If so, the module
->  	  will be called nvmem-snvs-lpgpr.
->  
-> +config NVMEM_RASPBERRYPI_OTP
-> +	tristate "Raspberry Pi Customer OTP support"
-> +	depends on (ARCH_BCM2835 && RASPBERRYPI_FIRMWARE) || (COMPILE_TEST && !RASPBERRYPI_FIRMWARE)
-> +	depends on RASPBERRYPI_FIRMWARE
-> +	help
-> +	  This is a driver for access to the Customer OTP on the Raspberry Pi.
-> +
-> +	  This driver can also be built as a module. If so, the module
-> +	  will be called nvmem-raspberrypi-otp.
-> +
->  endif
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index e54dcfa..3b53b0b 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -37,3 +37,5 @@ obj-$(CONFIG_MESON_MX_EFUSE)	+= nvmem_meson_mx_efuse.o
->  nvmem_meson_mx_efuse-y		:= meson-mx-efuse.o
->  obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
->  nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
-> +obj-$(CONFIG_NVMEM_RASPBERRYPI_OTP)	+= nvmem-raspberrypi-otp.o
-> +nvmem-raspberrypi-otp-y		:= raspberrypi-otp.o
-> diff --git a/drivers/nvmem/raspberrypi-otp.c b/drivers/nvmem/raspberrypi-otp.c
-> new file mode 100644
-> index 0000000..e925435
-> --- /dev/null
-> +++ b/drivers/nvmem/raspberrypi-otp.c
-> @@ -0,0 +1,138 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Raspberry Pi Customer OTP driver
-> + *
-> + * Copyright (C) 2018 Stefan Wahren <stefan.wahren@i2se.com>
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <soc/bcm2835/raspberrypi-firmware.h>
-> +
-> +#define CUSTOMER_CELLS 8
-> +
-> +struct rpi_otp {
-> +	struct nvmem_device *nvmem;
-> +	struct rpi_firmware *fw;
-> +};
-> +
-> +/*
-> + * Packet definition used by RPI_FIRMWARE_GET_CUSTOMER_OTP
-> + */
-> +struct rpi_customer_otp_packet {
-> +	u32 index;
-> +	u32 length;
-> +	u32 cells[CUSTOMER_CELLS];
-> +};
-> +
-> +static int rpi_otp_read(void *context, unsigned int offset, void *val,
-> +			size_t bytes)
-> +{
-> +	struct rpi_customer_otp_packet packet;
-> +	struct rpi_otp *otp = context;
-> +	u32 *buf = val;
-> +	int ret;
-> +
-> +	packet.index = 0;
-> +	packet.length = CUSTOMER_CELLS;
-> +	memset(packet.cells, 0xff, sizeof(packet.cells));
-> +
-> +	ret = rpi_firmware_property(otp->fw, RPI_FIRMWARE_GET_CUSTOMER_OTP,
-> +				    &packet, sizeof(packet));
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Request rejected by firmware */
-> +	if (packet.index)
-> +		return -EIO;
-> +
-> +	while (bytes) {
-> +		if ((offset / 4) < sizeof(packet.cells))
-> +			*buf = packet.cells[offset / 4];
-> +		else
-> +			*buf = 0;
-> +
-> +		buf++;
-> +		bytes -= 4;
-> +		offset += 4;
-> +	}
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or cpu intensive tasks.
 
-It looks like nvmem core makes sure that offset + bytes <= nvmem->size,
-so I think you can turn this loop into just a memcpy.
+Having an API to control the requirement of the system in term of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
 
-Other than that,
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/5edec855/attachment.sig>
+The API is using a consumer/provider-based model, where the providers are
+the interconnect buses and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the NoCs.
+
+ +----------------+    +----------------+
+ | HW Accelerator |--->|      M NoC     |<---------------+
+ +----------------+    +----------------+                |
+                         |      |                    +------------+
+  +-----+  +-------------+      V       +------+     |            |
+  | DDR |  |                +--------+  | PCIe |     |            |
+  +-----+  |                | Slaves |  +------+     |            |
+    ^ ^    |                +--------+     |         |   C NoC    |
+    | |    V                               V         |            |
+ +------------------+   +------------------------+   |            |   +-----+
+ |                  |-->|                        |-->|            |-->| CPU |
+ |                  |-->|                        |<--|            |   +-----+
+ |     Mem NoC      |   |         S NoC          |   +------------+
+ |                  |<--|                        |---------+    |
+ |                  |<--|                        |<------+ |    |   +--------+
+ +------------------+   +------------------------+       | |    +-->| Slaves |
+   ^  ^    ^    ^          ^                             | |        +--------+
+   |  |    |    |          |                             | V
+ +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+ | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
+ +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+           |
+       +-------+
+       | Modem |
+       +-------+
+
+TODO:
+ * Create icc_set_extended() to handle parameters such as latency and other QoS
+   values.
+ * Convert from using global node identifiers to local per provider identifiers.
+ * Cache the path between the nodes instead of walking the graph on each get().
+ * Sync interconnect requests with the idle state of the device.
+
+Changes since patchset v3 (https://lkml.org/lkml/2017/9/8/544)
+* Refactored the constraints aggregation.
+* Use the IDR API.
+* Split the provider and consumer bindings into separate patches and propose
+  new bindings for consumers, which allows to specify the local source port.
+* Adopted the icc_ prefix for API functions.
+* Introduced separate API functions for creating interconnect nodes and links.
+* Added DT lookup support in addition to platform data.
+* Dropped the event tracing patch for now.
+* Added a patch to provide summary via debugfs. 
+* Use macro for the list of topology definitions in the platform driver.
+* Various minor changes.
+
+Changes since patchset v2 (https://lkml.org/lkml/2017/7/20/825)
+* Split the aggregation into per node and per provider. Cache the
+  aggregated values.
+* Various small refactorings and cleanups in the framework.
+* Added a patch introducing basic tracepoint support for monitoring
+  the time required to update the interconnect nodes.
+
+Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
+* Updates in the documentation.
+* Changes in request aggregation, locking.
+* Dropped the aggregate() callback and use the default as it currently
+  sufficient for the single vendor driver. Will add it later when needed.
+* Dropped the dt-bindings draft patch for now.
+
+Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
+* Converted documentation to rst format.
+* Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
+
+Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+* Refactored code into shorter functions.
+* Added a new aggregate() API function.
+* Rearranged some structs to reduce padding bytes.
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+Georgi Djakov (7):
+  interconnect: Add generic on-chip interconnect API
+  dt-bindings: Introduce interconnect provider bindings
+  interconnect: Add debugfs support
+  interconnect: qcom: Add RPM communication
+  interconnect: qcom: Add msm8916 interconnect provider driver
+  dt-bindings: Introduce interconnect consumers bindings
+  interconnect: Allow endpoints translation via DT
+
+ .../bindings/interconnect/interconnect.txt         |  70 +++
+ .../devicetree/bindings/interconnect/qcom-smd.txt  |  31 ++
+ Documentation/interconnect/interconnect.rst        |  96 ++++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/interconnect/Kconfig                       |  15 +
+ drivers/interconnect/Makefile                      |   2 +
+ drivers/interconnect/core.c                        | 597 +++++++++++++++++++++
+ drivers/interconnect/qcom/Kconfig                  |  11 +
+ drivers/interconnect/qcom/Makefile                 |   3 +
+ drivers/interconnect/qcom/msm8916.c                | 482 +++++++++++++++++
+ drivers/interconnect/qcom/smd-rpm.c                |  90 ++++
+ drivers/interconnect/qcom/smd-rpm.h                |  15 +
+ include/linux/interconnect-provider.h              | 109 ++++
+ include/linux/interconnect.h                       |  46 ++
+ include/linux/interconnect/qcom.h                  | 350 ++++++++++++
+ 16 files changed, 1920 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+ create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+ create mode 100644 Documentation/interconnect/interconnect.rst
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/core.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/msm8916.c
+ create mode 100644 drivers/interconnect/qcom/smd-rpm.c
+ create mode 100644 drivers/interconnect/qcom/smd-rpm.h
+ create mode 100644 include/linux/interconnect-provider.h
+ create mode 100644 include/linux/interconnect.h
+ create mode 100644 include/linux/interconnect/qcom.h
