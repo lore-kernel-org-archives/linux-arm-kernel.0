@@ -1,75 +1,78 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri,  9 Mar 2018 10:44:17 -0800
-Subject: [PATCH v3 6/6] staging: vc04_services: Remove
- vchiq_queue_bulk_{transmit, receive}.
+Date: Fri,  9 Mar 2018 10:44:13 -0800
+Subject: [PATCH v3 2/6] staging: vc04_services: Remove cache-line-size
+ property (v3)
 In-Reply-To: <20180309184417.23368-1-eric@anholt.net>
 References: <20180309184417.23368-1-eric@anholt.net>
-Message-ID: <20180309184417.23368-6-eric@anholt.net>
+Message-ID: <20180309184417.23368-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are dead code, including in the downstream Raspberry Pi tree.
+It's been tempting to replace this with (L1) cache_line_size(), but
+that's really not what the value is about.  It's about coordinating
+the condition for the pagelist fragment behavior between the two
+sides.  However, the property was not accepted for the upstream DT
+binding, so we have to use the firmware's fallback value.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
 
-v2-3: no changes
+v2: Kept the property but added documentation.
+v3: Remove the DT property again, more documentation.
 
- .../vc04_services/interface/vchiq_arm/vchiq_arm.c    | 20 --------------------
- .../vc04_services/interface/vchiq_arm/vchiq_if.h     | 10 ----------
- 2 files changed, 30 deletions(-)
+ .../interface/vchiq_arm/vchiq_2835_arm.c             | 20 +++++++++++---------
+ .../interface/vchiq_arm/vchiq_pagelist.h             |  1 -
+ 2 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 8068c0308b34..24d456b0a6f0 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -406,26 +406,6 @@ VCHIQ_STATUS_T vchiq_open_service(
- }
- EXPORT_SYMBOL(vchiq_open_service);
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index b59ef14890aa..afdd3e944f3f 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -77,7 +77,17 @@ struct vchiq_pagelist_info {
+ };
  
--VCHIQ_STATUS_T
--vchiq_queue_bulk_transmit(VCHIQ_SERVICE_HANDLE_T handle,
--	const void *data, unsigned int size, void *userdata)
--{
--	return vchiq_bulk_transfer(handle,
--		VCHI_MEM_HANDLE_INVALID, (void *)data, size, userdata,
--		VCHIQ_BULK_MODE_CALLBACK, VCHIQ_BULK_TRANSMIT);
--}
--EXPORT_SYMBOL(vchiq_queue_bulk_transmit);
+ static void __iomem *g_regs;
+-static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
++/* This value is the size of the L2 cache lines as understood by the
++ * VPU firmware, which determines the required alignment of the
++ * offsets/sizes in pagelists.
++ *
++ * Modern VPU firmware looks for a DT "cache-line-size" property in
++ * the VCHIQ node and will overwrite it with the actual L2 cache size,
++ * which the kernel must then respect.  That property was rejected
++ * upstream, so we have to use the VPU firmware's compatibility value
++ * of 32.
++ */
++static unsigned int g_cache_line_size = 32;
+ static unsigned int g_fragments_size;
+ static char *g_fragments_base;
+ static char *g_free_fragments;
+@@ -117,14 +127,6 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 	if (err < 0)
+ 		return err;
+ 
+-	err = of_property_read_u32(dev->of_node, "cache-line-size",
+-				   &g_cache_line_size);
 -
--VCHIQ_STATUS_T
--vchiq_queue_bulk_receive(VCHIQ_SERVICE_HANDLE_T handle, void *data,
--	unsigned int size, void *userdata)
--{
--	return vchiq_bulk_transfer(handle,
--		VCHI_MEM_HANDLE_INVALID, data, size, userdata,
--		VCHIQ_BULK_MODE_CALLBACK, VCHIQ_BULK_RECEIVE);
--}
--EXPORT_SYMBOL(vchiq_queue_bulk_receive);
+-	if (err) {
+-		dev_err(dev, "Missing cache-line-size property\n");
+-		return -ENODEV;
+-	}
 -
- VCHIQ_STATUS_T
- vchiq_bulk_transmit(VCHIQ_SERVICE_HANDLE_T handle, const void *data,
- 	unsigned int size, void *userdata, VCHIQ_BULK_MODE_T mode)
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-index 0e270852900d..e4109a83e628 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-@@ -149,16 +149,6 @@ vchiq_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
- 		    size_t size);
- extern void           vchiq_release_message(VCHIQ_SERVICE_HANDLE_T service,
- 	VCHIQ_HEADER_T *header);
--extern VCHIQ_STATUS_T vchiq_queue_bulk_transmit(VCHIQ_SERVICE_HANDLE_T service,
--	const void *data, unsigned int size, void *userdata);
--extern VCHIQ_STATUS_T vchiq_queue_bulk_receive(VCHIQ_SERVICE_HANDLE_T service,
--	void *data, unsigned int size, void *userdata);
--extern VCHIQ_STATUS_T vchiq_queue_bulk_transmit_handle(
--	VCHIQ_SERVICE_HANDLE_T service, VCHI_MEM_HANDLE_T handle,
--	const void *offset, unsigned int size, void *userdata);
--extern VCHIQ_STATUS_T vchiq_queue_bulk_receive_handle(
--	VCHIQ_SERVICE_HANDLE_T service, VCHI_MEM_HANDLE_T handle,
--	void *offset, unsigned int size, void *userdata);
- extern VCHIQ_STATUS_T vchiq_bulk_transmit(VCHIQ_SERVICE_HANDLE_T service,
- 	const void *data, unsigned int size, void *userdata,
- 	VCHIQ_BULK_MODE_T mode);
+ 	g_fragments_size = 2 * g_cache_line_size;
+ 
+ 	/* Allocate space for the channels in coherent memory */
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
+index a6c5f7cc78f0..bec411061554 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_pagelist.h
+@@ -34,7 +34,6 @@
+ #ifndef VCHIQ_PAGELIST_H
+ #define VCHIQ_PAGELIST_H
+ 
+-#define CACHE_LINE_SIZE 32
+ #define PAGELIST_WRITE 0
+ #define PAGELIST_READ 1
+ #define PAGELIST_READ_WITH_FRAGMENTS 2
 -- 
 2.16.2
