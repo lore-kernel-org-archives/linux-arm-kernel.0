@@ -1,35 +1,31 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri,  9 Mar 2018 16:43:51 +0800
-Subject: [RESEND PATCH v4 4/4] ARM: rockchip: Set name of regmap_config
-In-Reply-To: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
-References: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180309084351.32009-5-jeffy.chen@rock-chips.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Fri, 09 Mar 2018 16:45:48 +0800
+Subject: [PATCH v4 0/4] Set name of regmap_config
+In-Reply-To: <20180309081603.4u5pgwwsfxernodm@dell>
+References: <20180309015146.8297-1-jeffy.chen@rock-chips.com>
+ <20180309081603.4u5pgwwsfxernodm@dell>
+Message-ID: <5AA249BC.6020705@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now allowing to register debugfs without a valid device, and not
-having a valid name will end up using "dummy*" to create debugfs dir.
+Hi Lee,
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Thanks for your reply.
 
-Changes in v4: None
-Changes in v3: None
+On 03/09/2018 04:16 PM, Lee Jones wrote:
+>> >
+>> >Jeffy Chen (4):
+>> >   mfd: syscon: Set name of regmap_config
+>> >   rtc: at91sam9: Set name of regmap_config
+>> >   clk: lpc32xx: Set name of regmap_config
+>> >   ARM: rockchip: Set name of regmap_config
+>> >
+>> >  arch/arm/mach-rockchip/platsmp.c | 1 +
+>> >  drivers/clk/nxp/clk-lpc32xx.c    | 1 +
+>> >  drivers/mfd/syscon.c             | 1 +
+> It's difficult to review, since we cannot see what's happening with
+> the rest of the patch set.  Would you mind re-sending the whole set to
+> all parties please?
+sure, i can do that :)
 
- arch/arm/mach-rockchip/platsmp.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index ecec340ca345..51984a40b097 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -208,6 +208,7 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
- }
- 
- static const struct regmap_config rockchip_pmu_regmap_config = {
-+	.name = "rockchip-pmu",
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
--- 
-2.11.0
+>
