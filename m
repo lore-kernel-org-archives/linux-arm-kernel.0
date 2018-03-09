@@ -1,35 +1,30 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri,  9 Mar 2018 11:14:43 +0100
-Subject: [PATCH 7/9] ARM: dts: sun5i: Use video-engine node
+Date: Fri,  9 Mar 2018 11:14:44 +0100
+Subject: [PATCH 8/9] ARM: dts: sun8i: add video engine support for A33
 In-Reply-To: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
 References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
-Message-ID: <20180309101445.16190-5-paul.kocialkowski@bootlin.com>
+Message-ID: <20180309101445.16190-6-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florent Revest <florent.revest@free-electrons.com>
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Now that we have a driver matching "allwinner,sun4i-a10-video-engine" we
-can load it.
+A33 has a video engine just like the one in A10.
 
-The "video-engine" node depends on the new sunxi-ng's CCU clock and
-reset bindings. This patch also includes a ve_reserved DMA pool for
-videobuf2 buffer allocations in sunxi-cedrus.
+Add the support for it in the device tree.
 
-Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
-[Icenowy: beautify the node name]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/sun8i-a33.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 4e830f5cb7f1..18bc8d739cd0 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -51,6 +51,19 @@
- / {
- 	interrupt-parent = <&intc>;
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 50eb84fa246a..253a71851b77 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -181,6 +181,21 @@
+ 		reg = <0x40000000 0x80000000>;
+ 	};
  
 +	reserved-memory {
 +		#address-cells = <1>;
@@ -38,38 +33,54 @@ index 4e830f5cb7f1..18bc8d739cd0 100644
 +
 +		ve_reserved: cma {
 +			compatible = "shared-dma-pool";
-+			reg = <0x43d00000 0x9000000>;
 +			no-map;
++			size = <0x4000000>;
++			alignment = <0x2000>;
++			alloc-ranges = <0x40000000 0x10000000>;
 +			linux,cma-default;
 +		};
 +	};
 +
- 	thermal-zones {
- 		cpu_thermal {
- 			/* milliseconds */
-@@ -97,6 +110,23 @@
- 			status = "disabled";
+ 	sound: sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "sun8i-a33-audio";
+@@ -204,6 +219,11 @@
+ 	};
+ 
+ 	soc at 1c00000 {
++		syscon: system-controller at 01c00000 {
++			compatible = "allwinner,sun8i-a33-syscon", "syscon";
++			reg = <0x01c00000 0x1000>;
++		};
++
+ 		tcon0: lcd-controller at 1c0c000 {
+ 			compatible = "allwinner,sun8i-a33-tcon";
+ 			reg = <0x01c0c000 0x1000>;
+@@ -240,6 +260,25 @@
+ 			};
  		};
  
 +		ve: video-engine at 01c0e000 {
 +			compatible = "allwinner,sun4i-a10-video-engine";
 +			memory-region = <&ve_reserved>;
++			syscon = <&syscon>;
 +
-+			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
++			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
 +				 <&ccu CLK_DRAM_VE>;
 +			clock-names = "ahb", "mod", "ram";
 +
 +			assigned-clocks = <&ccu CLK_VE>;
 +			assigned-clock-rates = <320000000>;
 +
-+			resets = <&ccu RST_VE>;
++			resets = <&ccu RST_BUS_VE>;
 +
-+			interrupts = <53>;
++			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
 +
 +			reg = <0x01c0e000 0x1000>;
 +		};
- 	};
- };
- 
++
+ 		crypto: crypto-engine at 1c15000 {
+ 			compatible = "allwinner,sun4i-a10-crypto";
+ 			reg = <0x01c15000 0x1000>;
 -- 
 2.16.2
