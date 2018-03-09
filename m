@@ -1,71 +1,107 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:04 +0100
-Subject: [PATCH v5 13/36] drm/bridge: analogix_dp: Ensure edp is disabled when
- shutting down the panel
+Date: Fri,  9 Mar 2018 23:22:53 +0100
+Subject: [PATCH v5 02/36] drm/rockchip: Remove analogix psr worker
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-14-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-3-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+From: Sean Paul <seanpaul@chromium.org>
 
-When panel is shut down, we should make sure edp can be disabled to avoid
-undefined behavior.
+Now that the spinlocks and timers are gone, we can remove the psr
+worker located in rockchip's analogix driver and do the enable/disable
+directly. This should simplify the code and remove races on disable.
 
+Cc: ?? ? <wzz@rock-chips.com>
 Cc: St?phane Marchesin <marcheu@chromium.org>
-Signed-off-by: Lin Huang <hl@rock-chips.com>
-Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 31 ++-----------------------
+ 1 file changed, 2 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 92fb9a072cb6..3a222e7e46ee 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -1160,6 +1160,12 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 7d76ff47028d..36334839a3f8 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -71,10 +71,6 @@ struct rockchip_dp_device {
+ 	struct regmap            *grf;
+ 	struct reset_control     *rst;
  
- 	pm_runtime_get_sync(dp->dev);
+-	struct work_struct	 psr_work;
+-	struct mutex             psr_lock;
+-	unsigned int             psr_state;
+-
+ 	const struct rockchip_dp_chip_data *data;
  
-+	ret = clk_prepare_enable(dp->clock);
-+	if (ret < 0) {
-+		DRM_ERROR("Failed to prepare_enable the clock clk [%d]\n", ret);
-+		goto out_dp_clk_pre;
-+	}
-+
- 	if (dp->plat_data->power_on)
- 		dp->plat_data->power_on(dp->plat_data);
+ 	struct analogix_dp_device *adp;
+@@ -84,28 +80,13 @@ struct rockchip_dp_device {
+ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ {
+ 	struct rockchip_dp_device *dp = to_dp(encoder);
++	int ret;
  
-@@ -1191,6 +1197,8 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
- 	phy_power_off(dp->phy);
- 	if (dp->plat_data->power_off)
- 		dp->plat_data->power_off(dp->plat_data);
-+	clk_disable_unprepare(dp->clock);
-+out_dp_clk_pre:
- 	pm_runtime_put_sync(dp->dev);
+ 	if (!analogix_dp_psr_supported(dp->adp))
+ 		return;
  
- 	return ret;
-@@ -1233,11 +1241,14 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+ 	DRM_DEV_DEBUG(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+ 
+-	mutex_lock(&dp->psr_lock);
+-	if (enabled)
+-		dp->psr_state = EDP_VSC_PSR_STATE_ACTIVE;
+-	else
+-		dp->psr_state = ~EDP_VSC_PSR_STATE_ACTIVE;
+-
+-	schedule_work(&dp->psr_work);
+-	mutex_unlock(&dp->psr_lock);
+-}
+-
+-static void analogix_dp_psr_work(struct work_struct *work)
+-{
+-	struct rockchip_dp_device *dp =
+-				container_of(work, typeof(*dp), psr_work);
+-	int ret;
+-
+ 	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
+ 					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+ 	if (ret) {
+@@ -113,12 +94,10 @@ static void analogix_dp_psr_work(struct work_struct *work)
+ 		return;
  	}
  
- 	disable_irq(dp->irq);
-+	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
- 	phy_power_off(dp->phy);
+-	mutex_lock(&dp->psr_lock);
+-	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
++	if (enabled)
+ 		analogix_dp_enable_psr(dp->adp);
+ 	else
+ 		analogix_dp_disable_psr(dp->adp);
+-	mutex_unlock(&dp->psr_lock);
+ }
  
- 	if (dp->plat_data->power_off)
- 		dp->plat_data->power_off(dp->plat_data);
+ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
+@@ -135,8 +114,6 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
+ 	struct rockchip_dp_device *dp = to_dp(plat_data);
+ 	int ret;
  
-+	clk_disable_unprepare(dp->clock);
-+
- 	pm_runtime_put_sync(dp->dev);
+-	cancel_work_sync(&dp->psr_work);
+-
+ 	ret = clk_prepare_enable(dp->pclk);
+ 	if (ret < 0) {
+ 		DRM_DEV_ERROR(dp->dev, "failed to enable pclk %d\n", ret);
+@@ -355,10 +332,6 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	dp->plat_data.power_off = rockchip_dp_powerdown;
+ 	dp->plat_data.get_modes = rockchip_dp_get_modes;
  
- 	ret = analogix_dp_prepare_panel(dp, false, true);
+-	mutex_init(&dp->psr_lock);
+-	dp->psr_state = ~EDP_VSC_PSR_STATE_ACTIVE;
+-	INIT_WORK(&dp->psr_work, analogix_dp_psr_work);
+-
+ 	ret = rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
+ 	if (ret < 0)
+ 		goto err_cleanup_encoder;
 -- 
 2.16.1
