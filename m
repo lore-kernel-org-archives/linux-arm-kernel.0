@@ -1,71 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 9 Mar 2018 16:16:58 +0100
-Subject: [RFC PATCH 0/6] arm64: untag user pointers passed to the kernel
-In-Reply-To: <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
-Message-ID: <CAMuHMdWtdYAVOvR=gffVu0T1vzEcKM4pqxRc6zWr=k3PykgwiA@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 9 Mar 2018 23:18:53 +0800
+Subject: [PATCH 0/2] hwrng: omap: Fix clock resource for Armada 7K/8K
+In-Reply-To: <20180228142723.11562-1-gregory.clement@bootlin.com>
+References: <20180228142723.11562-1-gregory.clement@bootlin.com>
+Message-ID: <20180309151853.GF13567@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 3:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Mar 09, 2018 at 03:01:58PM +0100, Andrey Konovalov wrote:
->> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
->> tags into the top byte of each pointer. Userspace programs (such as
->> HWASan, a memory debugging tool [1]) might use this feature and pass
->> tagged user pointers to the kernel through syscalls or other interfaces.
->>
->> This patch makes a few of the kernel interfaces accept tagged user
->> pointers. The kernel is already able to handle user faults with tagged
->> pointers and has the untagged_addr macro, which this patchset reuses.
->>
->> We're not trying to cover all possible ways the kernel accepts user
->> pointers in one patchset, so this one should be considered as a start.
->> It would be nice to learn about the interfaces that I missed though.
->
-> There are many ways that user pointers can be passed to the kernel, and
-> I'm not sure that it's feasible to catch them all, especially as user
-> pointers are often passed in data structures (e.g. iovecs) rather than
-> direct syscall arguments.
->
-> If we *really* want the kernel to support taking tagged addresses, anything
-> with a __user annotation (or cast to something with a __user annotation)
-> requires tag removal somewhere in the kernel.
->
-> It looks like there are plenty uapi structures and syscalls to look at:
->
-> [mark at lakrids:~/src/linux]% git grep __user -- include/uapi | wc -l
-> 216
-> [mark at lakrids:~/src/linux]% git grep __user | grep SYSCALL_DEFINE | wc -l
-> 308
->
-> ... in addition to special syscalls like ioctl which multiplex a number
-> of operations with different arguments, where the tag stripping would
-> have to occur elsewhere (e.g. in particular drivers).
+On Wed, Feb 28, 2018 at 03:27:21PM +0100, Gregory CLEMENT wrote:
+> Hi,
+> 
+> This short series fixes the way the clocks are used for the SafeXcel
+> IP-76 controller embedded in the Marvell Armada 7K/8K SoCs. On these
+> SoCs a second one is needed in order to clock the registers. It was
+> not noticed until now because we relied on the bootloader and also
+> because the clock driver was wrong.
+> 
+> Thanks to this fix, it would be possible to fix the clock driver
+> without introducing a regression.
+> 
+> The first patch is just a small cleanup found when I wrote the main
+> patch.
+> 
+> Gregory CLEMENT (2):
+>   hwrng: omap - Remove useless test before clk_disable_unprepare
+>   hwrng: omap - Fix clock resource by adding a register clock
+> 
+>  Documentation/devicetree/bindings/rng/omap_rng.txt |  7 ++++++-
+>  drivers/char/hw_random/omap-rng.c                  | 22 ++++++++++++++++++----
+>  2 files changed, 24 insertions(+), 5 deletions(-)
 
-Hence we definitely need good support from e.g. sparse to catch any errors
-from happening.
-
-So doing assignments to the same pointer variable like
-
-     addr = untagged_addr(addr);
-
-defeats any checking.
-
-> I also wonder if we ever write any of these pointers back to userspace
-> memory. If so, we have a nasty ABI problem, since we'll have to marshal
-> the original tag along with the pointer, to ensure userspace pointer
-> comparisons continue to work.
-
-Oh, another can of worms...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
