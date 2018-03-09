@@ -1,45 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 9 Mar 2018 15:07:51 +0300
-Subject: [PATCH 2/3] arm64: dts: renesas: condor: add SCIF0 pins
-In-Reply-To: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
-References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
-Message-ID: <7d9d311f-7e0f-aea5-d7c4-afe1995c6f7f@cogentembedded.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Mar 2018 13:08:31 +0100
+Subject: [PATCH 1/2] arm64: defconfig: Enable CONFIG_ARM_TEGRA186_CPUFREQ
+In-Reply-To: <20171116114652.25321-1-mperttunen@nvidia.com>
+References: <20171116114652.25321-1-mperttunen@nvidia.com>
+Message-ID: <20180309120831.GA18609@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the (previously omitted) SCIF0 pin data to the Condor board's
-device tree.
+On Thu, Nov 16, 2017 at 01:46:51PM +0200, Mikko Perttunen wrote:
+> Enable Tegra186 CPU frequency scaling support by default.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Both patches applied, thanks.
 
----
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -49,7 +49,22 @@
- 	clock-frequency = <32768>;
- };
- 
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data";
-+		function = "scif0";
-+	};
-+
-+	scif_clk_pins: scif_clk {
-+		groups = "scif_clk_b";
-+		function = "scif_clk";
-+	};
-+};
-+
- &scif0 {
-+	pinctrl-0 = <&scif0_pins>, <&scif_clk_pins>;
-+	pinctrl-names = "default";
-+
- 	status = "okay";
- };
- 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/57666a4c/attachment-0001.sig>
