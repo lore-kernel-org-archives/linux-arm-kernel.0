@@ -1,128 +1,145 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:22:55 +0100
-Subject: [PATCH v5 04/36] drm/rockchip: add mutex vop lock
+Date: Fri,  9 Mar 2018 23:22:52 +0100
+Subject: [PATCH v5 01/36] drm/bridge: analogix_dp: detect Sink PSR state after
+ configuring the PSR
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-5-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Yakir Yang <ykk@rock-chips.com>
 
-Add a lock to vop to avoid disabling the crtc while waiting for a line
-flag while enabling psr. If we disable in the middle of waiting for the
-line flag, we'll end up timing out or worse.
+Make sure the request PSR state takes effect in analogix_dp_send_psr_spd()
+function, or print the sink PSR error state if we failed to apply the
+requested PSR setting.
 
-Signed-off-by: zain wang <wzz@rock-chips.com>
+Cc: ?? ? <wzz@rock-chips.com>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+[seanpaul changed timeout loop to a readx poll]
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 30 +++++++++++++++++++++++------
- 1 file changed, 24 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  6 ++--
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  6 ++--
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 35 +++++++++++++++++++---
+ 3 files changed, 37 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 158e79e5062e..b601c59e76a8 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -117,6 +117,8 @@ struct vop {
- 	spinlock_t reg_lock;
- 	/* lock vop irq reg */
- 	spinlock_t irq_lock;
-+	/* protects crtc enable/disable */
-+	struct mutex vop_lock;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index a693ab3078f0..e738aa6de1af 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -122,8 +122,7 @@ int analogix_dp_enable_psr(struct analogix_dp_device *dp)
+ 	psr_vsc.DB0 = 0;
+ 	psr_vsc.DB1 = EDP_VSC_PSR_STATE_ACTIVE | EDP_VSC_PSR_CRC_VALUES_VALID;
  
- 	unsigned int irq;
- 
-@@ -569,6 +571,7 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
- 
- 	WARN_ON(vop->event);
- 
-+	mutex_lock(&vop->vop_lock);
- 	drm_crtc_vblank_off(crtc);
- 
- 	/*
-@@ -604,6 +607,7 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
- 	clk_disable(vop->aclk);
- 	clk_disable(vop->hclk);
- 	pm_runtime_put(vop->dev);
-+	mutex_unlock(&vop->vop_lock);
- 
- 	if (crtc->state->event && !crtc->state->active) {
- 		spin_lock_irq(&crtc->dev->event_lock);
-@@ -868,10 +872,13 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
- 	uint32_t pin_pol, val;
- 	int ret;
- 
-+	mutex_lock(&vop->vop_lock);
-+
- 	WARN_ON(vop->event);
- 
- 	ret = vop_enable(crtc);
- 	if (ret) {
-+		mutex_unlock(&vop->vop_lock);
- 		DRM_DEV_ERROR(vop->dev, "Failed to enable vop (%d)\n", ret);
- 		return;
- 	}
-@@ -935,6 +942,7 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
- 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
- 
- 	VOP_REG_SET(vop, common, standby, 0);
-+	mutex_unlock(&vop->vop_lock);
- }
- 
- static bool vop_fs_irq_is_pending(struct vop *vop)
-@@ -1473,15 +1481,21 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
- {
- 	struct vop *vop = to_vop(crtc);
- 	unsigned long jiffies_left;
-+	int ret = 0;
- 
- 	if (!crtc || !vop->is_enabled)
- 		return -ENODEV;
- 
--	if (mstimeout <= 0)
--		return -EINVAL;
-+	mutex_lock(&vop->vop_lock);
-+	if (mstimeout <= 0) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
- 
--	if (vop_line_flag_irq_is_enabled(vop))
--		return -EBUSY;
-+	if (vop_line_flag_irq_is_enabled(vop)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
- 
- 	reinit_completion(&vop->line_flag_completion);
- 	vop_line_flag_irq_enable(vop);
-@@ -1492,10 +1506,13 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
- 
- 	if (jiffies_left == 0) {
- 		DRM_DEV_ERROR(vop->dev, "Timeout waiting for IRQ\n");
--		return -ETIMEDOUT;
-+		ret = -ETIMEDOUT;
-+		goto out;
- 	}
- 
+-	analogix_dp_send_psr_spd(dp, &psr_vsc);
 -	return 0;
-+out:
-+	mutex_unlock(&vop->vop_lock);
-+	return ret;
++	return analogix_dp_send_psr_spd(dp, &psr_vsc);
  }
- EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
+ EXPORT_SYMBOL_GPL(analogix_dp_enable_psr);
  
-@@ -1545,6 +1562,7 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+@@ -149,8 +148,7 @@ int analogix_dp_disable_psr(struct analogix_dp_device *dp)
+ 	if (ret != 1)
+ 		dev_err(dp->dev, "Failed to set DP Power0 %d\n", ret);
  
- 	spin_lock_init(&vop->reg_lock);
- 	spin_lock_init(&vop->irq_lock);
-+	mutex_init(&vop->vop_lock);
+-	analogix_dp_send_psr_spd(dp, &psr_vsc);
+-	return 0;
++	return analogix_dp_send_psr_spd(dp, &psr_vsc);
+ }
+ EXPORT_SYMBOL_GPL(analogix_dp_disable_psr);
  
- 	ret = devm_request_irq(dev, vop->irq, vop_isr,
- 			       IRQF_SHARED, dev_name(dev), vop);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index 5c6a28806129..b039b28d8fcc 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -20,6 +20,8 @@
+ #define MAX_CR_LOOP 5
+ #define MAX_EQ_LOOP 5
+ 
++#define DP_TIMEOUT_PSR_LOOP_MS			300
++
+ /* DP_MAX_LANE_COUNT */
+ #define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
+ #define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
+@@ -247,8 +249,8 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp);
+ void analogix_dp_enable_scrambling(struct analogix_dp_device *dp);
+ void analogix_dp_disable_scrambling(struct analogix_dp_device *dp);
+ void analogix_dp_enable_psr_crc(struct analogix_dp_device *dp);
+-void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+-			      struct edp_vsc_psr *vsc);
++int analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
++			     struct edp_vsc_psr *vsc);
+ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 			     struct drm_dp_aux_msg *msg);
+ 
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index 303083ad28e3..005a3f7005d2 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -10,10 +10,11 @@
+  * option) any later version.
+  */
+ 
+-#include <linux/device.h>
+-#include <linux/io.h>
+ #include <linux/delay.h>
++#include <linux/device.h>
+ #include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
+ 
+ #include <drm/bridge/analogix_dp.h>
+ 
+@@ -992,10 +993,25 @@ void analogix_dp_enable_psr_crc(struct analogix_dp_device *dp)
+ 	writel(PSR_VID_CRC_ENABLE, dp->reg_base + ANALOGIX_DP_CRC_CON);
+ }
+ 
+-void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+-			      struct edp_vsc_psr *vsc)
++static ssize_t analogix_dp_get_psr_status(struct analogix_dp_device *dp)
++{
++	ssize_t val;
++	u8 status;
++
++	val = drm_dp_dpcd_readb(&dp->aux, DP_PSR_STATUS, &status);
++	if (val < 0) {
++		dev_err(dp->dev, "PSR_STATUS read failed ret=%zd", val);
++		return val;
++	}
++	return status;
++}
++
++int analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
++			     struct edp_vsc_psr *vsc)
+ {
+ 	unsigned int val;
++	int ret;
++	ssize_t psr_status;
+ 
+ 	/* don't send info frame */
+ 	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+@@ -1036,6 +1052,17 @@ void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+ 	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+ 	val |= IF_EN;
+ 	writel(val, dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
++
++	ret = readx_poll_timeout(analogix_dp_get_psr_status, dp, psr_status,
++		psr_status >= 0 &&
++		((vsc->DB1 && psr_status == DP_PSR_SINK_ACTIVE_RFB) ||
++		(!vsc->DB1 && psr_status == DP_PSR_SINK_INACTIVE)), 1500,
++		DP_TIMEOUT_PSR_LOOP_MS * 1000);
++	if (ret) {
++		dev_warn(dp->dev, "Failed to apply PSR %d\n", ret);
++		return ret;
++	}
++	return 0;
+ }
+ 
+ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
 -- 
 2.16.1
