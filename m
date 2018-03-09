@@ -1,159 +1,155 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:10 +0800
-Subject: [PATCH 27/39] ARM: 8478/2: arm/arm64: add arm-smccc
+Date: Fri,  9 Mar 2018 17:07:02 +0800
+Subject: [PATCH 19/39] arm64: prefetch: add alternative pattern for CPUs
+ without a prefetcher
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-28-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-20-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jens Wiklander <jens.wiklander@linaro.org>
+From: Will Deacon <will.deacon@arm.com>
 
-commit 98dd64f34f47ce19b388d9015f767f48393a81eb upstream.
+Most CPUs have a hardware prefetcher which generally performs better
+without explicit prefetch instructions issued by software, however
+some CPUs (e.g. Cavium ThunderX) rely solely on explicit prefetch
+instructions.
 
-Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
-CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
-SMC or HVC instruction. It's the responsibility of the caller to know if
-the SMC instruction is supported by the platform.
+This patch adds an alternative pattern (ARM64_HAS_NO_HW_PREFETCH) to
+allow our library code to make use of explicit prefetch instructions
+during things like copy routines only when the CPU does not have the
+capability to perform the prefetching itself.
 
-This patch doesn't provide an implementation of the declared functions.
-Later patches will bring in implementations and set
-CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Alex Shi <alex.shi@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/firmware/Kconfig  |   3 ++
- include/linux/arm-smccc.h | 105 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
- create mode 100644 include/linux/arm-smccc.h
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/include/asm/cputype.h    | 17 ++++++++++++++++-
+ arch/arm64/kernel/cpu_errata.c      | 18 +++---------------
+ arch/arm64/kernel/cpufeature.c      | 17 +++++++++++++++++
+ 4 files changed, 38 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index cf478fe6b335..49a3a1185bb6 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -173,6 +173,9 @@ config QCOM_SCM_64
- 	def_bool y
- 	depends on QCOM_SCM && ARM64
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index ede73d2c09a4..77dd88f0d1fc 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -32,8 +32,9 @@
+ #define ARM64_WORKAROUND_834220			7
+ #define ARM64_WORKAROUND_CAVIUM_27456		8
+ #define ARM64_HARDEN_BRANCH_PREDICTOR		9
++#define ARM64_HAS_NO_HW_PREFETCH		10
  
-+config HAVE_ARM_SMCCC
-+	bool
+-#define ARM64_NCAPS				10
++#define ARM64_NCAPS				11
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 1a5949364ed0..7540284a17fe 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -57,11 +57,22 @@
+ #define MIDR_IMPLEMENTOR(midr)	\
+ 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+ 
+-#define MIDR_CPU_PART(imp, partnum) \
++#define MIDR_CPU_MODEL(imp, partnum) \
+ 	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
+ 	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
+ 	((partnum)		<< MIDR_PARTNUM_SHIFT))
+ 
++#define MIDR_CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
++			     MIDR_ARCHITECTURE_MASK)
 +
- source "drivers/firmware/broadcom/Kconfig"
- source "drivers/firmware/google/Kconfig"
- source "drivers/firmware/efi/Kconfig"
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-new file mode 100644
-index 000000000000..632dbb45a110
---- /dev/null
-+++ b/include/linux/arm-smccc.h
-@@ -0,0 +1,105 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#ifndef __LINUX_ARM_SMCCC_H
-+#define __LINUX_ARM_SMCCC_H
++#define MIDR_IS_CPU_MODEL_RANGE(midr, model, rv_min, rv_max)		\
++({									\
++	u32 _model = (midr) & MIDR_CPU_MODEL_MASK;			\
++	u32 rv = (midr) & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK);	\
++									\
++	_model == (model) && rv >= (rv_min) && rv <= (rv_max);		\
++ })
 +
-+/*
-+ * This file provides common defines for ARM SMC Calling Convention as
-+ * specified in
-+ * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-+ */
+ #define ARM_CPU_IMP_ARM			0x41
+ #define ARM_CPU_IMP_APM			0x50
+ #define ARM_CPU_IMP_CAVIUM		0x43
+@@ -75,6 +86,10 @@
+ 
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
+ 
++#define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
++#define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
 +
-+#define ARM_SMCCC_STD_CALL		0
-+#define ARM_SMCCC_FAST_CALL		1
-+#define ARM_SMCCC_TYPE_SHIFT		31
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 0d3ea874133d..b84a93e8c8bd 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -21,24 +21,12 @@
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
+ 
+-#define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+-#define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+-#define MIDR_THUNDERX	MIDR_CPU_PART(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+-
+-#define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
+-			MIDR_ARCHITECTURE_MASK)
+-
+ static bool __maybe_unused
+ is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
+ {
+-	u32 midr = read_cpuid_id();
+-
+-	if ((midr & CPU_MODEL_MASK) != entry->midr_model)
+-		return false;
+-
+-	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
+-
+-	return (midr >= entry->midr_range_min && midr <= entry->midr_range_max);
++	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
++				       entry->midr_range_min,
++				       entry->midr_range_max);
+ }
+ 
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 8488a829e24e..2cf2f799455a 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -624,6 +624,18 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
+ 	return has_sre;
+ }
+ 
++static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry)
++{
++	u32 midr = read_cpuid_id();
++	u32 rv_min, rv_max;
 +
-+#define ARM_SMCCC_SMC_32		0
-+#define ARM_SMCCC_SMC_64		1
-+#define ARM_SMCCC_CALL_CONV_SHIFT	30
++	/* Cavium ThunderX pass 1.x and 2.x */
++	rv_min = 0;
++	rv_max = (1 << MIDR_VARIANT_SHIFT) | MIDR_REVISION_MASK;
 +
-+#define ARM_SMCCC_OWNER_MASK		0x3F
-+#define ARM_SMCCC_OWNER_SHIFT		24
++	return MIDR_IS_CPU_MODEL_RANGE(midr, MIDR_THUNDERX, rv_min, rv_max);
++}
 +
-+#define ARM_SMCCC_FUNC_MASK		0xFFFF
-+
-+#define ARM_SMCCC_IS_FAST_CALL(smc_val)	\
-+	((smc_val) & (ARM_SMCCC_FAST_CALL << ARM_SMCCC_TYPE_SHIFT))
-+#define ARM_SMCCC_IS_64(smc_val) \
-+	((smc_val) & (ARM_SMCCC_SMC_64 << ARM_SMCCC_CALL_CONV_SHIFT))
-+#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
-+#define ARM_SMCCC_OWNER_NUM(smc_val) \
-+	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
-+
-+#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
-+	(((type) << ARM_SMCCC_TYPE_SHIFT) | \
-+	((calling_convention) << ARM_SMCCC_CALL_CONV_SHIFT) | \
-+	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
-+	((func_num) & ARM_SMCCC_FUNC_MASK))
-+
-+#define ARM_SMCCC_OWNER_ARCH		0
-+#define ARM_SMCCC_OWNER_CPU		1
-+#define ARM_SMCCC_OWNER_SIP		2
-+#define ARM_SMCCC_OWNER_OEM		3
-+#define ARM_SMCCC_OWNER_STANDARD	4
-+#define ARM_SMCCC_OWNER_TRUSTED_APP	48
-+#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
-+#define ARM_SMCCC_OWNER_TRUSTED_OS	50
-+#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
-+
-+#ifndef __ASSEMBLY__
-+#include <linux/linkage.h>
-+#include <linux/types.h>
-+/**
-+ * struct arm_smccc_res - Result from SMC/HVC call
-+ * @a0-a3 result values from registers 0 to 3
-+ */
-+struct arm_smccc_res {
-+	unsigned long a0;
-+	unsigned long a1;
-+	unsigned long a2;
-+	unsigned long a3;
-+};
-+
-+/**
-+ * arm_smccc_smc() - make SMC calls
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This function is used to make SMC calls following SMC Calling Convention.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the SMC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the SMC instruction.
-+ */
-+asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
-+			unsigned long a2, unsigned long a3, unsigned long a4,
-+			unsigned long a5, unsigned long a6, unsigned long a7,
-+			struct arm_smccc_res *res);
-+
-+/**
-+ * arm_smccc_hvc() - make HVC calls
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This function is used to make HVC calls following SMC Calling
-+ * Convention.  The content of the supplied param are copied to registers 0
-+ * to 7 prior to the HVC instruction. The return values are updated with
-+ * the content from register 0 to 3 on return from the HVC instruction.
-+ */
-+asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
-+			unsigned long a2, unsigned long a3, unsigned long a4,
-+			unsigned long a5, unsigned long a6, unsigned long a7,
-+			struct arm_smccc_res *res);
-+
-+#endif /*__ASSEMBLY__*/
-+#endif /*__LINUX_ARM_SMCCC_H*/
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -654,6 +666,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++	{
++		.desc = "Software prefetching using PRFM",
++		.capability = ARM64_HAS_NO_HW_PREFETCH,
++		.matches = has_no_hw_prefetch,
++	},
+ 	{},
+ };
+ 
 -- 
 2.16.2.440.gc6284da
