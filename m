@@ -1,205 +1,142 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 9 Mar 2018 09:58:14 +0100
-Subject: [PATCH] arm: dts: nes: add Nintendo NES Classic Edition support
-In-Reply-To: <20180309082656.kglipdyu3knfq4ga@flea.lan>
-References: <20180307164336.32359-1-miquel.raynal@bootlin.com>
- <20180309082656.kglipdyu3knfq4ga@flea.lan>
-Message-ID: <20180309095814.5ea40afe@xps13>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Fri, 09 Mar 2018 11:04:58 +0200
+Subject: [PATCH 2/4] usb: dwc3: add dwc3 glue layer for UniPhier SoCs
+In-Reply-To: <CAK7LNARE0YT8HQ-shz=Kg9eaB0pZzaefoqMe-ZnE=eqSQWFp-w@mail.gmail.com>
+References: <1516712454-2915-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <87o9lklnwb.fsf@linux.intel.com> <20180124215228.ED43.4A936039@socionext.com>
+ <87a7x3l8gr.fsf@linux.intel.com>
+ <CAK7LNARE0YT8HQ-shz=Kg9eaB0pZzaefoqMe-ZnE=eqSQWFp-w@mail.gmail.com>
+Message-ID: <87y3j1aabp.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
 
-On Fri, 9 Mar 2018 09:26:56 +0100, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
+Hi,
 
-> Hi Miquel,
-> 
-> On Wed, Mar 07, 2018 at 05:43:36PM +0100, Miquel Raynal wrote:
-> > The Nintendo NES Classic features an R16 already well supported in
-> > mainline.
-> > 
-> > The console over UART0 may be wired on two ports of the R16, both
-> > available on the NES Classic PCB.
-> > 
-> > USB host can be used after a bit of soldering to wire a 5V power supply
-> > directly on the PCB, in order to free the micro-USB port from that task
-> > and allow the plug of any USB device.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                         |  1 +
-> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 18 ++++++
-> >  .../dts/sun8i-r16-nintendo-nes-classic-edition.dts | 71 ++++++++++++++++++++++
-> >  3 files changed, 90 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index ade7a38543dc..eed4e1222897 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -990,6 +990,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
-> >  	sun8i-h3-orangepi-plus.dtb \
-> >  	sun8i-h3-orangepi-plus2e.dtb \
-> >  	sun8i-r16-bananapi-m2m.dtb \
-> > +	sun8i-r16-nintendo-nes-classic-edition.dtb \
-> >  	sun8i-r16-parrot.dtb \
-> >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> >  	sun8i-v3s-licheepi-zero.dtb \
-> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > index 971f9be699a7..1ad7291581be 100644
-> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > @@ -315,6 +315,24 @@
-> >  				bias-pull-up;
-> >  			};
-> >  
-> > +			nand_pins_a: nand-base0 at 0 {
-> > +				pins = "PC0", "PC1", "PC2",
-> > +				       "PC5", "PC8", "PC9", "PC10",
-> > +				       "PC11", "PC12", "PC13", "PC14",
-> > +				       "PC15";
+Masahiro Yamada <yamada.masahiro@socionext.com> writes:
+>>>> > +static void dwc3u_reset_init(struct dwc3u_priv *priv)
+>>>> > +{
+>>>> > +  dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
+>>>> > +  usleep_range(1000, 2000);
+>>>> > +  dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, LINK_RESET);
+>>>> > +}
+>>>> > +
+>>>> > +static void dwc3u_reset_clear(struct dwc3u_priv *priv)
+>>>> > +{
+>>>> > +  dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
+>>>> > +}
+>>>>
+>>>> drivers/reset ?
+>>>
+>>> The reset driver manages "sysctrl" IO map area in our SoC.
+>>>
+>>> RESET_CTL register belongs to "dwc3-glue" IO map area,
+>>> and the kernel can't access this area until enabling usb clocks and
+>>> deasserting usb resets in "sysctrl".
+>>>
+>>> I think that "dwc3-glue" register control should be separated from
+>>> "sysctrl".
+>>
+>> Just split your address space and treat your glue as a device with
+>> several children:
+>>
+>> glue at 65b00000 {
+>>         compatible = "foo"
+>>
+>>         phy at bar {
+>>                 ...
+>>         };
+>>
+>>         sysctrl at baz {
+>>                 ...
+>>         };
+>>
+>>         dwc3 at foo {
+>>                 compatible = "snps, dwc3";
+>>                 ...
+>>         };
+>> };
+>>
+>> Then you know that you can let dwc3/core.c handle the PHY for you. If we
+>> need to teach dwc3/core.c about regulators, we can do that. But we don't
+>> need SoC-specific hacks ;-)
+>>
+>> --
+>> balbi
+>
+>
+> Slightly related question.
+>
+>
+> Why don't we put clocks and resets to dwc3/core.c?
 
-I will change a bit the visual organization.
+We can do that for the simpler platforms, no worries.
 
-> > +				function = "nand0";
-> > +			};
-> > +
-> > +			nand_cs0_pins_a: nand-cs at 0 {
-> > +				pins = "PC4";
-> > +				function = "nand0";
-> > +			};
-> > +
-> > +			nand_rb0_pins_a: nand-rb at 0 {
-> > +				pins = "PC6";
-> > +				function = "nand0";
-> > +			};
-> > +  
-> 
-> This should be in a separate patch.
+> dwc3-of-simple.c only handles clocks and resets.
+> This is generic enough to be added to dwc3/core.c, I think.
+>
+>
+> I checked the two instances of dwc3-of-simple.
+>
+> "qcom,dwc3"
+> https://github.com/torvalds/linux/blob/v4.16-rc3/arch/arm64/boot/dts/qcom/msm8996.dtsi#L780
+>
+> "rockchip,rk3399-dwc3"
+> https://github.com/torvalds/linux/blob/v4.16-rc3/arch/arm64/boot/dts/rockchip/rk3399.dtsi#L395
+>
+>
+> They just contain clocks, resets, and "snps,dwc3" sub-node.
+>
+>
+> If we do that,
+>
+> usb at 7600000 {
+>         compatible = "qcom,dwc3";
+>         clocks = ...;
+>
+>         dwc3 at 7600000 {
+>                 compatible = "snps,dwc3";
+>                 reg = ...;
+>                 interrupts = ...;
+>                 phys = ...;
+>         }
+> };
+>
+>
+> will be turned into
+>
+>
+> dwc3 at 7600000 {
+>         compatible = "qcom,dwc3", "snps,dwc3";
+>         reg = ...;
+>         clocks = ...;
+>         interrupts = ...;
+>         phys = ...;
+> };
+>
+>
+> This looks simpler.
 
-Ok.
+yup. This will only work for the simpler platforms, though. TI platforms
+and PCI-based platforms, this really won't work :-)
 
-> 
-> Also, these will generate dtc warnings.
+> Also, dwc3/core.c and dwc3-of-simple.c
+> duplicate runtime PM.
 
-I will remove the trailing @0.
+they "kinda" duplicate :-) Some platforms have platform-specific clocks
+which are not generic enough to be stuffed into dwc3/core.c. Some of
+those clocks may need special handling of some sorts. It's best to keep
+the option for peculiar clock tree setups available.
 
-> 
-> If there is multiple muxing options, I'd suggest to have the node
-> names be nand-pc-pins, and the label nand_pc_pins. If there's only
-> one, you can drop the pc part.
-
-There is only one, I will name it nand_pins: nand-pins.
-
-For CS and RB pins, there are two of them each time, I will declare
-them all:
-nand_pins_cs0 PC4
-nand_pins_cs1 PC3
-nand_pins_rb0 PC6
-nand_pins_rb1 PC7
-
-> 
-> >  			pwm0_pins: pwm0 {
-> >  				pins = "PH0";
-> >  				function = "pwm0";
-> > diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
-> > new file mode 100644
-> > index 000000000000..63c289f1f46d
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic-edition.dts
-> > @@ -0,0 +1,71 @@
-> > +// SPDX-License-Identifier: GPL-2.0 OR X11
-> > +/* Copyright (c) 2016 FUKAUMI Naoki <naobsd@gmail.com> */
-> > +
-> > +/dts-v1/;
-> > +#include "sun8i-a33.dtsi"
-> > +#include "sunxi-common-regulators.dtsi"
-> > +
-> > +/ {
-> > +	model = "Nintendo NES Classic Edition";
-> > +	compatible = "nintendo,nes-classic-edition", "allwinner,sun8i-a33";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	/*
-> > +	 * UART0 is available on two ports, both accessible on the NES Classic
-> > +	 * PCB. One can use the <&uart0_pins_b> handle instead.
-> > +	 */  
-> 
-> I guess you should mention that the PF pins will also rule out the SD
-> option that might be convenient.
-
-Sure. I will add that port PB and PF can both mux UART0, but PF can
-also be used for the SD card, so PB is preferred (
-> 
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&uart0_pins_a>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&nfc {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
-
-I'll move this in the DTSI also.
-
-> > +	status = "okay";
-> > +
-> > +	/* 2Gb Macronix MX30LF2G18AC (3V) */
-> > +	nand at 0 {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		reg = <0>;
-> > +		allwinner,rb = <0>;
-> > +		nand-ecc-mode = "hw";
-> > +		nand-ecc-strength = <16>;
-> > +		nand-ecc-step-size = <1024>;
-> > +	};
-> > +};
-> > +
-> > +/*
-> > + * The NES is powered by the USB port. However it is possible to solder a wire
-> > + * from the internal side of the connector on VBUS pin to supply the required 5V
-> > + * without the need of a cable plugged in the micro USB port. This way it is
-> > + * easy to use any USB device.
-> > + */
-> > +&usb_otg {
-> > +	dr_mode = "host";
-> > +	status = "okay";
-> > +};  
-> 
-> We want to support the default setup, and not require some hackery to
-> be done. It will thus be some OTG / peripheral mode, most likely with
-> an ID pin somewhere.
-> 
-> Since you tested on a SuperNES Classic, I think you should also create
-> a new DT (possibly include it) with a compatible of its own.
-> 
-> That way, if we ever find some differences, it will be easy to deal
-> with them.
-
-So, what you would prefer is:
-1/ Move this entire DTS but the usb_otg node into a
-"sun8i-r16-nintendo-nes.dtsi"
-2/ Include that DTSI from a
-"sun8i-r16-nintendo-super-nes-classic-edition.dts" that would add the
-usb_otg node as it is above.
-
-Right?
-
-Thanks,
-Miqu?l
+If your platform is simple enough that you can get away without a glue
+layer, sure thing. More power for you :-)
 
 -- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/ad3034ea/attachment-0001.sig>
