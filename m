@@ -1,235 +1,62 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri,  9 Mar 2018 10:43:43 +0530
-Subject: [PATCH v5 7/9] gpio: Add gpio driver for Actions OWL S900 SoC
-In-Reply-To: <20180309051345.1011-1-manivannan.sadhasivam@linaro.org>
-References: <20180309051345.1011-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180309051345.1011-8-manivannan.sadhasivam@linaro.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 9 Mar 2018 07:54:43 +0200
+Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
+In-Reply-To: <CAFLEztT4XJ9QnvLciv62dFCfj-y7Kynd2R8HpVxXeUXObvp3GQ@mail.gmail.com>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+ <20180308120200.wpcjnbglf4x32vrp@tarshish>
+ <CAFLEztTokSaXJuN8Ls0BpAEuFdTC+Viwn6PGxC=TC6vZAs+w3g@mail.gmail.com>
+ <20180309040903.hhkhylvs6q6lvqjy@tarshish>
+ <CAFLEztT4XJ9QnvLciv62dFCfj-y7Kynd2R8HpVxXeUXObvp3GQ@mail.gmail.com>
+Message-ID: <20180309055443.edcj2uvbc2s6bcoy@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
-controlling the gpio shares the same register range with pinctrl block.
+Hi Jacob,
 
-GPIO registers are organized as 6 banks and each bank controls the
-maximum of 32 gpios.
+On Fri, Mar 09, 2018 at 01:05:28PM +0800, Jacob Chen wrote:
+> 2018-03-09 12:09 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
+> > On Fri, Mar 09, 2018 at 08:53:57AM +0800, Jacob Chen wrote:
+> >> 2018-03-08 20:02 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
+> >> > On Thu, Mar 08, 2018 at 05:47:50PM +0800, Jacob Chen wrote:
+> >> >> This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399
+> >> >> SoC.
+> >> >>
+> >> >> Wiki Pages:
+> >> >> http://opensource.rock-chips.com/wiki_Rockchip-isp1
+> >> >>
+> >> >> The deprecated g_mbus_config op is not dropped in  V6 because i am waiting
+> >> >> tomasz's patches.
+> >> >
+> >> > Which tree is this series based on? On top of v4.16-rc4 I get the build
+> >> > failure below. The V4L2_BUF_TYPE_META_OUTPUT macro, for example, is not even
+> >> > in media_tree.git.
+> >>
+> >> This series is based on v4.16-rc4 with below patch.
+> >> https://patchwork.kernel.org/patch/9792001/
+> >
+> > This patch does not apply on v4.16-rc4. I also tried v2 of this patch with the
+> > same result:
+> >
+> >   https://patchwork.linuxtv.org/patch/44682/
+> 
+> It need resolve merge conflict.
+> 
+> > Can you push your series to a public git repo branch?
+> 
+> Sure, I have push it to my github.
+> https://github.com/wzyy2/linux/tree/4.16-rc4
+> 
+> This commit might be a bit of a mess
+> https://github.com/wzyy2/linux/commit/ff68323c4804adc10f64836ea1be172c54a9d6c6
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
----
- drivers/gpio/Kconfig    |   8 +++
- drivers/gpio/Makefile   |   1 +
- drivers/gpio/gpio-owl.c | 172 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 181 insertions(+)
- create mode 100644 drivers/gpio/gpio-owl.c
+Thanks. This is very helpful.
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 8dbb2280538d..75533f55ad0e 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -364,6 +364,14 @@ config GPIO_OMAP
- 	help
- 	  Say yes here to enable GPIO support for TI OMAP SoCs.
- 
-+config GPIO_OWL
-+	tristate "Actions Semi OWL GPIO support"
-+	default ARCH_ACTIONS
-+	depends on ARCH_ACTIONS || COMPILE_TEST
-+	depends on OF_GPIO
-+	help
-+	  Say yes here to enable GPIO support for Actions Semi OWL SoCs.
-+
- config GPIO_PL061
- 	bool "PrimeCell PL061 GPIO support"
- 	depends on ARM_AMBA
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index cccb0d40846c..b2bb11d4675f 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -91,6 +91,7 @@ obj-$(CONFIG_GPIO_MXC)		+= gpio-mxc.o
- obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
- obj-$(CONFIG_GPIO_OCTEON)	+= gpio-octeon.o
- obj-$(CONFIG_GPIO_OMAP)		+= gpio-omap.o
-+obj-$(CONFIG_GPIO_OWL)		+= gpio-owl.o
- obj-$(CONFIG_GPIO_PCA953X)	+= gpio-pca953x.o
- obj-$(CONFIG_GPIO_PCF857X)	+= gpio-pcf857x.o
- obj-$(CONFIG_GPIO_PCH)		+= gpio-pch.o
-diff --git a/drivers/gpio/gpio-owl.c b/drivers/gpio/gpio-owl.c
-new file mode 100644
-index 000000000000..38449586ecc7
---- /dev/null
-+++ b/drivers/gpio/gpio-owl.c
-@@ -0,0 +1,172 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * OWL SoC's GPIO driver
-+ *
-+ * Copyright (c) 2018 Linaro Ltd.
-+ * Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/gpio/driver.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define GPIO_OUTEN	0x0000
-+#define GPIO_INEN	0x0004
-+#define GPIO_DAT	0x0008
-+
-+struct owl_gpio {
-+	struct gpio_chip gpio;
-+	void __iomem *base;
-+};
-+
-+static void owl_gpio_set_reg(void __iomem *base, unsigned int pin, int flag)
-+{
-+	u32 val;
-+
-+	val = readl_relaxed(base);
-+
-+	if (flag)
-+		val |= BIT(pin);
-+	else
-+		val &= ~BIT(pin);
-+
-+	writel_relaxed(val, base);
-+}
-+
-+static int owl_gpio_request(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+
-+	/*
-+	 * GPIOs have higher priority over other modules, so either setting
-+	 * them as OUT or IN is sufficient
-+	 */
-+	owl_gpio_set_reg(gpio->base + GPIO_OUTEN, offset, true);
-+
-+	return 0;
-+}
-+
-+static void owl_gpio_free(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+
-+	/* disable gpio output */
-+	owl_gpio_set_reg(gpio->base + GPIO_OUTEN, offset, false);
-+
-+	/* disable gpio input */
-+	owl_gpio_set_reg(gpio->base + GPIO_INEN, offset, false);
-+}
-+
-+static int owl_gpio_get(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	u32 val;
-+
-+	val = readl_relaxed(gpio->base + GPIO_DAT);
-+
-+	return !!(val & BIT(offset));
-+}
-+
-+static void owl_gpio_set(struct gpio_chip *chip, unsigned int offset, int value)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+	u32 val;
-+
-+	val = readl_relaxed(gpio->base + GPIO_DAT);
-+
-+	if (value)
-+		val |= BIT(offset);
-+	else
-+		val &= ~BIT(offset);
-+
-+	writel_relaxed(val, gpio->base + GPIO_DAT);
-+}
-+
-+static int owl_gpio_direction_input(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+
-+	owl_gpio_set_reg(gpio->base + GPIO_OUTEN, offset, false);
-+	owl_gpio_set_reg(gpio->base + GPIO_INEN, offset, true);
-+
-+	return 0;
-+}
-+
-+static int owl_gpio_direction_output(struct gpio_chip *chip,
-+				unsigned int offset, int value)
-+{
-+	struct owl_gpio *gpio = gpiochip_get_data(chip);
-+
-+	owl_gpio_set_reg(gpio->base + GPIO_INEN, offset, false);
-+	owl_gpio_set_reg(gpio->base + GPIO_OUTEN, offset, true);
-+	owl_gpio_set(chip, offset, value);
-+
-+	return 0;
-+}
-+
-+static int owl_gpio_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct owl_gpio *gpio;
-+	u32 ngpios;
-+	int ret;
-+
-+	gpio = devm_kzalloc(dev, sizeof(*gpio), GFP_KERNEL);
-+	if (!gpio)
-+		return -ENOMEM;
-+
-+	gpio->base = of_iomap(dev->of_node, 0);
-+	if (IS_ERR(gpio->base))
-+		return PTR_ERR(gpio->base);
-+
-+	ret = of_property_read_u32(dev->of_node, "ngpios", &ngpios);
-+	if (ret)
-+		return ret;
-+
-+	gpio->gpio.request = owl_gpio_request;
-+	gpio->gpio.free = owl_gpio_free;
-+	gpio->gpio.get = owl_gpio_get;
-+	gpio->gpio.set = owl_gpio_set;
-+	gpio->gpio.direction_input = owl_gpio_direction_input;
-+	gpio->gpio.direction_output = owl_gpio_direction_output;
-+
-+	gpio->gpio.base = -1;
-+	gpio->gpio.parent = dev;
-+	gpio->gpio.label = dev_name(dev);
-+	gpio->gpio.ngpio = ngpios;
-+
-+	platform_set_drvdata(pdev, gpio);
-+
-+	ret = devm_gpiochip_add_data(dev, &gpio->gpio, gpio);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to register gpiochip\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id owl_gpio_of_match[] = {
-+	{ .compatible = "actions,s900-gpio", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, owl_gpio_of_match);
-+
-+static struct platform_driver owl_gpio_driver = {
-+	.driver		= {
-+		.name	= "owl-gpio",
-+		.of_match_table = owl_gpio_of_match,
-+	},
-+	.probe		= owl_gpio_probe
-+};
-+module_platform_driver(owl_gpio_driver);
-+
-+MODULE_AUTHOR("Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>");
-+MODULE_DESCRIPTION("Actions Semi OWL SoCs GPIO driver");
-+MODULE_LICENSE("GPL");
+I'm mostly interested in the tinkerboard, so the DT bits in your tree are also 
+useful.
+
+baruch
+
 -- 
-2.14.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
