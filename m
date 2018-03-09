@@ -1,48 +1,36 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri,  9 Mar 2018 10:44:16 -0800
-Subject: [PATCH v3 5/6] staging: vc04_services: Mark the "DT bindings" job
- done.
-In-Reply-To: <20180309184417.23368-1-eric@anholt.net>
-References: <20180309184417.23368-1-eric@anholt.net>
-Message-ID: <20180309184417.23368-5-eric@anholt.net>
+Date: Fri,  9 Mar 2018 10:44:12 -0800
+Subject: [PATCH v3 1/6] staging: vc04_services: Replace "firmware" node with a
+ compatible lookup.
+Message-ID: <20180309184417.23368-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we just need to get the other drivers merged and finish the style
-cleanups/garbage collecting so we can get out of staging.
+This was requested by Rob Herring in DT bindings review.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
 
-v2-3: no changes
+v2: new patch
+v3: no changes
 
- drivers/staging/vc04_services/interface/vchi/TODO | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchi/TODO b/drivers/staging/vc04_services/interface/vchi/TODO
-index df93154b1aa6..46b20a1961a2 100644
---- a/drivers/staging/vc04_services/interface/vchi/TODO
-+++ b/drivers/staging/vc04_services/interface/vchi/TODO
-@@ -1,9 +1,4 @@
--1) Write a DT binding doc and get the corresponding DT node merged to
--   bcm2835.
--
--This will let the driver probe when enabled.
--
--2) Import drivers using VCHI.
-+1) Import drivers using VCHI.
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index f5cefda49b22..8068c0308b34 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -3594,7 +3594,8 @@ static int vchiq_probe(struct platform_device *pdev)
+ 	struct rpi_firmware *fw;
+ 	int err;
  
- VCHI is just a tool to let drivers talk to the firmware.  Here are
- some of the ones we want:
-@@ -26,7 +21,7 @@ some of the ones we want:
-   to manage these buffers as dmabufs so that we can zero-copy import
-   camera images into vc4 for rendering/display.
- 
--3) Garbage-collect unused code
-+2) Garbage-collect unused code
- 
- One of the reasons this driver wasn't upstreamed previously was that
- there's a lot code that got built that's probably unnecessary these
+-	fw_node = of_parse_phandle(pdev->dev.of_node, "firmware", 0);
++	fw_node = of_find_compatible_node(NULL, NULL,
++					  "raspberrypi,bcm2835-firmware");
+ 	if (!fw_node) {
+ 		dev_err(&pdev->dev, "Missing firmware node\n");
+ 		return -ENOENT;
 -- 
 2.16.2
