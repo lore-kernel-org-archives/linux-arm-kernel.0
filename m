@@ -1,77 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 9 Mar 2018 14:01:12 +0100
-Subject: [PATCH v2 4/4] ARM: dts: Enable HDMI audio on Snow Chromebook
-In-Reply-To: <20180308162559.391-1-s.nawrocki@samsung.com>
-References: <CGME20180308162609epcas1p45458c1671c38b389e047f17804690eb9@epcas1p4.samsung.com>
- <20180307172711.15697-4-s.nawrocki@samsung.com>
- <20180308162559.391-1-s.nawrocki@samsung.com>
-Message-ID: <CAJKOXPemC09mmjt9AKa9Qfhy14=CdUampi3=x957=NNEzq7LqQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Mar 2018 13:10:18 +0000
+Subject: [PATCH v2 2/3] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <87o9jymbsj.fsf@xmission.com>
+References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
+ <1519926248-12591-3-git-send-email-Dave.Martin@arm.com>
+ <20180308171153.GD14918@arm.com> <87o9jymbsj.fsf@xmission.com>
+Message-ID: <20180309131017.GB20370@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 5:25 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> This patch adds new cpu, codec subnodes according to the updated
-> "google,snow-audio-max98095" DT bindings and the I2S clock tree
-> configuration so sound on the HDMI interface can also be supported.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Changes since v2:
->  - changed order of codec phandles in codec/cpu-dai property
->    to match the DT bindings documentation.
-> ---
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 ++++
->  arch/arm/boot/dts/exynos5250-snow.dts         | 8 ++++++++
->  2 files changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-> index bdf59dd3654b..932a00cfd716 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-> @@ -9,6 +9,7 @@
->  #include <dt-bindings/clock/maxim,max77686.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/input/input.h>
-> +#include <dt-bindings/sound/samsung-i2s.h>
->  #include "exynos5250.dtsi"
->
->  / {
-> @@ -523,6 +524,9 @@
->  };
->
->  &i2s0 {
-> +       assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
-> +       assigned-clock-parents = <&clock_audss EXYNOS_I2S_BUS>;
-> +       #clock-cells = <1>;
+Hi Eric,
 
-Shouldn't this be property of exynos5250.dtsi? Along with clock-output-names?
+On Thu, Mar 08, 2018 at 04:40:12PM -0600, Eric W. Biederman wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> 
+> > On Thu, Mar 01, 2018 at 05:44:07PM +0000, Dave Martin wrote:
+> >> Currently a SIGFPE delivered in response to a floating-point
+> >> exception trap may have si_code set to 0 on arm64.  As reported by
+> >> Eric, this is a bad idea since this is the value of SI_USER -- yet
+> >> this signal is definitely not the result of kill(2), tgkill(2) etc.
+> >> and si_uid and si_pid make limited sense whereas we do want to
+> >> yield a value for si_addr (which doesn't exist for SI_USER).
+> >
+> > [...]
+> >
+> >> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> >> index e7226c4..9040038 100644
+> >> --- a/arch/arm64/kernel/fpsimd.c
+> >> +++ b/arch/arm64/kernel/fpsimd.c
+> >> @@ -39,6 +39,7 @@
+> >>  #include <linux/slab.h>
+> >>  #include <linux/sysctl.h>
+> >>  
+> >> +#include <asm/esr.h>
+> >>  #include <asm/fpsimd.h>
+> >>  #include <asm/cputype.h>
+> >>  #include <asm/simd.h>
+> >> @@ -867,18 +868,20 @@ asmlinkage void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+> >>  asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+> >>  {
+> >>  	siginfo_t info;
+> >> -	unsigned int si_code = FPE_FIXME;
+> >> -
+> >> -	if (esr & FPEXC_IOF)
+> >> -		si_code = FPE_FLTINV;
+> >> -	else if (esr & FPEXC_DZF)
+> >> -		si_code = FPE_FLTDIV;
+> >> -	else if (esr & FPEXC_OFF)
+> >> -		si_code = FPE_FLTOVF;
+> >> -	else if (esr & FPEXC_UFF)
+> >> -		si_code = FPE_FLTUND;
+> >> -	else if (esr & FPEXC_IXF)
+> >> -		si_code = FPE_FLTRES;
+> >> +	unsigned int si_code = FPE_FLTUNK;
+> >
+> > Happy to take this patch once the dependency on FPE_FLTUNK in core code is
+> > resolved.
+> 
+> Would it help for me to take the FPE_FLTUNK patch into my siginfo-next
+> branch?   So that there is a common branch with the code so we don't
+> need to worry about conflicts.  If so I will look at that on Monday.
 
-BR,
-Krzysztof
+Yes please, that would be helpful actually. I can then pull that into
+arm64 if you give me a stable branch or tag. Alternatively, I can define
+FPE_FLTUNK locally and remove it at -rc1.
 
->         status = "okay";
->  };
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 16e37c337a3f..75fdc5e6d423 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -18,6 +18,14 @@
->
->                 samsung,model = "Snow-I2S-MAX98095";
->                 samsung,audio-codec = <&max98095>;
-> +
-> +               cpu {
-> +                       sound-dai = <&i2s0 0>;
-> +               };
-> +
-> +               codec {
-> +                       sound-dai = <&max98095 0>, <&hdmi>;
-> +               };
->         };
->  };
->
-> --
-> 2.14.2
->
+Cheers,
+
+Will
