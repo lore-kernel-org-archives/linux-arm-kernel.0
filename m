@@ -1,62 +1,128 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 9 Mar 2018 23:18:34 +0100
-Subject: Nokia N900: refcount_t underflow, use after free
-In-Reply-To: <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
-References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
- <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com>
- <20180308185046.GA22796@amd>
- <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
- <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
-Message-ID: <20180309221834.GA15476@amd>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Fri,  9 Mar 2018 23:22:55 +0100
+Subject: [PATCH v5 04/36] drm/rockchip: add mutex vop lock
+In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-5-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-03-09 16:13:36, Suman Anna wrote:
-> On 03/09/2018 06:08 AM, Robin Murphy wrote:
-> > On 08/03/18 18:50, Pavel Machek wrote:
-> >> Hi!
-> >>
-> >>>> * Pavel Machek <pavel@ucw.cz> [180308 14:31]:
-> >>>>> Hi!
-> >>>>>
-> >>>>> I'm getting this warning... Has anyone seen/debugged that before?
-> >>>>> Unfortunately the backtrace does not seem to be too useful :-(.
-> >>>>
-> >>>> Adding Suman to Cc, as it points to arm_iommu_release_mapping().
-> >>>
-> >>> Hmm, we need to find out if the failure paths in isp_probe() are
-> >>> mismatched, or if this is coming from some mismatch between the OMAP
-> >>> IOMMU driver and the DMA plumbing. AFAIK, the cleanup paths in this
-> >>
-> >> Well, camera only started to work on N900 pretty recently. Let me add
-> >> some debug printks...
-> >>
-> >> Camera does not work in 4.16.0-rc4-next-20180308-dirty.
-> >>
-> >> I see this. It looks like problem in isp error paths, indeed:
-> > 
-> > Well, there certainly seems to be an obvious bug wherein
-> > isp_detach_iommu() just releases the mapping directly without calling
-> > arm_iommu_detach_device() to balance the equivalent attach. That can't
-> > be helping.
-> 
-> Indeed, I have been able to reproduce the same warning using a
-> standalone test module, and the missing arm_iommu_detach_device() is
-> causing the warning after probe (during failure path) or during
-> remove.
+From: zain wang <wzz@rock-chips.com>
 
-Ok do you have an idea how to fix the isp error paths? Untested patch
-would be fine... But it seems that you know what needs to be fixed and
-I don't.
+Add a lock to vop to avoid disabling the crtc while waiting for a line
+flag while enabling psr. If we disable in the middle of waiting for the
+line flag, we'll end up timing out or worse.
 
-									Pavel
+Signed-off-by: zain wang <wzz@rock-chips.com>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 30 +++++++++++++++++++++++------
+ 1 file changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 158e79e5062e..b601c59e76a8 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -117,6 +117,8 @@ struct vop {
+ 	spinlock_t reg_lock;
+ 	/* lock vop irq reg */
+ 	spinlock_t irq_lock;
++	/* protects crtc enable/disable */
++	struct mutex vop_lock;
+ 
+ 	unsigned int irq;
+ 
+@@ -569,6 +571,7 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
+ 
+ 	WARN_ON(vop->event);
+ 
++	mutex_lock(&vop->vop_lock);
+ 	drm_crtc_vblank_off(crtc);
+ 
+ 	/*
+@@ -604,6 +607,7 @@ static void vop_crtc_atomic_disable(struct drm_crtc *crtc,
+ 	clk_disable(vop->aclk);
+ 	clk_disable(vop->hclk);
+ 	pm_runtime_put(vop->dev);
++	mutex_unlock(&vop->vop_lock);
+ 
+ 	if (crtc->state->event && !crtc->state->active) {
+ 		spin_lock_irq(&crtc->dev->event_lock);
+@@ -868,10 +872,13 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
+ 	uint32_t pin_pol, val;
+ 	int ret;
+ 
++	mutex_lock(&vop->vop_lock);
++
+ 	WARN_ON(vop->event);
+ 
+ 	ret = vop_enable(crtc);
+ 	if (ret) {
++		mutex_unlock(&vop->vop_lock);
+ 		DRM_DEV_ERROR(vop->dev, "Failed to enable vop (%d)\n", ret);
+ 		return;
+ 	}
+@@ -935,6 +942,7 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
+ 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+ 
+ 	VOP_REG_SET(vop, common, standby, 0);
++	mutex_unlock(&vop->vop_lock);
+ }
+ 
+ static bool vop_fs_irq_is_pending(struct vop *vop)
+@@ -1473,15 +1481,21 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 	unsigned long jiffies_left;
++	int ret = 0;
+ 
+ 	if (!crtc || !vop->is_enabled)
+ 		return -ENODEV;
+ 
+-	if (mstimeout <= 0)
+-		return -EINVAL;
++	mutex_lock(&vop->vop_lock);
++	if (mstimeout <= 0) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 
+-	if (vop_line_flag_irq_is_enabled(vop))
+-		return -EBUSY;
++	if (vop_line_flag_irq_is_enabled(vop)) {
++		ret = -EBUSY;
++		goto out;
++	}
+ 
+ 	reinit_completion(&vop->line_flag_completion);
+ 	vop_line_flag_irq_enable(vop);
+@@ -1492,10 +1506,13 @@ int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
+ 
+ 	if (jiffies_left == 0) {
+ 		DRM_DEV_ERROR(vop->dev, "Timeout waiting for IRQ\n");
+-		return -ETIMEDOUT;
++		ret = -ETIMEDOUT;
++		goto out;
+ 	}
+ 
+-	return 0;
++out:
++	mutex_unlock(&vop->vop_lock);
++	return ret;
+ }
+ EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
+ 
+@@ -1545,6 +1562,7 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 
+ 	spin_lock_init(&vop->reg_lock);
+ 	spin_lock_init(&vop->irq_lock);
++	mutex_init(&vop->vop_lock);
+ 
+ 	ret = devm_request_irq(dev, vop->irq, vop_isr,
+ 			       IRQF_SHARED, dev_name(dev), vop);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/d5d56f16/attachment.sig>
+2.16.1
