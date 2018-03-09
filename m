@@ -1,75 +1,142 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Mar 2018 14:25:57 +0000
-Subject: [PATCH v2 2/3] arm64: fpsimd: Fix bad si_code for undiagnosed
- SIGFPE
-In-Reply-To: <20180309131017.GB20370@arm.com>
-References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
- <1519926248-12591-3-git-send-email-Dave.Martin@arm.com>
- <20180308171153.GD14918@arm.com> <87o9jymbsj.fsf@xmission.com>
- <20180309131017.GB20370@arm.com>
-Message-ID: <20180309142557.GT32331@e103592.cambridge.arm.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 09 Mar 2018 15:25:22 +0100
+Subject: [PATCH 5/9] media: platform: Add Sunxi Cedrus decoder driver
+In-Reply-To: <20180309135702.pk4webt7xnj7lrza@flea>
+References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
+ <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
+ <20180309135702.pk4webt7xnj7lrza@flea>
+Message-ID: <1520605522.15946.14.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 01:10:18PM +0000, Will Deacon wrote:
-> Hi Eric,
-> 
-> On Thu, Mar 08, 2018 at 04:40:12PM -0600, Eric W. Biederman wrote:
-> > Will Deacon <will.deacon@arm.com> writes:
-> > 
-> > > On Thu, Mar 01, 2018 at 05:44:07PM +0000, Dave Martin wrote:
-> > >> Currently a SIGFPE delivered in response to a floating-point
-> > >> exception trap may have si_code set to 0 on arm64.  As reported by
-> > >> Eric, this is a bad idea since this is the value of SI_USER -- yet
-> > >> this signal is definitely not the result of kill(2), tgkill(2) etc.
-> > >> and si_uid and si_pid make limited sense whereas we do want to
-> > >> yield a value for si_addr (which doesn't exist for SI_USER).
-> > >
-> > > [...]
-> > >
-> > >> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > >> index e7226c4..9040038 100644
-> > >> --- a/arch/arm64/kernel/fpsimd.c
-> > >> +++ b/arch/arm64/kernel/fpsimd.c
-> > >> @@ -39,6 +39,7 @@
-> > >>  #include <linux/slab.h>
-> > >>  #include <linux/sysctl.h>
-> > >>  
-> > >> +#include <asm/esr.h>
-> > >>  #include <asm/fpsimd.h>
-> > >>  #include <asm/cputype.h>
-> > >>  #include <asm/simd.h>
-> > >> @@ -867,18 +868,20 @@ asmlinkage void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
-> > >>  asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
-> > >>  {
-> > >>  	siginfo_t info;
-> > >> -	unsigned int si_code = FPE_FIXME;
-> > >> -
-> > >> -	if (esr & FPEXC_IOF)
-> > >> -		si_code = FPE_FLTINV;
-> > >> -	else if (esr & FPEXC_DZF)
-> > >> -		si_code = FPE_FLTDIV;
-> > >> -	else if (esr & FPEXC_OFF)
-> > >> -		si_code = FPE_FLTOVF;
-> > >> -	else if (esr & FPEXC_UFF)
-> > >> -		si_code = FPE_FLTUND;
-> > >> -	else if (esr & FPEXC_IXF)
-> > >> -		si_code = FPE_FLTRES;
-> > >> +	unsigned int si_code = FPE_FLTUNK;
-> > >
-> > > Happy to take this patch once the dependency on FPE_FLTUNK in core code is
-> > > resolved.
-> > 
-> > Would it help for me to take the FPE_FLTUNK patch into my siginfo-next
-> > branch?   So that there is a common branch with the code so we don't
-> > need to worry about conflicts.  If so I will look at that on Monday.
-> 
-> Yes please, that would be helpful actually. I can then pull that into
-> arm64 if you give me a stable branch or tag. Alternatively, I can define
-> FPE_FLTUNK locally and remove it at -rc1.
+Hi,
 
-OK Eric, let me know if you need me to rebase anything for the first 2
-patches.
+On Fri, 2018-03-09 at 14:57 +0100, Maxime Ripard wrote:
+> Hi,
+> 
+> On Fri, Mar 09, 2018 at 11:14:41AM +0100, Paul Kocialkowski wrote:
+> > +/*
+> > + * mem2mem callbacks
+> > + */
+> > +
+> > +void job_abort(void *priv)
+> > +{}
+> 
+> Is that still needed?
 
-Cheers
----Dave
+It looks like we need a dummy callback here, the v4l2_m2m_init function
+puts a hard requirement on it.
+
+The feature is definitely not used for now, but maybe this could be
+hooked to aborting the matching request? It was probably designed for
+the case where the driver handles a queue of jobs on its own (that's how
+it's used in vim2m) and such an internal queue is perhaps irrelevant
+when using the request API (and fences later).
+
+> > +/*
+> > + * device_run() - prepares and starts processing
+> > + */
+> > +void device_run(void *priv)
+> > +{
+> 
+> This function (and the one above) should probably made static. Or at
+> least if you can't, they should have a much more specific name in
+> order not to conflict with anything from the core.
+
+Good point, let's go for static. Since these are passed as function
+pointers, it shouldn't be a problem.
+
+> > +	/*
+> > +	 * The VPU is only able to handle bus addresses so we have
+> > to subtract
+> > +	 * the RAM offset to the physcal addresses
+> > +	 */
+> > +	in_buf     -= PHYS_OFFSET;
+> > +	out_luma   -= PHYS_OFFSET;
+> > +	out_chroma -= PHYS_OFFSET;
+> 
+> You should take care of that by putting it in the dma_pfn_offset field
+> of the struct device (at least before we come up with something
+> better).
+> 
+> You'll then be able to use the dma_addr_t directly without modifying
+> it.
+
+Definitely!
+
+> > +	vpu->syscon = syscon_regmap_lookup_by_phandle(vpu->dev-
+> > >of_node,
+> > +						      "syscon");
+> > +	if (IS_ERR(vpu->syscon)) {
+> > +		vpu->syscon = NULL;
+> > +	} else {
+> > +		regmap_write_bits(vpu->syscon,
+> > SYSCON_SRAM_CTRL_REG0,
+> > +				  SYSCON_SRAM_C1_MAP_VE,
+> > +				  SYSCON_SRAM_C1_MAP_VE);
+> > +	}
+> 
+> This should be using our SRAM controller driver (and API), see
+> Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> include/linux/soc/sunxi/sunxi_sram.h
+
+I'll look into that.
+
+> > +	ret = clk_prepare_enable(vpu->ahb_clk);
+> > +	if (ret) {
+> > +		dev_err(vpu->dev, "could not enable ahb clock\n");
+> > +		return -EFAULT;
+> > +	}
+> > +	ret = clk_prepare_enable(vpu->mod_clk);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(vpu->ahb_clk);
+> > +		dev_err(vpu->dev, "could not enable mod clock\n");
+> > +		return -EFAULT;
+> > +	}
+> > +	ret = clk_prepare_enable(vpu->ram_clk);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(vpu->mod_clk);
+> > +		clk_disable_unprepare(vpu->ahb_clk);
+> > +		dev_err(vpu->dev, "could not enable ram clock\n");
+> > +		return -EFAULT;
+> > +	}
+> 
+> Ideally, this should be using runtime_pm to manage the device power
+> state, and disable it when not used.
+
+I'll add that to my tasks list. I suppose we shouldn't make this a
+priority for now, but this is definitely good to have.
+
+> > +	reset_control_assert(vpu->rstc);
+> > +	reset_control_deassert(vpu->rstc);
+> 
+> You can use reset_control_reset here
+
+Noted!
+
+> > +	return 0;
+> > +}
+> > +
+> > +void sunxi_cedrus_hw_remove(struct sunxi_cedrus_dev *vpu)
+> > +{
+> > +	clk_disable_unprepare(vpu->ram_clk);
+> > +	clk_disable_unprepare(vpu->mod_clk);
+> > +	clk_disable_unprepare(vpu->ahb_clk);
+> 
+> The device is not put back into reset here
+
+Good catch, thanks!
+
+Cheers,
+
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/36053b68/attachment.sig>
