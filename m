@@ -1,82 +1,99 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 09 Mar 2018 07:33:33 +0100
-Subject: [alsa-devel] [BUG] Kernel crash on Allwinner H3 due to sound core
- changes
-In-Reply-To: <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
-References: <2424862.oPtAVTfrB9@jernej-laptop>
- <20180308111348.GB6019@sirena.org.uk>
- <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <2477367.T7DEPNfgqC@jernej-laptop>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 9 Mar 2018 14:44:12 +0800
+Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
+ architecutres
+In-Reply-To: <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
+References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+ <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
+ <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180309064412.GA5327@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Dne petek, 09. marec 2018 ob 00:49:18 CET je Kuninori Morimoto napisal(a):
-> Hi Mark,Jernej
-> 
-> > > Ahh.. indeed. Good catch !
-> > > How about to add such flag ?
-> > > This is just idea. No tested, No compiled, but can help you ?
+On 03/09/18 at 02:02pm, Dave Young wrote:
+> On 03/08/18 at 09:05am, Dave Young wrote:
+> > [Cc Andrew]
 > > 
-> > I think this makes sense as a patch.  We might want to disallow
-> > allocating components as part of a bigger struct so everything is more
-> > consistent but that's a bigger thing.
-> 
-> (snip)
-> 
-> > I tested this patch and there is no crash anymore. If you will send it as
-> > a
-> > fix, you can add:
+> > On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
+> > > This is a preparatory patch set for adding kexec_file support on arm64.
+> > > 
+> > > It was originally included in a arm64 patch set[1], but Philipp is also
+> > > working on their kexec_file support on s390[2] and some changes are now
+> > > conflicting.
+> > > 
+> > > So these common parts were extracted and put into a separate patch set for
+> > > better integration. What's more, my original patch#4 was split into a few
+> > > small chunks for easier review after Dave's comment.
+> > > 
+> > > As such, the resulting code is basically identical with my original, and
+> > > the only *visible* differences are:
+> > >   * renamings of _kexec_kernel_image_probe() and
+> > >     _kimage_file_post_load_cleanup()
+> > >   * change one of types of arguments at prepare_elf64_headers()
+> > > Those, unfortunately, require a couple of trivial changes on the rest
+> > > (#1, #6 to #13) of my arm64 kexec_file patch set[1].
+> > > 
+> > > Patch#1 allows making a use of purgatory optional, particularly useful
+> > > for arm64.
+> > > Patch#2 commonalizes arch_kexec_kernel_{image_probe, image_load,
+> > > verify_sig}() and arch_kimage_file_post_load_cleanup() across architectures.
+> > > Patch#3-#7 is also intended to generalize parse_elf64_headers(), along with
+> > > exclude_mem_range(), to be made best re-use of.
+> > > 
+> > > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/561182.html
+> > > [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.1/02596.html
+> > > 
+> > > 
+> > > Changes in v2 (Mar 6, 2018)
+> > > * use IS_ENABLED() instead of #ifdef's in kexec_calculate_store_digests() 
+> > > * rename _kexec_kernel_*() and make them static for now except for
+> > >   kexec_image_probe_default() which is actually used by arch(powerpc) code
+> > >   (Note: kexec_image_post_load_cleanup_default() will also be exported by
+> > >   arm64 patches.)
+> > > * change a type of kernel_map in prepare_elf64_headers() to "int"
+> > > * check for a total number of system ram regions in full_up_crash_elf_data()
+> > >   and use vzalloc() instead of vmalloc()
+> > > 
+> > > AKASHI Takahiro (7):
+> > >   kexec_file: make an use of purgatory optional
+> > >   kexec_file,x86,powerpc: factor out kexec_file_ops functions
+> > >   x86: kexec_file: purge system-ram walking from prepare_elf64_headers()
+> > >   x86: kexec_file: remove X86_64 dependency from prepare_elf64_headers()
+> > >   x86: kexec_file: lift CRASH_MAX_RANGES limit on crash_mem buffer
+> > >   x86: kexec_file: clean up prepare_elf64_headers()
+> > >   kexec_file, x86: move re-factored code to generic side
+> > > 
+> > >  arch/powerpc/Kconfig                        |   3 +
+> > >  arch/powerpc/include/asm/kexec.h            |   2 +-
+> > >  arch/powerpc/kernel/kexec_elf_64.c          |   2 +-
+> > >  arch/powerpc/kernel/machine_kexec_file_64.c |  39 +---
+> > >  arch/x86/Kconfig                            |   3 +
+> > >  arch/x86/include/asm/kexec-bzimage64.h      |   2 +-
+> > >  arch/x86/kernel/crash.c                     | 334 ++++++----------------------
+> > >  arch/x86/kernel/kexec-bzimage64.c           |   2 +-
+> > >  arch/x86/kernel/machine_kexec_64.c          |  45 +---
+> > >  include/linux/kexec.h                       |  32 ++-
+> > >  kernel/kexec_file.c                         | 240 +++++++++++++++++++-
+> > >  11 files changed, 338 insertions(+), 366 deletions(-)
+> > > 
+> > > -- 
+> > > 2.16.2
+> > > 
 > > 
-> > Reported-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > Tested-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > AKASHI, thanks for another update, looks good to me:
+> > 
+> > Acked-by: Dave Young <dyoung@redhat.com>
 > 
-> previous my patch used new flag (= .alloced_component),
-> but I think it is not good idea.
-> And I noticed that snd_soc_add_component() is
-> also calling kfree(component) (= has same bug).
-> 
-> So how about below one ?
-> I want to post it instead of previous.
-> 
-> # I will go to ELC next week, thus posting patch will be
-> # 2weeks later
-> 
-> ------------
-> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-> index c0edac8..4a8de23 100644
-> --- a/sound/soc/soc-core.c
-> +++ b/sound/soc/soc-core.c
-> @@ -3476,7 +3476,6 @@ int snd_soc_add_component(struct device *dev,
->  err_cleanup:
->  	snd_soc_component_cleanup(component);
->  err_free:
-> -	kfree(component);
->  	return ret;
->  }
->  EXPORT_SYMBOL_GPL(snd_soc_add_component);
-> @@ -3488,7 +3487,7 @@ int snd_soc_register_component(struct device *dev,
->  {
->  	struct snd_soc_component *component;
-> 
-> -	component = kzalloc(sizeof(*component), GFP_KERNEL);
-> +	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
->  	if (!component)
->  		return -ENOMEM;
-> 
-> @@ -3523,7 +3522,6 @@ static int __snd_soc_unregister_component(struct
-> device *dev)
-> 
->  	if (found) {
->  		snd_soc_component_cleanup(component);
-> -		kfree(component);
->  	}
-> 
->  	return found;
+> Hold on the ack, during today's tests kexec kernel can not boot, it
+> hangs early.  Will see if it is caused by this series and come back
+> later.
 
-That patch also prevents the crash, so you can add my tested-by and reported-
-by tags for this patch too.
+AKASHI, it seems the first patch causes the hang, can you take a look?
 
-Best regards,
-Jernej
+> 
+> > 
+> > Thanks
+> > Dave
+> 
+> Thanks
+> Dave
