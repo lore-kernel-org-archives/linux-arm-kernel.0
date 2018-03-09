@@ -1,61 +1,38 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 09 Mar 2018 12:10:45 +0100
-Subject: [PATCH] dt-bindings: exynos: Document #sound-dai-cells property
- of the HDMI node
-In-Reply-To: <5AA1F30B.8010607@samsung.com>
-References: <CGME20180307171131epcas1p4687ef394d1a0a6d0eb2de2691c977c3f@epcas1p4.samsung.com>
- <20180307171111.14551-1-s.nawrocki@samsung.com>
- <5AA0B59F.3070402@samsung.com>
- <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
- <5AA0DD39.3040108@samsung.com>
- <9f1e8619-974d-cd07-79c3-c6d9a4dc0f97@samsung.com>
- <5AA0F10D.9010602@samsung.com>
- <e3e1c628-d88f-6fb4-171e-a49c7ee38135@samsung.com>
- <5AA1F30B.8010607@samsung.com>
-Message-ID: <6e9a0ba4-2997-b7c5-f5c3-461870b7d3e5@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Mar 2018 11:14:19 +0000
+Subject: [BUG] Kernel crash on Allwinner H3 due to sound core changes
+In-Reply-To: <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
+References: <2424862.oPtAVTfrB9@jernej-laptop>
+ <20180302124050.GF6255@sirena.org.uk>
+ <26212674.B0xcQEiVyd@jernej-laptop>
+ <1832733.mujlD9skaR@jernej-laptop>
+ <87efkvtldx.wl%kuninori.morimoto.gx@renesas.com>
+ <20180308111348.GB6019@sirena.org.uk>
+ <87h8pq166i.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20180309111419.GA5252@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 03:35 AM, Inki Dae wrote:
-> 2018? 03? 08? 20:22? Sylwester Nawrocki ?(?) ? ?:
->> On 03/08/2018 09:15 AM, Inki Dae wrote:
-[...]
->>> Is there a possibility for other boards based on Exynos4210/4212/5420/5433 
->>> SoC to use this property later?
->>
->> All these SoCs have the HDMI IP block which has one input DAI, connected 
->> internally over I2S bus with the I2S controller.
->>
->> I think there is no advantage in limiting ourselves now only to SoC's 
->> for which we currently rely on that DT property in current kernel code, 
->> just to update this documentation later when we actually put the property 
->> in dts files.
->>
->> In case of exynos5420 we already require #sound-dai-cells for Odroid and
-> 
-> Maybe exynos5422? Odroid XU3/4 use Exynos5422.
+On Thu, Mar 08, 2018 at 11:49:18PM +0000, Kuninori Morimoto wrote:
 
-Yes, my mistake, Exynos5422 for Odroid and Exynos5420 for Peach-Pit.
-It just happens we use "samsung,exynos5420-hdmi" compatible for that both
-SoCs.
- 
+> previous my patch used new flag (= .alloced_component),
+> but I think it is not good idea.
+> And I noticed that snd_soc_add_component() is
+> also calling kfree(component) (= has same bug).
 
-> Seems that '#sound-dai-cells' is required mandatorily in case of Exynos5422 
-> because Odroid XU3/4 Audio driver checks this property, and the driver 
-> returns error if the property doesn't exist in its device tree.
-> And if other SoCs - Exynos4210/4212/5250/5420/5433 - require this property 
-> with additional driver works later then this property would also be required 
-> mandatorily for them not optionally. In this case we may need to modify the 
-> description again.
-> 
-> So my opinion is to add only the description required mandatorily if I 
-> understood correctly.
+> So how about below one ?
+> I want to post it instead of previous.
 
-You are right, it would be better to make this a mandatory property, I only
-made it optional because now this property is missing in many dts files.
-Let me resend with #sound-dai-cells description moved to the "Required 
-properties" paragraph.
+That should work also.
 
---
-Thanks,
-Sylwester
+> # I will go to ELC next week, thus posting patch will be
+> # 2weeks later
+
+I'll be there as well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/3f008113/attachment.sig>
