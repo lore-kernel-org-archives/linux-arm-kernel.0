@@ -1,207 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Mar 2018 17:14:33 -0600
-Subject: [PATCH v2 1/4] dt-bindings: mfd: Add Gateworks System Controller
- bindings
-In-Reply-To: <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
-References: <1520287361-12569-1-git-send-email-tharvey@gateworks.com>
- <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
-Message-ID: <20180309231433.tmlfy6vwbkvopmwd@rob-hp-laptop>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 09 Mar 2018 15:26:09 -0800
+Subject: [GIT PULL] Allwinner clock fixes for 4.16
+In-Reply-To: <20180223113120.GA2659@wens.csie.org>
+References: <20180223113120.GA2659@wens.csie.org>
+Message-ID: <152063796996.113003.6796575742282477127@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 02:02:38PM -0800, Tim Harvey wrote:
-> This patch adds documentation of device-tree bindings for the
-> Gateworks System Controller (GSC).
+Quoting Chen-Yu Tsai (2018-02-23 03:31:20)
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 > 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  Documentation/devicetree/bindings/mfd/gsc.txt | 159 ++++++++++++++++++++++++++
->  1 file changed, 159 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/gsc.txt
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/gsc.txt b/Documentation/devicetree/bindings/mfd/gsc.txt
-> new file mode 100644
-> index 0000000..fe5d114
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/gsc.txt
-> @@ -0,0 +1,159 @@
-> +Gateworks System Controller multi-function device
-> +
-> +The GSC is a Multifunction I2C slave device with the following submodules:
-> +- WDT
-> +- GPIO
-> +- Pushbutton controller
-> +- HWMON
-> +
-> +Required properties:
-> +- compatible : Must be "gw,gsc_v1", "gw,gsc_v2", "gw,gsc_v3"
-
-s/_/-/
-
-> +- reg: I2C address of the device
-> +- interrupts: interrupt triggered by GSC_IRQ# signal
-> +- interrupt-parent: Interrupt controller GSC is connected to
-> +- #interrupt-cells: should be <1>, index of the interrupt within the
-> +  controller, in accordance with the "one cell" variant of
-> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
-> +
-> +Optional nodes:
-> +* watchdog:
-> +The GSC provides a Watchdog monitor which can power cycle the board's
-> +primary power supply on most board models when tripped.
-> +
-> +Required properties:
-> +- compatible: must be "gw,gsc-watchdog"
-> +
-> +* input:
-> +The GSC provides an input device capable of dispatching Linux Input events
-
-Linux details that are not relevant to the binding.
-
-> +for user pushbutton events, tamper switch events, etc.
-> +
-> +Required properties:
-> +- compatible: must be "gw,gsc-input"
-> +
-> +* hwmon:
-> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
-> +temperature and/or voltage monitoring.
-> +
-> +Required properties:
-> +- compatible: must be "gw,gsc-hwmon"
-> +
-> +Example:
-> +
-> +	gsc: gsc at 20 {
-> +		compatible = "gw,gsc_v2";
-> +		reg = <0x20>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <4 GPIO_ACTIVE_LOW>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +
-> +		gsc_input {
-
-input {
-
-> +			compatible = "gw,gsc-input";
-> +		};
-> +
-> +		gsc_watchdog {
-
-watchdog {
-
-> +			compatible = "gw,gsc-watchdog";
-> +		};
-> +
-> +		gsc_hwmon {
-
-hwmon {
-
-> +			compatible = "gw,gsc-hwmon";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			hwmon at 0 { /* A0: Board Temperature */
-> +				type = <0>;
-
-Not documented.
-
-> +				reg = <0x00>;
-> +				label = "temp";
-> +			};
-> +
-> +			hwmon at 1 { /* A1: Input Voltage */
-> +				type = <1>;
-> +				reg = <0x02>;
-> +				label = "Vin";
-> +			};
-> +
-> +			hwmon at 2 { /* A2: 5P0 */
-> +				type = <1>;
-> +				reg = <0x0b>;
-> +				label = "5P0";
-> +			};
-> +
-> +			hwmon at 4 { /* A4: 0-5V input */
-> +				type = <1>;
-> +				reg = <0x14>;
-> +				label = "ANL0";
-> +			};
-> +
-> +			hwmon at 5 { /* A5: 2P5 PCIe/GigE */
-> +				type = <1>;
-> +				reg = <0x23>;
-> +				label = "2P5";
-> +			};
-> +
-> +			hwmon at 6 { /* A6: 1P8 Aud/Vid */
-> +				type = <1>;
-> +				reg = <0x1d>;
-> +				label = "1P8";
-> +			};
-> +
-> +			hwmon at 7 { /* A7: GPS */
-> +				type = <1>;
-> +				reg = <0x26>;
-> +				label = "GPS";
-> +			};
-> +
-> +			hwmon at 12 { /* A12: VDD_CORE */
-> +				type = <1>;
-> +				reg = <0x3>;
-> +				label = "VDD_CORE";
-> +			};
-> +
-> +			hwmon at 13 { /* A13: VDD_SOC */
-> +				type = <1>;
-> +				reg = <0x11>;
-> +				label = "VDD_SOC";
-> +			};
-> +
-> +			hwmon at 14 { /* A14: 1P0 PCIe SW */
-> +				type = <1>;
-> +				reg = <0x20>;
-> +				label = "1P0";
-> +			};
-> +
-> +			hwmon at 15 { /* fan0 */
-> +				type = <2>;
-> +				reg = <0x2c>;
-> +				label = "fan_50p";
-> +			};
-> +
-> +			hwmon at 16 { /* fan1 */
-> +				type = <2>;
-> +				reg = <0x2e>;
-> +				label = "fan_60p";
-> +			};
-> +
-> +			hwmon at 17 { /* fan2 */
-> +				type = <2>;
-> +				reg = <0x30>;
-> +				label = "fan_70p";
-> +			};
-> +
-> +			hwmon at 18 { /* fan3 */
-> +				type = <2>;
-> +				reg = <0x32>;
-> +				label = "fan_80p";
-> +			};
-> +
-> +			hwmon at 19 { /* fan4 */
-> +				type = <2>;
-> +				reg = <0x34>;
-> +				label = "fan_90p";
-> +			};
-> +
-> +			hwmon at 20 { /* fan5 */
-> +				type = <2>;
-> +				reg = <0x36>;
-> +				label = "fan_100p";
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.7.4
+> are available in the Git repository at:
 > 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.16
+> 
+> for you to fetch changes up to 5682e268350f9eccdbb04006605c1b7068a7b323:
+> 
+>   clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops (2018-02-19 08:59:50 +0100)
+> 
+> ----------------------------------------------------------------
+> Allwinner clock fixes for 4.16
+> 
+> A critical fix for the A31 sunxi-ng clock driver. The CLK_OUT clocks
+> had definitions paired with the incorrect type of clk ops. This results
+> in a serious oops starting with commit 946797aa3f08 ("clk: sunxi-ng:
+> Support fixed post-dividers on MP style clocks"), which exposed the
+> incorrect clk ops when it added a new field to the data structures,
+> which then nudged the underlying (compatible but incorrect) data
+> structures out of alignment.
+> 
+
+Thanks. Pulled.
