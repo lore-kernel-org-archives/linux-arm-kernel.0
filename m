@@ -1,112 +1,100 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 9 Mar 2018 20:06:07 +0530
-Subject: [PATCH v3 09/11] perf vendor events arm64: fixup ThunderX2 to use
- recommended events
-In-Reply-To: <1520506716-197429-10-git-send-email-john.garry@huawei.com>
-References: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
- <1520506716-197429-10-git-send-email-john.garry@huawei.com>
-Message-ID: <CAKTKpr5QqVN7VPLckQzkSqae_NjkQDmz59RZfUu89_dDNU42WQ@mail.gmail.com>
+From: jhogan@kernel.org (James Hogan)
+Date: Fri, 9 Mar 2018 14:44:21 +0000
+Subject: [PATCH v4 7/8] MIPS: BMIPS: Add PCI bindings for 7425, 7435
+In-Reply-To: <1516058925-46522-8-git-send-email-jim2101024@gmail.com>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-8-git-send-email-jim2101024@gmail.com>
+Message-ID: <20180309144420.GG24558@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On Mon, Jan 15, 2018 at 06:28:44PM -0500, Jim Quinlan wrote:
+> diff --git a/arch/mips/boot/dts/brcm/bcm7425.dtsi b/arch/mips/boot/dts/brcm/bcm7425.dtsi
+> index e4fb9b6..02168d0 100644
+> --- a/arch/mips/boot/dts/brcm/bcm7425.dtsi
+> +++ b/arch/mips/boot/dts/brcm/bcm7425.dtsi
+> @@ -495,4 +495,30 @@
+>  			status = "disabled";
+>  		};
+>  	};
+> +
+> +	pcie: pcie at 10410000 {
+> +		reg = <0x10410000 0x830c>;
+> +		compatible = "brcm,bcm7425-pcie";
+> +		interrupts = <37>, <37>;
+> +		interrupt-names = "pcie", "msi";
+> +		interrupt-parent = <&periph_intc>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		linux,pci-domain = <0>;
+> +		brcm,enable-ssc;
+> +		bus-range = <0x00 0xff>;
+> +		msi-controller;
+> +		#interrupt-cells = <1>;
+> +		/* 4x128mb windows */
+> +		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
+> +		interrupt-map-mask = <0 0 0 7>;
+> +		interrupt-map = <0 0 0 1 &periph_intc 33
+> +				 0 0 0 2 &periph_intc 34
+> +				 0 0 0 3 &periph_intc 35
+> +				 0 0 0 4 &periph_intc 36>;
 
-On Thu, Mar 8, 2018 at 4:28 PM, John Garry <john.garry@huawei.com> wrote:
-> This patch fixes the Cavium ThunderX2 JSON to use event definitions
-> from the ARMv8 recommended events.
->
-> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> Signed-off-by: John Garry <john.garry@huawei.com>
-> ---
->  .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 50 +++++-----------------
->  1 file changed, 10 insertions(+), 40 deletions(-)
->
-> diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> index 2db45c4..bc03c06 100644
-> --- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> +++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> @@ -1,62 +1,32 @@
->  [
->      {
-> -        "PublicDescription": "Attributable Level 1 data cache access, read",
-> -        "EventCode": "0x40",
-> -        "EventName": "l1d_cache_rd",
-> -        "BriefDescription": "L1D cache read",
-> +        "ArchStdEvent": "L1D_CACHE_RD",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data cache access, write ",
-> -        "EventCode": "0x41",
-> -        "EventName": "l1d_cache_wr",
-> -        "BriefDescription": "L1D cache write",
-> +        "ArchStdEvent": "L1D_CACHE_WR",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data cache refill, read",
-> -        "EventCode": "0x42",
-> -        "EventName": "l1d_cache_refill_rd",
-> -        "BriefDescription": "L1D cache refill read",
-> +        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data cache refill, write",
-> -        "EventCode": "0x43",
-> -        "EventName": "l1d_cache_refill_wr",
-> -        "BriefDescription": "L1D refill write",
-> +        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-> -        "EventCode": "0x4C",
-> -        "EventName": "l1d_tlb_refill_rd",
-> -        "BriefDescription": "L1D tlb refill read",
-> +        "ArchStdEvent": "L1D_TLB_REFILL_RD",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-> -        "EventCode": "0x4D",
-> -        "EventName": "l1d_tlb_refill_wr",
-> -        "BriefDescription": "L1D tlb refill write",
-> +        "ArchStdEvent": "L1D_TLB_REFILL_WR",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-> -        "EventCode": "0x4E",
-> -        "EventName": "l1d_tlb_rd",
-> -        "BriefDescription": "L1D tlb read",
-> +        "ArchStdEvent": "L1D_TLB_RD",
->      },
->      {
-> -        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-> -        "EventCode": "0x4F",
-> -        "EventName": "l1d_tlb_wr",
-> -        "BriefDescription": "L1D tlb write",
-> +        "ArchStdEvent": "L1D_TLB_WR",
->      },
->      {
-> -        "PublicDescription": "Bus access read",
-> -        "EventCode": "0x60",
-> -        "EventName": "bus_access_rd",
-> -        "BriefDescription": "Bus access read",
-> +        "ArchStdEvent": "BUS_ACCESS_RD",
->     },
->     {
-> -        "PublicDescription": "Bus access write",
-> -        "EventCode": "0x61",
-> -        "EventName": "bus_access_wr",
-> -        "BriefDescription": "Bus access write",
-> +        "ArchStdEvent": "BUS_ACCESS_WR",
->     }
->  ]
+no status = "disabled" like the other dtsi?
 
-This patch looks ok to me.
-i have tried on thunderx2 for few events and it is working fine.
+> +	};
+> +
+>  };
+> diff --git a/arch/mips/boot/dts/brcm/bcm7435.dtsi b/arch/mips/boot/dts/brcm/bcm7435.dtsi
+> index 1484e89..84881224 100644
+> --- a/arch/mips/boot/dts/brcm/bcm7435.dtsi
+> +++ b/arch/mips/boot/dts/brcm/bcm7435.dtsi
+> @@ -510,4 +510,31 @@
+>  			status = "disabled";
+>  		};
+>  	};
+> +
+> +	pcie: pcie at 10410000 {
+> +		reg = <0x10410000 0x930c>;
+> +		interrupts = <0x27>, <0x27>;
+> +		interrupt-names = "pcie", "msi";
+> +		interrupt-parent = <&periph_intc>;
+> +		compatible = "brcm,bcm7435-pcie";
 
-Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Might be nice to be consistent in your property ordering between these
+two dtsi files. I for one would prefer compatible to be near the top
+too, if only for consistency with most other nodes in these files.
 
-> --
-> 1.9.1
->
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		linux,pci-domain = <0>;
+> +		brcm,enable-ssc;
+> +		bus-range = <0x00 0xff>;
+> +		msi-controller;
+> +		#interrupt-cells = <1>;
+> +		/* 4x128mb windows */
+> +		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
+> +			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
+> +		interrupt-map-mask = <0 0 0 7>;
+> +		interrupt-map = <0 0 0 1 &periph_intc 35
+> +				 0 0 0 2 &periph_intc 36
+> +				 0 0 0 3 &periph_intc 37
+> +				 0 0 0 4 &periph_intc 38>;
+> +		status = "disabled";
+> +	};
+> +
+>  };
 
-thanks
-Ganapat
+Cheers
+James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/edb1389d/attachment.sig>
