@@ -1,84 +1,19 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 09 Mar 2018 17:50:14 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for
- the uart nodes
-In-Reply-To: <20180301131819.10790-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Thu, 1 Mar 2018 14:18:19 +0100")
-References: <20180301131819.10790-1-gregory.clement@bootlin.com>
-Message-ID: <87po4d2ny1.fsf@bootlin.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 09 Mar 2018 12:00:25 -0500 (EST)
+Subject: [PATCH] net: ethernet: ave: enable Rx drop interrupt
+In-Reply-To: <1520576840-17566-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1520576840-17566-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180309.120025.876982305242341526.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., mars 01 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Date: Fri,  9 Mar 2018 15:27:20 +0900
 
-> This extra clock is needed to access the registers of the UARTs used on
-> CP110 component of the Armada 7K/8K SoCs.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> This enables AVE_GI_RXDROP interrupt factor. This factor indicates
+> depletion of Rx descriptors and the handler counts the number
+> of dropped packets.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-Applied on mvebu/dt64
-
-Gregory
-
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index d3f422f8f086..355bb295e4d9 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -303,7 +303,9 @@
->  			reg-shift = <2>;
->  			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-io-width = <1>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
->  			status = "disabled";
->  		};
->  
-> @@ -313,7 +315,9 @@
->  			reg-shift = <2>;
->  			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-io-width = <1>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
->  			status = "disabled";
->  		};
->  
-> @@ -323,7 +327,9 @@
->  			reg-shift = <2>;
->  			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-io-width = <1>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
->  			status = "disabled";
->  		};
->  
-> @@ -333,7 +339,9 @@
->  			reg-shift = <2>;
->  			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-io-width = <1>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
->  			status = "disabled";
->  		};
->  
-> -- 
-> 2.16.1
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Applied, thank you.
