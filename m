@@ -1,32 +1,73 @@
-From: d.schultz@phytec.de (Daniel Schultz)
-Date: Fri, 9 Mar 2018 11:18:51 +0100
-Subject: [PATCH v2] ARM: multi_v7_defconfig: enable CONFIG_DP83867_PHY
-Message-ID: <1520590731-34556-1-git-send-email-d.schultz@phytec.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 09 Mar 2018 10:27:12 +0100
+Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
+In-Reply-To: <20180309093738.7cd5fded@karo-electronics.de>
+References: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
+ <20180308161135.1f3d3d18@karo-electronics.de>
+ <20180308153832.GA28454@botnar.kaiser.cx>
+ <20180309093738.7cd5fded@karo-electronics.de>
+Message-ID: <1520587632.19507.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the driver for TI's DP83867 ethernet phy.
+Hi Lothar,
 
-Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
----
-Changes:
-	v2: Re-submit with more recipients.
-	Sorry, I only added Russell and vger in v1.
+Am Freitag, den 09.03.2018, 09:37 +0100 schrieb Lothar Wa?mann:
+> Hi,
+> 
+> On Thu, 8 Mar 2018 16:38:32 +0100 Martin Kaiser wrote:
+> > Hi Lothar,
+> > 
+> > > > Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
+> > 
+> > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> > > > index 9725705..cf70df2 100644
+> > > > --- a/arch/arm/boot/dts/imx25.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx25.dtsi
+> > > > @@ -269,6 +269,7 @@
+> > > > > > > > ?				dmas = <&sdma 24 1 0>,
+> > > > > > > > ?				???????<&sdma 25 1 0>;
+> > > > > > > > ?				dma-names = "rx", "tx";
+> > > > > > > > +				fsl,fifo-depth = <15>;
+> > > > > > > > ?				status = "disabled";
+> > > > > > > > ?			};
+> > > > @@ -329,6 +330,7 @@
+> > > > > > > > ?				dmas = <&sdma 28 1 0>,
+> > > > > > > > ?				???????<&sdma 29 1 0>;
+> > > > > > > > ?				dma-names = "rx", "tx";
+> > > > > > > > +				fsl,fifo-depth = <15>;
+> > > > > > > > ?				status = "disabled";
+> > > > ?			};
+> > > You are changing the global .dtsi file. Did you test this change with
+> > > all devices that are affected by it?
+> > 
+> > I changed the hardware description of the imx25 SSI to match the
+> > reference manual.
+> > 
+> > I did test this change on an imx25 board with audio playback. This uses
+> > the SSI description I modified. I verified that the driver is actually
+> > taking the modified setting into account and that this causes no
+> > problems.
+> > 
+> > As of today, this setting is used by the fsl_ssi driver to set the fifo
+> > water level for dma requests.
+> > 
+> > Of course, I don't have access to the enitre range of supported imx25
+> > boards and I don't think this is required for submitting patches.
+> > 
+> > Do you have any indication why this patch should not be merged?
+> > 
+> 
+> Usually patches should not willy-nilly change the behaviour of existing
+> configurations unless they fix any real life bugs.
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+With this logic we wouldn't be able to get most driver changes applied.
+If it is matching the reference manual and has been tested on the
+affected hardware it should be good to go.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index da73876..62ad2c6 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -270,6 +270,7 @@ CONFIG_AT803X_PHY=y
- CONFIG_MARVELL_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_BROADCOM_PHY=y
-+CONFIG_DP83867_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
--- 
-2.7.4
+If you know about any specific corner cases that might break with this
+change, please speak up now. Don't reject patches based on the
+overarching "it might break something" argument.
+
+Regards,
+Lucas
