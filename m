@@ -1,36 +1,22 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 9 Mar 2018 13:36:19 +0100
-Subject: [PATCH 1/3] arm64: dts: renesas: r8a77980: add PFC support
-In-Reply-To: <e1130d4e-7c70-fe3d-1a09-349e95ad1b33@cogentembedded.com>
+Date: Fri, 9 Mar 2018 13:39:59 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: condor: add SCIF0 pins
+In-Reply-To: <7d9d311f-7e0f-aea5-d7c4-afe1995c6f7f@cogentembedded.com>
 References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
- <e1130d4e-7c70-fe3d-1a09-349e95ad1b33@cogentembedded.com>
-Message-ID: <CAMuHMdW_Ub-iVGbgmHzp6QqUCUXL0X8bYaa=yZP=1GQkLWDr=w@mail.gmail.com>
+ <7d9d311f-7e0f-aea5-d7c4-afe1995c6f7f@cogentembedded.com>
+Message-ID: <CAMuHMdXThVPC5x+rO-UHhX1Wdr9UFca0ajXg5ma0XJ0uWG+7SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 1:06 PM, Sergei Shtylyov
+Hi Sergei,
+
+On Fri, Mar 9, 2018 at 1:07 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A77980 part of the PFC device node.
+> Add the (previously omitted) SCIF0 pin data to the Condor board's
+> device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> @@ -71,6 +71,11 @@
->                 #size-cells = <2>;
->                 ranges;
->
-> +               pfc: pin-controller at e6060000 {
-> +                       compatible = "renesas,pfc-r8a77980";
-> +                       reg = <0 0xe6060000 0 0x50c>;
-
-0x50c is an odd number, given the last register is at offset 0x500, just like
-on V3M ;-)
-
-> +               };
-> +
-
-With the above fixed:
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
