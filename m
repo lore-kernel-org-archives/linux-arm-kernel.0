@@ -1,75 +1,43 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:22 +0100
-Subject: [PATCH v5 31/36] drm/rockchip: Cancel PSR enable work before changing
- the state
+Date: Fri,  9 Mar 2018 23:23:05 +0100
+Subject: [PATCH v5 14/36] drm/bridge: analogix_dp: Extend hpd check time to
+ 100ms
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-32-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-15-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+From: Lin Huang <hl@rock-chips.com>
 
-If we change the state first and reschedule later, we might have the
-work executed according to previous scheduled time and end up with PSR
-re-enabled instantly. Let's cancel the work before changing the state.
+There was a 1ms delay to detect the hpd signal, which is too short to
+detect a short pulse. This patch extends this delay to 100ms.
 
-While at it, consolidate psr_disable_handler() to just call
-rockchip_drm_do_flush(), as they are both supposed to do the same.
-
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: ?? ? <wzz@rock-chips.com>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-index a107845ba97c..c8655e625ba2 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-@@ -138,18 +138,6 @@ static void psr_flush_handler(struct work_struct *work)
- 	mutex_unlock(&psr->lock);
- }
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 3a222e7e46ee..6cbde8473f58 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -76,7 +76,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ 			return 0;
  
--static void psr_disable_handler(struct work_struct *work)
--{
--	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
--
--	/* If the state has changed since we initiated the flush, do nothing */
--	mutex_lock(&psr->lock);
--	if (psr->state == PSR_ENABLE)
--		psr_set_state_locked(psr, PSR_FLUSH);
--	mutex_unlock(&psr->lock);
--	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
--}
--
- /**
-  * rockchip_drm_psr_activate - activate PSR on the given pipe
-  * @encoder: encoder to obtain the PSR encoder
-@@ -198,6 +186,7 @@ EXPORT_SYMBOL(rockchip_drm_psr_deactivate);
+ 		timeout_loop++;
+-		usleep_range(10, 11);
++		usleep_range(1000, 1100);
+ 	}
  
- static void rockchip_drm_do_flush(struct psr_drv *psr)
- {
-+	cancel_delayed_work_sync(&psr->flush_work);
- 	psr_set_state(psr, PSR_FLUSH);
- 	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
- }
-@@ -244,6 +233,13 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev)
- }
- EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
- 
-+static void psr_disable_handler(struct work_struct *work)
-+{
-+	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
-+
-+	rockchip_drm_do_flush(psr);
-+}
-+
- static void psr_input_event(struct input_handle *handle,
- 			    unsigned int type, unsigned int code,
- 			    int value)
+ 	/*
 -- 
 2.16.1
