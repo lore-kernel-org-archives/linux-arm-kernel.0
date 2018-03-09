@@ -1,23 +1,46 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 9 Mar 2018 13:39:59 +0100
-Subject: [PATCH 2/3] arm64: dts: renesas: condor: add SCIF0 pins
-In-Reply-To: <7d9d311f-7e0f-aea5-d7c4-afe1995c6f7f@cogentembedded.com>
+Date: Fri, 9 Mar 2018 13:44:57 +0100
+Subject: [PATCH 3/3] arm64: dts: renesas: condor: add EtherAVB pins
+In-Reply-To: <82c33f37-bfbb-e515-f996-83333cd26171@cogentembedded.com>
 References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
- <7d9d311f-7e0f-aea5-d7c4-afe1995c6f7f@cogentembedded.com>
-Message-ID: <CAMuHMdXThVPC5x+rO-UHhX1Wdr9UFca0ajXg5ma0XJ0uWG+7SA@mail.gmail.com>
+ <82c33f37-bfbb-e515-f996-83333cd26171@cogentembedded.com>
+Message-ID: <CAMuHMdVJkRuEvzmAJf2pWd9E+XVgmO122-2mHSgw7Y4aLXdfYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sergei,
 
-On Fri, Mar 9, 2018 at 1:07 PM, Sergei Shtylyov
+On Fri, Mar 9, 2018 at 1:09 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add the (previously omitted) SCIF0 pin data to the Condor board's
+> Add the (previously omitted) EtherAVB pin data to the Condor board's
 > device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+According to the Condor schematics, the KSZ9031RNXVB is wired to
+GEther by default. So I guess you are using a modified board?
+
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+> @@ -30,6 +30,9 @@
+>  };
+>
+>  &avb {
+> +       pinctrl-0 = <&avb_pins>;
+> +       pinctrl-names = "default";
+> +
+>         phy-mode = "rgmii-id";
+>         phy-handle = <&phy0>;
+>         renesas,no-ether-link;
+> @@ -50,6 +53,11 @@
+>  };
+>
+>  &pfc {
+> +       avb_pins: avb {
+> +               groups = "avb_mdio", "avb_rgmii";
+> +               function = "avb";
+> +       };
+> +
 
 Gr{oetje,eeting}s,
 
