@@ -1,54 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 9 Mar 2018 13:44:57 +0100
-Subject: [PATCH 3/3] arm64: dts: renesas: condor: add EtherAVB pins
-In-Reply-To: <82c33f37-bfbb-e515-f996-83333cd26171@cogentembedded.com>
-References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
- <82c33f37-bfbb-e515-f996-83333cd26171@cogentembedded.com>
-Message-ID: <CAMuHMdVJkRuEvzmAJf2pWd9E+XVgmO122-2mHSgw7Y4aLXdfYA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 9 Mar 2018 12:49:41 +0000
+Subject: [PATCH] arm64: defconfig: enable Rockchip io-domain driver
+In-Reply-To: <20180308213540.4309-1-enric.balletbo@collabora.com>
+References: <20180308213540.4309-1-enric.balletbo@collabora.com>
+Message-ID: <5be003fc-7b86-6d49-278a-1297891212d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 08/03/18 21:35, Enric Balletbo i Serra wrote:
+> Heiko St?bner justified pretty well the change in commit e330eb86ba0
+> 'ARM: multi_v7_defconfig: enable Rockchip io-domain driver'. This change
+> is also needed for arm64 rockchip boards, so, do the same for arm64.
+> 
+> The io-domain driver is necessary to notify the soc about voltages
+> changes happening on supplying regulators. Probably the most important
+> user right now is the mmc tuning code, where the soc needs to get
+> notified when the voltage is dropped to the 1.8V point.
+> 
+> As this option is necessary to successfully tune UHS cards etc, it
+> should get built in. Otherwise, tunning will fail with,
+> 
+>     dwmmc_rockchip fe320000.dwmmc: All phases bad!
+>     mmc0: tuning execution failed: -5
 
-On Fri, Mar 9, 2018 at 1:09 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add the (previously omitted) EtherAVB pin data to the Condor board's
-> device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+It also causes ethernet to fail in a rather odd manner if your board 
+needs RGMII at <3.3v but you're using firmware which leaves the relevant 
+IO domain set inappropriately (I guess the parts expecting to be driven 
+by the external phy clock just lock up). Given the several hours I spent 
+scratching my head over that one,
 
-According to the Condor schematics, the KSZ9031RNXVB is wired to
-GEther by default. So I guess you are using a modified board?
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-> @@ -30,6 +30,9 @@
->  };
->
->  &avb {
-> +       pinctrl-0 = <&avb_pins>;
-> +       pinctrl-names = "default";
-> +
->         phy-mode = "rgmii-id";
->         phy-handle = <&phy0>;
->         renesas,no-ether-link;
-> @@ -50,6 +53,11 @@
->  };
->
->  &pfc {
-> +       avb_pins: avb {
-> +               groups = "avb_mdio", "avb_rgmii";
-> +               function = "avb";
-> +       };
-> +
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Cc: Heiko St?bner <heiko@sntech.de>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+>   arch/arm64/configs/defconfig | 2 ++
+>   1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index ba859709c2d4..d65d53b1ff77 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -313,6 +313,8 @@ CONFIG_GPIO_XGENE_SB=y
+>   CONFIG_GPIO_PCA953X=y
+>   CONFIG_GPIO_PCA953X_IRQ=y
+>   CONFIG_GPIO_MAX77620=y
+> +CONFIG_POWER_AVS=y
+> +CONFIG_ROCKCHIP_IODOMAIN=y
+>   CONFIG_POWER_RESET_MSM=y
+>   CONFIG_POWER_RESET_XGENE=y
+>   CONFIG_POWER_RESET_SYSCON=y
+> 
