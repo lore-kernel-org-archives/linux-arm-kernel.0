@@ -1,9 +1,10 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:07 +0000
-Subject: [PATCH 13/25] nvmem: imx-iim: Convert to use devm_nvmem_register()
+Date: Fri,  9 Mar 2018 14:47:04 +0000
+Subject: [PATCH 10/25] nvmem: meson-mx-efuse: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-14-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-11-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,40 +28,40 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/imx-iim.c | 16 ++--------------
+ drivers/nvmem/meson-mx-efuse.c | 16 ++--------------
  1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
-index 52cfe91d9762..b98d76ac7790 100644
---- a/drivers/nvmem/imx-iim.c
-+++ b/drivers/nvmem/imx-iim.c
-@@ -138,25 +138,13 @@ static int imx_iim_probe(struct platform_device *pdev)
- 	cfg.size = drvdata->nregs;
- 	cfg.priv = iim;
+diff --git a/drivers/nvmem/meson-mx-efuse.c b/drivers/nvmem/meson-mx-efuse.c
+index 41d3a3c1104e..a085563e39e3 100644
+--- a/drivers/nvmem/meson-mx-efuse.c
++++ b/drivers/nvmem/meson-mx-efuse.c
+@@ -233,25 +233,13 @@ static int meson_mx_efuse_probe(struct platform_device *pdev)
+ 		return PTR_ERR(efuse->core_clk);
+ 	}
  
--	nvmem = nvmem_register(&cfg);
--	if (IS_ERR(nvmem))
--		return PTR_ERR(nvmem);
-+	nvmem = devm_nvmem_register(dev, &cfg);
+-	efuse->nvmem = nvmem_register(&efuse->config);
+-	if (IS_ERR(efuse->nvmem))
+-		return PTR_ERR(efuse->nvmem);
++	efuse->nvmem = devm_nvmem_register(&pdev->dev, &efuse->config);
  
--	platform_set_drvdata(pdev, nvmem);
+-	platform_set_drvdata(pdev, efuse);
 -
 -	return 0;
 -}
 -
--static int imx_iim_remove(struct platform_device *pdev)
+-static int meson_mx_efuse_remove(struct platform_device *pdev)
 -{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-	struct meson_mx_efuse *efuse = platform_get_drvdata(pdev);
 -
--	return nvmem_unregister(nvmem);
-+	return PTR_ERR_OR_ZERO(nvmem);
+-	return nvmem_unregister(efuse->nvmem);
++	return PTR_ERR_OR_ZERO(efuse->nvmem);
  }
  
- static struct platform_driver imx_iim_driver = {
- 	.probe	= imx_iim_probe,
--	.remove	= imx_iim_remove,
+ static struct platform_driver meson_mx_efuse_driver = {
+ 	.probe = meson_mx_efuse_probe,
+-	.remove = meson_mx_efuse_remove,
  	.driver = {
- 		.name	= "imx-iim",
- 		.of_match_table = imx_iim_dt_ids,
+ 		.name = "meson-mx-efuse",
+ 		.of_match_table = meson_mx_efuse_match,
 -- 
 2.15.1
