@@ -1,153 +1,144 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:14 +0800
-Subject: [PATCH 31/39] arm/arm64: KVM: Advertise SMCCC v1.1
+Date: Fri,  9 Mar 2018 17:07:12 +0800
+Subject: [PATCH 29/39] ARM: 8480/2: arm64: add implementation for arm-smccc
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-32-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-30-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Jens Wiklander <jens.wiklander@linaro.org>
 
-commit 09e6be12effd upstream.
+commit 14457459f9ca2ff8521686168ea179edc3a56a44 upstream.
 
-The new SMC Calling Convention (v1.1) allows for a reduced overhead
-when calling into the firmware, and provides a new feature discovery
-mechanism.
+Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
 
-Make it visible to KVM guests.
-
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm/kvm/handle_exit.c   |  2 +-
- arch/arm/kvm/psci.c          | 24 +++++++++++++++++++++++-
- arch/arm64/kvm/handle_exit.c |  2 +-
- include/kvm/arm_psci.h       |  2 +-
- include/linux/arm-smccc.h    | 16 ++++++++++++++++
- 5 files changed, 42 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/arm64ksyms.c  |  5 ++++
+ arch/arm64/kernel/asm-offsets.c |  3 +++
+ arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/smccc-call.S
 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index fc911e349a18..7bce79dcc746 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -43,7 +43,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
- 		      kvm_vcpu_hvc_get_imm(vcpu));
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a7cf7dd99c1c..1e233e81430e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,6 +92,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_ARM_SMCCC
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
  
--	ret = kvm_psci_call(vcpu);
-+	ret = kvm_hvc_call_handler(vcpu);
- 	if (ret < 0) {
- 		kvm_inject_undefined(vcpu);
- 		return 1;
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 84027927986b..a74e3a67ef7a 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 3404ad0f9d8a..fa131fc27321 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -17,7 +17,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o
++			   smp.o smp_spin_table.o topology.o smccc-call.o
  
+ extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 3b6d8cc9dfe0..678f30b05a45 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -26,6 +26,7 @@
+ #include <linux/syscalls.h>
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
 +#include <linux/arm-smccc.h>
- #include <linux/preempt.h>
- #include <linux/kvm_host.h>
- #include <linux/wait.h>
-@@ -338,6 +339,7 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
- 		case PSCI_0_2_FN_SYSTEM_OFF:
- 		case PSCI_0_2_FN_SYSTEM_RESET:
- 		case PSCI_1_0_FN_PSCI_FEATURES:
-+		case ARM_SMCCC_VERSION_FUNC_ID:
- 			val = 0;
- 			break;
- 		default:
-@@ -392,7 +394,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-  * Errors:
-  * -EINVAL: Unrecognized PSCI function
-  */
--int kvm_psci_call(struct kvm_vcpu *vcpu)
-+static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ 
+ #include <asm/checksum.h>
+ 
+@@ -68,3 +69,7 @@ EXPORT_SYMBOL(test_and_change_bit);
+ #ifdef CONFIG_FUNCTION_TRACER
+ EXPORT_SYMBOL(_mcount);
+ #endif
++
++	/* arm-smccc */
++EXPORT_SYMBOL(arm_smccc_smc);
++EXPORT_SYMBOL(arm_smccc_hvc);
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 087cf9a65359..7c4146a4257b 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -28,6 +28,7 @@
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+ #include <linux/kbuild.h>
++#include <linux/arm-smccc.h>
+ 
+ int main(void)
  {
- 	switch (kvm_psci_version(vcpu)) {
- 	case KVM_ARM_PSCI_1_0:
-@@ -405,3 +407,23 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	};
+@@ -162,5 +163,7 @@ int main(void)
+   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
+   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
+ #endif
++  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
++  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+   return 0;
  }
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+new file mode 100644
+index 000000000000..ae0496fa4235
+--- /dev/null
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License Version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/linkage.h>
++#include <asm/asm-offsets.h>
 +
-+int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
-+{
-+	u32 func_id = smccc_get_function(vcpu);
-+	u32 val = PSCI_RET_NOT_SUPPORTED;
++	.macro SMCCC instr
++	.cfi_startproc
++	\instr	#0
++	ldr	x4, [sp]
++	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
++	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
++	ret
++	.cfi_endproc
++	.endm
 +
-+	switch (func_id) {
-+	case ARM_SMCCC_VERSION_FUNC_ID:
-+		val = ARM_SMCCC_VERSION_1_1;
-+		break;
-+	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
-+		/* Nothing supported yet */
-+		break;
-+	default:
-+		return kvm_psci_call(vcpu);
-+	}
++/*
++ * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
++ *		  unsigned long a3, unsigned long a4, unsigned long a5,
++ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++ */
++ENTRY(arm_smccc_smc)
++	SMCCC	smc
++ENDPROC(arm_smccc_smc)
 +
-+	smccc_set_retval(vcpu, val, 0, 0, 0);
-+	return 1;
-+}
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index f1b00be0b829..031691843729 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -41,7 +41,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	trace_kvm_hvc_arm64(*vcpu_pc(vcpu), vcpu_get_reg(vcpu, 0),
- 			    kvm_vcpu_hvc_get_imm(vcpu));
- 
--	ret = kvm_psci_call(vcpu);
-+	ret = kvm_hvc_call_handler(vcpu);
- 	if (ret < 0) {
- 		vcpu_set_reg(vcpu, 0, ~0UL);
- 		return 1;
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index 32360432cff5..ed1dd8088f1c 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -27,6 +27,6 @@
- #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
-+int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
- 
- #endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index 632dbb45a110..80e6a6bb8a20 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -60,6 +60,22 @@
- #ifndef __ASSEMBLY__
- #include <linux/linkage.h>
- #include <linux/types.h>
-+#define ARM_SMCCC_QUIRK_NONE		0
-+#define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
-+
-+#define ARM_SMCCC_VERSION_1_0		0x10000
-+#define ARM_SMCCC_VERSION_1_1		0x10001
-+
-+#define ARM_SMCCC_VERSION_FUNC_ID					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 0)
-+
-+#define ARM_SMCCC_ARCH_FEATURES_FUNC_ID					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 1)
-+
- /**
-  * struct arm_smccc_res - Result from SMC/HVC call
-  * @a0-a3 result values from registers 0 to 3
++/*
++ * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
++ *		  unsigned long a3, unsigned long a4, unsigned long a5,
++ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++ */
++ENTRY(arm_smccc_hvc)
++	SMCCC	hvc
++ENDPROC(arm_smccc_hvc)
 -- 
 2.16.2.440.gc6284da
