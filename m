@@ -1,33 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Mar 2018 16:09:19 +0000
-Subject: [PATCH] arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
-In-Reply-To: <CAKv+Gu9vhS-CmyCMm8arYE0rgAPwKqXHnG7JDmSzW=vhwAYDMw@mail.gmail.com>
-References: <20180309154050.30656-1-marc.zyngier@arm.com>
- <CAKv+Gu9vhS-CmyCMm8arYE0rgAPwKqXHnG7JDmSzW=vhwAYDMw@mail.gmail.com>
-Message-ID: <7e59ba1c-c6dd-5d71-d163-99a674b4762b@arm.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Fri,  9 Mar 2018 14:47:15 +0000
+Subject: [PATCH 21/25] nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
+In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-22-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/18 15:55, Ard Biesheuvel wrote:
-> On 9 March 2018 at 15:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> A recent update to the ARM SMCCC ARCH_WORKAROUND_1 specification
->> allows firmware to return a non zero, positive value to describe
->> that although the mitigation is implemented at the higher exception
->> level, the CPU on which the call is made is not affected.
->>
->> Let's relax the check on the return value from ARCH_WORKAROUND_1
->> so that we only error out if the returned value is negative.
->>
->> Fixes: b092201e0020 ("arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> OK, so this means the current code running on new firmware will
-> erroneously assume that the mitigation is not implemented or needed if
-> it, say, happens to run on the A53 cluster on Juno?
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Yup, that's the problem. To my knowledge, there is no such firmware in
-the wild, as the spec has just been published.
+There's "dev" variable for this already. Use it.
 
-	M.
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/bcm-ocotp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
+index 24c30fa475cc..4159b3f41d79 100644
+--- a/drivers/nvmem/bcm-ocotp.c
++++ b/drivers/nvmem/bcm-ocotp.c
+@@ -262,8 +262,7 @@ static int bcm_otpc_probe(struct platform_device *pdev)
+ 	else if (of_device_is_compatible(dev->of_node, "brcm,ocotp-v2"))
+ 		priv->map = &otp_map_v2;
+ 	else {
+-		dev_err(&pdev->dev,
+-			"%s otpc config map not defined\n", __func__);
++		dev_err(dev, "%s otpc config map not defined\n", __func__);
+ 		return -EINVAL;
+ 	}
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.15.1
