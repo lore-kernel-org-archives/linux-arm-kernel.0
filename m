@@ -1,29 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 9 Mar 2018 16:07:16 +0530
-Subject: [GIT PULL] DaVinci fixes for v4.16
-Message-ID: <e6ec7a59-e577-222b-3c04-5dc6ed9a0821@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 9 Mar 2018 10:53:14 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5AA1CE48.5030203@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5AA1CE48.5030203@codeaurora.org>
+Message-ID: <a466d82b-2a0f-ffba-f9f7-c76c6c787bb5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
++ Cc: Lorenzo, Charles.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+On 08/03/18 23:59, Saravana Kannan wrote:
+> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
+>> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
+>> The DSU integrates one or more cores with an L3 memory system, control
+>> logic, and external interfaces to form a multicore cluster. The PMU
+>> allows counting the various events related to L3, SCU etc, along with
+>> providing a cycle counter.
+>>
+>> The PMU can be accessed via system registers, which are common
+>> to the cores in the same cluster. The PMU registers follow the
+>> semantics of the ARMv8 PMU, mostly, with the exception that
+>> the counters record the cluster wide events.
+>>
+>> This driver is mostly based on the ARMv8 and CCI PMU drivers.
+>> The driver only supports ARM64 at the moment. It can be extended
+>> to support ARM32 by providing register accessors like we do in
+>> arch/arm64/include/arm_dsu_pmu.h.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+>> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-are available in the git repository at:
+[...]
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.16
+> 
+> Looking at the code, I didn't see any specific handling of cluster power collapse. AFAIK, the HW counters do not retain config (what event they are counting) or value (the current count) across power collapse. Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers to handle that?
 
-for you to fetch changes up to c4dc56be7e26040bfc60ce73425353516a356955:
+Good point, yes *somebody* needs to save-restore the registers. But who ? As far
+as the kernel is concerned, it doesn't control the DSU states. Also, as of now
+there is no reliable way to get the "ENTER/EXIT" notifications for the DSU power
+domain state changes. All we do is use the PMU, assuming it is available. AFAIT,
+it should really be done at EL3, which manages the DSU, but may be I am wrong.
 
-  ARM: davinci: fix the GPIO lookup for omapl138-hawk (2018-03-09 15:25:40 +0530)
+Sudeep, Lorenzo, Charles,
 
-----------------------------------------------------------------
-A patch fixing GPIO look-up for MMC/SD card detect and write-protect
-pins on OMAP-L138 Hawkboard.
+Please feel free to share your thoughts.
 
-----------------------------------------------------------------
-Bartosz Golaszewski (1):
-      ARM: davinci: fix the GPIO lookup for omapl138-hawk
-
- arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cheers
+Suzuki
