@@ -1,99 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Mar 2018 09:45:12 +0000
-Subject: a Heisenbug tale (was: Re: arm crypto .S_shipped files sometimes
- get rebuilt randomly)
-In-Reply-To: <c4b2ac3a-9f6f-9985-c7a3-f758c13e7b73@rasmusvillemoes.dk>
-References: <1520450729.13685.19.camel@nxp.com>
- <c4b2ac3a-9f6f-9985-c7a3-f758c13e7b73@rasmusvillemoes.dk>
-Message-ID: <CAKv+Gu8z2aMeGEi5Jbi+CBpbyMAmxHnZCO+URrVFgb33tddppw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 9 Mar 2018 11:50:20 +0200
+Subject: [PATCH] ARM: OMAP2+: powerdomain: use raw_smp_processor_id() for trace
+Message-ID: <1520589020-14018-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 March 2018 at 23:19, Rasmus Villemoes <linux@rasmusvillemoes.dk> wrote:
-> On 2018-03-07 20:25, Leonard Crestez wrote:
->> Hello,
->>
->> I am using a toolchain with a broken/old version of perl which doesn't
->> include integer.pm and I noticed it triggers occasional build failures
->> on arch/arm64/crypto/sha512-core.S_shipped. Workarounds are easy, but
->> if the purpose of the .S_shipped is to avoid the need to have all
->> dependencies on the build machine then something went wrong?
->
-> About a year ago, I debugged a very similar problem for a customer. The
-> build system (an OpenEmbedded clone) did something like
->
-> (1) git clone -n ...
-> (2) git checkout -q $somerev
-> (3) make foo_config
-> (4) make vmlinux
-> (5) make LOADADDR=0x1234 uImage
-> (6) make modules
-> ...
->
-> The symptoms, when the bug appeared, was that the kernel was built with
-> some version string "4.5.6-01234-g0abcdef", but the modules (both the
-> native kernel modules and those built externally using the linux-dev
-> package) ended up in /lib/modules/4.5.6-01234-g0abcdef-dirty.
->
-> Now, the truly annoying thing about this bug was that when I did the
-> above steps manually, but did a "git status" in-between steps 4 and 5 to
-> see where the -dirty might come from, I could _never_ reproduce the bug
-> (and git status always reported that the tree was clean), while it
-> usually happened at least 1 in 20 CI builds. Of course, I didn't realize
-> right away that "git status" was hiding the bug, but without that, I
-> could reproduce about as often as the CI, while 100 builds with that
-> extra step never reproduced. With that as a hint, I found
-> http://git.661346.n2.nabble.com/BUG-in-git-diff-index-td7652105.html#a7652109,
-> and slowly began to realize what might be happening.
->
-> The thing is, the setlocalversion script doesn't use "git status" to
-> decide whether to append -dirty, but rather the plumbing command "git
-> diff-index". During the "make vmlinux", the tree is obviously clean, so
-> we get the 4.5.6-01234-g0abcdef string baked into vmlinux. In some
-> cases, the two files
->
-> arch/arm/crypto/aesbs-core.S_shipped
-> arch/arm/crypto/bsaes-armv7.pl
->
-> ended up with different timestamps (the latter being newest) after the
-> git checkout, so during that same "make vmlinux", the S_shipped file
-> would be regenerated using the perl script. Since it is updated with ">"
-> shell redirection, the dev and ino stays the same, so does the content,
-> but the mtime is obviously updated.
->
-> If we then go on to do a "make LOADADDR=0x1234 uImage", the kernel build
-> system again calls setlocalversion, and this time "git diff-index
-> --name-only HEAD" actually produces output (namely,
-> arch/arm/crypto/aesbs-core.S_shipped), so include/config/kernel.release
-> is recreated, this time containing "4.5.6-01234-g0abcdef-dirty". The
-> right version string was already baked into vmlinux, so the resulting
-> kernel shows that for uname -r, but everything from now on, including
-> internal and external module builds, ends up using the -dirty string.
->
-> And this is why doing a "git status" would always hide the bug: git
-> diff-index only looks at the stat(2) information, and the newer mtime
-> was enough for it to print out arch/arm/crypto/aesbs-core.S_shipped ;
-> but "git status" actually opens the file and compares the contents
-> (which are unchanged), and then updates git's index, noting the new
-> stat() info for the file.
->
-> With that, I started looking at the timestamps of the above files
-> immediately after "git checkout". They were either identical (=no bug),
-> or the .pl was 4 ms (aka 1 jiffy) newer than the .S_shipped (=the bug
-> would appear), so that explained why the bug apparently happened at
-> random: if and only if a timer tick hit between git creating those two
-> files.
->
-> What we ended up doing was to explicitly set the mtime of every file in
-> the repo to the same reference time after the git checkout (find ... |
-> xargs touch --date=...). I also wanted to send a patch to change the
-> Makefile to use the filechk mechanism to avoid updating the .S_shipped
-> file when the script produced identical output, but never got around to it.
->
+smp_processor_id() checks preemption if CONFIG_DEBUG_PREEMPT is enabled,
+causing a warning dump during boot:
 
-I had no idea that _shipped files were causing issues like this, and
-AFAICT, this is not specific to this use case in arch/arm/crypto,
-right?
+[    5.042377] BUG: using smp_processor_id() in preemptible [00000000] code: swapper/0/1
+[    5.050281] caller is pwrdm_set_next_pwrst+0x48/0x88
+[    5.055330] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.14.24-g57341df0b4 #1
 
-Russell, would you mind if we removed the _shipped.S file here and
-just assume that perl is available?
+Use the raw_smp_processor_id() for the trace instead, this value does
+not need to be perfectly correct. The alternative of disabling preempt
+is too heavy weight operation to be applied in PM hot path for just
+tracing purposes.
+
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 76eb6ec..1e6a967 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -188,7 +188,7 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+ 			trace_power_domain_target_rcuidle(pwrdm->name,
+ 							  trace_state,
+-							  smp_processor_id());
++							  raw_smp_processor_id());
+ 		}
+ 		break;
+ 	default:
+@@ -518,7 +518,7 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+ 		/* Trace the pwrdm desired target state */
+ 		trace_power_domain_target_rcuidle(pwrdm->name, pwrst,
+-						  smp_processor_id());
++						  raw_smp_processor_id());
+ 		/* Program the pwrdm desired target state */
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+ 	}
+-- 
+1.9.1
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
