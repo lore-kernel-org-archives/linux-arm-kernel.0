@@ -1,186 +1,118 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 9 Mar 2018 09:27:15 +0000
-Subject: [PATCH 1/7] ARM: linker script: factor out some common
- definitions between XIP and non-XIP
-In-Reply-To: <20180309032100.31039-2-nicolas.pitre@linaro.org>
-References: <20180309032100.31039-1-nicolas.pitre@linaro.org>
- <20180309032100.31039-2-nicolas.pitre@linaro.org>
-Message-ID: <89d1d757-213c-4f47-af42-347ef27934d9@arm.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Fri,  9 Mar 2018 17:07:18 +0800
+Subject: [PATCH 35/39] firmware/psci: Expose PSCI conduit
+In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
+References: <20180309090722.26279-1-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-36-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/18 03:20, Nicolas Pitre wrote:
-> Lots of duplications between vmlinux.lds.S and vmlinux-xip.lds.S.
-> This may lead to one file being updated but not the other. For example,
-> SOFTIRQENTRY_TEXT and HYPERVISOR_TEXT were missing from the XIP version.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-It looks to me that HYPERVISOR_TEXT was not present in the XIP version
-intentionally - XIP depends on !ARM_LPAE, i.e. not support for virtualisation.
+commit 09a8d6d48499 upstream.
 
-Cheers
-Vladimir
+In order to call into the firmware to apply workarounds, it is
+useful to find out whether we're using HVC or SMC. Let's expose
+this through the psci_ops.
 
-> 
-> This creates vmlinux.lds.h where a bunch of common defines are moved.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  arch/arm/kernel/vmlinux-xip.lds.S | 35 +++-------------------------------
->  arch/arm/kernel/vmlinux.lds.S     | 38 +------------------------------------
->  arch/arm/kernel/vmlinux.lds.h     | 40 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 44 insertions(+), 69 deletions(-)
->  create mode 100644 arch/arm/kernel/vmlinux.lds.h
-> 
-> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-> index 12b87591eb..0a8922b616 100644
-> --- a/arch/arm/kernel/vmlinux-xip.lds.S
-> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
-> @@ -15,38 +15,7 @@
->  #include <asm/memory.h>
->  #include <asm/page.h>
->  
-> -#define PROC_INFO							\
-> -	. = ALIGN(4);							\
-> -	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-> -	*(.proc.info.init)						\
-> -	VMLINUX_SYMBOL(__proc_info_end) = .;
-> -
-> -#define IDMAP_TEXT							\
-> -	ALIGN_FUNCTION();						\
-> -	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-> -	*(.idmap.text)							\
-> -	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-> -	. = ALIGN(PAGE_SIZE);						\
-> -	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-> -	*(.hyp.idmap.text)						\
-> -	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-> -
-> -#ifdef CONFIG_HOTPLUG_CPU
-> -#define ARM_CPU_DISCARD(x)
-> -#define ARM_CPU_KEEP(x)		x
-> -#else
-> -#define ARM_CPU_DISCARD(x)	x
-> -#define ARM_CPU_KEEP(x)
-> -#endif
-> -
-> -#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-> -	defined(CONFIG_GENERIC_BUG)
-> -#define ARM_EXIT_KEEP(x)	x
-> -#define ARM_EXIT_DISCARD(x)
-> -#else
-> -#define ARM_EXIT_KEEP(x)
-> -#define ARM_EXIT_DISCARD(x)	x
-> -#endif
-> +#include "vmlinux.lds.h"
->  
->  OUTPUT_ARCH(arm)
->  ENTRY(stext)
-> @@ -100,10 +69,12 @@ SECTIONS
->  			*(.entry.text)
->  			__entry_text_end = .;
->  			IRQENTRY_TEXT
-> +			SOFTIRQENTRY_TEXT
->  			TEXT_TEXT
->  			SCHED_TEXT
->  			CPUIDLE_TEXT
->  			LOCK_TEXT
-> +			HYPERVISOR_TEXT
->  			KPROBES_TEXT
->  			*(.gnu.warning)
->  			*(.glue_7)
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 84a1ae3ce4..6a6eb483d9 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -15,43 +15,7 @@
->  #include <asm/page.h>
->  #include <asm/pgtable.h>
->  
-> -#define PROC_INFO							\
-> -	. = ALIGN(4);							\
-> -	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-> -	*(.proc.info.init)						\
-> -	VMLINUX_SYMBOL(__proc_info_end) = .;
-> -
-> -#define HYPERVISOR_TEXT							\
-> -	VMLINUX_SYMBOL(__hyp_text_start) = .;				\
-> -	*(.hyp.text)							\
-> -	VMLINUX_SYMBOL(__hyp_text_end) = .;
-> -
-> -#define IDMAP_TEXT							\
-> -	ALIGN_FUNCTION();						\
-> -	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-> -	*(.idmap.text)							\
-> -	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-> -	. = ALIGN(PAGE_SIZE);						\
-> -	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-> -	*(.hyp.idmap.text)						\
-> -	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-> -
-> -#ifdef CONFIG_HOTPLUG_CPU
-> -#define ARM_CPU_DISCARD(x)
-> -#define ARM_CPU_KEEP(x)		x
-> -#else
-> -#define ARM_CPU_DISCARD(x)	x
-> -#define ARM_CPU_KEEP(x)
-> -#endif
-> -
-> -#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-> -	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
-> -#define ARM_EXIT_KEEP(x)	x
-> -#define ARM_EXIT_DISCARD(x)
-> -#else
-> -#define ARM_EXIT_KEEP(x)
-> -#define ARM_EXIT_DISCARD(x)	x
-> -#endif
-> +#include "vmlinux.lds.h"
->  
->  OUTPUT_ARCH(arm)
->  ENTRY(stext)
-> diff --git a/arch/arm/kernel/vmlinux.lds.h b/arch/arm/kernel/vmlinux.lds.h
-> new file mode 100644
-> index 0000000000..0a86e8a111
-> --- /dev/null
-> +++ b/arch/arm/kernel/vmlinux.lds.h
-> @@ -0,0 +1,40 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +#define ARM_CPU_DISCARD(x)
-> +#define ARM_CPU_KEEP(x)		x
-> +#else
-> +#define ARM_CPU_DISCARD(x)	x
-> +#define ARM_CPU_KEEP(x)
-> +#endif
-> +
-> +#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-> +	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
-> +#define ARM_EXIT_KEEP(x)	x
-> +#define ARM_EXIT_DISCARD(x)
-> +#else
-> +#define ARM_EXIT_KEEP(x)
-> +#define ARM_EXIT_DISCARD(x)	x
-> +#endif
-> +
-> +#define PROC_INFO							\
-> +		. = ALIGN(4);						\
-> +		VMLINUX_SYMBOL(__proc_info_begin) = .;			\
-> +		*(.proc.info.init)					\
-> +		VMLINUX_SYMBOL(__proc_info_end) = .;
-> +
-> +#define HYPERVISOR_TEXT							\
-> +		VMLINUX_SYMBOL(__hyp_text_start) = .;			\
-> +		*(.hyp.text)						\
-> +		VMLINUX_SYMBOL(__hyp_text_end) = .;
-> +
-> +#define IDMAP_TEXT							\
-> +		ALIGN_FUNCTION();					\
-> +		VMLINUX_SYMBOL(__idmap_text_start) = .;			\
-> +		*(.idmap.text)						\
-> +		VMLINUX_SYMBOL(__idmap_text_end) = .;			\
-> +		. = ALIGN(PAGE_SIZE);					\
-> +		VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;		\
-> +		*(.hyp.idmap.text)					\
-> +		VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-> +
-> 
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+ include/linux/psci.h    |  7 +++++++
+ 2 files changed, 30 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 0f35aebb30a7..9dc559955ce6 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -55,7 +55,9 @@ bool psci_tos_resident_on(int cpu)
+ 	return cpu == resident_cpu;
+ }
+ 
+-struct psci_operations psci_ops;
++struct psci_operations psci_ops = {
++	.conduit = PSCI_CONDUIT_NONE,
++};
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+@@ -206,6 +208,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+ 			      0, 0, 0);
+ }
+ 
++static void set_conduit(enum psci_conduit conduit)
++{
++	switch (conduit) {
++	case PSCI_CONDUIT_HVC:
++		invoke_psci_fn = __invoke_psci_fn_hvc;
++		break;
++	case PSCI_CONDUIT_SMC:
++		invoke_psci_fn = __invoke_psci_fn_smc;
++		break;
++	default:
++		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
++	}
++
++	psci_ops.conduit = conduit;
++}
++
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -218,9 +236,9 @@ static int get_set_conduit_method(struct device_node *np)
+ 	}
+ 
+ 	if (!strcmp("hvc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	} else if (!strcmp("smc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 	} else {
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 		return -EINVAL;
+@@ -482,9 +500,9 @@ int __init psci_acpi_init(void)
+ 	pr_info("probing for conduit method from ACPI.\n");
+ 
+ 	if (acpi_psci_use_hvc())
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	else
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 
+ 	return psci_probe();
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 04b4d92c7791..e071a1b8ddb5 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -24,6 +24,12 @@ bool psci_tos_resident_on(int cpu);
+ bool psci_power_state_loses_context(u32 state);
+ bool psci_power_state_is_valid(u32 state);
+ 
++enum psci_conduit {
++	PSCI_CONDUIT_NONE,
++	PSCI_CONDUIT_SMC,
++	PSCI_CONDUIT_HVC,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -33,6 +39,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	enum psci_conduit conduit;
+ };
+ 
+ extern struct psci_operations psci_ops;
+-- 
+2.16.2.440.gc6284da
