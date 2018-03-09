@@ -1,44 +1,68 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri,  9 Mar 2018 15:36:39 -0800
-Subject: [PATCH] ARM: bcm2835: Add the DPI hardware to the device tree.
-Message-ID: <20180309233639.2029-1-eric@anholt.net>
+From: miltonm@us.ibm.com (Milton Miller II)
+Date: Fri, 9 Mar 2018 23:41:00 +0000
+Subject: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings: Add a
+ document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
+In-Reply-To: <20180307221124.GD10438@amd>
+References: <20180307221124.GD10438@amd>,
+ <20180221161606.32247-1-jae.hyun.yoo@linux.intel.com>
+ <20180221161606.32247-3-jae.hyun.yoo@linux.intel.com>
+ <20180306124002.GA13950@amd>
+ <33bf6563-b220-7ff9-8b04-84e9bd781b3f@linux.intel.com>
+Message-ID: <OF08D8261E.8F72E5DC-ON0025824B.008218BB-0025824B.008218C6@notes.na.collabserv.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's currently marked disabled, as it's not useful without a panel
-associated with it and the GPIO pins routed to ALT2.
+About  03/07/2018 04:12PM in some time zone, Pavel Machek wrote:
+>Subject: Re: [PATCH v2 2/8] [PATCH 2/8] Documentations: dt-bindings:
+>Add a document of PECI adapter driver for Aspeed AST24xx/25xx SoCs
+>
+>Hi!
+>
+>> >Are these SoCs x86-based?
+>> 
+>> Yes, these are ARM SoCs. Please see Andrew's answer as well.
+>
+>Understood, thanks.
+>
+>> >>+	Read sampling point selection. The whole period of a bit time
+>will be
+>> >>+	divided into 16 time frames. This value will determine which
+>time frame
+>> >>+	this controller will sample PECI signal for data read back.
+>Usually in
+>> >>+	the middle of a bit time is the best.
+>> >
+>> >English? "This value will determine when this controller"?
+>> >
+>> 
+>> Could I change it like below?:
+>> 
+>> "This value will determine in which time frame this controller
+>samples PECI
+>> signal for data read back"
+>
+>I guess... I'm not native speaker, I guess this could be improved
+>some
+>more.
+>
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+I agree this wording is still confusing. 
 
-This patch got misplaced as part of the original VC4 DPI work (which
-included the binding).  I've got a full branch demoing a panel at
-https://github.com/anholt/linux/commits/drm-vc4-dpi
+The problem is that the key subject, the time of the sampling, is in the descriptive clause "in which time frame".
 
- arch/arm/boot/dts/bcm283x.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+"This value will determine the time frame in which the controller will sample"
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 18db25a5a66e..4359cb2aae22 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -438,6 +438,17 @@
- 			interrupts = <2 14>; /* pwa1 */
- 		};
- 
-+		dpi: dpi at 7e208000 {
-+			compatible = "brcm,bcm2835-dpi";
-+			reg = <0x7e208000 0x8c>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>,
-+				 <&clocks BCM2835_CLOCK_DPI>;
-+			clock-names = "core", "pixel";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		dsi0: dsi at 7e209000 {
- 			compatible = "brcm,bcm2835-dsi0";
- 			reg = <0x7e209000 0x78>;
--- 
-2.16.2
+or perhaps phrase it as saving a specific sample from the over-clock, or a phase of the clock.
+
+>Best regards,
+>									Pavel
+>
+>-- 
+>(english) http://www.livejournal.com/~pavelmachek
+>(cesky, pictures)
+>http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>
+
+milton
+--
+Speaking for myself not IBM.
