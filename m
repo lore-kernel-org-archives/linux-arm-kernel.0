@@ -1,54 +1,61 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 9 Mar 2018 10:53:14 +0000
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <5AA1CE48.5030203@codeaurora.org>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5AA1CE48.5030203@codeaurora.org>
-Message-ID: <a466d82b-2a0f-ffba-f9f7-c76c6c787bb5@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 09 Mar 2018 12:10:45 +0100
+Subject: [PATCH] dt-bindings: exynos: Document #sound-dai-cells property
+ of the HDMI node
+In-Reply-To: <5AA1F30B.8010607@samsung.com>
+References: <CGME20180307171131epcas1p4687ef394d1a0a6d0eb2de2691c977c3f@epcas1p4.samsung.com>
+ <20180307171111.14551-1-s.nawrocki@samsung.com>
+ <5AA0B59F.3070402@samsung.com>
+ <3c68c3da-a0c3-4e4e-da6b-3e4b1af6d19d@samsung.com>
+ <5AA0DD39.3040108@samsung.com>
+ <9f1e8619-974d-cd07-79c3-c6d9a4dc0f97@samsung.com>
+ <5AA0F10D.9010602@samsung.com>
+ <e3e1c628-d88f-6fb4-171e-a49c7ee38135@samsung.com>
+ <5AA1F30B.8010607@samsung.com>
+Message-ID: <6e9a0ba4-2997-b7c5-f5c3-461870b7d3e5@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Cc: Lorenzo, Charles.
-
-On 08/03/18 23:59, Saravana Kannan wrote:
-> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
->> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
->> The DSU integrates one or more cores with an L3 memory system, control
->> logic, and external interfaces to form a multicore cluster. The PMU
->> allows counting the various events related to L3, SCU etc, along with
->> providing a cycle counter.
->>
->> The PMU can be accessed via system registers, which are common
->> to the cores in the same cluster. The PMU registers follow the
->> semantics of the ARMv8 PMU, mostly, with the exception that
->> the counters record the cluster wide events.
->>
->> This driver is mostly based on the ARMv8 and CCI PMU drivers.
->> The driver only supports ARM64 at the moment. It can be extended
->> to support ARM32 by providing register accessors like we do in
->> arch/arm64/include/arm_dsu_pmu.h.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
+On 03/09/2018 03:35 AM, Inki Dae wrote:
+> 2018? 03? 08? 20:22? Sylwester Nawrocki ?(?) ? ?:
+>> On 03/08/2018 09:15 AM, Inki Dae wrote:
 [...]
-
+>>> Is there a possibility for other boards based on Exynos4210/4212/5420/5433 
+>>> SoC to use this property later?
+>>
+>> All these SoCs have the HDMI IP block which has one input DAI, connected 
+>> internally over I2S bus with the I2S controller.
+>>
+>> I think there is no advantage in limiting ourselves now only to SoC's 
+>> for which we currently rely on that DT property in current kernel code, 
+>> just to update this documentation later when we actually put the property 
+>> in dts files.
+>>
+>> In case of exynos5420 we already require #sound-dai-cells for Odroid and
 > 
-> Looking at the code, I didn't see any specific handling of cluster power collapse. AFAIK, the HW counters do not retain config (what event they are counting) or value (the current count) across power collapse. Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers to handle that?
+> Maybe exynos5422? Odroid XU3/4 use Exynos5422.
 
-Good point, yes *somebody* needs to save-restore the registers. But who ? As far
-as the kernel is concerned, it doesn't control the DSU states. Also, as of now
-there is no reliable way to get the "ENTER/EXIT" notifications for the DSU power
-domain state changes. All we do is use the PMU, assuming it is available. AFAIT,
-it should really be done at EL3, which manages the DSU, but may be I am wrong.
+Yes, my mistake, Exynos5422 for Odroid and Exynos5420 for Peach-Pit.
+It just happens we use "samsung,exynos5420-hdmi" compatible for that both
+SoCs.
+ 
 
-Sudeep, Lorenzo, Charles,
+> Seems that '#sound-dai-cells' is required mandatorily in case of Exynos5422 
+> because Odroid XU3/4 Audio driver checks this property, and the driver 
+> returns error if the property doesn't exist in its device tree.
+> And if other SoCs - Exynos4210/4212/5250/5420/5433 - require this property 
+> with additional driver works later then this property would also be required 
+> mandatorily for them not optionally. In this case we may need to modify the 
+> description again.
+> 
+> So my opinion is to add only the description required mandatorily if I 
+> understood correctly.
 
-Please feel free to share your thoughts.
+You are right, it would be better to make this a mandatory property, I only
+made it optional because now this property is missing in many dts files.
+Let me resend with #sound-dai-cells description moved to the "Required 
+properties" paragraph.
 
-Cheers
-Suzuki
+--
+Thanks,
+Sylwester
