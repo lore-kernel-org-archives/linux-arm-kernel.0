@@ -1,75 +1,76 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 09 Mar 2018 14:49:00 -0800
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180309133531.fepm2suvdmvm4muv@lakrids.cambridge.arm.com>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5AA1CE48.5030203@codeaurora.org>
- <a466d82b-2a0f-ffba-f9f7-c76c6c787bb5@arm.com>
- <20180309133531.fepm2suvdmvm4muv@lakrids.cambridge.arm.com>
-Message-ID: <5AA30F5C.2010402@codeaurora.org>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 9 Mar 2018 14:28:21 -0800
+Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
+In-Reply-To: <20180309221220.GA15272@amd>
+References: <20180309221220.GA15272@amd>
+Message-ID: <20180309222821.GA16973@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 05:35 AM, Mark Rutland wrote:
-> On Fri, Mar 09, 2018 at 10:53:14AM +0000, Suzuki K Poulose wrote:
->> + Cc: Lorenzo, Charles.
->>
->> On 08/03/18 23:59, Saravana Kannan wrote:
->>> On 01/02/2018 03:25 AM, Suzuki K Poulose wrote:
->>>> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
->>>> The DSU integrates one or more cores with an L3 memory system, control
->>>> logic, and external interfaces to form a multicore cluster. The PMU
->>>> allows counting the various events related to L3, SCU etc, along with
->>>> providing a cycle counter.
->>>>
->>>> The PMU can be accessed via system registers, which are common
->>>> to the cores in the same cluster. The PMU registers follow the
->>>> semantics of the ARMv8 PMU, mostly, with the exception that
->>>> the counters record the cluster wide events.
->>>>
->>>> This driver is mostly based on the ARMv8 and CCI PMU drivers.
->>>> The driver only supports ARM64 at the moment. It can be extended
->>>> to support ARM32 by providing register accessors like we do in
->>>> arch/arm64/include/arm_dsu_pmu.h.
->>>>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
->>>> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->> [...]
->>
->>>
->>> Looking at the code, I didn't see any specific handling of cluster power collapse. AFAIK, the HW counters do not retain config (what event they are counting) or value (the current count) across power collapse. Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers to handle that?
->>
->> Good point, yes *somebody* needs to save-restore the registers. But who ? As far
->> as the kernel is concerned, it doesn't control the DSU states. Also, as of now
->> there is no reliable way to get the "ENTER/EXIT" notifications for the DSU power
->> domain state changes. All we do is use the PMU, assuming it is available. AFAIT,
->> it should really be done at EL3, which manages the DSU, but may be I am wrong.
->
-> Given this can happen behind the back of the kernel, if FW doesn't
-> save/restore this state, we'll have to inhibit cpuidle on a CPU
-> associated with the DSU PMU whenever it has active events, which would
-> keep the cluster online.
->
+On Fri, Mar 09, 2018 at 11:12:21PM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> Hmm. Looks like there's a lot of fun to be had with sysfs.
+> 
+> 								Pavel
+> 
+> 
+> pavel at n900:~$ uname -a
+> Linux n900 4.16.0-rc4-59690-g7f84626-dirty #543 Thu Mar 8 19:53:30 CET
+> 2018 armv7l GNU/Linux
+> 
+> [  306.402496] bq2415x: command Timer reset
+> [  312.761322] adp1653 2-0030: Read Addr:03 Val:00 ok
+> [  313.264129] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000
+> 000
+> [  313.272308] pgd = 01336620
+> [  313.275146] [00000000] *pgd=800af831, *pte=00000000, *ppte=00000000
+> [  313.281463] Internal error: Oops: 80000007 [#1] ARM
+> [  313.286376] Modules linked in:
+> [  313.289459] CPU: 0 PID: 3584 Comm: grep Tainted: G        W
+> 4.16.0-rc4-59690-g
+> 7f84626-dirty #543
+> [  313.298919] Hardware name: Nokia RX-51 board
+> [  313.303222] PC is at   (null)
+> [  313.306213] LR is at iio_ev_state_show+0x38/0x54
+> [  313.310852] pc : [<00000000>]    lr : [<c05d69c0>]    psr: a0000013
+> [  313.317169] sp : c7b47e70  ip : c087bb24  fp : 00000001
+> [  313.322418] r10: cb19e000  r9 : c0857220  r8 : 00001000
+> [  313.327667] r7 : 00000fff  r6 : cb711c80  r5 : cb19e000  r4 :
+> 00000000
+> [  313.334228] r3 : 00000001  r2 : 00000000  r1 : c087b4dc  r0 :
+> ce584800
+> [  313.340789] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+> Segment none
+> [  313.347991] Control: 10c5387d  Table: 87bec019  DAC: 00000051
+> [  313.353759] Process grep (pid: 3584, stack limit = 0xc4e45eab)
+> [  313.359619] Stack: (0xc7b47e70 to 0xc7b48000)
+> [  313.364013] 7e60:                                     c05d6988
+> cb711b00 ce585c00 c0450d68
+> [  313.471038] [<c05d69c0>] (iio_ev_state_show) from [<c0450d68>]
+> (dev_attr_show+0x1c/0x4c)
+> [  313.479187] [<c0450d68>] (dev_attr_show) from [<c023f934>]
+> (sysfs_kf_seq_show+0x90/0x108)
+> [  313.487426] [<c023f934>] (sysfs_kf_seq_show) from [<c023e2f8>]
+> (kernfs_seq_show+0x24/0x28)
+> [  313.495758] [<c023e2f8>] (kernfs_seq_show) from [<c01fc954>]
+> (seq_read+0x1dc/0x500)
+> [  313.503479] [<c01fc954>] (seq_read) from [<c01d9f80>]
+> (__vfs_read+0x2c/0x120)
+> [  313.510681] [<c01d9f80>] (__vfs_read) from [<c01da0fc>]
+> (vfs_read+0x88/0x114)
+> [  313.517852] [<c01da0fc>] (vfs_read) from [<c01da584>]
+> (SyS_read+0x40/0x8c)
+> [  313.524780] [<c01da584>] (SyS_read) from [<c0101000>]
+> (ret_fast_syscall+0x0/0x54)
+> [  313.532318] Exception stack(0xc7b47fa8 to 0xc7b47ff0)
+> [  313.537414] 7fa0:                   00035330 00042000 00000003
+> 00042000 00008000 00008000
+> 
 
-Using PMUs should be designed to have the least impact on 
-power/performance. Otherwise, using them to profile and debug issues 
-becomes impossible. Disabling cpuidle would significantly affect power 
-and performance.
+What file are you opening to cause this?
 
-Why not use CPU_CLUSTER_PM_ENTER similar to how arm-pmu.c uses 
-CPU_PM_ENTER for saving and restoring the counters? Technically a lot of 
-stuff could be pushed to FW. Doesn't mean we should. At worst, we'll 
-save and restore for a few cases where we didn't need to.
+thanks,
 
-Thanks,
-Saravana
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+greg k-h
