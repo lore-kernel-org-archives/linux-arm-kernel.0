@@ -1,9 +1,9 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:08 +0000
-Subject: [PATCH 14/25] nvmem: bcm-ocotp: Convert to use devm_nvmem_register()
+Date: Fri,  9 Mar 2018 14:47:03 +0000
+Subject: [PATCH 09/25] nvmem: mtk-efuse: Convert to use devm_nvmem_register()
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-15-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-10-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,41 +27,43 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/bcm-ocotp.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/mtk-efuse.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
-index 5e9e324427f9..24c30fa475cc 100644
---- a/drivers/nvmem/bcm-ocotp.c
-+++ b/drivers/nvmem/bcm-ocotp.c
-@@ -302,27 +302,17 @@ static int bcm_otpc_probe(struct platform_device *pdev)
- 
- 	priv->config = &bcm_otpc_nvmem_config;
- 
--	nvmem = nvmem_register(&bcm_otpc_nvmem_config);
-+	nvmem = devm_nvmem_register(dev, &bcm_otpc_nvmem_config);
- 	if (IS_ERR(nvmem)) {
- 		dev_err(dev, "error registering nvmem config\n");
- 		return PTR_ERR(nvmem);
- 	}
+diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+index 9ee3479cfc7b..e66adf17a747 100644
+--- a/drivers/nvmem/mtk-efuse.c
++++ b/drivers/nvmem/mtk-efuse.c
+@@ -72,20 +72,9 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+ 	econfig.size = resource_size(res);
+ 	econfig.priv = priv;
+ 	econfig.dev = dev;
+-	nvmem = nvmem_register(&econfig);
+-	if (IS_ERR(nvmem))
+-		return PTR_ERR(nvmem);
++	nvmem = devm_nvmem_register(dev, &econfig);
  
 -	platform_set_drvdata(pdev, nvmem);
 -
- 	return 0;
- }
- 
--static int bcm_otpc_remove(struct platform_device *pdev)
+-	return 0;
+-}
+-
+-static int mtk_efuse_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
--}
--
- static struct platform_driver bcm_otpc_driver = {
- 	.probe	= bcm_otpc_probe,
--	.remove	= bcm_otpc_remove,
++	return PTR_ERR_OR_ZERO(nvmem);
+ }
+ 
+ static const struct of_device_id mtk_efuse_of_match[] = {
+@@ -97,7 +86,6 @@ MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
+ 
+ static struct platform_driver mtk_efuse_driver = {
+ 	.probe = mtk_efuse_probe,
+-	.remove = mtk_efuse_remove,
  	.driver = {
- 		.name	= "brcm-otpc",
- 		.of_match_table = bcm_otpc_dt_ids,
+ 		.name = "mediatek,efuse",
+ 		.of_match_table = mtk_efuse_of_match,
 -- 
 2.15.1
