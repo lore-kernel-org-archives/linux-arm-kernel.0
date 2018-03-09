@@ -1,16 +1,15 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:05 +0000
-Subject: [PATCH 11/25] nvmem: meson-efuse: Convert to use devm_nvmem_register()
+Date: Fri,  9 Mar 2018 14:47:14 +0000
+Subject: [PATCH 20/25] nvmem: imx-iim: Do not use "&pdev->dev" explicitly
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-12-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-21-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+There's already "dev" variable for that. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -27,40 +26,21 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/meson-efuse.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ drivers/nvmem/imx-iim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-index a43c68f90937..71823d1403c5 100644
---- a/drivers/nvmem/meson-efuse.c
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -60,25 +60,13 @@ static int meson_efuse_probe(struct platform_device *pdev)
- 	econfig.reg_read = meson_efuse_read;
- 	econfig.size = size;
+diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
+index b98d76ac7790..6651e4cdc002 100644
+--- a/drivers/nvmem/imx-iim.c
++++ b/drivers/nvmem/imx-iim.c
+@@ -125,7 +125,7 @@ static int imx_iim_probe(struct platform_device *pdev)
  
--	nvmem = nvmem_register(&econfig);
--	if (IS_ERR(nvmem))
--		return PTR_ERR(nvmem);
-+	nvmem = devm_nvmem_register(&pdev->dev, &econfig);
+ 	drvdata = of_id->data;
  
--	platform_set_drvdata(pdev, nvmem);
--
--	return 0;
--}
--
--static int meson_efuse_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
-+	return PTR_ERR_OR_ZERO(nvmem);
- }
+-	iim->clk = devm_clk_get(&pdev->dev, NULL);
++	iim->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(iim->clk))
+ 		return PTR_ERR(iim->clk);
  
- static struct platform_driver meson_efuse_driver = {
- 	.probe = meson_efuse_probe,
--	.remove = meson_efuse_remove,
- 	.driver = {
- 		.name = "meson-efuse",
- 		.of_match_table = meson_efuse_match,
 -- 
 2.15.1
