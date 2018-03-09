@@ -1,74 +1,50 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:06:59 +0800
-Subject: [PATCH 16/39] arm64: entry: Apply BP hardening for high-priority
- synchronous exceptions
+Date: Fri,  9 Mar 2018 17:07:01 +0800
+Subject: [PATCH 18/39] arm64: cpu_errata: Allow an erratum to be match for all
+ revisions of a core
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-17-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-19-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 5dfc6ed27710 upstream.
+commit 06f1494f837 upstream.
 
-Software-step and PC alignment fault exceptions have higher priority than
-instruction abort exceptions, so apply the BP hardening hooks there too
-if the user PC appears to reside in kernel space.
+Some minor erratum may not be fixed in further revisions of a core,
+leading to a situation where the workaround needs to be updated each
+time an updated core is released.
 
-Reported-by: Dan Hettena <dhettena@nvidia.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Introduce a MIDR_ALL_VERSIONS match helper that will work for all
+versions of that MIDR, once and for all.
+
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- arch/arm64/kernel/entry.S | 6 ++++--
- arch/arm64/mm/fault.c     | 9 +++++++++
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/cpu_errata.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 1dfbd9023777..bc62f8d2c981 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -530,8 +530,10 @@ el0_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
-+	msr	daifclr, #(8 | 4 | 1)
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_off
-+#endif
- 	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 8a4e0a317edb..b1f084dd7b6d 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -561,6 +561,12 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
- 	struct siginfo info;
- 	struct task_struct *tsk = current;
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 894333617d4e..0d3ea874133d 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -118,6 +118,12 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ 	.midr_range_min = min, \
+ 	.midr_range_max = max
  
-+	if (user_mode(regs)) {
-+		if (instruction_pointer(regs) > TASK_SIZE)
-+			arm64_apply_bp_hardening();
-+		local_irq_enable();
-+	}
++#define MIDR_ALL_VERSIONS(model) \
++	.matches = is_affected_midr_range, \
++	.midr_model = model, \
++	.midr_range_min = 0, \
++	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
 +
- 	if (show_unhandled_signals && unhandled_signal(tsk, SIGBUS))
- 		pr_info_ratelimited("%s[%d]: %s exception: pc=%p sp=%p\n",
- 				    tsk->comm, task_pid_nr(tsk),
-@@ -612,6 +618,9 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
- 	struct siginfo info;
- 
-+	if (user_mode(regs) && instruction_pointer(regs) > TASK_SIZE)
-+		arm64_apply_bp_hardening();
-+
- 	if (!inf->fn(addr, esr, regs))
- 		return 1;
- 
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
 -- 
 2.16.2.440.gc6284da
