@@ -1,69 +1,47 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:01 +0000
-Subject: [PATCH 07/25] nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
-In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-8-srinivas.kandagatla@linaro.org>
+From: jhogan@kernel.org (James Hogan)
+Date: Fri, 9 Mar 2018 15:07:27 +0000
+Subject: [PATCH v4 1/8] SOC: brcmstb: add memory API
+In-Reply-To: <1516058925-46522-2-git-send-email-jim2101024@gmail.com>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-2-git-send-email-jim2101024@gmail.com>
+Message-ID: <20180309150727.GH24558@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
+On Mon, Jan 15, 2018 at 06:28:38PM -0500, Jim Quinlan wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
+> 
+> This commit adds a memory API suitable for ascertaining the sizes of
+> each of the N memory controllers in a Broadcom STB chip.  Its first
+> user will be the Broadcom STB PCIe root complex driver, which needs
+> to know these sizes to properly set up DMA mappings for inbound
+> regions.
+> 
+> We cannot use memblock here or anything like what Linux provides
+> because it collapses adjacent regions within a larger block, and here
+> we actually need per-memory controller addresses and sizes, which is
+> why we resort to manual DT parsing.
+> 
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> 
+> Conflicts:
+> 	drivers/soc/bcm/brcmstb/Makefile
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+That can go.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: cphealy at gmail.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mediatek at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/snvs_lpgpr.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+> +++ b/drivers/soc/bcm/brcmstb/memory.c
+...
+> +/* Macro to help extract property data */
+> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(*(u32*)(b + offs)))
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index e5c2a4a17f03..cb471d5e8e86 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -117,20 +117,9 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->reg_read  = snvs_lpgpr_read,
- 	cfg->reg_write = snvs_lpgpr_write,
- 
--	nvmem = nvmem_register(cfg);
--	if (IS_ERR(nvmem))
--		return PTR_ERR(nvmem);
-+	nvmem = devm_nvmem_register(dev, cfg);
- 
--	platform_set_drvdata(pdev, nvmem);
--
--	return 0;
--}
--
--static int snvs_lpgpr_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
-+	return PTR_ERR_OR_ZERO(nvmem);
- }
- 
- static const struct of_device_id snvs_lpgpr_dt_ids[] = {
-@@ -143,7 +132,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
- 
- static struct platform_driver snvs_lpgpr_driver = {
- 	.probe	= snvs_lpgpr_probe,
--	.remove	= snvs_lpgpr_remove,
- 	.driver = {
- 		.name	= "snvs_lpgpr",
- 		.of_match_table = snvs_lpgpr_dt_ids,
--- 
-2.15.1
+Checkpatch complains about missing whitespace after u32.
+
+Cheers
+James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/b6615c86/attachment-0001.sig>
