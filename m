@@ -1,49 +1,25 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 10 Mar 2018 00:00:56 +0100 (CET)
-Subject: Make set_handle_irq and handle_arch_irq generic, v3
-In-Reply-To: <mhng-df44504d-acc2-4ef9-9660-9959298ae26c@palmer-si-x1c4>
-References: <mhng-df44504d-acc2-4ef9-9660-9959298ae26c@palmer-si-x1c4>
-Message-ID: <alpine.DEB.2.21.1803092358120.1570@nanos.tec.linutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Mar 2018 17:02:25 -0600
+Subject: [PATCH v2] dt-bindings: exynos: Document #sound-dai-cells
+ property of the HDMI node
+In-Reply-To: <20180309154016.15562-1-s.nawrocki@samsung.com>
+References: <CGME20180309154029epcas1p280472548d1aa86daafceb405b10f1589@epcas1p2.samsung.com>
+ <20180309154016.15562-1-s.nawrocki@samsung.com>
+Message-ID: <20180309230225.i2ytunejt2sotsrc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Mar 2018, Palmer Dabbelt wrote:
-> On Fri, 09 Mar 2018 02:20:12 PST (-0800), tglx at linutronix.de wrote:
-> > This looks sensible. We have two options for getting this merged:
-> > 
-> > 1)   I'll take the whole lot through tip/irq/core
-> > 
-> > 2)   I'll apply patch 1/N to a special branch in tip. That branch will
-> > contain
-> >      only this commit on top of 4.16-rc4 and can be pulled by the relevant
-> >      architecture maintainers, so they can apply their architecture specific
-> >      patches.
+On Fri, Mar 09, 2018 at 04:40:16PM +0100, Sylwester Nawrocki wrote:
+> The #sound-dai-cells DT property is required to describe link between
+> the HDMI IP block and the SoC's audio subsystem.
 > 
-> Option 1 seems like the lowest overhead, as that way we don't need to sequence
-> the patches between multiple trees.  If all the other arch maintianers are OK
-> with it then that works for me.
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> Changes since v2:
+>  - the property has been moved to "Required properties" paragraph,
+>    I didn't add Rob's Reviewed-by due to this change
+> ---
+>  Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Ok, I wait for someone to yell NO until tuesday. If that doesn't happen I
-pick it up.
-
-> The 0-day robot found a new build warning on openrisc.  I was plannning
-> on submitting a v4 with this fix in it
->
->    diff --git a/arch/openrisc/include/asm/irq.h
-> b/arch/openrisc/include/asm/irq.h
->    index d9eee0a2b7b4..eb612b1865d2 100644
->    --- a/arch/openrisc/include/asm/irq.h
->    +++ b/arch/openrisc/include/asm/irq.h
->    @@ -24,6 +24,4 @@
->        #define NO_IRQ         (-1)
->       -extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->    -
->     #endif /* __ASM_OPENRISC_IRQ_H__ */
-> 
-> I can submit a v4, or you can just grab it from
-
-Just reply on the v3 openrisc patch with a v4 and I grab it from there.
-
-Thanks,
-
-	tglx
+Reviewed-by: Rob Herring <robh@kernel.org>
