@@ -1,187 +1,102 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri,  9 Mar 2018 23:09:55 +0200
-Subject: [PATCH v4 4/7] interconnect: qcom: Add RPM communication
+Date: Fri,  9 Mar 2018 23:09:58 +0200
+Subject: [PATCH v4 7/7] interconnect: Allow endpoints translation via DT
 In-Reply-To: <20180309210958.16672-1-georgi.djakov@linaro.org>
 References: <20180309210958.16672-1-georgi.djakov@linaro.org>
-Message-ID: <20180309210958.16672-5-georgi.djakov@linaro.org>
+Message-ID: <20180309210958.16672-8-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Qualcomm SoCs, there is a remote processor, which controls some of
-the Network-On-Chip interconnect resources. Other CPUs express their needs
-by communicating with this processor. Add a driver to handle comminication
-with this remote processor.
+Currently we support only platform data for specifying the interconnect
+endpoints. As now the endpoints are hard-coded into the consumer driver
+this may leed to complications when a single driver is used by multiple
+SoCs, which may have different interconnect topology.
+To avoid cluttering the consumer drivers, introduce a translation function
+to help us get the board specific interconnect data from device-tree.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- .../devicetree/bindings/interconnect/qcom-smd.txt  | 31 ++++++++
- drivers/interconnect/qcom/Makefile                 |  1 +
- drivers/interconnect/qcom/smd-rpm.c                | 90 ++++++++++++++++++++++
- drivers/interconnect/qcom/smd-rpm.h                | 15 ++++
- 4 files changed, 137 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
- create mode 100644 drivers/interconnect/qcom/Makefile
- create mode 100644 drivers/interconnect/qcom/smd-rpm.c
- create mode 100644 drivers/interconnect/qcom/smd-rpm.h
+ drivers/interconnect/core.c  | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/interconnect.h |  6 ++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interconnect/qcom-smd.txt b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-new file mode 100644
-index 000000000000..14e83ed7019b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-@@ -0,0 +1,31 @@
-+Qualcomm SMD-RPM interconnect driver binding
-+------------------------------------------------
-+The RPM is a dedicated hardware engine for managing the shared
-+SoC resources in order to keep the lowest power profile. It
-+communicates with other hardware subsystems via shared memory
-+and accepts requests for various resources.
-+
-+Required properties :
-+- compatible : shall contain only one of the following:
-+			"qcom,interconnect-smd-rpm"
-+
-+Example:
-+	smd {
-+		compatible = "qcom,smd";
-+
-+		rpm {
-+			interrupts = <0 168 1>;
-+			qcom,ipc = <&apcs 8 0>;
-+			qcom,smd-edge = <15>;
-+
-+			rpm_requests {
-+				compatible = "qcom,rpm-msm8916";
-+				qcom,smd-channels = "rpm_requests";
-+
-+				interconnect-smd-rpm {
-+					compatible = "qcom,interconnect-smd-rpm";
-+				};
-+
-+			};
-+		};
-+	};
-diff --git a/drivers/interconnect/qcom/Makefile b/drivers/interconnect/qcom/Makefile
-new file mode 100644
-index 000000000000..095bdef1ee6e
---- /dev/null
-+++ b/drivers/interconnect/qcom/Makefile
-@@ -0,0 +1 @@
-+obj-y += smd-rpm.o
-diff --git a/drivers/interconnect/qcom/smd-rpm.c b/drivers/interconnect/qcom/smd-rpm.c
-new file mode 100644
-index 000000000000..0cf772f51642
---- /dev/null
-+++ b/drivers/interconnect/qcom/smd-rpm.c
-@@ -0,0 +1,90 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * RPM over SMD communication wrapper for interconects
-+ *
-+ * Copyright (C) 2018 Linaro Ltd
-+ * Author: Georgi Djakov <georgi.djakov@linaro.org>
-+ */
-+
-+#include <linux/interconnect-provider.h>
-+#include <linux/module.h>
+diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+index a06f752a6aaa..014993473763 100644
+--- a/drivers/interconnect/core.c
++++ b/drivers/interconnect/core.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
 +#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/soc/qcom/smd-rpm.h>
-+#include "smd-rpm.h"
-+
-+#define	RPM_KEY_BW	0x00007762
-+
-+static struct qcom_icc_rpm {
-+	struct qcom_smd_rpm *rpm;
-+} icc_rpm_smd;
-+
-+struct icc_rpm_smd_req {
-+	__le32 key;
-+	__le32 nbytes;
-+	__le32 value;
-+};
-+
-+bool qcom_icc_rpm_smd_available(void)
+ #include <linux/uaccess.h>
+ 
+ static DEFINE_IDR(icc_idr);
+@@ -297,6 +298,43 @@ static int constraints_apply(struct icc_path *path)
+ 	return 0;
+ }
+ 
++struct icc_path *of_icc_get(struct device *dev, const char *name)
 +{
-+	if (!icc_rpm_smd.rpm)
-+		return false;
++	struct device_node *np;
++	u32 src_id, dst_id;
++	int index, ret;
 +
-+	return true;
-+}
++	if (!dev || !name)
++		return NULL;
 +
-+int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val)
-+{
-+	struct icc_rpm_smd_req req = {
-+		.key = cpu_to_le32(RPM_KEY_BW),
-+		.nbytes = cpu_to_le32(sizeof(u32)),
-+		.value = cpu_to_le32(val),
-+	};
++	np = dev->of_node;
 +
-+	return qcom_rpm_smd_write(icc_rpm_smd.rpm, ctx, rsc_type, id, &req,
-+				  sizeof(req));
-+}
-+EXPORT_SYMBOL(qcom_icc_rpm_smd_send);
++	index = of_property_match_string(np, "interconnect-names", name);
++	if (index < 0)
++		return ERR_PTR(index);
 +
-+static int qcom_icc_rpm_smd_probe(struct platform_device *pdev)
-+{
-+	icc_rpm_smd.rpm = dev_get_drvdata(pdev->dev.parent);
-+	if (!icc_rpm_smd.rpm) {
-+		dev_err(&pdev->dev, "unable to retrieve handle to RPM\n");
-+		return -ENODEV;
++	/*
++	 * We use a combination of phandle and specifier for endpoint. For now
++	 * lets support only global ids and extend this is the future if needed
++	 * without breaking DT compatibility.
++	 */
++	ret = of_property_read_u32_index(np, "interconnects", index * 2 + 1,
++					 &src_id);
++	if (ret) {
++		dev_err(dev, "interconnect src port is invalid (%d)\n", ret);
++		return ERR_PTR(ret);
++	}
++	ret = of_property_read_u32_index(np, "interconnects", index * 2 + 3,
++					 &dst_id);
++	if (ret) {
++		dev_err(dev, "interconnect dst port is invalid (%d)\n", ret);
++		return ERR_PTR(ret);
 +	}
 +
-+	return 0;
++	return icc_get(src_id, dst_id);
 +}
++EXPORT_SYMBOL_GPL(of_icc_get);
 +
-+static const struct of_device_id qcom_icc_rpm_smd_dt_match[] = {
-+	{ .compatible = "qcom,interconnect-smd-rpm", },
-+	{ },
-+};
-+
-+MODULE_DEVICE_TABLE(of, qcom_interconnect_rpm_smd_dt_match);
-+
-+static struct platform_driver qcom_interconnect_rpm_smd_driver = {
-+	.driver = {
-+		.name		= "qcom-interconnect-smd-rpm",
-+		.of_match_table	= qcom_icc_rpm_smd_dt_match,
-+	},
-+	.probe = qcom_icc_rpm_smd_probe,
-+};
-+
-+static int __init rpm_smd_interconnect_init(void)
+ /**
+  * icc_set() - set constraints on an interconnect path between two endpoints
+  * @path: reference to the path returned by icc_get()
+diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
+index 5a7cf72b76a5..996c48ea67d5 100644
+--- a/include/linux/interconnect.h
++++ b/include/linux/interconnect.h
+@@ -16,6 +16,7 @@ struct device;
+ #if IS_ENABLED(CONFIG_INTERCONNECT)
+ 
+ struct icc_path *icc_get(const int src_id, const int dst_id);
++struct icc_path *of_icc_get(struct device *dev, const char *name);
+ void icc_put(struct icc_path *path);
+ int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+ 
+@@ -26,6 +27,11 @@ static inline struct icc_path *icc_get(const int src_id, const int dst_id)
+ 	return NULL;
+ }
+ 
++static inline struct icc_path *of_icc_get(struct device *dev, const char *name)
 +{
-+	return platform_driver_register(&qcom_interconnect_rpm_smd_driver);
++	return NULL;
 +}
-+subsys_initcall(rpm_smd_interconnect_init);
 +
-+static void __exit rpm_smd_interconnect_exit(void)
-+{
-+	platform_driver_unregister(&qcom_interconnect_rpm_smd_driver);
-+}
-+module_exit(rpm_smd_interconnect_exit)
-+
-+MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
-+MODULE_DESCRIPTION("Qualcomm SMD RPM interconnect driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/interconnect/qcom/smd-rpm.h b/drivers/interconnect/qcom/smd-rpm.h
-new file mode 100644
-index 000000000000..0f4a3da31cf6
---- /dev/null
-+++ b/drivers/interconnect/qcom/smd-rpm.h
-@@ -0,0 +1,15 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (c) 2018, Linaro Ltd.
-+ * Author: Georgi Djakov <georgi.djakov@linaro.org>
-+ */
-+
-+#ifndef __LINUX_INTERCONNECT_QCOM_RPM_H
-+#define __LINUX_INTERCONNECT_QCOM_RPM_H
-+
-+#include <linux/soc/qcom/smd-rpm.h>
-+
-+bool qcom_icc_rpm_smd_available(void);
-+int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val);
-+
-+#endif
+ static inline void icc_put(struct icc_path *path)
+ {
+ }
