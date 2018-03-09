@@ -1,78 +1,233 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 9 Mar 2018 23:12:21 +0100
-Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
-Message-ID: <20180309221220.GA15272@amd>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 9 Mar 2018 16:13:36 -0600
+Subject: Nokia N900: refcount_t underflow, use after free
+In-Reply-To: <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
+References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
+ <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com> <20180308185046.GA22796@amd>
+ <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
+Message-ID: <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 03/09/2018 06:08 AM, Robin Murphy wrote:
+> On 08/03/18 18:50, Pavel Machek wrote:
+>> Hi!
+>>
+>>>> * Pavel Machek <pavel@ucw.cz> [180308 14:31]:
+>>>>> Hi!
+>>>>>
+>>>>> I'm getting this warning... Has anyone seen/debugged that before?
+>>>>> Unfortunately the backtrace does not seem to be too useful :-(.
+>>>>
+>>>> Adding Suman to Cc, as it points to arm_iommu_release_mapping().
+>>>
+>>> Hmm, we need to find out if the failure paths in isp_probe() are
+>>> mismatched, or if this is coming from some mismatch between the OMAP
+>>> IOMMU driver and the DMA plumbing. AFAIK, the cleanup paths in this
+>>
+>> Well, camera only started to work on N900 pretty recently. Let me add
+>> some debug printks...
+>>
+>> Camera does not work in 4.16.0-rc4-next-20180308-dirty.
+>>
+>> I see this. It looks like problem in isp error paths, indeed:
+> 
+> Well, there certainly seems to be an obvious bug wherein
+> isp_detach_iommu() just releases the mapping directly without calling
+> arm_iommu_detach_device() to balance the equivalent attach. That can't
+> be helping.
 
-Hmm. Looks like there's a lot of fun to be had with sysfs.
+Indeed, I have been able to reproduce the same warning using a
+standalone test module, and the missing arm_iommu_detach_device() is
+causing the warning after probe (during failure path) or during remove.
 
-								Pavel
+regards
+Suman
 
-
-pavel at n900:~$ uname -a
-Linux n900 4.16.0-rc4-59690-g7f84626-dirty #543 Thu Mar 8 19:53:30 CET
-2018 armv7l GNU/Linux
-
-[  306.402496] bq2415x: command Timer reset
-[  312.761322] adp1653 2-0030: Read Addr:03 Val:00 ok
-[  313.264129] Unable to handle kernel NULL pointer dereference at
-virtual address 00000
-000
-[  313.272308] pgd = 01336620
-[  313.275146] [00000000] *pgd=800af831, *pte=00000000, *ppte=00000000
-[  313.281463] Internal error: Oops: 80000007 [#1] ARM
-[  313.286376] Modules linked in:
-[  313.289459] CPU: 0 PID: 3584 Comm: grep Tainted: G        W
-4.16.0-rc4-59690-g
-7f84626-dirty #543
-[  313.298919] Hardware name: Nokia RX-51 board
-[  313.303222] PC is at   (null)
-[  313.306213] LR is at iio_ev_state_show+0x38/0x54
-[  313.310852] pc : [<00000000>]    lr : [<c05d69c0>]    psr: a0000013
-[  313.317169] sp : c7b47e70  ip : c087bb24  fp : 00000001
-[  313.322418] r10: cb19e000  r9 : c0857220  r8 : 00001000
-[  313.327667] r7 : 00000fff  r6 : cb711c80  r5 : cb19e000  r4 :
-00000000
-[  313.334228] r3 : 00000001  r2 : 00000000  r1 : c087b4dc  r0 :
-ce584800
-[  313.340789] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
-Segment none
-[  313.347991] Control: 10c5387d  Table: 87bec019  DAC: 00000051
-[  313.353759] Process grep (pid: 3584, stack limit = 0xc4e45eab)
-[  313.359619] Stack: (0xc7b47e70 to 0xc7b48000)
-[  313.364013] 7e60:                                     c05d6988
-cb711b00 ce585c00 c0450d68
-[  313.471038] [<c05d69c0>] (iio_ev_state_show) from [<c0450d68>]
-(dev_attr_show+0x1c/0x4c)
-[  313.479187] [<c0450d68>] (dev_attr_show) from [<c023f934>]
-(sysfs_kf_seq_show+0x90/0x108)
-[  313.487426] [<c023f934>] (sysfs_kf_seq_show) from [<c023e2f8>]
-(kernfs_seq_show+0x24/0x28)
-[  313.495758] [<c023e2f8>] (kernfs_seq_show) from [<c01fc954>]
-(seq_read+0x1dc/0x500)
-[  313.503479] [<c01fc954>] (seq_read) from [<c01d9f80>]
-(__vfs_read+0x2c/0x120)
-[  313.510681] [<c01d9f80>] (__vfs_read) from [<c01da0fc>]
-(vfs_read+0x88/0x114)
-[  313.517852] [<c01da0fc>] (vfs_read) from [<c01da584>]
-(SyS_read+0x40/0x8c)
-[  313.524780] [<c01da584>] (SyS_read) from [<c0101000>]
-(ret_fast_syscall+0x0/0x54)
-[  313.532318] Exception stack(0xc7b47fa8 to 0xc7b47ff0)
-[  313.537414] 7fa0:                   00035330 00042000 00000003
-00042000 00008000 00008000
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/433c8299/attachment.sig>
+> 
+> Robin.
+> 
+>>
+>> [??? 1.672210] bus: 'platform': driver_probe_device: matched device
+>> 480bc000.isp with dr
+>> iver omap3isp
+>> [??? 1.681976] isp_probe: 1
+>> [??? 1.684906] isp_probe: 2
+>> [??? 1.687591] isp_probe: 3
+>> [??? 1.690338] isp_probe: 4
+>> [??? 1.693054] omap3isp 480bc000.isp: 480bc000.isp supply vdd-csiphy1
+>> not found, using d
+>> ummy regulator
+>> [??? 1.702728] omap3isp 480bc000.isp: 480bc000.isp supply vdd-csiphy2
+>> not found, using d
+>> ummy regulator
+>> [??? 1.712402] isp_probe: 5
+>> [??? 1.715393] omap3isp 480bc000.isp: Revision 2.0 found
+>> [??? 1.720794] isp_probe: 6
+>> [??? 1.723815] isp_probe: 7
+>> [??? 1.726715] omap-iommu 480bd400.mmu: 480bd400.mmu: version 1.1
+>> [??? 1.732849] isp_probe: 8
+>> [??? 1.735656] isp_probe: 9
+>> [??? 1.738403] isp_probe: 10
+>> [??? 1.741241] isp_probe: f3
+>> [??? 1.744018] iommu_release_mapping... ce4d9500 ce4d949c
+>> [??? 1.749450] iommu_release_mapping... ok
+>> [??? 1.753479] isp_probe: f4
+>> [??? 1.756286] clk_unregister: unregistering prepared clock: cam_xclka
+>> [??? 1.762878] clk_unregister: unregistering prepared clock: cam_xclkb
+>> [??? 1.769500] isp_probe: f5
+>> [??? 1.772430] iommu_release_mapping... ce4d9500 ce4d949c
+>> [??? 1.777862] ------------[ cut here ]------------
+>> [??? 1.782745] WARNING: CPU: 0 PID: 1 at lib/refcount.c:187
+>> refcount_sub_and_test+0x94/0
+>> xa8
+>> [??? 1.791290] refcount_t: underflow; use-after-free.
+>> [??? 1.796356] Modules linked in:
+>> [??? 1.799591] CPU: 0 PID: 1 Comm: swapper Not tainted
+>> 4.16.0-rc4-next-20180308-dirty #7
+>> 3
+>> [??? 1.807922] Hardware name: Nokia RX-51 board
+>> [??? 1.812469] [<c010d6cc>] (unwind_backtrace) from [<c010b568>]
+>> (show_stack+0x10/0x14)
+>> [??? 1.820648] [<c010b568>] (show_stack) from [<c0127df4>]
+>> (__warn+0xe8/0x110)
+>> ...
+>> [??? 1.968688] iommu_release_mapping... ok
+>> [??? 1.973754] bus: 'platform': driver_probe_device: matched device
+>> n900-battery with driver rx51-battery
+>> [??? 1.984436] bus: 'platform': driver_probe_device: matched device
+>> 48002524.bandgap with driver ti-soc-thermal
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 8c398fe..16f4c69 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -2251,8 +2251,11 @@ static int extend_iommu_mapping(struct
+>> dma_iommu_mapping *mapping)
+>> ? ? void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping)
+>> ? {
+>> +??? printk("iommu_release_mapping... %lx %lx\n", mapping,
+>> mapping->domain);
+>> ????? if (mapping)
+>> ????????? kref_put(&mapping->kref, release_iommu_mapping);
+>> +??? printk("iommu_release_mapping... ok\n");
+>> +???
+>> ? }
+>> ? EXPORT_SYMBOL_GPL(arm_iommu_release_mapping);
+>> ? diff --git a/drivers/media/platform/omap3isp/isp.c
+>> b/drivers/media/platform/omap3isp/isp.c
+>> index 8eb000e..4d58683 100644
+>> --- a/drivers/media/platform/omap3isp/isp.c
+>> +++ b/drivers/media/platform/omap3isp/isp.c
+>> @@ -2193,12 +2193,14 @@ static int isp_probe(struct platform_device
+>> *pdev)
+>> ????? int ret;
+>> ????? int i, m;
+>> ? +??? printk("isp_probe: 1\n");
+>> ????? isp = devm_kzalloc(&pdev->dev, sizeof(*isp), GFP_KERNEL);
+>> ????? if (!isp) {
+>> ????????? dev_err(&pdev->dev, "could not allocate memory\n");
+>> ????????? return -ENOMEM;
+>> ????? }
+>> ? +??????? printk("isp_probe: 2\n");
+>> ????? ret = fwnode_property_read_u32(of_fwnode_handle(pdev->dev.of_node),
+>> ???????????????????????? "ti,phy-type", &isp->phy_type);
+>> ????? if (ret)
+>> @@ -2219,6 +2221,8 @@ static int isp_probe(struct platform_device *pdev)
+>> ????? mutex_init(&isp->isp_mutex);
+>> ????? spin_lock_init(&isp->stat_lock);
+>> ? +??????????? printk("isp_probe: 3\n");
+>> +
+>> ????? ret = v4l2_async_notifier_parse_fwnode_endpoints(
+>> ????????? &pdev->dev, &isp->notifier, sizeof(struct isp_async_subdev),
+>> ????????? isp_fwnode_parse);
+>> @@ -2232,6 +2236,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????? if (ret)
+>> ????????? goto error;
+>> ? +??????????????? printk("isp_probe: 4\n");
+>> ????? platform_set_drvdata(pdev, isp);
+>> ? ????? /* Regulators */
+>> @@ -2258,6 +2263,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????????????? return PTR_ERR(isp->mmio_base[map_idx]);
+>> ????? }
+>> ? +??? printk("isp_probe: 5\n");
+>> ????? ret = isp_get_clocks(isp);
+>> ????? if (ret < 0)
+>> ????????? goto error;
+>> @@ -2277,6 +2283,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????????? goto error;
+>> ????? }
+>> ? +??????? printk("isp_probe: 6\n");
+>> ????? ret = isp_reset(isp);
+>> ????? if (ret < 0)
+>> ????????? goto error_isp;
+>> @@ -2306,6 +2313,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????????????? isp->mmio_base[OMAP3_ISP_IOMEM_CSI2A_REGS1]
+>> ????????????? + isp_res_maps[m].offset[i];
+>> ? +??????? printk("isp_probe: 7\n");
+>> ????? isp->mmio_hist_base_phys =
+>> ????????? mem->start + isp_res_maps[m].offset[OMAP3_ISP_IOMEM_HIST];
+>> ? @@ -2316,6 +2324,8 @@ static int isp_probe(struct platform_device
+>> *pdev)
+>> ????????? goto error_isp;
+>> ????? }
+>> ? +??????? printk("isp_probe: 8\n");
+>> +
+>> ????? /* Interrupt */
+>> ????? ret = platform_get_irq(pdev, 0);
+>> ????? if (ret <= 0) {
+>> @@ -2325,6 +2335,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????? }
+>> ????? isp->irq_num = ret;
+>> ? +??????????? printk("isp_probe: 9\n");
+>> ????? if (devm_request_irq(isp->dev, isp->irq_num, isp_isr, IRQF_SHARED,
+>> ?????????????????? "OMAP3 ISP", isp)) {
+>> ????????? dev_err(isp->dev, "Unable to request IRQ\n");
+>> @@ -2332,6 +2343,7 @@ static int isp_probe(struct platform_device *pdev)
+>> ????????? goto error_iommu;
+>> ????? }
+>> ? +??????????????? printk("isp_probe: 10\n");
+>> ????? /* Entities */
+>> ????? ret = isp_initialize_modules(isp);
+>> ????? if (ret < 0)
+>> @@ -2345,27 +2357,35 @@ static int isp_probe(struct platform_device
+>> *pdev)
+>> ????? if (ret < 0)
+>> ????????? goto error_register_entities;
+>> ? +??????????????????? printk("isp_probe: 11\n");
+>> ????? isp->notifier.ops = &isp_subdev_notifier_ops;
+>> ? ????? ret = v4l2_async_notifier_register(&isp->v4l2_dev,
+>> &isp->notifier);
+>> ????? if (ret)
+>> ????????? goto error_register_entities;
+>> ? +??????????????????? printk("isp_probe: 12\n");???
+>> ????? isp_core_init(isp, 1);
+>> +??????????????????? printk("isp_probe: 13\n");???????
+>> ????? omap3isp_put(isp);
+>> ? ????? return 0;
+>> ? ? error_register_entities:
+>> +??????????????????? printk("isp_probe: f1\n");???????
+>> ????? isp_unregister_entities(isp);
+>> ? error_modules:
+>> +??????????????????????? printk("isp_probe: f2\n");???????
+>> ????? isp_cleanup_modules(isp);
+>> ? error_iommu:
+>> +??????????????????????????? printk("isp_probe: f3\n");???????
+>> ????? isp_detach_iommu(isp);
+>> ? error_isp:
+>> +??????????????????????????? printk("isp_probe: f4\n");???????
+>> ????? isp_xclk_cleanup(isp);
+>> ????? __omap3isp_put(isp, false);
+>> ? error:
+>> +??????????????????????? printk("isp_probe: f5\n");???????????
+>> ????? v4l2_async_notifier_cleanup(&isp->notifier);
+>> ????? mutex_destroy(&isp->isp_mutex);
+>> ?
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
