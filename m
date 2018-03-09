@@ -1,110 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Mar 2018 14:28:38 +0000
-Subject: [PATCHv2 10/12] arm64/kvm: context-switch ptrauth registers
-In-Reply-To: <20180206123847.GY21802@cbox>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-11-mark.rutland@arm.com>
- <20180206123847.GY21802@cbox>
-Message-ID: <20180309142838.uvcv3mhvqqlprktt@lakrids.cambridge.arm.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Fri, 9 Mar 2018 11:34:15 -0300
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for
+ ThunderX2 B0
+In-Reply-To: <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
+References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
+ <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
+ <20180307143832.GJ3701@kernel.org>
+ <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
+ <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
+ <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
+ <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
+Message-ID: <20180309143415.GB4194@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 01:38:47PM +0100, Christoffer Dall wrote:
-> On Mon, Nov 27, 2017 at 04:38:04PM +0000, Mark Rutland wrote:
-> > When pointer authentication is supported, a guest may wish to use it.
-> > This patch adds the necessary KVM infrastructure for this to work, with
-> > a semi-lazy context switch of the pointer auth state.
-> > 
-> > When we schedule a vcpu, 
+Em Fri, Mar 09, 2018 at 07:57:04PM +0530, Ganapatrao Kulkarni escreveu:
+> Hi Arnaldo,
 > 
-> That's not quite what the code does, the code only does this when we
-> schedule back a preempted or blocked vcpu thread.
+> can you please pull-in this patch?
 
-Does that only leave the case of the vCPU being scheduled for the first
-time? Or am I missing something else?
+So everybody is Ok with this? Can I have some Acked-by: from subject
+matter experts?
 
-[...]
-
-> > we disable guest usage of pointer
-> > authentication instructions and accesses to the keys. While these are
-> > disabled, we avoid context-switching the keys. When we trap the guest
-> > trying to use pointer authentication functionality, we change to eagerly
-> > context-switching the keys, and enable the feature. The next time the
-> > vcpu is scheduled out/in, we start again.
-> > 
-> > Pointer authentication consists of address authentication and generic
-> > authentication, and CPUs in a system might have varied support for
-> > either. Where support for either feature is not uniform, it is hidden
-> > from guests via ID register emulation, as a result of the cpufeature
-> > framework in the host.
-> > 
-> > Unfortunately, address authentication and generic authentication cannot
-> > be trapped separately, as the architecture provides a single EL2 trap
-> > covering both. If we wish to expose one without the other, we cannot
-> > prevent a (badly-written) guest from intermittently using a feature
-> > which is not uniformly supported (when scheduled on a physical CPU which
-> > supports the relevant feature). 
+- Arnaldo
+ 
+> On Thu, Mar 8, 2018 at 9:44 AM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
+> > On Thu, Mar 8, 2018 at 12:01 AM, William Cohen <wcohen@redhat.com> wrote:
+> >> On 03/07/2018 12:35 PM, Ganapatrao Kulkarni wrote:
+> >>> Hi Will Cohen,
+> >>>
+> >>> On Wed, Mar 7, 2018 at 8:08 PM, Arnaldo Carvalho de Melo
+> >>> <acme@kernel.org> wrote:
+> >>>> Em Wed, Mar 07, 2018 at 09:32:05AM -0500, William Cohen escreveu:
+> >>>>> On 03/07/2018 06:08 AM, Ganapatrao Kulkarni wrote:
+> >>>>>> There is MIDR change on ThunderX2 B0, adding an entry to mapfile
+> >>>>>> to enable JSON events for B0.
+> >>>>>>
+> >>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> >>>>
+> >>>> Ganapatrao, can you please take this in consideration and if agreeing
+> >>>> send a v2 patch?
+> >>>>
+> >>>> With that I can add an Acked-by: wcohen, Right?
+> >>>>
+> >>>> - Arnaldo
+> >>>>>> ---
+> >>>>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
+> >>>>>>  1 file changed, 1 insertion(+)
+> >>>>>>
+> >>>>>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> >>>>>> index e61c9ca..93c5d14 100644
+> >>>>>> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> >>>>>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> >>>>>> @@ -13,4 +13,5 @@
+> >>>>>>  #
+> >>>>>>  #Family-model,Version,Filename,EventType
+> >>>>>>  0x00000000420f5160,v1,cavium,core
+> >>>>>> +0x00000000430f0af0,v1,cavium,core
+> >>>>>>  0x00000000410fd03[[:xdigit:]],v1,cortex-a53,core
+> >>>>>>
+> >>>>>
+> >>>>> Hi,
+> >>>>> Like the cortex-a53 the last digit '0' of the match for the MIDR should be replaced with [[:xdigit:]] to allow for possible future revisions of chip:
+> >>>
+> >>> for arm64 implementation,  bits 3:0(Revision) and bits 23:20(Variant)
+> >>> are ignored/dont-care.
+> >>
+> >> Thanks for pointing that out.  See the code masking out those bits in linux/toos/perf/arch/util/header.c. For the ppc64 it just copies the equivalent of the MIDR including the revision bits. Thus, the need for regular expression matching to avoid having to create a new entry for each revision.
+> >
+> > It is same for arm64 too, there is no need to add an entry for every
+> > revision change,  need to add when part number changes.
+> > This patch is not intended to add entry for revision change, the fact
+> > of the matter is that, there  is complete MIDR change (vulcan to
+> > thunderx2) in B0.
+> > as per current arm64
+> > implementation(.tools/perf/arch/arm64/util/header.c), it is not
+> > required to have any dontcare marking in mapfile for revision/variant
+> > bits.
+> >
+> > thanks
+> > Ganapat
+> >
+> >>
+> >> -Will
+> >>
+> >>>
+> >>>>>
+> >>>>> 0x00000000430f0af[[:xdigit:]],v1,cavium,core
+> >>>>>
+> >>>>>
+> >>>>> -Will Cohen
+> >>>>
+> >>>
+> >>> thanks
+> >>> Ganapat
+> >>>> _______________________________________________
+> >>>> linux-arm-kernel mailing list
+> >>>> linux-arm-kernel at lists.infradead.org
+> >>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
 > 
-> We could choose to always trap and emulate in software in this case,
-> couldn't we?  (not saying we should though).
-
-Practically speaking, we cannot. Emulating the feature would be so
-detrimental to performance as to render the feature useless --  every
-function prologue/epilogue in a guest would end up trapping to hyp.
-
-Additionally, if the algorithm is IMP DEF, we simply don't know how to
-emulate it.
-
-[...]
-
-> Also, this patch doesn't let userspace decide if we should hide or
-> expose the feature to guests, and will expose new system registers to
-> userspace.  That means that on hardware supporting pointer
-> authentication, with this patch, it's not possible to migrate to a
-> machine which doesn't have the support.  That's probably a good thing
-> (false sense of security etc.), but I wonder if we should have a
-> mechanism for userspace to ask for pointer authentication in the guest
-> and only if that's enabled, do we expose the feature to the guest and in
-> the system register list to user space as well?
-
-Making this an opt-in makes sense to me, given it affects migration.
-I'll take a look at what we do for SVE.
-
-[...]
-
-> > When the guest is scheduled on a
-> > physical CPU lacking the feature, these atetmps will result in an UNDEF
-> 
-> attempts
-
-Whoops. Fixed.
-
-[...]
-
-> > +static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
-> > +{
-> > +	kvm_arm_vcpu_ptrauth_disable(vcpu);
-> > +}
-> > +
-> 
-> I still find this decision to begin trapping again quite arbitrary, and
-> would at least prefer this to be in vcpu_load (which would make the
-> behavior match the commit text as well).
-
-Sure, done.
-
-> My expectation would be that if a guest is running software with pointer
-> authentication enabled, then it's likely to either keep using the
-> feature, or not use it at all, so I would make this a one-time flag.
-
-I think it's likely that some applications will use ptrauth while others
-do not. Even if the gust OS supports ptrauth, KVM may repeatedly preempt
-an application that doesn't use it, and we'd win in that case.
-
-There are also some rarer cases, like kexec in a guest from a
-ptrauth-aware kernel to a ptrauth-oblivious one.
-
-I don't have strong feelings either way, and I have no data.
-
-Thanks,
-Mark.
+> thanks
+> Ganapat
