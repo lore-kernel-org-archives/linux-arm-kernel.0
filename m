@@ -1,86 +1,32 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri,  9 Mar 2018 11:14:44 +0100
-Subject: [PATCH 8/9] ARM: dts: sun8i: add video engine support for A33
-In-Reply-To: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
-References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
-Message-ID: <20180309101445.16190-6-paul.kocialkowski@bootlin.com>
+From: d.schultz@phytec.de (Daniel Schultz)
+Date: Fri, 9 Mar 2018 11:18:51 +0100
+Subject: [PATCH v2] ARM: multi_v7_defconfig: enable CONFIG_DP83867_PHY
+Message-ID: <1520590731-34556-1-git-send-email-d.schultz@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+This adds the driver for TI's DP83867 ethernet phy.
 
-A33 has a video engine just like the one in A10.
-
-Add the support for it in the device tree.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+Changes:
+	v2: Re-submit with more recipients.
+	Sorry, I only added Russell and vger in v1.
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 50eb84fa246a..253a71851b77 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -181,6 +181,21 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		ve_reserved: cma {
-+			compatible = "shared-dma-pool";
-+			no-map;
-+			size = <0x4000000>;
-+			alignment = <0x2000>;
-+			alloc-ranges = <0x40000000 0x10000000>;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -204,6 +219,11 @@
- 	};
- 
- 	soc at 1c00000 {
-+		syscon: system-controller at 01c00000 {
-+			compatible = "allwinner,sun8i-a33-syscon", "syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
-+
- 		tcon0: lcd-controller at 1c0c000 {
- 			compatible = "allwinner,sun8i-a33-tcon";
- 			reg = <0x01c0c000 0x1000>;
-@@ -240,6 +260,25 @@
- 			};
- 		};
- 
-+		ve: video-engine at 01c0e000 {
-+			compatible = "allwinner,sun4i-a10-video-engine";
-+			memory-region = <&ve_reserved>;
-+			syscon = <&syscon>;
-+
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+
-+			assigned-clocks = <&ccu CLK_VE>;
-+			assigned-clock-rates = <320000000>;
-+
-+			resets = <&ccu RST_BUS_VE>;
-+
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			reg = <0x01c0e000 0x1000>;
-+		};
-+
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index da73876..62ad2c6 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -270,6 +270,7 @@ CONFIG_AT803X_PHY=y
+ CONFIG_MARVELL_PHY=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_BROADCOM_PHY=y
++CONFIG_DP83867_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_REALTEK_PHY=y
+ CONFIG_MICREL_PHY=y
 -- 
-2.16.2
+2.7.4
