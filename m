@@ -1,110 +1,238 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:18 +0100
-Subject: [PATCH v5 27/36] drm/rockchip: pre dither down when output bpc is 8bit
+Date: Fri,  9 Mar 2018 23:23:21 +0100
+Subject: [PATCH v5 30/36] drm/rockchip: Disable PSR on input events
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-28-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-31-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+From: "Kristian H. Kristensen" <hoegsberg@google.com>
 
-Some encoder have a crc verification check, crc check fail if
-input and output data is not equal.
+To improve PSR exit latency, we speculatively start exiting when we
+receive input events. Occasionally, this may lead to false positives,
+but most of the time we get a head start on coming out of PSR. Depending
+on how userspace takes to produce a new frame in response to the event,
+this can completely hide the exit latency. In case of Chrome OS, we
+typically get the input notifier 50ms or more before the dirty_fb
+triggered exit.
 
-That means encoder input and output need use same color depth,
-vop can output 10bit data to encoder, but some panel only support
-8bit depth, that would make crc check die.
-
-So pre dither down vop data to 8bit if panel's bpc is 8.
-
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-[seanpaul resolved conflict in rockchip_drm_vop.c]
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Kristian H. Kristensen <hoegsberg@google.com>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 2 ++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 6 ++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c     | 1 +
- 5 files changed, 11 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 134 ++++++++++++++++++++++++++++
+ 1 file changed, 134 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 8c884f9ce713..b3f46ed24cdc 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -218,6 +218,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
- 				      struct drm_connector_state *conn_state)
- {
- 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
-+	struct drm_display_info *di = &conn_state->connector->display_info;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index 9376f4396b6b..a107845ba97c 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -12,6 +12,8 @@
+  * GNU General Public License for more details.
+  */
  
- 	/*
- 	 * The hardware IC designed that VOP must output the RGB10 video
-@@ -229,6 +230,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
++#include <linux/input.h>
++
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
  
- 	s->output_mode = ROCKCHIP_OUT_MODE_AAAA;
- 	s->output_type = DRM_MODE_CONNECTOR_eDP;
-+	s->output_bpc = di->bpc;
+@@ -35,6 +37,9 @@ struct psr_drv {
+ 	enum psr_state		state;
+ 
+ 	struct delayed_work	flush_work;
++	struct work_struct	disable_work;
++
++	struct input_handler    input_handler;
+ 
+ 	int (*set)(struct drm_encoder *encoder, bool enable);
+ };
+@@ -133,6 +138,18 @@ static void psr_flush_handler(struct work_struct *work)
+ 	mutex_unlock(&psr->lock);
+ }
+ 
++static void psr_disable_handler(struct work_struct *work)
++{
++	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
++
++	/* If the state has changed since we initiated the flush, do nothing */
++	mutex_lock(&psr->lock);
++	if (psr->state == PSR_ENABLE)
++		psr_set_state_locked(psr, PSR_FLUSH);
++	mutex_unlock(&psr->lock);
++	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
++}
++
+ /**
+  * rockchip_drm_psr_activate - activate PSR on the given pipe
+  * @encoder: encoder to obtain the PSR encoder
+@@ -173,6 +190,7 @@ int rockchip_drm_psr_deactivate(struct drm_encoder *encoder)
+ 	psr->active = false;
+ 	mutex_unlock(&psr->lock);
+ 	cancel_delayed_work_sync(&psr->flush_work);
++	cancel_work_sync(&psr->disable_work);
  
  	return 0;
  }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index 9c064a40458b..3a6ebfc26036 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -36,6 +36,7 @@ struct rockchip_crtc_state {
- 	struct drm_crtc_state base;
- 	int output_type;
- 	int output_mode;
-+	int output_bpc;
- };
- #define to_rockchip_crtc_state(s) \
- 		container_of(s, struct rockchip_crtc_state, base)
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index b601c59e76a8..e2c9ee3204f4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -923,6 +923,12 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
- 	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA &&
- 	    !(vop_data->feature & VOP_FEATURE_OUTPUT_RGB10))
- 		s->output_mode = ROCKCHIP_OUT_MODE_P888;
-+
-+	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA && s->output_bpc == 8)
-+		VOP_REG_SET(vop, common, pre_dither_down, 1);
-+	else
-+		VOP_REG_SET(vop, common, pre_dither_down, 0);
-+
- 	VOP_REG_SET(vop, common, out_mode, s->output_mode);
+@@ -226,6 +244,95 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev)
+ }
+ EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
  
- 	VOP_REG_SET(vop, modeset, htotal_pw, (htotal << 16) | hsync_len);
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 56bbd2e2a8ef..084acdd0019a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -67,6 +67,7 @@ struct vop_common {
- 	struct vop_reg cfg_done;
- 	struct vop_reg dsp_blank;
- 	struct vop_reg data_blank;
-+	struct vop_reg pre_dither_down;
- 	struct vop_reg dither_down;
- 	struct vop_reg dither_up;
- 	struct vop_reg gate_en;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 2e4eea3459fe..08023d3ecb76 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -264,6 +264,7 @@ static const struct vop_common rk3288_common = {
- 	.standby = VOP_REG_SYNC(RK3288_SYS_CTRL, 0x1, 22),
- 	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
- 	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
-+	.pre_dither_down = VOP_REG(RK3288_DSP_CTRL1, 0x1, 1),
- 	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
- 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
- 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
++static void psr_input_event(struct input_handle *handle,
++			    unsigned int type, unsigned int code,
++			    int value)
++{
++	struct psr_drv *psr = handle->handler->private;
++
++	schedule_work(&psr->disable_work);
++}
++
++static int psr_input_connect(struct input_handler *handler,
++			     struct input_dev *dev,
++			     const struct input_device_id *id)
++{
++	struct input_handle *handle;
++	int error;
++
++	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
++	if (!handle)
++		return -ENOMEM;
++
++	handle->dev = dev;
++	handle->handler = handler;
++	handle->name = "rockchip-psr";
++
++	error = input_register_handle(handle);
++	if (error)
++		goto err2;
++
++	error = input_open_device(handle);
++	if (error)
++		goto err1;
++
++	return 0;
++
++err1:
++	input_unregister_handle(handle);
++err2:
++	kfree(handle);
++	return error;
++}
++
++static void psr_input_disconnect(struct input_handle *handle)
++{
++	input_close_device(handle);
++	input_unregister_handle(handle);
++	kfree(handle);
++}
++
++/* Same device ids as cpu-boost */
++static const struct input_device_id psr_ids[] = {
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
++			 INPUT_DEVICE_ID_MATCH_ABSBIT,
++		.evbit = { BIT_MASK(EV_ABS) },
++		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
++			    BIT_MASK(ABS_MT_POSITION_X) |
++			    BIT_MASK(ABS_MT_POSITION_Y) },
++	}, /* multi-touch touchscreen */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
++		.evbit = { BIT_MASK(EV_ABS) },
++		.absbit = { [BIT_WORD(ABS_X)] = BIT_MASK(ABS_X) }
++
++	}, /* stylus or joystick device */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++		.keybit = { [BIT_WORD(BTN_LEFT)] = BIT_MASK(BTN_LEFT) },
++	}, /* pointer (e.g. trackpad, mouse) */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++		.keybit = { [BIT_WORD(KEY_ESC)] = BIT_MASK(KEY_ESC) },
++	}, /* keyboard */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
++				INPUT_DEVICE_ID_MATCH_KEYBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++		.keybit = {[BIT_WORD(BTN_JOYSTICK)] = BIT_MASK(BTN_JOYSTICK) },
++	}, /* joysticks not caught by ABS_X above */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
++				INPUT_DEVICE_ID_MATCH_KEYBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++		.keybit = { [BIT_WORD(BTN_GAMEPAD)] = BIT_MASK(BTN_GAMEPAD) },
++	}, /* gamepad */
++	{ },
++};
++
+ /**
+  * rockchip_drm_psr_register - register encoder to psr driver
+  * @encoder: encoder that obtain the PSR function
+@@ -239,6 +346,7 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+ {
+ 	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
+ 	struct psr_drv *psr;
++	int error;
+ 
+ 	if (!encoder || !psr_set)
+ 		return -EINVAL;
+@@ -248,6 +356,7 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+ 		return -ENOMEM;
+ 
+ 	INIT_DELAYED_WORK(&psr->flush_work, psr_flush_handler);
++	INIT_WORK(&psr->disable_work, psr_disable_handler);
+ 	mutex_init(&psr->lock);
+ 
+ 	psr->active = true;
+@@ -255,11 +364,33 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+ 	psr->encoder = encoder;
+ 	psr->set = psr_set;
+ 
++	psr->input_handler.event = psr_input_event;
++	psr->input_handler.connect = psr_input_connect;
++	psr->input_handler.disconnect = psr_input_disconnect;
++	psr->input_handler.name =
++		kasprintf(GFP_KERNEL, "rockchip-psr-%s", encoder->name);
++	if (!psr->input_handler.name) {
++		error = -ENOMEM;
++		goto err2;
++	}
++	psr->input_handler.id_table = psr_ids;
++	psr->input_handler.private = psr;
++
++	error = input_register_handler(&psr->input_handler);
++	if (error)
++		goto err1;
++
+ 	mutex_lock(&drm_drv->psr_list_lock);
+ 	list_add_tail(&psr->list, &drm_drv->psr_list);
+ 	mutex_unlock(&drm_drv->psr_list_lock);
+ 
+ 	return 0;
++
++ err1:
++	kfree(psr->input_handler.name);
++ err2:
++	kfree(psr);
++	return error;
+ }
+ EXPORT_SYMBOL(rockchip_drm_psr_register);
+ 
+@@ -279,8 +410,11 @@ void rockchip_drm_psr_unregister(struct drm_encoder *encoder)
+ 	mutex_lock(&drm_drv->psr_list_lock);
+ 	list_for_each_entry_safe(psr, n, &drm_drv->psr_list, list) {
+ 		if (psr->encoder == encoder) {
++			input_unregister_handler(&psr->input_handler);
+ 			cancel_delayed_work_sync(&psr->flush_work);
++			cancel_work_sync(&psr->disable_work);
+ 			list_del(&psr->list);
++			kfree(psr->input_handler.name);
+ 			kfree(psr);
+ 		}
+ 	}
 -- 
 2.16.1
