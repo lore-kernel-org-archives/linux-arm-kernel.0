@@ -1,80 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Mar 2018 18:15:39 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.17 (#1)
-Message-ID: <87lgf12mro.fsf@bootlin.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 09 Mar 2018 09:18:41 -0800
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+ <20180307050624.GR23018@vireshk-i7>
+ <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+ <20180309034332.GO6842@vireshk-i7>
+ <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
+Message-ID: <152061592175.13890.6455929815877326231@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+(I wrote an email that seems to have been lost)
 
-Here is the first pull request for dt64 for mvebu for v4.17.
+Quoting Jordan Crouse (2018-03-09 08:03:55)
+> On Fri, Mar 09, 2018 at 09:13:32AM +0530, Viresh Kumar wrote:
+> > On 08-03-18, 13:14, Jordan Crouse wrote:
+> > > It seems to me that performance_state has a direct relationship with genpd
+> > > which is good for CPU votes but in this case, we're just passing along raw data
+> > > to an independent microcontroller. The 'qcom,arc-level' is used to construct
+> > > the actual values that the GMU will program into the RPMh. Since these are
+> > 
+> > The "genpd" here is created specially for this RPM. The performance-state thing
+> > is designed to solve this very specific problem of qualcomm SoCs and there is no
+> > way we are going to add another property for this now.
+> > 
+> > > informational (from the CPU perspective) rather than functional I feel like
+> > > that using performance_state for this would be as hacky as using opp-microvolt
+> > > or something else.
+> > 
+> > There is some WIP stuff here Rajendra is testing currently.
+> > 
+> > ssh://git at git.linaro.org/people/viresh.kumar/mylinux.git opp/genpd/qcom
+> > 
+> > Please have a talk with Rajendra who can help you understand on how this can be
+> > used for GPUs.
+> 
+> I don't think we are understanding each other. The GMU is a separate
+> microcontroller. It is given a magic number (actually a combination of magic
+> numbers) that it then uses to directly interact with the other hardware to make
+> the vote. The only responsibility that the CPU has is to construct that magic
+> number (once, at init) and send it across when asked.
+> 
+> Looking at the sdhc code from the testing tree it makes perfect sense
+> that you have a device that needs to eventually do a RPMh vote from the CPU and
+> so the 'required-opp' and performance state come together to do the right thing.
+> This is good code.
+> 
+> None of this is true for the GPU. The CPU never votes for the GPU so there 
+> isn't any need to connect it to the power domain drivers. Even if you did
+> there isn't any current mechanism for the rpmpd driver to pass the right magic
+> number to the GPU driver which is what it really needs.
+> 
+> I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
+> then thats just a naming dispute. We still need a way for the GPU to query the
+> magic values.
+> 
 
-Gregory
+Agreed. Forcing genpd and set_performance_state APIs on GMU doesn't make
+any sense if the GMU is doing it all itself.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+The binding should be the same between sdhc and GMU if they're actually
+talking about the same thing though. I think they are, because I suspect
+GMU needs to translate the human reasonable value of qcom,corner into
+the hardware qcom,arc-level value to write into it's hardware so the GMU
+can auto-transition performance states. If I'm wrong, then
+qcom,arc-level needs to be created alongside of qcom,corner because
+they're different number spaces.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.17-1
-
-for you to fetch changes up to 597667d889517c6085d57aac92dbf1cc624cd8ae:
-
-  ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for the uart nodes (2018-03-09 17:49:46 +0100)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.17 (part 1)
-
-- convert to the SPDX-License-Identifier
-- add missing clocks (for the registers) on some of the peripherals
-- use the new nand driver
-- add more uart for Armada 7K/8K SoCs
-
-----------------------------------------------------------------
-Baruch Siach (3):
-      arm64: dts: marvell: add CP110 uart peripherals
-      arm64: dts: marvell: mcbin: enable uart headers
-      arm64: dts: marvell: mcbin: fix board name typo
-
-Gregory CLEMENT (11):
-      ARM64: dts: marvell: armada-cp110: Add registers clock for SPI nodes
-      ARM64: dts: marvell: armada-cp110: Add registers clock for I2C nodes
-      arm64: dts: marvell: use SPDX-License-Identifier for Armada SoCs
-      arm64: dts: marvell: armada-3720-db: use SPDX-License-Identifier
-      arm64: dts: marvell: armada-3720-espressobin: use SPDX-License-Identifier
-      arm64: dts: marvell: armada-7040-db: use SPDX-License-Identifier
-      arm64: dts: marvell: armada-8040-db: use SPDX-License-Identifier
-      arm64: dts: marvell: armada-8040-mcbin: use SPDX-License-Identifier
-      arm64: dts: marvell: armada-8080-db: use SPDX-License-Identifier
-      ARM64: dts: marvell: armada-cp110: Add registers clock for sata node
-      ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for the uart nodes
-
-Miquel Raynal (2):
-      arm64: dts: marvell: use reworked NAND controller driver on Armada 7K
-      arm64: dts: marvell: use reworked NAND controller driver on Armada 8K
-
- arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 38 +--------
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 39 +--------
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 38 +--------
- arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 38 +--------
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 38 +--------
- arch/arm64/boot/dts/marvell/armada-7020.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 93 ++++++++--------------
- arch/arm64/boot/dts/marvell/armada-7040.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 87 +++++++-------------
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 65 ++++++---------
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-8080-db.dts     | 41 +---------
- arch/arm64/boot/dts/marvell/armada-8080.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi       | 41 +---------
- arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi | 41 +---------
- arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi | 41 +---------
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 41 +---------
- .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 41 +---------
- arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 41 +---------
- arch/arm64/boot/dts/marvell/armada-common.dtsi     |  2 +-
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 81 ++++++++++++++++---
- 23 files changed, 172 insertions(+), 880 deletions(-)
+BTW, it's qcom,corner and not qcom-corner right?
