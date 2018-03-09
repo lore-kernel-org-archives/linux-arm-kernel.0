@@ -1,35 +1,44 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 09 Mar 2018 15:26:09 -0800
-Subject: [GIT PULL] Allwinner clock fixes for 4.16
-In-Reply-To: <20180223113120.GA2659@wens.csie.org>
-References: <20180223113120.GA2659@wens.csie.org>
-Message-ID: <152063796996.113003.6796575742282477127@swboyd.mtv.corp.google.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri,  9 Mar 2018 15:36:39 -0800
+Subject: [PATCH] ARM: bcm2835: Add the DPI hardware to the device tree.
+Message-ID: <20180309233639.2029-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chen-Yu Tsai (2018-02-23 03:31:20)
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> 
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.16
-> 
-> for you to fetch changes up to 5682e268350f9eccdbb04006605c1b7068a7b323:
-> 
->   clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops (2018-02-19 08:59:50 +0100)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock fixes for 4.16
-> 
-> A critical fix for the A31 sunxi-ng clock driver. The CLK_OUT clocks
-> had definitions paired with the incorrect type of clk ops. This results
-> in a serious oops starting with commit 946797aa3f08 ("clk: sunxi-ng:
-> Support fixed post-dividers on MP style clocks"), which exposed the
-> incorrect clk ops when it added a new field to the data structures,
-> which then nudged the underlying (compatible but incorrect) data
-> structures out of alignment.
-> 
+It's currently marked disabled, as it's not useful without a panel
+associated with it and the GPIO pins routed to ALT2.
 
-Thanks. Pulled.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+
+This patch got misplaced as part of the original VC4 DPI work (which
+included the binding).  I've got a full branch demoing a panel at
+https://github.com/anholt/linux/commits/drm-vc4-dpi
+
+ arch/arm/boot/dts/bcm283x.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 18db25a5a66e..4359cb2aae22 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -438,6 +438,17 @@
+ 			interrupts = <2 14>; /* pwa1 */
+ 		};
+ 
++		dpi: dpi at 7e208000 {
++			compatible = "brcm,bcm2835-dpi";
++			reg = <0x7e208000 0x8c>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>,
++				 <&clocks BCM2835_CLOCK_DPI>;
++			clock-names = "core", "pixel";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		dsi0: dsi at 7e209000 {
+ 			compatible = "brcm,bcm2835-dsi0";
+ 			reg = <0x7e209000 0x78>;
+-- 
+2.16.2
