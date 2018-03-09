@@ -1,100 +1,83 @@
-From: jhogan@kernel.org (James Hogan)
-Date: Fri, 9 Mar 2018 14:44:21 +0000
-Subject: [PATCH v4 7/8] MIPS: BMIPS: Add PCI bindings for 7425, 7435
-In-Reply-To: <1516058925-46522-8-git-send-email-jim2101024@gmail.com>
-References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
- <1516058925-46522-8-git-send-email-jim2101024@gmail.com>
-Message-ID: <20180309144420.GG24558@saruman>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Fri,  9 Mar 2018 14:46:58 +0000
+Subject: [PATCH 04/25] nvmem: vf610-ocotp: Convert to use devm_nvmem_register()
+In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-5-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 06:28:44PM -0500, Jim Quinlan wrote:
-> diff --git a/arch/mips/boot/dts/brcm/bcm7425.dtsi b/arch/mips/boot/dts/brcm/bcm7425.dtsi
-> index e4fb9b6..02168d0 100644
-> --- a/arch/mips/boot/dts/brcm/bcm7425.dtsi
-> +++ b/arch/mips/boot/dts/brcm/bcm7425.dtsi
-> @@ -495,4 +495,30 @@
->  			status = "disabled";
->  		};
->  	};
-> +
-> +	pcie: pcie at 10410000 {
-> +		reg = <0x10410000 0x830c>;
-> +		compatible = "brcm,bcm7425-pcie";
-> +		interrupts = <37>, <37>;
-> +		interrupt-names = "pcie", "msi";
-> +		interrupt-parent = <&periph_intc>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		linux,pci-domain = <0>;
-> +		brcm,enable-ssc;
-> +		bus-range = <0x00 0xff>;
-> +		msi-controller;
-> +		#interrupt-cells = <1>;
-> +		/* 4x128mb windows */
-> +		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
-> +		interrupt-map-mask = <0 0 0 7>;
-> +		interrupt-map = <0 0 0 1 &periph_intc 33
-> +				 0 0 0 2 &periph_intc 34
-> +				 0 0 0 3 &periph_intc 35
-> +				 0 0 0 4 &periph_intc 36>;
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-no status = "disabled" like the other dtsi?
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
-> +	};
-> +
->  };
-> diff --git a/arch/mips/boot/dts/brcm/bcm7435.dtsi b/arch/mips/boot/dts/brcm/bcm7435.dtsi
-> index 1484e89..84881224 100644
-> --- a/arch/mips/boot/dts/brcm/bcm7435.dtsi
-> +++ b/arch/mips/boot/dts/brcm/bcm7435.dtsi
-> @@ -510,4 +510,31 @@
->  			status = "disabled";
->  		};
->  	};
-> +
-> +	pcie: pcie at 10410000 {
-> +		reg = <0x10410000 0x930c>;
-> +		interrupts = <0x27>, <0x27>;
-> +		interrupt-names = "pcie", "msi";
-> +		interrupt-parent = <&periph_intc>;
-> +		compatible = "brcm,bcm7435-pcie";
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/vf610-ocotp.c | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
 
-Might be nice to be consistent in your property ordering between these
-two dtsi files. I for one would prefer compatible to be near the top
-too, if only for consistency with most other nodes in these files.
-
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		linux,pci-domain = <0>;
-> +		brcm,enable-ssc;
-> +		bus-range = <0x00 0xff>;
-> +		msi-controller;
-> +		#interrupt-cells = <1>;
-> +		/* 4x128mb windows */
-> +		ranges = <0x2000000 0x0 0xd0000000 0xd0000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xd8000000 0xd8000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xe0000000 0xe0000000 0 0x08000000>,
-> +			 <0x2000000 0x0 0xe8000000 0xe8000000 0 0x08000000>;
-> +		interrupt-map-mask = <0 0 0 7>;
-> +		interrupt-map = <0 0 0 1 &periph_intc 35
-> +				 0 0 0 2 &periph_intc 36
-> +				 0 0 0 3 &periph_intc 37
-> +				 0 0 0 4 &periph_intc 38>;
-> +		status = "disabled";
-> +	};
-> +
->  };
-
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/edb1389d/attachment.sig>
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 5ae9e002f195..5a395ffb2ca8 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -217,13 +217,6 @@ static const struct of_device_id ocotp_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, ocotp_of_match);
+ 
+-static int vf610_ocotp_remove(struct platform_device *pdev)
+-{
+-	struct vf610_ocotp *ocotp_dev = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(ocotp_dev->nvmem);
+-}
+-
+ static int vf610_ocotp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -246,26 +239,20 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 			PTR_ERR(ocotp_dev->clk));
+ 		return PTR_ERR(ocotp_dev->clk);
+ 	}
++	ocotp_dev->dev = dev;
++	ocotp_dev->timing = vf610_ocotp_calculate_timing(ocotp_dev);
+ 
+ 	ocotp_config.size = resource_size(res);
+ 	ocotp_config.priv = ocotp_dev;
+ 	ocotp_config.dev = dev;
+ 
+-	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
+-	if (IS_ERR(ocotp_dev->nvmem))
+-		return PTR_ERR(ocotp_dev->nvmem);
++	ocotp_dev->nvmem = devm_nvmem_register(dev, &ocotp_config);
+ 
+-	ocotp_dev->dev = dev;
+-	platform_set_drvdata(pdev, ocotp_dev);
+-
+-	ocotp_dev->timing = vf610_ocotp_calculate_timing(ocotp_dev);
+-
+-	return 0;
++	return PTR_ERR_OR_ZERO(ocotp_dev->nvmem);
+ }
+ 
+ static struct platform_driver vf610_ocotp_driver = {
+ 	.probe = vf610_ocotp_probe,
+-	.remove = vf610_ocotp_remove,
+ 	.driver = {
+ 		.name = "vf610-ocotp",
+ 		.of_match_table = ocotp_of_match,
+-- 
+2.15.1
