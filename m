@@ -1,31 +1,23 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:13 +0100
-Subject: [PATCH v5 22/36] drm/bridge: analogix_dp: Fix incorrect operations
- with register ANALOGIX_DP_FUNC_EN_1
+Date: Fri,  9 Mar 2018 23:23:12 +0100
+Subject: [PATCH v5 21/36] drm/bridge: analogix_dp: Fix timeout of video
+ streamclk config
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-23-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-22-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: zain wang <wzz@rock-chips.com>
 
-Register ANALOGIX_DP_FUNC_EN_1(offset 0x18), Rockchip is different to
-Exynos:
+The STRM_VALID bit in register ANALOGIX_DP_SYS_CTL_3 may be unstable,
+so we may hit the error log "Timeout of video streamclk ok" since
+checked this unstable bit.
+In fact, we can go continue and the streamclk is ok if we wait enough time,
+it does no effect on display.
+Let's change this error to warn.
 
-on Exynos edp phy,
-BIT 7		MASTER_VID_FUNC_EN_N
-BIT 6		reserved
-BIT 5		SLAVE_VID_FUNC_EN_N
-
-on Rockchip edp phy,
-BIT 7		reserved
-BIT 6		RK_VID_CAP_FUNC_EN_N
-BIT 5		RK_VID_FIFO_FUNC_EN_N
-
-So, we should do some private operations to Rockchip.
-
-Cc: Tomasz Figa <tfiga@chromium.org>
+Cc: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
@@ -34,60 +26,24 @@ Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 19 ++++++++++++++-----
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h |  2 ++
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 02ab1aaa9993..4eae206ec31b 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -126,9 +126,14 @@ void analogix_dp_reset(struct analogix_dp_device *dp)
- 	analogix_dp_stop_video(dp);
- 	analogix_dp_enable_video_mute(dp, 0);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 1f1cb624414d..d76e1652b1fd 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -921,8 +921,9 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
+ 			done_count = 0;
+ 		}
+ 		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
+-			dev_err(dp->dev, "Timeout of video streamclk ok\n");
+-			return -ETIMEDOUT;
++			dev_warn(dp->dev,
++				 "Ignoring timeout of video streamclk ok\n");
++			break;
+ 		}
  
--	reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
--		AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
--		HDCP_FUNC_EN_N | SW_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type))
-+		reg = RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N |
-+			SW_FUNC_EN_N;
-+	else
-+		reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
-+			AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
-+			HDCP_FUNC_EN_N | SW_FUNC_EN_N;
-+
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
- 
- 	reg = SSC_FUNC_EN_N | AUX_FUNC_EN_N |
-@@ -971,8 +976,12 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp)
- 	u32 reg;
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
--	reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
--	reg |= MASTER_VID_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type)) {
-+		reg &= ~(RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N);
-+	} else {
-+		reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
-+		reg |= MASTER_VID_FUNC_EN_N;
-+	}
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index b633a4a5082a..0cf27c731727 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -127,7 +127,9 @@
- 
- /* ANALOGIX_DP_FUNC_EN_1 */
- #define MASTER_VID_FUNC_EN_N			(0x1 << 7)
-+#define RK_VID_CAP_FUNC_EN_N			(0x1 << 6)
- #define SLAVE_VID_FUNC_EN_N			(0x1 << 5)
-+#define RK_VID_FIFO_FUNC_EN_N			(0x1 << 5)
- #define AUD_FIFO_FUNC_EN_N			(0x1 << 4)
- #define AUD_FUNC_EN_N				(0x1 << 3)
- #define HDCP_FUNC_EN_N				(0x1 << 2)
+ 		usleep_range(1000, 1001);
 -- 
 2.16.1
