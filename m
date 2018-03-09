@@ -1,93 +1,151 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri,  9 Mar 2018 23:23:09 +0100
-Subject: [PATCH v5 18/36] drm/bridge: analogix_dp: Reset aux channel if an
- error occurred
+Date: Fri,  9 Mar 2018 23:23:10 +0100
+Subject: [PATCH v5 19/36] drm/rockchip: Restore psr->state when enable/disable
+ psr failed
 In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
-Message-ID: <20180309222327.18689-19-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-20-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+From: zain wang <wzz@rock-chips.com>
 
-AUX errors are caused by many different reasons. We may not know what
-happened in aux channel on failure, so let's reset aux channel if some
-errors occurred.
+If we failed disable psr, it would hang the display until next psr
+cycle coming. So we should restore psr->state when it failed.
 
-Cc: ?? ? <wzz@rock-chips.com>
-Cc: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: Lin Huang <hl@rock-chips.com>
+Cc: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: zain wang <wzz@rock-chips.com>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  4 +++-
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 10 +++++-----
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c        | 20 +++++++++++++-------
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.h        |  2 +-
+ 4 files changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index dee1ba109b5f..7b7fd227e1f9 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -466,6 +466,10 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
- 	reg = RPLY_RECEIV | AUX_ERR;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index be6eddd0d0a7..1f1cb624414d 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -153,8 +153,10 @@ int analogix_dp_disable_psr(struct analogix_dp_device *dp)
+ 	psr_vsc.DB1 = 0;
  
-+	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, true);
-+	usleep_range(10, 11);
-+	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, false);
-+
- 	analogix_dp_reset_aux(dp);
+ 	ret = drm_dp_dpcd_writeb(&dp->aux, DP_SET_POWER, DP_SET_POWER_D0);
+-	if (ret != 1)
++	if (ret != 1) {
+ 		dev_err(dp->dev, "Failed to set DP Power0 %d\n", ret);
++		return ret;
++	}
  
- 	/* Disable AUX transaction H/W retry */
-@@ -1159,7 +1163,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 				 reg, !(reg & AUX_EN), 25, 500 * 1000);
- 	if (ret) {
- 		dev_err(dp->dev, "AUX CH enable timeout!\n");
--		return -ETIMEDOUT;
-+		goto aux_error;
- 	}
- 
- 	/* TODO: Wait for an interrupt instead of looping? */
-@@ -1168,7 +1172,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 				 reg, reg & RPLY_RECEIV, 10, 20 * 1000);
- 	if (ret) {
- 		dev_err(dp->dev, "AUX CH cmd reply timeout!\n");
--		return -ETIMEDOUT;
-+		goto aux_error;
- 	}
- 
- 	/* Clear interrupt source for AUX CH command reply */
-@@ -1178,7 +1182,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
- 	if (reg & AUX_ERR) {
- 		writel(AUX_ERR, dp->reg_base + ANALOGIX_DP_INT_STA);
--		return -EREMOTEIO;
-+		goto aux_error;
- 	}
- 
- 	/* Check AUX CH error access status */
-@@ -1186,7 +1190,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 	if ((reg & AUX_STATUS_MASK)) {
- 		dev_err(dp->dev, "AUX CH error happened: %d\n\n",
- 			reg & AUX_STATUS_MASK);
--		return -EREMOTEIO;
-+		goto aux_error;
- 	}
- 
- 	if (msg->request & DP_AUX_I2C_READ) {
-@@ -1212,4 +1216,10 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
- 
- 	return num_transferred > 0 ? num_transferred : -EBUSY;
-+
-+aux_error:
-+	/* if aux err happen, reset aux */
-+	analogix_dp_init_aux(dp);
-+
-+	return -EREMOTEIO;
+ 	return analogix_dp_send_psr_spd(dp, &psr_vsc, false);
  }
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 3e8bf79bea58..8c884f9ce713 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -77,13 +77,13 @@ struct rockchip_dp_device {
+ 	struct analogix_dp_plat_data plat_data;
+ };
+ 
+-static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
++static int analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ {
+ 	struct rockchip_dp_device *dp = to_dp(encoder);
+ 	int ret;
+ 
+ 	if (!analogix_dp_psr_enabled(dp->adp))
+-		return;
++		return 0;
+ 
+ 	DRM_DEV_DEBUG(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+ 
+@@ -91,13 +91,13 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ 					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+ 	if (ret) {
+ 		DRM_DEV_ERROR(dp->dev, "line flag interrupt did not arrive\n");
+-		return;
++		return -ETIMEDOUT;
+ 	}
+ 
+ 	if (enabled)
+-		analogix_dp_enable_psr(dp->adp);
++		return analogix_dp_enable_psr(dp->adp);
+ 	else
+-		analogix_dp_disable_psr(dp->adp);
++		return analogix_dp_disable_psr(dp->adp);
+ }
+ 
+ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index b339ca943139..9376f4396b6b 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -36,7 +36,7 @@ struct psr_drv {
+ 
+ 	struct delayed_work	flush_work;
+ 
+-	void (*set)(struct drm_encoder *encoder, bool enable);
++	int (*set)(struct drm_encoder *encoder, bool enable);
+ };
+ 
+ static struct psr_drv *find_psr_by_crtc(struct drm_crtc *crtc)
+@@ -93,19 +93,25 @@ static void psr_set_state_locked(struct psr_drv *psr, enum psr_state state)
+ 		return;
+ 	}
+ 
+-	psr->state = state;
+-
+ 	/* Actually commit the state change to hardware */
+-	switch (psr->state) {
++	switch (state) {
+ 	case PSR_ENABLE:
+-		psr->set(psr->encoder, true);
++		if (psr->set(psr->encoder, true))
++			return;
+ 		break;
+ 
+ 	case PSR_DISABLE:
+ 	case PSR_FLUSH:
+-		psr->set(psr->encoder, false);
++		if (psr->set(psr->encoder, false))
++			return;
+ 		break;
++
++	default:
++		pr_err("%s: Unknown state %d\n", __func__, state);
++		return;
+ 	}
++
++	psr->state = state;
+ }
+ 
+ static void psr_set_state(struct psr_drv *psr, enum psr_state state)
+@@ -229,7 +235,7 @@ EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
+  * Zero on success, negative errno on failure.
+  */
+ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+-			void (*psr_set)(struct drm_encoder *, bool enable))
++			int (*psr_set)(struct drm_encoder *, bool enable))
+ {
+ 	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
+ 	struct psr_drv *psr;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+index b1ea0155e57c..06537ee27565 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+@@ -22,7 +22,7 @@ int rockchip_drm_psr_activate(struct drm_encoder *encoder);
+ int rockchip_drm_psr_deactivate(struct drm_encoder *encoder);
+ 
+ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+-			void (*psr_set)(struct drm_encoder *, bool enable));
++			int (*psr_set)(struct drm_encoder *, bool enable));
+ void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+ 
+ #endif /* __ROCKCHIP_DRM_PSR__ */
 -- 
 2.16.1
