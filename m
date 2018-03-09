@@ -1,46 +1,71 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 09 Mar 2018 16:09:47 +0100
-Subject: [PATCH v2 4/4] ARM: dts: Enable HDMI audio on Snow Chromebook
-In-Reply-To: <CAJKOXPemC09mmjt9AKa9Qfhy14=CdUampi3=x957=NNEzq7LqQ@mail.gmail.com>
-References: <CGME20180308162609epcas1p45458c1671c38b389e047f17804690eb9@epcas1p4.samsung.com>
- <20180307172711.15697-4-s.nawrocki@samsung.com>
- <20180308162559.391-1-s.nawrocki@samsung.com>
- <CAJKOXPemC09mmjt9AKa9Qfhy14=CdUampi3=x957=NNEzq7LqQ@mail.gmail.com>
-Message-ID: <7be21210-edc4-bfa7-6e77-ee23fae141da@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 9 Mar 2018 16:16:58 +0100
+Subject: [RFC PATCH 0/6] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
+Message-ID: <CAMuHMdWtdYAVOvR=gffVu0T1vzEcKM4pqxRc6zWr=k3PykgwiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 02:01 PM, Krzysztof Kozlowski wrote:
->> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
->> index bdf59dd3654b..932a00cfd716 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
->> @@ -9,6 +9,7 @@
->>  #include <dt-bindings/clock/maxim,max77686.h>
->>  #include <dt-bindings/interrupt-controller/irq.h>
->>  #include <dt-bindings/input/input.h>
->> +#include <dt-bindings/sound/samsung-i2s.h>
->>  #include "exynos5250.dtsi"
+On Fri, Mar 9, 2018 at 3:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Mar 09, 2018 at 03:01:58PM +0100, Andrey Konovalov wrote:
+>> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+>> tags into the top byte of each pointer. Userspace programs (such as
+>> HWASan, a memory debugging tool [1]) might use this feature and pass
+>> tagged user pointers to the kernel through syscalls or other interfaces.
 >>
->>  / {
->> @@ -523,6 +524,9 @@
->>  };
+>> This patch makes a few of the kernel interfaces accept tagged user
+>> pointers. The kernel is already able to handle user faults with tagged
+>> pointers and has the untagged_addr macro, which this patchset reuses.
 >>
->>  &i2s0 {
->> +       assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
->> +       assigned-clock-parents = <&clock_audss EXYNOS_I2S_BUS>;
->> +       #clock-cells = <1>;
+>> We're not trying to cover all possible ways the kernel accepts user
+>> pointers in one patchset, so this one should be considered as a start.
+>> It would be nice to learn about the interfaces that I missed though.
 >
-> Shouldn't this be property of exynos5250.dtsi? Along with clock-output-names?
+> There are many ways that user pointers can be passed to the kernel, and
+> I'm not sure that it's feasible to catch them all, especially as user
+> pointers are often passed in data structures (e.g. iovecs) rather than
+> direct syscall arguments.
+>
+> If we *really* want the kernel to support taking tagged addresses, anything
+> with a __user annotation (or cast to something with a __user annotation)
+> requires tag removal somewhere in the kernel.
+>
+> It looks like there are plenty uapi structures and syscalls to look at:
+>
+> [mark at lakrids:~/src/linux]% git grep __user -- include/uapi | wc -l
+> 216
+> [mark at lakrids:~/src/linux]% git grep __user | grep SYSCALL_DEFINE | wc -l
+> 308
+>
+> ... in addition to special syscalls like ioctl which multiplex a number
+> of operations with different arguments, where the tag stripping would
+> have to occur elsewhere (e.g. in particular drivers).
 
-Hmm, it should be safe to move it there. By specifying this property or not
-we can control whether the I2S clocks are exposed or not. If we move it to 
-exynos5250.dtsi the clocks we always be exposed. But should be the right thing
-to do anyway. I will post v3.
+Hence we definitely need good support from e.g. sparse to catch any errors
+from happening.
 
-Of course we recently made the clock-output-names property deprecated, it will
-not bee needed any more. It was there just to ensure the clk names are unique.
+So doing assignments to the same pointer variable like
 
--- 
-Regards,
-Sylwester
+     addr = untagged_addr(addr);
+
+defeats any checking.
+
+> I also wonder if we ever write any of these pointers back to userspace
+> memory. If so, we have a nasty ABI problem, since we'll have to marshal
+> the original tag along with the pointer, to ensure userspace pointer
+> comparisons continue to work.
+
+Oh, another can of worms...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
