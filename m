@@ -1,50 +1,60 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 9 Mar 2018 14:33:16 -0300
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <20180309155808.GP15537@arm.com>
-References: <20180307110803.32418-1-ganapatrao.kulkarni@cavium.com>
- <3384d33f-c927-740a-97f1-b20775ef2c7b@redhat.com>
- <20180307143832.GJ3701@kernel.org>
- <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
- <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
- <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
- <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
- <20180309143415.GB4194@kernel.org> <20180309155808.GP15537@arm.com>
-Message-ID: <20180309173316.GF8347@kernel.org>
+From: eugenis@google.com (Evgenii Stepanov)
+Date: Fri, 9 Mar 2018 09:42:29 -0800
+Subject: [RFC PATCH 3/6] mm, arm64: untag user addresses in memory syscalls
+In-Reply-To: <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
+ <20180309155315.4x44sbp3darractt@armageddon.cambridge.arm.com>
+ <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
+Message-ID: <CAFKCwrgPEhBEbXn95ugxVuxHw7UTiQWuo3+HJ_t7UBG69fbUcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, Mar 09, 2018 at 03:58:09PM +0000, Will Deacon escreveu:
-> On Fri, Mar 09, 2018 at 11:34:15AM -0300, Arnaldo Carvalho de Melo wrote:
-> > Em Fri, Mar 09, 2018 at 07:57:04PM +0530, Ganapatrao Kulkarni escreveu:
-> > > Hi Arnaldo,
-> > > 
-> > > can you please pull-in this patch?
-> > 
-> > So everybody is Ok with this? Can I have some Acked-by: from subject
-> > matter experts?
-> 
-> The original patch looks fine to me:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+On Fri, Mar 9, 2018 at 9:31 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Fri, Mar 9, 2018 at 4:53 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Fri, Mar 09, 2018 at 03:02:01PM +0100, Andrey Konovalov wrote:
+>>> Memory subsystem syscalls accept user addresses as arguments, but don't use
+>>> copy_from_user and other similar functions, so we need to handle this case
+>>> separately.
+>>>
+>>> Untag user pointers passed to madvise, mbind, get_mempolicy, mincore,
+>>> mlock, mlock2, brk, mmap_pgoff, old_mmap, munmap, remap_file_pages,
+>>> mprotect, pkey_mprotect, mremap and msync.
+>>>
+>>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>>
+>> Please keep the cc list small (maybe linux-arch, linux-arm-kernel) as
+>> I'm sure some lists would consider this spam.
+>
+> OK.
+>
+>>
+>>>  mm/madvise.c   | 2 ++
+>>>  mm/mempolicy.c | 6 ++++++
+>>>  mm/mincore.c   | 2 ++
+>>>  mm/mlock.c     | 5 +++++
+>>>  mm/mmap.c      | 9 +++++++++
+>>>  mm/mprotect.c  | 2 ++
+>>>  mm/mremap.c    | 2 ++
+>>>  mm/msync.c     | 3 +++
+>>
+>> I'm not yet convinced these functions need to allow tagged pointers.
+>> They are not doing memory accesses but rather dealing with the memory
+>> range, hence an untagged pointer is better suited. There is probably a
+>> reason why the "start" argument is "unsigned long" vs "void __user *"
+>> (in the kernel, not the man page).
+>
+> So that would make the user to untag pointers before passing to these syscalls.
+>
+> Evgeniy, would that be possible to untag pointers in HWASan before
+> using memory subsystem syscalls? Is there a reason for untagging them
+> in the kernel?
 
-Ok, so, as John mentioned in another message in his thread, this
-conflicts with a series he sent and that Ganapatrao acked and I already
-applied, I looked at it and think this patch should turn into the patch
-at the end of this message, which I'm applying with the commit log
-message in the original patch in this thread, Ack?
+Generally, no. It's possible to intercept a libc call using symbol
+interposition, but I don't know how to rewrite arguments of a raw
+system call other than through ptrace, and that creates more problems
+than it solves.
 
-- Arnaldo
-
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-index 8f11aeb003a9..624e8cae6e86 100644
---- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -13,5 +13,5 @@
- #
- #Family-model,Version,Filename,EventType
- 0x00000000410fd03[[:xdigit:]],v1,arm/cortex-a53,core
--0x00000000420f5160,v1,cavium/thunderx2,core
-+0x00000000430f0af0,v1,cavium/thunderx2,core
- 0x00000000480fd010,v1,hisilicon/hip08,core
+AFAIU, it's valid for a program to pass an address obtained from
+malloc or, better, posix_memalign to an mm syscall like mprotect().
+These arguments are pointers from the userspace point of view.
