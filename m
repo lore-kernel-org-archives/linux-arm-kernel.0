@@ -1,54 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Mar 2018 14:55:47 +0000
-Subject: [RFC PATCH 0/6] arm64: untag user pointers passed to the kernel
-In-Reply-To: <cover.1520600533.git.andreyknvl@google.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
-Message-ID: <20180309145547.r25eis5ejy6d6xzu@lakrids.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Fri,  9 Mar 2018 14:47:11 +0000
+Subject: [PATCH 17/25] nvmem: rockchip-efuse: Make use of
+ of_device_get_match_data()
+In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-18-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-[trimming Ccs]
+Simplify code a bit by using of_device_get_match_data() instead of
+of_match_device().
 
-On Fri, Mar 09, 2018 at 03:01:58PM +0100, Andrey Konovalov wrote:
-> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-> tags into the top byte of each pointer. Userspace programs (such as
-> HWASan, a memory debugging tool [1]) might use this feature and pass
-> tagged user pointers to the kernel through syscalls or other interfaces.
-> 
-> This patch makes a few of the kernel interfaces accept tagged user
-> pointers. The kernel is already able to handle user faults with tagged
-> pointers and has the untagged_addr macro, which this patchset reuses.
-> 
-> We're not trying to cover all possible ways the kernel accepts user
-> pointers in one patchset, so this one should be considered as a start.
-> It would be nice to learn about the interfaces that I missed though.
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/rockchip-efuse.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-There are many ways that user pointers can be passed to the kernel, and
-I'm not sure that it's feasible to catch them all, especially as user
-pointers are often passed in data structures (e.g. iovecs) rather than
-direct syscall arguments.
-
-If we *really* want the kernel to support taking tagged addresses, anything
-with a __user annotation (or cast to something with a __user annotation)
-requires tag removal somewhere in the kernel.
-
-It looks like there are plenty uapi structures and syscalls to look at:
-
-[mark at lakrids:~/src/linux]% git grep __user -- include/uapi | wc -l
-216
-[mark at lakrids:~/src/linux]% git grep __user | grep SYSCALL_DEFINE | wc -l
-308
-
-... in addition to special syscalls like ioctl which multiplex a number
-of operations with different arguments, where the tag stripping would
-have to occur elsewhere (e.g. in particular drivers).
-
-I also wonder if we ever write any of these pointers back to userspace
-memory. If so, we have a nasty ABI problem, since we'll have to marshal
-the original tag along with the pointer, to ensure userspace pointer
-comparisons continue to work.
-
-Thanks,
-Mark.
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index fec6e4c48b9a..ade8848adf82 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -259,11 +259,11 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct nvmem_device *nvmem;
+ 	struct rockchip_efuse_chip *efuse;
+-	const struct of_device_id *match;
++	const void *data;
+ 	struct device *dev = &pdev->dev;
+ 
+-	match = of_match_device(dev->driver->of_match_table, dev);
+-	if (!match || !match->data) {
++	data = of_device_get_match_data(dev);
++	if (!data) {
+ 		dev_err(dev, "failed to get match data\n");
+ 		return -EINVAL;
+ 	}
+@@ -286,7 +286,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
+ 				 &econfig.size))
+ 		econfig.size = resource_size(res);
+-	econfig.reg_read = match->data;
++	econfig.reg_read = data;
+ 	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
+ 	nvmem = devm_nvmem_register(dev, &econfig);
+-- 
+2.15.1
