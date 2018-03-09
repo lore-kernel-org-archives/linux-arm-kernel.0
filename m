@@ -1,76 +1,92 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 9 Mar 2018 14:28:21 -0800
-Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
-In-Reply-To: <20180309221220.GA15272@amd>
-References: <20180309221220.GA15272@amd>
-Message-ID: <20180309222821.GA16973@kroah.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Fri,  9 Mar 2018 23:23:27 +0100
+Subject: [PATCH v5 36/36] drm/rockchip: psr: Remove flush by CRTC
+In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+Message-ID: <20180309222327.18689-37-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 11:12:21PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> Hmm. Looks like there's a lot of fun to be had with sysfs.
-> 
-> 								Pavel
-> 
-> 
-> pavel at n900:~$ uname -a
-> Linux n900 4.16.0-rc4-59690-g7f84626-dirty #543 Thu Mar 8 19:53:30 CET
-> 2018 armv7l GNU/Linux
-> 
-> [  306.402496] bq2415x: command Timer reset
-> [  312.761322] adp1653 2-0030: Read Addr:03 Val:00 ok
-> [  313.264129] Unable to handle kernel NULL pointer dereference at
-> virtual address 00000
-> 000
-> [  313.272308] pgd = 01336620
-> [  313.275146] [00000000] *pgd=800af831, *pte=00000000, *ppte=00000000
-> [  313.281463] Internal error: Oops: 80000007 [#1] ARM
-> [  313.286376] Modules linked in:
-> [  313.289459] CPU: 0 PID: 3584 Comm: grep Tainted: G        W
-> 4.16.0-rc4-59690-g
-> 7f84626-dirty #543
-> [  313.298919] Hardware name: Nokia RX-51 board
-> [  313.303222] PC is at   (null)
-> [  313.306213] LR is at iio_ev_state_show+0x38/0x54
-> [  313.310852] pc : [<00000000>]    lr : [<c05d69c0>]    psr: a0000013
-> [  313.317169] sp : c7b47e70  ip : c087bb24  fp : 00000001
-> [  313.322418] r10: cb19e000  r9 : c0857220  r8 : 00001000
-> [  313.327667] r7 : 00000fff  r6 : cb711c80  r5 : cb19e000  r4 :
-> 00000000
-> [  313.334228] r3 : 00000001  r2 : 00000000  r1 : c087b4dc  r0 :
-> ce584800
-> [  313.340789] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
-> Segment none
-> [  313.347991] Control: 10c5387d  Table: 87bec019  DAC: 00000051
-> [  313.353759] Process grep (pid: 3584, stack limit = 0xc4e45eab)
-> [  313.359619] Stack: (0xc7b47e70 to 0xc7b48000)
-> [  313.364013] 7e60:                                     c05d6988
-> cb711b00 ce585c00 c0450d68
-> [  313.471038] [<c05d69c0>] (iio_ev_state_show) from [<c0450d68>]
-> (dev_attr_show+0x1c/0x4c)
-> [  313.479187] [<c0450d68>] (dev_attr_show) from [<c023f934>]
-> (sysfs_kf_seq_show+0x90/0x108)
-> [  313.487426] [<c023f934>] (sysfs_kf_seq_show) from [<c023e2f8>]
-> (kernfs_seq_show+0x24/0x28)
-> [  313.495758] [<c023e2f8>] (kernfs_seq_show) from [<c01fc954>]
-> (seq_read+0x1dc/0x500)
-> [  313.503479] [<c01fc954>] (seq_read) from [<c01d9f80>]
-> (__vfs_read+0x2c/0x120)
-> [  313.510681] [<c01d9f80>] (__vfs_read) from [<c01da0fc>]
-> (vfs_read+0x88/0x114)
-> [  313.517852] [<c01da0fc>] (vfs_read) from [<c01da584>]
-> (SyS_read+0x40/0x8c)
-> [  313.524780] [<c01da584>] (SyS_read) from [<c0101000>]
-> (ret_fast_syscall+0x0/0x54)
-> [  313.532318] Exception stack(0xc7b47fa8 to 0xc7b47ff0)
-> [  313.537414] 7fa0:                   00035330 00042000 00000003
-> 00042000 00008000 00008000
-> 
+From: Tomasz Figa <tfiga@chromium.org>
 
-What file are you opening to cause this?
+It is not used anymore after last changes and it was not even correct to
+begin with as it assumed a 1:1 relation between a CRTC and encoder,
+while in fact a CRTC can be attached to multiple encoders.
 
-thanks,
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
 
-greg k-h
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 35 -----------------------------
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.h |  1 -
+ 2 files changed, 36 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index 1bf5cba9a64d..b1988ac758d5 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -40,23 +40,6 @@ struct psr_drv {
+ 	int (*set)(struct drm_encoder *encoder, bool enable);
+ };
+ 
+-static struct psr_drv *find_psr_by_crtc(struct drm_crtc *crtc)
+-{
+-	struct rockchip_drm_private *drm_drv = crtc->dev->dev_private;
+-	struct psr_drv *psr;
+-
+-	mutex_lock(&drm_drv->psr_list_lock);
+-	list_for_each_entry(psr, &drm_drv->psr_list, list) {
+-		if (psr->encoder->crtc == crtc)
+-			goto out;
+-	}
+-	psr = ERR_PTR(-ENODEV);
+-
+-out:
+-	mutex_unlock(&drm_drv->psr_list_lock);
+-	return psr;
+-}
+-
+ static struct psr_drv *find_psr_by_encoder(struct drm_encoder *encoder)
+ {
+ 	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
+@@ -173,24 +156,6 @@ static void rockchip_drm_do_flush(struct psr_drv *psr)
+ 	mutex_unlock(&psr->lock);
+ }
+ 
+-/**
+- * rockchip_drm_psr_flush - flush a single pipe
+- * @crtc: CRTC of the pipe to flush
+- *
+- * Returns:
+- * 0 on success, -errno on fail
+- */
+-int rockchip_drm_psr_flush(struct drm_crtc *crtc)
+-{
+-	struct psr_drv *psr = find_psr_by_crtc(crtc);
+-	if (IS_ERR(psr))
+-		return PTR_ERR(psr);
+-
+-	rockchip_drm_do_flush(psr);
+-	return 0;
+-}
+-EXPORT_SYMBOL(rockchip_drm_psr_flush);
+-
+ /**
+  * rockchip_drm_psr_flush_all - force to flush all registered PSR encoders
+  * @dev: drm device
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+index 40e026c14168..860c62494496 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+@@ -16,7 +16,6 @@
+ #define __ROCKCHIP_DRM_PSR___
+ 
+ void rockchip_drm_psr_flush_all(struct drm_device *dev);
+-int rockchip_drm_psr_flush(struct drm_crtc *crtc);
+ 
+ int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
+ int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
+-- 
+2.16.1
