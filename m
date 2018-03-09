@@ -1,47 +1,46 @@
-From: jhogan@kernel.org (James Hogan)
-Date: Fri, 9 Mar 2018 15:07:27 +0000
-Subject: [PATCH v4 1/8] SOC: brcmstb: add memory API
-In-Reply-To: <1516058925-46522-2-git-send-email-jim2101024@gmail.com>
-References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
- <1516058925-46522-2-git-send-email-jim2101024@gmail.com>
-Message-ID: <20180309150727.GH24558@saruman>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 09 Mar 2018 16:09:47 +0100
+Subject: [PATCH v2 4/4] ARM: dts: Enable HDMI audio on Snow Chromebook
+In-Reply-To: <CAJKOXPemC09mmjt9AKa9Qfhy14=CdUampi3=x957=NNEzq7LqQ@mail.gmail.com>
+References: <CGME20180308162609epcas1p45458c1671c38b389e047f17804690eb9@epcas1p4.samsung.com>
+ <20180307172711.15697-4-s.nawrocki@samsung.com>
+ <20180308162559.391-1-s.nawrocki@samsung.com>
+ <CAJKOXPemC09mmjt9AKa9Qfhy14=CdUampi3=x957=NNEzq7LqQ@mail.gmail.com>
+Message-ID: <7be21210-edc4-bfa7-6e77-ee23fae141da@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 06:28:38PM -0500, Jim Quinlan wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> This commit adds a memory API suitable for ascertaining the sizes of
-> each of the N memory controllers in a Broadcom STB chip.  Its first
-> user will be the Broadcom STB PCIe root complex driver, which needs
-> to know these sizes to properly set up DMA mappings for inbound
-> regions.
-> 
-> We cannot use memblock here or anything like what Linux provides
-> because it collapses adjacent regions within a larger block, and here
-> we actually need per-memory controller addresses and sizes, which is
-> why we resort to manual DT parsing.
-> 
-> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> 
-> Conflicts:
-> 	drivers/soc/bcm/brcmstb/Makefile
+On 03/09/2018 02:01 PM, Krzysztof Kozlowski wrote:
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>> index bdf59dd3654b..932a00cfd716 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>> @@ -9,6 +9,7 @@
+>>  #include <dt-bindings/clock/maxim,max77686.h>
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>  #include <dt-bindings/input/input.h>
+>> +#include <dt-bindings/sound/samsung-i2s.h>
+>>  #include "exynos5250.dtsi"
+>>
+>>  / {
+>> @@ -523,6 +524,9 @@
+>>  };
+>>
+>>  &i2s0 {
+>> +       assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
+>> +       assigned-clock-parents = <&clock_audss EXYNOS_I2S_BUS>;
+>> +       #clock-cells = <1>;
+>
+> Shouldn't this be property of exynos5250.dtsi? Along with clock-output-names?
 
-That can go.
+Hmm, it should be safe to move it there. By specifying this property or not
+we can control whether the I2S clocks are exposed or not. If we move it to 
+exynos5250.dtsi the clocks we always be exposed. But should be the right thing
+to do anyway. I will post v3.
 
-> +++ b/drivers/soc/bcm/brcmstb/memory.c
-...
-> +/* Macro to help extract property data */
-> +#define DT_PROP_DATA_TO_U32(b, offs) (fdt32_to_cpu(*(u32*)(b + offs)))
+Of course we recently made the clock-output-names property deprecated, it will
+not bee needed any more. It was there just to ensure the clk names are unique.
 
-Checkpatch complains about missing whitespace after u32.
-
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180309/b6615c86/attachment-0001.sig>
+-- 
+Regards,
+Sylwester
