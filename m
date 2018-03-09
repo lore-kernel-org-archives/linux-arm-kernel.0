@@ -1,185 +1,478 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Fri, 9 Mar 2018 13:05:28 +0800
-Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
-In-Reply-To: <20180309040903.hhkhylvs6q6lvqjy@tarshish>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <20180308120200.wpcjnbglf4x32vrp@tarshish>
- <CAFLEztTokSaXJuN8Ls0BpAEuFdTC+Viwn6PGxC=TC6vZAs+w3g@mail.gmail.com>
- <20180309040903.hhkhylvs6q6lvqjy@tarshish>
-Message-ID: <CAFLEztT4XJ9QnvLciv62dFCfj-y7Kynd2R8HpVxXeUXObvp3GQ@mail.gmail.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Fri, 9 Mar 2018 05:06:19 +0000
+Subject: [PATCH v4 2/2] ARM: dts: imx: Add basic dts support for imx6sll
+ EVK board
+In-Reply-To: <20180309033612.GH3217@dragon>
+References: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
+ <1520503424-22985-2-git-send-email-ping.bai@nxp.com>
+ <20180309033612.GH3217@dragon>
+Message-ID: <HE1PR04MB31131B0A4F35D6C8E0CCA53387DE0@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+> Subject: Re: [PATCH v4 2/2] ARM: dts: imx: Add basic dts support for imx6sll EVK
+> board
+> 
+> On Thu, Mar 08, 2018 at 06:03:44PM +0800, Bai Ping wrote:
+> > Add dts file support for imx6sll EVK board.
+> >
+> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> > ---
+> >  change v3->v4
+> >  - update the license indentifier
+> >  - remove leading zero of node
+> >  - remove unused pin from hog group
+> > ---
+> >  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+> >  arch/arm/boot/dts/Makefile                    |   2 +
+> >  arch/arm/boot/dts/imx6sll-evk.dts             | 372
+> ++++++++++++++++++++++++++
+> >  3 files changed, 378 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> > b/Documentation/devicetree/bindings/arm/fsl.txt
+> > index cdb9dd7..8a1baa2 100644
+> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> > @@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board  Required root
+> > node properties:
+> >      - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+> >
+> > +i.MX6SLL EVK board
+> > +Required root node properties:
+> > +    - compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
+> > +
+> >  Generic i.MX boards
+> >  -------------------
+> >
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index ade7a38..28bff8b 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -505,6 +505,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+> >  dtb-$(CONFIG_SOC_IMX6SL) += \
+> >  	imx6sl-evk.dtb \
+> >  	imx6sl-warp.dtb
+> > +dtb-$(CONFIG_SOC_IMX6SLL) += \
+> > +	imx6sll-evk.dtb
+> >  dtb-$(CONFIG_SOC_IMX6SX) += \
+> >  	imx6sx-nitrogen6sx.dtb \
+> >  	imx6sx-sabreauto.dtb \
+> > diff --git a/arch/arm/boot/dts/imx6sll-evk.dts
+> > b/arch/arm/boot/dts/imx6sll-evk.dts
+> > new file mode 100644
+> > index 0000000..892fbec
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6sll-evk.dts
+> > @@ -0,0 +1,372 @@
+> > +//SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> 
+> Missing space after //.
+> 
 
-2018-03-09 12:09 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
-> Hi Jacob,
->
-> On Fri, Mar 09, 2018 at 08:53:57AM +0800, Jacob Chen wrote:
->> 2018-03-08 20:02 GMT+08:00 Baruch Siach <baruch@tkos.co.il>:
->> > On Thu, Mar 08, 2018 at 05:47:50PM +0800, Jacob Chen wrote:
->> >> This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399
->> >> SoC.
->> >>
->> >> Wiki Pages:
->> >> http://opensource.rock-chips.com/wiki_Rockchip-isp1
->> >>
->> >> The deprecated g_mbus_config op is not dropped in  V6 because i am waiting
->> >> tomasz's patches.
->> >
->> > Which tree is this series based on? On top of v4.16-rc4 I get the build
->> > failure below. The V4L2_BUF_TYPE_META_OUTPUT macro, for example, is not even
->> > in media_tree.git.
->>
->> This series is based on v4.16-rc4 with below patch.
->> https://patchwork.kernel.org/patch/9792001/
->
-> This patch does not apply on v4.16-rc4. I also tried v2 of this patch with the
-> same result:
->
->   https://patchwork.linuxtv.org/patch/44682/
+OK, will fix the comments of this patch in V5.
 
-It need resolve merge conflict.
-
->
-> Can you push your series to a public git repo branch?
->
-
-Sure, I have push it to my github.
-https://github.com/wzyy2/linux/tree/4.16-rc4
-
-This commit might be a bit of a mess
-https://github.com/wzyy2/linux/commit/ff68323c4804adc10f64836ea1be172c54a9d6c6
-
-> Thanks,
-> baruch
->
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1321:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_enum_fmt_meta_out?; did you mean ?vidioc_enum_fmt_meta_cap??
->> >   .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
->> >    ^~~~~~~~~~~~~~~~~~~~~~~~
->> >    vidioc_enum_fmt_meta_cap
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->> >   .vidioc_enum_fmt_meta_out = rkisp1_params_enum_fmt_meta_out,
->> >                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1321:30: note: (near initialization for ?rkisp1_params_ioctl.vidioc_g_std?)
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1322:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_g_fmt_meta_out?; did you mean ?vidioc_g_fmt_meta_cap??
->> >   .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >    ^~~~~~~~~~~~~~~~~~~~~
->> >    vidioc_g_fmt_meta_cap
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->> >   .vidioc_g_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1322:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_s_std?)
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1323:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_s_fmt_meta_out?; did you mean ?vidioc_s_fmt_meta_cap??
->> >   .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >    ^~~~~~~~~~~~~~~~~~~~~
->> >    vidioc_s_fmt_meta_cap
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->> >   .vidioc_s_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1323:27: note: (near initialization for ?rkisp1_params_ioctl.vidioc_querystd?)
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1324:3: error: ?const struct v4l2_ioctl_ops? has no member named ?vidioc_try_fmt_meta_out?; did you mean ?vidioc_try_fmt_meta_cap??
->> >   .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >    ^~~~~~~~~~~~~~~~~~~~~~~
->> >    vidioc_try_fmt_meta_cap
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->> >   .vidioc_try_fmt_meta_out = rkisp1_params_g_fmt_meta_out,
->> >                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1324:29: note: (near initialization for ?rkisp1_params_ioctl.vidioc_enum_input?)
->> > drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_params_init_vb2_queue?:
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: error: ?V4L2_BUF_TYPE_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_BUF_TYPE_SDR_OUTPUT??
->> >   q->type = V4L2_BUF_TYPE_META_OUTPUT;
->> >             ^~~~~~~~~~~~~~~~~~~~~~~~~
->> >             V4L2_BUF_TYPE_SDR_OUTPUT
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1462:12: note: each undeclared identifier is reported only once for each function it appears in
->> >   CC      drivers/media/platform/rockchip/isp1/mipi_dphy_sy.o
->> > drivers/media/platform/rockchip/isp1/isp_params.c: In function ?rkisp1_register_params_vdev?:
->> > drivers/media/platform/rockchip/isp1/isp_params.c:1507:43: error: ?V4L2_CAP_META_OUTPUT? undeclared (first use in this function); did you mean ?V4L2_CAP_VBI_OUTPUT??
->> >   vdev->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_META_OUTPUT;
->> >                                            ^~~~~~~~~~~~~~~~~~~~
->> >                                            V4L2_CAP_VBI_OUTPUT
->> >
->> > Thanks,
->> > baruch
->> >
->> >> Jacob Chen (12):
->> >>   media: doc: add document for rkisp1 meta buffer format
->> >>   media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
->> >>   media: rkisp1: add Rockchip ISP1 subdev driver
->> >>   media: rkisp1: add ISP1 statistics driver
->> >>   media: rkisp1: add ISP1 params driver
->> >>   media: rkisp1: add capture device driver
->> >>   media: rkisp1: add rockchip isp1 core driver
->> >>   dt-bindings: Document the Rockchip ISP1 bindings
->> >>   dt-bindings: Document the Rockchip MIPI RX D-PHY bindings
->> >>   ARM: dts: rockchip: add isp node for rk3288
->> >>   ARM: dts: rockchip: add rx0 mipi-phy for rk3288
->> >>   MAINTAINERS: add entry for Rockchip ISP1 driver
->> >>
->> >> Jeffy Chen (1):
->> >>   media: rkisp1: Add user space ABI definitions
->> >>
->> >> Shunqian Zheng (3):
->> >>   media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
->> >>   arm64: dts: rockchip: add isp0 node for rk3399
->> >>   arm64: dts: rockchip: add rx0 mipi-phy for rk3399
->> >>
->> >> Wen Nuan (1):
->> >>   ARM: dts: rockchip: Add dts mipi-dphy TXRX1 node for rk3288
->> >>
->> >>  .../devicetree/bindings/media/rockchip-isp1.txt    |   69 +
->> >>  .../bindings/media/rockchip-mipi-dphy.txt          |   90 +
->> >>  Documentation/media/uapi/v4l/meta-formats.rst      |    2 +
->> >>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst   |   20 +
->> >>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst     |   18 +
->> >>  MAINTAINERS                                        |   10 +
->> >>  arch/arm/boot/dts/rk3288.dtsi                      |   33 +
->> >>  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   25 +
->> >>  drivers/media/platform/Kconfig                     |   10 +
->> >>  drivers/media/platform/Makefile                    |    1 +
->> >>  drivers/media/platform/rockchip/isp1/Makefile      |    8 +
->> >>  drivers/media/platform/rockchip/isp1/capture.c     | 1751 ++++++++++++++++++++
->> >>  drivers/media/platform/rockchip/isp1/capture.h     |  167 ++
->> >>  drivers/media/platform/rockchip/isp1/common.h      |  110 ++
->> >>  drivers/media/platform/rockchip/isp1/dev.c         |  626 +++++++
->> >>  drivers/media/platform/rockchip/isp1/dev.h         |   93 ++
->> >>  drivers/media/platform/rockchip/isp1/isp_params.c  | 1539 +++++++++++++++++
->> >>  drivers/media/platform/rockchip/isp1/isp_params.h  |   49 +
->> >>  drivers/media/platform/rockchip/isp1/isp_stats.c   |  508 ++++++
->> >>  drivers/media/platform/rockchip/isp1/isp_stats.h   |   58 +
->> >>  .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  868 ++++++++++
->> >>  .../media/platform/rockchip/isp1/mipi_dphy_sy.h    |   15 +
->> >>  drivers/media/platform/rockchip/isp1/regs.c        |  239 +++
->> >>  drivers/media/platform/rockchip/isp1/regs.h        | 1550 +++++++++++++++++
->> >>  drivers/media/platform/rockchip/isp1/rkisp1.c      | 1177 +++++++++++++
->> >>  drivers/media/platform/rockchip/isp1/rkisp1.h      |  105 ++
->> >>  drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
->> >>  include/uapi/linux/rkisp1-config.h                 |  798 +++++++++
->> >>  include/uapi/linux/videodev2.h                     |    4 +
->> >>  29 files changed, 9945 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
->> >>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
->> >>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
->> >>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/common.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
->> >>  create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
->> >>  create mode 100644 include/uapi/linux/rkisp1-config.h
->
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Jacky
+> > +/*
+> > + * Copyright 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017-2018 NXP.
+> > + *
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/input/input.h>
+> > +#include "imx6sll.dtsi"
+> > +
+> > +/ {
+> > +	model = "Freescale i.MX6SLL EVK Board";
+> > +	compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
+> > +
+> > +	memory at 80000000 {
+> > +		reg = <0x80000000 0x80000000>;
+> > +	};
+> > +
+> > +	backlight {
+> > +		compatible = "pwm-backlight";
+> > +		pwms = <&pwm1 0 5000000>;
+> > +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> > +		default-brightness-level = <6>;
+> > +		status = "okay";
+> > +	};
+> > +
+> > +	reg_usb_otg1_vbus: reg-usb-otg1-vbus {
+> 
+> regulator-xxx for node name.
+> 
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "usb_otg1_vbus";
+> > +		regulator-min-microvolt = <5000000>;
+> > +		regulator-max-microvolt = <5000000>;
+> > +		gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+> > +		enable-active-high;
+> > +	};
+> > +
+> > +	reg_usb_otg2_vbus: reg-usb-otg2-vbus {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "usb_otg2_vbus";
+> > +		regulator-min-microvolt = <5000000>;
+> > +		regulator-max-microvolt = <5000000>;
+> > +		gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
+> > +		enable-active-high;
+> > +	};
+> > +
+> > +	reg_aud3v: reg-aud3v {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "wm8962-supply-3v15";
+> > +		regulator-min-microvolt = <3150000>;
+> > +		regulator-max-microvolt = <3150000>;
+> > +		regulator-boot-on;
+> > +	};
+> > +
+> > +	reg_aud4v: reg-aud4v {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "wm8962-supply-4v2";
+> > +		regulator-min-microvolt = <4325000>;
+> > +		regulator-max-microvolt = <4325000>;
+> > +		regulator-boot-on;
+> > +	};
+> > +
+> > +	reg_lcd: reg-lcd {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "lcd-pwr";
+> > +		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
+> > +		enable-active-high;
+> > +	};
+> > +
+> > +	reg_sd1_vmmc: reg-sd1-vmmc {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "SD1_SPWR";
+> > +		regulator-min-microvolt = <3000000>;
+> > +		regulator-max-microvolt = <3000000>;
+> > +		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
+> > +		enable-active-high;
+> > +	};
+> > +};
+> > +
+> > +&cpu0 {
+> > +	arm-supply = <&sw1a_reg>;
+> > +	soc-supply = <&sw1c_reg>;
+> > +};
+> > +
+> > +&i2c1 {
+> > +	clock-frequency = <100000>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_i2c1>;
+> > +	status = "okay";
+> > +
+> > +	pmic: pfuze100 at 8 {
+> 
+> pfuze100: pmic
+> 
+> > +		compatible = "fsl,pfuze100";
+> > +		reg = <0x08>;
+> > +
+> > +		regulators {
+> > +			sw1a_reg: sw1ab {
+> > +				regulator-min-microvolt = <300000>;
+> > +				regulator-max-microvolt = <1875000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +				regulator-ramp-delay = <6250>;
+> > +			};
+> > +
+> > +			sw1c_reg: sw1c {
+> > +				regulator-min-microvolt = <300000>;
+> > +				regulator-max-microvolt = <1875000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +				regulator-ramp-delay = <6250>;
+> > +			};
+> > +
+> > +			sw2_reg: sw2 {
+> > +				regulator-min-microvolt = <800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			sw3a_reg: sw3a {
+> > +				regulator-min-microvolt = <400000>;
+> > +				regulator-max-microvolt = <1975000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			sw3b_reg: sw3b {
+> > +				regulator-min-microvolt = <400000>;
+> > +				regulator-max-microvolt = <1975000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			sw4_reg: sw4 {
+> > +				regulator-min-microvolt = <800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +			};
+> > +
+> > +			swbst_reg: swbst {
+> > +				regulator-min-microvolt = <5000000>;
+> > +				regulator-max-microvolt = <5150000>;
+> > +			};
+> > +
+> > +			snvs_reg: vsnvs {
+> > +				regulator-min-microvolt = <1000000>;
+> > +				regulator-max-microvolt = <3000000>;
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			vref_reg: vrefddr {
+> > +				regulator-boot-on;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			vgen1_reg: vgen1 {
+> > +				regulator-min-microvolt = <800000>;
+> > +				regulator-max-microvolt = <1550000>;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			vgen2_reg: vgen2 {
+> > +				regulator-min-microvolt = <800000>;
+> > +				regulator-max-microvolt = <1550000>;
+> > +			};
+> > +
+> > +			vgen3_reg: vgen3 {
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +			};
+> > +
+> > +			vgen4_reg: vgen4 {
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			vgen5_reg: vgen5 {
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-always-on;
+> > +			};
+> > +
+> > +			vgen6_reg: vgen6 {
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-always-on;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&iomuxc {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_hog0>, <&pinctrl_hog1>;
+> > +
+> > +	pinctrl_hog0: hog0grp {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_KEY_ROW7__GPIO4_IO07
+> > +			MX6SLL_PAD_GPIO4_IO22__GPIO4_IO22
+> > +			MX6SLL_PAD_KEY_COL3__GPIO3_IO30
+> > +			MX6SLL_PAD_KEY_COL4__GPIO4_IO00
+> > +			MX6SLL_PAD_KEY_COL5__GPIO4_IO02
+> 
+> I don't think these GPIOs should be in hog group, as they are used by particular
+> client device, and should be in pinctrl entries for the client devices.
+> 
+> Shawn
+> 
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x3>;
+> > +		fsl,pin-speed = <0x1>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_hog1: hog1grp {
+> > +		pinmux = <
+> > +			/*
+> > +			 * Must set the LVE of pad SD2_RESET, otherwise current
+> > +			 * leakage through eMMC chip will pull high the VCCQ to
+> > +			 * 2.6v, which will impact SD1 and SD3 SD3.0 voltage switch.
+> > +			 */
+> > +			MX6SLL_PAD_SD2_RESET__GPIO4_IO27
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x3>;
+> > +		fsl,pin-speed = <0x1>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +		fsl,low-voltage-enable = <0x1>;
+> > +	};
+> > +
+> > +	pinctrl_uart1: uart1grp {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_UART1_TXD__UART1_DCE_TX
+> > +			MX6SLL_PAD_UART1_RXD__UART1_DCE_RX
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x6>;
+> > +		fsl,pin-speed = <0x2>;
+> > +		bias-pull-up = <0x2>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_data: usdhc1datagrp {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_SD1_CMD__SD1_CMD
+> > +			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
+> > +			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
+> > +			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
+> > +			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x4>;
+> > +		fsl,pin-speed = <0x1>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_clk: usdhc1clkgrp {
+> > +		pinmux = <MX6SLL_PAD_SD1_CLK__SD1_CLK>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x4>;
+> > +		fsl,pin-speed = <0x1>;
+> > +		bias-pull-down = <0x0>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_data_100mhz: usdhc1datagrp_100mhz {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_SD1_CMD__SD1_CMD
+> > +			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
+> > +			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
+> > +			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
+> > +			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x4>;
+> > +		fsl,pin-speed = <0x2>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_clk_100mhz: usdhc1clkgrp_100mhz {
+> > +		pinmux = < MX6SLL_PAD_SD1_CLK__SD1_CLK>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x4>;
+> > +		fsl,pin-speed = <0x2>;
+> > +		bias-pull-down = <0x0>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_data_200mhz: usdhc1datagrp_200mhz {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_SD1_CMD__SD1_CMD
+> > +			MX6SLL_PAD_SD1_DATA0__SD1_DATA0
+> > +			MX6SLL_PAD_SD1_DATA1__SD1_DATA1
+> > +			MX6SLL_PAD_SD1_DATA2__SD1_DATA2
+> > +			MX6SLL_PAD_SD1_DATA3__SD1_DATA3
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x5>;
+> > +		fsl,pin-speed = <0x3>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usdhc1_clk_200mhz: usdhc1clkgrp_200mhz {
+> > +		pinmux = <MX6SLL_PAD_SD1_CLK__SD1_CLK>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x7>;
+> > +		fsl,pin-speed = <0x3>;
+> > +		bias-pull-down = <0x0>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_usbotg1: usbotg1grp {
+> > +		pinmux = <MX6SLL_PAD_EPDC_PWR_COM__USB_OTG1_ID>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x3>;
+> > +		fsl,pin-speed = <0x1>;
+> > +		bias-pull-up = <0x1>;
+> > +		input-schmitt-enable;
+> > +	};
+> > +
+> > +	pinctrl_i2c1: i2c1grp {
+> > +		pinmux = <
+> > +			MX6SLL_PAD_I2C1_SCL__I2C1_SCL
+> > +			MX6SLL_PAD_I2C1_SDA__I2C1_SDA
+> > +		>;
+> > +		slew-rate = <0x1>;
+> > +		drive-strength = <0x6>;
+> > +		fsl,pin-speed = <0x2>;
+> > +		drive-open-drain;
+> > +		bias-pull-up = <0x2>;
+> > +		input-schmitt-enable;
+> > +		input-enable;
+> > +	};
+> > +};
+> > +
+> > +&uart1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_uart1>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usdhc1 {
+> > +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> > +	pinctrl-0 = <&pinctrl_usdhc1_data>, <&pinctrl_usdhc1_clk>;
+> > +	pinctrl-1 = <&pinctrl_usdhc1_data_100mhz>,
+> <&pinctrl_usdhc1_clk_100mhz>;
+> > +	pinctrl-2 = <&pinctrl_usdhc1_data_200mhz>,
+> <&pinctrl_usdhc1_clk_200mhz>;
+> > +	cd-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
+> > +	wp-gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+> > +	keep-power-in-suspend;
+> > +	wakeup-source;
+> > +	vmmc-supply = <&reg_sd1_vmmc>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usbotg1 {
+> > +	vbus-supply = <&reg_usb_otg1_vbus>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_usbotg1>;
+> > +	disable-over-current;
+> > +	srp-disable;
+> > +	hnp-disable;
+> > +	adp-disable;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usbotg2 {
+> > +	vbus-supply = <&reg_usb_otg2_vbus>;
+> > +	dr_mode = "host";
+> > +	disable-over-current;
+> > +	status = "okay";
+> > +};
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
+> >
+> s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-kernel&data=02%7C01%7
+> >
+> Cping.bai%40nxp.com%7Ccc2d554875244f40801108d5856f03b5%7C686ea1d3
+> bc2b4
+> >
+> c6fa92cd99c5c301635%7C0%7C0%7C636561634214012078&sdata=maWc00%
+> 2BYifMKn
+> > oiD8rVmQFIWsHDgcIfN58UuarYqfCQ%3D&reserved=0
