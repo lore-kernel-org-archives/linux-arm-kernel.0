@@ -1,53 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 9 Mar 2018 12:49:41 +0000
-Subject: [PATCH] arm64: defconfig: enable Rockchip io-domain driver
-In-Reply-To: <20180308213540.4309-1-enric.balletbo@collabora.com>
-References: <20180308213540.4309-1-enric.balletbo@collabora.com>
-Message-ID: <5be003fc-7b86-6d49-278a-1297891212d6@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 9 Mar 2018 13:54:26 +0100
+Subject: [PATCH 1/4] ARM: dts: exynos5250: Add #sound-dai-cells property
+ to hdmi device node
+In-Reply-To: <20180307172711.15697-1-s.nawrocki@samsung.com>
+References: <CGME20180307172723epcas1p1b8879bb555737cab7406a172b7d13a56@epcas1p1.samsung.com>
+ <20180307172711.15697-1-s.nawrocki@samsung.com>
+Message-ID: <CAJKOXPdgsNwcVQ0FZLDR_q8Dz1AkSEBaG-1Mij7TKSLpSRJLpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 21:35, Enric Balletbo i Serra wrote:
-> Heiko St?bner justified pretty well the change in commit e330eb86ba0
-> 'ARM: multi_v7_defconfig: enable Rockchip io-domain driver'. This change
-> is also needed for arm64 rockchip boards, so, do the same for arm64.
-> 
-> The io-domain driver is necessary to notify the soc about voltages
-> changes happening on supplying regulators. Probably the most important
-> user right now is the mmc tuning code, where the soc needs to get
-> notified when the voltage is dropped to the 1.8V point.
-> 
-> As this option is necessary to successfully tune UHS cards etc, it
-> should get built in. Otherwise, tunning will fail with,
-> 
->     dwmmc_rockchip fe320000.dwmmc: All phases bad!
->     mmc0: tuning execution failed: -5
-
-It also causes ethernet to fail in a rather odd manner if your board 
-needs RGMII at <3.3v but you're using firmware which leaves the relevant 
-IO domain set inappropriately (I guess the parts expecting to be driven 
-by the external phy clock just lock up). Given the several hours I spent 
-scratching my head over that one,
-
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-
-> Cc: Heiko St?bner <heiko@sntech.de>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+On Wed, Mar 7, 2018 at 6:27 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> This property is required for specifying link between the HDMI IP block
+> and the SoC's audio subsystem.
+>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > ---
->   arch/arm64/configs/defconfig | 2 ++
->   1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index ba859709c2d4..d65d53b1ff77 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -313,6 +313,8 @@ CONFIG_GPIO_XGENE_SB=y
->   CONFIG_GPIO_PCA953X=y
->   CONFIG_GPIO_PCA953X_IRQ=y
->   CONFIG_GPIO_MAX77620=y
-> +CONFIG_POWER_AVS=y
-> +CONFIG_ROCKCHIP_IODOMAIN=y
->   CONFIG_POWER_RESET_MSM=y
->   CONFIG_POWER_RESET_XGENE=y
->   CONFIG_POWER_RESET_SYSCON=y
-> 
+>  arch/arm/boot/dts/exynos5250.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+
+Subject prefix:
+ARM: dts: exynos: Add..... to Exynos5250
+
+Please fix it here and in other places. For arm64 prefix is slightly
+different (arm64: dts: exynos:). I did not notice that in your last
+patches and applied them but please take care about this in future.
+
+In case you forget how the prefix should look like - run "git log
+--oneline -- arch/arm/boot/dts/exynos*" or "git log --oneline --
+arch/arm64/boot/dts/exynos/".
+
+BR,
+Krzysztof
