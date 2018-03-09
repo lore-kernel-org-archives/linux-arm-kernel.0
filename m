@@ -1,71 +1,36 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri,  9 Mar 2018 11:14:42 +0100
-Subject: [PATCH 6/9] sunxi-cedrus: Add device tree binding document
+Date: Fri,  9 Mar 2018 11:14:39 +0100
+Subject: [PATCH 3/9] v4l: Add sunxi Video Engine pixel format
 In-Reply-To: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
 References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
-Message-ID: <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
+Message-ID: <20180309101445.16190-1-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Florent Revest <florent.revest@free-electrons.com>
 
-Device Tree bindings for the Allwinner's video engine
+Add support for the allwinner's proprietary pixel format described in
+details here: http://linux-sunxi.org/File:Ve_tile_format_v1.pdf
+
+This format is similar to V4L2_PIX_FMT_NV12M but the planes are divided
+in tiles of 32x32px.
 
 Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
 ---
- .../devicetree/bindings/media/sunxi-cedrus.txt     | 44 ++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+ include/uapi/linux/videodev2.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-new file mode 100644
-index 000000000000..138581113c49
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-@@ -0,0 +1,44 @@
-+Device-Tree bindings for SUNXI video engine found in sunXi SoC family
-+
-+Required properties:
-+- compatible	    : "allwinner,sun4i-a10-video-engine";
-+- memory-region     : DMA pool for buffers allocation;
-+- clocks	    : list of clock specifiers, corresponding to
-+		      entries in clock-names property;
-+- clock-names	    : should contain "ahb", "mod" and "ram" entries;
-+- resets	    : phandle for reset;
-+- interrupts	    : should contain VE interrupt number;
-+- reg		    : should contain register base and length of VE.
-+
-+Example:
-+
-+reserved-memory {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	ve_reserved: cma {
-+		compatible = "shared-dma-pool";
-+		reg = <0x43d00000 0x9000000>;
-+		no-map;
-+		linux,cma-default;
-+	};
-+};
-+
-+video-engine {
-+	compatible = "allwinner,sun4i-a10-video-engine";
-+	memory-region = <&ve_reserved>;
-+
-+	clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
-+		 <&dram_gates 0>;
-+	clock-names = "ahb", "mod", "ram";
-+
-+	assigned-clocks = <&ccu CLK_VE>;
-+	assigned-clock-rates = <320000000>;
-+
-+	resets = <&ccu RST_VE>;
-+
-+	interrupts = <53>;
-+
-+	reg = <0x01c0e000 4096>;
-+};
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 35706204e81d..cee906681db7 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -669,6 +669,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
+ #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
+ #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
++#define V4L2_PIX_FMT_SUNXI    v4l2_fourcc('S', 'X', 'I', 'Y') /* Sunxi VE's 32x32 tiled NV12 */
+ 
+ /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
+ #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
 -- 
 2.16.2
