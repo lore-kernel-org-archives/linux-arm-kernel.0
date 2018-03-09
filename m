@@ -1,53 +1,53 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 9 Mar 2018 18:29:41 +0000
-Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
-In-Reply-To: <20180308074115.GB15748@lst.de>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
- <20180305150814.GA15918@lst.de>
- <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
- <20180305183938.GB20086@lst.de>
- <1729ae21-d08c-b413-51a3-f22c394b388d@arm.com>
- <HE1PR0401MB24251E99564CAA526F719ECCE6D90@HE1PR0401MB2425.eurprd04.prod.outlook.com>
- <20180308074115.GB15748@lst.de>
-Message-ID: <HE1PR0401MB2425871215B13AD0EFDCA5C3E6DE0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Mar 2018 18:40:19 +0000
+Subject: [GIT PULL] arm64 fixes for 4.16-rc5
+Message-ID: <20180309184014.xeczrjhn5no77s7j@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+Please pull the arm64 fixes below. Thanks.
 
-> -----Original Message-----
-> From: Christoph Hellwig [mailto:hch at lst.de]
-> Sent: Thursday, March 08, 2018 13:11
-> 
-> On Tue, Mar 06, 2018 at 04:41:56AM +0000, Nipun Gupta wrote:
-> > Sorry for asking a trivial question - looking into dma_configure() I see that
-> > PCI is used in the start and the end of the API.
-> > In the end part pci_put_host_bridge_device() is called.
-> > So are two bus callbacks something like 'dma_config_start' &
-> 'dma_config_end'
-> > will be required where the former one will return "dma_dev"?
-> 
-> I'd just use dma_configure as the callback.
+The following changes since commit 4a3928c6f8a53fa1aed28ccba227742486e8ddcb:
 
-This would be a decent stuff.
+  Linux 4.16-rc3 (2018-02-25 18:50:41 -0800)
 
-> 
-> Currently the of_dma_configure and acpi_dma_configure are only used
-> for PCI anyway, as no one else sets a non-NULL dma dev.
+are available in the git repository at:
 
-My understanding is that even the platform bus uses the of_dma_configure
-and probably acpi_dma_configure too. So platform bus may also need the
-callback implemented. Please correct me if my understanding is wrong.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-I will submit the patch with 'dma_configure' callback implemented for
-the busses shortly.
+for you to fetch changes up to e21da1c992007594d391e7b301779cf30f438691:
 
-> For fsl-mc I suspect only of_dma_configure is relevanet, so just call that directly.
-> If at some point we get enough busses with either OF or ACPI we could
-> create a helper called from ->dma_configure for that.
+  arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery (2018-03-09 17:52:07 +0000)
 
-Totally agree with this.
+----------------------------------------------------------------
+arm64 fixes:
 
-Thanks,
-Nipun
+- The SMCCC firmware interface for the spectre variant 2 mitigation has
+  been updated to allow the discovery of whether the CPU needs the
+  workaround. This pull request relaxes the kernel check on the return
+  value from firmware.
+
+- Fix the commit allowing changing from global to non-global page table
+  entries which inadvertently disallowed other safe attribute changes.
+
+- Fix sleeping in atomic during the arm_perf_teardown_cpu() code.
+
+----------------------------------------------------------------
+Ard Biesheuvel (1):
+      arm64: mm: fix thinko in non-global page table attribute check
+
+Marc Zyngier (1):
+      arm64: Relax ARM_SMCCC_ARCH_WORKAROUND_1 discovery
+
+Will Deacon (1):
+      arm_pmu: Use disable_irq_nosync when disabling SPI in CPU teardown hook
+
+ arch/arm64/kernel/cpu_errata.c | 4 ++--
+ arch/arm64/mm/mmu.c            | 8 ++++----
+ drivers/perf/arm_pmu.c         | 2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+
+-- 
+Catalin
