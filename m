@@ -1,83 +1,77 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 9 Mar 2018 23:37:04 +0530
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <20180309180241.GJ8347@kernel.org>
-References: <20180307143832.GJ3701@kernel.org>
- <CAKTKpr4zMcRLykw8xwWJKf2eiuCrf2RuJ7kexGRQNN7_OdJ=uQ@mail.gmail.com>
- <52328144-3a2a-af03-273b-3a2f3bdadda6@redhat.com>
- <CAKTKpr7HgsdZ90k0_evSq_aZW-uGSKwLndHOQ2Jahajj3Gkc0Q@mail.gmail.com>
- <CAKTKpr5=Doy2bQz8yYcoRNUGQ1HEgLcqk7U+4m-=1T_TZWa4HA@mail.gmail.com>
- <20180309143415.GB4194@kernel.org> <20180309155808.GP15537@arm.com>
- <20180309173316.GF8347@kernel.org>
- <CAKTKpr7AQQVQKpQyeDObXvgq1Cps7K7STW2TngjFmOjmCRXQWQ@mail.gmail.com>
- <20180309180040.GI8347@kernel.org> <20180309180241.GJ8347@kernel.org>
-Message-ID: <CAKTKpr6XBqBMA0yfauwMxpfMzcvy6LO0hgZMhnebSrCmHu7dOg@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 9 Mar 2018 19:21:39 +0100
+Subject: [PATCH] ARM: smp: Move clear_tasks_mm_cpumask() call to __cpu_die()
+Message-ID: <20180309182139.gnyed3n34skwceqk@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 11:32 PM, Arnaldo Carvalho de Melo
-<arnaldo.melo@gmail.com> wrote:
-> Em Fri, Mar 09, 2018 at 03:00:40PM -0300, Arnaldo Carvalho de Melo escreveu:
->> Em Fri, Mar 09, 2018 at 11:15:16PM +0530, Ganapatrao Kulkarni escreveu:
->> > On Fri, Mar 9, 2018 at 11:03 PM, Arnaldo Carvalho de Melo
->> > > +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> > > @@ -13,5 +13,5 @@
->> > >  #
->> > >  #Family-model,Version,Filename,EventType
->> > >  0x00000000410fd03[[:xdigit:]],v1,arm/cortex-a53,core
->> > > -0x00000000420f5160,v1,cavium/thunderx2,core
->> > > +0x00000000430f0af0,v1,cavium/thunderx2,core
->> > >  0x00000000480fd010,v1,hisilicon/hip08,core
->
->> > please do not delete existing entry,  add additional entry.
->> > > +0x00000000430f0af0,v1,cavium/thunderx2,core
->
->> Ok, my bad, I think my eyes are failing me, I swear I saw them in the
->> original patch, which is not the case...
->
->> Ok, will add, together with Will's Acked-by
->
-> So this is how it ended up:
->
->
-> commit 9245299469de2e02d9c3cb167c0e52f75f1cc180
-> Author: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> Date:   Wed Mar 7 16:38:03 2018 +0530
->
->     perf vendor events arm64: Enable JSON events for ThunderX2 B0
->
->     There is MIDR change on ThunderX2 B0, adding an entry to mapfile to
->     enable JSON events for B0.
->
->     Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->     Acked-by: Will Deacon <will.deacon@arm.com>
->     Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
->     Cc: Ganapatrao Kulkarni <gpkulkarni@gklkml16.com>
->     Cc: Jayachandran C <jnair@caviumnetworks.com>
->     Cc: Jiri Olsa <jolsa@redhat.com>
->     Cc: John Garry <john.garry@huawei.com>
->     Cc: Mark Rutland <mark.rutland@arm.com>
->     Cc: Peter Zijlstra <peterz@infradead.org>
->     Cc: Robert Richter <robert.richter@cavium.com>
->     Cc: William Cohen <wcohen@redhat.com>
->     Cc: linux-arm-kernel at lists.infradead.org
->     Link: http://lkml.kernel.org/r/20180307110803.32418-1-ganapatrao.kulkarni at cavium.com
->     [ Fixup wrt recent patchset by John Garry ]
->     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
->
-> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> index 8f11aeb003a9..f03e26ecb658 100644
-> --- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> @@ -14,4 +14,5 @@
->  #Family-model,Version,Filename,EventType
->  0x00000000410fd03[[:xdigit:]],v1,arm/cortex-a53,core
->  0x00000000420f5160,v1,cavium/thunderx2,core
-> +0x00000000430f0af0,v1,cavium/thunderx2,core
->  0x00000000480fd010,v1,hisilicon/hip08,core
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-thanks for help Arnaldo!
+Suspending a CPU on a RT kernel results in the following backtrace:
 
-thanks
-ganapat
+| Disabling non-boot CPUs ...
+| BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+| in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
+| INFO: lockdep is turned off.
+| irq event stamp: 122
+| hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
+| hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
+|  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
+| Hardware name: Generic DRA74X (Flattened Device Tree)
+| [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
+| [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
+| [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
+| [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
+| [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
+| [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
+| [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
+| [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
+| [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
+| [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
+| [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
+| [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
+| [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
+| CPU1: shutdown
+
+The root cause of above backtrace is task_lock() which takes a sleeping
+lock on -RT.
+
+To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
+to __cpu_die() which is called on the thread which is asking for a target
+CPU to be shutdown. In addition, this change restores CPU hotplug
+functionality on ARM CPU1 can be unplugged/plugged many times.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Austin Schuh <austin@peloton-tech.com>
+Cc: <philipp@peloton-tech.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+[bigeasy: slighty edited the commit message]
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/kernel/smp.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -236,8 +236,6 @@ int __cpu_disable(void)
+ 	flush_cache_louis();
+ 	local_flush_tlb_all();
+ 
+-	clear_tasks_mm_cpumask(cpu);
+-
+ 	return 0;
+ }
+ 
+@@ -255,6 +253,7 @@ void __cpu_die(unsigned int cpu)
+ 	}
+ 	pr_debug("CPU%u: shutdown\n", cpu);
+ 
++	clear_tasks_mm_cpumask(cpu);
+ 	/*
+ 	 * platform_cpu_kill() is generally expected to do the powering off
+ 	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
