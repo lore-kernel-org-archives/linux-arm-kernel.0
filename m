@@ -1,118 +1,105 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Fri,  9 Mar 2018 17:07:18 +0800
-Subject: [PATCH 35/39] firmware/psci: Expose PSCI conduit
+Date: Fri,  9 Mar 2018 17:07:17 +0800
+Subject: [PATCH 34/39] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
 In-Reply-To: <20180309090722.26279-1-alex.shi@linaro.org>
 References: <20180309090722.26279-1-alex.shi@linaro.org>
-Message-ID: <20180309090722.26279-36-alex.shi@linaro.org>
+Message-ID: <20180309090722.26279-35-alex.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-commit 09a8d6d48499 upstream.
+commit f72af90c3783 upstream.
 
-In order to call into the firmware to apply workarounds, it is
-useful to find out whether we're using HVC or SMC. Let's expose
-this through the psci_ops.
+Rewrite the patch on arch/arm64/kvm/hyp.S instead of
+arch/arm64/kvm/hyp/hyp-entry.S.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+    We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+    So let's intercept it as early as we can by testing for the
+    function call number as soon as we've identified a HVC call
+    coming from the guest.
+
+    Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+    Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+    Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
 ---
- drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
- include/linux/psci.h    |  7 +++++++
- 2 files changed, 30 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/hyp.S      | 20 ++++++++++++++++++--
+ include/linux/arm-smccc.h |  6 +++---
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 0f35aebb30a7..9dc559955ce6 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -55,7 +55,9 @@ bool psci_tos_resident_on(int cpu)
- 	return cpu == resident_cpu;
- }
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 86c289832272..525da4446f1c 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -15,6 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
--struct psci_operations psci_ops;
-+struct psci_operations psci_ops = {
-+	.conduit = PSCI_CONDUIT_NONE,
-+};
++#include <linux/arm-smccc.h>
+ #include <linux/linkage.h>
  
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
- 				unsigned long, unsigned long);
-@@ -206,6 +208,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
- 			      0, 0, 0);
- }
+ #include <asm/alternative.h>
+@@ -974,10 +975,11 @@ el1_sync:					// Guest trapped into EL2
+ 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
  
-+static void set_conduit(enum psci_conduit conduit)
-+{
-+	switch (conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		break;
-+	case PSCI_CONDUIT_SMC:
-+		invoke_psci_fn = __invoke_psci_fn_smc;
-+		break;
-+	default:
-+		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
-+	}
+ 	cmp	x2, #ESR_ELx_EC_HVC64
++	ccmp	x2, #ESR_ELx_EC_HVC32, #4, ne
+ 	b.ne	el1_trap
+ 
+-	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
+-	cbnz	x3, el1_trap			// called HVC
++	mrs	x3, vttbr_el2		// If vttbr is valid, the guest
++	cbnz	x3, el1_hvc_guest	// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
+ 	pop	x2, x3
+@@ -1003,6 +1005,20 @@ el1_sync:					// Guest trapped into EL2
+ 	pop	lr, xzr
+ 2:	eret
+ 
++el1_hvc_guest:
++	/*
++	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
++	 * The workaround has already been applied on the host,
++	 * so let's quickly get back to the guest. We don't bother
++	 * restoring x3, as it can be clobbered anyway.
++	 */
++	ldr	x3, [sp]				// Guest's x0
++	eor	w3, w3, #ARM_SMCCC_ARCH_WORKAROUND_1
++	cbnz	w3, el1_trap
++	mov	x0, x3
++	add	sp, sp, #16
++	eret
 +
-+	psci_ops.conduit = conduit;
-+}
-+
- static int get_set_conduit_method(struct device_node *np)
- {
- 	const char *method;
-@@ -218,9 +236,9 @@ static int get_set_conduit_method(struct device_node *np)
- 	}
+ el1_trap:
+ 	/*
+ 	 * x1: ESR
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index a5ed4511af47..e7a439454950 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -57,9 +57,6 @@
+ #define ARM_SMCCC_OWNER_TRUSTED_OS	50
+ #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
  
- 	if (!strcmp("hvc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		set_conduit(PSCI_CONDUIT_HVC);
- 	} else if (!strcmp("smc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_smc;
-+		set_conduit(PSCI_CONDUIT_SMC);
- 	} else {
- 		pr_warn("invalid \"method\" property: %s\n", method);
- 		return -EINVAL;
-@@ -482,9 +500,9 @@ int __init psci_acpi_init(void)
- 	pr_info("probing for conduit method from ACPI.\n");
+-#ifndef __ASSEMBLY__
+-#include <linux/linkage.h>
+-#include <linux/types.h>
+ #define ARM_SMCCC_QUIRK_NONE		0
+ #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
  
- 	if (acpi_psci_use_hvc())
--		invoke_psci_fn = __invoke_psci_fn_hvc;
-+		set_conduit(PSCI_CONDUIT_HVC);
- 	else
--		invoke_psci_fn = __invoke_psci_fn_smc;
-+		set_conduit(PSCI_CONDUIT_SMC);
+@@ -81,6 +78,9 @@
+ 			   ARM_SMCCC_SMC_32,				\
+ 			   0, 0x8000)
  
- 	return psci_probe();
- }
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 04b4d92c7791..e071a1b8ddb5 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -24,6 +24,12 @@ bool psci_tos_resident_on(int cpu);
- bool psci_power_state_loses_context(u32 state);
- bool psci_power_state_is_valid(u32 state);
- 
-+enum psci_conduit {
-+	PSCI_CONDUIT_NONE,
-+	PSCI_CONDUIT_SMC,
-+	PSCI_CONDUIT_HVC,
-+};
-+
- struct psci_operations {
- 	u32 (*get_version)(void);
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-@@ -33,6 +39,7 @@ struct psci_operations {
- 	int (*affinity_info)(unsigned long target_affinity,
- 			unsigned long lowest_affinity_level);
- 	int (*migrate_info_type)(void);
-+	enum psci_conduit conduit;
- };
- 
- extern struct psci_operations psci_ops;
++#ifndef __ASSEMBLY__
++#include <linux/linkage.h>
++#include <linux/types.h>
+ /**
+  * struct arm_smccc_res - Result from SMC/HVC call
+  * @a0-a3 result values from registers 0 to 3
 -- 
 2.16.2.440.gc6284da
