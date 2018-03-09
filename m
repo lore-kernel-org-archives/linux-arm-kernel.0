@@ -1,17 +1,16 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Fri,  9 Mar 2018 14:47:11 +0000
-Subject: [PATCH 17/25] nvmem: rockchip-efuse: Make use of
- of_device_get_match_data()
+Date: Fri,  9 Mar 2018 14:47:10 +0000
+Subject: [PATCH 16/25] nvmem: snvs_lpgpr: Convert commas to semicolons
 In-Reply-To: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
 References: <20180309144719.29904-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180309144719.29904-18-srinivas.kandagatla@linaro.org>
+Message-ID: <20180309144719.29904-17-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Simplify code a bit by using of_device_get_match_data() instead of
-of_match_device().
+Looks like commas were accidentally used where semicolons were
+supposed to be. Fix that.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -28,36 +27,31 @@ Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index fec6e4c48b9a..ade8848adf82 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -259,11 +259,11 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct rockchip_efuse_chip *efuse;
--	const struct of_device_id *match;
-+	const void *data;
- 	struct device *dev = &pdev->dev;
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index cb471d5e8e86..92e1e41d128e 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->priv = priv;
+ 	cfg->name = dev_name(dev);
+ 	cfg->dev = dev;
+-	cfg->stride = 4,
+-	cfg->word_size = 4,
+-	cfg->size = 4,
+-	cfg->owner = THIS_MODULE,
+-	cfg->reg_read  = snvs_lpgpr_read,
+-	cfg->reg_write = snvs_lpgpr_write,
++	cfg->stride = 4;
++	cfg->word_size = 4;
++	cfg->size = 4;
++	cfg->owner = THIS_MODULE;
++	cfg->reg_read  = snvs_lpgpr_read;
++	cfg->reg_write = snvs_lpgpr_write;
  
--	match = of_match_device(dev->driver->of_match_table, dev);
--	if (!match || !match->data) {
-+	data = of_device_get_match_data(dev);
-+	if (!data) {
- 		dev_err(dev, "failed to get match data\n");
- 		return -EINVAL;
- 	}
-@@ -286,7 +286,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
- 				 &econfig.size))
- 		econfig.size = resource_size(res);
--	econfig.reg_read = match->data;
-+	econfig.reg_read = data;
- 	econfig.priv = efuse;
- 	econfig.dev = efuse->dev;
- 	nvmem = devm_nvmem_register(dev, &econfig);
+ 	nvmem = devm_nvmem_register(dev, cfg);
+ 
 -- 
 2.15.1
