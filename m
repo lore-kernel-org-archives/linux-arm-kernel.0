@@ -1,80 +1,67 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 9 Mar 2018 16:40:08 +0100
-Subject: [PATCH] ARM: dts: i.MX25: define SSI FIFO depth
-In-Reply-To: <1520587632.19507.3.camel@pengutronix.de>
-References: <1520373499-13623-1-git-send-email-martin@kaiser.cx>
- <20180308161135.1f3d3d18@karo-electronics.de>
- <20180308153832.GA28454@botnar.kaiser.cx>
- <20180309093738.7cd5fded@karo-electronics.de>
- <1520587632.19507.3.camel@pengutronix.de>
-Message-ID: <20180309164008.52d41dd5@karo-electronics.de>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 9 Mar 2018 15:39:49 +0000
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.17
+Message-ID: <5AA2AAC5.2000806@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Hi Olof, Hi Kevin,
 
-On Fri, 09 Mar 2018 10:27:12 +0100 Lucas Stach wrote:
-> Hi Lothar,
-> 
-> Am Freitag, den 09.03.2018, 09:37 +0100 schrieb Lothar Wa?mann:
-> > Hi,
-> > 
-> > On Thu, 8 Mar 2018 16:38:32 +0100 Martin Kaiser wrote:
-> > > Hi Lothar,
-> > > 
-> > > > > Thus wrote Lothar Wa?mann (LW at KARO-electronics.de):
-> > > 
-> > > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > > > > index 9725705..cf70df2 100644
-> > > > > --- a/arch/arm/boot/dts/imx25.dtsi
-> > > > > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > > > > @@ -269,6 +269,7 @@
-> > > > > > > > > ?				dmas = <&sdma 24 1 0>,
-> > > > > > > > > ?				???????<&sdma 25 1 0>;
-> > > > > > > > > ?				dma-names = "rx", "tx";
-> > > > > > > > > +				fsl,fifo-depth = <15>;
-> > > > > > > > > ?				status = "disabled";
-> > > > > > > > > ?			};
-> > > > > @@ -329,6 +330,7 @@
-> > > > > > > > > ?				dmas = <&sdma 28 1 0>,
-> > > > > > > > > ?				???????<&sdma 29 1 0>;
-> > > > > > > > > ?				dma-names = "rx", "tx";
-> > > > > > > > > +				fsl,fifo-depth = <15>;
-> > > > > > > > > ?				status = "disabled";
-> > > > > ?			};
-> > > > You are changing the global .dtsi file. Did you test this change with
-> > > > all devices that are affected by it?
-> > > 
-> > > I changed the hardware description of the imx25 SSI to match the
-> > > reference manual.
-> > > 
-> > > I did test this change on an imx25 board with audio playback. This uses
-> > > the SSI description I modified. I verified that the driver is actually
-> > > taking the modified setting into account and that this causes no
-> > > problems.
-> > > 
-> > > As of today, this setting is used by the fsl_ssi driver to set the fifo
-> > > water level for dma requests.
-> > > 
-> > > Of course, I don't have access to the enitre range of supported imx25
-> > > boards and I don't think this is required for submitting patches.
-> > > 
-> > > Do you have any indication why this patch should not be merged?
-> > > 
-> > 
-> > Usually patches should not willy-nilly change the behaviour of existing
-> > configurations unless they fix any real life bugs.
-> 
-> With this logic we wouldn't be able to get most driver changes applied.
-> If it is matching the reference manual and has been tested on the
-> affected hardware it should be good to go.
-> 
-> If you know about any specific corner cases that might break with this
-> change, please speak up now. Don't reject patches based on the
-> overarching "it might break something" argument.
-> 
-I didn't reject anything, I just wanted to make sure, that the
-implications of this patch were sufficiently considered.
+Please help to pull the following changes.
+Thanks!
 
+Best Regards,
+Wei
 
-Lothar Wa?mann
+---
+
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the Git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.17
+
+for you to fetch changes up to 928c4a5ce8684d2c8a37543b3361cfc12d83b167:
+
+  arm64: dts: Hi3660: Remove 'CPU_NAP' idle state (2018-03-02 16:19:44 +0000)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.17
+
+- Add XGE CPLD control support for hip07 SoC
+- Disable the SMMU on hip06 and hip07 SoCs becuase of
+  the hardware limitation
+- Enable HS200 mode for the MMC controller on hi6220 hikey board
+- Remove "cooling-{min|max}-level" this kind unused properties
+  for hi6220 SoC
+- Add watchdog node for hi6220 SoC
+- Remove "CPU_NAP" idle state on hikey960 board since it is
+  not stable and useless with the updated firmware
+
+----------------------------------------------------------------
+Dmitry Shmidt (1):
+      arm64: dts: hi6220: enable watchdog
+
+Huazhong Tan (1):
+      arm64: dts: hisi: add hns-dsaf cpld control for the hip07 SoC
+
+Leo Yan (1):
+      arm64: dts: Hi3660: Remove 'CPU_NAP' idle state
+
+Shameerali Kolothum Thodi (1):
+      arm64: dts: hisi: Disable hisilicon smmu node on hip06/hip07
+
+Viresh Kumar (1):
+      ARM64: dts: hi6220: Remove "cooling-{min|max}-level" for CPU nodes
+
+oscardagrach (1):
+      arm64: dts: hikey: Enable HS200 mode on eMMC
+
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi      | 32 ++-------------
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  2 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 10 ++++-
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi       | 56 ++++++++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi       | 33 +++++++++++++++
+ 5 files changed, 103 insertions(+), 30 deletions(-)
