@@ -1,77 +1,53 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 9 Mar 2018 19:21:39 +0100
-Subject: [PATCH] ARM: smp: Move clear_tasks_mm_cpumask() call to __cpu_die()
-Message-ID: <20180309182139.gnyed3n34skwceqk@linutronix.de>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 9 Mar 2018 18:29:41 +0000
+Subject: [PATCH 5/6] dma-mapping: support fsl-mc bus
+In-Reply-To: <20180308074115.GB15748@lst.de>
+References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
+ <1520260166-29387-6-git-send-email-nipun.gupta@nxp.com>
+ <20180305150814.GA15918@lst.de>
+ <7b4f9972-6aaa-fc9d-3854-d48b19a8051c@arm.com>
+ <20180305183938.GB20086@lst.de>
+ <1729ae21-d08c-b413-51a3-f22c394b388d@arm.com>
+ <HE1PR0401MB24251E99564CAA526F719ECCE6D90@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+ <20180308074115.GB15748@lst.de>
+Message-ID: <HE1PR0401MB2425871215B13AD0EFDCA5C3E6DE0@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Suspending a CPU on a RT kernel results in the following backtrace:
 
-| Disabling non-boot CPUs ...
-| BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-| in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
-| INFO: lockdep is turned off.
-| irq event stamp: 122
-| hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
-| hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
-|  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
-| Hardware name: Generic DRA74X (Flattened Device Tree)
-| [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
-| [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
-| [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
-| [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
-| [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
-| [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
-| [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
-| [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
-| [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
-| [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
-| [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
-| [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
-| [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
-| CPU1: shutdown
+> -----Original Message-----
+> From: Christoph Hellwig [mailto:hch at lst.de]
+> Sent: Thursday, March 08, 2018 13:11
+> 
+> On Tue, Mar 06, 2018 at 04:41:56AM +0000, Nipun Gupta wrote:
+> > Sorry for asking a trivial question - looking into dma_configure() I see that
+> > PCI is used in the start and the end of the API.
+> > In the end part pci_put_host_bridge_device() is called.
+> > So are two bus callbacks something like 'dma_config_start' &
+> 'dma_config_end'
+> > will be required where the former one will return "dma_dev"?
+> 
+> I'd just use dma_configure as the callback.
 
-The root cause of above backtrace is task_lock() which takes a sleeping
-lock on -RT.
+This would be a decent stuff.
 
-To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
-to __cpu_die() which is called on the thread which is asking for a target
-CPU to be shutdown. In addition, this change restores CPU hotplug
-functionality on ARM CPU1 can be unplugged/plugged many times.
+> 
+> Currently the of_dma_configure and acpi_dma_configure are only used
+> for PCI anyway, as no one else sets a non-NULL dma dev.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Austin Schuh <austin@peloton-tech.com>
-Cc: <philipp@peloton-tech.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-[bigeasy: slighty edited the commit message]
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- arch/arm/kernel/smp.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+My understanding is that even the platform bus uses the of_dma_configure
+and probably acpi_dma_configure too. So platform bus may also need the
+callback implemented. Please correct me if my understanding is wrong.
 
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -236,8 +236,6 @@ int __cpu_disable(void)
- 	flush_cache_louis();
- 	local_flush_tlb_all();
- 
--	clear_tasks_mm_cpumask(cpu);
--
- 	return 0;
- }
- 
-@@ -255,6 +253,7 @@ void __cpu_die(unsigned int cpu)
- 	}
- 	pr_debug("CPU%u: shutdown\n", cpu);
- 
-+	clear_tasks_mm_cpumask(cpu);
- 	/*
- 	 * platform_cpu_kill() is generally expected to do the powering off
- 	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
+I will submit the patch with 'dma_configure' callback implemented for
+the busses shortly.
+
+> For fsl-mc I suspect only of_dma_configure is relevanet, so just call that directly.
+> If at some point we get enough busses with either OF or ACPI we could
+> create a helper called from ->dma_configure for that.
+
+Totally agree with this.
+
+Thanks,
+Nipun
