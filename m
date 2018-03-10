@@ -1,55 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sat, 10 Mar 2018 15:45:36 +0000
-Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <5AA30F5C.2010402@codeaurora.org>
-References: <20180102112533.13640-1-suzuki.poulose@arm.com>
- <20180102112533.13640-9-suzuki.poulose@arm.com>
- <5AA1CE48.5030203@codeaurora.org>
- <a466d82b-2a0f-ffba-f9f7-c76c6c787bb5@arm.com>
- <20180309133531.fepm2suvdmvm4muv@lakrids.cambridge.arm.com>
- <5AA30F5C.2010402@codeaurora.org>
-Message-ID: <20180310154527.f6j2fgqimbtn4eme@salmiak>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 11 Mar 2018 00:39:09 +0800
+Subject: [xlnx:master 1273/1515] warning: (DRM_RADEON && ..) selects
+ BACKLIGHT_CLASS_DEVICE which has unmet direct dependencies (HAS_IOMEM && ..)
+Message-ID: <201803110008.0D5c6ByP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 02:49:00PM -0800, Saravana Kannan wrote:
-> > > > Looking at the code, I didn't see any specific handling of cluster
-> > > > power collapse. AFAIK, the HW counters do not retain config (what event
-> > > > they are counting) or value (the current count) across power collapse.
-> > > > Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers
-> > > > to handle that?
-> > > 
-> > > Good point, yes *somebody* needs to save-restore the registers. But who ? As far
-> > > as the kernel is concerned, it doesn't control the DSU states. Also, as of now
-> > > there is no reliable way to get the "ENTER/EXIT" notifications for the DSU power
-> > > domain state changes. All we do is use the PMU, assuming it is available. AFAIT,
-> > > it should really be done at EL3, which manages the DSU, but may be I am wrong.
-> > 
-> > Given this can happen behind the back of the kernel, if FW doesn't
-> > save/restore this state, we'll have to inhibit cpuidle on a CPU
-> > associated with the DSU PMU whenever it has active events, which would
-> > keep the cluster online.
-> 
-> Using PMUs should be designed to have the least impact on power/performance.
-> Otherwise, using them to profile and debug issues becomes impossible.
-> Disabling cpuidle would significantly affect power and performance.
-> 
-> Why not use CPU_CLUSTER_PM_ENTER similar to how arm-pmu.c uses CPU_PM_ENTER
-> for saving and restoring the counters?
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   f445aa62727567784c6e32780d9b13f1011ddc1c
+commit: 4d08c576e74d1f07fbfd2a0be564fc3b59fe2e99 [1273/1515] drm: xlnx: dsi: Adding dsi driver to new framework
+config: i386-randconfig-x018-201809 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        git checkout 4d08c576e74d1f07fbfd2a0be564fc3b59fe2e99
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-The CPU_CLUSTER_PM_{ENTER,EXIT} notifications only exist on particular 32-bit
-platforms where the kernel directly manages CPU power states. These do not
-exist on systems where FW manages the cluster power state (e.g. on any arm64
-platform with PSCI). So we cannot rely on CPU_CLUSTER_PM_{ENTER,EXIT} in the
-DSU PMU driver.
+All warnings (new ones prefixed by >>):
 
-The arm-pmu code manages state which is strictly CPU affine, so we can rely on
-the CPU_PM_{ENTER,EXIT} notifications there.
+warning: (DRM_RADEON && DRM_AMDGPU && DRM_NOUVEAU && DRM_I915 && DRM_GMA500 && DRM_SHMOBILE && DRM_TILCDC && DRM_FSL_DCU && DRM_TINYDRM && DRM_XLNX_DSI && DRM_PARADE_PS8622 && FB_BACKLIGHT && FB_ARMCLCD && FB_MX3 && USB_APPLEDISPLAY && FB_OLPC_DCON && ACPI_CMPC && SAMSUNG_Q10) selects BACKLIGHT_CLASS_DEVICE which has unmet direct dependencies (HAS_IOMEM && BACKLIGHT_LCD_SUPPORT)
 
-We cannot rely on CPU_PM_{ENTER,EXIT} notifications to manage per-cluster
-state, as CPUs can race to enter/exit idle, and we cannot track the cluster
-state accurately in the kernel without serializing idle entry/exit across CPUs,
-which will affect power/performance.
-
-Thanks,
-Mark.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25834 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180311/91640e4b/attachment-0001.gz>
