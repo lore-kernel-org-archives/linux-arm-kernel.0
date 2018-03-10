@@ -1,41 +1,69 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Mar 2018 16:16:02 +0800
-Subject: [PATCH 0/4] ARM: sunxi: Clean and improvements for multi-cluster
- SMP
-In-Reply-To: <20180308150012.19045-1-wens@csie.org>
-References: <20180308150012.19045-1-wens@csie.org>
-Message-ID: <CAGb2v67WVY0zPUhqy0nZOhKEfZskZvKcvUrUA_wghw=37Eq3sA@mail.gmail.com>
+From: megous@megous.com (megous at megous.com)
+Date: Sat, 10 Mar 2018 12:05:11 +0100
+Subject: [PATCH] drm/sun4i: Fix exclusivity of the TCON clocks
+Message-ID: <20180310110511.14697-1-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2018 at 11:00 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi,
->
-> This series is a bit of cleanup and improvement for the new
-> multi-cluster SMP code for Allwinner A80 and A83T (soon) SoCs.
->
-> The first patch is just a typo fix.
->
-> The second and third patch add the use of the "enable-method" cpu
-> property to enable SMP, instead of matching against the machine
-> compatible. However, due to how init calls are sequenced, we still
-> need to use a platform early_init call.
->
-> The last patch splits out parts of the SoC-specific init code, i.e.
-> the device node matching parts. This should help with Mylene's work
-> on adding support for the A83T.
->
-> Please have a look.
->
-> Regards
-> ChenYu
->
-> Chen-Yu Tsai (4):
->   ARM: sunxi: mc-smp: Fix "lookback" typo
->   ARM: sunxi: mc-smp: Use DT enable-method for sun9i A80 SMP
->   ARM: dts: sun9i: Add enable-method for SMP support for the A80 SoC
->   ARM: sunxi: mc-smp: Split out SoC-specific device node lookup sequence
+From: Ondrej Jirman <megous@megous.com>
 
-Merged all 4 patches.
+Currently the exclusivity is enabled when the rate is set by
+the mode setting functions. These functions are called by
+mode_set_nofb callback of drm_crc_helper. Then exclusivity
+is disabled when tcon is disabled by atomic_disable
+callback.
 
-ChenYu
+What happens is that mode_set_nofb can be called once when
+mode chnages, and afterwards the system can call atomic_enable
+and atomic_disable multiple times without further calls to
+mode_set_nofb.
+
+This happens:
+
+mode_set_nofb   - clk exclusivity is enabled
+atomic_enable
+atomic_disable  - clk exclusivity is disabled
+atomic_enable
+atomic_disable  - clk exclusivity is already disabled, leading to WARN
+                  in clk_rate_exclusive_put
+
+Solution is to enable exclusivity in sun4i_tcon_channel_set_status.
+
+Signed-off-by: Ondrej Jirman <megous@megous.com>
+Cc: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index d4a29847dadd..cc29daa062f7 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -104,6 +104,7 @@ static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
+ 
+ 	if (enabled) {
+ 		clk_prepare_enable(clk);
++		clk_rate_exclusive_get(clk);
+ 	} else {
+ 		clk_rate_exclusive_put(clk);
+ 		clk_disable_unprepare(clk);
+@@ -263,7 +264,7 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+ 					const struct drm_display_mode *mode)
+ {
+ 	/* Configure the dot clock */
+-	clk_set_rate_exclusive(tcon->dclk, mode->crtc_clock * 1000);
++	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+ 
+ 	/* Set the resolution */
+ 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+@@ -428,7 +429,7 @@ static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 	WARN_ON(!tcon->quirks->has_channel_1);
+ 
+ 	/* Configure the dot clock */
+-	clk_set_rate_exclusive(tcon->sclk1, mode->crtc_clock * 1000);
++	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
+ 
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
+-- 
+2.16.2
