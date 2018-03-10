@@ -1,73 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Mar 2018 15:22:06 +0000
-Subject: [PATCH v5 21/23] crypto: arm64/sha512-ce - yield NEON after every
- block of input
-In-Reply-To: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
-References: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180310152208.10369-22-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 10 Mar 2018 15:45:36 +0000
+Subject: [PATCH v11 8/8] perf: ARM DynamIQ Shared Unit PMU support
+In-Reply-To: <5AA30F5C.2010402@codeaurora.org>
+References: <20180102112533.13640-1-suzuki.poulose@arm.com>
+ <20180102112533.13640-9-suzuki.poulose@arm.com>
+ <5AA1CE48.5030203@codeaurora.org>
+ <a466d82b-2a0f-ffba-f9f7-c76c6c787bb5@arm.com>
+ <20180309133531.fepm2suvdmvm4muv@lakrids.cambridge.arm.com>
+ <5AA30F5C.2010402@codeaurora.org>
+Message-ID: <20180310154527.f6j2fgqimbtn4eme@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid excessive scheduling delays under a preemptible kernel by
-conditionally yielding the NEON after every block of input.
+On Fri, Mar 09, 2018 at 02:49:00PM -0800, Saravana Kannan wrote:
+> > > > Looking at the code, I didn't see any specific handling of cluster
+> > > > power collapse. AFAIK, the HW counters do not retain config (what event
+> > > > they are counting) or value (the current count) across power collapse.
+> > > > Wouldn't you need to register for some kind of PM_ENTER/EXIT notifiers
+> > > > to handle that?
+> > > 
+> > > Good point, yes *somebody* needs to save-restore the registers. But who ? As far
+> > > as the kernel is concerned, it doesn't control the DSU states. Also, as of now
+> > > there is no reliable way to get the "ENTER/EXIT" notifications for the DSU power
+> > > domain state changes. All we do is use the PMU, assuming it is available. AFAIT,
+> > > it should really be done at EL3, which manages the DSU, but may be I am wrong.
+> > 
+> > Given this can happen behind the back of the kernel, if FW doesn't
+> > save/restore this state, we'll have to inhibit cpuidle on a CPU
+> > associated with the DSU PMU whenever it has active events, which would
+> > keep the cluster online.
+> 
+> Using PMUs should be designed to have the least impact on power/performance.
+> Otherwise, using them to profile and debug issues becomes impossible.
+> Disabling cpuidle would significantly affect power and performance.
+> 
+> Why not use CPU_CLUSTER_PM_ENTER similar to how arm-pmu.c uses CPU_PM_ENTER
+> for saving and restoring the counters?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/sha512-ce-core.S | 27 +++++++++++++++-----
- 1 file changed, 21 insertions(+), 6 deletions(-)
+The CPU_CLUSTER_PM_{ENTER,EXIT} notifications only exist on particular 32-bit
+platforms where the kernel directly manages CPU power states. These do not
+exist on systems where FW manages the cluster power state (e.g. on any arm64
+platform with PSCI). So we cannot rely on CPU_CLUSTER_PM_{ENTER,EXIT} in the
+DSU PMU driver.
 
-diff --git a/arch/arm64/crypto/sha512-ce-core.S b/arch/arm64/crypto/sha512-ce-core.S
-index 7f3bca5c59a2..ce65e3abe4f2 100644
---- a/arch/arm64/crypto/sha512-ce-core.S
-+++ b/arch/arm64/crypto/sha512-ce-core.S
-@@ -107,17 +107,23 @@
- 	 */
- 	.text
- ENTRY(sha512_ce_transform)
-+	frame_push	3
-+
-+	mov		x19, x0
-+	mov		x20, x1
-+	mov		x21, x2
-+
- 	/* load state */
--	ld1		{v8.2d-v11.2d}, [x0]
-+0:	ld1		{v8.2d-v11.2d}, [x19]
- 
- 	/* load first 4 round constants */
- 	adr_l		x3, .Lsha512_rcon
- 	ld1		{v20.2d-v23.2d}, [x3], #64
- 
- 	/* load input */
--0:	ld1		{v12.2d-v15.2d}, [x1], #64
--	ld1		{v16.2d-v19.2d}, [x1], #64
--	sub		w2, w2, #1
-+1:	ld1		{v12.2d-v15.2d}, [x20], #64
-+	ld1		{v16.2d-v19.2d}, [x20], #64
-+	sub		w21, w21, #1
- 
- CPU_LE(	rev64		v12.16b, v12.16b	)
- CPU_LE(	rev64		v13.16b, v13.16b	)
-@@ -196,9 +202,18 @@ CPU_LE(	rev64		v19.16b, v19.16b	)
- 	add		v11.2d, v11.2d, v3.2d
- 
- 	/* handled all input blocks? */
--	cbnz		w2, 0b
-+	cbz		w21, 3f
-+
-+	if_will_cond_yield_neon
-+	st1		{v8.2d-v11.2d}, [x19]
-+	do_cond_yield_neon
-+	b		0b
-+	endif_yield_neon
-+
-+	b		1b
- 
- 	/* store new state */
--3:	st1		{v8.2d-v11.2d}, [x0]
-+3:	st1		{v8.2d-v11.2d}, [x19]
-+	frame_pop
- 	ret
- ENDPROC(sha512_ce_transform)
--- 
-2.15.1
+The arm-pmu code manages state which is strictly CPU affine, so we can rely on
+the CPU_PM_{ENTER,EXIT} notifications there.
+
+We cannot rely on CPU_PM_{ENTER,EXIT} notifications to manage per-cluster
+state, as CPUs can race to enter/exit idle, and we cannot track the cluster
+state accurately in the kernel without serializing idle entry/exit across CPUs,
+which will affect power/performance.
+
+Thanks,
+Mark.
