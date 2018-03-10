@@ -1,80 +1,114 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Mar 2018 13:57:59 +0000
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
- with the same vintid
-In-Reply-To: <20180309213931.GE1917@lvm>
-References: <20180307124055.13800-1-marc.zyngier@arm.com>
- <20180307124055.13800-2-marc.zyngier@arm.com>
- <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
- <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
- <20180308160242.GA1917@lvm> <86tvtqbis9.wl-marc.zyngier@arm.com>
- <86o9jybeef.wl-marc.zyngier@arm.com> <20180309213931.GE1917@lvm>
-Message-ID: <86ina4av88.wl-marc.zyngier@arm.com>
+From: peng.hao2@zte.com.cn (peng.hao2 at zte.com.cn)
+Date: Sat, 10 Mar 2018 22:34:48 +0800 (CST)
+Subject: =?UTF-8?B?UmU6UmU6IFtQQVRDSF0gS1ZNOmFybS9hcm02NDogZGNhY2hlIG5lZWQgYmUgY29oZXJlbnQgdW5jb25kaXRpb25hbGx5?=
+Message-ID: <201803102234486300587@zte.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+>On Sat, 10 Mar 2018 03:23:18 +0000,
+>peng hao wrote:
+>> >> For emulation devices just like vga, keeping coherent dcache between
+>> >> guest and host timely is needed.
+>> >> Now the display of vnc-viewer will not update continuously and the
+>> >> patch can fix up.
+>> >> 
+>> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+>> >> ---
+>> >>  virt/kvm/arm/mmu.c | 6 ++----
+>> >>  1 file changed, 2 insertions(+), 4 deletions(-)
+>> >> 
+>> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> >> index ec62d1c..4a28395e 100644
+>> >> --- a/virt/kvm/arm/mmu.c
+>> >> +++ b/virt/kvm/arm/mmu.c
+>> >> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>> >>              kvm_set_pfn_dirty(pfn);
+>> >>          }
+>> >>  
+>> >> -        if (fault_status != FSC_PERM)
+>> >> -            clean_dcache_guest_page(pfn, PMD_SIZE);
+>> >> +        clean_dcache_guest_page(pfn, PMD_SIZE);
+>> >>  
+>> >>          if (exec_fault) {
+>> >>              new_pmd = kvm_s2pmd_mkexec(new_pmd);
+>> >> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>> >>              mark_page_dirty(kvm, gfn);
+>> >>          }
+>> >>  
+>> >> -        if (fault_status != FSC_PERM)
+>> >> -            clean_dcache_guest_page(pfn, PAGE_SIZE);
+>> >> +        clean_dcache_guest_page(pfn, PAGE_SIZE);
+>> >>  
+>> >>          if (exec_fault) {
+>> >>              new_pte = kvm_s2pte_mkexec(new_pte);
+>> >> 
+>> 
+>> >I'm sorry, but I have to NAK this.
+>> 
+>> >You're papering over the fundamental issue that you're accessing a
+>> >cacheable alias of a non cacheable memory. The architecture is very
+>> >clear about why this doesn't work, and KVM implements the architecture.
+>> 
+>> 
+>> 
+>> I find that I just encounter the problem after the commit
+>> '15303ba5d1cd9b28d03a980456c0978c0ea3b208 " .
 
-On Fri, 09 Mar 2018 21:39:31 +0000,
-Christoffer Dall wrote:
-> 
-> On Thu, Mar 08, 2018 at 06:39:20PM +0000, Marc Zyngier wrote:
-> > Thinking of it a bit more: MI on EOI doesn't offer much more guarantee
-> > in the way of priority ordering. Taking your example above: Even if
-> > you generate a MI when EOIing the SGI, there is no guarantee that
-> > you'll take the MI before you've acked the SPI.
-> 
-> There's no guarantee, but at least you're attempting at processing the
-> SGIs in first.  It's the best we can do, but not completely correct,
-> kinda thing...
-> 
-> > 
-> > If you really want to offer that absolute guarantee that all the
-> > multi-source SGIs of higher priority are delivered before anything
-> > else, then you must make sure that only the SGIs are present in the
-> > LRs, excluding any other interrupt on lower priority until you've
-> > queued them all.
-> 
-> Yes, that sucks!  Might not be too hard to implement, it's basically an
-> early out of the loop traversing the AP list, but just an annoying
-> complication.
+>This should really be a9c0e12ebee5 ("KVM: arm/arm64: Only clean the
+>dcache on translation fault").
 
-Yeah, it is a bit gross. The way I implemented it is by forcing the AP
-list to be sorted if there is any multi-SGI in the pipeline, and early
-out as soon as we see an interrupt of a lower priority than the first
-multi-SGI. That way, we only have an overhead in the case that
-combines multi-SGI and lower priority interrupts.
+>> The commit contains "icache invalidation optimizations, improving VM
+>> startup time",it changes from unconditionally calling
+>> coherent_cache_guest_page(including dcache handle) to conditionally
+>> calling clean_dcache_guest_page.
+>> 
+>> I trace the display of vnc abnormally and find it generate data
+>> abort in vga address region with FSC_PERM,and it will not call
+>> clean_dcache_guest_page . So I think should recover to uncontionally
+>> calling clean_dcache_guest_page.
 
-> > At that stage, I wonder if there is a point in doing anything at
-> > all. The GICv2 architecture is too rubbish for words.
-> > 
-> 
-> The case we do need to worry about is the guest processing all its
-> interrupts and not exiting while there is actually still an SGI pending.
-> At that point, we can either do it with the "no interrupts pending
-> maintenance interrupt" or with the "EOI maintenance interrupt", and I
-> think the latter at least gets us slightly closer to the architecture
-> for a non-virtualized system.
+>[I really hate ranting on a Saturday morning as the sun is finally out
+>and I could be relaxing in the garden, but hey, I guess that's the
+>fate of a kernel hacker who made the silly mistake of reading email on
+>a Saturday morning instead of being out in the garden...]
 
-I think that this is where we disagree. I don't see anything in the
-architecture that mandates that we should present the SGIs before
-anything else. All we need to do is to ensure that interrupts of
-higher priority are presented before anything else. It is perfectly
-acceptable for an implementation to deliver SGI0, then SPI3, and SGI0
-(from another CPU) after that, as long as SPI3 isn't of lesser
-priority than SGI0.
+>Even if you enabled dirty tracking on the VGA memory (and thus making
+>it RO to generate a permission fault), you would end-up cleaning to
+>the PoC *before* any write has been committed to the page. How useful
+>is that? You're also pretty lucky that this does a clean+invalidate
+>(rather than a clean which would be good enough), meaning that QEMU
+>will in turn miss in the cache (PIPT caches) and read some *stale*
+>data from memory.
 
-Another thing I dislike about using EOI for that is forces us to
-propagate the knowledge of the multi-SGI horror further down the
-stack, down to both implementations of vgic_populate_lr. NPIE allows
-us to keep that knowledge local. But that's an orthogonal issue, and
-we can further argue/bikeshed about the respective merits of both
-solutions once we have something that fits the sorry state of the
-GICv2 architecture ;-).
+>Repeat that often enough, and yes, you can get some sort of
+>display. Is that the right thing to do? Hell no. You might just as
+>well have a userspace process thrashing the cache at the PoC, running
+>concurrently with your VM, it would have a similar effect. It may work
+>on your particular platform, in some specific conditions, but it just
+>doesn't work in general.
 
-Thanks,
+>What you are describing is a long standing issue. VGA emulation never
+>worked on ARM, because it is fundamentally incompatible with the ARM
+>memory architecture. Read the various discussions on the list over the
+>past 4 years or so, read the various presentations I and others have
+>given about this problem and how to address it[1].
 
-	M.
+>The *real* fix is a one-liner in the Linux VGA driver: map the VGA
+>memory as cacheable, and stop lying to the guest. Or if you want to
+>lie to the guest, perform cache maintenance from userspace in QEMU
+>based on the dirty tracking bitmap that it uses for the VGA memory.
 
--- 
-Jazz is not dead, it just smell funny.
+>Anything else is out of the scope of the architecture, and I'm not
+>going to add more crap to satisfy requirements that cannot be
+>implemented on real HW, let alone in a virtualized environment.
+
+Thanks for your explanation in detail
+
+>Thanks,
+
+>    M.
+
+>[1] http://events17.linuxfoundation.org/sites/events/files/slides/slides_10.pdf
+
+>-- 
+>Jazz is not dead, it just smell funny.
