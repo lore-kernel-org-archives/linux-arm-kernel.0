@@ -1,621 +1,475 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Sat, 10 Mar 2018 02:24:39 +0000
-Subject: [PATCH v4 07/24] ASoC: qdsp6: q6afe: Add q6afe driver
+Date: Sat, 10 Mar 2018 02:24:48 +0000
+Subject: [PATCH v4 16/24] ASoC: qdsp6: q6routing: Add q6routing driver
 In-Reply-To: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
 References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180310022456.26739-17-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
+This patch adds support to q6 routing driver which configures route
+between ASM and AFE module using ADM apis.
 
-AFE module sits right at the other end of cpu where the codec/audio
-devices are connected.
-
-AFE provides abstraced interfaces to both hardware and virtual devices.
-Each AFE tx/rx port can be configured to connect to one of the hardware
-devices like codec, hdmi, slimbus, i2s and so on. AFE services include
-starting, stopping, and if needed, any configurations of the ports.
+This driver uses dapm widgets to setup the matrix between AFE ports and
+ASM streams.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/Kconfig        |   4 +
- sound/soc/qcom/Makefile       |   3 +
- sound/soc/qcom/qdsp6/Makefile |   1 +
- sound/soc/qcom/qdsp6/q6afe.c  | 503 ++++++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h  |  35 +++
- 5 files changed, 546 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
+ sound/soc/qcom/Kconfig           |   4 +
+ sound/soc/qcom/qdsp6/Makefile    |   1 +
+ sound/soc/qcom/qdsp6/q6routing.c | 392 +++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6routing.h |   9 +
+ 4 files changed, 406 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
 
 diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 8247ade16dbe..f50c76d712c0 100644
+index 488ee93ee084..7a868a6fac1b 100644
 --- a/sound/soc/qcom/Kconfig
 +++ b/sound/soc/qcom/Kconfig
-@@ -47,10 +47,14 @@ config SND_SOC_APQ8016_SBC
- config SND_SOC_QDSP6_COMMON
+@@ -53,6 +53,9 @@ config SND_SOC_QDSP6_AFE
+ config SND_SOC_QDSP6_ADM
  	tristate
  
-+config SND_SOC_QDSP6_AFE
++config SND_SOC_QDSP6_ROUTING
 +	tristate
 +
- config SND_SOC_QDSP6
- 	tristate "SoC ALSA audio driver for QDSP6"
- 	depends on QCOM_APR && HAS_DMA
- 	select SND_SOC_QDSP6_COMMON
-+	select SND_SOC_QDSP6_AFE
- 	help
- 	 To add support for MSM QDSP6 Soc Audio.
- 	 This will enable sound soc platform specific
-diff --git a/sound/soc/qcom/Makefile b/sound/soc/qcom/Makefile
-index d5280355c24f..0276717917c0 100644
---- a/sound/soc/qcom/Makefile
-+++ b/sound/soc/qcom/Makefile
-@@ -16,3 +16,6 @@ snd-soc-apq8016-sbc-objs := apq8016_sbc.o
+ config SND_SOC_QDSP6_ASM
+ 	tristate
  
- obj-$(CONFIG_SND_SOC_STORM) += snd-soc-storm.o
- obj-$(CONFIG_SND_SOC_APQ8016_SBC) += snd-soc-apq8016-sbc.o
-+
-+#DSP lib
-+obj-$(CONFIG_SND_SOC_QDSP6) += qdsp6/
+@@ -65,6 +68,7 @@ config SND_SOC_QDSP6
+ 	select SND_SOC_QDSP6_COMMON
+ 	select SND_SOC_QDSP6_AFE
+ 	select SND_SOC_QDSP6_ADM
++	select SND_SOC_QDSP6_ROUTING
+ 	select SND_SOC_QDSP6_ASM
+ 	select SND_SOC_QDSP6_CORE
+ 	help
 diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index accebdb49306..9ec951e0833b 100644
+index 61f089bc0d25..6640bceccc18 100644
 --- a/sound/soc/qcom/qdsp6/Makefile
 +++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -1 +1,2 @@
+@@ -1,5 +1,6 @@
  obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
-+obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
-diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
+ obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
++obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+ obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
 new file mode 100644
-index 000000000000..fd76f7296f36
+index 000000000000..b72bd9045fea
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -0,0 +1,503 @@
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -0,0 +1,392 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2011-2017, The Linux Foundation
 +// Copyright (c) 2018, Linaro Limited
 +
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <linux/uaccess.h>
-+#include <linux/wait.h>
-+#include <linux/jiffies.h>
-+#include <linux/sched.h>
++#include <linux/init.h>
++#include <linux/err.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
++#include <linux/platform_device.h>
 +#include <linux/of_platform.h>
-+#include <linux/spinlock.h>
-+#include <linux/delay.h>
-+#include <linux/soc/qcom/apr.h>
-+#include "q6dsp-errno.h"
-+#include "q6core.h"
++#include <linux/bitops.h>
++#include <linux/component.h>
++#include <linux/mutex.h>
++#include <linux/of_device.h>
++#include <linux/slab.h>
++#include <sound/core.h>
++#include <sound/soc.h>
++#include <sound/soc-dapm.h>
++#include <sound/pcm.h>
++#include <sound/control.h>
++#include <sound/asound.h>
++#include <sound/pcm_params.h>
 +#include "q6afe.h"
++#include "q6asm.h"
++#include "q6adm.h"
++#include "q6routing.h"
 +
-+/* AFE CMDs */
-+#define AFE_PORT_CMD_DEVICE_START	0x000100E5
-+#define AFE_PORT_CMD_DEVICE_STOP	0x000100E6
-+#define AFE_PORT_CMD_SET_PARAM_V2	0x000100EF
-+#define AFE_PORT_CMDRSP_GET_PARAM_V2	0x00010106
-+#define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
-+#define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
++struct session_data {
++	int state;
++	int port_id;
++	int path_type;
++	int app_type;
++	int acdb_id;
++	int sample_rate;
++	int bits_per_sample;
++	int channels;
++	int perf_mode;
++	int numcopps;
++	int fedai_id;
++	unsigned long copp_map;
++};
 +
-+/* Port IDs */
-+#define AFE_API_VERSION_HDMI_CONFIG	0x1
-+#define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
-+#define TIMEOUT_MS 1000
-+#define AFE_CMD_RESP_AVAIL	0
-+#define AFE_CMD_RESP_NONE	1
-+
-+struct q6afe {
-+	struct apr_device *apr;
++struct msm_routing_data {
++	struct session_data sessions[MAX_SESSIONS];
++	struct session_data port_data[AFE_MAX_PORTS];
 +	struct device *dev;
-+	struct q6core_svc_api_info ainfo;
 +	struct mutex lock;
-+	struct list_head port_list;
-+	spinlock_t port_list_lock;
-+	struct list_head node;
-+	struct platform_device *pdev_dais;
 +};
 +
-+struct afe_port_cmd_device_start {
-+	struct apr_hdr hdr;
-+	u16 port_id;
-+	u16 reserved;
-+} __packed;
-+
-+struct afe_port_cmd_device_stop {
-+	struct apr_hdr hdr;
-+	u16 port_id;
-+	u16 reserved;
-+/* Reserved for 32-bit alignment. This field must be set to 0.*/
-+} __packed;
-+
-+struct afe_port_param_data_v2 {
-+	u32 module_id;
-+	u32 param_id;
-+	u16 param_size;
-+	u16 reserved;
-+} __packed;
-+
-+struct afe_port_cmd_set_param_v2 {
-+	u16 port_id;
-+	u16 payload_size;
-+	u32 payload_address_lsw;
-+	u32 payload_address_msw;
-+	u32 mem_map_handle;
-+} __packed;
-+
-+struct afe_param_id_hdmi_multi_chan_audio_cfg {
-+	u32 hdmi_cfg_minor_version;
-+	u16 datatype;
-+	u16 channel_allocation;
-+	u32 sample_rate;
-+	u16 bit_width;
-+	u16 reserved;
-+} __packed;
-+
-+union afe_port_config {
-+	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
-+} __packed;
-+
-+struct q6afe_port {
-+	wait_queue_head_t wait;
-+	union afe_port_config port_cfg;
-+	int token;
-+	int id;
-+	int cfg_type;
-+	struct q6afe *afe;
-+	struct list_head	node;
-+};
-+
-+struct afe_audioif_config_command {
-+	struct apr_hdr hdr;
-+	struct afe_port_cmd_set_param_v2 param;
-+	struct afe_port_param_data_v2 pdata;
-+	union afe_port_config pcfg;
-+} __packed;
-+
-+struct afe_port_map {
-+	int port_id;
-+	int token;
-+	int is_rx;
-+	int is_dig_pcm;
-+};
++static struct msm_routing_data *routing_data;
 +
 +/**
-+ * Mapping between Virtual Port IDs to DSP AFE Port ID
-+ * On B Family SoCs DSP Port IDs are consistent across multiple SoCs
-+ * on A Family SoCs DSP port IDs are same as virtual Port IDs.
-+ **/
-+
-+static struct afe_port_map port_maps[AFE_PORT_MAX] = {
-+	[HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX, HDMI_RX, 1, 1},
-+};
-+
-+static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
++ * q6routing_stream_open() - Register a new stream for route setup
++ *
++ * @fedai_id: Frontend dai id.
++ * @perf_mode: Performance mode.
++ * @stream_id: ASM stream id to map.
++ * @stream_type: Direction of stream
++ *
++ * Return: Will be an negative on error or a zero on success.
++ */
++int q6routing_stream_open(int fedai_id, int perf_mode,
++			   int stream_id, int stream_type)
 +{
-+	struct q6afe_port *p = NULL;
-+	unsigned long flags;
++	int j, topology, num_copps = 0;
++	struct route_payload payload;
++	int copp_idx;
++	struct session_data *session, *pdata;
 +
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_for_each_entry(p, &afe->port_list, node)
-+		if (p->token == token)
-+			break;
++	if (!routing_data) {
++		pr_err("Routing driver not yet ready\n");
++		return -EINVAL;
++	}
 +
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+	return p;
++	session = &routing_data->sessions[stream_id - 1];
++	pdata = &routing_data->port_data[session->port_id];
++
++	mutex_lock(&routing_data->lock);
++	session->fedai_id = fedai_id;
++
++	session->path_type = pdata->path_type;
++	session->sample_rate = pdata->sample_rate;
++	session->channels = pdata->channels;
++	session->bits_per_sample = pdata->bits_per_sample;
++
++	payload.num_copps = 0; /* only RX needs to use payload */
++	topology = NULL_COPP_TOPOLOGY;
++	copp_idx = q6adm_open(routing_data->dev, session->port_id,
++			      session->path_type, session->sample_rate,
++			      session->channels, topology, perf_mode,
++			      session->bits_per_sample, 0, 0);
++
++	if (copp_idx < 0) {
++		mutex_unlock(&routing_data->lock);
++		return -EINVAL;
++	}
++
++	set_bit(copp_idx, &session->copp_map);
++
++	for_each_set_bit(j, &session->copp_map, MAX_COPPS_PER_PORT) {
++		payload.port_id[num_copps] = session->port_id;
++		payload.copp_idx[num_copps] = j;
++		num_copps++;
++	}
++
++	if (num_copps) {
++		payload.num_copps = num_copps;
++		payload.session_id = stream_id;
++		q6adm_matrix_map(routing_data->dev, session->path_type,
++				 payload, perf_mode);
++	}
++	mutex_unlock(&routing_data->lock);
++
++	return 0;
 +}
++EXPORT_SYMBOL_GPL(q6routing_stream_open);
 +
-+static int q6afe_callback(struct apr_device *adev,
-+			struct apr_client_message *data)
++static struct session_data *get_session_from_id(struct msm_routing_data *data,
++						int fedai_id)
 +{
-+	struct q6afe *afe = dev_get_drvdata(&adev->dev);
-+	struct aprv2_ibasic_rsp_result_t *res;
-+	struct q6afe_port *port;
++	int i;
 +
-+	if (!data->payload_size)
-+		return 0;
++	for (i = 0; i < MAX_SESSIONS; i++) {
++		if (fedai_id == data->sessions[i].fedai_id)
++			return &data->sessions[i];
++	}
 +
-+	res = data->payload;
-+	switch (data->opcode) {
-+	case APR_BASIC_RSP_RESULT: {
-+		if (res->status) {
-+			dev_err(afe->dev, "cmd = 0x%x returned error = 0x%x\n",
-+				res->opcode, res->status);
-+		}
-+		switch (res->opcode) {
-+		case AFE_PORT_CMD_SET_PARAM_V2:
-+		case AFE_PORT_CMD_DEVICE_STOP:
-+		case AFE_PORT_CMD_DEVICE_START:
-+			port = afe_find_port(afe, data->token);
-+			if (port) {
-+				port->result = *res;
-+				wake_up(&port->wait);
-+			}
-+			break;
-+		default:
-+			dev_err(afe->dev, "Unknown cmd 0x%x\n",	res->opcode);
-+			break;
-+		}
-+	}
-+		break;
-+	default:
-+		break;
-+	}
++	return NULL;
++}
++/**
++ * q6routing_stream_close() - Deregister a stream
++ *
++ * @fedai_id: Frontend dai id.
++ * @stream_type: Direction of stream
++ *
++ * Return: Will be an negative on error or a zero on success.
++ */
++void q6routing_stream_close(int fedai_id, int stream_type)
++{
++	struct session_data *session;
++	int idx;
++
++	session = get_session_from_id(routing_data, fedai_id);
++	if (!session)
++		return;
++
++	for_each_set_bit(idx, &session->copp_map, MAX_COPPS_PER_PORT)
++		q6adm_close(routing_data->dev, session->port_id,
++			    session->perf_mode, idx);
++
++	session->fedai_id = -1;
++	session->copp_map = 0;
++}
++EXPORT_SYMBOL_GPL(q6routing_stream_close);
++
++static int msm_routing_get_audio_mixer(struct snd_kcontrol *kcontrol,
++				       struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_dapm_context *dapm =
++	    snd_soc_dapm_kcontrol_dapm(kcontrol);
++	struct soc_mixer_control *mc =
++	    (struct soc_mixer_control *)kcontrol->private_value;
++	int session_id = mc->shift;
++	struct snd_soc_platform *platform = snd_soc_dapm_to_platform(dapm);
++	struct msm_routing_data *priv = dev_get_drvdata(platform->dev);
++	struct session_data *session = &priv->sessions[session_id];
++
++	if (session->port_id == mc->reg)
++		ucontrol->value.integer.value[0] = 1;
++	else
++		ucontrol->value.integer.value[0] = 0;
 +
 +	return 0;
 +}
 +
-+/**
-+ * q6afe_get_port_id() - Get port id from a given port index
-+ *
-+ * @index: port index
-+ *
-+ * Return: Will be an negative on error or valid port_id on success
-+ */
-+int q6afe_get_port_id(int index)
++static int msm_routing_put_audio_mixer(struct snd_kcontrol *kcontrol,
++				       struct snd_ctl_elem_value *ucontrol)
 +{
-+	if (index < 0 || index > AFE_PORT_MAX)
-+		return -EINVAL;
++	struct snd_soc_dapm_context *dapm =
++				    snd_soc_dapm_kcontrol_dapm(kcontrol);
++	struct snd_soc_platform *platform = snd_soc_dapm_to_platform(dapm);
++	struct msm_routing_data *data = dev_get_drvdata(platform->dev);
++	struct soc_mixer_control *mc =
++		    (struct soc_mixer_control *)kcontrol->private_value;
++	struct snd_soc_dapm_update *update = NULL;
++	int be_id = mc->reg;
++	int session_id = mc->shift;
++	struct session_data *session = &data->sessions[session_id];
 +
-+	return port_maps[index].port_id;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_get_port_id);
-+
-+static int afe_apr_send_pkt(struct q6afe *afe, void *data,
-+			    struct q6afe_port *port)
-+{
-+	wait_queue_head_t *wait = &port->wait;
-+	struct apr_hdr *hdr = data;
-+	int ret;
-+
-+	mutex_lock(&afe->lock);
-+	port->result.opcode = 0;
-+	port->result.status = 0;
-+
-+	ret = apr_send_pkt(afe->apr, data);
-+	if (ret < 0) {
-+		dev_err(afe->dev, "packet not transmitted (%d)\n", ret);
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	ret = wait_event_timeout(*wait, (port->result.opcode == hdr->opcode),
-+				 msecs_to_jiffies(TIMEOUT_MS));
-+	if (!ret) {
-+		ret = -ETIMEDOUT;
-+	} else if (port->result.status > 0) {
-+		dev_err(afe->dev, "DSP returned error[%x]\n",
-+		        port->result.status);
-+		ret = -EINVAL;
++	if (ucontrol->value.integer.value[0]) {
++		session->port_id = be_id;
++		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 1, update);
 +	} else {
-+		ret = 0;
++		session->port_id = -1;
++		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 0, update);
 +	}
 +
-+err:
-+	mutex_unlock(&afe->lock);
-+
-+	return ret;
++	return 1;
 +}
 +
-+static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
-+				   int param_id, int psize)
++static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", HDMI_RX,
++		       MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0,
++		       msm_routing_get_audio_mixer,
++		       msm_routing_put_audio_mixer),
++};
++
++static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
++	/* Frontend AIF */
++	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL2", "MultiMedia2 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL3", "MultiMedia3 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL4", "MultiMedia4 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL5", "MultiMedia5 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL6", "MultiMedia6 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL7", "MultiMedia7 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("MM_DL8", "MultiMedia8 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL3", "MultiMedia3 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL4", "MultiMedia4 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL5", "MultiMedia5 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL6", "MultiMedia6 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL7", "MultiMedia7 Capture", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("MM_UL8", "MultiMedia8 Capture", 0, 0, 0, 0),
++
++	/* Mixer definitions */
++	SND_SOC_DAPM_MIXER("HDMI Mixer", SND_SOC_NOPM, 0, 0,
++			   hdmi_mixer_controls,
++			   ARRAY_SIZE(hdmi_mixer_controls)),
++};
++
++static const struct snd_soc_dapm_route intercon[] = {
++	{"HDMI Mixer", "MultiMedia1", "MM_DL1"},
++	{"HDMI Mixer", "MultiMedia2", "MM_DL2"},
++	{"HDMI Mixer", "MultiMedia3", "MM_DL3"},
++	{"HDMI Mixer", "MultiMedia4", "MM_DL4"},
++	{"HDMI Mixer", "MultiMedia5", "MM_DL5"},
++	{"HDMI Mixer", "MultiMedia6", "MM_DL6"},
++	{"HDMI Mixer", "MultiMedia7", "MM_DL7"},
++	{"HDMI Mixer", "MultiMedia8", "MM_DL8"},
++	{"HDMI_RX", NULL, "HDMI Mixer"},
++};
++
++static int routing_hw_params(struct snd_pcm_substream *substream,
++				     struct snd_pcm_hw_params *params)
 +{
-+	struct apr_hdr *hdr;
-+	struct afe_port_cmd_set_param_v2 *param;
-+	struct afe_port_param_data_v2 *pdata;
-+	struct q6afe *afe = port->afe;
-+	u16 port_id = port->id;
-+	int ret;
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	unsigned int be_id = rtd->cpu_dai->id;
++	struct snd_soc_platform *platform = rtd->platform;
++	struct msm_routing_data *data = dev_get_drvdata(platform->dev);
++	struct session_data *session;
++	int path_type;
 +
-+	hdr = data;
-+	param = data + sizeof(*hdr);
-+	pdata = data + sizeof(*hdr) + sizeof(*param);
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		path_type = ADM_PATH_PLAYBACK;
++	else
++		path_type = ADM_PATH_LIVE_REC;
 +
-+	hdr->hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					      APR_HDR_LEN(APR_HDR_SIZE),
-+					      APR_PKT_VER);
-+	hdr->pkt_size = sizeof(*hdr) + sizeof(*param) +
-+			sizeof(*pdata) + psize;
-+	hdr->src_port = 0;
-+	hdr->dest_port = 0;
-+	hdr->token = port->token;
-+	hdr->opcode = AFE_PORT_CMD_SET_PARAM_V2;
-+	param->port_id = port_id;
-+	param->payload_size = sizeof(*pdata) + psize;
-+	param->payload_address_lsw = 0x00;
-+	param->payload_address_msw = 0x00;
-+	param->mem_map_handle = 0x00;
-+	pdata->module_id = AFE_MODULE_AUDIO_DEV_INTERFACE;
-+	pdata->param_id = param_id;
-+	pdata->param_size = psize;
-+
-+	ret = afe_apr_send_pkt(afe, data, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+		       port_id, ret);
-+
-+
-+	return ret;
-+}
-+
-+/**
-+ * q6afe_port_stop() - Stop a afe port
-+ *
-+ * @port: Instance of port to stop
-+ *
-+ * Return: Will be an negative on packet size on success.
-+ */
-+int q6afe_port_stop(struct q6afe_port *port)
-+{
-+	int port_id = port->id;
-+	struct afe_port_cmd_device_stop stop;
-+	struct q6afe *afe = port->afe;
-+	int ret = 0;
-+	int index;
-+
-+	port_id = port->id;
-+	index = port->token;
-+	if (index < 0 || index > AFE_PORT_MAX) {
-+		dev_err(afe->dev, "AFE port index[%d] invalid!\n", index);
++	if (be_id > AFE_MAX_PORTS)
 +		return -EINVAL;
-+	}
 +
-+	stop.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					   APR_HDR_LEN(APR_HDR_SIZE),
-+					   APR_PKT_VER);
-+	stop.hdr.pkt_size = sizeof(stop);
-+	stop.hdr.src_port = 0;
-+	stop.hdr.dest_port = 0;
-+	stop.hdr.token = index;
-+	stop.hdr.opcode = AFE_PORT_CMD_DEVICE_STOP;
-+	stop.port_id = port_id;
-+	stop.reserved = 0;
++	session = &data->port_data[be_id];
 +
-+	ret = afe_apr_send_pkt(afe, &stop, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE close failed %d\n", ret);
++	mutex_lock(&data->lock);
 +
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_stop);
++	session->path_type = path_type;
++	session->sample_rate = params_rate(params);
++	session->channels = params_channels(params);
 +
-+/**
-+ * q6afe_hdmi_port_prepare() - Prepare hdmi afe port.
-+ *
-+ * @port: Instance of afe port
-+ * @cfg: HDMI configuration for the afe port
-+ *
-+ */
-+void q6afe_hdmi_port_prepare(struct q6afe_port *port,
-+			     struct q6afe_hdmi_cfg *cfg)
-+{
-+	union afe_port_config *pcfg = &port->port_cfg;
-+
-+	pcfg->hdmi_multi_ch.hdmi_cfg_minor_version =
-+					AFE_API_VERSION_HDMI_CONFIG;
-+	pcfg->hdmi_multi_ch.datatype = cfg->datatype;
-+	pcfg->hdmi_multi_ch.channel_allocation = cfg->channel_allocation;
-+	pcfg->hdmi_multi_ch.sample_rate = cfg->sample_rate;
-+	pcfg->hdmi_multi_ch.bit_width = cfg->bit_width;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_hdmi_port_prepare);
-+
-+/**
-+ * q6afe_port_start() - Start a afe port
-+ *
-+ * @port: Instance of port to start
-+ *
-+ * Return: Will be an negative on packet size on success.
-+ */
-+int q6afe_port_start(struct q6afe_port *port)
-+{
-+	struct afe_audioif_config_command config = {0,};
-+	struct afe_port_cmd_device_start start;
-+	struct q6afe *afe = port->afe;
-+	int port_id = port->id;
-+	int ret, param_id = port->cfg_type;
-+
-+	config.pcfg = port->port_cfg;
-+
-+	ret  = q6afe_port_set_param_v2(port, &config, param_id,
-+				       sizeof(config.pcfg));
-+	if (ret) {
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+			port_id, ret);
-+		return ret;
-+	}
-+
-+	start.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					    APR_HDR_LEN(APR_HDR_SIZE),
-+					    APR_PKT_VER);
-+	start.hdr.pkt_size = sizeof(start);
-+	start.hdr.src_port = 0;
-+	start.hdr.dest_port = 0;
-+	start.hdr.token = port->token;
-+	start.hdr.opcode = AFE_PORT_CMD_DEVICE_START;
-+	start.port_id = port_id;
-+
-+	ret = afe_apr_send_pkt(afe, &start, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+			port_id, ret);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_start);
-+
-+/**
-+ * q6afe_port_get_from_id() - Get port instance from a port id
-+ *
-+ * @dev: Pointer to afe child device.
-+ * @id: port id
-+ *
-+ * Return: Will be an error pointer on error or a valid afe port
-+ * on success.
-+ */
-+struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
-+{
-+	int port_id;
-+	struct q6afe *afe = dev_get_drvdata(dev->parent);
-+	struct q6afe_port *port;
-+	unsigned long flags;
-+	int cfg_type;
-+
-+	if (id < 0 || id > AFE_PORT_MAX) {
-+		dev_err(dev, "AFE port token[%d] invalid!\n", id);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	port_id = port_maps[id].port_id;
-+
-+	switch (port_id) {
-+	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
-+		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++			session->bits_per_sample = 16;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++			session->bits_per_sample = 24;
 +		break;
 +	default:
-+		dev_err(dev, "Invalid port id 0x%x\n", port_id);
-+		return ERR_PTR(-EINVAL);
++		break;
 +	}
 +
-+	port = kzalloc(sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init_waitqueue_head(&port->wait);
-+
-+	port->token = id;
-+	port->id = port_id;
-+	port->afe = afe;
-+	port->cfg_type = cfg_type;
-+
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_add_tail(&port->node, &afe->port_list);
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+
-+	return port;
-+
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_get_from_id);
-+
-+/**
-+ * q6afe_port_put() - Release port reference
-+ *
-+ * @port: Instance of port to put
-+ */
-+void q6afe_port_put(struct q6afe_port *port)
-+{
-+	struct q6afe *afe = port->afe;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_del(&port->node);
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+	kfree(port);
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_put);
-+
-+static int q6afe_probe(struct apr_device *adev)
-+{
-+	struct q6afe *afe;
-+	struct device *dev = &adev->dev;
-+	struct device_node *dais_np;
-+
-+	afe = devm_kzalloc(dev, sizeof(*afe), GFP_KERNEL);
-+	if (!afe)
-+		return -ENOMEM;
-+
-+	q6core_get_svc_api_info(adev->svc_id, &afe->ainfo);
-+	afe->apr = adev;
-+	mutex_init(&afe->lock);
-+	afe->dev = dev;
-+	INIT_LIST_HEAD(&afe->port_list);
-+	spin_lock_init(&afe->port_list_lock);
-+
-+	dev_set_drvdata(dev, afe);
-+
-+	dais_np = of_get_child_by_name(dev->of_node, "dais");
-+	if (dais_np) {
-+		afe->pdev_dais = of_platform_device_create(dais_np,
-+							   "q6afe-dai", dev);
-+		of_node_put(dais_np);
-+	}
-+
++	mutex_unlock(&data->lock);
 +	return 0;
 +}
 +
-+static int q6afe_remove(struct apr_device *adev)
-+{
-+	struct q6afe *afe = dev_get_drvdata(&adev->dev);
-+
-+	if (afe->pdev_dais)
-+		of_platform_device_destroy(&afe->pdev_dais->dev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id q6afe_device_id[]  = {
-+	{ .compatible = "qcom,q6afe" },
-+	{},
++static struct snd_pcm_ops q6pcm_routing_ops = {
++	.hw_params = routing_hw_params,
 +};
-+MODULE_DEVICE_TABLE(of, q6afe_device_id);
 +
-+static struct apr_driver qcom_q6afe_driver = {
-+	.probe = q6afe_probe,
-+	.remove = q6afe_remove,
-+	.callback = q6afe_callback,
-+	.driver = {
-+		.name = "qcom-q6afe",
-+		.of_match_table = of_match_ptr(q6afe_device_id),
++static int msm_routing_probe(struct snd_soc_platform *platform)
++{
++	int i;
 +
++	for (i = 0; i < MAX_SESSIONS; i++)
++		routing_data->sessions[i].port_id = -1;
++
++	return 0;
++}
++
++static struct snd_soc_platform_driver msm_soc_routing_platform = {
++	.ops = &q6pcm_routing_ops,
++	.probe = msm_routing_probe,
++	.component_driver = {
++		.name		= "q6routing-component",
++		.dapm_widgets = msm_qdsp6_widgets,
++		.num_dapm_widgets = ARRAY_SIZE(msm_qdsp6_widgets),
++		.dapm_routes = intercon,
++		.num_dapm_routes = ARRAY_SIZE(intercon),
 +	},
 +};
 +
-+module_apr_driver(qcom_q6afe_driver);
-+MODULE_DESCRIPTION("Q6 Audio Front End");
++static int q6routing_dai_bind(struct device *dev, struct device *master,
++			      void *data)
++{
++	routing_data = kzalloc(sizeof(*routing_data), GFP_KERNEL);
++	if (!routing_data)
++		return -ENOMEM;
++
++	routing_data->dev = dev;
++
++	mutex_init(&routing_data->lock);
++	dev_set_drvdata(dev, routing_data);
++
++	return snd_soc_register_platform(dev,
++					      &msm_soc_routing_platform);
++}
++static void q6routing_dai_unbind(struct device *dev, struct device *master,
++				 void *d)
++{
++	struct msm_routing_data *data = dev_get_drvdata(dev);
++
++	snd_soc_unregister_platform(dev);
++
++	kfree(data);
++
++	routing_data = NULL;
++}
++
++static const struct component_ops q6routing_dai_comp_ops = {
++	.bind   = q6routing_dai_bind,
++	.unbind = q6routing_dai_unbind,
++};
++
++static int q6pcm_routing_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &q6routing_dai_comp_ops);
++}
++
++static int q6pcm_routing_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &q6routing_dai_comp_ops);
++	return 0;
++}
++
++static struct platform_driver q6pcm_routing_platform_driver = {
++	.driver = {
++		.name = "q6routing",
++	},
++	.probe = q6pcm_routing_probe,
++	.remove = q6pcm_routing_remove,
++};
++module_platform_driver(q6pcm_routing_platform_driver);
++
++MODULE_DESCRIPTION("Q6 Routing platform");
 +MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
+diff --git a/sound/soc/qcom/qdsp6/q6routing.h b/sound/soc/qcom/qdsp6/q6routing.h
 new file mode 100644
-index 000000000000..63250f118df8
+index 000000000000..aa41e4f45742
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -0,0 +1,35 @@
++++ b/sound/soc/qcom/qdsp6/q6routing.h
+@@ -0,0 +1,9 @@
 +// SPDX-License-Identifier: GPL-2.0
++#ifndef _Q6_PCM_ROUTING_H
++#define _Q6_PCM_ROUTING_H
 +
-+#ifndef __Q6AFE_H__
-+#define __Q6AFE_H__
++int q6routing_stream_open(int fedai_id, int perf_mode,
++			   int stream_id, int stream_type);
++void q6routing_stream_close(int fedai_id, int stream_type);
 +
-+#include <dt-bindings/sound/qcom,q6afe.h>
-+
-+#define AFE_PORT_MAX		48
-+
-+#define MSM_AFE_PORT_TYPE_RX 0
-+#define MSM_AFE_PORT_TYPE_TX 1
-+#define AFE_MAX_PORTS AFE_PORT_MAX
-+
-+struct q6afe_hdmi_cfg {
-+	u16                  datatype;
-+	u16                  channel_allocation;
-+	u32                  sample_rate;
-+	u16                  bit_width;
-+};
-+
-+struct q6afe_port_config {
-+	struct q6afe_hdmi_cfg hdmi;
-+};
-+
-+struct q6afe_port;
-+
-+struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id);
-+int q6afe_port_start(struct q6afe_port *port);
-+int q6afe_port_stop(struct q6afe_port *port);
-+void q6afe_port_put(struct q6afe_port *port);
-+int q6afe_get_port_id(int index);
-+void q6afe_hdmi_port_prepare(struct q6afe_port *port,
-+			    struct q6afe_hdmi_cfg *cfg);
-+
-+#endif /* __Q6AFE_H__ */
++#endif /*_Q6_PCM_ROUTING_H */
 -- 
 2.15.1
