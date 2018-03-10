@@ -1,114 +1,104 @@
-From: peng.hao2@zte.com.cn (peng.hao2 at zte.com.cn)
-Date: Sat, 10 Mar 2018 22:34:48 +0800 (CST)
-Subject: =?UTF-8?B?UmU6UmU6IFtQQVRDSF0gS1ZNOmFybS9hcm02NDogZGNhY2hlIG5lZWQgYmUgY29oZXJlbnQgdW5jb25kaXRpb25hbGx5?=
-Message-ID: <201803102234486300587@zte.com.cn>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 10 Mar 2018 14:59:29 +0000
+Subject: [PATCH] arm64: asm: drop special versions of adr_l/ldr_l/str_l for
+ modules
+Message-ID: <20180310145929.6797-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->On Sat, 10 Mar 2018 03:23:18 +0000,
->peng hao wrote:
->> >> For emulation devices just like vga, keeping coherent dcache between
->> >> guest and host timely is needed.
->> >> Now the display of vnc-viewer will not update continuously and the
->> >> patch can fix up.
->> >> 
->> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->> >> ---
->> >>  virt/kvm/arm/mmu.c | 6 ++----
->> >>  1 file changed, 2 insertions(+), 4 deletions(-)
->> >> 
->> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> >> index ec62d1c..4a28395e 100644
->> >> --- a/virt/kvm/arm/mmu.c
->> >> +++ b/virt/kvm/arm/mmu.c
->> >> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->> >>              kvm_set_pfn_dirty(pfn);
->> >>          }
->> >>  
->> >> -        if (fault_status != FSC_PERM)
->> >> -            clean_dcache_guest_page(pfn, PMD_SIZE);
->> >> +        clean_dcache_guest_page(pfn, PMD_SIZE);
->> >>  
->> >>          if (exec_fault) {
->> >>              new_pmd = kvm_s2pmd_mkexec(new_pmd);
->> >> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->> >>              mark_page_dirty(kvm, gfn);
->> >>          }
->> >>  
->> >> -        if (fault_status != FSC_PERM)
->> >> -            clean_dcache_guest_page(pfn, PAGE_SIZE);
->> >> +        clean_dcache_guest_page(pfn, PAGE_SIZE);
->> >>  
->> >>          if (exec_fault) {
->> >>              new_pte = kvm_s2pte_mkexec(new_pte);
->> >> 
->> 
->> >I'm sorry, but I have to NAK this.
->> 
->> >You're papering over the fundamental issue that you're accessing a
->> >cacheable alias of a non cacheable memory. The architecture is very
->> >clear about why this doesn't work, and KVM implements the architecture.
->> 
->> 
->> 
->> I find that I just encounter the problem after the commit
->> '15303ba5d1cd9b28d03a980456c0978c0ea3b208 " .
+Now that we started keeping modules within 4 GB of the core kernel
+in all cases, we no longer need to special case the adr_l/ldr_l/str_l
+macros for modules to deal with them being loaded farther away.
 
->This should really be a9c0e12ebee5 ("KVM: arm/arm64: Only clean the
->dcache on translation fault").
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/assembler.h | 34 ++------------------
+ 1 file changed, 2 insertions(+), 32 deletions(-)
 
->> The commit contains "icache invalidation optimizations, improving VM
->> startup time",it changes from unconditionally calling
->> coherent_cache_guest_page(including dcache handle) to conditionally
->> calling clean_dcache_guest_page.
->> 
->> I trace the display of vnc abnormally and find it generate data
->> abort in vga address region with FSC_PERM,and it will not call
->> clean_dcache_guest_page . So I think should recover to uncontionally
->> calling clean_dcache_guest_page.
-
->[I really hate ranting on a Saturday morning as the sun is finally out
->and I could be relaxing in the garden, but hey, I guess that's the
->fate of a kernel hacker who made the silly mistake of reading email on
->a Saturday morning instead of being out in the garden...]
-
->Even if you enabled dirty tracking on the VGA memory (and thus making
->it RO to generate a permission fault), you would end-up cleaning to
->the PoC *before* any write has been committed to the page. How useful
->is that? You're also pretty lucky that this does a clean+invalidate
->(rather than a clean which would be good enough), meaning that QEMU
->will in turn miss in the cache (PIPT caches) and read some *stale*
->data from memory.
-
->Repeat that often enough, and yes, you can get some sort of
->display. Is that the right thing to do? Hell no. You might just as
->well have a userspace process thrashing the cache at the PoC, running
->concurrently with your VM, it would have a similar effect. It may work
->on your particular platform, in some specific conditions, but it just
->doesn't work in general.
-
->What you are describing is a long standing issue. VGA emulation never
->worked on ARM, because it is fundamentally incompatible with the ARM
->memory architecture. Read the various discussions on the list over the
->past 4 years or so, read the various presentations I and others have
->given about this problem and how to address it[1].
-
->The *real* fix is a one-liner in the Linux VGA driver: map the VGA
->memory as cacheable, and stop lying to the guest. Or if you want to
->lie to the guest, perform cache maintenance from userspace in QEMU
->based on the dirty tracking bitmap that it uses for the VGA memory.
-
->Anything else is out of the scope of the architecture, and I'm not
->going to add more crap to satisfy requirements that cannot be
->implemented on real HW, let alone in a virtualized environment.
-
-Thanks for your explanation in detail
-
->Thanks,
-
->    M.
-
->[1] http://events17.linuxfoundation.org/sites/events/files/slides/slides_10.pdf
-
->-- 
->Jazz is not dead, it just smell funny.
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 3c78835bba94..053d83e8db6f 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -202,25 +202,15 @@ lr	.req	x30		// link register
+ 
+ /*
+  * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> where
+- * <symbol> is within the range +/- 4 GB of the PC when running
+- * in core kernel context. In module context, a movz/movk sequence
+- * is used, since modules may be loaded far away from the kernel
+- * when KASLR is in effect.
++ * <symbol> is within the range +/- 4 GB of the PC.
+  */
+ 	/*
+ 	 * @dst: destination register (64 bit wide)
+ 	 * @sym: name of the symbol
+ 	 */
+ 	.macro	adr_l, dst, sym
+-#ifndef MODULE
+ 	adrp	\dst, \sym
+ 	add	\dst, \dst, :lo12:\sym
+-#else
+-	movz	\dst, #:abs_g3:\sym
+-	movk	\dst, #:abs_g2_nc:\sym
+-	movk	\dst, #:abs_g1_nc:\sym
+-	movk	\dst, #:abs_g0_nc:\sym
+-#endif
+ 	.endm
+ 
+ 	/*
+@@ -231,7 +221,6 @@ lr	.req	x30		// link register
+ 	 *       the address
+ 	 */
+ 	.macro	ldr_l, dst, sym, tmp=
+-#ifndef MODULE
+ 	.ifb	\tmp
+ 	adrp	\dst, \sym
+ 	ldr	\dst, [\dst, :lo12:\sym]
+@@ -239,15 +228,6 @@ lr	.req	x30		// link register
+ 	adrp	\tmp, \sym
+ 	ldr	\dst, [\tmp, :lo12:\sym]
+ 	.endif
+-#else
+-	.ifb	\tmp
+-	adr_l	\dst, \sym
+-	ldr	\dst, [\dst]
+-	.else
+-	adr_l	\tmp, \sym
+-	ldr	\dst, [\tmp]
+-	.endif
+-#endif
+ 	.endm
+ 
+ 	/*
+@@ -257,28 +237,18 @@ lr	.req	x30		// link register
+ 	 *       while <src> needs to be preserved.
+ 	 */
+ 	.macro	str_l, src, sym, tmp
+-#ifndef MODULE
+ 	adrp	\tmp, \sym
+ 	str	\src, [\tmp, :lo12:\sym]
+-#else
+-	adr_l	\tmp, \sym
+-	str	\src, [\tmp]
+-#endif
+ 	.endm
+ 
+ 	/*
+-	 * @dst: Result of per_cpu(sym, smp_processor_id()), can be SP for
+-	 *       non-module code
++	 * @dst: Result of per_cpu(sym, smp_processor_id()) (can be SP)
+ 	 * @sym: The name of the per-cpu variable
+ 	 * @tmp: scratch register
+ 	 */
+ 	.macro adr_this_cpu, dst, sym, tmp
+-#ifndef MODULE
+ 	adrp	\tmp, \sym
+ 	add	\dst, \tmp, #:lo12:\sym
+-#else
+-	adr_l	\dst, \sym
+-#endif
+ alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	mrs	\tmp, tpidr_el1
+ alternative_else
+-- 
+2.15.1
