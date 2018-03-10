@@ -1,66 +1,48 @@
-From: peng.hao2@zte.com.cn (peng.hao2 at zte.com.cn)
-Date: Sat, 10 Mar 2018 11:48:12 +0800 (CST)
-Subject: =?UTF-8?B?UmU6IFJlOiBbUEFUQ0hdIEtWTTphcm0vYXJtNjQ6IGRjYWNoZSBuZWVkIGJlIGNvaGVyZW50IHVuY29uZGl0aW9uYWxseQ==?=
-Message-ID: <201803101148125935444@zte.com.cn>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Sat, 10 Mar 2018 06:20:07 +0100
+Subject: [GIT PULL] ARM: at91: SoC for 4.17
+Message-ID: <20180310052007.GA5536@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->On 09/03/18 22:15, Peng Hao wrote:
->> For emulation devices just like vga, keeping coherent dcache between
->> guest and host timely is needed.
->> Now the display of vnc-viewer will not update continuously and the
->> patch can fix up.
->> 
->> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->> ---
->>  virt/kvm/arm/mmu.c | 6 ++----
->>  1 file changed, 2 insertions(+), 4 deletions(-)
->> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index ec62d1c..4a28395e 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>              kvm_set_pfn_dirty(pfn);
->>          }
->>  
->> -        if (fault_status != FSC_PERM)
->> -            clean_dcache_guest_page(pfn, PMD_SIZE);
->> +        clean_dcache_guest_page(pfn, PMD_SIZE);
->>  
->>          if (exec_fault) {
->>              new_pmd = kvm_s2pmd_mkexec(new_pmd);
->> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>              mark_page_dirty(kvm, gfn);
->>          }
->>  
->> -        if (fault_status != FSC_PERM)
->> -            clean_dcache_guest_page(pfn, PAGE_SIZE);
->> +        clean_dcache_guest_page(pfn, PAGE_SIZE);
->>  
->>          if (exec_fault) {
->>              new_pte = kvm_s2pte_mkexec(new_pte);
->> 
+Arnd, Olof,
 
->I'm sorry, but I have to NAK this.
+It has been two years that Atmel merge with Microchip, rename where
+relevant.
 
->You're papering over the fundamental issue that you're accessing a
->cacheable alias of a non cacheable memory. The architecture is very
->clear about why this doesn't work, and KVM implements the architecture.
+This is based on my fixes PR which is already in next/soc. Tell me if
+this is not right.
 
-I find that I  just encounter the problem after  the commit '15303ba5d1cd9b28d03a980456c0978c0ea3b208 " .
-The commit contains "icache invalidation optimizations, improving VM startup time",it changes
-from unconditionally calling coherent_cache_guest_page(including dcache handle) to conditionally calling clean_dcache_guest_page.
- I trace the display of vnc abnormally and find it generate data abort in vga
-address region with FSC_PERM,and it will not call clean_dcache_guest_page . So I think  should recover to uncontionally calling clean_dcache_guest_page.
+The following changes since commit c8d5dcf122b194e897d2a6311903eae0c1023325:
 
-Thanks.
->If you want this to work, map your VGA device as cacheable, add cache
->maintenance to QEMU, or use another frame-buffer emulation that doesn't
->require such a gack.
+  MAINTAINERS: ARM: at91: update my email address (2018-02-22 16:22:15 +0100)
 
->Thanks,
+are available in the Git repository at:
 
->    M.
->-- 
->Jazz is not dead. It just smells funny...
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.17-soc
+
+for you to fetch changes up to ed08b63c8b3e23dfc8a32f0b450a23a35a3d91b4:
+
+  ARM: at91: Kconfig: Update company to Microchip (2018-02-28 16:21:51 +0100)
+
+----------------------------------------------------------------
+AT91 SoC for 4.17:
+
+ - Rename Atmel to Microhip in MAINTAINERS, Documentation and Kconfig
+
+----------------------------------------------------------------
+Nicolas Ferre (3):
+      MAINTAINERS: ARM: at91: update entry for ARM/Microchip
+      Documentation: at91: Update Microchip SoC documentation
+      ARM: at91: Kconfig: Update company to Microchip
+
+ Documentation/arm/{Atmel => Microchip}/README | 52 +++++++++++++--------------
+ MAINTAINERS                                   | 42 +++++++++++-----------
+ arch/arm/mach-at91/Kconfig                    | 14 ++++----
+ 3 files changed, 53 insertions(+), 55 deletions(-)
+ rename Documentation/arm/{Atmel => Microchip}/README (64%)
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
