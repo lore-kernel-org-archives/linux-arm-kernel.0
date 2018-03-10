@@ -1,297 +1,308 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Sat, 10 Mar 2018 02:24:54 +0000
-Subject: [PATCH v4 22/24] ASoC: qcom: apq8096: Add db820c machine driver
+Date: Sat, 10 Mar 2018 02:24:49 +0000
+Subject: [PATCH v4 17/24] ASoC: qdsp6: q6routing: Add support to all SLIMBus
+ Mixers
 In-Reply-To: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
 References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180310022456.26739-23-srinivas.kandagatla@linaro.org>
+Message-ID: <20180310022456.26739-18-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to DB820c machine driver.
+This patch adds support to SLIMBus related mixers to control mux between
+ASM stream and AFE port.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/Kconfig   |   9 ++
- sound/soc/qcom/Makefile  |   2 +
- sound/soc/qcom/apq8096.c | 235 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 246 insertions(+)
- create mode 100644 sound/soc/qcom/apq8096.c
+ sound/soc/qcom/qdsp6/q6routing.c | 261 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 261 insertions(+)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 5bdf39f6003f..9d8007e2f3cf 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -84,3 +84,12 @@ config SND_SOC_QDSP6
- 	 This will enable sound soc platform specific
- 	 audio drivers. This includes q6asm, q6adm,
- 	 q6afe interfaces to DSP using apr.
-+
-+config SND_SOC_MSM8996
-+	tristate "SoC Machine driver for MSM8996 and APQ8096 boards"
-+	depends on QCOM_APR
-+	select SND_SOC_QDSP6
-+	help
-+          Support for Qualcomm Technologies LPASS audio block in
-+          APQ8096 SoC-based systems.
-+          Say Y if you want to use audio device on this SoCs
-diff --git a/sound/soc/qcom/Makefile b/sound/soc/qcom/Makefile
-index 0276717917c0..206945bb9ba1 100644
---- a/sound/soc/qcom/Makefile
-+++ b/sound/soc/qcom/Makefile
-@@ -13,9 +13,11 @@ obj-$(CONFIG_SND_SOC_LPASS_APQ8016) += snd-soc-lpass-apq8016.o
- # Machine
- snd-soc-storm-objs := storm.o
- snd-soc-apq8016-sbc-objs := apq8016_sbc.o
-+snd-soc-apq8096-objs := apq8096.o
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index b72bd9045fea..c6be775167b8 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -232,6 +232,180 @@ static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
+ 		       msm_routing_put_audio_mixer),
+ };
  
- obj-$(CONFIG_SND_SOC_STORM) += snd-soc-storm.o
- obj-$(CONFIG_SND_SOC_APQ8016_SBC) += snd-soc-apq8016-sbc.o
-+obj-$(CONFIG_SND_SOC_MSM8996) += snd-soc-apq8096.o
++static const struct snd_kcontrol_new slimbus_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_0_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_1_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_1_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_2_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_2_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_3_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_3_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_4_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_4_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_4_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_4_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_5_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_5_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new slimbus_6_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SLIMBUS_6_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
++
+ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
+ 	/* Frontend AIF */
+ 	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
+@@ -255,6 +429,28 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
+ 	SND_SOC_DAPM_MIXER("HDMI Mixer", SND_SOC_NOPM, 0, 0,
+ 			   hdmi_mixer_controls,
+ 			   ARRAY_SIZE(hdmi_mixer_controls)),
++
++	SND_SOC_DAPM_MIXER("SLIMBUS_0_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_1_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_1_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_1_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_2_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_2_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_2_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_3_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_3_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_3_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_4_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_4_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_4_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_5_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_5_rx_mixer_controls,
++			    ARRAY_SIZE(slimbus_5_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SLIMBUS_6_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   slimbus_6_rx_mixer_controls,
++			   ARRAY_SIZE(slimbus_6_rx_mixer_controls)),
+ };
  
- #DSP lib
- obj-$(CONFIG_SND_SOC_QDSP6) += qdsp6/
-diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
-new file mode 100644
-index 000000000000..e9b61dc0aa63
---- /dev/null
-+++ b/sound/soc/qcom/apq8096.c
-@@ -0,0 +1,235 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, Linaro Limited
+ static const struct snd_soc_dapm_route intercon[] = {
+@@ -267,6 +463,71 @@ static const struct snd_soc_dapm_route intercon[] = {
+ 	{"HDMI Mixer", "MultiMedia7", "MM_DL7"},
+ 	{"HDMI Mixer", "MultiMedia8", "MM_DL8"},
+ 	{"HDMI_RX", NULL, "HDMI Mixer"},
 +
-+#include <linux/soc/qcom/apr.h>
-+#include <linux/module.h>
-+#include <linux/component.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_device.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <sound/pcm.h>
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_0_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_0_RX", NULL, "SLIMBUS_0_RX Audio Mixer"},
 +
-+static int apq8096_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
-+				      struct snd_pcm_hw_params *params)
-+{
-+	struct snd_interval *rate = hw_param_interval(params,
-+					SNDRV_PCM_HW_PARAM_RATE);
-+	struct snd_interval *channels = hw_param_interval(params,
-+					SNDRV_PCM_HW_PARAM_CHANNELS);
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_1_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_1_RX", NULL, "SLIMBUS_1_RX Audio Mixer"},
 +
-+	rate->min = rate->max = 48000;
-+	channels->min = channels->max = 2;
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_2_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_2_RX", NULL, "SLIMBUS_2_RX Audio Mixer"},
 +
-+	return 0;
-+}
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_3_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_3_RX", NULL, "SLIMBUS_3_RX Audio Mixer"},
 +
-+static int apq8096_sbc_parse_of(struct snd_soc_card *card)
-+{
-+	struct device_node *np, *codec, *platform, *cpu, *node;
-+	struct device *dev = card->dev;
-+	struct snd_soc_dai_link *link;
-+	int ret, num_links;
++	{"SLIMBUS_4_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_4_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_4_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_4_RX", NULL, "SLIMBUS_4_RX Audio Mixer"},
 +
-+	ret = snd_soc_of_parse_card_name(card, "qcom,model");
-+	if (ret) {
-+		dev_err(dev, "Error parsing card name: %d\n", ret);
-+		return ret;
-+	}
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_5_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_5_RX", NULL, "SLIMBUS_5_RX Audio Mixer"},
 +
-+	node = dev->of_node;
-+
-+	/* DAPM routes */
-+	if (of_property_read_bool(node, "qcom,audio-routing")) {
-+		ret = snd_soc_of_parse_audio_routing(card,
-+					"qcom,audio-routing");
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Populate links */
-+	num_links = of_get_child_count(node);
-+
-+	/* Allocate the DAI link array */
-+	card->dai_link = kcalloc(num_links, sizeof(*link), GFP_KERNEL);
-+	if (!card->dai_link)
-+		return -ENOMEM;
-+
-+	card->num_links	= num_links;
-+	link = card->dai_link;
-+
-+	for_each_child_of_node(node, np) {
-+		cpu = of_get_child_by_name(np, "cpu");
-+		platform = of_get_child_by_name(np, "platform");
-+		codec = of_get_child_by_name(np, "codec");
-+
-+		if (!cpu) {
-+			dev_err(dev, "Can't find cpu DT node\n");
-+			return -EINVAL;
-+		}
-+
-+		link->cpu_of_node = of_parse_phandle(cpu, "sound-dai", 0);
-+		if (!link->cpu_of_node) {
-+			dev_err(card->dev, "error getting cpu phandle\n");
-+			return -EINVAL;
-+		}
-+
-+		link->platform_of_node = of_parse_phandle(platform,
-+							  "sound-dai", 0);
-+		if (!link->platform_of_node) {
-+			dev_err(card->dev, "error getting platform phandle\n");
-+			return -EINVAL;
-+		}
-+
-+		ret = snd_soc_of_get_dai_name(cpu, &link->cpu_dai_name);
-+		if (ret) {
-+			dev_err(card->dev, "error getting cpu dai name\n");
-+			return ret;
-+		}
-+
-+		if (codec) {
-+			ret = snd_soc_of_get_dai_link_codecs(dev, codec, link);
-+
-+			if (ret < 0) {
-+				dev_err(card->dev, "error getting codec dai name\n");
-+				return ret;
-+			}
-+			link->no_pcm = 1;
-+			link->ignore_suspend = 1;
-+			link->ignore_pmdown_time = 1;
-+			link->be_hw_params_fixup = apq8096_be_hw_params_fixup;
-+		} else {
-+			link->codec_dai_name = "snd-soc-dummy-dai";
-+			link->codec_name = "snd-soc-dummy";
-+			link->dynamic = 1;
-+		}
-+
-+		ret = of_property_read_string(np, "link-name", &link->name);
-+		if (ret) {
-+			dev_err(card->dev, "error getting codec dai_link name\n");
-+			return ret;
-+		}
-+
-+		link->dpcm_playback = 1;
-+		link->dpcm_capture = 1;
-+		link->stream_name = link->name;
-+		link++;
-+	}
-+
-+	return ret;
-+}
-+
-+static int apq8096_bind(struct device *dev)
-+{
-+	struct snd_soc_card *card;
-+	int ret;
-+
-+	card = kzalloc(sizeof(*card), GFP_KERNEL);
-+	if (!card)
-+		return -ENOMEM;
-+
-+	component_bind_all(dev, card);
-+	card->dev = dev;
-+	ret = apq8096_sbc_parse_of(card);
-+	if (ret) {
-+		dev_err(dev, "Error parsing OF data\n");
-+		component_unbind_all(dev, card);
-+		return ret;
-+	}
-+
-+	return snd_soc_register_card(card);
-+}
-+
-+static void apq8096_unbind(struct device *dev)
-+{
-+	struct snd_soc_card *card = dev_get_drvdata(dev);
-+
-+	component_unbind_all(dev, card);
-+	snd_soc_unregister_card(card);
-+	kfree(card->dai_link);
-+	kfree(card);
-+}
-+
-+static const struct component_master_ops apq8096_ops = {
-+	.bind = apq8096_bind,
-+	.unbind = apq8096_unbind,
-+};
-+
-+static int apq8016_compare_of(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+static void apq8016_release_of(struct device *dev, void *data)
-+{
-+	of_node_put(data);
-+}
-+
-+static int add_audio_components(struct device *dev,
-+				struct component_match **matchptr)
-+{
-+	struct device_node *np, *platform, *cpu, *node, *dai_node;
-+
-+	node = dev->of_node;
-+
-+	for_each_child_of_node(node, np) {
-+		cpu = of_get_child_by_name(np, "cpu");
-+		if (cpu) {
-+			dai_node = of_parse_phandle(cpu, "sound-dai", 0);
-+			of_node_get(dai_node);
-+			component_match_add_release(dev, matchptr,
-+						    apq8016_release_of,
-+						    apq8016_compare_of,
-+						    dai_node);
-+		}
-+
-+		platform = of_get_child_by_name(np, "platform");
-+		if (platform) {
-+			dai_node = of_parse_phandle(platform, "sound-dai", 0);
-+			component_match_add_release(dev, matchptr,
-+						    apq8016_release_of,
-+						    apq8016_compare_of,
-+						    dai_node);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int apq8096_platform_probe(struct platform_device *pdev)
-+{
-+	struct component_match *match = NULL;
-+	int ret;
-+
-+	ret = add_audio_components(&pdev->dev, &match);
-+	if (ret)
-+		return ret;
-+
-+	return component_master_add_with_match(&pdev->dev, &apq8096_ops, match);
-+}
-+
-+static int apq8096_platform_remove(struct platform_device *pdev)
-+{
-+	component_master_del(&pdev->dev, &apq8096_ops);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id msm_snd_apq8096_dt_match[] = {
-+	{.compatible = "qcom,apq8096-sndcard"},
-+	{}
-+};
-+
-+static struct platform_driver msm_snd_apq8096_driver = {
-+	.probe  = apq8096_platform_probe,
-+	.remove = apq8096_platform_remove,
-+	.driver = {
-+		.name = "msm-snd-apq8096",
-+		.owner = THIS_MODULE,
-+		.of_match_table = msm_snd_apq8096_dt_match,
-+	},
-+};
-+module_platform_driver(msm_snd_apq8096_driver);
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
-+MODULE_DESCRIPTION("APQ8096 ASoC Machine Driver");
-+MODULE_LICENSE("GPL v2");
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"SLIMBUS_6_RX", NULL, "SLIMBUS_6_RX Audio Mixer"},
+ };
+ 
+ static int routing_hw_params(struct snd_pcm_substream *substream,
 -- 
 2.15.1
