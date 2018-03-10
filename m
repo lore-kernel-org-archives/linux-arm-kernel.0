@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Mar 2018 15:21:49 +0000
-Subject: [PATCH v5 04/23] crypto: arm64/aes-bs - move kernel mode neon
+Date: Sat, 10 Mar 2018 15:21:47 +0000
+Subject: [PATCH v5 02/23] crypto: arm64/aes-ce-ccm - move kernel mode neon
  en/disable into loop
 In-Reply-To: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
 References: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180310152208.10369-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180310152208.10369-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,151 +28,160 @@ the code with kernel mode NEON disabled (and preemption enabled)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-neonbs-glue.c | 36 +++++++++-----------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ arch/arm64/crypto/aes-ce-ccm-glue.c | 47 ++++++++++----------
+ 1 file changed, 23 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
-index 9d823c77ec84..e7a95a566462 100644
---- a/arch/arm64/crypto/aes-neonbs-glue.c
-+++ b/arch/arm64/crypto/aes-neonbs-glue.c
-@@ -99,9 +99,8 @@ static int __ecb_crypt(struct skcipher_request *req,
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-@@ -109,12 +108,13 @@ static int __ecb_crypt(struct skcipher_request *req,
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
- 
-+		kernel_neon_begin();
- 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->rk,
- 		   ctx->rounds, blocks);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
- 
- 	return err;
- }
-@@ -158,19 +158,19 @@ static int cbc_encrypt(struct skcipher_request *req)
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
- 		/* fall back to the non-bitsliced NEON implementation */
-+		kernel_neon_begin();
- 		neon_aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				     ctx->enc, ctx->key.rounds, blocks,
- 				     walk.iv);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
- 	return err;
+diff --git a/arch/arm64/crypto/aes-ce-ccm-glue.c b/arch/arm64/crypto/aes-ce-ccm-glue.c
+index a1254036f2b1..68b11aa690e4 100644
+--- a/arch/arm64/crypto/aes-ce-ccm-glue.c
++++ b/arch/arm64/crypto/aes-ce-ccm-glue.c
+@@ -107,11 +107,13 @@ static int ccm_init_mac(struct aead_request *req, u8 maciv[], u32 msglen)
  }
  
-@@ -181,9 +181,8 @@ static int cbc_decrypt(struct skcipher_request *req)
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-@@ -191,13 +190,14 @@ static int cbc_decrypt(struct skcipher_request *req)
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
- 
+ static void ccm_update_mac(struct crypto_aes_ctx *key, u8 mac[], u8 const in[],
+-			   u32 abytes, u32 *macp, bool use_neon)
++			   u32 abytes, u32 *macp)
+ {
+-	if (likely(use_neon)) {
++	if (may_use_simd()) {
 +		kernel_neon_begin();
- 		aesbs_cbc_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				  ctx->key.rk, ctx->key.rounds, blocks,
- 				  walk.iv);
+ 		ce_aes_ccm_auth_data(mac, in, abytes, macp, key->key_enc,
+ 				     num_rounds(key));
 +		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	} else {
+ 		if (*macp > 0 && *macp < AES_BLOCK_SIZE) {
+ 			int added = min(abytes, AES_BLOCK_SIZE - *macp);
+@@ -143,8 +145,7 @@ static void ccm_update_mac(struct crypto_aes_ctx *key, u8 mac[], u8 const in[],
  	}
--	kernel_neon_end();
- 
- 	return err;
  }
-@@ -229,9 +229,8 @@ static int ctr_encrypt(struct skcipher_request *req)
- 	u8 buf[AES_BLOCK_SIZE];
- 	int err;
  
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
+-static void ccm_calculate_auth_mac(struct aead_request *req, u8 mac[],
+-				   bool use_neon)
++static void ccm_calculate_auth_mac(struct aead_request *req, u8 mac[])
+ {
+ 	struct crypto_aead *aead = crypto_aead_reqtfm(req);
+ 	struct crypto_aes_ctx *ctx = crypto_aead_ctx(aead);
+@@ -163,7 +164,7 @@ static void ccm_calculate_auth_mac(struct aead_request *req, u8 mac[],
+ 		ltag.len = 6;
+ 	}
  
--	kernel_neon_begin();
- 	while (walk.nbytes > 0) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 		u8 *final = (walk.total % AES_BLOCK_SIZE) ? buf : NULL;
-@@ -242,8 +241,10 @@ static int ctr_encrypt(struct skcipher_request *req)
- 			final = NULL;
+-	ccm_update_mac(ctx, mac, (u8 *)&ltag, ltag.len, &macp, use_neon);
++	ccm_update_mac(ctx, mac, (u8 *)&ltag, ltag.len, &macp);
+ 	scatterwalk_start(&walk, req->src);
+ 
+ 	do {
+@@ -175,7 +176,7 @@ static void ccm_calculate_auth_mac(struct aead_request *req, u8 mac[],
+ 			n = scatterwalk_clamp(&walk, len);
  		}
+ 		p = scatterwalk_map(&walk);
+-		ccm_update_mac(ctx, mac, p, n, &macp, use_neon);
++		ccm_update_mac(ctx, mac, p, n, &macp);
+ 		len -= n;
  
-+		kernel_neon_begin();
- 		aesbs_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				  ctx->rk, ctx->rounds, blocks, walk.iv, final);
-+		kernel_neon_end();
- 
- 		if (final) {
- 			u8 *dst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
-@@ -258,8 +259,6 @@ static int ctr_encrypt(struct skcipher_request *req)
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
--
- 	return err;
- }
- 
-@@ -304,12 +303,11 @@ static int __xts_crypt(struct skcipher_request *req,
- 	struct skcipher_walk walk;
+ 		scatterwalk_unmap(p);
+@@ -242,43 +243,42 @@ static int ccm_encrypt(struct aead_request *req)
+ 	u8 __aligned(8) mac[AES_BLOCK_SIZE];
+ 	u8 buf[AES_BLOCK_SIZE];
+ 	u32 len = req->cryptlen;
+-	bool use_neon = may_use_simd();
  	int err;
  
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
+ 	err = ccm_init_mac(req, mac, len);
+ 	if (err)
+ 		return err;
  
- 	kernel_neon_begin();
+-	if (likely(use_neon))
+-		kernel_neon_begin();
 -
--	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey,
--			     ctx->key.rounds, 1);
-+	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey, ctx->key.rounds, 1);
-+	kernel_neon_end();
+ 	if (req->assoclen)
+-		ccm_calculate_auth_mac(req, mac, use_neon);
++		ccm_calculate_auth_mac(req, mac);
  
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
-@@ -318,13 +316,13 @@ static int __xts_crypt(struct skcipher_request *req,
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
+ 	/* preserve the original iv for the final round */
+ 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
  
-+		kernel_neon_begin();
- 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->key.rk,
- 		   ctx->key.rounds, blocks, walk.iv);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	err = skcipher_walk_aead_encrypt(&walk, req, true);
+ 
+-	if (likely(use_neon)) {
++	if (may_use_simd()) {
+ 		while (walk.nbytes) {
+ 			u32 tail = walk.nbytes % AES_BLOCK_SIZE;
+ 
+ 			if (walk.nbytes == walk.total)
+ 				tail = 0;
+ 
++			kernel_neon_begin();
+ 			ce_aes_ccm_encrypt(walk.dst.virt.addr,
+ 					   walk.src.virt.addr,
+ 					   walk.nbytes - tail, ctx->key_enc,
+ 					   num_rounds(ctx), mac, walk.iv);
++			kernel_neon_end();
+ 
+ 			err = skcipher_walk_done(&walk, tail);
+ 		}
+-		if (!err)
++		if (!err) {
++			kernel_neon_begin();
+ 			ce_aes_ccm_final(mac, buf, ctx->key_enc,
+ 					 num_rounds(ctx));
+-
+-		kernel_neon_end();
++			kernel_neon_end();
++		}
+ 	} else {
+ 		err = ccm_crypt_fallback(&walk, mac, buf, ctx, true);
  	}
--	kernel_neon_end();
--
- 	return err;
- }
+@@ -301,43 +301,42 @@ static int ccm_decrypt(struct aead_request *req)
+ 	u8 __aligned(8) mac[AES_BLOCK_SIZE];
+ 	u8 buf[AES_BLOCK_SIZE];
+ 	u32 len = req->cryptlen - authsize;
+-	bool use_neon = may_use_simd();
+ 	int err;
  
+ 	err = ccm_init_mac(req, mac, len);
+ 	if (err)
+ 		return err;
+ 
+-	if (likely(use_neon))
+-		kernel_neon_begin();
+-
+ 	if (req->assoclen)
+-		ccm_calculate_auth_mac(req, mac, use_neon);
++		ccm_calculate_auth_mac(req, mac);
+ 
+ 	/* preserve the original iv for the final round */
+ 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
+ 
+ 	err = skcipher_walk_aead_decrypt(&walk, req, true);
+ 
+-	if (likely(use_neon)) {
++	if (may_use_simd()) {
+ 		while (walk.nbytes) {
+ 			u32 tail = walk.nbytes % AES_BLOCK_SIZE;
+ 
+ 			if (walk.nbytes == walk.total)
+ 				tail = 0;
+ 
++			kernel_neon_begin();
+ 			ce_aes_ccm_decrypt(walk.dst.virt.addr,
+ 					   walk.src.virt.addr,
+ 					   walk.nbytes - tail, ctx->key_enc,
+ 					   num_rounds(ctx), mac, walk.iv);
++			kernel_neon_end();
+ 
+ 			err = skcipher_walk_done(&walk, tail);
+ 		}
+-		if (!err)
++		if (!err) {
++			kernel_neon_begin();
+ 			ce_aes_ccm_final(mac, buf, ctx->key_enc,
+ 					 num_rounds(ctx));
+-
+-		kernel_neon_end();
++			kernel_neon_end();
++		}
+ 	} else {
+ 		err = ccm_crypt_fallback(&walk, mac, buf, ctx, false);
+ 	}
 -- 
 2.15.1
