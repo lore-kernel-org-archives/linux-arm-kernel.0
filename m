@@ -1,88 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 10 Mar 2018 13:00:53 +0100
-Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
-In-Reply-To: <1bb9aa1e-1a78-5d1c-d2d6-f2cd6b925f31@metafoo.de>
-References: <20180309221220.GA15272@amd> <20180309222821.GA16973@kroah.com>
- <20180309230124.GA17721@amd>
- <1bb9aa1e-1a78-5d1c-d2d6-f2cd6b925f31@metafoo.de>
-Message-ID: <20180310120053.GB31614@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 10 Mar 2018 12:20:19 +0000
+Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for level
+ interrupt resampling
+In-Reply-To: <20180309213612.GD1917@lvm>
+References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
+ <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
+ <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com>
+ <20180308161900.GC1917@lvm> <86r2oubho3.wl-marc.zyngier@arm.com>
+ <20180309213612.GD1917@lvm>
+Message-ID: <86k1ukazr0.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Sat 2018-03-10 12:19:29, Lars-Peter Clausen wrote:
-> On 03/10/2018 12:01 AM, Pavel Machek wrote:
-> [...]
-> >> What file are you opening to cause this?
-> > 
-> > Strace says:
-> > 
-> > openat(7, "in_intensity_both_thresh_rising_en",
-> >>> O_RDONLY|O_LARGEFILE|O_NOFOLLOW) = 3
-> > fstat64(3, {st_mode=S_IFREG|0644, st_size=4096, ...}) = 0
-> > ioctl(3, SNDCTL_TMR_TIMEBASE or TCGETS, 0xbe83b714) = -1 ENOTTY
-> >>> (Inappropriate ioctl for device)
-> > read(3,
-> > Message from syslogd at localhost at Mar  9 23:54:39 ...
-> >  kernel:[ 3097.357696] Internal error: Oops: 80000007 [#2] ARM
-> > 
-> > So that would be:
-> > 
-> > ./devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1/events/in_intensity_both_thresh_rising_en
-> > 
-> > And indeed, manually cat-ing that file reproduces the problem.
-> > 
-> > pavel at n900:/sys/devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1$
-> > cat name
-> > tsl2563
-> > 
-> > I can not find tsl2563 in MAINTAINERS, file is
-> > ./drivers/iio/light/tsl2563.c . I added few people pointed by git log.
+On Fri, 09 Mar 2018 21:36:12 +0000,
+Christoffer Dall wrote:
 > 
-> The driver registers event attributes, but does not provide a handle to
-> access those attributes.
+> On Thu, Mar 08, 2018 at 05:28:44PM +0000, Marc Zyngier wrote:
+> > I'd be more confident if we did forbid P+A for such interrupts
+> > altogether, as they really feel like another kind of HW interrupt.
 > 
-> Now the question is how to best handle this case.
-> 
-> 1) Return an error when the device is registered and abort registration
-> 2) Skip registering the event attributes
-> 3) Skip registering the event attributes, but print a warning
-> 4) Register the attributes, but return an error when they are accessed
-> 
-> I'd prefer 2 since it offers a nice method of disabling all events for a
-> device (e.g. if not interrupt is provided).
+> How about a slightly bigger hammer:  Can we avoid doing P+A for level
+> interrupts completely?  I don't think that really makes much sense, and
+> I think we simply everything if we just come back out and resample the
+> line.  For an edge, something like a network card, there's a potential
+> performance win to appending a new pending state, but I doubt that this
+> is the case for level interrupts.
 
-2 works for me.
+I started implementing the same thing yesterday. Somehow, it feels
+slightly better to have the same flow for all level interrupts,
+including the timer, and we only use the MI on EOI as a way to trigger
+the next state of injection. Still testing, but looking good so far.
 
-Tested-by: Pavel Machek <pavel@ucw.cz>
-Reported-by: Pavel Machek <pavel@ucw.cz>
+I'm still puzzled that we have this level-but-not-quite behaviour for
+VFIO interrupts. At some point, it is going to bite us badly.
 
-Now grep -ri asdfasdf /sys finishes.
-
-Thanks,
-								Pavel
-
-> --- a/drivers/iio/industrialio-event.c
-> +++ b/drivers/iio/industrialio-event.c
-> @@ -477,7 +477,8 @@ int iio_device_register_eventset(struct iio_dev
->  	struct attribute **attr;
-> 
->  	if (!(indio_dev->info->event_attrs ||
-> -	      iio_check_for_dynamic_events(indio_dev)))
-> +	      iio_check_for_dynamic_events(indio_dev)) ||
-> +	    !indio_dev->info->read_event_config)
->  		return 0;
-> 
->  	indio_dev->event_interface =
+	M.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180310/b613357c/attachment.sig>
+Jazz is not dead, it just smell funny.
