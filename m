@@ -1,114 +1,88 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Mar 2018 11:48:30 +0000
-Subject: [PATCH] KVM:arm/arm64: dcache need be coherent unconditionally
-In-Reply-To: <201803101123186035154@zte.com.cn>
-Message-ID: <86muzgb181.wl-marc.zyngier@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 10 Mar 2018 13:00:53 +0100
+Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
+In-Reply-To: <1bb9aa1e-1a78-5d1c-d2d6-f2cd6b925f31@metafoo.de>
+References: <20180309221220.GA15272@amd> <20180309222821.GA16973@kroah.com>
+ <20180309230124.GA17721@amd>
+ <1bb9aa1e-1a78-5d1c-d2d6-f2cd6b925f31@metafoo.de>
+Message-ID: <20180310120053.GB31614@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Mar 2018 03:23:18 +0000,
-peng hao wrote:
+Hi!
 
-> >> For emulation devices just like vga, keeping coherent dcache between
-> >> guest and host timely is needed.
-> >> Now the display of vnc-viewer will not update continuously and the
-> >> patch can fix up.
-> >> 
-> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> >> ---
-> >>  virt/kvm/arm/mmu.c | 6 ++----
-> >>  1 file changed, 2 insertions(+), 4 deletions(-)
-> >> 
-> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> >> index ec62d1c..4a28395e 100644
-> >> --- a/virt/kvm/arm/mmu.c
-> >> +++ b/virt/kvm/arm/mmu.c
-> >> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>              kvm_set_pfn_dirty(pfn);
-> >>          }
-> >>  
-> >> -        if (fault_status != FSC_PERM)
-> >> -            clean_dcache_guest_page(pfn, PMD_SIZE);
-> >> +        clean_dcache_guest_page(pfn, PMD_SIZE);
-> >>  
-> >>          if (exec_fault) {
-> >>              new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> >> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>              mark_page_dirty(kvm, gfn);
-> >>          }
-> >>  
-> >> -        if (fault_status != FSC_PERM)
-> >> -            clean_dcache_guest_page(pfn, PAGE_SIZE);
-> >> +        clean_dcache_guest_page(pfn, PAGE_SIZE);
-> >>  
-> >>          if (exec_fault) {
-> >>              new_pte = kvm_s2pte_mkexec(new_pte);
-> >> 
+On Sat 2018-03-10 12:19:29, Lars-Peter Clausen wrote:
+> On 03/10/2018 12:01 AM, Pavel Machek wrote:
+> [...]
+> >> What file are you opening to cause this?
+> > 
+> > Strace says:
+> > 
+> > openat(7, "in_intensity_both_thresh_rising_en",
+> >>> O_RDONLY|O_LARGEFILE|O_NOFOLLOW) = 3
+> > fstat64(3, {st_mode=S_IFREG|0644, st_size=4096, ...}) = 0
+> > ioctl(3, SNDCTL_TMR_TIMEBASE or TCGETS, 0xbe83b714) = -1 ENOTTY
+> >>> (Inappropriate ioctl for device)
+> > read(3,
+> > Message from syslogd at localhost at Mar  9 23:54:39 ...
+> >  kernel:[ 3097.357696] Internal error: Oops: 80000007 [#2] ARM
+> > 
+> > So that would be:
+> > 
+> > ./devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1/events/in_intensity_both_thresh_rising_en
+> > 
+> > And indeed, manually cat-ing that file reproduces the problem.
+> > 
+> > pavel at n900:/sys/devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1$
+> > cat name
+> > tsl2563
+> > 
+> > I can not find tsl2563 in MAINTAINERS, file is
+> > ./drivers/iio/light/tsl2563.c . I added few people pointed by git log.
 > 
-> >I'm sorry, but I have to NAK this.
+> The driver registers event attributes, but does not provide a handle to
+> access those attributes.
 > 
-> >You're papering over the fundamental issue that you're accessing a
-> >cacheable alias of a non cacheable memory. The architecture is very
-> >clear about why this doesn't work, and KVM implements the architecture.
+> Now the question is how to best handle this case.
 > 
+> 1) Return an error when the device is registered and abort registration
+> 2) Skip registering the event attributes
+> 3) Skip registering the event attributes, but print a warning
+> 4) Register the attributes, but return an error when they are accessed
 > 
-> 
-> I find that I just encounter the problem after the commit
-> '15303ba5d1cd9b28d03a980456c0978c0ea3b208 " .
+> I'd prefer 2 since it offers a nice method of disabling all events for a
+> device (e.g. if not interrupt is provided).
 
-This should really be a9c0e12ebee5 ("KVM: arm/arm64: Only clean the
-dcache on translation fault").
+2 works for me.
 
-> The commit contains "icache invalidation optimizations, improving VM
-> startup time",it changes from unconditionally calling
-> coherent_cache_guest_page(including dcache handle) to conditionally
-> calling clean_dcache_guest_page.
-> 
-> I trace the display of vnc abnormally and find it generate data
-> abort in vga address region with FSC_PERM,and it will not call
-> clean_dcache_guest_page . So I think should recover to uncontionally
-> calling clean_dcache_guest_page.
+Tested-by: Pavel Machek <pavel@ucw.cz>
+Reported-by: Pavel Machek <pavel@ucw.cz>
 
-[I really hate ranting on a Saturday morning as the sun is finally out
-and I could be relaxing in the garden, but hey, I guess that's the
-fate of a kernel hacker who made the silly mistake of reading email on
-a Saturday morning instead of being out in the garden...]
-
-Even if you enabled dirty tracking on the VGA memory (and thus making
-it RO to generate a permission fault), you would end-up cleaning to
-the PoC *before* any write has been committed to the page. How useful
-is that? You're also pretty lucky that this does a clean+invalidate
-(rather than a clean which would be good enough), meaning that QEMU
-will in turn miss in the cache (PIPT caches) and read some *stale*
-data from memory.
-
-Repeat that often enough, and yes, you can get some sort of
-display. Is that the right thing to do? Hell no. You might just as
-well have a userspace process thrashing the cache at the PoC, running
-concurrently with your VM, it would have a similar effect. It may work
-on your particular platform, in some specific conditions, but it just
-doesn't work in general.
-
-What you are describing is a long standing issue. VGA emulation never
-worked on ARM, because it is fundamentally incompatible with the ARM
-memory architecture. Read the various discussions on the list over the
-past 4 years or so, read the various presentations I and others have
-given about this problem and how to address it[1].
-
-The *real* fix is a one-liner in the Linux VGA driver: map the VGA
-memory as cacheable, and stop lying to the guest. Or if you want to
-lie to the guest, perform cache maintenance from userspace in QEMU
-based on the dirty tracking bitmap that it uses for the VGA memory.
-
-Anything else is out of the scope of the architecture, and I'm not
-going to add more crap to satisfy requirements that cannot be
-implemented on real HW, let alone in a virtualized environment.
+Now grep -ri asdfasdf /sys finishes.
 
 Thanks,
+								Pavel
 
-	M.
-
-[1] http://events17.linuxfoundation.org/sites/events/files/slides/slides_10.pdf
+> --- a/drivers/iio/industrialio-event.c
+> +++ b/drivers/iio/industrialio-event.c
+> @@ -477,7 +477,8 @@ int iio_device_register_eventset(struct iio_dev
+>  	struct attribute **attr;
+> 
+>  	if (!(indio_dev->info->event_attrs ||
+> -	      iio_check_for_dynamic_events(indio_dev)))
+> +	      iio_check_for_dynamic_events(indio_dev)) ||
+> +	    !indio_dev->info->read_event_config)
+>  		return 0;
+> 
+>  	indio_dev->event_interface =
 
 -- 
-Jazz is not dead, it just smell funny.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180310/b613357c/attachment.sig>
