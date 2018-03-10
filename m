@@ -1,97 +1,79 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 10 Mar 2018 17:59:11 +0000
-Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
-In-Reply-To: <20180310120053.GB31614@amd>
-References: <20180309221220.GA15272@amd> <20180309222821.GA16973@kroah.com>
- <20180309230124.GA17721@amd>
- <1bb9aa1e-1a78-5d1c-d2d6-f2cd6b925f31@metafoo.de>
- <20180310120053.GB31614@amd>
-Message-ID: <20180310175911.292dcf0c@archlinux>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sat, 10 Mar 2018 12:25:43 -0600
+Subject: [PATCH] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <20180306152540.GC18477@arm.com>
+References: <1520027418-10646-1-git-send-email-shankerd@codeaurora.org>
+ <20180305155614.GG6618@arm.com>
+ <05c25982-4939-593f-ad30-bf496e879885@codeaurora.org>
+ <20180305171529.GA12869@arm.com>
+ <770bb422-7a53-06b9-a136-4e38a0a4bed2@codeaurora.org>
+ <20180306152540.GC18477@arm.com>
+Message-ID: <e0c6d403-beab-395b-ae19-766deeb867aa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Mar 2018 13:00:53 +0100
-Pavel Machek <pavel@ucw.cz> wrote:
+Hi Will,
 
-> Hi!
+On 03/06/2018 09:25 AM, Will Deacon wrote:
+> On Mon, Mar 05, 2018 at 12:03:33PM -0600, Shanker Donthineni wrote:
+>> On 03/05/2018 11:15 AM, Will Deacon wrote:
+>>> On Mon, Mar 05, 2018 at 10:57:58AM -0600, Shanker Donthineni wrote:
+>>>> On 03/05/2018 09:56 AM, Will Deacon wrote:
+>>>>> On Fri, Mar 02, 2018 at 03:50:18PM -0600, Shanker Donthineni wrote:
+>>>>>> @@ -199,33 +208,15 @@ static int enable_smccc_arch_workaround_1(void *data)
+>>>>>>  		return 0;
+>>>>>>  	}
+>>>>>>  
+>>>>>> +	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+>>>>>> +	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
+>>>>>> +		cb = qcom_link_stack_sanitization;
+>>>>>
+>>>>> Is this just a performance thing? Do you actually see an advantage over
+>>>>> always making the firmware call? We've seen minimal impact in our testing.
+>>>>>
+>>>>
+>>>> Yes, we've couple of advantages using the standard SMCCC_ARCH_WOKAROUND_1 framework. 
+>>>>   - Improves the code readability.
+>>>>   - Avoid the unnecessary MIDR checks on each vCPU exit.
+>>>>   - Validates ID_AA64PFR0_CVS2 feature for Falkor chips.
+>>>>   - Avoids the 2nd link stack sanitization workaround in firmware.
+>>>
+>>> What I mean is, can we drop qcom_link_stack_sanitization altogether and
+>>> use the SMCCC interface for everything?
+>>>
+>>
+>> No, We would like to keep it qcom_link_stack_sanitization for host kernel
+>> since it takes a few CPU cycles instead of heavyweight SMCCC call.
 > 
-> On Sat 2018-03-10 12:19:29, Lars-Peter Clausen wrote:
-> > On 03/10/2018 12:01 AM, Pavel Machek wrote:
-> > [...]  
-> > >> What file are you opening to cause this?  
-> > > 
-> > > Strace says:
-> > > 
-> > > openat(7, "in_intensity_both_thresh_rising_en",  
-> > >>> O_RDONLY|O_LARGEFILE|O_NOFOLLOW) = 3  
-> > > fstat64(3, {st_mode=S_IFREG|0644, st_size=4096, ...}) = 0
-> > > ioctl(3, SNDCTL_TMR_TIMEBASE or TCGETS, 0xbe83b714) = -1 ENOTTY  
-> > >>> (Inappropriate ioctl for device)  
-> > > read(3,
-> > > Message from syslogd at localhost at Mar  9 23:54:39 ...
-> > >  kernel:[ 3097.357696] Internal error: Oops: 80000007 [#2] ARM
-> > > 
-> > > So that would be:
-> > > 
-> > > ./devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1/events/in_intensity_both_thresh_rising_en
-> > > 
-> > > And indeed, manually cat-ing that file reproduces the problem.
-> > > 
-> > > pavel at n900:/sys/devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1$
-> > > cat name
-> > > tsl2563
-> > > 
-> > > I can not find tsl2563 in MAINTAINERS, file is
-> > > ./drivers/iio/light/tsl2563.c . I added few people pointed by git log.  
-> > 
-> > The driver registers event attributes, but does not provide a handle to
-> > access those attributes.
-> > 
-> > Now the question is how to best handle this case.
-> > 
-> > 1) Return an error when the device is registered and abort registration
-> > 2) Skip registering the event attributes
-> > 3) Skip registering the event attributes, but print a warning
-> > 4) Register the attributes, but return an error when they are accessed
-> > 
-> > I'd prefer 2 since it offers a nice method of disabling all events for a
-> > device (e.g. if not interrupt is provided).  
-> 
-> 2 works for me.
-> 
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> 
-> Now grep -ri asdfasdf /sys finishes.
+> Is that something that you can actually measure in the workloads and
+> benchmarks that you care about? If so, fine, but that doesn't seem to be the
+> case for the Cortex cores we've looked at internally and it would be nice to
+> avoid having different workarounds in the kernel just because the SMCCC
+> interface wasn't baked in time, rather than because there's a meaningful
+> performance difference.
+>
 
-Hmm. I'd count this as a good general prevention of what is actually
-a driver bug.  The driver should either have failed or as has been suggested
-should have come up without the event sysfs attributes by registering different
-abilities.
+We've seen noticeable performance improvement with the microbench workloads,
+ans also some of our customers have observed improvements on heavy workloads. 
+Unfortunately I can't share those specific results here. SMCCC call overhead 
+is much higher as compared to link stack workaround on Falkor, ~99X.
 
-So I'm favour of this change, but from a semantic point of view I'd
-like the addition of a warning for this case and ideally for the driver
-to be fixed to not attempt to add them (two iio_info structures which
-is what a lot of other drivers do to allow them to work with and
-without the interrupt being available.).
+Host kernel workaround takes less than ~20 CPU cycles, whereas SMCCC_ARCH_WOKAROUND_1
+consumes thousands of CPU cycles to sanitize the branch prediction on Falkor.  
 
-Anyhow, Lars, please send a formal patch for the below and we'll
-get that headed for mainline asap.
+Especially workloads inside virtual machines provides much better results because
+no KVM involvement is required whenever guest calls qcom_link_stack_sanitization().            
+ 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-> 
-> Thanks,
-> 								Pavel
-> 
-> > --- a/drivers/iio/industrialio-event.c
-> > +++ b/drivers/iio/industrialio-event.c
-> > @@ -477,7 +477,8 @@ int iio_device_register_eventset(struct iio_dev
-> >  	struct attribute **attr;
-> > 
-> >  	if (!(indio_dev->info->event_attrs ||
-> > -	      iio_check_for_dynamic_events(indio_dev)))
-> > +	      iio_check_for_dynamic_events(indio_dev)) ||
-> > +	    !indio_dev->info->read_event_config)
-> >  		return 0;
-> > 
-> >  	indio_dev->event_interface =  
-> 
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
