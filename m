@@ -1,69 +1,102 @@
-From: megous@megous.com (megous at megous.com)
-Date: Sat, 10 Mar 2018 12:05:11 +0100
-Subject: [PATCH] drm/sun4i: Fix exclusivity of the TCON clocks
-Message-ID: <20180310110511.14697-1-megous@megous.com>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Sat, 10 Mar 2018 20:19:20 +0900
+Subject: Nokia N900: v4.16-rc4: oops in iio when grepping sysfs
+In-Reply-To: <20180309230124.GA17721@amd>
+References: <20180309221220.GA15272@amd> <20180309222821.GA16973@kroah.com>
+ <20180309230124.GA17721@amd>
+Message-ID: <CAC5umygQvPHPFt7ek_WpTmYHh_=NnDCGBEB+HcgWZgmRG5Rvxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+2018-03-10 8:01 GMT+09:00 Pavel Machek <pavel@ucw.cz>:
+> Hi!
+>
+>> > Hmm. Looks like there's a lot of fun to be had with sysfs.
+>> >
+>> >
+>> > pavel at n900:~$ uname -a
+>> > Linux n900 4.16.0-rc4-59690-g7f84626-dirty #543 Thu Mar 8 19:53:30 CET
+>> > 2018 armv7l GNU/Linux
+>> >
+>> > [  306.402496] bq2415x: command Timer reset
+>> > [  312.761322] adp1653 2-0030: Read Addr:03 Val:00 ok
+>> > [  313.264129] Unable to handle kernel NULL pointer dereference at
+>> > virtual address 00000
+>> > 000
+>> > [  313.272308] pgd = 01336620
+>> > [  313.275146] [00000000] *pgd=800af831, *pte=00000000, *ppte=00000000
+>> > [  313.281463] Internal error: Oops: 80000007 [#1] ARM
+>> > [  313.286376] Modules linked in:
+>> > [  313.289459] CPU: 0 PID: 3584 Comm: grep Tainted: G        W
+>> > 4.16.0-rc4-59690-g
+>> > 7f84626-dirty #543
+>> > [  313.298919] Hardware name: Nokia RX-51 board
+>> > [  313.303222] PC is at   (null)
+>> > [  313.306213] LR is at iio_ev_state_show+0x38/0x54
+>> > [  313.310852] pc : [<00000000>]    lr : [<c05d69c0>]    psr: a0000013
+>> > [  313.317169] sp : c7b47e70  ip : c087bb24  fp : 00000001
+>> > [  313.322418] r10: cb19e000  r9 : c0857220  r8 : 00001000
+>> > [  313.327667] r7 : 00000fff  r6 : cb711c80  r5 : cb19e000  r4 :
+>> > 00000000
+>> > [  313.334228] r3 : 00000001  r2 : 00000000  r1 : c087b4dc  r0 :
+>> > ce584800
+>> > [  313.340789] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+>> > Segment none
+>> > [  313.347991] Control: 10c5387d  Table: 87bec019  DAC: 00000051
+>> > [  313.353759] Process grep (pid: 3584, stack limit = 0xc4e45eab)
+>> > [  313.359619] Stack: (0xc7b47e70 to 0xc7b48000)
+>> > [  313.364013] 7e60:                                     c05d6988
+>> > cb711b00 ce585c00 c0450d68
+>> > [  313.471038] [<c05d69c0>] (iio_ev_state_show) from [<c0450d68>]
+>> > (dev_attr_show+0x1c/0x4c)
+>> > [  313.479187] [<c0450d68>] (dev_attr_show) from [<c023f934>]
+>> > (sysfs_kf_seq_show+0x90/0x108)
+>> > [  313.487426] [<c023f934>] (sysfs_kf_seq_show) from [<c023e2f8>]
+>> > (kernfs_seq_show+0x24/0x28)
+>> > [  313.495758] [<c023e2f8>] (kernfs_seq_show) from [<c01fc954>]
+>> > (seq_read+0x1dc/0x500)
+>> > [  313.503479] [<c01fc954>] (seq_read) from [<c01d9f80>]
+>> > (__vfs_read+0x2c/0x120)
+>> > [  313.510681] [<c01d9f80>] (__vfs_read) from [<c01da0fc>]
+>> > (vfs_read+0x88/0x114)
+>> > [  313.517852] [<c01da0fc>] (vfs_read) from [<c01da584>]
+>> > (SyS_read+0x40/0x8c)
+>> > [  313.524780] [<c01da584>] (SyS_read) from [<c0101000>]
+>> > (ret_fast_syscall+0x0/0x54)
+>> > [  313.532318] Exception stack(0xc7b47fa8 to 0xc7b47ff0)
+>> > [  313.537414] 7fa0:                   00035330 00042000 00000003
+>> > 00042000 00008000 00008000
+>> >
+>>
+>> What file are you opening to cause this?
+>
+> Strace says:
+>
+> openat(7, "in_intensity_both_thresh_rising_en",
+>> > O_RDONLY|O_LARGEFILE|O_NOFOLLOW) = 3
+> fstat64(3, {st_mode=S_IFREG|0644, st_size=4096, ...}) = 0
+> ioctl(3, SNDCTL_TMR_TIMEBASE or TCGETS, 0xbe83b714) = -1 ENOTTY
+>> > (Inappropriate ioctl for device)
+> read(3,
+> Message from syslogd at localhost at Mar  9 23:54:39 ...
+>  kernel:[ 3097.357696] Internal error: Oops: 80000007 [#2] ARM
+>
+> So that would be:
+>
+> ./devices/platform/68000000.ocp/48072000.i2c/i2c-2/2-0029/iio:device1/events/in_intensity_both_thresh_rising_en
+>
+> And indeed, manually cat-ing that file reproduces the problem.
 
-Currently the exclusivity is enabled when the rate is set by
-the mode setting functions. These functions are called by
-mode_set_nofb callback of drm_crc_helper. Then exclusivity
-is disabled when tcon is disabled by atomic_disable
-callback.
+This problem happens when no irq is defined for this device.
 
-What happens is that mode_set_nofb can be called once when
-mode chnages, and afterwards the system can call atomic_enable
-and atomic_disable multiple times without further calls to
-mode_set_nofb.
+In this case, tsl2563_info_no_irq whose read_event_config field is NULL
+is selected as iio_info.  On the other hand, iio_chan_spec for this
+driver always registers event_spec.
 
-This happens:
+So sysfs files related to the channel events are always created even if
+no irq is defined.
 
-mode_set_nofb   - clk exclusivity is enabled
-atomic_enable
-atomic_disable  - clk exclusivity is disabled
-atomic_enable
-atomic_disable  - clk exclusivity is already disabled, leading to WARN
-                  in clk_rate_exclusive_put
+I think we can fix this issue by defining another iio_chan_spec with
+no event_spec for no irq case.
 
-Solution is to enable exclusivity in sun4i_tcon_channel_set_status.
-
-Signed-off-by: Ondrej Jirman <megous@megous.com>
-Cc: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index d4a29847dadd..cc29daa062f7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -104,6 +104,7 @@ static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
- 
- 	if (enabled) {
- 		clk_prepare_enable(clk);
-+		clk_rate_exclusive_get(clk);
- 	} else {
- 		clk_rate_exclusive_put(clk);
- 		clk_disable_unprepare(clk);
-@@ -263,7 +264,7 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
- 					const struct drm_display_mode *mode)
- {
- 	/* Configure the dot clock */
--	clk_set_rate_exclusive(tcon->dclk, mode->crtc_clock * 1000);
-+	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
- 
- 	/* Set the resolution */
- 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
-@@ -428,7 +429,7 @@ static void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 	WARN_ON(!tcon->quirks->has_channel_1);
- 
- 	/* Configure the dot clock */
--	clk_set_rate_exclusive(tcon->sclk1, mode->crtc_clock * 1000);
-+	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
- 
- 	/* Adjust clock delay */
- 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
--- 
-2.16.2
+Jonathan, do you have any other idea how to fix this issue?
