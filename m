@@ -1,444 +1,808 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Sat, 10 Mar 2018 02:24:42 +0000
-Subject: [PATCH v4 10/24] ASoC: qdsp6: q6afe: Add support to MI2S sysclks
+Date: Sat, 10 Mar 2018 02:24:51 +0000
+Subject: [PATCH v4 19/24] ASoC: qdsp6: q6afe: Add q6afe dai driver
 In-Reply-To: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
 References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180310022456.26739-11-srinivas.kandagatla@linaro.org>
+Message-ID: <20180310022456.26739-20-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to LPASS Bit clock, LPASS Digital
-core clock and OSR clock. These clocks are required for both
-MI2S and PCM setup.
+This patch adds support to q6afe backend dais driver.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 211 ++++++++++++++++++++++++++++++++++++++++++-
- sound/soc/qcom/qdsp6/q6afe.h | 131 +++++++++++++++++++++++++++
- 2 files changed, 340 insertions(+), 2 deletions(-)
+ sound/soc/qcom/Kconfig           |   4 +
+ sound/soc/qcom/qdsp6/Makefile    |   1 +
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 746 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 751 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index 2da5e3b14e38..40ba53d13e98 100644
---- a/sound/soc/qcom/qdsp6/q6afe.c
-+++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -26,6 +26,7 @@
- #define AFE_PORT_CMD_DEVICE_START	0x000100E5
- #define AFE_PORT_CMD_DEVICE_STOP	0x000100E6
- #define AFE_PORT_CMD_SET_PARAM_V2	0x000100EF
-+#define AFE_SVC_CMD_SET_PARAM		0x000100f3
- #define AFE_PORT_CMDRSP_GET_PARAM_V2	0x00010106
- #define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
- #define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
-@@ -68,6 +69,11 @@
- #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
+diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+index 7a868a6fac1b..9b630686eb19 100644
+--- a/sound/soc/qcom/Kconfig
++++ b/sound/soc/qcom/Kconfig
+@@ -50,6 +50,9 @@ config SND_SOC_QDSP6_COMMON
+ config SND_SOC_QDSP6_AFE
+ 	tristate
  
- #define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
-+/* Clock set API version */
-+#define AFE_API_VERSION_CLOCK_SET 1
-+#define Q6AFE_LPASS_CLK_CONFIG_API_VERSION	0x1
-+#define AFE_MODULE_CLOCK_SET		0x0001028F
-+#define AFE_PARAM_ID_CLOCK_SET		0x00010290
- 
- /* SLIMbus Rx port on channel 0. */
- #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
-@@ -146,6 +152,13 @@ struct afe_port_param_data_v2 {
- 	u16 reserved;
- } __packed;
- 
-+struct afe_svc_cmd_set_param {
-+	uint32_t payload_size;
-+	uint32_t payload_address_lsw;
-+	uint32_t payload_address_msw;
-+	uint32_t mem_map_handle;
-+} __packed;
++config SND_SOC_QDSP6_AFE_DAI
++	tristate
 +
- struct afe_port_cmd_set_param_v2 {
- 	u16 port_id;
- 	u16 payload_size;
-@@ -206,6 +219,23 @@ struct afe_param_id_slimbus_cfg {
-  */
- } __packed;
+ config SND_SOC_QDSP6_ADM
+ 	tristate
  
-+struct afe_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val1;
-+	u32                  clk_val2;
-+	u16                  clk_src;
-+	u16                  clk_root;
-+	u16                  clk_set_mode;
-+	u16                  reserved;
-+} __packed;
+@@ -67,6 +70,7 @@ config SND_SOC_QDSP6
+ 	depends on QCOM_APR && HAS_DMA
+ 	select SND_SOC_QDSP6_COMMON
+ 	select SND_SOC_QDSP6_AFE
++	select SND_SOC_QDSP6_AFE_DAI
+ 	select SND_SOC_QDSP6_ADM
+ 	select SND_SOC_QDSP6_ROUTING
+ 	select SND_SOC_QDSP6_ASM
+diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+index 6640bceccc18..6a8ae698f22f 100644
+--- a/sound/soc/qcom/qdsp6/Makefile
++++ b/sound/soc/qcom/qdsp6/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+ obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
++obj-$(CONFIG_SND_SOC_QDSP6_AFE_DAI) += q6afe-dai.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+new file mode 100644
+index 000000000000..5cb8b59a8cd9
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -0,0 +1,746 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2011-2016, The Linux Foundation
++// Copyright (c) 2018, Linaro Limited
 +
-+struct afe_digital_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val;
-+	u16                  clk_root;
-+	u16                  reserved;
-+} __packed;
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/component.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/pcm_params.h>
++#include "q6afe.h"
 +
- struct afe_param_id_i2s_cfg {
- 	u32	i2s_cfg_minor_version;
- 	u16	bit_width;
-@@ -223,9 +253,43 @@ union afe_port_config {
- 	struct afe_param_id_i2s_cfg	i2s_cfg;
- } __packed;
- 
-+
-+struct afe_clk_set {
-+	uint32_t clk_set_minor_version;
-+	uint32_t clk_id;
-+	uint32_t clk_freq_in_hz;
-+	uint16_t clk_attri;
-+	uint16_t clk_root;
-+	uint32_t enable;
++struct q6afe_dai_priv_data {
++	uint32_t sd_line_mask;
 +};
 +
-+struct afe_lpass_clk_config_command {
-+	struct apr_hdr			 hdr;
-+	struct afe_port_cmd_set_param_v2 param;
-+	struct afe_port_param_data_v2    pdata;
-+	struct afe_clk_cfg clk_cfg;
-+} __packed;
++struct q6afe_dai_data {
++	struct q6afe_port *port[AFE_PORT_MAX];
++	struct q6afe_port_config port_config[AFE_PORT_MAX];
++	bool is_port_started[AFE_PORT_MAX];
++	struct q6afe_dai_priv_data priv[AFE_PORT_MAX];
++};
 +
-+struct afe_lpass_clk_config_command_v2 {
-+	struct apr_hdr			hdr;
-+	struct afe_svc_cmd_set_param	param;
-+	struct afe_port_param_data_v2    pdata;
-+	struct afe_clk_set		clk_cfg;
-+} __packed;
-+
-+
-+
-+struct afe_lpass_digital_clk_config_command {
-+	struct apr_hdr			 hdr;
-+	struct afe_port_cmd_set_param_v2 param;
-+	struct afe_port_param_data_v2    pdata;
-+	struct afe_digital_clk_cfg clk_cfg;
-+} __packed;
-+
- struct q6afe_port {
- 	wait_queue_head_t wait;
- 	union afe_port_config port_cfg;
-+	struct aprv2_ibasic_rsp_result_t result;
- 	int token;
- 	int id;
- 	int cfg_type;
-@@ -393,6 +457,46 @@ static int afe_apr_send_pkt(struct q6afe *afe, void *data,
- 	return ret;
- }
- 
-+static int q6afe_port_set_param(struct q6afe_port *port, void *data,
-+				   int param_id, int module_id, int psize)
++static int q6slim_hw_params(struct snd_pcm_substream *substream,
++			    struct snd_pcm_hw_params *params,
++			    struct snd_soc_dai *dai)
 +{
-+	struct apr_hdr *hdr;
-+	struct afe_svc_cmd_set_param *param;
-+	struct afe_port_param_data_v2 *pdata;
-+	struct q6afe *afe = port->afe;
-+	u16 port_id = port->id;
-+	int ret;
 +
-+	hdr = data;
-+	param = data + sizeof(*hdr);
-+	pdata = data + sizeof(*hdr) + sizeof(*param);
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_slim_cfg *slim = &dai_data->port_config[dai->id].slim;
 +
-+	hdr->hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					      APR_HDR_LEN(APR_HDR_SIZE),
-+					      APR_PKT_VER);
-+	hdr->pkt_size = sizeof(*hdr) + sizeof(*param) +
-+			sizeof(*pdata) + psize;
-+	hdr->src_port = 0;
-+	hdr->dest_port = 0;
-+	hdr->token = port->token;
-+	hdr->opcode = AFE_SVC_CMD_SET_PARAM;
++	slim->num_channels = params_channels(params);
++	slim->sample_rate = params_rate(params);
 +
-+	param->payload_size = sizeof(*pdata) + psize;
-+	param->payload_address_lsw = 0x00;
-+	param->payload_address_msw = 0x00;
-+	param->mem_map_handle = 0x00;
-+	pdata->module_id = module_id;
-+	pdata->param_id = param_id;
-+	pdata->param_size = psize;
-+
-+	ret = afe_apr_send_pkt(afe, data, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+		       port_id, ret);
-+
-+	return ret;
-+}
-+
- static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
- 				   int param_id, int psize)
- {
-@@ -434,6 +538,110 @@ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
- 	return ret;
- }
- 
-+static int q6afe_set_lpass_clock(struct q6afe_port *port,
-+				 struct afe_clk_cfg *cfg)
-+{
-+	struct afe_lpass_clk_config_command clk_cfg = {0};
-+	int param_id = AFE_PARAM_ID_LPAIF_CLK_CONFIG;
-+	struct q6afe *afe = port->afe;
-+
-+	if (!cfg) {
-+		dev_err(afe->dev, "clock cfg is NULL\n");
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++	case SNDRV_PCM_FORMAT_SPECIAL:
++		slim->bit_width = 16;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		slim->bit_width = 24;
++		break;
++	case SNDRV_PCM_FORMAT_S32_LE:
++		slim->bit_width = 32;
++		break;
++	default:
++		pr_err("%s: format %d\n",
++			__func__, params_format(params));
 +		return -EINVAL;
 +	}
 +
-+	clk_cfg.clk_cfg = *cfg;
-+
-+	return q6afe_port_set_param_v2(port, &clk_cfg, param_id, sizeof(*cfg));
++	return 0;
 +}
 +
-+static int q6afe_set_lpass_clock_v2(struct q6afe_port *port,
-+				 struct afe_clk_set *cfg)
++static int q6hdmi_hw_params(struct snd_pcm_substream *substream,
++				struct snd_pcm_hw_params *params,
++				struct snd_soc_dai *dai)
 +{
-+	struct afe_lpass_clk_config_command_v2 clk_cfg = {0};
-+	int param_id = AFE_PARAM_ID_CLOCK_SET;
-+	int module_id = AFE_MODULE_CLOCK_SET;
-+	struct q6afe *afe = port->afe;
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int channels = params_channels(params);
++	struct q6afe_hdmi_cfg *hdmi = &dai_data->port_config[dai->id].hdmi;
 +
-+	if (!cfg) {
-+		dev_err(afe->dev, "clock cfg is NULL\n");
++	hdmi->sample_rate = params_rate(params);
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		hdmi->bit_width = 16;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		hdmi->bit_width = 24;
++		break;
++	}
++
++	/* HDMI spec CEA-861-E: Table 28 Audio InfoFrame Data Byte 4 */
++	switch (channels) {
++	case 2:
++		hdmi->channel_allocation = 0;
++		break;
++	case 3:
++		hdmi->channel_allocation = 0x02;
++		break;
++	case 4:
++		hdmi->channel_allocation = 0x06;
++		break;
++	case 5:
++		hdmi->channel_allocation = 0x0A;
++		break;
++	case 6:
++		hdmi->channel_allocation = 0x0B;
++		break;
++	case 7:
++		hdmi->channel_allocation = 0x12;
++		break;
++	case 8:
++		hdmi->channel_allocation = 0x13;
++		break;
++	default:
++		dev_err(dai->dev, "invalid Channels = %u\n", channels);
 +		return -EINVAL;
 +	}
 +
-+	clk_cfg.clk_cfg = *cfg;
-+
-+	return q6afe_port_set_param(port, &clk_cfg, param_id,
-+				       module_id, sizeof(*cfg));
++	return 0;
 +}
 +
-+static int q6afe_set_digital_codec_core_clock(struct q6afe_port *port,
-+					      struct afe_digital_clk_cfg *cfg)
++static int q6i2s_hw_params(struct snd_pcm_substream *substream,
++			   struct snd_pcm_hw_params *params,
++			   struct snd_soc_dai *dai)
 +{
-+	struct afe_lpass_digital_clk_config_command clk_cfg = {0};
-+	int param_id = AFE_PARAM_ID_INTERNAL_DIGITAL_CDC_CLK_CONFIG;
-+	struct q6afe *afe = port->afe;
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_i2s_cfg *i2s = &dai_data->port_config[dai->id].i2s_cfg;
 +
-+	if (!cfg) {
-+		dev_err(afe->dev, "clock cfg is NULL\n");
++	i2s->sample_rate = params_rate(params);
++	i2s->bit_width = params_width(params);
++	i2s->num_channels = params_channels(params);
++	i2s->sd_line_mask = dai_data->priv[dai->id].sd_line_mask;
++
++	return 0;
++}
++
++static int q6i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_i2s_cfg *i2s = &dai_data->port_config[dai->id].i2s_cfg;
++
++	i2s->fmt = fmt;
++
++	return 0;
++}
++
++static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int rc;
++
++	rc = q6afe_port_stop(dai_data->port[dai->id]);
++	if (rc < 0)
++		dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
++
++	dai_data->is_port_started[dai->id] = false;
++
++}
++
++static int q6afe_mi2s_prepare(struct snd_pcm_substream *substream,
++		struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int rc;
++
++	if (dai_data->is_port_started[dai->id]) {
++		/* stop the port and restart with new port config */
++		rc = q6afe_port_stop(dai_data->port[dai->id]);
++		if (rc < 0) {
++			dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
++			return rc;
++		}
++	}
++
++	rc = q6afe_i2s_port_prepare(dai_data->port[dai->id],
++			       &dai_data->port_config[dai->id].i2s_cfg);
++	if (rc < 0) {
++		dev_err(dai->dev, "fail to prepare AFE port %x\n", dai->id);
++		return rc;
++	}
++
++	rc = q6afe_port_start(dai_data->port[dai->id]);
++	if (rc < 0) {
++		dev_err(dai->dev, "fail to start AFE port %x\n", dai->id);
++		return rc;
++	}
++	dai_data->is_port_started[dai->id] = true;
++
++	return 0;
++}
++
++static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
++		struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int rc;
++
++	if (dai_data->is_port_started[dai->id]) {
++		/* stop the port and restart with new port config */
++		rc = q6afe_port_stop(dai_data->port[dai->id]);
++		if (rc < 0) {
++			dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
++			return rc;
++		}
++	}
++
++	if (dai->id == HDMI_RX)
++		q6afe_hdmi_port_prepare(dai_data->port[dai->id],
++					&dai_data->port_config[dai->id].hdmi);
++	else if (dai->id >= SLIMBUS_0_RX && dai->id <= SLIMBUS_6_TX)
++		q6afe_slim_port_prepare(dai_data->port[dai->id],
++					&dai_data->port_config[dai->id].slim);
++
++	rc = q6afe_port_start(dai_data->port[dai->id]);
++	if (rc < 0) {
++		dev_err(dai->dev, "fail to start AFE port %x\n", dai->id);
++		return rc;
++	}
++	dai_data->is_port_started[dai->id] = true;
++
++	return 0;
++}
++
++static int q6slim_set_channel_map(struct snd_soc_dai *dai,
++				unsigned int tx_num, unsigned int *tx_slot,
++				unsigned int rx_num, unsigned int *rx_slot)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_port_config *pcfg = &dai_data->port_config[dai->id];
++	int i;
++
++	if (!rx_slot) {
++		pr_err("%s: rx slot not found\n", __func__);
 +		return -EINVAL;
 +	}
 +
-+	clk_cfg.clk_cfg = *cfg;
++	for (i = 0; i < rx_num; i++) {
++		pcfg->slim.ch_mapping[i] =   rx_slot[i];
++		pr_debug("%s: find number of channels[%d] ch[%d]\n",
++		       __func__, i, rx_slot[i]);
++	}
 +
-+	return q6afe_port_set_param_v2(port, &clk_cfg, param_id, sizeof(*cfg));
++	pcfg->slim.num_channels = rx_num;
++
++	pr_debug("%s: SLIMBUS_%d_RX cnt[%d] ch[%d %d]\n", __func__,
++		(dai->id - SLIMBUS_0_RX) / 2, rx_num,
++		pcfg->slim.ch_mapping[0],
++		pcfg->slim.ch_mapping[1]);
++
++	return 0;
 +}
 +
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir)
++static int q6afe_mi2s_set_sysclk(struct snd_soc_dai *dai,
++		int clk_id, unsigned int freq, int dir)
 +{
-+	struct afe_clk_cfg ccfg = {0,};
-+	struct afe_clk_set cset = {0,};
-+	struct afe_digital_clk_cfg dcfg = {0,};
-+	int ret;
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct q6afe_port *port = dai_data->port[dai->id];
 +
 +	switch (clk_id) {
 +	case LPAIF_DIG_CLK:
-+		dcfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		dcfg.clk_val = freq;
-+		dcfg.clk_root = clk_root;
-+		ret = q6afe_set_digital_codec_core_clock(port, &dcfg);
-+		break;
++		return q6afe_port_set_sysclk(port, clk_id, 0, 5, freq, dir);
 +	case LPAIF_BIT_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val1 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK1_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
-+		break;
-+
 +	case LPAIF_OSR_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val2 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK2_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
-+		break;
-+	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
-+		cset.clk_set_minor_version = AFE_API_VERSION_CLOCK_SET;
-+		cset.clk_id = clk_id;
-+		cset.clk_freq_in_hz = freq;
-+		cset.clk_attri = clk_src;
-+		cset.clk_root = clk_root;
-+		cset.enable = !!freq;
-+		ret = q6afe_set_lpass_clock_v2(port, &cset);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
++		return q6afe_port_set_sysclk(port, clk_id,
++					     Q6AFE_LPASS_CLK_SRC_INTERNAL,
++					     Q6AFE_LPASS_CLK_ROOT_DEFAULT,
++					     freq, dir);
++	}
++
++	return 0;
++}
++
++static const struct snd_soc_dapm_route q6afe_dapm_routes[] = {
++	{"HDMI Playback", NULL, "HDMI_RX"},
++	{"Slimbus1 Playback", NULL, "SLIMBUS_1_RX"},
++	{"Slimbus2 Playback", NULL, "SLIMBUS_2_RX"},
++	{"Slimbus3 Playback", NULL, "SLIMBUS_3_RX"},
++	{"Slimbus4 Playback", NULL, "SLIMBUS_4_RX"},
++	{"Slimbus5 Playback", NULL, "SLIMBUS_5_RX"},
++	{"Slimbus6 Playback", NULL, "SLIMBUS_6_RX"},
++
++	{"Primary MI2S Playback", NULL, "PRI_MI2S_RX"},
++	{"Secondary MI2S Playback", NULL, "SEC_MI2S_RX"},
++	{"Tertiary MI2S Playback", NULL, "TERT_MI2S_RX"},
++	{"Quaternary MI2S Playback", NULL, "QUAT_MI2S_RX"},
++
++	{"TERT_MI2S_TX", NULL, "Tertiary MI2S Capture"},
++	{"PRI_MI2S_TX", NULL, "Primary MI2S Capture"},
++	{"SEC_MI2S_TX", NULL, "Secondary MI2S Capture"},
++	{"QUAT_MI2S_TX", NULL, "Quaternary MI2S Capture"},
++};
++
++static struct snd_soc_dai_ops q6hdmi_ops = {
++	.prepare	= q6afe_dai_prepare,
++	.hw_params	= q6hdmi_hw_params,
++	.shutdown	= q6afe_dai_shutdown,
++};
++
++static struct snd_soc_dai_ops q6i2s_ops = {
++	.prepare	= q6afe_mi2s_prepare,
++	.hw_params	= q6i2s_hw_params,
++	.set_fmt	= q6i2s_set_fmt,
++	.shutdown	= q6afe_dai_shutdown,
++	.set_sysclk	= q6afe_mi2s_set_sysclk,
++};
++
++static struct snd_soc_dai_ops q6slim_ops = {
++	.prepare	= q6afe_dai_prepare,
++	.hw_params	= q6slim_hw_params,
++	.shutdown	= q6afe_dai_shutdown,
++	.set_channel_map = q6slim_set_channel_map,
++};
++
++static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	struct snd_soc_dapm_context *dapm;
++	struct q6afe_port *port;
++
++	dapm = snd_soc_component_get_dapm(dai->component);
++
++	port = q6afe_port_get_from_id(dai->dev, dai->id);
++	if (IS_ERR(port)) {
++		dev_err(dai->dev, "Unable to get afe port\n");
++		return -EINVAL;
++	}
++	dai_data->port[dai->id] = port;
++
++	return 0;
++}
++
++static int msm_dai_q6_dai_remove(struct snd_soc_dai *dai)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
++
++	q6afe_port_put(dai_data->port[dai->id]);
++	dai_data->port[dai->id] = NULL;
++
++	return 0;
++}
++
++static struct snd_soc_dai_driver q6afe_dais[] = {
++	{
++		.playback = {
++			.stream_name = "HDMI Playback",
++			.rates = SNDRV_PCM_RATE_48000 |
++				 SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 2,
++			.channels_max = 8,
++			.rate_max =     192000,
++			.rate_min =	48000,
++		},
++		.ops = &q6hdmi_ops,
++		.id = HDMI_RX,
++		.name = "HDMI",
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.name = "SLIMBUS_0_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_0_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++		.playback = {
++			.stream_name = "Slimbus Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 8,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++	}, {
++		.playback = {
++			.stream_name = "Slimbus1 Playback",
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 2,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.name = "SLIMBUS_1_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_1_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Slimbus2 Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 8,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.name = "SLIMBUS_2_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_2_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Slimbus3 Playback",
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 2,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.name = "SLIMBUS_3_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_3_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Slimbus4 Playback",
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 2,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.name = "SLIMBUS_4_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_4_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Slimbus5 Playback",
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 2,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.name = "SLIMBUS_5_RX",
++		.ops = &q6slim_ops,
++		.id = SLIMBUS_5_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Slimbus6 Playback",
++			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++				 SNDRV_PCM_RATE_192000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.channels_min = 1,
++			.channels_max = 2,
++			.rate_min = 8000,
++			.rate_max = 192000,
++		},
++		.ops = &q6slim_ops,
++		.name = "SLIMBUS_6_RX",
++		.id = SLIMBUS_6_RX,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Primary MI2S Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.id = PRIMARY_MI2S_RX,
++		.name = "PRI_MI2S_RX",
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.capture = {
++			.stream_name = "Primary MI2S Capture",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.id = PRIMARY_MI2S_TX,
++		.name = "PRI_MI2S_TX",
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Secondary MI2S Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.name = "SEC_MI2S_RX",
++		.id = SECONDARY_MI2S_RX,
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.capture = {
++			.stream_name = "Secondary MI2S Capture",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.id = SECONDARY_MI2S_TX,
++		.name = "SEC_MI2S_TX",
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Tertiary MI2S Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.name = "TERT_MI2S_RX",
++		.id = TERTIARY_MI2S_RX,
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.capture = {
++			.stream_name = "Tertiary MI2S Capture",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.id = TERTIARY_MI2S_TX,
++		.name = "TERT_MI2S_TX",
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.playback = {
++			.stream_name = "Quaternary MI2S Playback",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.name = "QUAT_MI2S_RX",
++		.id = QUATERNARY_MI2S_RX,
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	}, {
++		.capture = {
++			.stream_name = "Quaternary MI2S Capture",
++			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
++				 SNDRV_PCM_RATE_16000,
++			.formats = SNDRV_PCM_FMTBIT_S16_LE |
++				   SNDRV_PCM_FMTBIT_S24_LE,
++			.rate_min =     8000,
++			.rate_max =     48000,
++		},
++		.id = QUATERNARY_MI2S_TX,
++		.name = "QUAT_MI2S_TX",
++		.ops = &q6i2s_ops,
++		.probe = msm_dai_q6_dai_probe,
++		.remove = msm_dai_q6_dai_remove,
++	},
++};
++
++static int q6afe_of_xlate_dai_name(struct snd_soc_component *component,
++				   struct of_phandle_args *args,
++				   const char **dai_name)
++{
++	int id = args->args[0];
++	int ret = -EINVAL;
++	int i;
++
++	for (i = 0; i  < ARRAY_SIZE(q6afe_dais); i++) {
++		if (q6afe_dais[i].id == id) {
++			*dai_name = q6afe_dais[i].name;
++			ret = 0;
++			break;
++		}
 +	}
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(q6afe_port_set_sysclk);
 +
- /**
-  * q6afe_port_stop() - Stop a afe port
-  *
-@@ -526,8 +734,7 @@ EXPORT_SYMBOL_GPL(q6afe_hdmi_port_prepare);
-  *
-  * @port: Instance of afe port
-  * @cfg: I2S configuration for the afe port
-- *
--  Return: Will be an negative on error and zero on success.
-+ * Return: Will be an negative on error and zero on success.
-  */
- int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg)
- {
-diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
-index 05c61014abea..f21c89a25c29 100644
---- a/sound/soc/qcom/qdsp6/q6afe.h
-+++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -16,6 +16,134 @@
- #define AFE_MAX_CHAN_COUNT	8
- #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
- 
-+#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
-+#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
++static const struct snd_soc_dapm_widget q6afe_dai_widgets[] = {
++	SND_SOC_DAPM_AIF_OUT("HDMI_RX", "HDMI Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_0_RX", "Slimbus Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_1_RX", "Slimbus1 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_2_RX", "Slimbus2 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_3_RX", "Slimbus3 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_4_RX", "Slimbus4 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_5_RX", "Slimbus5 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SLIMBUS_6_RX", "Slimbus6 Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("QUAT_MI2S_RX", "Quaternary MI2S Playback",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("QUAT_MI2S_TX", "Quaternary MI2S Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("TERT_MI2S_RX", "Tertiary MI2S Playback",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("TERT_MI2S_TX", "Tertiary MI2S Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_MI2S_RX", "Secondary MI2S Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("SEC_MI2S_TX", "Secondary MI2S Capture",
++						0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("SEC_MI2S_RX_SD1",
++			"Secondary MI2S Playback SD1",
++			0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_OUT("PRI_MI2S_RX", "Primary MI2S Playback",
++			     0, 0, 0, 0),
++	SND_SOC_DAPM_AIF_IN("PRI_MI2S_TX", "Primary MI2S Capture",
++						0, 0, 0, 0),
++};
 +
-+#define LPAIF_DIG_CLK	1
-+#define LPAIF_BIT_CLK	2
-+#define LPAIF_OSR_CLK	3
++static const struct snd_soc_component_driver q6afe_dai_component = {
++	.name		= "q6afe-dai-component",
++	.dapm_widgets = q6afe_dai_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(q6afe_dai_widgets),
++	.dapm_routes = q6afe_dapm_routes,
++	.num_dapm_routes = ARRAY_SIZE(q6afe_dapm_routes),
++	.of_xlate_dai_name = q6afe_of_xlate_dai_name,
 +
-+/* Clock ID for Primary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT                          0x100
-+/* Clock ID for Primary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_EBIT                          0x101
-+/* Clock ID for Secondary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT                          0x102
-+/* Clock ID for Secondary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT                          0x103
-+/* Clock ID for Tertiary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_MI2S_IBIT                          0x104
-+/* Clock ID for Tertiary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_MI2S_EBIT                          0x105
-+/* Clock ID for Quartnery I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT                         0x106
-+/* Clock ID for Quartnery I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_EBIT                         0x107
-+/* Clock ID for Speaker I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_IBIT                       0x108
-+/* Clock ID for Speaker I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_EBIT                       0x109
-+/* Clock ID for Speaker I2S OSR */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_OSR                        0x10A
++};
 +
-+/* Clock ID for QUINARY  I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_IBIT			0x10B
-+/* Clock ID for QUINARY  I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_EBIT			0x10C
-+/* Clock ID for SENARY  I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_IBIT			0x10D
-+/* Clock ID for SENARY  I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_EBIT			0x10E
-+/* Clock ID for INT0 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT0_MI2S_IBIT                       0x10F
-+/* Clock ID for INT1 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT1_MI2S_IBIT                       0x110
-+/* Clock ID for INT2 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT2_MI2S_IBIT                       0x111
-+/* Clock ID for INT3 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT3_MI2S_IBIT                       0x112
-+/* Clock ID for INT4 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT4_MI2S_IBIT                       0x113
-+/* Clock ID for INT5 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT5_MI2S_IBIT                       0x114
-+/* Clock ID for INT6 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT6_MI2S_IBIT                       0x115
++static void of_q6afe_parse_dai_data(struct device *dev,
++				    struct q6afe_dai_data *data)
++{
++	struct device_node *node;
++	int ret;
 +
-+/* Clock ID for QUINARY MI2S OSR CLK  */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_OSR                         0x116
++	for_each_child_of_node(dev->of_node, node) {
++		unsigned int lines[Q6AFE_MAX_MI2S_LINES];
++		struct q6afe_dai_priv_data *priv;
++		const char *if_type;
++		int id, i, num_lines;
 +
-+/* Clock ID for Primary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_PCM_IBIT                           0x200
-+/* Clock ID for Primary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_PCM_EBIT                           0x201
-+/* Clock ID for Secondary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_PCM_IBIT                           0x202
-+/* Clock ID for Secondary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_PCM_EBIT                           0x203
-+/* Clock ID for Tertiary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_PCM_IBIT                           0x204
-+/* Clock ID for Tertiary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_PCM_EBIT                           0x205
-+/* Clock ID for Quartery PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_IBIT                          0x206
-+/* Clock ID for Quartery PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_EBIT                          0x207
-+/* Clock ID for Quinary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_IBIT                          0x208
-+/* Clock ID for Quinary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_EBIT                          0x209
-+/* Clock ID for QUINARY PCM OSR  */
-+#define Q6AFE_LPASS_CLK_ID_QUI_PCM_OSR                            0x20A
++		ret = of_property_read_u32(node, "reg", &id);
++		if (ret || id > AFE_PORT_MAX) {
++			dev_err(dev, "valid dai id not found:%d\n", ret);
++			continue;
++		}
 +
-+/** Clock ID for Primary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_TDM_IBIT                           0x200
-+/** Clock ID for Primary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_TDM_EBIT                           0x201
-+/** Clock ID for Secondary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_TDM_IBIT                           0x202
-+/** Clock ID for Secondary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_TDM_EBIT                           0x203
-+/** Clock ID for Tertiary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT                           0x204
-+/** Clock ID for Tertiary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_TDM_EBIT                           0x205
-+/** Clock ID for Quartery TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_IBIT                          0x206
-+/** Clock ID for Quartery TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_EBIT                          0x207
-+/** Clock ID for Quinary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_IBIT                          0x208
-+/** Clock ID for Quinary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_EBIT                          0x209
-+/** Clock ID for Quinary TDM OSR */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_OSR                           0x20A
++		if (of_property_read_string(node, "interface-type", &if_type))
++			continue;
 +
-+/* Clock ID for MCLK1 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_1                                 0x300
-+/* Clock ID for MCLK2 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_2                                 0x301
-+/* Clock ID for MCLK3 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_3                                 0x302
-+/* Clock ID for MCLK4 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_4                                 0x304
-+/* Clock ID for Internal Digital Codec Core */
-+#define Q6AFE_LPASS_CLK_ID_INTERNAL_DIGITAL_CODEC_CORE            0x303
-+/* Clock ID for INT MCLK0 */
-+#define Q6AFE_LPASS_CLK_ID_INT_MCLK_0                             0x305
-+/* Clock ID for INT MCLK1 */
-+#define Q6AFE_LPASS_CLK_ID_INT_MCLK_1                             0x306
++		priv = &data->priv[id];
 +
-+/* Clock attribute for invalid use (reserved for internal usage) */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVALID		0x0
-+/* Clock attribute for no couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO		0x1
-+/* Clock attribute for dividend couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVIDEND	0x2
-+/* Clock attribute for divisor couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVISOR	0x3
-+/* Clock attribute for invert and no couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO	0x4
++		/* MI2S specific properties */
++		if (!strcmp(if_type, "mi2s")) {
++			ret = of_property_read_variable_u32_array(node,
++							"qcom,sd-lines", lines, 0,
++							Q6AFE_MAX_MI2S_LINES);
++			if (ret < 0)
++				num_lines = 0;
++			else
++				num_lines = ret;
 +
- struct q6afe_hdmi_cfg {
- 	u16                  datatype;
- 	u16                  channel_allocation;
-@@ -59,4 +187,7 @@ void q6afe_slim_port_prepare(struct q6afe_port *port,
- 			  struct q6afe_slim_cfg *cfg);
- int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
- 
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir);
- #endif /* __Q6AFE_H__ */
++			priv->sd_line_mask = 0;
++
++			for (i = 0; i < num_lines; i++)
++				priv->sd_line_mask |= BIT(lines[i]);
++		}
++	}
++}
++
++static int q6afe_dai_bind(struct device *dev, struct device *master, void *data)
++{
++	struct q6afe_dai_data *dai_data;
++	int rc = 0;
++
++	dai_data = kzalloc(sizeof(*dai_data), GFP_KERNEL);
++	if (!dai_data)
++		rc = -ENOMEM;
++
++	dev_set_drvdata(dev, dai_data);
++
++	of_q6afe_parse_dai_data(dev, dai_data);
++
++	return snd_soc_register_component(dev, &q6afe_dai_component,
++					  q6afe_dais, ARRAY_SIZE(q6afe_dais));
++}
++
++static void q6afe_dai_unbind(struct device *dev, struct device *master,
++			     void *data)
++{
++	struct q6afe_dai_data *dai_data = dev_get_drvdata(dev);
++
++	snd_soc_unregister_component(dev);
++	kfree(dai_data);
++}
++
++static const struct component_ops q6afe_dai_comp_ops = {
++	.bind   = q6afe_dai_bind,
++	.unbind = q6afe_dai_unbind,
++};
++
++static int q6afe_dai_dev_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &q6afe_dai_comp_ops);
++}
++
++static int q6afe_dai_dev_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &q6afe_dai_comp_ops);
++	return 0;
++}
++
++static struct platform_driver q6afe_dai_platform_driver = {
++	.driver = {
++		.name = "q6afe-dai",
++	},
++	.probe = q6afe_dai_dev_probe,
++	.remove = q6afe_dai_dev_remove,
++};
++module_platform_driver(q6afe_dai_platform_driver);
++
++MODULE_DESCRIPTION("Q6 Audio Fronend dai driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.15.1
