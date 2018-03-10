@@ -1,694 +1,761 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Sat, 10 Mar 2018 02:24:52 +0000
-Subject: [PATCH v4 20/24] ASoC: qdsp6: q6asm: Add q6asm dai driver
+Date: Sat, 10 Mar 2018 02:24:43 +0000
+Subject: [PATCH v4 11/24] ASoC: qdsp6: q6adm: Add q6adm driver
 In-Reply-To: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
 References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180310022456.26739-21-srinivas.kandagatla@linaro.org>
+Message-ID: <20180310022456.26739-12-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to q6asm dai driver which configures Q6ASM streams
-to pass pcm data.
+This patch adds support to Q6ADM (Audio Device Manager) module in
+q6dsp. ADM performs routing between audio streams and AFE ports.
+It does Rate matching for streams going to devices driven by
+different clocks, it handles volume ramping, Mixing with channel
+and bit-width. ADM creates and destroys dynamic COPP services
+for device-related audio processing as needed.
+
+This patch adds basic support to ADM.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/Kconfig           |   4 +
- sound/soc/qcom/qdsp6/Makefile    |   1 +
- sound/soc/qcom/qdsp6/q6asm-dai.c | 632 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 637 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6asm-dai.c
+ sound/soc/qcom/Kconfig        |   4 +
+ sound/soc/qcom/qdsp6/Makefile |   1 +
+ sound/soc/qcom/qdsp6/q6adm.c  | 664 ++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6adm.h  |  25 ++
+ 4 files changed, 694 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/q6adm.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6adm.h
 
 diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 9b630686eb19..5bdf39f6003f 100644
+index f50c76d712c0..5090ffa75648 100644
 --- a/sound/soc/qcom/Kconfig
 +++ b/sound/soc/qcom/Kconfig
-@@ -62,6 +62,9 @@ config SND_SOC_QDSP6_ROUTING
- config SND_SOC_QDSP6_ASM
+@@ -50,11 +50,15 @@ config SND_SOC_QDSP6_COMMON
+ config SND_SOC_QDSP6_AFE
  	tristate
  
-+config SND_SOC_QDSP6_ASM_DAI
++config SND_SOC_QDSP6_ADM
 +	tristate
 +
- config SND_SOC_QDSP6_CORE
- 	tristate
- 
-@@ -74,6 +77,7 @@ config SND_SOC_QDSP6
- 	select SND_SOC_QDSP6_ADM
- 	select SND_SOC_QDSP6_ROUTING
- 	select SND_SOC_QDSP6_ASM
-+	select SND_SOC_QDSP6_ASM_DAI
- 	select SND_SOC_QDSP6_CORE
+ config SND_SOC_QDSP6
+ 	tristate "SoC ALSA audio driver for QDSP6"
+ 	depends on QCOM_APR && HAS_DMA
+ 	select SND_SOC_QDSP6_COMMON
+ 	select SND_SOC_QDSP6_AFE
++	select SND_SOC_QDSP6_ADM
  	help
  	 To add support for MSM QDSP6 Soc Audio.
+ 	 This will enable sound soc platform specific
 diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 6a8ae698f22f..af44711eba24 100644
+index 9ec951e0833b..930944425051 100644
 --- a/sound/soc/qcom/qdsp6/Makefile
 +++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -4,4 +4,5 @@ obj-$(CONFIG_SND_SOC_QDSP6_AFE_DAI) += q6afe-dai.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
- obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
- obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
-+obj-$(CONFIG_SND_SOC_QDSP6_ASM_DAI) += q6asm-dai.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-diff --git a/sound/soc/qcom/qdsp6/q6asm-dai.c b/sound/soc/qcom/qdsp6/q6asm-dai.c
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+ obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
++obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
 new file mode 100644
-index 000000000000..c411070b67eb
+index 000000000000..4b4c604cb998
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6asm-dai.c
-@@ -0,0 +1,632 @@
++++ b/sound/soc/qcom/qdsp6/q6adm.c
+@@ -0,0 +1,664 @@
 +// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2016, The Linux Foundation
-+// Copyright (c) 2017, Linaro Limited
++// Copyright (c) 2011-2017, The Linux Foundation
++// Copyright (c) 2018, Linaro Limited
 +
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
 +#include <linux/slab.h>
-+#include <linux/component.h>
-+#include <sound/soc.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <sound/pcm.h>
-+#include <asm/dma.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/of_device.h>
-+#include <sound/pcm_params.h>
-+#include "q6asm.h"
-+#include "q6routing.h"
++#include <linux/wait.h>
++#include <linux/kernel.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/sched.h>
++#include <linux/jiffies.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/kref.h>
++#include <linux/wait.h>
++#include <linux/soc/qcom/apr.h>
++#include <linux/platform_device.h>
++#include <sound/asound.h>
++#include "q6adm.h"
++#include "q6afe.h"
++#include "q6core.h"
 +#include "q6dsp-errno.h"
++#include "q6dsp-common.h"
 +
-+#define PLAYBACK_MIN_NUM_PERIODS    2
-+#define PLAYBACK_MAX_NUM_PERIODS   8
-+#define PLAYBACK_MAX_PERIOD_SIZE    65536
-+#define PLAYBACK_MIN_PERIOD_SIZE    128
-+#define CAPTURE_MIN_NUM_PERIODS     2
-+#define CAPTURE_MAX_NUM_PERIODS     8
-+#define CAPTURE_MAX_PERIOD_SIZE     4096
-+#define CAPTURE_MIN_PERIOD_SIZE     320
-+#define SID_MASK_DEFAULT	0xFF
++#define ADM_CMD_DEVICE_OPEN_V5		0x00010326
++#define ADM_CMDRSP_DEVICE_OPEN_V5	0x00010329
++#define ADM_CMD_DEVICE_CLOSE_V5		0x00010327
++#define ADM_CMD_MATRIX_MAP_ROUTINGS_V5	0x00010325
 +
-+enum stream_state {
-+	Q6ASM_STREAM_IDLE = 0,
-+	Q6ASM_STREAM_STOPPED,
-+	Q6ASM_STREAM_RUNNING,
++#define TIMEOUT_MS 1000
++#define RESET_COPP_ID 99
++#define INVALID_COPP_ID 0xFF
++/* Definition for a legacy device session. */
++#define ADM_LEGACY_DEVICE_SESSION	0
++#define ADM_MATRIX_ID_AUDIO_RX		0
++#define ADM_MATRIX_ID_AUDIO_TX		1
++
++struct copp {
++	int afe_port;
++	int copp_idx;
++	int id;
++	int topology;
++	int mode;
++	int rate;
++	int bit_width;
++	int channels;
++	int app_type;
++	int acdb_id;
++
++	struct aprv2_ibasic_rsp_result_t result;
++	struct kref refcount;
++	wait_queue_head_t wait;
++	struct list_head node;
++	struct q6adm *adm;
 +};
 +
-+struct q6asm_dai_rtd {
-+	struct snd_pcm_substream *substream;
-+	phys_addr_t phys;
-+	unsigned int pcm_size;
-+	unsigned int pcm_count;
-+	unsigned int pcm_irq_pos;       /* IRQ position */
-+	unsigned int periods;
-+	uint16_t bits_per_sample;
-+	uint16_t source; /* Encoding source bit mask */
-+	struct audio_client *audio_client;
-+	uint16_t session_id;
-+	enum stream_state state;
-+};
-+
-+struct q6asm_dai_data {
-+	long long int sid;
-+};
-+
-+static struct snd_pcm_hardware q6asm_dai_hardware_capture = {
-+	.info =                 (SNDRV_PCM_INFO_MMAP |
-+				SNDRV_PCM_INFO_BLOCK_TRANSFER |
-+				SNDRV_PCM_INFO_MMAP_VALID |
-+				SNDRV_PCM_INFO_INTERLEAVED |
-+				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-+	.formats =              (SNDRV_PCM_FMTBIT_S16_LE |
-+				SNDRV_PCM_FMTBIT_S24_LE),
-+	.rates =                SNDRV_PCM_RATE_8000_48000,
-+	.rate_min =             8000,
-+	.rate_max =             48000,
-+	.channels_min =         1,
-+	.channels_max =         4,
-+	.buffer_bytes_max =     CAPTURE_MAX_NUM_PERIODS *
-+				CAPTURE_MAX_PERIOD_SIZE,
-+	.period_bytes_min =	CAPTURE_MIN_PERIOD_SIZE,
-+	.period_bytes_max =     CAPTURE_MAX_PERIOD_SIZE,
-+	.periods_min =          CAPTURE_MIN_NUM_PERIODS,
-+	.periods_max =          CAPTURE_MAX_NUM_PERIODS,
-+	.fifo_size =            0,
-+};
-+
-+static struct snd_pcm_hardware q6asm_dai_hardware_playback = {
-+	.info =                 (SNDRV_PCM_INFO_MMAP |
-+				SNDRV_PCM_INFO_BLOCK_TRANSFER |
-+				SNDRV_PCM_INFO_MMAP_VALID |
-+				SNDRV_PCM_INFO_INTERLEAVED |
-+				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-+	.formats =              (SNDRV_PCM_FMTBIT_S16_LE |
-+				SNDRV_PCM_FMTBIT_S24_LE),
-+	.rates =                SNDRV_PCM_RATE_8000_192000,
-+	.rate_min =             8000,
-+	.rate_max =             192000,
-+	.channels_min =         1,
-+	.channels_max =         8,
-+	.buffer_bytes_max =     (PLAYBACK_MAX_NUM_PERIODS *
-+				PLAYBACK_MAX_PERIOD_SIZE),
-+	.period_bytes_min =	PLAYBACK_MIN_PERIOD_SIZE,
-+	.period_bytes_max =     PLAYBACK_MAX_PERIOD_SIZE,
-+	.periods_min =          PLAYBACK_MIN_NUM_PERIODS,
-+	.periods_max =          PLAYBACK_MAX_NUM_PERIODS,
-+	.fifo_size =            0,
-+};
-+
-+#define Q6ASM_FEDAI_DRIVER(num) { \
-+		.playback = {						\
-+			.stream_name = "MultiMedia"#num" Playback",	\
-+			.rates = (SNDRV_PCM_RATE_8000_192000|		\
-+					SNDRV_PCM_RATE_KNOT),		\
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |		\
-+					SNDRV_PCM_FMTBIT_S24_LE),	\
-+			.channels_min = 1,				\
-+			.channels_max = 8,				\
-+			.rate_min =     8000,				\
-+			.rate_max =	192000,				\
-+		},							\
-+		.capture = {						\
-+			.stream_name = "MultiMedia"#num" Capture",	\
-+			.rates = (SNDRV_PCM_RATE_8000_48000|		\
-+					SNDRV_PCM_RATE_KNOT),		\
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |		\
-+				    SNDRV_PCM_FMTBIT_S24_LE),		\
-+			.channels_min = 1,				\
-+			.channels_max = 4,				\
-+			.rate_min =     8000,				\
-+			.rate_max =	48000,				\
-+		},							\
-+		.name = "MultiMedia"#num,				\
-+		.probe = fe_dai_probe,					\
-+		.id = MSM_FRONTEND_DAI_MULTIMEDIA##num,			\
-+	}
-+
-+/* Conventional and unconventional sample rate supported */
-+static unsigned int supported_sample_rates[] = {
-+	8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000,
-+	88200, 96000, 176400, 192000
-+};
-+
-+static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
-+	.count = ARRAY_SIZE(supported_sample_rates),
-+	.list = supported_sample_rates,
-+	.mask = 0,
-+};
-+
-+static void event_handler(uint32_t opcode, uint32_t token,
-+			  uint32_t *payload, void *priv)
-+{
-+	struct q6asm_dai_rtd *prtd = priv;
-+	struct snd_pcm_substream *substream = prtd->substream;
-+
-+	switch (opcode) {
-+	case ASM_CLIENT_EVENT_CMD_RUN_DONE:
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+			q6asm_write_async(prtd->audio_client,
-+				   prtd->pcm_count, 0, 0, NO_TIMESTAMP);
-+		break;
-+	case ASM_CLIENT_EVENT_CMD_EOS_DONE:
-+		prtd->state = Q6ASM_STREAM_STOPPED;
-+		break;
-+	case ASM_CLIENT_EVENT_DATA_WRITE_DONE: {
-+		prtd->pcm_irq_pos += prtd->pcm_count;
-+		snd_pcm_period_elapsed(substream);
-+		if (prtd->state == Q6ASM_STREAM_RUNNING)
-+			q6asm_write_async(prtd->audio_client,
-+					   prtd->pcm_count, 0, 0, NO_TIMESTAMP);
-+
-+		break;
-+		}
-+	case ASM_CLIENT_EVENT_DATA_READ_DONE:
-+		prtd->pcm_irq_pos += prtd->pcm_count;
-+		snd_pcm_period_elapsed(substream);
-+		if (prtd->state == Q6ASM_STREAM_RUNNING)
-+			q6asm_read(prtd->audio_client);
-+
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static int q6asm_dai_prepare(struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
-+	struct q6asm_dai_rtd *prtd = runtime->private_data;
-+	struct q6asm_dai_data *pdata;
-+	int ret, i;
-+
-+	pdata = snd_soc_platform_get_drvdata(soc_prtd->platform);
-+	if (!pdata)
-+		return -EINVAL;
-+
-+	if (!prtd || !prtd->audio_client) {
-+		pr_err("%s: private data null or audio client freed\n",
-+			__func__);
-+		return -EINVAL;
-+	}
-+
-+	prtd->pcm_count = snd_pcm_lib_period_bytes(substream);
-+	prtd->pcm_irq_pos = 0;
-+	/* rate and channels are sent to audio driver */
-+	if (prtd->state) {
-+		/* clear the previous setup if any  */
-+		q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-+		q6asm_unmap_memory_regions(substream->stream,
-+					   prtd->audio_client);
-+		q6routing_stream_close(soc_prtd->dai_link->id,
-+					 substream->stream);
-+	}
-+
-+	ret = q6asm_map_memory_regions(substream->stream, prtd->audio_client,
-+				       prtd->phys,
-+				       (prtd->pcm_size / prtd->periods),
-+				       prtd->periods);
-+
-+	if (ret < 0) {
-+		pr_err("Audio Start: Buffer Allocation failed rc = %d\n",
-+							ret);
-+		return -ENOMEM;
-+	}
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		ret = q6asm_open_write(prtd->audio_client, FORMAT_LINEAR_PCM,
-+				       prtd->bits_per_sample);
-+	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-+		ret = q6asm_open_read(prtd->audio_client, FORMAT_LINEAR_PCM,
-+				       prtd->bits_per_sample);
-+	}
-+
-+	if (ret < 0) {
-+		pr_err("%s: q6asm_open_write failed\n", __func__);
-+		q6asm_audio_client_free(prtd->audio_client);
-+		prtd->audio_client = NULL;
-+		return -ENOMEM;
-+	}
-+
-+	prtd->session_id = q6asm_get_session_id(prtd->audio_client);
-+	ret = q6routing_stream_open(soc_prtd->dai_link->id, LEGACY_PCM_MODE,
-+			      prtd->session_id, substream->stream);
-+	if (ret) {
-+		pr_err("%s: stream reg failed ret:%d\n", __func__, ret);
-+		return ret;
-+	}
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		ret = q6asm_media_format_block_multi_ch_pcm(
-+				prtd->audio_client, runtime->rate,
-+				runtime->channels, NULL,
-+				prtd->bits_per_sample);
-+	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-+		ret = q6asm_enc_cfg_blk_pcm_format_support(prtd->audio_client,
-+					runtime->rate, runtime->channels,
-+					prtd->bits_per_sample);
-+
-+		/* Queue the buffers */
-+		for (i = 0; i < runtime->periods; i++)
-+			q6asm_read(prtd->audio_client);
-+
-+	}
-+	if (ret < 0)
-+		pr_info("%s: CMD Format block failed\n", __func__);
-+
-+	prtd->state = Q6ASM_STREAM_RUNNING;
-+
-+	return 0;
-+}
-+
-+static int q6asm_dai_trigger(struct snd_pcm_substream *substream, int cmd)
-+{
-+	int ret = 0;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct q6asm_dai_rtd *prtd = runtime->private_data;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		ret = q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
-+		break;
-+	case SNDRV_PCM_TRIGGER_STOP:
-+		prtd->state = Q6ASM_STREAM_STOPPED;
-+		ret = q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
-+		break;
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		ret = q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+static int q6asm_dai_open(struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
-+	struct snd_soc_dai *cpu_dai = soc_prtd->cpu_dai;
-+
-+	struct q6asm_dai_rtd *prtd;
-+	struct q6asm_dai_data *pdata;
-+	struct device *dev = soc_prtd->platform->dev;
-+	int ret = 0;
-+	int stream_id;
-+
-+	stream_id = cpu_dai->driver->id;
-+
-+	pdata = snd_soc_platform_get_drvdata(soc_prtd->platform);
-+	if (!pdata) {
-+		pr_err("Platform data not found ..\n");
-+		return -EINVAL;
-+	}
-+
-+	prtd = kzalloc(sizeof(struct q6asm_dai_rtd), GFP_KERNEL);
-+	if (prtd == NULL)
-+		return -ENOMEM;
-+
-+	prtd->substream = substream;
-+	prtd->audio_client = q6asm_audio_client_alloc(dev,
-+				(q6asm_cb)event_handler, prtd, stream_id,
-+				LEGACY_PCM_MODE);
-+	if (!prtd->audio_client) {
-+		pr_info("%s: Could not allocate memory\n", __func__);
-+		kfree(prtd);
-+		return -ENOMEM;
-+	}
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		runtime->hw = q6asm_dai_hardware_playback;
-+	else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-+		runtime->hw = q6asm_dai_hardware_capture;
-+
-+	ret = snd_pcm_hw_constraint_list(runtime, 0,
-+				SNDRV_PCM_HW_PARAM_RATE,
-+				&constraints_sample_rates);
-+	if (ret < 0)
-+		pr_info("snd_pcm_hw_constraint_list failed\n");
-+	/* Ensure that buffer size is a multiple of period size */
-+	ret = snd_pcm_hw_constraint_integer(runtime,
-+					    SNDRV_PCM_HW_PARAM_PERIODS);
-+	if (ret < 0)
-+		pr_info("snd_pcm_hw_constraint_integer failed\n");
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		ret = snd_pcm_hw_constraint_minmax(runtime,
-+			SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
-+			PLAYBACK_MIN_NUM_PERIODS * PLAYBACK_MIN_PERIOD_SIZE,
-+			PLAYBACK_MAX_NUM_PERIODS * PLAYBACK_MAX_PERIOD_SIZE);
-+		if (ret < 0) {
-+			pr_err("constraint for buffer bytes min max ret = %d\n",
-+									ret);
-+		}
-+	}
-+
-+	ret = snd_pcm_hw_constraint_step(runtime, 0,
-+		SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
-+	if (ret < 0) {
-+		pr_err("constraint for period bytes step ret = %d\n",
-+								ret);
-+	}
-+	ret = snd_pcm_hw_constraint_step(runtime, 0,
-+		SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
-+	if (ret < 0) {
-+		pr_err("constraint for buffer bytes step ret = %d\n",
-+								ret);
-+	}
-+
-+	runtime->private_data = prtd;
-+
-+	snd_soc_set_runtime_hwparams(substream, &q6asm_dai_hardware_playback);
-+
-+	runtime->dma_bytes = q6asm_dai_hardware_playback.buffer_bytes_max;
-+
-+
-+	if (pdata->sid < 0)
-+		prtd->phys = substream->dma_buffer.addr;
-+	else
-+		prtd->phys = substream->dma_buffer.addr | (pdata->sid << 32);
-+
-+	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-+
-+	return 0;
-+}
-+
-+static int q6asm_dai_close(struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
-+	struct q6asm_dai_rtd *prtd = runtime->private_data;
-+
-+	if (prtd->audio_client) {
-+		q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-+		q6asm_unmap_memory_regions(substream->stream,
-+					   prtd->audio_client);
-+		q6asm_audio_client_free(prtd->audio_client);
-+		prtd->audio_client = NULL;
-+	}
-+	q6routing_stream_close(soc_prtd->dai_link->id,
-+						substream->stream);
-+	kfree(prtd);
-+	return 0;
-+}
-+
-+static snd_pcm_uframes_t q6asm_dai_pointer(struct snd_pcm_substream *substream)
-+{
-+
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct q6asm_dai_rtd *prtd = runtime->private_data;
-+
-+	if (prtd->pcm_irq_pos >= prtd->pcm_size)
-+		prtd->pcm_irq_pos = 0;
-+
-+	return bytes_to_frames(runtime, (prtd->pcm_irq_pos));
-+}
-+
-+static int q6asm_dai_mmap(struct snd_pcm_substream *substream,
-+				struct vm_area_struct *vma)
-+{
-+
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
-+	struct device *dev = soc_prtd->platform->dev;
-+
-+	return dma_mmap_coherent(dev, vma,
-+			runtime->dma_area, runtime->dma_addr,
-+			runtime->dma_bytes);
-+}
-+
-+static int q6asm_dai_hw_params(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct q6asm_dai_rtd *prtd = runtime->private_data;
-+
-+	prtd->pcm_size = params_buffer_bytes(params);
-+	prtd->periods = params_periods(params);
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		prtd->bits_per_sample = 16;
-+		break;
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+		prtd->bits_per_sample = 24;
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct snd_pcm_ops q6asm_dai_ops = {
-+	.open           = q6asm_dai_open,
-+	.hw_params	= q6asm_dai_hw_params,
-+	.close          = q6asm_dai_close,
-+	.ioctl          = snd_pcm_lib_ioctl,
-+	.prepare        = q6asm_dai_prepare,
-+	.trigger        = q6asm_dai_trigger,
-+	.pointer        = q6asm_dai_pointer,
-+	.mmap		= q6asm_dai_mmap,
-+};
-+
-+static int q6asm_dai_pcm_new(struct snd_soc_pcm_runtime *rtd)
-+{
-+	struct snd_pcm_substream *psubstream, *csubstream;
-+	struct q6asm_dai_data *pdata;
-+	struct snd_pcm *pcm = rtd->pcm;
++struct q6adm {
++	struct apr_device *apr;
 +	struct device *dev;
-+	int size, ret;
++	struct q6core_svc_api_info ainfo;
++	unsigned long copp_bitmap[AFE_MAX_PORTS];
++	struct list_head copps_list;
++	spinlock_t copps_list_lock;
++	struct aprv2_ibasic_rsp_result_t result;
++	struct mutex lock;
++	wait_queue_head_t matrix_map_wait;
++	void *routing_data;
++	struct platform_device *pdev_routing;
++};
 +
-+	dev = rtd->platform->dev;
-+	pdata = snd_soc_platform_get_drvdata(rtd->platform);
++struct adm_cmd_device_open_v5 {
++	struct apr_hdr hdr;
++	u16 flags;
++	u16 mode_of_operation;
++	u16 endpoint_id_1;
++	u16 endpoint_id_2;
++	u32 topology_id;
++	u16 dev_num_channel;
++	u16 bit_width;
++	u32 sample_rate;
++	u8 dev_channel_mapping[8];
++} __packed;
 +
-+	size = q6asm_dai_hardware_playback.buffer_bytes_max;
++struct adm_cmd_matrix_map_routings_v5 {
++	struct apr_hdr hdr;
++	u32 matrix_id;
++	u32 num_sessions;
++} __packed;
 +
-+	psubstream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
-+	if (psubstream) {
-+		ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, dev, size,
-+					  &psubstream->dma_buffer);
-+		if (ret) {
-+			dev_err(dev, "Cannot allocate buffer(s)\n");
-+			return ret;
-+		}
++struct adm_session_map_node_v5 {
++	u16 session_id;
++	u16 num_copps;
++} __packed;
++
++static struct copp *adm_find_copp(struct q6adm *adm, int port_idx,
++				  int copp_idx)
++{
++	struct copp *c = NULL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&adm->copps_list_lock, flags);
++	list_for_each_entry(c, &adm->copps_list, node) {
++		if ((port_idx == c->afe_port) && (copp_idx == c->copp_idx))
++			break;
 +	}
 +
-+	csubstream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
-+	if (csubstream) {
-+		ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, dev, size,
-+					  &csubstream->dma_buffer);
-+		if (ret) {
-+			dev_err(dev, "Cannot allocate buffer(s)\n");
-+			if (psubstream)
-+				snd_dma_free_pages(&psubstream->dma_buffer);
-+			return ret;
-+		}
++	spin_unlock_irqrestore(&adm->copps_list_lock, flags);
++
++	return c;
++
++}
++
++static int q6adm_callback(struct apr_device *adev,
++			struct apr_client_message *data)
++{
++	struct aprv2_ibasic_rsp_result_t *result = data->payload;
++	int port_idx, copp_idx;
++	struct copp *copp;
++	struct q6adm *adm = dev_get_drvdata(&adev->dev);
++
++	if (!data->payload_size)
++		return 0;
++
++	copp_idx = (data->token) & 0XFF;
++	port_idx = ((data->token) >> 16) & 0xFF;
++	if (port_idx < 0 || port_idx >= AFE_MAX_PORTS) {
++		dev_err(&adev->dev, "Invalid port idx %d token %d\n",
++		       port_idx, data->token);
++		return 0;
++	}
++	if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
++		dev_err(&adev->dev, "Invalid copp idx %d token %d\n",
++			copp_idx, data->token);
++		return 0;
 +	}
 +
++	switch (data->opcode) {
++	case APR_BASIC_RSP_RESULT: {
++		if (result->status != 0) {
++			dev_err(&adev->dev, "cmd = 0x%x return error = 0x%x\n",
++				result->opcode, result->status);
++		}
++		switch (result->opcode) {
++		case ADM_CMD_DEVICE_OPEN_V5:
++		case ADM_CMD_DEVICE_CLOSE_V5:
++			copp = adm_find_copp(adm, port_idx, copp_idx);
++			if (!copp)
++				return 0;
++
++			copp->result = *result;
++			wake_up(&copp->wait);
++			break;
++		case ADM_CMD_MATRIX_MAP_ROUTINGS_V5:
++			adm->result = *result;
++			wake_up(&adm->matrix_map_wait);
++			break;
++
++		default:
++			dev_err(&adev->dev, "Unknown Cmd: 0x%x\n",
++				result->opcode);
++			break;
++		}
++		return 0;
++	}
++	case ADM_CMDRSP_DEVICE_OPEN_V5: {
++		struct adm_cmd_rsp_device_open_v5 {
++			u32 status;
++			u16 copp_id;
++			u16 reserved;
++		} __packed * open = data->payload;
++
++		open = data->payload;
++		copp = adm_find_copp(adm, port_idx, copp_idx);
++		if (!copp)
++			return 0;
++
++		if (open->copp_id == INVALID_COPP_ID) {
++			dev_err(&adev->dev, "Invalid coppid rxed %d\n",
++				open->copp_id);
++			copp->result.status = ADSP_EBADPARAM;
++			wake_up(&copp->wait);
++			break;
++		}
++		copp->result.opcode = data->opcode;
++		copp->id = open->copp_id;
++		wake_up(&copp->wait);
++	}
++	break;
++	default:
++		dev_err(&adev->dev, "Unknown cmd:0x%x\n",
++		       data->opcode);
++		break;
++	}
++
++	return 0;
++}
++
++static struct copp *adm_alloc_copp(struct q6adm *adm, int port_idx)
++{
++	struct copp *c;
++	int idx;
++
++	idx = find_first_zero_bit(&adm->copp_bitmap[port_idx],
++				  MAX_COPPS_PER_PORT);
++
++	if (idx > MAX_COPPS_PER_PORT)
++		return ERR_PTR(-EBUSY);
++
++	c = kzalloc(sizeof(*c), GFP_KERNEL);
++	if (!c)
++		return ERR_PTR(-ENOMEM);
++
++	set_bit(idx, &adm->copp_bitmap[port_idx]);
++	c->copp_idx = idx;
++	c->afe_port = port_idx;
++	c->adm = adm;
++
++	init_waitqueue_head(&c->wait);
++
++	return c;
++}
++
++static int q6adm_apr_send_copp_pkt(struct q6adm *adm, struct copp *copp,
++				   void *data, uint32_t rsp_opcode)
++{
++	struct device *dev = adm->dev;
++	struct apr_hdr *hdr = data;
++	uint32_t opcode = hdr->opcode;
++	int ret;
++
++	mutex_lock(&adm->lock);
++	copp->result.opcode = 0;
++	copp->result.status = 0;
++	ret = apr_send_pkt(adm->apr, data);
++	if (ret < 0) {
++		dev_err(dev, "Failed to send APR packet\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* Wait for the callback with copp id */
++	if (rsp_opcode)
++		ret = wait_event_timeout(copp->wait,
++					 (copp->result.opcode == opcode) ||
++					 (copp->result.opcode == rsp_opcode),
++					 msecs_to_jiffies(TIMEOUT_MS));
++	else
++		ret = wait_event_timeout(copp->wait,
++					 (copp->result.opcode == opcode),
++					 msecs_to_jiffies(TIMEOUT_MS));
++
++	if (!ret) {
++		dev_err(dev, "ADM copp cmd timedout\n");
++		ret = -EINVAL;
++	} else if (copp->result.status > 0) {
++		dev_err(dev, "DSP returned error[%d]\n",
++			copp->result.status);
++		ret = -EINVAL;
++	}
++
++err:
++	mutex_unlock(&adm->lock);
 +	return ret;
 +}
 +
-+static void q6asm_dai_pcm_free(struct snd_pcm *pcm)
++static int q6adm_device_close(struct q6adm *adm, struct copp *copp,
++			      int port_id, int copp_idx)
 +{
-+	struct snd_pcm_substream *substream;
-+	int i;
++	struct apr_hdr close = {0};
 +
-+	for (i = 0; i < ARRAY_SIZE(pcm->streams); i++) {
-+		substream = pcm->streams[i].substream;
-+		if (substream) {
-+			snd_dma_free_pages(&substream->dma_buffer);
-+			substream->dma_buffer.area = NULL;
-+			substream->dma_buffer.addr = 0;
++	close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++					APR_HDR_LEN(APR_HDR_SIZE),
++					APR_PKT_VER);
++	close.pkt_size = sizeof(close);
++	close.src_svc = APR_SVC_ADM;
++	close.src_domain = APR_DOMAIN_APPS;
++	close.src_port = port_id;
++	close.dest_svc = APR_SVC_ADM;
++	close.dest_domain = APR_DOMAIN_ADSP;
++	close.dest_port = copp->id;
++	close.token = port_id << 16 | copp_idx;
++	close.opcode = ADM_CMD_DEVICE_CLOSE_V5;
++
++	return q6adm_apr_send_copp_pkt(adm, copp, &close, 0);
++}
++
++static void adm_free_copp(struct kref *ref)
++{
++	struct copp *c = container_of(ref, struct copp, refcount);
++	struct q6adm *adm = c->adm;
++	int port_idx = c->afe_port;
++	int copp_idx = c->copp_idx;
++	unsigned long flags;
++	int ret;
++
++	ret = q6adm_device_close(adm, c, port_idx, copp_idx);
++	if (ret < 0)
++		dev_err(adm->dev, "Failed to close copp %d\n", ret);
++
++	clear_bit(c->copp_idx, &adm->copp_bitmap[port_idx]);
++	spin_lock_irqsave(&adm->copps_list_lock, flags);
++	list_del(&c->node);
++	spin_unlock_irqrestore(&adm->copps_list_lock, flags);
++	kfree(c);
++}
++
++static struct copp *adm_find_matching_copp(struct q6adm *adm,
++					   int port_id, int topology,
++					   int mode, int rate, int channel_mode,
++					   int bit_width, int app_type)
++{
++	unsigned long flags;
++	struct copp *c;
++
++	spin_lock_irqsave(&adm->copps_list_lock, flags);
++
++	list_for_each_entry(c, &adm->copps_list, node) {
++		if ((port_id == c->afe_port) && (topology == c->topology) &&
++		    (mode == c->mode) && (rate == c->rate) &&
++		    (bit_width == c->bit_width) && (app_type == c->app_type)) {
++			spin_unlock_irqrestore(&adm->copps_list_lock, flags);
++			return c;
 +		}
 +	}
++	spin_unlock_irqrestore(&adm->copps_list_lock, flags);
++
++	c = adm_alloc_copp(adm, port_id);
++	if (IS_ERR_OR_NULL(c))
++		return ERR_CAST(c);
++
++	kref_init(&c->refcount);
++	c->topology = topology;
++	c->mode = mode;
++	c->rate = rate;
++	c->channels = channel_mode;
++	c->bit_width = bit_width;
++	c->app_type = app_type;
++
++	spin_lock_irqsave(&adm->copps_list_lock, flags);
++	list_add_tail(&c->node, &adm->copps_list);
++	spin_unlock_irqrestore(&adm->copps_list_lock, flags);
++
++	return c;
++
 +}
 +
-+static struct snd_soc_platform_driver q6asm_soc_platform = {
-+	.ops		= &q6asm_dai_ops,
-+	.pcm_new	= q6asm_dai_pcm_new,
-+	.pcm_free	= q6asm_dai_pcm_free,
-+
-+};
-+
-+static const struct snd_soc_dapm_route afe_pcm_routes[] = {
-+	{"MM_DL1",  NULL, "MultiMedia1 Playback" },
-+	{"MM_DL2",  NULL, "MultiMedia2 Playback" },
-+	{"MM_DL3",  NULL, "MultiMedia3 Playback" },
-+	{"MM_DL4",  NULL, "MultiMedia4 Playback" },
-+	{"MM_DL5",  NULL, "MultiMedia5 Playback" },
-+	{"MM_DL6",  NULL, "MultiMedia6 Playback" },
-+	{"MM_DL7",  NULL, "MultiMedia7 Playback" },
-+	{"MM_DL7",  NULL, "MultiMedia8 Playback" },
-+	{"MultiMedia1 Capture", NULL, "MM_UL1"},
-+	{"MultiMedia2 Capture", NULL, "MM_UL2"},
-+	{"MultiMedia3 Capture", NULL, "MM_UL3"},
-+	{"MultiMedia4 Capture", NULL, "MM_UL4"},
-+	{"MultiMedia5 Capture", NULL, "MM_UL5"},
-+	{"MultiMedia6 Capture", NULL, "MM_UL6"},
-+	{"MultiMedia7 Capture", NULL, "MM_UL7"},
-+	{"MultiMedia8 Capture", NULL, "MM_UL8"},
-+
-+};
-+
-+static int fe_dai_probe(struct snd_soc_dai *dai)
++static int q6adm_device_open(struct q6adm *adm, struct copp *copp, int port_id,
++			     int path, int topology, int channel_mode,
++			     int bit_width, int rate)
 +{
-+	struct snd_soc_dapm_context *dapm;
++	struct adm_cmd_device_open_v5 open = {0,};
++	int afe_port = q6afe_get_port_id(port_id);
++	int ret;
 +
-+	dapm = snd_soc_component_get_dapm(dai->component);
-+	snd_soc_dapm_add_routes(dapm, afe_pcm_routes,
-+				ARRAY_SIZE(afe_pcm_routes));
++	open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++					   APR_HDR_LEN(APR_HDR_SIZE),
++					   APR_PKT_VER);
++	open.hdr.pkt_size = sizeof(open);
++	open.hdr.src_svc = APR_SVC_ADM;
++	open.hdr.src_domain = APR_DOMAIN_APPS;
++	open.hdr.src_port = afe_port;
++	open.hdr.dest_svc = APR_SVC_ADM;
++	open.hdr.dest_domain = APR_DOMAIN_ADSP;
++	open.hdr.dest_port = afe_port;
++	open.hdr.token = port_id << 16 | copp->copp_idx;
++	open.hdr.opcode = ADM_CMD_DEVICE_OPEN_V5;
++	open.flags = ADM_LEGACY_DEVICE_SESSION;
++	open.mode_of_operation = path;
++	open.endpoint_id_1 = afe_port;
++	open.topology_id = topology;
++	open.dev_num_channel = channel_mode & 0x00FF;
++	open.bit_width = bit_width;
++	open.sample_rate = rate;
 +
-+	return 0;
++	ret = q6dsp_map_channels(&open.dev_channel_mapping[0],
++				 channel_mode);
++	if (ret)
++		return ret;
++
++	return q6adm_apr_send_copp_pkt(adm, copp, &open,
++				       ADM_CMDRSP_DEVICE_OPEN_V5);
 +}
 +
-+static const struct snd_soc_component_driver q6asm_fe_dai_component = {
-+	.name		= "q6asm-fe-dai",
-+};
-+
-+static struct snd_soc_dai_driver q6asm_fe_dais[] = {
-+	Q6ASM_FEDAI_DRIVER(1),
-+	Q6ASM_FEDAI_DRIVER(2),
-+	Q6ASM_FEDAI_DRIVER(3),
-+	Q6ASM_FEDAI_DRIVER(4),
-+	Q6ASM_FEDAI_DRIVER(5),
-+	Q6ASM_FEDAI_DRIVER(6),
-+	Q6ASM_FEDAI_DRIVER(7),
-+	Q6ASM_FEDAI_DRIVER(8),
-+};
-+
-+static int q6asm_dai_bind(struct device *dev, struct device *master, void *data)
++/**
++ * q6adm_open() - open adm and grab a free copp
++ *
++ * @dev: Pointer to adm child device.
++ * @port_id: port id
++ * @path: playback or capture path.
++ * @rate: rate at which copp is required.
++ * @channel_mode: channel mode
++ * @topology: adm topology id
++ * @perf_mode: performace mode.
++ * @bit_width: audio sample bit width
++ * @app_type: Application type.
++ * @acdb_id: ACDB id
++ *
++ * Return: Will be an negative on error or a valid copp index on success.
++ */
++int q6adm_open(struct device *dev, int port_id, int path, int rate,
++	       int channel_mode, int topology, int perf_mode,
++	       uint16_t bit_width, int app_type, int acdb_id)
 +{
-+	struct device_node *node = dev->of_node;
-+	struct of_phandle_args args;
-+	struct q6asm_dai_data *pdata;
-+	int rc;
++	struct q6adm *adm = dev_get_drvdata(dev->parent);
++	struct copp *copp;
++	int ret = 0;
 +
-+	pdata = kzalloc(sizeof(struct q6asm_dai_data), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	rc = of_parse_phandle_with_fixed_args(node, "iommus", 1, 0, &args);
-+	if (rc < 0)
-+		pdata->sid = -1;
-+	else
-+		pdata->sid = args.args[0] & SID_MASK_DEFAULT;
-+
-+	dev_set_drvdata(dev, pdata);
-+
-+	rc = snd_soc_register_platform(dev,  &q6asm_soc_platform);
-+	if (rc) {
-+		dev_err(dev, "err_dai_platform\n");
-+		return rc;
++	if (port_id < 0) {
++		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
++		return -EINVAL;
 +	}
 +
-+	return snd_soc_register_component(dev, &q6asm_fe_dai_component,
-+					q6asm_fe_dais,
-+					ARRAY_SIZE(q6asm_fe_dais));
++	copp = adm_find_matching_copp(adm, port_id, topology, perf_mode,
++				      rate, channel_mode, bit_width, app_type);
++	if (kref_read(&copp->refcount) == 1) {
++		/* not initialized yet */
++		ret = q6adm_device_open(adm, copp, port_id, path, topology,
++				  channel_mode, bit_width, rate);
++		if (ret < 0)
++			return ret;
++	}
++
++	kref_get(&copp->refcount);
++
++	return copp->copp_idx;
 +}
-+static void q6asm_dai_unbind(struct device *dev, struct device *master,
-+			     void *data)
++EXPORT_SYMBOL_GPL(q6adm_open);
++
++/**
++ * q6adm_set_routing_data() - set routing private data
++ *
++ * @dev: Pointer to adm device.
++ * @data: routing private data
++ *
++ */
++void q6adm_set_routing_data(struct device *dev, void *data)
 +{
-+	struct q6asm_dai_data *pdata = dev_get_drvdata(dev);
++	struct q6adm *adm = dev_get_drvdata(dev->parent);
 +
-+	snd_soc_unregister_platform(dev);
-+	snd_soc_unregister_component(dev);
-+
-+	kfree(pdata);
-+
++	adm->routing_data = data;
 +}
++EXPORT_SYMBOL_GPL(q6adm_set_routing_data);
 +
-+static const struct component_ops q6asm_dai_comp_ops = {
-+	.bind   = q6asm_dai_bind,
-+	.unbind = q6asm_dai_unbind,
-+};
-+
-+static int q6asm_dai_probe(struct platform_device *pdev)
++/**
++ * q6adm_get_routing_data() - get routing private data
++ *
++ * @dev: Pointer to adm device.
++ *
++ * Return: pointer to routing private data
++ */
++void *q6adm_get_routing_data(struct device *dev)
 +{
-+	return component_add(&pdev->dev, &q6asm_dai_comp_ops);
++	struct q6adm *adm = dev_get_drvdata(dev->parent);
++
++	return adm->routing_data;
 +}
++EXPORT_SYMBOL_GPL(q6adm_get_routing_data);
 +
-+static int q6asm_dai_dev_remove(struct platform_device *pdev)
++/**
++ * q6adm_matrix_map() - Map asm streams and afe ports using payload
++ *
++ * @dev: Pointer to adm child device.
++ * @path: playback or capture path.
++ * @payload_map: map between session id and afe ports.
++ * @perf_mode: Performace mode.
++ *
++ * Return: Will be an negative on error or a zero on success.
++ */
++int q6adm_matrix_map(struct device *dev, int path,
++		     struct route_payload payload_map, int perf_mode)
 +{
-+	component_del(&pdev->dev, &q6asm_dai_comp_ops);
++	struct q6adm *adm = dev_get_drvdata(dev->parent);
++	struct adm_cmd_matrix_map_routings_v5 *route;
++	struct adm_session_map_node_v5 *node;
++	uint16_t *copps_list;
++	int cmd_size, ret, i, copp_idx;
++	void *matrix_map = NULL;
++	struct copp *copp;
++
++	/* Assumes port_ids have already been validated during adm_open */
++	cmd_size = (sizeof(*route) +
++		    sizeof(*node) +
++		    (sizeof(uint32_t) * payload_map.num_copps));
++	matrix_map = kzalloc(cmd_size, GFP_KERNEL);
++	if (!matrix_map)
++		return -ENOMEM;
++
++	route = matrix_map;
++	route->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++					     APR_HDR_LEN(APR_HDR_SIZE),
++					     APR_PKT_VER);
++	route->hdr.pkt_size = cmd_size;
++	route->hdr.src_svc = 0;
++	route->hdr.src_domain = APR_DOMAIN_APPS;
++	route->hdr.dest_svc = APR_SVC_ADM;
++	route->hdr.dest_domain = APR_DOMAIN_ADSP;
++	route->hdr.token = 0;
++	route->hdr.opcode = ADM_CMD_MATRIX_MAP_ROUTINGS_V5;
++	route->num_sessions = 1;
++
++	switch (path) {
++	case ADM_PATH_PLAYBACK:
++		route->matrix_id = ADM_MATRIX_ID_AUDIO_RX;
++		break;
++	case ADM_PATH_LIVE_REC:
++		route->matrix_id = ADM_MATRIX_ID_AUDIO_TX;
++		break;
++	default:
++		dev_err(dev, "Wrong path set[%d]\n", path);
++
++		break;
++	}
++
++	node = matrix_map + sizeof(*route);
++	node->session_id = payload_map.session_id;
++	node->num_copps = payload_map.num_copps;
++	copps_list = matrix_map + sizeof(*route) + sizeof(*node);
++
++	for (i = 0; i < payload_map.num_copps; i++) {
++		int port_idx = payload_map.port_id[i];
++
++		if (port_idx < 0) {
++			dev_err(dev, "Invalid port_id 0x%x\n",
++				payload_map.port_id[i]);
++			ret = -EINVAL;
++			goto fail_cmd;
++		}
++		copp_idx = payload_map.copp_idx[i];
++
++		copp = adm_find_copp(adm, port_idx, copp_idx);
++		if (!copp) {
++			ret = -EINVAL;
++			goto fail_cmd;
++		}
++
++		copps_list[i] = copp->id;
++	}
++
++	mutex_lock(&adm->lock);
++	adm->result.status = 0;
++	adm->result.opcode = 0;
++
++	ret = apr_send_pkt(adm->apr, matrix_map);
++	if (ret < 0) {
++		dev_err(dev, "routing for syream %d failed ret %d\n",
++		       payload_map.session_id, ret);
++		goto fail_cmd;
++	}
++	ret = wait_event_timeout(adm->matrix_map_wait,
++				 adm->result.opcode == route->hdr.opcode,
++				 msecs_to_jiffies(TIMEOUT_MS));
++	if (!ret) {
++		dev_err(dev, "routing for syream %d failed\n",
++		       payload_map.session_id);
++		ret = -ETIMEDOUT;
++		goto fail_cmd;
++	} else if (adm->result.status > 0) {
++		dev_err(dev, "DSP returned error[%d]\n",
++		        adm->result.status);
++		ret = -EINVAL;
++		goto fail_cmd;
++	}
++
++fail_cmd:
++	mutex_unlock(&adm->lock);
++	kfree(matrix_map);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(q6adm_matrix_map);
++
++/**
++ * q6adm_close() - Close adm copp
++ *
++ * @dev: Pointer to adm child device.
++ * @port_id: afe port id.
++ * @perf_mode: perf_mode mode
++ * @copp_idx: copp index to close
++ *
++ * Return: Will be an negative on error or a zero on success.
++ */
++int q6adm_close(struct device *dev, int port_id, int perf_mode, int copp_idx)
++{
++	struct q6adm *adm = dev_get_drvdata(dev->parent);
++	struct copp *copp;
++
++	if (port_id < 0) {
++		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
++		return -EINVAL;
++	}
++
++	if ((copp_idx < 0) || (copp_idx >= MAX_COPPS_PER_PORT)) {
++		dev_err(dev, "Invalid copp idx: %d\n", copp_idx);
++		return -EINVAL;
++	}
++
++	copp = adm_find_copp(adm, port_id, copp_idx);
++	if (!copp)
++		return -EINVAL;
++
++	kref_put(&copp->refcount, adm_free_copp);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(q6adm_close);
++
++static int q6adm_probe(struct apr_device *adev)
++{
++	struct device *dev = &adev->dev;
++	struct device_node *dais_np;
++	struct q6adm *adm;
++
++	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
++	if (!adm)
++		return -ENOMEM;
++
++	adm->apr = adev;
++	dev_set_drvdata(&adev->dev, adm);
++	adm->dev = dev;
++	q6core_get_svc_api_info(adev->svc_id, &adm->ainfo);
++	mutex_init(&adm->lock);
++	init_waitqueue_head(&adm->matrix_map_wait);
++
++	INIT_LIST_HEAD(&adm->copps_list);
++	spin_lock_init(&adm->copps_list_lock);
++
++	dais_np = of_get_child_by_name(dev->of_node, "routing");
++	if (dais_np) {
++		adm->pdev_routing = of_platform_device_create(dais_np,
++							   "q6routing", dev);
++		of_node_put(dais_np);
++	}
++
 +	return 0;
 +}
 +
-+static struct platform_driver q6asm_dai_platform_driver = {
-+	.driver = {
-+		.name = "q6asm-dai",
-+	},
-+	.probe = q6asm_dai_probe,
-+	.remove = q6asm_dai_dev_remove,
-+};
-+module_platform_driver(q6asm_dai_platform_driver);
++static int q6adm_remove(struct apr_device *adev)
++{
++	struct q6adm *adm = dev_get_drvdata(&adev->dev);
 +
-+MODULE_DESCRIPTION("Q6ASM dai driver");
++	if (adm->pdev_routing)
++		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id q6adm_device_id[]  = {
++	{ .compatible = "qcom,q6adm" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, q6adm_device_id);
++
++static struct apr_driver qcom_q6adm_driver = {
++	.probe = q6adm_probe,
++	.remove = q6adm_remove,
++	.callback = q6adm_callback,
++	.driver = {
++		.name = "qcom-q6adm",
++		.of_match_table = of_match_ptr(q6adm_device_id),
++	},
++};
++
++module_apr_driver(qcom_q6adm_driver);
++MODULE_DESCRIPTION("Q6 Audio Device Manager");
 +MODULE_LICENSE("GPL v2");
+diff --git a/sound/soc/qcom/qdsp6/q6adm.h b/sound/soc/qcom/qdsp6/q6adm.h
+new file mode 100644
+index 000000000000..7ad278399ec0
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6adm.h
+@@ -0,0 +1,25 @@
++// SPDX-License-Identifier: GPL-2.0
++#ifndef __Q6_ADM_V2_H__
++#define __Q6_ADM_V2_H__
++
++#define ADM_PATH_PLAYBACK	0x1
++#define ADM_PATH_LIVE_REC	0x2
++#define MAX_COPPS_PER_PORT	8
++#define NULL_COPP_TOPOLOGY	0x00010312
++
++/* multiple copp per stream. */
++struct route_payload {
++	int num_copps;
++	int session_id;
++	int copp_idx[MAX_COPPS_PER_PORT];
++	int port_id[MAX_COPPS_PER_PORT];
++};
++
++int q6adm_open(struct device *dev, int port_id, int path, int rate,
++	       int channel_mode, int topology, int perf_mode,
++	       uint16_t bit_width, int app_type, int acdb_id);
++int q6adm_close(struct device *dev, int port, int topology, int perf_mode);
++int q6adm_matrix_map(struct device *dev, int path,
++		     struct route_payload payload_map, int perf_mode);
++
++#endif /* __Q6_ADM_V2_H__ */
 -- 
 2.15.1
