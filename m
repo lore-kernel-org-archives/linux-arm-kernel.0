@@ -1,68 +1,41 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sat, 10 Mar 2018 06:26:01 +0100
-Subject: [GIT PULL] ARM: at91: DT for 4.17
-Message-ID: <20180310052601.GA6294@piout.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Mar 2018 16:16:02 +0800
+Subject: [PATCH 0/4] ARM: sunxi: Clean and improvements for multi-cluster
+ SMP
+In-Reply-To: <20180308150012.19045-1-wens@csie.org>
+References: <20180308150012.19045-1-wens@csie.org>
+Message-ID: <CAGb2v67WVY0zPUhqy0nZOhKEfZskZvKcvUrUA_wghw=37Eq3sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Thu, Mar 8, 2018 at 11:00 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+>
+> This series is a bit of cleanup and improvement for the new
+> multi-cluster SMP code for Allwinner A80 and A83T (soon) SoCs.
+>
+> The first patch is just a typo fix.
+>
+> The second and third patch add the use of the "enable-method" cpu
+> property to enable SMP, instead of matching against the machine
+> compatible. However, due to how init calls are sequenced, we still
+> need to use a platform early_init call.
+>
+> The last patch splits out parts of the SoC-specific init code, i.e.
+> the device node matching parts. This should help with Mylene's work
+> on adding support for the A83T.
+>
+> Please have a look.
+>
+> Regards
+> ChenYu
+>
+> Chen-Yu Tsai (4):
+>   ARM: sunxi: mc-smp: Fix "lookback" typo
+>   ARM: sunxi: mc-smp: Use DT enable-method for sun9i A80 SMP
+>   ARM: dts: sun9i: Add enable-method for SMP support for the A80 SoC
+>   ARM: sunxi: mc-smp: Split out SoC-specific device node lookup sequence
 
-Not much this cycle, mainly changes on the Axentia boards from Peter and
-a cleanup from Bartosz.
+Merged all 4 patches.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.17-dt
-
-for you to fetch changes up to 6fa65edf87886f85a18680ed7bdedc15cb810065:
-
-  ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9263ek (2018-02-13 17:15:18 +0100)
-
-----------------------------------------------------------------
-AT91 DT for 4.17:
-
- - use 'atmel' as at24 manufacturer
- - device addition and fixes for axentia boards
- - fix sama5d4 pinctrl compatible
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: dts: at91: sam9rl: Properly assign copyright
-
-Bartosz Golaszewski (5):
-      ARM: dts: at91: use 'atmel' as at24 manufacturer for sama5d34ek
-      ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9260ek
-      ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9g20ek
-      ARM: dts: at91: use 'atmel' as at24 manufacturer for at91-sama5d2_ptc_ek
-      ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9263ek
-
-Peter Rosin (5):
-      ARM: dts: at91: nattis: use the correct compatible for the eeprom
-      ARM: dts: at91: tse850: use the correct compatible for the eeprom
-      ARM: dts: at91: nattis: use up-to-date mtd partitions
-      ARM: dts: at91: nattis: add lvds-encoder
-      ARM: dts: at91: tse850: make the sound dai cell count explicit
-
-Santiago Esteban (1):
-      ARM: dts: at91: sama5d4: fix pinctrl compatible string
-
- arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 60 +++++++++++++++++++++--------
- arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts   |  2 +-
- arch/arm/boot/dts/at91-tse850-3.dts         |  3 +-
- arch/arm/boot/dts/at91sam9260ek.dts         |  2 +-
- arch/arm/boot/dts/at91sam9263ek.dts         |  2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  2 +-
- arch/arm/boot/dts/at91sam9rl.dtsi           |  3 +-
- arch/arm/boot/dts/at91sam9rlek.dts          |  3 +-
- arch/arm/boot/dts/sama5d34ek.dts            |  2 +-
- arch/arm/boot/dts/sama5d4.dtsi              |  2 +-
- 10 files changed, 57 insertions(+), 24 deletions(-)
-
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+ChenYu
