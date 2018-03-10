@@ -1,68 +1,114 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 10 Mar 2018 12:26:34 +0100
-Subject: Nokia N900: refcount_t underflow, use after free
-In-Reply-To: <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com>
-References: <20180308143053.GA17267@amd> <20180308165903.GM5799@atomide.com>
- <57c9f17b-fc9d-8506-4b5d-70ac216c9248@ti.com>
- <20180308185046.GA22796@amd>
- <1dfc05fe-1612-f5a5-b5f1-9038b3cecfe5@arm.com>
- <1643b74a-62ba-bea6-71c2-a2dd02430463@ti.com>
- <20180309221834.GA15476@amd>
- <c8ee5692-bf71-a9d7-8607-50adc9f0e9f1@ti.com>
-Message-ID: <20180310112634.GA31614@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 10 Mar 2018 11:48:30 +0000
+Subject: [PATCH] KVM:arm/arm64: dcache need be coherent unconditionally
+In-Reply-To: <201803101123186035154@zte.com.cn>
+Message-ID: <86muzgb181.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Sat, 10 Mar 2018 03:23:18 +0000,
+peng hao wrote:
 
-> >>> Well, there certainly seems to be an obvious bug wherein
-> >>> isp_detach_iommu() just releases the mapping directly without calling
-> >>> arm_iommu_detach_device() to balance the equivalent attach. That can't
-> >>> be helping.
-> >>
-> >> Indeed, I have been able to reproduce the same warning using a
-> >> standalone test module, and the missing arm_iommu_detach_device() is
-> >> causing the warning after probe (during failure path) or during
-> >> remove.
-> > 
-> > Ok do you have an idea how to fix the isp error paths? Untested patch
-> > would be fine... But it seems that you know what needs to be fixed and
-> > I don't.
-> > 
+> >> For emulation devices just like vga, keeping coherent dcache between
+> >> guest and host timely is needed.
+> >> Now the display of vnc-viewer will not update continuously and the
+> >> patch can fix up.
+> >> 
+> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> >> ---
+> >>  virt/kvm/arm/mmu.c | 6 ++----
+> >>  1 file changed, 2 insertions(+), 4 deletions(-)
+> >> 
+> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >> index ec62d1c..4a28395e 100644
+> >> --- a/virt/kvm/arm/mmu.c
+> >> +++ b/virt/kvm/arm/mmu.c
+> >> @@ -1416,8 +1416,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>              kvm_set_pfn_dirty(pfn);
+> >>          }
+> >>  
+> >> -        if (fault_status != FSC_PERM)
+> >> -            clean_dcache_guest_page(pfn, PMD_SIZE);
+> >> +        clean_dcache_guest_page(pfn, PMD_SIZE);
+> >>  
+> >>          if (exec_fault) {
+> >>              new_pmd = kvm_s2pmd_mkexec(new_pmd);
+> >> @@ -1438,8 +1437,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>              mark_page_dirty(kvm, gfn);
+> >>          }
+> >>  
+> >> -        if (fault_status != FSC_PERM)
+> >> -            clean_dcache_guest_page(pfn, PAGE_SIZE);
+> >> +        clean_dcache_guest_page(pfn, PAGE_SIZE);
+> >>  
+> >>          if (exec_fault) {
+> >>              new_pte = kvm_s2pte_mkexec(new_pte);
+> >> 
 > 
-> OK, see if the following fixes the issue for you, only build tested.
-
-Word-wrapped, so I applied by hand. And yes, the oops at boot is
-gone. Thanks!
-
-(Camera still does not work in -next... kills system. Oh well. Lets
-debug that some other day.)
-
-> 8< ---------------------
-> >From bac9a48fb646dc51f2030d676a0dbe3298c3b134 Mon Sep 17 00:00:00 2001
-> From: Suman Anna <s-anna@ti.com>
-> Date: Fri, 9 Mar 2018 16:39:59 -0600
-> Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+> >I'm sorry, but I have to NAK this.
 > 
-> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-> ARM DMA backend. The current code creates a dma_iommu_mapping and
-> attaches this to the ISP device, but never detaches the mapping in
-> either the probe failure paths or the driver remove path resulting
-> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+> >You're papering over the fundamental issue that you're accessing a
+> >cacheable alias of a non cacheable memory. The architecture is very
+> >clear about why this doesn't work, and KVM implements the architecture.
 > 
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> 
+> 
+> I find that I just encounter the problem after the commit
+> '15303ba5d1cd9b28d03a980456c0978c0ea3b208 " .
 
-Tested-by: Pavel Machek <pavel@ucw.cz>
-									Pavel
+This should really be a9c0e12ebee5 ("KVM: arm/arm64: Only clean the
+dcache on translation fault").
+
+> The commit contains "icache invalidation optimizations, improving VM
+> startup time",it changes from unconditionally calling
+> coherent_cache_guest_page(including dcache handle) to conditionally
+> calling clean_dcache_guest_page.
+> 
+> I trace the display of vnc abnormally and find it generate data
+> abort in vga address region with FSC_PERM,and it will not call
+> clean_dcache_guest_page . So I think should recover to uncontionally
+> calling clean_dcache_guest_page.
+
+[I really hate ranting on a Saturday morning as the sun is finally out
+and I could be relaxing in the garden, but hey, I guess that's the
+fate of a kernel hacker who made the silly mistake of reading email on
+a Saturday morning instead of being out in the garden...]
+
+Even if you enabled dirty tracking on the VGA memory (and thus making
+it RO to generate a permission fault), you would end-up cleaning to
+the PoC *before* any write has been committed to the page. How useful
+is that? You're also pretty lucky that this does a clean+invalidate
+(rather than a clean which would be good enough), meaning that QEMU
+will in turn miss in the cache (PIPT caches) and read some *stale*
+data from memory.
+
+Repeat that often enough, and yes, you can get some sort of
+display. Is that the right thing to do? Hell no. You might just as
+well have a userspace process thrashing the cache at the PoC, running
+concurrently with your VM, it would have a similar effect. It may work
+on your particular platform, in some specific conditions, but it just
+doesn't work in general.
+
+What you are describing is a long standing issue. VGA emulation never
+worked on ARM, because it is fundamentally incompatible with the ARM
+memory architecture. Read the various discussions on the list over the
+past 4 years or so, read the various presentations I and others have
+given about this problem and how to address it[1].
+
+The *real* fix is a one-liner in the Linux VGA driver: map the VGA
+memory as cacheable, and stop lying to the guest. Or if you want to
+lie to the guest, perform cache maintenance from userspace in QEMU
+based on the dirty tracking bitmap that it uses for the VGA memory.
+
+Anything else is out of the scope of the architecture, and I'm not
+going to add more crap to satisfy requirements that cannot be
+implemented on real HW, let alone in a virtualized environment.
+
+Thanks,
+
+	M.
+
+[1] http://events17.linuxfoundation.org/sites/events/files/slides/slides_10.pdf
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180310/85acc094/attachment.sig>
+Jazz is not dead, it just smell funny.
