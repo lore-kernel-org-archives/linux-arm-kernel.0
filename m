@@ -1,25 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 10 Mar 2018 10:57:43 -0300
-Subject: [PATCH v2 1/4] dt-bindings: mfd: Add Gateworks System Controller
- bindings
-In-Reply-To: <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
-References: <1520287361-12569-1-git-send-email-tharvey@gateworks.com>
- <1520287361-12569-2-git-send-email-tharvey@gateworks.com>
-Message-ID: <CAOMZO5Cw+XW_G_euCL5itmuvfxDDnWWHqg2EjPTCVkuTzqXHug@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 10 Mar 2018 13:57:59 +0000
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs
+ with the same vintid
+In-Reply-To: <20180309213931.GE1917@lvm>
+References: <20180307124055.13800-1-marc.zyngier@arm.com>
+ <20180307124055.13800-2-marc.zyngier@arm.com>
+ <CAEDV+gJoamQJX_hcwCNBo1gc7-NUT+m-N9n=00wCJ=_TD82EkQ@mail.gmail.com>
+ <8e873168-110f-6781-506c-4ca89b7a4e0d@arm.com>
+ <20180308160242.GA1917@lvm> <86tvtqbis9.wl-marc.zyngier@arm.com>
+ <86o9jybeef.wl-marc.zyngier@arm.com> <20180309213931.GE1917@lvm>
+Message-ID: <86ina4av88.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Hi Christoffer,
 
-On Mon, Mar 5, 2018 at 7:02 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+On Fri, 09 Mar 2018 21:39:31 +0000,
+Christoffer Dall wrote:
+> 
+> On Thu, Mar 08, 2018 at 06:39:20PM +0000, Marc Zyngier wrote:
+> > Thinking of it a bit more: MI on EOI doesn't offer much more guarantee
+> > in the way of priority ordering. Taking your example above: Even if
+> > you generate a MI when EOIing the SGI, there is no guarantee that
+> > you'll take the MI before you've acked the SPI.
+> 
+> There's no guarantee, but at least you're attempting at processing the
+> SGIs in first.  It's the best we can do, but not completely correct,
+> kinda thing...
+> 
+> > 
+> > If you really want to offer that absolute guarantee that all the
+> > multi-source SGIs of higher priority are delivered before anything
+> > else, then you must make sure that only the SGIs are present in the
+> > LRs, excluding any other interrupt on lower priority until you've
+> > queued them all.
+> 
+> Yes, that sucks!  Might not be too hard to implement, it's basically an
+> early out of the loop traversing the AP list, but just an annoying
+> complication.
 
-> +
-> +                       hwmon at 1 { /* A1: Input Voltage */
-> +                               type = <1>;
-> +                               reg = <0x02>;
+Yeah, it is a bit gross. The way I implemented it is by forcing the AP
+list to be sorted if there is any multi-SGI in the pipeline, and early
+out as soon as we see an interrupt of a lower priority than the first
+multi-SGI. That way, we only have an overhead in the case that
+combines multi-SGI and lower priority interrupts.
 
-Unit address (@1) does not match the 'reg' value.
+> > At that stage, I wonder if there is a point in doing anything at
+> > all. The GICv2 architecture is too rubbish for words.
+> > 
+> 
+> The case we do need to worry about is the guest processing all its
+> interrupts and not exiting while there is actually still an SGI pending.
+> At that point, we can either do it with the "no interrupts pending
+> maintenance interrupt" or with the "EOI maintenance interrupt", and I
+> think the latter at least gets us slightly closer to the architecture
+> for a non-virtualized system.
 
-If someone build this example with W=1 a warning will be shown.
+I think that this is where we disagree. I don't see anything in the
+architecture that mandates that we should present the SGIs before
+anything else. All we need to do is to ensure that interrupts of
+higher priority are presented before anything else. It is perfectly
+acceptable for an implementation to deliver SGI0, then SPI3, and SGI0
+(from another CPU) after that, as long as SPI3 isn't of lesser
+priority than SGI0.
 
-Same problem happens in other places of this example.
+Another thing I dislike about using EOI for that is forces us to
+propagate the knowledge of the multi-SGI horror further down the
+stack, down to both implementations of vgic_populate_lr. NPIE allows
+us to keep that knowledge local. But that's an orthogonal issue, and
+we can further argue/bikeshed about the respective merits of both
+solutions once we have something that fits the sorry state of the
+GICv2 architecture ;-).
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
