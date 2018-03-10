@@ -1,32 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Mar 2018 17:57:12 -0600
-Subject: [PATCH v2 02/12] clk: stm32mp1: Introduce STM32MP1 clock driver
-In-Reply-To: <1520528045-18330-3-git-send-email-gabriel.fernandez@st.com>
-References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
- <1520528045-18330-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20180309235543.cjyywayv3m6fwtbc@rob-hp-laptop>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Mar 2018 20:05:07 -0500 (EST)
+Subject: [PATCH 1/7] ARM: linker script: factor out some common definitions
+ between XIP and non-XIP
+In-Reply-To: <89d1d757-213c-4f47-af42-347ef27934d9@arm.com>
+References: <20180309032100.31039-1-nicolas.pitre@linaro.org>
+ <20180309032100.31039-2-nicolas.pitre@linaro.org>
+ <89d1d757-213c-4f47-af42-347ef27934d9@arm.com>
+Message-ID: <nycvar.YSQ.7.76.1803092001270.7678@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 05:53:55PM +0100, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch introduces the mechanism to probe stm32mp1 driver.
-> It also defines registers definition.
-> This patch also introduces the generic mechanism to register
-> a clock (a simple gate, divider and fixed factor).
-> 
-> All clocks will be defined in one table.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->  drivers/clk/Kconfig                       |   6 +
->  drivers/clk/Makefile                      |   1 +
->  drivers/clk/clk-stm32mp1.c                | 364 ++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/stm32mp1-clks.h | 254 +++++++++++++++++++++
+On Fri, 9 Mar 2018, Vladimir Murzin wrote:
 
-This should really be part of the binding patch.
+> On 09/03/18 03:20, Nicolas Pitre wrote:
+> > Lots of duplications between vmlinux.lds.S and vmlinux-xip.lds.S.
+> > This may lead to one file being updated but not the other. For example,
+> > SOFTIRQENTRY_TEXT and HYPERVISOR_TEXT were missing from the XIP version.
+> 
+> It looks to me that HYPERVISOR_TEXT was not present in the XIP version
+> intentionally - XIP depends on !ARM_LPAE, i.e. not support for virtualisation.
 
->  4 files changed, 625 insertions(+)
->  create mode 100644 drivers/clk/clk-stm32mp1.c
->  create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
+Still... the !ARM_LPAE is an artificial dependency and there is no 
+fundamental reason besides kconfig issues that would prevent XIP on 
+LPAE.
+
+
+Nicolas
