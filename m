@@ -1,25 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 10 Mar 2018 13:46:30 -0300
-Subject: PSCI version misdetection
-Message-ID: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Sat, 10 Mar 2018 12:12:44 -0500
+Subject: [PATCH] ARM: BCM5301X: Fix NAND ECC parameters for Linksys Panamera
+Message-ID: <20180310171244.70299-1-npcomplete13@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Using BCH8 gives ecc errors and makes the router unsuable.
+Switching to BCH1 fixes these errors.
 
-On a  imx7d-sdb board running 4.14-rc6:
+Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
+---
+ arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[    0.000000] psci: probing for conduit method from DT.
-[    0.000000] psci: PSCIv65535.65535 detected in firmware.
-[    0.000000] psci: Using standard PSCI v0.2 function IDs
-[    0.000000] psci: MIGRATE_INFO_TYPE not supported.
-
-The PSCI version seems to be misdetected.
-
-CONFIG_ARMV7_PSCI_1_0 is passed in U-Boot, so I would expect to see:
-
-psci: PSCIv1.0 detected in firmware.
-
-Any ideas?
-
-Thanks
+diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+index b6750f70dffb..ea1b3f5eff29 100644
+--- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
++++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+@@ -7,7 +7,7 @@
+ /dts-v1/;
+ 
+ #include "bcm47094.dtsi"
+-#include "bcm5301x-nand-cs0-bch8.dtsi"
++#include "bcm5301x-nand-cs0-bch1.dtsi"
+ 
+ / {
+ 	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
+-- 
+2.11.0
