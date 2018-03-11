@@ -1,55 +1,66 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Sun, 11 Mar 2018 15:42:37 -0700
-Subject: [PATCH v2 00/12] Introduce STM32MP1 clock driver
-In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1520808064.5otv3fo1pe.astroid@resonance.none>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 11 Mar 2018 23:44:39 +0100
+Subject: [PATCH v2 1/4] dt-bindings: soc: add SCPSYS binding for MT7623
+ and MT7623A SoC
+In-Reply-To: <1520414224.677.2.camel@mtkswgap22>
+References: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
+ <1520414224.677.2.camel@mtkswgap22>
+Message-ID: <25eceb5d-7f5e-8bac-0bfd-ad547520a9b5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Excerpts from gabriel.fernandez at st.com's message of March 8, 2018 8:53 am:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> v2:
->   - Don't use MFD, use existing binding of STM32 RCC.
->   - Rework Peripheral and Kernel clocks
->   - cosmetic changes
-> 
-> This patch-set introduces clock driver for STM32MP157 based on Arm Cortex-A7.
-> The driver patch is split in several patches (by kind of clock) to facilitate
-> code reviewing.
 
-Applied to clk-stm32mp1 towards v4.17.
 
-Regards,
-Mike
+On 03/07/2018 10:17 AM, Sean Wang wrote:
+> Hi, Matthias
+> 
+> just a gentle ping to the four related patches
+> 
 
+All four pushed with Ulf's reviewed-by to v4.16-next/soc
+
+Thanks a lot!
+
+> 	Sean
 > 
-> Gabriel Fernandez (12):
->   dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings
->   clk: stm32mp1: Introduce STM32MP1 clock driver
->   clk: stm32mp1: add MP1 gate for hse/hsi/csi oscillators
->   clk: stm32mp1: add Source Clocks for PLLs
->   clk: stm32mp1: add PLL clocks
->   clk: stm32mp1: add Post-dividers for PLL
->   clk: stm32mp1: add Sub System clocks
->   clk: stm32mp1: add Kernel timers
->   clk: stm32mp1: add Peripheral & Kernel Clocks
->   clk: stm32mp1: add RTC clock
->   clk: stm32mp1: add MCO clocks
->   clk: stm32mp1: add Debug clocks
-> 
->  .../devicetree/bindings/clock/st,stm32mp1-rcc.txt  |   60 +
->  drivers/clk/Kconfig                                |    6 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-stm32mp1.c                         | 2117 ++++++++++++++++++++
->  include/dt-bindings/clock/stm32mp1-clks.h          |  254 +++
->  5 files changed, 2438 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
->  create mode 100644 drivers/clk/clk-stm32mp1.c
->  create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
-> 
-> -- 
-> 1.9.1
+> On Wed, 2018-02-07 at 18:22 +0800, sean.wang at mediatek.com wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> document the binding for enabling SCPSYS on MediaTek MT7623 and MT7623A
+>> SoC. Where MT7623 SoC has the same definition about power domains with
+>> MT2701, so it's fine to using MT2701 ones as MT7623's fallback.
+>>
+>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+>> index 76bf45b..d6fe16f 100644
+>> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+>> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+>> @@ -21,6 +21,8 @@ Required properties:
+>>  	- "mediatek,mt2712-scpsys"
+>>  	- "mediatek,mt6797-scpsys"
+>>  	- "mediatek,mt7622-scpsys"
+>> +	- "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
+>> +	- "mediatek,mt7623a-scpsys": For MT7623A SoC
+>>  	- "mediatek,mt8173-scpsys"
+>>  - #power-domain-cells: Must be 1
+>>  - reg: Address range of the SCPSYS unit
+>> @@ -28,10 +30,11 @@ Required properties:
+>>  - clock, clock-names: clocks according to the common clock binding.
+>>                        These are clocks which hardware needs to be
+>>                        enabled before enabling certain power domains.
+>> -	Required clocks for MT2701: "mm", "mfg", "ethif"
+>> +	Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
+>>  	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
+>>  	Required clocks for MT6797: "mm", "mfg", "vdec"
+>>  	Required clocks for MT7622: "hif_sel"
+>> +	Required clocks for MT7622A: "ethif"
+>>  	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+>>  
+>>  Optional properties:
 > 
 > 
