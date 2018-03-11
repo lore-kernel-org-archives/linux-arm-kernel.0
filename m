@@ -1,31 +1,31 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 11 Mar 2018 18:44:21 +0100
-Subject: [PATCH v3 2/6] ARM: dts: exynos: Add audio clocks configuration
- for exynos5250-snow
-In-Reply-To: <20180309172250.23019-2-s.nawrocki@samsung.com>
-References: <20180309172250.23019-1-s.nawrocki@samsung.com>
- <CGME20180309172404epcas1p446cf7033027ccefe2d8cfcfc49edc179@epcas1p4.samsung.com>
- <20180309172250.23019-2-s.nawrocki@samsung.com>
-Message-ID: <20180311174421.ooontplgqqo4xdxl@kozik-lap>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 11 Mar 2018 15:37:06 -0300
+Subject: PSCI version misdetection
+In-Reply-To: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
+References: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
+Message-ID: <CAOMZO5B1sGECGRAtaYwuV9xeDkAXSv0iqPJeopJ_JEtFAOaM-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 06:22:46PM +0100, Sylwester Nawrocki wrote:
-> Currently the audio subsystem clocks are not configured properly on Snow
-> and sound is not working. The MAX98095 CODEC is not getting its master clock
-> on the MCLK pin connected to the SOC's CLKOUT GPIO. This patch adds CLKOUT
-> and other clocks configuration so HDMI audio can also be supported.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Changes since v1:
->  - edited commit summary line.
-> ---
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
+On Sat, Mar 10, 2018 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi,
+>
+> On a  imx7d-sdb board running 4.14-rc6:
 
-Thanks, applied.
+I meant 4.14-rc4 :-)
 
-Best regards,
-Krzysztof
+>
+> [    0.000000] psci: probing for conduit method from DT.
+> [    0.000000] psci: PSCIv65535.65535 detected in firmware.
+> [    0.000000] psci: Using standard PSCI v0.2 function IDs
+> [    0.000000] psci: MIGRATE_INFO_TYPE not supported.
+>
+> The PSCI version seems to be misdetected.
+>
+> CONFIG_ARMV7_PSCI_1_0 is passed in U-Boot, so I would expect to see:
+>
+> psci: PSCIv1.0 detected in firmware.
+>
+> Any ideas?
+>
+> Thanks
