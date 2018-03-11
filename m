@@ -1,53 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 11 Mar 2018 20:35:58 +0000
-Subject: [PATCH v8 1/6] arch: enable relative relocations for arm64, power
- and x86
-In-Reply-To: <CA+55aFxcB+5oB_hL83EASOJQrVRCrzT9iS+2+XtEUToG6VHiqA@mail.gmail.com>
-References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
- <20180311123815.17916-2-ard.biesheuvel@linaro.org>
- <CA+55aFxcB+5oB_hL83EASOJQrVRCrzT9iS+2+XtEUToG6VHiqA@mail.gmail.com>
-Message-ID: <CAKv+Gu_E8mVqaR9OmzP2whc7WHGaFX5ypCh7F0UHEyY1DY_t3Q@mail.gmail.com>
+From: inbox@menno.io (Menno Finlay-Smits)
+Date: Mon, 12 Mar 2018 09:59:04 +1300
+Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
+ kernel memory overwrite attempt detected" on QNAP NAS (ARM)
+In-Reply-To: <1520766391.3566.7.camel@debian.org>
+References: <20180304204115.GD21710@lunn.ch>
+ <151652931598.757.4527606947579667082.reportbug@massive.lan>
+ <20180305142846.GJ25189@lunn.ch> <1520265474.2408.8.camel@debian.org>
+ <1520297697.4117371.1292731088.7BEDFAAE@webmail.messagingengine.com>
+ <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
+ <20180307133611.GC18030@lunn.ch>
+ <1520455769.3085111.1295233032.3B89F103@webmail.messagingengine.com>
+ <20180307222722.GH1326@lunn.ch>
+ <1520589187.923608.1297117744.23E3098C@webmail.messagingengine.com>
+ <20180309142724.GD27783@lunn.ch>
+ <1520766137.2953662.1298951624.71C28713@webmail.messagingengine.com>
+ <1520766391.3566.7.camel@debian.org>
+Message-ID: <1520801944.4060970.1299301640.3BE4BF94@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2018 at 20:20, Linus Torvalds <torvalds@linux-foundation.org> wrote:
-> On Sun, Mar 11, 2018 at 5:38 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> Before updating certain subsystems to use place relative 32-bit
->> relocations in special sections, to save space and reduce the
->> number of absolute relocations that need to be processed at runtime
->> by relocatable kernels, introduce the Kconfig symbol and define it
->> for some architectures that should be able to support and benefit
->> from it.
->
-> Are there actually architectures hat _don't_ support those relative
-> 32-bit relocations? That really feels pretty fundamental.
->
 
-I started out doing all of them, and I don't remember the exact list,
-but there are quite a few architectures that don't support these
-relocations in their module loaders, and in fact, not even ARM does
-(as one of the 'big' architectures).
+On Mon, 12 Mar 2018, at 00:06, Yves-Alexis Perez wrote:
+> On Mon, 2018-03-12 at 00:02 +1300, Menno Finlay-Smits wrote:
+> > Do you want me to help figure out which change to the kernel fixed the
+> > problem?
+> 
+> As far as I can tell and if I'm not mistaken, the fix is already identified
+> and is included in 4.9.86.
+> 
+> I've started working on it for Stretch, and at one point it will be uploaded
+> to -proposed-updates for inclusion in the next point release (9.5). When it's
+> done I'll probably ask you to try a test kernel to make sure it's really
+> fixed.
 
-This is not really surprising, given that the C compiler never emits
-such relative references.
-
-> I would have expected all of them to do it - is your selection of
-> arm64/powerpc/x86 perhaps more about "I have tested these" than about
-> anything else?
->
-> Because I'd almost prefer to just do the switch-over unconditionally
-> if that is at all possible?
->
-
-arm64, powerpc and x86 implement CONFIG_RELOCATABLE, and so they
-benefit more than other architectures, because of the fact that the
-relocation metadata for these data structures can be dropped entirely.
-Other 64-bit architectures only have the 50% size reduction benefit,
-and 32-bit architectures have no benefit at all.
-
-I'm sure all of these architectures define some kind of 32-bit place
-relative relocation in their ELF psABI, and I see how it would be
-cleaner to change everything at once, but I anticipate a long tail of
-issues with toolchains for niche architectures that I have no way to
-test.
+I'm happy to try it out when it's available.
