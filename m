@@ -1,47 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 11 Mar 2018 12:49:54 +0000
-Subject: [PATCH v2 0/2] KVM: arm/arm64: GICv2-on-v3 fixes
-Message-ID: <20180311124956.7683-1-marc.zyngier@arm.com>
+Date: Sun, 11 Mar 2018 12:49:56 +0000
+Subject: [PATCH v2 2/2] kvm: arm/arm64: vgic-v3: Tighten synchronization for
+ guests using v2 on v3
+In-Reply-To: <20180311124956.7683-1-marc.zyngier@arm.com>
+References: <20180311124956.7683-1-marc.zyngier@arm.com>
+Message-ID: <20180311124956.7683-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been trying to run VMs on a GICv3-based system that offers the
-GICv2 compatibility feature, and noticed that they would tend to
-slowly die under load, or even without load.
+On guest exit, and when using GICv2 on GICv3, we use a dsb(st) to
+force synchronization between the memory-mapped guest view and
+the system-register view that the hypervisor uses.
 
-It turned out that this is due to KVM not being exactly true to the
-architecture, and ends up injecting multiple SGI with the same vintid,
-which the architecture clearly outlines as a "don't do that". This bug
-has been there since the first days of the "new vgic". This also
-affects GICv2, but for some reason GIC-400 seems quite tolerant, and
-GIC-500 much less so.
+This is incorrect, as the spec calls out the need for "a DSB whose
+required access type is both loads and stores with any Shareability
+attribute", while we're only synchronizing stores.
 
-The fix is a bit tortuous, as we must ensure that we never allow
-interrupts of lesser priority to be queued before all the pending
-multi-source SGIs are injected (I'd be happy to provide beer to
-whoever writes a proper unit test for that one).
+We also lack an isb after the dsb to ensure that the latter has
+actually been executed before we start reading stuff from the sysregs.
 
-Another issue is that we don't use the right barriers when exiting
-from the guest, as we only synchronize stores, while the architecture
-requires to synchronize both loads and stores. And we miss an isb to
-force execution of the previous dsb.
+The fix is pretty easy: turn dsb(st) into dsb(sy), and slap an isb()
+just after.
 
-- From v1:
-  - Reworked patch #1 after much discussions with Christoffer.
+Cc: stable at vger.kernel.org
+Fixes: f68d2b1b73cc ("arm64: KVM: Implement vgic-v3 save/restore")
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Marc Zyngier (2):
-  KVM: arm/arm64: vgic: Don't populate multiple LRs with the same vintid
-  kvm: arm/arm64: vgic-v3: Tighten synchronization for guests using v2
-    on v3
-
- include/linux/irqchip/arm-gic-v3.h |  1 +
- include/linux/irqchip/arm-gic.h    |  1 +
- virt/kvm/arm/hyp/vgic-v3-sr.c      |  3 +-
- virt/kvm/arm/vgic/vgic-v2.c        |  9 +++++-
- virt/kvm/arm/vgic/vgic-v3.c        |  9 +++++-
- virt/kvm/arm/vgic/vgic.c           | 61 +++++++++++++++++++++++++++++---------
- virt/kvm/arm/vgic/vgic.h           |  2 ++
- 7 files changed, 69 insertions(+), 17 deletions(-)
-
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index f5c3d6d7019e..b89ce5432214 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -215,7 +215,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 	 * are now visible to the system register interface.
+ 	 */
+ 	if (!cpu_if->vgic_sre) {
+-		dsb(st);
++		dsb(sy);
++		isb();
+ 		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+ 	}
+ 
 -- 
 2.14.2
