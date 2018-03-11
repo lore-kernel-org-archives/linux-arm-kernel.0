@@ -1,48 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 11 Mar 2018 23:51:17 +0100
-Subject: [PATCH] soc: mediatek: fix the mistaken pointer accessed when
- subdomains are added
-In-Reply-To: <9d9d75250bf62b491294a0c550c35ab7aba05eef.1518113047.git.sean.wang@mediatek.com>
-References: <9d9d75250bf62b491294a0c550c35ab7aba05eef.1518113047.git.sean.wang@mediatek.com>
-Message-ID: <b3923ae4-3fb4-c107-e7df-cd9d3c5f0652@gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Mon, 12 Mar 2018 00:19:09 +0100
+Subject: [PATCH] drm/sun4i: Fix an error handling path in 'sun4i_drv_bind()'
+Message-ID: <20180311231909.5381-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 070badfab767 ("drm/sun4i: call drm_vblank_init with correct number
+of crtcs") has moved some code without updating the error handling gotos
+accordingly.
+
+Branch to the correct label and remove a now unused lablel.
+
+Fixes: 070badfab767 ("drm/sun4i: call drm_vblank_init with correct number of crtcs")
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 4570da0227b4..d9a71f361b14 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -111,7 +111,7 @@ static int sun4i_drv_bind(struct device *dev)
+ 	/* drm_vblank_init calls kcalloc, which can fail */
+ 	ret = drm_vblank_init(drm, drm->mode_config.num_crtc);
+ 	if (ret)
+-		goto free_mem_region;
++		goto cleanup_mode_config;
+ 
+ 	drm->irq_enabled = true;
+ 
+@@ -139,7 +139,6 @@ static int sun4i_drv_bind(struct device *dev)
+ 	sun4i_framebuffer_free(drm);
+ cleanup_mode_config:
+ 	drm_mode_config_cleanup(drm);
+-free_mem_region:
+ 	of_reserved_mem_device_release(dev);
+ free_drm:
+ 	drm_dev_unref(drm);
+-- 
+2.14.1
 
 
-On 02/08/2018 07:07 PM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Fix the pointer to struct scp_subdomian not being moved forward
-> when each sub-domain is expected to be iteratively added through
-> pm_genpd_add_subdomain call.
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: 53fddb1a66dd ("soc: mediatek: reduce code duplication of scpsys_probe across all SoCs")
-> Reported-by: Weiyi Lu <weiyi.lu@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-
-Pushed now to v4.16-next/soc
-
-Thanks a lot
-
-@stable this would need to be applied since v4.13
-
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index fc55faa..9de801e 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -1048,7 +1048,7 @@ static int scpsys_probe(struct platform_device *pdev)
->  
->  	pd_data = &scp->pd_data;
->  
-> -	for (i = 0, sd = soc->subdomains ; i < soc->num_subdomains ; i++) {
-> +	for (i = 0, sd = soc->subdomains; i < soc->num_subdomains; i++, sd++) {
->  		ret = pm_genpd_add_subdomain(pd_data->domains[sd->origin],
->  					     pd_data->domains[sd->subdomain]);
->  		if (ret && IS_ENABLED(CONFIG_PM))
-> 
+---
+L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
+https://www.avast.com/antivirus
