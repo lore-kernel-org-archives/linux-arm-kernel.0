@@ -1,47 +1,232 @@
-From: corsac@debian.org (Yves-Alexis Perez)
-Date: Sun, 11 Mar 2018 12:06:31 +0100
-Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
- kernel memory overwrite attempt detected" on QNAP NAS (ARM)
-In-Reply-To: <1520766137.2953662.1298951624.71C28713@webmail.messagingengine.com>
-References: <20180304204115.GD21710@lunn.ch>
- <151652931598.757.4527606947579667082.reportbug@massive.lan>
- <20180305142846.GJ25189@lunn.ch> <1520265474.2408.8.camel@debian.org>
- <1520297697.4117371.1292731088.7BEDFAAE@webmail.messagingengine.com>
- <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
- <20180307133611.GC18030@lunn.ch>
- <1520455769.3085111.1295233032.3B89F103@webmail.messagingengine.com>
- <20180307222722.GH1326@lunn.ch>
- <1520589187.923608.1297117744.23E3098C@webmail.messagingengine.com>
- <20180309142724.GD27783@lunn.ch>
- <1520766137.2953662.1298951624.71C28713@webmail.messagingengine.com>
-Message-ID: <1520766391.3566.7.camel@debian.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 11 Mar 2018 12:17:33 +0000
+Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for level
+ interrupt resampling
+In-Reply-To: <CAEDV+g+29ZK6QQEn=2h_77dMZC7wmw+d4MZC-GU-CqeaK_xhMg@mail.gmail.com>
+References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
+ <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
+ <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com>
+ <20180308161900.GC1917@lvm> <86r2oubho3.wl-marc.zyngier@arm.com>
+ <20180309213612.GD1917@lvm> <86k1ukazr0.wl-marc.zyngier@arm.com>
+ <CAEDV+g+29ZK6QQEn=2h_77dMZC7wmw+d4MZC-GU-CqeaK_xhMg@mail.gmail.com>
+Message-ID: <20180311121733.643fb1a5@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-03-12 at 00:02 +1300, Menno Finlay-Smits wrote:
-> Bingo. The problem doesn't seem to happen using linux-image-4.14.0-3-
-> marvell_4.14.17-1 from sid. I've now successfully transferred 1.5TB from an
-> external USB drive onto the internal hard disk. Previously the problem would
-> show up within the first few 100MB of the transfer.
+On Sun, 11 Mar 2018 01:55:08 +0000
+Christoffer Dall <cdall@kernel.org> wrote:
+
+> On Sat, Mar 10, 2018 at 12:20 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On Fri, 09 Mar 2018 21:36:12 +0000,
+> > Christoffer Dall wrote:  
+> >>
+> >> On Thu, Mar 08, 2018 at 05:28:44PM +0000, Marc Zyngier wrote:  
+> >> > I'd be more confident if we did forbid P+A for such interrupts
+> >> > altogether, as they really feel like another kind of HW interrupt.  
+> >>
+> >> How about a slightly bigger hammer:  Can we avoid doing P+A for level
+> >> interrupts completely?  I don't think that really makes much sense, and
+> >> I think we simply everything if we just come back out and resample the
+> >> line.  For an edge, something like a network card, there's a potential
+> >> performance win to appending a new pending state, but I doubt that this
+> >> is the case for level interrupts.  
+> >
+> > I started implementing the same thing yesterday. Somehow, it feels
+> > slightly better to have the same flow for all level interrupts,
+> > including the timer, and we only use the MI on EOI as a way to trigger
+> > the next state of injection. Still testing, but looking good so far.
+> >
+> > I'm still puzzled that we have this level-but-not-quite behaviour for
+> > VFIO interrupts. At some point, it is going to bite us badly.
+> >  
 > 
-> Do you want me to help figure out which change to the kernel fixed the
-> problem?
+> Where is the departure from level-triggered behavior with VFIO?  As
+> far as I can tell, the GIC flow of the interrupts will be just a level
+> interrupt, 
 
-As far as I can tell and if I'm not mistaken, the fix is already identified
-and is included in 4.9.86.
+The GIC is fine, I believe. What is not exactly fine is the signalling
+from the device, which will never be dropped until the EOI has been
+detected.
 
-I've started working on it for Stretch, and at one point it will be uploaded
-to -proposed-updates for inclusion in the next point release (9.5). When it's
-done I'll probably ask you to try a test kernel to make sure it's really
-fixed.
+> but we just need to make sure the resamplefd mechanism is
+> supported for both types of interrupts.  Whether or not that's a
+> decent mechanism seems orthogonal to me, but that's a discussion for
+> another day I think.
 
-Regards,
+Given that VFIO is built around this mechanism, I don't think we have a
+choice but to support it. Anyway, I came up with the following patch,
+which I tested on Seattle with mtty. It also survived my usual
+hammering of cyclictest, hackbench  and bulk VM installs.
+
+Shunyong, could you please give it a go?
+
+Thanks,
+
+	M.
+
+>From 9ca96b9fb535cc6ab578bda85c4ecbc4a8c63cd7 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Fri, 9 Mar 2018 14:59:40 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Disallow Active+Pending for level
+ interrupts
+
+It was recently reported that VFIO mediated devices, and anything
+that VFIO exposes as level interrupts, do no strictly follow the
+expected logic of such interrupts as it only lowers the input
+line when the guest has EOId the interrupt at the GIC level, rather
+than when it Acked the interrupt at the device level.
+
+The GIC's Active+Pending state is fundamentally incompatible with
+this behaviour, as it prevents KVM from observing the EOI, and in
+turn results in VFIO never dropping the line. This results in an
+interrupt storm in the guest, which it really never expected.
+
+As we cannot really change VFIO to follow the strict rules of level
+signalling, let's forbid the A+P state altogether, as it is in the
+end only an optimization. It ensures that we will transition via
+an invalid state, which we can use to notify VFIO of the EOI.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-v2.c | 47 +++++++++++++++++++++++++++------------------
+ virt/kvm/arm/vgic/vgic-v3.c | 47 +++++++++++++++++++++++++++------------------
+ 2 files changed, 56 insertions(+), 38 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 29556f71b691..9356d749da1d 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -153,8 +153,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ {
+ 	u32 val = irq->intid;
++	bool allow_pending = true;
+ 
+-	if (irq_is_pending(irq)) {
++	if (irq->active)
++		val |= GICH_LR_ACTIVE_BIT;
++
++	if (irq->hw) {
++		val |= GICH_LR_HW;
++		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
++		/*
++		 * Never set pending+active on a HW interrupt, as the
++		 * pending state is kept@the physical distributor
++		 * level.
++		 */
++		if (irq->active)
++			allow_pending = false;
++	} else {
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			val |= GICH_LR_EOI;
++
++			/*
++			 * Software resampling doesn't work very well
++			 * if we allow P+A, so let's not do that.
++			 */
++			if (irq->active)
++				allow_pending = false;
++		}
++	}
++
++	if (allow_pending && irq_is_pending(irq)) {
+ 		val |= GICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+@@ -171,24 +198,6 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 		}
+ 	}
+ 
+-	if (irq->active)
+-		val |= GICH_LR_ACTIVE_BIT;
+-
+-	if (irq->hw) {
+-		val |= GICH_LR_HW;
+-		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+-		/*
+-		 * Never set pending+active on a HW interrupt, as the
+-		 * pending state is kept@the physical distributor
+-		 * level.
+-		 */
+-		if (irq->active && irq_is_pending(irq))
+-			val &= ~GICH_LR_PENDING_BIT;
+-	} else {
+-		if (irq->config == VGIC_CONFIG_LEVEL)
+-			val |= GICH_LR_EOI;
+-	}
+-
+ 	/*
+ 	 * Level-triggered mapped IRQs are special because we only observe
+ 	 * rising edges as input to the VGIC.  We therefore lower the line
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 0ff2006f3781..6b484575cafb 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -135,8 +135,35 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ {
+ 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+ 	u64 val = irq->intid;
++	bool allow_pending = true;
+ 
+-	if (irq_is_pending(irq)) {
++	if (irq->active)
++		val |= ICH_LR_ACTIVE_BIT;
++
++	if (irq->hw) {
++		val |= ICH_LR_HW;
++		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
++		/*
++		 * Never set pending+active on a HW interrupt, as the
++		 * pending state is kept@the physical distributor
++		 * level.
++		 */
++		if (irq->active)
++			allow_pending = false;
++	} else {
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			val |= ICH_LR_EOI;
++
++			/*
++			 * Software resampling doesn't work very well
++			 * if we allow P+A, so let's not do that.
++			 */
++			if (irq->active)
++				allow_pending = false;
++		}
++	}
++
++	if (allow_pending && irq_is_pending(irq)) {
+ 		val |= ICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+@@ -154,24 +181,6 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 		}
+ 	}
+ 
+-	if (irq->active)
+-		val |= ICH_LR_ACTIVE_BIT;
+-
+-	if (irq->hw) {
+-		val |= ICH_LR_HW;
+-		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
+-		/*
+-		 * Never set pending+active on a HW interrupt, as the
+-		 * pending state is kept@the physical distributor
+-		 * level.
+-		 */
+-		if (irq->active && irq_is_pending(irq))
+-			val &= ~ICH_LR_PENDING_BIT;
+-	} else {
+-		if (irq->config == VGIC_CONFIG_LEVEL)
+-			val |= ICH_LR_EOI;
+-	}
+-
+ 	/*
+ 	 * Level-triggered mapped IRQs are special because we only observe
+ 	 * rising edges as input to the VGIC.  We therefore lower the line
 -- 
-Yves-Alexis
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180311/9575cd85/attachment.sig>
+2.14.2
+
+
+-- 
+Without deviation from the norm, progress is not possible.
