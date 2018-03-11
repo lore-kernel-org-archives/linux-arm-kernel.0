@@ -1,9 +1,9 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Mar 2018 14:52:58 +0100
-Subject: [PATCH 01/10] ARM: dts: Augment VGA connector bridge on PB11MPcore
+Date: Sun, 11 Mar 2018 14:53:00 +0100
+Subject: [PATCH 03/10] ARM: dts: Augment VGA connector bridge on Realview EB
 In-Reply-To: <20180311135307.6271-1-linus.walleij@linaro.org>
 References: <20180311135307.6271-1-linus.walleij@linaro.org>
-Message-ID: <20180311135307.6271-2-linus.walleij@linaro.org>
+Message-ID: <20180311135307.6271-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,15 +16,15 @@ Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Mali DP Maintainers <malidp@foss.arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/arm-realview-pb11mp.dts | 78 +++++++++++++++++++++----------
- 1 file changed, 53 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/arm-realview-eb.dtsi | 64 +++++++++++++++++++++-------------
+ 1 file changed, 40 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-index 3944765ac4b0..36203288de42 100644
---- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
-+++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-@@ -242,6 +242,49 @@
- 		bank-width = <4>;
+diff --git a/arch/arm/boot/dts/arm-realview-eb.dtsi b/arch/arm/boot/dts/arm-realview-eb.dtsi
+index e2e9599596e2..a917cf8825ca 100644
+--- a/arch/arm/boot/dts/arm-realview-eb.dtsi
++++ b/arch/arm/boot/dts/arm-realview-eb.dtsi
+@@ -143,6 +143,43 @@
+ 		port1-otg;
  	};
  
 +	bridge {
@@ -55,13 +55,7 @@ index 3944765ac4b0..36203288de42 100644
 +	};
 +
 +	vga {
-+		/*
-+		 * This DDC I2C is connected directly to the DVI portions
-+		 * of the connector, so it's not really working when the
-+		 * monitor is connected to the VGA connector.
-+		 */
 +		compatible = "vga-connector";
-+		ddc-i2c-bus = <&i2c1>;
 +
 +		port {
 +			vga_con_in: endpoint {
@@ -70,28 +64,13 @@ index 3944765ac4b0..36203288de42 100644
 +		};
 +	};
 +
- 	soc {
+ 	/* These peripherals are inside the FPGA */
+ 	fpga {
  		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -575,6 +618,13 @@
- 			clock-names = "apb_pclk";
- 		};
- 
-+		i2c1: i2c at 10016000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "arm,versatile-i2c";
-+			reg = <0x10016000 0x1000>;
-+		};
-+
- 		rtc: rtc at 10017000 {
- 			compatible = "arm,pl031", "arm,primecell";
- 			reg = <0x10017000 0x1000>;
-@@ -609,37 +659,15 @@
- 			interrupts = <0 23 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&oscclk4>, <&pclk>;
+@@ -409,36 +446,15 @@
+ 			interrupt-names = "combined";
+ 			clocks = <&oscclk0>, <&pclk>;
  			clock-names = "clcdclk", "apb_pclk";
--			max-memory-bandwidth = <130000000>; /* 16bpp @ 63.5MHz */
 +			/* 1024x768 16bpp @65MHz works fine */
 +			max-memory-bandwidth = <95000000>;
  
@@ -126,7 +105,7 @@ index 3944765ac4b0..36203288de42 100644
 -				};
 -			};
  		};
- 
- 		/*
+ 	};
+ };
 -- 
 2.14.3
