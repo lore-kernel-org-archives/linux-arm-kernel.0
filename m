@@ -1,35 +1,55 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 11 Mar 2018 23:27:41 +0100
-Subject: [PATCH v1 3/5] dt-bindings: clock: add clocks for MT2712
-In-Reply-To: <1519957404.14513.5.camel@mtksdaap41>
-References: <20180222054851.26096-1-weiyi.lu@mediatek.com>
- <20180222054851.26096-5-weiyi.lu@mediatek.com>
- <20180301224555.44pvl67l5oqibbkg@rob-hp-laptop>
- <1519957404.14513.5.camel@mtksdaap41>
-Message-ID: <d1f7b0e7-fa9b-cc87-80df-3479db8b9281@gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Sun, 11 Mar 2018 15:42:37 -0700
+Subject: [PATCH v2 00/12] Introduce STM32MP1 clock driver
+In-Reply-To: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
+References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1520808064.5otv3fo1pe.astroid@resonance.none>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Excerpts from gabriel.fernandez at st.com's message of March 8, 2018 8:53 am:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> v2:
+>   - Don't use MFD, use existing binding of STM32 RCC.
+>   - Rework Peripheral and Kernel clocks
+>   - cosmetic changes
+> 
+> This patch-set introduces clock driver for STM32MP157 based on Arm Cortex-A7.
+> The driver patch is split in several patches (by kind of clock) to facilitate
+> code reviewing.
 
+Applied to clk-stm32mp1 towards v4.17.
 
-On 03/02/2018 03:23 AM, Weiyi Lu wrote:
-> On Thu, 2018-03-01 at 16:45 -0600, Rob Herring wrote:
->> On Thu, Feb 22, 2018 at 01:48:49PM +0800, Weiyi Lu wrote:
->>> add new clocks according to ECO design change
->>>
->>> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
->>> ---
->>>  include/dt-bindings/clock/mt2712-clk.h | 294 +++++++++++++++++----------------
->>>  1 file changed, 151 insertions(+), 143 deletions(-)
->>
->> You can't just renumber your clocks. They are an ABI. Plus, for an ECO 
->> there can't have been that much change.
->>
-> Hi Rob,
-> Got it! Is it correct if I append those new added clocks at the bottom
-> of each own subsystem? If the answer is yes, I'll resend a new version.
+Regards,
+Mike
 
-Yes, that will work. Please do that and resubmit.
-
-Thanks,
-Matthias
+> 
+> Gabriel Fernandez (12):
+>   dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings
+>   clk: stm32mp1: Introduce STM32MP1 clock driver
+>   clk: stm32mp1: add MP1 gate for hse/hsi/csi oscillators
+>   clk: stm32mp1: add Source Clocks for PLLs
+>   clk: stm32mp1: add PLL clocks
+>   clk: stm32mp1: add Post-dividers for PLL
+>   clk: stm32mp1: add Sub System clocks
+>   clk: stm32mp1: add Kernel timers
+>   clk: stm32mp1: add Peripheral & Kernel Clocks
+>   clk: stm32mp1: add RTC clock
+>   clk: stm32mp1: add MCO clocks
+>   clk: stm32mp1: add Debug clocks
+> 
+>  .../devicetree/bindings/clock/st,stm32mp1-rcc.txt  |   60 +
+>  drivers/clk/Kconfig                                |    6 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-stm32mp1.c                         | 2117 ++++++++++++++++++++
+>  include/dt-bindings/clock/stm32mp1-clks.h          |  254 +++
+>  5 files changed, 2438 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+>  create mode 100644 drivers/clk/clk-stm32mp1.c
+>  create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
+> 
+> -- 
+> 1.9.1
+> 
+> 
