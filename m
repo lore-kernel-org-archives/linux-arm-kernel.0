@@ -1,32 +1,64 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 11 Mar 2018 07:24:14 +0800
-Subject: [xlnx:master 1140/1515] warning: (MACB && ..) selects PTP_1588_CLOCK
- which has unmet direct dependencies (NET && ..)
-Message-ID: <201803110709.OvojESuX%fengguang.wu@intel.com>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Sun, 11 Mar 2018 01:56:29 +0100
+Subject: a Heisenbug tale
+In-Reply-To: <CAKv+Gu8z2aMeGEi5Jbi+CBpbyMAmxHnZCO+URrVFgb33tddppw@mail.gmail.com>
+References: <1520450729.13685.19.camel@nxp.com>
+ <c4b2ac3a-9f6f-9985-c7a3-f758c13e7b73@rasmusvillemoes.dk>
+ <CAKv+Gu8z2aMeGEi5Jbi+CBpbyMAmxHnZCO+URrVFgb33tddppw@mail.gmail.com>
+Message-ID: <24703f21-6125-030d-e2ab-4b91cb5c25f8@rasmusvillemoes.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   f445aa62727567784c6e32780d9b13f1011ddc1c
-commit: bd5e4254ba46283ee1aa1e04ba498c34ef171e25 [1140/1515] net: xilinx: Remove ancient xilinx_emacpc.c driver
-config: i386-randconfig-x070-201810 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        git checkout bd5e4254ba46283ee1aa1e04ba498c34ef171e25
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On 2018-03-09 10:45, Ard Biesheuvel wrote:
+> On 8 March 2018 at 23:19, Rasmus Villemoes <linux@rasmusvillemoes.dk> wrote:
+>> On 2018-03-07 20:25, Leonard Crestez wrote:
+>>> Hello,
+>>>
 
-All warnings (new ones prefixed by >>):
+>>
+>> What we ended up doing was to explicitly set the mtime of every file in
+>> the repo to the same reference time after the git checkout (find ... |
+>> xargs touch --date=...). I also wanted to send a patch to change the
+>> Makefile to use the filechk mechanism to avoid updating the .S_shipped
+>> file when the script produced identical output, but never got around to it.
+>>
+> 
+> I had no idea that _shipped files were causing issues like this, and
+> AFAICT, this is not specific to this use case in arch/arm/crypto,
+> right?
+> 
+> Russell, would you mind if we removed the _shipped.S file here and
+> just assume that perl is available?
+> 
 
-warning: (MACB && XILINX_AXI_EMAC_HWTSTAMP && XILINX_TSN_PTP && XILINX_TSN_QBV) selects PTP_1588_CLOCK which has unmet direct dependencies (NET && POSIX_TIMERS)
+Well, in that case I won't need to write a proper changelog for the
+below, but this seems to work. It will of course still give the spurious
+build failures when perl is not available and one hits the "files got
+checked out at almost but not quite the same time", but it would have
+prevented the spurious -dirty bug.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 29681 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180311/828203fa/attachment-0001.gz>
+
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index 30ef8e291271..f0cec9a92fd8 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -54,13 +54,14 @@ crct10dif-arm-ce-y	:= crct10dif-ce-core.o
+crct10dif-ce-glue.o
+ crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+ chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
+
+-quiet_cmd_perl = PERL    $@
+-      cmd_perl = $(PERL) $(<) > $(@)
++define filechk_perl
++	perl $<
++endef
+
+ $(src)/sha256-core.S_shipped: $(src)/sha256-armv4.pl
+-	$(call cmd,perl)
++	$(call filechk,perl)
+
+ $(src)/sha512-core.S_shipped: $(src)/sha512-armv4.pl
+-	$(call cmd,perl)
++	$(call filechk,perl)
+
+ .PRECIOUS: $(obj)/sha256-core.S $(obj)/sha512-core.S
