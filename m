@@ -1,47 +1,39 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Mon, 12 Mar 2018 00:19:09 +0100
-Subject: [PATCH] drm/sun4i: Fix an error handling path in 'sun4i_drv_bind()'
-Message-ID: <20180311231909.5381-1-christophe.jaillet@wanadoo.fr>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 11 Mar 2018 20:19:42 -0300
+Subject: [PATCH] soc: imx: gpc: Use kemdup() function
+Message-ID: <1520810382-13341-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 070badfab767 ("drm/sun4i: call drm_vblank_init with correct number
-of crtcs") has moved some code without updating the error handling gotos
-accordingly.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Branch to the correct label and remove a now unused lablel.
+Use kmemdup() rather than duplicating its implementation.
 
-Fixes: 070badfab767 ("drm/sun4i: call drm_vblank_init with correct number of crtcs")
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Detected with Coccinelle script.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/soc/imx/gpc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 4570da0227b4..d9a71f361b14 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -111,7 +111,7 @@ static int sun4i_drv_bind(struct device *dev)
- 	/* drm_vblank_init calls kcalloc, which can fail */
- 	ret = drm_vblank_init(drm, drm->mode_config.num_crtc);
- 	if (ret)
--		goto free_mem_region;
-+		goto cleanup_mode_config;
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 196f17b..cc3bad8 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -444,12 +444,12 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 			if (domain_index >= of_id_data->num_domains)
+ 				continue;
  
- 	drm->irq_enabled = true;
+-			domain = kmalloc(sizeof(*domain), GFP_KERNEL);
++			domain = kmemdup(&imx_gpc_domains[domain_index],
++					 sizeof(*domain), GFP_KERNEL);
+ 			if (!domain) {
+ 				of_node_put(np);
+ 				return -ENOMEM;
+ 			}
+-			memcpy(domain, &imx_gpc_domains[domain_index], sizeof(*domain));
+ 			domain->regmap = regmap;
+ 			domain->ipg_rate_mhz = ipg_rate_mhz;
  
-@@ -139,7 +139,6 @@ static int sun4i_drv_bind(struct device *dev)
- 	sun4i_framebuffer_free(drm);
- cleanup_mode_config:
- 	drm_mode_config_cleanup(drm);
--free_mem_region:
- 	of_reserved_mem_device_release(dev);
- free_drm:
- 	drm_dev_unref(drm);
 -- 
-2.14.1
-
-
----
-L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
-https://www.avast.com/antivirus
+2.7.4
