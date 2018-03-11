@@ -1,49 +1,58 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Mar 2018 14:53:06 +0100
-Subject: [PATCH 09/10] ARM: defconfig: Update Versatile defconfig
+Date: Sun, 11 Mar 2018 14:53:07 +0100
+Subject: [PATCH 10/10] ARM: defconfig: Configure Versatile boards to use PL111
+ DRM
 In-Reply-To: <20180311135307.6271-1-linus.walleij@linaro.org>
 References: <20180311135307.6271-1-linus.walleij@linaro.org>
-Message-ID: <20180311135307.6271-10-linus.walleij@linaro.org>
+Message-ID: <20180311135307.6271-11-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Versatile defconfig to the latest savedefconfig
-results reflecting changes in Kconfig. We add in the Flash memory
-support that has been available upstream for a while now.
+The DRM driver is now finalized for the Versatile board family,
+so switch the defconfig to use this driver instead of the old
+fbdev driver.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/versatile_defconfig | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/configs/versatile_defconfig | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index 295408ea9dc7..6a3e5774247e 100644
+index 6a3e5774247e..df68dc4056e5 100644
 --- a/arch/arm/configs/versatile_defconfig
 +++ b/arch/arm/configs/versatile_defconfig
-@@ -32,7 +32,9 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_EEPROM_LEGACY=m
- CONFIG_NETDEVICES=y
-@@ -54,14 +56,11 @@ CONFIG_SPI=y
+@@ -12,6 +12,7 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_VERSATILE=y
+ CONFIG_AEABI=y
+ CONFIG_OABI_COMPAT=y
++CONFIG_CMA=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=1f03 mem=32M"
+@@ -49,16 +50,20 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_8250_RSA=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=m
+ CONFIG_I2C_VERSATILE=y
+ CONFIG_SPI=y
  CONFIG_GPIOLIB=y
  CONFIG_GPIO_PL061=y
  # CONFIG_HWMON is not set
--CONFIG_MFD_SYSCON=y
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FB=y
+-CONFIG_FB_ARMCLCD=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_DRM=y
++CONFIG_DRM_PANEL_ARM_VERSATILE=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_PL111=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_LOGO=y
  CONFIG_SOUND=y
  CONFIG_SND=m
--CONFIG_SND_MIXER_OSS=m
--CONFIG_SND_PCM_OSS=m
  CONFIG_SND_ARMAACI=m
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
 -- 
 2.14.3
