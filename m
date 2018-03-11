@@ -1,44 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 11 Mar 2018 12:44:36 +0000
-Subject: [PATCH v8 0/6] add support for relative references in special
- sections
-In-Reply-To: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
-References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9X7THvdZtoshSQbYGmAHvi+TdaqiM9ienASG-3-Zv88w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 11 Mar 2018 12:49:54 +0000
+Subject: [PATCH v2 0/2] KVM: arm/arm64: GICv2-on-v3 fixes
+Message-ID: <20180311124956.7683-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2018 at 12:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-...
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Thomas Garnier <thgarnie@google.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: "Serge E. Hallyn" <serge@hallyn.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Petr Mladek <pmladek@suse.com>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: James Morris <james.l.morris@oracle.com>
+I've been trying to run VMs on a GICv3-based system that offers the
+GICv2 compatibility feature, and noticed that they would tend to
+slowly die under load, or even without load.
 
-Note when replying: this ^^^ email address no longer works.
+It turned out that this is due to KVM not being exactly true to the
+architecture, and ends up injecting multiple SGI with the same vintid,
+which the architecture clearly outlines as a "don't do that". This bug
+has been there since the first days of the "new vgic". This also
+affects GICv2, but for some reason GIC-400 seems quite tolerant, and
+GIC-500 much less so.
 
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Josh Poimboeuf <jpoimboe@redhat.com>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Jessica Yu <jeyu@kernel.org>
->
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: x86 at kernel.org
->
-...
+The fix is a bit tortuous, as we must ensure that we never allow
+interrupts of lesser priority to be queued before all the pending
+multi-source SGIs are injected (I'd be happy to provide beer to
+whoever writes a proper unit test for that one).
+
+Another issue is that we don't use the right barriers when exiting
+from the guest, as we only synchronize stores, while the architecture
+requires to synchronize both loads and stores. And we miss an isb to
+force execution of the previous dsb.
+
+- From v1:
+  - Reworked patch #1 after much discussions with Christoffer.
+
+Marc Zyngier (2):
+  KVM: arm/arm64: vgic: Don't populate multiple LRs with the same vintid
+  kvm: arm/arm64: vgic-v3: Tighten synchronization for guests using v2
+    on v3
+
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ include/linux/irqchip/arm-gic.h    |  1 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c      |  3 +-
+ virt/kvm/arm/vgic/vgic-v2.c        |  9 +++++-
+ virt/kvm/arm/vgic/vgic-v3.c        |  9 +++++-
+ virt/kvm/arm/vgic/vgic.c           | 61 +++++++++++++++++++++++++++++---------
+ virt/kvm/arm/vgic/vgic.h           |  2 ++
+ 7 files changed, 69 insertions(+), 17 deletions(-)
+
+-- 
+2.14.2
