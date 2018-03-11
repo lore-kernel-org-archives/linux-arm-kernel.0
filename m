@@ -1,130 +1,78 @@
-From: amonakov@ispras.ru (Alexander Monakov)
-Date: Sun, 11 Mar 2018 19:00:08 +0300
-Subject: [PATCH 8/8] ARM: dts: berlin2cd: add Valve Steam Link board
-In-Reply-To: <20180311160008.22928-1-amonakov@ispras.ru>
-References: <20180311160008.22928-1-amonakov@ispras.ru>
-Message-ID: <20180311160008.22928-9-amonakov@ispras.ru>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Sun, 11 Mar 2018 17:39:46 +0100
+Subject: [PATCH] clk: imx25: set correct parents for ssi ipg clocks
+In-Reply-To: <CAOMZO5Czv7Rj-wA9L42S9GJhufjw3br0d+iLcf070NWH4SjCbA@mail.gmail.com>
+References: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
+ <CAOMZO5A7W4rbPbZB8ERs518obrg+6F6mDeojkwJaGComFAJB0A@mail.gmail.com>
+ <20180308140851.GA25601@botnar.kaiser.cx>
+ <CAOMZO5BdBWExt9FvPrfUG74Y62e4EUs6cqFyfVs5JuUtym00hQ@mail.gmail.com>
+ <20180308164654.GA31199@botnar.kaiser.cx>
+ <CAOMZO5Czv7Rj-wA9L42S9GJhufjw3br0d+iLcf070NWH4SjCbA@mail.gmail.com>
+Message-ID: <20180311163946.GA11507@botnar.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Valve Steam Link is a consumer device built around the Marvell BG2CD SoC.
-This board file enables the UART, USB and Ethernet interfaces as well as
-internal I2C and SDIO, and adds SoC voltage regulator and board-specific
-GPIO restart method info.
+Hi Fabio & Lothar,
 
-Cc: Sam Lantinga <saml@valvesoftware.com>
-Signed-off-by: Alexander Monakov <amonakov@ispras.ru>
----
-At this point, major missing user-facing features are audio/video and
-power management (cpufreq, cpuidle, and/or suspend).
+Thus wrote Fabio Estevam (festevam at gmail.com):
 
-It's easy to wire up the Vivante 3D graphics core, but without scanout
-it's not useful.
+> On Thu, Mar 8, 2018 at 1:46 PM, Martin Kaiser <martin@kaiser.cx> wrote:
 
-For avoidance of doubt, I am not affiliated with Valve.
+> >> I can get audio to work fine without your patch on a mx25pdk.
 
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/berlin2cd-valve-steamlink.dts | 80 +++++++++++++++++++++++++
- 2 files changed, 81 insertions(+)
- create mode 100644 arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
+> > this is surprising. How come the ssi1_ipg_per clock is not turned off by
+> > clk_disable_unused()? Where is it used? Do you have
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9caf21..e52fa7168dd8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -140,6 +140,7 @@ dtb-$(CONFIG_ARCH_BCM_NSP) += \
- dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2-sony-nsz-gs7.dtb \
- 	berlin2cd-google-chromecast.dtb \
-+	berlin2cd-valve-steamlink.dtb \
- 	berlin2q-marvell-dmp.dtb
- dtb-$(CONFIG_ARCH_BRCMSTB) += \
- 	bcm7445-bcm97445svmb.dtb
-diff --git a/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts b/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
-new file mode 100644
-index 000000000000..3161ada6eb34
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
-@@ -0,0 +1,80 @@
-+/*
-+ * Copyright 2018 Alexander Monakov <amonakov@gmail.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+/dts-v1/;
-+
-+#include "berlin2cd.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Valve Steam Link";
-+	compatible = "valve,steamlink", "marvell,berlin2cd", "marvell,berlin";
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>; /* 512 MB */
-+	};
-+
-+	gpio-restart {
-+		compatible = "gpio-restart";
-+		gpios = <&porta 6 GPIO_ACTIVE_HIGH>;
-+		active-delay = <100>;
-+		inactive-delay = <10>;
-+		wait-delay = <100>;
-+		priority = <200>;
-+	};
-+};
-+
-+&cpu {
-+	cpu-supply = <&vcpu>;
-+	operating-points = <
-+		/* kHz    uV */
-+		1000000 1325000
-+	>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	/* There are two regulators on the board. One is accessible via I2C,
-+	 * with buck1 providing SoC power (set up by bootloader to 1.325V or
-+	 * less depending on leakage value in OTP), and buck2 likely used for
-+	 * DRAM (providing 1.35V). The other regulator on the opposite side
-+	 * of the board is probably supplying SDIO and NAND fixed voltages. */
-+	regulator at 19 {
-+		compatible = "marvell,88pg868";
-+		reg = <0x19>;
-+
-+		vcpu: buck1 {
-+			regulator-boot-on;
-+			regulator-always-on;
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1325000>;
-+		};
-+	};
-+};
-+
-+/* Fixed interface to on-board Marvell 8897 Wi-Fi/Bluetooth/NFC chip. */
-+&sdhci0 {
-+	keep-power-in-suspend;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	/* RX/TX are routed to TP50/TP51 on the board. */
-+	status = "okay";
-+};
-+
-+/* The SoC is connected to on-board USB hub that in turn has one downstream
-+ * port wired to the on-board Steam Controller wireless receiver chip. */
-+&usb_phy1 { status = "okay"; };
-+
-+&usb1 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&eth1 { status = "okay"; };
--- 
-2.11.0
+> > <&clks 55>
+
+> > anywhere in your DT?
+
+> No, I don't. imx25-pdk board operates SSI in slave mode.
+
+> > (My codec chip does not use a dedicated clock line. It takes the bit clock that
+> > is the output of SSI. Are you maybe using ssi1_ipg_per for your codec and
+> > enable it there?)
+
+> The difference between our boards is that you use SSI in master mode
+> and mx25pdk in slave mode.
+
+> > In my first mail, I was wondering about imx25 uart1, where we also have
+> > uart1_ipg and uart_ipg_per and the clock seeting is
+
+> >    clk[uart1_ipg] = imx_clk_gate("uart1_ipg", "ipg", ccm(CCM_CGCR2), 14);
+
+> > In this case, both uart1 and uart_ipg_per are listed in the device tree
+
+> >          uart1: serial at 43f90000 {
+> > ...
+> >             clocks = <&clks 120>, <&clks 57>;
+> >             clock-names = "ipg", "per";
+> >          };
+
+> > Documentation/devicetree/bindings/clock/imx25-clock.txt
+> >    uart_ipg_per      57
+> >    uart1_ipg      120
+
+> > and the driver enables both clocks explicitly. So they are not unused.
+
+
+> > Doing something like this is not an option for ssi, this will not work with
+> > imx31, 35 etc.
+
+> The solution to this is passing the "baud" clock as Lothar pointed out.
+
+ok, I got your point now.
+
+The ssi1_ipg clock does not depend on ssi1_ipg_per. This is in line with
+the clock generation scheme in the reference manual.
+
+And there's configurations where ssi1_ipg should be switched on, but not
+ssi1_ipg_per.
+
+I'll look into using the baud clock on my board.
+
+Thanks to both of you for taking the time to explain this.
+
+Best regards,
+
+   Martin
