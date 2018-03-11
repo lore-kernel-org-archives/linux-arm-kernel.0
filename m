@@ -1,9 +1,9 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Mar 2018 14:52:59 +0100
-Subject: [PATCH 02/10] ARM: dts: Augment VGA connector bridge on PB1176
+Date: Sun, 11 Mar 2018 14:53:01 +0100
+Subject: [PATCH 04/10] ARM: dts: Augment VGA connector bridge on Realview PBX
 In-Reply-To: <20180311135307.6271-1-linus.walleij@linaro.org>
 References: <20180311135307.6271-1-linus.walleij@linaro.org>
-Message-ID: <20180311135307.6271-3-linus.walleij@linaro.org>
+Message-ID: <20180311135307.6271-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,14 +16,24 @@ Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Mali DP Maintainers <malidp@foss.arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/arm-realview-pb1176.dts | 66 +++++++++++++++++++------------
- 1 file changed, 40 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/arm-realview-pbx.dtsi | 82 ++++++++++++++++++++++-----------
+ 1 file changed, 55 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
-index c789564f2803..f935b72d3d96 100644
---- a/arch/arm/boot/dts/arm-realview-pb1176.dts
-+++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
-@@ -161,6 +161,43 @@
+diff --git a/arch/arm/boot/dts/arm-realview-pbx.dtsi b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+index aeb49c4bd773..10868ba3277f 100644
+--- a/arch/arm/boot/dts/arm-realview-pbx.dtsi
++++ b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+@@ -34,7 +34,8 @@
+ 		serial1 = &serial1;
+ 		serial2 = &serial2;
+ 		serial3 = &serial3;
+-		i2c0 = &i2c;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
+ 	};
+ 
+ 	memory {
+@@ -158,6 +159,49 @@
  		port1-otg;
  	};
  
@@ -55,7 +65,13 @@ index c789564f2803..f935b72d3d96 100644
 +	};
 +
 +	vga {
++		/*
++		 * This DDC I2C is connected directly to the DVI portions
++		 * of the connector, so it's not really working when the
++		 * monitor is connected to the VGA connector.
++		 */
 +		compatible = "vga-connector";
++		ddc-i2c-bus = <&i2c1>;
 +
 +		port {
 +			vga_con_in: endpoint {
@@ -64,12 +80,35 @@ index c789564f2803..f935b72d3d96 100644
 +		};
 +	};
 +
- 	soc {
+ 	soc: soc at 0 {
+ 		compatible = "arm,realview-pbx-soc", "simple-bus";
  		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -403,36 +440,15 @@
- 			interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&oscclk0>, <&pclk>;
+@@ -285,7 +329,7 @@
+ 					       <&timclk>;
+ 		};
+ 
+-		i2c: i2c at 10002000 {
++		i2c0: i2c at 10002000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "arm,versatile-i2c";
+@@ -396,7 +440,12 @@
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+-		/* DVI serial bus control is at 10016000 */
++		i2c1: i2c at 10016000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "arm,versatile-i2c";
++			reg = <0x10016000 0x1000>;
++		};
+ 
+ 		rtc: rtc at 10017000 {
+ 			compatible = "arm,pl031", "arm,primecell";
+@@ -506,36 +555,15 @@
+ 			interrupt-names = "combined";
+ 			clocks = <&oscclk4>, <&pclk>;
  			clock-names = "clcdclk", "apb_pclk";
 +			/* 1024x768 16bpp @65MHz works fine */
 +			max-memory-bandwidth = <95000000>;
@@ -105,14 +144,6 @@ index c789564f2803..f935b72d3d96 100644
 -				};
 -			};
  		};
- 	};
- 
-@@ -564,7 +580,5 @@
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
- 		};
--
--
  	};
  };
 -- 
