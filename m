@@ -1,9 +1,9 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Mar 2018 14:53:00 +0100
-Subject: [PATCH 03/10] ARM: dts: Augment VGA connector bridge on Realview EB
+Date: Sun, 11 Mar 2018 14:52:59 +0100
+Subject: [PATCH 02/10] ARM: dts: Augment VGA connector bridge on PB1176
 In-Reply-To: <20180311135307.6271-1-linus.walleij@linaro.org>
 References: <20180311135307.6271-1-linus.walleij@linaro.org>
-Message-ID: <20180311135307.6271-4-linus.walleij@linaro.org>
+Message-ID: <20180311135307.6271-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,14 +16,14 @@ Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Mali DP Maintainers <malidp@foss.arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/arm-realview-eb.dtsi | 64 +++++++++++++++++++++-------------
- 1 file changed, 40 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 66 +++++++++++++++++++------------
+ 1 file changed, 40 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/arm-realview-eb.dtsi b/arch/arm/boot/dts/arm-realview-eb.dtsi
-index e2e9599596e2..a917cf8825ca 100644
---- a/arch/arm/boot/dts/arm-realview-eb.dtsi
-+++ b/arch/arm/boot/dts/arm-realview-eb.dtsi
-@@ -143,6 +143,43 @@
+diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
+index c789564f2803..f935b72d3d96 100644
+--- a/arch/arm/boot/dts/arm-realview-pb1176.dts
++++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+@@ -161,6 +161,43 @@
  		port1-otg;
  	};
  
@@ -64,11 +64,11 @@ index e2e9599596e2..a917cf8825ca 100644
 +		};
 +	};
 +
- 	/* These peripherals are inside the FPGA */
- 	fpga {
+ 	soc {
  		#address-cells = <1>;
-@@ -409,36 +446,15 @@
- 			interrupt-names = "combined";
+ 		#size-cells = <1>;
+@@ -403,36 +440,15 @@
+ 			interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
  			clocks = <&oscclk0>, <&pclk>;
  			clock-names = "clcdclk", "apb_pclk";
 +			/* 1024x768 16bpp @65MHz works fine */
@@ -105,6 +105,14 @@ index e2e9599596e2..a917cf8825ca 100644
 -				};
 -			};
  		};
+ 	};
+ 
+@@ -564,7 +580,5 @@
+ 			clocks = <&pclk>;
+ 			clock-names = "apb_pclk";
+ 		};
+-
+-
  	};
  };
 -- 
