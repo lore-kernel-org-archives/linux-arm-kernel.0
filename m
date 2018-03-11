@@ -1,268 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 11 Mar 2018 12:49:55 +0000
-Subject: [PATCH v2 1/2] KVM: arm/arm64: vgic: Don't populate multiple LRs with
- the same vintid
-In-Reply-To: <20180311124956.7683-1-marc.zyngier@arm.com>
-References: <20180311124956.7683-1-marc.zyngier@arm.com>
-Message-ID: <20180311124956.7683-2-marc.zyngier@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 11 Mar 2018 14:52:57 +0100
+Subject: [PATCH 00/10] Switch Versatile and RealView to DRM
+Message-ID: <20180311135307.6271-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic code is trying to be clever when injecting GICv2 SGIs,
-and will happily populate LRs with the same interrupt number if
-they come from multiple vcpus (after all, they are distinct
-interrupt sources).
+The ARM Versatile and RealView platforms have enough support
+merged for v4.17/next that we can fully switch them all over to
+using the DRM PL111 driver instead of the old fbdev driver.
 
-Unfortunately, this is against the letter of the architecture,
-and the GICv2 architecture spec says "Each valid interrupt stored
-in the List registers must have a unique VirtualID for that
-virtual CPU interface.". GICv3 has similar (although slightly
-ambiguous) restrictions.
+Integrator and Versatile Express will follow.
 
-This results in guests locking up when using GICv2-on-GICv3, for
-example. The obvious fix is to stop trying so hard, and inject
-a single vcpu per SGI per guest entry. After all, pending SGIs
-with multiple source vcpus are pretty rare, and are mostly seen
-in scenario where the physical CPUs are severely overcomitted.
+The device trees are augmented with the proper VGA bridges
+instead of "panels" that were never correct, the maximum
+memory bandwidth is augmented and these platforms can now
+in many cases support 1024x768 in 16bpp instead of only
+640x480 with 32bpp.
 
-But as we now only inject a single instance of a multi-source SGI per
-vcpu entry, we may delay those interrupts for longer than strictly
-necessary, and run the risk of injecting lower priority interrupts
-in the meantime.
+If the board has the IB1 or IB2 daughterboard
+mounted, the daughterboard display will take precedence
+over the VGA connector. The IB1 daughterboard which connects
+a number of various displays does not need any separate device
+tree: it will be autodetected.
 
-In order to address this, we adopt a three stage strategy:
-- If we encounter a multi-source SGI in the AP list while computing
-  its depth, we force the list to be sorted
-- When populating the LRs, we prevent the injection of any interrupt
-  of lower priority than that of the first multi-source SGI we've
-  injected.
-- Finally, the injection of a multi-source SGI triggers the request
-  of a maintenance interrupt when there will be no pending interrupt
-  in the LRs (HCR_NPIE).
+For the Versatile CP with the IB2 daughterboard we need to
+add a new device tree, as it has a system controller we need
+to access and a few other features we may want to make use of
+in the future. (It already has proper device tree bindings
+in place.)
 
-At the point where the last pending interrupt in the LRs switches
-from Pending to Active, the maintenance interrupt will be delivered,
-allowing us to add the remaining SGIs using the same process.
+This has been tested on:
 
-Cc: stable at vger.kernel.org
-Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/linux/irqchip/arm-gic-v3.h |  1 +
- include/linux/irqchip/arm-gic.h    |  1 +
- virt/kvm/arm/vgic/vgic-v2.c        |  9 +++++-
- virt/kvm/arm/vgic/vgic-v3.c        |  9 +++++-
- virt/kvm/arm/vgic/vgic.c           | 61 +++++++++++++++++++++++++++++---------
- virt/kvm/arm/vgic/vgic.h           |  2 ++
- 6 files changed, 67 insertions(+), 16 deletions(-)
+- RealView PM11MPCore
+- RealView PB1176
+- Versatile AB with and without the IB2 daughterboard
+- All applicable QEMU models: RealView EB, RealView PBA8,
+  RealView PBX-A9 and Versatile AB.
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index c00c4c33e432..b26eccc78fb1 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -503,6 +503,7 @@
- 
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_NPIE			(1 << 3)
- #define ICH_HCR_TC			(1 << 10)
- #define ICH_HCR_TALL0			(1 << 11)
- #define ICH_HCR_TALL1			(1 << 12)
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index d3453ee072fc..68d8b1f73682 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -84,6 +84,7 @@
- 
- #define GICH_HCR_EN			(1 << 0)
- #define GICH_HCR_UIE			(1 << 1)
-+#define GICH_HCR_NPIE			(1 << 3)
- 
- #define GICH_LR_VIRTUALID		(0x3ff << 0)
- #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index c32d7b93ffd1..44264d11be02 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -37,6 +37,13 @@ void vgic_v2_init_lrs(void)
- 		vgic_v2_write_lr(i, 0);
- }
- 
-+void vgic_v2_set_npie(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-+
-+	cpuif->vgic_hcr |= GICH_HCR_NPIE;
-+}
-+
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-@@ -64,7 +71,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 	int lr;
- 	unsigned long flags;
- 
--	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
-+	cpuif->vgic_hcr &= ~(GICH_HCR_UIE | GICH_HCR_NPIE);
- 
- 	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
- 		u32 val = cpuif->vgic_lr[lr];
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6b329414e57a..0ff2006f3781 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -26,6 +26,13 @@ static bool group1_trap;
- static bool common_trap;
- static bool gicv4_enable;
- 
-+void vgic_v3_set_npie(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	cpuif->vgic_hcr |= ICH_HCR_NPIE;
-+}
-+
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -47,7 +54,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 	int lr;
- 	unsigned long flags;
- 
--	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
-+	cpuif->vgic_hcr &= ~(ICH_HCR_UIE | ICH_HCR_NPIE);
- 
- 	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
- 		u64 val = cpuif->vgic_lr[lr];
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index c7c5ef190afa..859cf88657d5 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -684,22 +684,37 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
- 		vgic_v3_set_underflow(vcpu);
- }
- 
-+static inline void vgic_set_npie(struct kvm_vcpu *vcpu)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_set_npie(vcpu);
-+	else
-+		vgic_v3_set_npie(vcpu);
-+}
-+
- /* Requires the ap_list_lock to be held. */
--static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
-+static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
-+				 bool *multi_sgi)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_irq *irq;
- 	int count = 0;
- 
-+	*multi_sgi = false;
-+
- 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
- 
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
- 		/* GICv2 SGIs can count for more than one... */
--		if (vgic_irq_is_sgi(irq->intid) && irq->source)
--			count += hweight8(irq->source);
--		else
-+		if (vgic_irq_is_sgi(irq->intid) && irq->source) {
-+			int w = hweight8(irq->source);
-+
-+			count += w;
-+			*multi_sgi |= (w > 1);
-+		} else {
- 			count++;
-+		}
- 		spin_unlock(&irq->irq_lock);
- 	}
- 	return count;
-@@ -710,28 +725,43 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_irq *irq;
--	int count = 0;
-+	int count;
-+	bool npie = false;
-+	bool multi_sgi;
-+	u8 prio = 0xff;
- 
- 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
- 
--	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr)
-+	count = compute_ap_list_depth(vcpu, &multi_sgi);
-+	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
- 		vgic_sort_ap_list(vcpu);
- 
-+	count = 0;
-+
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
- 
--		if (unlikely(vgic_target_oracle(irq) != vcpu))
--			goto next;
--
- 		/*
--		 * If we get an SGI with multiple sources, try to get
--		 * them in all at once.
-+		 * If we have multi-SGIs in the pipeline, we need to
-+		 * guarantee that they are all seen before any IRQ of
-+		 * lower priority. In that case, we need to filter out
-+		 * these interrupts by exiting early. This is easy as
-+		 * the AP list has been sorted already.
- 		 */
--		do {
-+		if (multi_sgi && irq->priority > prio) {
-+			spin_unlock(&irq->irq_lock);
-+			break;
-+		}
-+
-+		if (likely(vgic_target_oracle(irq) == vcpu)) {
- 			vgic_populate_lr(vcpu, irq, count++);
--		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
- 
--next:
-+			if (irq->source) {
-+				npie = true;
-+				prio = irq->priority;
-+			}
-+		}
-+
- 		spin_unlock(&irq->irq_lock);
- 
- 		if (count == kvm_vgic_global_state.nr_lr) {
-@@ -742,6 +772,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- 		}
- 	}
- 
-+	if (npie)
-+		vgic_set_npie(vcpu);
-+
- 	vcpu->arch.vgic_cpu.used_lrs = count;
- 
- 	/* Nuke remaining LRs */
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 12c37b89f7a3..91f37c05e817 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -159,6 +159,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+void vgic_v2_set_npie(struct kvm_vcpu *vcpu);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
- int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 int offset, u32 *val);
-@@ -188,6 +189,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
-+void vgic_v3_set_npie(struct kvm_vcpu *vcpu);
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_enable(struct kvm_vcpu *vcpu);
+I'm planning to send this as two pull requests: one for the
+DTS changes and one for the defconfig changes.
+
+Linus Walleij (10):
+  ARM: dts: Augment VGA connector bridge on PB11MPcore
+  ARM: dts: Augment VGA connector bridge on PB1176
+  ARM: dts: Augment VGA connector bridge on Realview EB
+  ARM: dts: Augment VGA connector bridge on Realview PBX
+  ARM: dts: Add Versatile IB2 device tree
+  ARM: dts: Augment panel setting for Versatile
+  ARM: defconfig: Update RealView defconfig
+  ARM: defconfig: Switch RealView boards to use P111 DRM
+  ARM: defconfig: Update Versatile defconfig
+  ARM: defconfig: Configure Versatile boards to use PL111 DRM
+
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/arm-realview-eb.dtsi    | 64 +++++++++++++++---------
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 66 ++++++++++++++----------
+ arch/arm/boot/dts/arm-realview-pb11mp.dts | 78 +++++++++++++++++++----------
+ arch/arm/boot/dts/arm-realview-pbx.dtsi   | 82 ++++++++++++++++++++----------
+ arch/arm/boot/dts/versatile-ab-ib2.dts    | 26 ++++++++++
+ arch/arm/boot/dts/versatile-ab.dts        | 83 ++++++++++++++++++++++++++++++-
+ arch/arm/configs/realview_defconfig       | 21 ++++----
+ arch/arm/configs/versatile_defconfig      | 18 ++++---
+ 9 files changed, 317 insertions(+), 122 deletions(-)
+ create mode 100644 arch/arm/boot/dts/versatile-ab-ib2.dts
+
 -- 
-2.14.2
+2.14.3
