@@ -1,19 +1,23 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 11 Mar 2018 15:38:13 -0300
-Subject: PSCI version misdetection
-In-Reply-To: <CAOMZO5B1sGECGRAtaYwuV9xeDkAXSv0iqPJeopJ_JEtFAOaM-Q@mail.gmail.com>
-References: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
- <CAOMZO5B1sGECGRAtaYwuV9xeDkAXSv0iqPJeopJ_JEtFAOaM-Q@mail.gmail.com>
-Message-ID: <CAOMZO5C73L4Dyf9iCC3nzWoGcf2CU4Cy4zvO6_72t+=v=b_Swg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Sun, 11 Mar 2018 12:08:00 -0700
+Subject: [PATCH v8 0/6] add support for relative references in special
+ sections
+In-Reply-To: <CAKv+Gu9X7THvdZtoshSQbYGmAHvi+TdaqiM9ienASG-3-Zv88w@mail.gmail.com>
+References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9X7THvdZtoshSQbYGmAHvi+TdaqiM9ienASG-3-Zv88w@mail.gmail.com>
+Message-ID: <CAGXu5jJSQZJMT1T0a4_yJ1FXCVEy+yhyYF8yLwVvugs8DA=_QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2018 at 3:37 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Sat, Mar 10, 2018 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi,
->>
->> On a  imx7d-sdb board running 4.14-rc6:
+On Sun, Mar 11, 2018 at 5:44 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 11 March 2018 at 12:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> Cc: James Morris <james.l.morris@oracle.com>
 >
-> I meant 4.14-rc4 :-)
+> Note when replying: this ^^^ email address no longer works.
 
-Ok, let me type it right: 4.16-rc4
+James updated MAINTAINERS to: James Morris <jmorris@namei.org>
+
+-- 
+Kees Cook
+Pixel Security
