@@ -1,232 +1,163 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 11 Mar 2018 12:17:33 +0000
-Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for level
- interrupt resampling
-In-Reply-To: <CAEDV+g+29ZK6QQEn=2h_77dMZC7wmw+d4MZC-GU-CqeaK_xhMg@mail.gmail.com>
-References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
- <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
- <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com>
- <20180308161900.GC1917@lvm> <86r2oubho3.wl-marc.zyngier@arm.com>
- <20180309213612.GD1917@lvm> <86k1ukazr0.wl-marc.zyngier@arm.com>
- <CAEDV+g+29ZK6QQEn=2h_77dMZC7wmw+d4MZC-GU-CqeaK_xhMg@mail.gmail.com>
-Message-ID: <20180311121733.643fb1a5@why.wild-wind.fr.eu.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 11 Mar 2018 12:38:09 +0000
+Subject: [PATCH v8 0/6] add support for relative references in special sections
+Message-ID: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Mar 2018 01:55:08 +0000
-Christoffer Dall <cdall@kernel.org> wrote:
+This adds support for emitting special sections such as initcall arrays,
+PCI fixups and tracepoints as relative references rather than absolute
+references. This reduces the size by 50% on 64-bit architectures, but
+more importantly, it removes the need for carrying relocation metadata
+for these sections in relocatable kernels (e.g., for KASLR) that needs
+to be fixed up at boot time. On arm64, this reduces the vmlinux footprint
+of such a reference by 8x (8 byte absolute reference + 24 byte RELA entry
+vs 4 byte relative reference)
 
-> On Sat, Mar 10, 2018 at 12:20 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On Fri, 09 Mar 2018 21:36:12 +0000,
-> > Christoffer Dall wrote:  
-> >>
-> >> On Thu, Mar 08, 2018 at 05:28:44PM +0000, Marc Zyngier wrote:  
-> >> > I'd be more confident if we did forbid P+A for such interrupts
-> >> > altogether, as they really feel like another kind of HW interrupt.  
-> >>
-> >> How about a slightly bigger hammer:  Can we avoid doing P+A for level
-> >> interrupts completely?  I don't think that really makes much sense, and
-> >> I think we simply everything if we just come back out and resample the
-> >> line.  For an edge, something like a network card, there's a potential
-> >> performance win to appending a new pending state, but I doubt that this
-> >> is the case for level interrupts.  
-> >
-> > I started implementing the same thing yesterday. Somehow, it feels
-> > slightly better to have the same flow for all level interrupts,
-> > including the timer, and we only use the MI on EOI as a way to trigger
-> > the next state of injection. Still testing, but looking good so far.
-> >
-> > I'm still puzzled that we have this level-but-not-quite behaviour for
-> > VFIO interrupts. At some point, it is going to bite us badly.
-> >  
-> 
-> Where is the departure from level-triggered behavior with VFIO?  As
-> far as I can tell, the GIC flow of the interrupts will be just a level
-> interrupt, 
+Patch #3 was sent out before as a single patch. This series supersedes
+the previous submission. This version makes relative ksymtab entries
+dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
+than trying to infer from kbuild test robot replies for which architectures
+it should be blacklisted.
 
-The GIC is fine, I believe. What is not exactly fine is the signalling
-from the device, which will never be dropped until the EOI has been
-detected.
+Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
+and sets it for the main architectures that are expected to benefit the
+most from this feature, i.e., 64-bit architectures or ones that use
+runtime relocations.
 
-> but we just need to make sure the resamplefd mechanism is
-> supported for both types of interrupts.  Whether or not that's a
-> decent mechanism seems orthogonal to me, but that's a discussion for
-> another day I think.
+Patch #2 add support for #define'ing __DISABLE_EXPORTS to get rid of
+ksymtab/kcrctab sections in decompressor and EFI stub objects when
+rebuilding existing C files to run in a different context.
 
-Given that VFIO is built around this mechanism, I don't think we have a
-choice but to support it. Anyway, I came up with the following patch,
-which I tested on Seattle with mtty. It also survived my usual
-hammering of cyclictest, hackbench  and bulk VM installs.
+Patches #4 - #6 implement relative references for initcalls, PCI fixups
+and tracepoints, respectively, all of which produce sections with order
+~1000 entries on an arm64 defconfig kernel with tracing enabled. This
+means we save about 28 KB of vmlinux space for each of these patches.
 
-Shunyong, could you please give it a go?
+[From the v7 series blurb, which included the jump_label patches as well]:
+  For the arm64 kernel, all patches combined reduce the memory footprint of
+  vmlinux by about 1.3 MB (using a config copied from Ubuntu that has KASLR
+  enabled), of which ~1 MB is the size reduction of the RELA section in .init,
+  and the remaining 300 KB is reduction of .text/.data.
 
-Thanks,
+Branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git relative-special-sections-v8
 
-	M.
+Changes since v7:
+- dropped the jump_label patches, these will be revisited in a separate series
+- reorder __DISABLE_EXPORTS with __KSYM_DEPS__ check in #2
+- use offset_to_ptr() helper function to abstract the relative pointer
+  conversion [int *off -> (ulong)off + *off] (#3 - #6)
+- rebase onto v4.16-rc3
 
->From 9ca96b9fb535cc6ab578bda85c4ecbc4a8c63cd7 Mon Sep 17 00:00:00 2001
-From: Marc Zyngier <marc.zyngier@arm.com>
-Date: Fri, 9 Mar 2018 14:59:40 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Disallow Active+Pending for level
- interrupts
+Changes since v6:
+- drop S390 from patch #1 introducing HAVE_ARCH_PREL32_RELOCATIONS: kbuild
+  robot threw me some s390 curveballs, and given that s390 does not define
+  CONFIG_RELOCATABLE in the first place, it does not benefit as much from
+  relative references as arm64, x86 and power do
+- add patch to allow symbol exports to be disabled at compilation unit
+  granularity (#2)
+- get rid of arm64 vmlinux.lds.S hunk to ensure code generated by __ADDRESSABLE
+  gets discarded from the EFI stub - it is no longer needed after adding #2 (#1)
+- change _ADDRESSABLE() to emit a data reference, not a code reference - this
+  is another simplification made possible by patch #2 (#3)
+- add Steven's ack to #6
+- split x86 jump_label patch into two (#9, #10)
 
-It was recently reported that VFIO mediated devices, and anything
-that VFIO exposes as level interrupts, do no strictly follow the
-expected logic of such interrupts as it only lowers the input
-line when the guest has EOId the interrupt at the GIC level, rather
-than when it Acked the interrupt at the device level.
+Changes since v5:
+- add missing jump_label prototypes to s390 jump_label.h (#6)
+- fix inverted condition in call to jump_entry_is_module_init() (#6)
 
-The GIC's Active+Pending state is fundamentally incompatible with
-this behaviour, as it prevents KVM from observing the EOI, and in
-turn results in VFIO never dropping the line. This results in an
-interrupt storm in the guest, which it really never expected.
+Changes since v4:
+- add patches to convert x86 and arm64 to use relative references for jump
+  tables (#6 - #8)
+- rename PCI patch and add Bjorn's ack (#4)
+- rebase onto v4.15-rc5
 
-As we cannot really change VFIO to follow the strict rules of level
-signalling, let's forbid the A+P state altogether, as it is in the
-end only an optimization. It ensures that we will transition via
-an invalid state, which we can use to notify VFIO of the EOI.
+Changes since v3:
+- fix module unload issue in patch #5 reported by Jessica, by reusing the
+  updated routine for_each_tracepoint_range() for the quiescent check at
+  module unload time; this requires this routine to be moved before
+  tracepoint_module_going() in kernel/tracepoint.c
+- add Jessica's ack to #2
+- rebase onto v4.14-rc1
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-v2.c | 47 +++++++++++++++++++++++++++------------------
- virt/kvm/arm/vgic/vgic-v3.c | 47 +++++++++++++++++++++++++++------------------
- 2 files changed, 56 insertions(+), 38 deletions(-)
+Changes since v2:
+- Revert my slightly misguided attempt to appease checkpatch, which resulted
+  in needless churn and worse code. This v3 is based on v1 with a few tweaks
+  that were actually reasonable checkpatch warnings: unnecessary braces (as
+  pointed out by Ingo) and other minor whitespace misdemeanors.
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 29556f71b691..9356d749da1d 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -153,8 +153,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- {
- 	u32 val = irq->intid;
-+	bool allow_pending = true;
- 
--	if (irq_is_pending(irq)) {
-+	if (irq->active)
-+		val |= GICH_LR_ACTIVE_BIT;
-+
-+	if (irq->hw) {
-+		val |= GICH_LR_HW;
-+		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-+		/*
-+		 * Never set pending+active on a HW interrupt, as the
-+		 * pending state is kept@the physical distributor
-+		 * level.
-+		 */
-+		if (irq->active)
-+			allow_pending = false;
-+	} else {
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			val |= GICH_LR_EOI;
-+
-+			/*
-+			 * Software resampling doesn't work very well
-+			 * if we allow P+A, so let's not do that.
-+			 */
-+			if (irq->active)
-+				allow_pending = false;
-+		}
-+	}
-+
-+	if (allow_pending && irq_is_pending(irq)) {
- 		val |= GICH_LR_PENDING_BIT;
- 
- 		if (irq->config == VGIC_CONFIG_EDGE)
-@@ -171,24 +198,6 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 		}
- 	}
- 
--	if (irq->active)
--		val |= GICH_LR_ACTIVE_BIT;
--
--	if (irq->hw) {
--		val |= GICH_LR_HW;
--		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
--		/*
--		 * Never set pending+active on a HW interrupt, as the
--		 * pending state is kept@the physical distributor
--		 * level.
--		 */
--		if (irq->active && irq_is_pending(irq))
--			val &= ~GICH_LR_PENDING_BIT;
--	} else {
--		if (irq->config == VGIC_CONFIG_LEVEL)
--			val |= GICH_LR_EOI;
--	}
--
- 	/*
- 	 * Level-triggered mapped IRQs are special because we only observe
- 	 * rising edges as input to the VGIC.  We therefore lower the line
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 0ff2006f3781..6b484575cafb 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -135,8 +135,35 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- {
- 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	u64 val = irq->intid;
-+	bool allow_pending = true;
- 
--	if (irq_is_pending(irq)) {
-+	if (irq->active)
-+		val |= ICH_LR_ACTIVE_BIT;
-+
-+	if (irq->hw) {
-+		val |= ICH_LR_HW;
-+		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-+		/*
-+		 * Never set pending+active on a HW interrupt, as the
-+		 * pending state is kept@the physical distributor
-+		 * level.
-+		 */
-+		if (irq->active)
-+			allow_pending = false;
-+	} else {
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			val |= ICH_LR_EOI;
-+
-+			/*
-+			 * Software resampling doesn't work very well
-+			 * if we allow P+A, so let's not do that.
-+			 */
-+			if (irq->active)
-+				allow_pending = false;
-+		}
-+	}
-+
-+	if (allow_pending && irq_is_pending(irq)) {
- 		val |= ICH_LR_PENDING_BIT;
- 
- 		if (irq->config == VGIC_CONFIG_EDGE)
-@@ -154,24 +181,6 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 		}
- 	}
- 
--	if (irq->active)
--		val |= ICH_LR_ACTIVE_BIT;
--
--	if (irq->hw) {
--		val |= ICH_LR_HW;
--		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
--		/*
--		 * Never set pending+active on a HW interrupt, as the
--		 * pending state is kept@the physical distributor
--		 * level.
--		 */
--		if (irq->active && irq_is_pending(irq))
--			val &= ~ICH_LR_PENDING_BIT;
--	} else {
--		if (irq->config == VGIC_CONFIG_LEVEL)
--			val |= ICH_LR_EOI;
--	}
--
- 	/*
- 	 * Level-triggered mapped IRQs are special because we only observe
- 	 * rising edges as input to the VGIC.  We therefore lower the line
--- 
-2.14.2
+Changes since v1:
+- Remove checkpatch errors to the extent feasible: in some cases, this
+  involves moving extern declarations into C files, and switching to
+  struct definitions rather than typedefs. Some errors are impossible
+  to fix: please find the remaining ones after the diffstat.
+- Used 'int' instead if 'signed int' for the various offset fields: there
+  is no ambiguity between architectures regarding its signedness (unlike
+  'char')
+- Refactor the different patches to be more uniform in the way they define
+  the section entry type and accessors in the .h file, and avoid the need to
+  add #ifdefs to the C code.
 
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Thomas Garnier <thgarnie@google.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: "Serge E. Hallyn" <serge@hallyn.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Petr Mladek <pmladek@suse.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: James Morris <james.l.morris@oracle.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Josh Poimboeuf <jpoimboe@redhat.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Jessica Yu <jeyu@kernel.org>
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: x86 at kernel.org
+
+Ard Biesheuvel (6):
+  arch: enable relative relocations for arm64, power and x86
+  module: allow symbol exports to be disabled
+  module: use relative references for __ksymtab entries
+  init: allow initcall tables to be emitted using relative references
+  PCI: Add support for relative addressing in quirk tables
+  kernel: tracepoints: add support for relative references
+
+ arch/Kconfig                          | 10 ++++
+ arch/arm64/Kconfig                    |  1 +
+ arch/powerpc/Kconfig                  |  1 +
+ arch/x86/Kconfig                      |  1 +
+ arch/x86/boot/compressed/kaslr.c      |  5 +-
+ arch/x86/include/asm/Kbuild           |  1 +
+ arch/x86/include/asm/export.h         |  5 --
+ drivers/firmware/efi/libstub/Makefile |  3 +-
+ drivers/pci/quirks.c                  | 12 +++--
+ include/asm-generic/export.h          | 12 ++++-
+ include/linux/compiler.h              | 19 +++++++
+ include/linux/export.h                | 57 +++++++++++++++-----
+ include/linux/init.h                  | 44 +++++++++++----
+ include/linux/pci.h                   | 20 +++++++
+ include/linux/tracepoint.h            | 19 +++++--
+ init/main.c                           | 32 +++++------
+ kernel/module.c                       | 32 ++++++++---
+ kernel/printk/printk.c                |  4 +-
+ kernel/tracepoint.c                   | 49 +++++++++--------
+ security/security.c                   |  4 +-
+ 20 files changed, 240 insertions(+), 91 deletions(-)
+ delete mode 100644 arch/x86/include/asm/export.h
 
 -- 
-Without deviation from the norm, progress is not possible.
+2.15.1
