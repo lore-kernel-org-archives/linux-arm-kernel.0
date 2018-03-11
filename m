@@ -1,43 +1,32 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Sun, 11 Mar 2018 06:03:13 -0400
-Subject: [PATCH] ARM: BCM5301X: Fix NAND ECC parameters for Linksys
- Panamera
-In-Reply-To: <CACna6rz1TeRbPq-60HkHz9A0TDn+iXtmXniE6FCiANpUmV-qrw@mail.gmail.com>
-References: <20180310171244.70299-1-npcomplete13@gmail.com>
- <CACna6rz1TeRbPq-60HkHz9A0TDn+iXtmXniE6FCiANpUmV-qrw@mail.gmail.com>
-Message-ID: <20180311100313.znonhesgh462rz65@osboxes>
+From: inbox@menno.io (Menno Finlay-Smits)
+Date: Mon, 12 Mar 2018 00:02:17 +1300
+Subject: Bug#887873: linux-image-4.9.0-5-marvell: frequent "usercopy:
+ kernel memory overwrite attempt detected" on QNAP NAS (ARM)
+In-Reply-To: <20180309142724.GD27783@lunn.ch>
+References: <20180304204115.GD21710@lunn.ch>
+ <151652931598.757.4527606947579667082.reportbug@massive.lan>
+ <20180305142846.GJ25189@lunn.ch> <1520265474.2408.8.camel@debian.org>
+ <1520297697.4117371.1292731088.7BEDFAAE@webmail.messagingengine.com>
+ <1520395120.2285859.1294250416.5E5FC747@webmail.messagingengine.com>
+ <20180307133611.GC18030@lunn.ch>
+ <1520455769.3085111.1295233032.3B89F103@webmail.messagingengine.com>
+ <20180307222722.GH1326@lunn.ch>
+ <1520589187.923608.1297117744.23E3098C@webmail.messagingengine.com>
+ <20180309142724.GD27783@lunn.ch>
+Message-ID: <1520766137.2953662.1298951624.71C28713@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
-
-On Sat, Mar 10, 2018 at 10:41:04PM +0100, Rafa? Mi?ecki wrote:
-> On 10 March 2018 at 18:12, Vivek Unune <npcomplete13@gmail.com> wrote:
-> > Using BCH8 gives ecc errors and makes the router unsuable.
-> > Switching to BCH1 fixes these errors.
+> > > Could you also try linux-image-4.14.0-3-marvell from sid?
+> > 
+> > Can do. Should I just use the kernel packages from sid or update the whole system to sid?
 > 
-> Can you provide CFE's log messages starting with
-> "Decompressing...done" and up to the "Press Ctrl+C to stop in CFE"
-> please? I'd like to see what NAND info CFE prints there.
+> Hi Menno
+> 
+> The kernel packages should be sufficient.
 
-See below. It does say BCH-8, however I can't get it to work.
+Bingo. The problem doesn't seem to happen using linux-image-4.14.0-3-marvell_4.14.17-1 from sid. I've now successfully transferred 1.5TB from an external USB drive onto the internal hard disk. Previously the problem would show up within the first few 100MB of the transfer.
 
-CFE log:
+Do you want me to help figure out which change to the kernel fixed the problem?
 
-Decompressing...done
-Found a Toshiba NAND flash:
-Total size:  128MB
-Block size:  128KB
-Page Size:   2048B
-OOB Size:    64B
-Sector size: 512B
-Spare size:  16B
-ECC level:   8 (8-bit)
-Device ID: 0x98 0xf1 0x80 0x15 0xf2 0x16
-find_devinfo: devinfo block found at 0x00180000!
-
-Press Ctrl+C to stop in CFE
-
-Thanks,
-
-Vivek
+- Menno
