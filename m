@@ -1,84 +1,85 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Mar 2018 14:53:02 +0100
-Subject: [PATCH 05/10] ARM: dts: Add Versatile IB2 device tree
+Date: Sun, 11 Mar 2018 14:53:04 +0100
+Subject: [PATCH 07/10] ARM: defconfig: Update RealView defconfig
 In-Reply-To: <20180311135307.6271-1-linus.walleij@linaro.org>
 References: <20180311135307.6271-1-linus.walleij@linaro.org>
-Message-ID: <20180311135307.6271-6-linus.walleij@linaro.org>
+Message-ID: <20180311135307.6271-8-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile board can be equipped with a interface board
-just named "IB2". This was created in the early 2000s for
-prototyping GSM candybar phone form factor products.
+Just update with some new results from savedefconfig so we are
+in sync with what has happened in Kconfig upstream.
 
-The IB2 board contains:
-- Cascaded interrupt controller
-- Enfora Enabler GSM0308 quad-band module with antenna and
-  separate audio jack
-- Keypad with joystick
-- Sanyo 2.5" color display
-- A 28-pin connector for mounting a camera
-
-This adds a DTS file for the combination of the Versatile AB
-with an IB2 daughterboard mounted, making the LED blink and
-making the system controller available for drivers, such as
-the panel driver.
-
-The device tree bindings already exist in
-Documentation/devicetree/bindings/arm/arm-boards.
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mali DP Maintainers <malidp@foss.arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/versatile-ab-ib2.dts | 26 ++++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
- create mode 100644 arch/arm/boot/dts/versatile-ab-ib2.dts
+ arch/arm/configs/realview_defconfig | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..850f36902b81 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1047,6 +1047,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
- 	uniphier-sld8-ref.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
-+	versatile-ab-ib2.dtb \
- 	versatile-pb.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += \
- 	vexpress-v2p-ca5s.dtb \
-diff --git a/arch/arm/boot/dts/versatile-ab-ib2.dts b/arch/arm/boot/dts/versatile-ab-ib2.dts
-new file mode 100644
-index 000000000000..5890cb974f78
---- /dev/null
-+++ b/arch/arm/boot/dts/versatile-ab-ib2.dts
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * The Versatile AB with the IB2 expansion board mounted.
-+ * This works as a superset of the Versatile AB.
-+ */
-+
-+#include "versatile-ab.dts"
-+
-+/ {
-+	model = "ARM Versatile AB + IB2 board";
-+
-+	/* Special IB2 control register */
-+	ib2_syscon at 27000000 {
-+		compatible = "arm,versatile-ib2-syscon", "syscon", "simple-mfd";
-+		reg = <0x27000000 0x4>;
-+
-+		led at 00.4 {
-+			compatible = "register-bit-led";
-+			offset = <0x00>;
-+			mask = <0x10>;
-+			label = "versatile-ib2:0";
-+			linux,default-trigger = "heartbeat";
-+			default-state = "on";
-+		};
-+	};
-+};
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index 2a6d69d896bd..95bd20b2a4d2 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -11,19 +11,16 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_MULTI_V6=y
+ CONFIG_ARCH_REALVIEW=y
+-CONFIG_REALVIEW_DT=y
+ CONFIG_MACH_REALVIEW_EB=y
+ CONFIG_REALVIEW_EB_ARM1136=y
+ CONFIG_REALVIEW_EB_ARM1176=y
+ CONFIG_REALVIEW_EB_A9MP=y
+ CONFIG_REALVIEW_EB_ARM11MP=y
+-CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+ CONFIG_MACH_REALVIEW_PB11MP=y
+ CONFIG_MACH_REALVIEW_PB1176=y
+ CONFIG_MACH_REALVIEW_PBA8=y
+ CONFIG_MACH_REALVIEW_PBX=y
+ CONFIG_SMP=y
+-CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/nfs nfsroot=10.1.69.3:/work/nfsroot ip=dhcp console=ttyAMA0 mem=128M"
+@@ -46,7 +43,7 @@ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_ROM=y
+ CONFIG_MTD_PHYSMAP=y
+-CONFIG_ARM_CHARLCD=y
++CONFIG_MTD_PHYSMAP_OF=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+@@ -59,7 +56,6 @@ CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+ CONFIG_I2C_VERSATILE=y
+ CONFIG_SPI=y
+ CONFIG_GPIOLIB=y
+@@ -72,8 +68,6 @@ CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_VGA16 is not set
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+-CONFIG_SND_MIXER_OSS=y
+-CONFIG_SND_PCM_OSS=y
+ # CONFIG_SND_DRIVERS is not set
+ CONFIG_SND_ARMAACI=y
+ CONFIG_USB=y
+@@ -83,13 +77,14 @@ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_VERSATILE=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_PL031=y
++CONFIG_AUXDISPLAY=y
++CONFIG_ARM_CHARLCD=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_CRAMFS=y
 -- 
 2.14.3
