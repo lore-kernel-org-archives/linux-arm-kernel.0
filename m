@@ -1,78 +1,28 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Sun, 11 Mar 2018 17:39:46 +0100
-Subject: [PATCH] clk: imx25: set correct parents for ssi ipg clocks
-In-Reply-To: <CAOMZO5Czv7Rj-wA9L42S9GJhufjw3br0d+iLcf070NWH4SjCbA@mail.gmail.com>
-References: <1520373735-13699-1-git-send-email-martin@kaiser.cx>
- <CAOMZO5A7W4rbPbZB8ERs518obrg+6F6mDeojkwJaGComFAJB0A@mail.gmail.com>
- <20180308140851.GA25601@botnar.kaiser.cx>
- <CAOMZO5BdBWExt9FvPrfUG74Y62e4EUs6cqFyfVs5JuUtym00hQ@mail.gmail.com>
- <20180308164654.GA31199@botnar.kaiser.cx>
- <CAOMZO5Czv7Rj-wA9L42S9GJhufjw3br0d+iLcf070NWH4SjCbA@mail.gmail.com>
-Message-ID: <20180311163946.GA11507@botnar.kaiser.cx>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 11 Mar 2018 18:43:17 +0100
+Subject: [PATCH v3 1/6] ARM: dts: exynos: Add #sound-dai-cells property
+ to hdmi node in exynos5250.dtsi
+In-Reply-To: <20180309172250.23019-1-s.nawrocki@samsung.com>
+References: <CGME20180309172349epcas2p120eb4533e672b52eb13ddba97f3e6833@epcas2p1.samsung.com>
+ <20180309172250.23019-1-s.nawrocki@samsung.com>
+Message-ID: <20180311174317.5cj5dnx64aylvgn6@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio & Lothar,
+On Fri, Mar 09, 2018 at 06:22:45PM +0100, Sylwester Nawrocki wrote:
+> This property is required for specifying link between the HDMI IP block
+> and the SoC's audio subsystem.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> Changes since v1:
+>  - edited commit summary line.
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
 
-Thus wrote Fabio Estevam (festevam at gmail.com):
-
-> On Thu, Mar 8, 2018 at 1:46 PM, Martin Kaiser <martin@kaiser.cx> wrote:
-
-> >> I can get audio to work fine without your patch on a mx25pdk.
-
-> > this is surprising. How come the ssi1_ipg_per clock is not turned off by
-> > clk_disable_unused()? Where is it used? Do you have
-
-> > <&clks 55>
-
-> > anywhere in your DT?
-
-> No, I don't. imx25-pdk board operates SSI in slave mode.
-
-> > (My codec chip does not use a dedicated clock line. It takes the bit clock that
-> > is the output of SSI. Are you maybe using ssi1_ipg_per for your codec and
-> > enable it there?)
-
-> The difference between our boards is that you use SSI in master mode
-> and mx25pdk in slave mode.
-
-> > In my first mail, I was wondering about imx25 uart1, where we also have
-> > uart1_ipg and uart_ipg_per and the clock seeting is
-
-> >    clk[uart1_ipg] = imx_clk_gate("uart1_ipg", "ipg", ccm(CCM_CGCR2), 14);
-
-> > In this case, both uart1 and uart_ipg_per are listed in the device tree
-
-> >          uart1: serial at 43f90000 {
-> > ...
-> >             clocks = <&clks 120>, <&clks 57>;
-> >             clock-names = "ipg", "per";
-> >          };
-
-> > Documentation/devicetree/bindings/clock/imx25-clock.txt
-> >    uart_ipg_per      57
-> >    uart1_ipg      120
-
-> > and the driver enables both clocks explicitly. So they are not unused.
-
-
-> > Doing something like this is not an option for ssi, this will not work with
-> > imx31, 35 etc.
-
-> The solution to this is passing the "baud" clock as Lothar pointed out.
-
-ok, I got your point now.
-
-The ssi1_ipg clock does not depend on ssi1_ipg_per. This is in line with
-the clock generation scheme in the reference manual.
-
-And there's configurations where ssi1_ipg should be switched on, but not
-ssi1_ipg_per.
-
-I'll look into using the baud clock on my board.
-
-Thanks to both of you for taking the time to explain this.
+Thanks, applied.
 
 Best regards,
-
-   Martin
+Krzysztof
