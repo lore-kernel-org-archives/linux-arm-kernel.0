@@ -1,45 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Mar 2018 09:12:14 +0000
-Subject: [RESEND PATCH v4 1/4] mfd: syscon: Set name of regmap_config
-In-Reply-To: <20180309084351.32009-2-jeffy.chen@rock-chips.com>
-References: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
- <20180309084351.32009-2-jeffy.chen@rock-chips.com>
-Message-ID: <20180312091214.f6dwq6q3eqqblfnf@dell>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Mon, 12 Mar 2018 17:29:14 +0800
+Subject: [PATCH v5 1/4] clk: imx: Add CLK_IS_CRITICAL flag for busy divider
+ and busy mux
+Message-ID: <1520846957-22348-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 09 Mar 2018, Jeffy Chen wrote:
+The busy divider and busy mux is actually used by the system critical clocks,
+so add 'CLK_IS_CRITICAL' to clocks registered with these two type.
 
-> We are now allowing to register debugfs without a valid device, and not
-> having a valid name will end up using "dummy*" to create debugfs dir.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3:
-> Modify commit message.
-> 
->  drivers/mfd/syscon.c | 1 +
->  1 file changed, 1 insertion(+)
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+---
+ change from V3->v4:
+ - fix a typo in commit log
+ change from v4->v5:
+ - optimize the commit subject
+---
+ drivers/clk/imx/clk-busy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Is this the RESEND I requested?  I can still only see this patch.
-
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index fc9ba0ea4e44..b6d05cd934e6 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -110,6 +110,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	syscon_config.reg_stride = reg_io_width;
->  	syscon_config.val_bits = reg_io_width * 8;
->  	syscon_config.max_register = resource_size(&res) - reg_io_width;
-> +	syscon_config.name = of_node_full_name(np);
->  
->  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
->  	if (IS_ERR(regmap)) {
-
+diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
+index 6df3389..9903652 100644
+--- a/drivers/clk/imx/clk-busy.c
++++ b/drivers/clk/imx/clk-busy.c
+@@ -101,7 +101,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_busy_divider_ops;
+-	init.flags = CLK_SET_RATE_PARENT;
++	init.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+ 
+@@ -175,7 +175,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_busy_mux_ops;
+-	init.flags = 0;
++	init.flags = CLK_IS_CRITICAL;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+ 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
