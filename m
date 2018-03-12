@@ -1,69 +1,44 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 12 Mar 2018 08:34:11 +0000
-Subject: [PATCH v2 00/12] Introduce STM32MP1 clock driver
-In-Reply-To: <1520808064.5otv3fo1pe.astroid@resonance.none>
-References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
- <1520808064.5otv3fo1pe.astroid@resonance.none>
-Message-ID: <13f327c2-5777-8425-9611-b9ef96f9d185@st.com>
+From: jeremymc@redhat.com (Jeremy McNicoll)
+Date: Mon, 12 Mar 2018 01:36:57 -0700
+Subject: [PATCH] arm64: dts: msm8992: add pstore-ramoops support
+Message-ID: <1520843817-9667-1-git-send-email-jeremymc@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Thanks Mike !
+With the addition of this ramoops node it enables post mortem
+analysis if a debug cable is not attached and/or not available.
 
-Best Regards
+All addresses and values were extracted from CAF AOSP marshmallow
+DR 1.6.
 
-Gabriel.
+Signed-off-by: Jeremy McNicoll <jeremymc@redhat.com>
+---
+ arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-
-On 03/11/2018 11:42 PM, Michael Turquette wrote:
-> Excerpts from gabriel.fernandez at st.com's message of March 8, 2018 8:53 
-> am:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> v2:
->> ? - Don't use MFD, use existing binding of STM32 RCC.
->> ? - Rework Peripheral and Kernel clocks
->> ? - cosmetic changes
->>
->> This patch-set introduces clock driver for STM32MP157 based on Arm 
->> Cortex-A7.
->> The driver patch is split in several patches (by kind of clock) to 
->> facilitate
->> code reviewing.
->
-> Applied to clk-stm32mp1 towards v4.17.
->
-> Regards,
-> Mike
->
->>
->> Gabriel Fernandez (12):
->> ? dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings
->> ? clk: stm32mp1: Introduce STM32MP1 clock driver
->> ? clk: stm32mp1: add MP1 gate for hse/hsi/csi oscillators
->> ? clk: stm32mp1: add Source Clocks for PLLs
->> ? clk: stm32mp1: add PLL clocks
->> ? clk: stm32mp1: add Post-dividers for PLL
->> ? clk: stm32mp1: add Sub System clocks
->> ? clk: stm32mp1: add Kernel timers
->> ? clk: stm32mp1: add Peripheral & Kernel Clocks
->> ? clk: stm32mp1: add RTC clock
->> ? clk: stm32mp1: add MCO clocks
->> ? clk: stm32mp1: add Debug clocks
->>
->> ?.../devicetree/bindings/clock/st,stm32mp1-rcc.txt? |?? 60 +
->> ?drivers/clk/Kconfig??????????????????????????????? |??? 6 +
->> ?drivers/clk/Makefile?????????????????????????????? |??? 1 +
->> ?drivers/clk/clk-stm32mp1.c???????????????????????? | 2117 
->> ++++++++++++++++++++
->> ?include/dt-bindings/clock/stm32mp1-clks.h????????? |? 254 +++
->> ?5 files changed, 2438 insertions(+)
->> ?create mode 100644 
->> Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
->> ?create mode 100644 drivers/clk/clk-stm32mp1.c
->> ?create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
->>
->> -- 
->> 1.9.1
->>
->>
+diff --git a/arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts b/arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts
+index 4542133..d1b62ef 100644
+--- a/arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts
++++ b/arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts
+@@ -38,4 +38,19 @@
+ 			pinctrl-1 = <&blsp1_uart2_sleep>;
+ 		};
+ 	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		ramoops at 1ff00000 {
++			compatible = "ramoops";
++			reg = <0x0 0x1ff00000 0x0 0x40000>;
++			console-size = <0x10000>;
++			record-size = <0x10000>;
++			ftrace-size = <0x10000>;
++			pmsg-size = <0x20000>;
++		};
++	};
+ };
+-- 
+2.6.1
