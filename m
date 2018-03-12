@@ -1,21 +1,130 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Mar 2018 11:11:04 +0100
-Subject: [PATCH v5 4/4] ARM: rockchip: Set name of regmap_config
-In-Reply-To: <20180312095142.30854-5-jeffy.chen@rock-chips.com>
-References: <20180312095142.30854-1-jeffy.chen@rock-chips.com>
- <20180312095142.30854-5-jeffy.chen@rock-chips.com>
-Message-ID: <6419126.t34s1xtZxx@phil>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Mon, 12 Mar 2018 12:16:47 +0200
+Subject: [PATCH 2/2] ARM: npcm: drop extraneous 'select' statements
+In-Reply-To: <20180307162430.2664523-2-arnd@arndb.de>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <20180307162430.2664523-2-arnd@arndb.de>
+Message-ID: <CAP6Zq1ikUJ9jTLbR6ehdRLjkQHxzFa2VSdXN1G2ocMw9RyhGjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. M?rz 2018, 10:51:42 CET schrieb Jeffy Chen:
-> We are now allowing to register debugfs without a valid device, and not
-> having a valid name will end up using "dummy*" to create debugfs dir.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Hi Amd,
 
-applied for 4.17
+Sorry for the delayed reply,
 
+the NPCM7xx is a family of BMC's that include NPCM750, NPCM730 and more
 
-Thanks
-Heiko
+All of the NPCM7xx BMC's have the same basic modules like Cortex-A9,
+WDT, timers and more
+
+can we reflacte the NPCM7xx as follow in the Kconfig:
+
+menuconfig ARCH_NPCM
+        bool "Nuvoton NPCM Architecture"
+        depends on ARCH_MULTI_V7
+        select USE_OF
+        select PINCTRL
+
+if ARCH_NPCM
+
+config ARCH_NPCM7XX
+        bool "Support for NPCM7xx BMC (Poleg)"
+        depends on ARCH_MULTI_V7
+        select HAVE_ARM_SCU
+        select PINCTRL_NPCM7XX
+        select NPCM7XX_TIMER
+        select ARCH_REQUIRE_GPIOLIB
+        select ARM_GIC
+        select ARM_ERRATA_720789
+        select ARM_ERRATA_754322
+        select ARM_ERRATA_794072
+        select PL310_ERRATA_588369
+        select PL310_ERRATA_727915
+        select MFD_SYSCON
+        help
+          General support for NPCM7xx BMC (Poleg).
+
+          Nuvoton NPCM7xx BMC based on the Cortex A9.
+
+if ARCH_NPCM7XX
+
+config ARCH_NPCM750
+        bool "NPCM750 BMC support with Device Tree"
+        select HAVE_ARM_TWD if SMP
+        help
+          General support for NPCM750 BMC (Poleg).
+
+          Nuvoton NPCM750 BMC based on the Cortex A9.
+
+config ARCH_NPCM730
+        bool "NPCM730 BMC support with Device Tree"
+        select HAVE_ARM_TWD if SMP
+        select ARM_ERRATA_764369 if SMP
+        help
+          General support for NPCM730 BMC (Poleg).
+
+          Nuvoton NPCM730 BMC based on the Cortex A9.
+
+endif #ARCH_NPCM7XX
+
+endif
+
+On 7 March 2018 at 18:24, Arnd Bergmann <arnd@arndb.de> wrote:
+> While looking at the build regression, I noticed that the
+> platform selects a lot of other Kconfig symbols that it really
+> should not:
+>
+> CPU_V7, ARM_GIC, HAVE_SMP, COMMON_CLK, GENERIC_CLOCKEVENTS,
+> and CLKDEV_LOOKUP are all implied by ARCH_MULTI_V7, so they
+> can be dropped.
+>
+> CACHE_L2X0, SMP and USB are meant to be user-selectable, we
+> want to be able to turn those off for testing purposes.
+>
+> CPU_USE_DOMAINS looks completely misplaced here, we should not
+> select that for an ARMv7 platform.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-npcm/Kconfig | 18 ------------------
+>  1 file changed, 18 deletions(-)
+>
+> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+> index 2bc6697c8d97..c6a16230e8ef 100644
+> --- a/arch/arm/mach-npcm/Kconfig
+> +++ b/arch/arm/mach-npcm/Kconfig
+> @@ -12,12 +12,6 @@ comment "NPCM7XX CPU type"
+>  config ARCH_NPCM750
+>         depends on ARCH_NPCM
+>         bool "Support for NPCM750 BMC CPU (Poleg)"
+> -       select CACHE_L2X0
+> -       select CPU_V7
+> -       select ARM_GIC
+> -       select HAVE_SMP
+> -       select SMP
+> -       select SMP_ON_UP
+>         select HAVE_ARM_SCU
+>         select HAVE_ARM_TWD if SMP
+>         select ARM_ERRATA_720789
+> @@ -26,18 +20,6 @@ config ARCH_NPCM750
+>         select ARM_ERRATA_794072
+>         select PL310_ERRATA_588369
+>         select PL310_ERRATA_727915
+> -       select USB_EHCI_ROOT_HUB_TT
+> -       select USB_ARCH_HAS_HCD
+> -       select USB_ARCH_HAS_EHCI
+> -       select USB_EHCI_HCD
+> -       select USB_ARCH_HAS_OHCI
+> -       select USB_OHCI_HCD
+> -       select USB
+> -       select FIQ
+> -       select CPU_USE_DOMAINS
+> -       select GENERIC_CLOCKEVENTS
+> -       select CLKDEV_LOOKUP
+> -       select COMMON_CLK if OF
+>         select NPCM750_TIMER
+>         select MFD_SYSCON
+>         help
+> --
+> 2.9.0
+>
