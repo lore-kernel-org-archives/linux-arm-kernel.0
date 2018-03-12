@@ -1,56 +1,69 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Mon, 12 Mar 2018 13:42:21 +0530
-Subject: [PATCH 2/2][v6] driver: mtd: update struct map_info's swap as per map
- requirement
-Message-ID: <20180312081221.8246-1-prabhakar.kushwaha@nxp.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Mon, 12 Mar 2018 08:34:11 +0000
+Subject: [PATCH v2 00/12] Introduce STM32MP1 clock driver
+In-Reply-To: <1520808064.5otv3fo1pe.astroid@resonance.none>
+References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
+ <1520808064.5otv3fo1pe.astroid@resonance.none>
+Message-ID: <13f327c2-5777-8425-9611-b9ef96f9d185@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-Maps device can be Big endian or little endian.
+Many Thanks Mike !
 
-Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
+Best Regards
 
-Now update struct map_info's swap field based on device characteristics
-defined in device tree.
+Gabriel.
 
-Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
----
-Changes for v2: Incorporated review comments from Boris Brezillon
-http://patchwork.ozlabs.org/patch/758381/
-Changes for v3: None
-Changes for v4: Updated code as per new defined binding of physmap.txt
-Changes for v5: Avoid map.swap set in case of endiannes not defined in dts file
-Changes for v6: Sending as it is
 
- drivers/mtd/maps/physmap_of_core.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/mtd/maps/physmap_of_core.c b/drivers/mtd/maps/physmap_of_core.c
-index b1bd4faecfb2..527b1682381f 100644
---- a/drivers/mtd/maps/physmap_of_core.c
-+++ b/drivers/mtd/maps/physmap_of_core.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/concat.h>
-+#include <linux/mtd/cfi_endian.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -233,6 +234,11 @@ static int of_flash_probe(struct platform_device *dev)
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
- 		info->list[i].map.device_node = dp;
- 
-+		if (of_property_read_bool(dp, "big-endian"))
-+			info->list[i].map.swap = CFI_BIG_ENDIAN;
-+		else if (of_property_read_bool(dp, "little-endian"))
-+			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-+
- 		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
- 		if (err)
- 			goto err_out;
--- 
-2.14.1
+On 03/11/2018 11:42 PM, Michael Turquette wrote:
+> Excerpts from gabriel.fernandez at st.com's message of March 8, 2018 8:53 
+> am:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> v2:
+>> ? - Don't use MFD, use existing binding of STM32 RCC.
+>> ? - Rework Peripheral and Kernel clocks
+>> ? - cosmetic changes
+>>
+>> This patch-set introduces clock driver for STM32MP157 based on Arm 
+>> Cortex-A7.
+>> The driver patch is split in several patches (by kind of clock) to 
+>> facilitate
+>> code reviewing.
+>
+> Applied to clk-stm32mp1 towards v4.17.
+>
+> Regards,
+> Mike
+>
+>>
+>> Gabriel Fernandez (12):
+>> ? dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings
+>> ? clk: stm32mp1: Introduce STM32MP1 clock driver
+>> ? clk: stm32mp1: add MP1 gate for hse/hsi/csi oscillators
+>> ? clk: stm32mp1: add Source Clocks for PLLs
+>> ? clk: stm32mp1: add PLL clocks
+>> ? clk: stm32mp1: add Post-dividers for PLL
+>> ? clk: stm32mp1: add Sub System clocks
+>> ? clk: stm32mp1: add Kernel timers
+>> ? clk: stm32mp1: add Peripheral & Kernel Clocks
+>> ? clk: stm32mp1: add RTC clock
+>> ? clk: stm32mp1: add MCO clocks
+>> ? clk: stm32mp1: add Debug clocks
+>>
+>> ?.../devicetree/bindings/clock/st,stm32mp1-rcc.txt? |?? 60 +
+>> ?drivers/clk/Kconfig??????????????????????????????? |??? 6 +
+>> ?drivers/clk/Makefile?????????????????????????????? |??? 1 +
+>> ?drivers/clk/clk-stm32mp1.c???????????????????????? | 2117 
+>> ++++++++++++++++++++
+>> ?include/dt-bindings/clock/stm32mp1-clks.h????????? |? 254 +++
+>> ?5 files changed, 2438 insertions(+)
+>> ?create mode 100644 
+>> Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+>> ?create mode 100644 drivers/clk/clk-stm32mp1.c
+>> ?create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
+>>
+>> -- 
+>> 1.9.1
+>>
+>>
