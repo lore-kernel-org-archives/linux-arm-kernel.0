@@ -1,33 +1,48 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Mon, 12 Mar 2018 15:03:38 +0800
-Subject: [PATCH v2 1/5] dt-bindings: soc: update MT2712 power dt-bindings
+Date: Mon, 12 Mar 2018 15:03:40 +0800
+Subject: [PATCH v2 3/5] dt-bindings: clock: add clocks for MT2712
 In-Reply-To: <20180312070342.4335-1-weiyi.lu@mediatek.com>
 References: <20180312070342.4335-1-weiyi.lu@mediatek.com>
-Message-ID: <20180312070342.4335-3-weiyi.lu@mediatek.com>
+Message-ID: <20180312070342.4335-5-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new power domains(MFG_SC1/MFG_SC2/MFG_SC3)
-for MT2712 according to ECO design change.
+add new clocks according to ECO design change
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- include/dt-bindings/power/mt2712-power.h | 3 +++
- 1 file changed, 3 insertions(+)
+ include/dt-bindings/clock/mt2712-clk.h | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/include/dt-bindings/power/mt2712-power.h b/include/dt-bindings/power/mt2712-power.h
-index 92b46d772fae..2c147817efc2 100644
---- a/include/dt-bindings/power/mt2712-power.h
-+++ b/include/dt-bindings/power/mt2712-power.h
-@@ -22,5 +22,8 @@
- #define MT2712_POWER_DOMAIN_USB		5
- #define MT2712_POWER_DOMAIN_USB2	6
- #define MT2712_POWER_DOMAIN_MFG		7
-+#define MT2712_POWER_DOMAIN_MFG_SC1	8
-+#define MT2712_POWER_DOMAIN_MFG_SC2	9
-+#define MT2712_POWER_DOMAIN_MFG_SC3	10
+diff --git a/include/dt-bindings/clock/mt2712-clk.h b/include/dt-bindings/clock/mt2712-clk.h
+index 48a8e797a617..76265836a1e1 100644
+--- a/include/dt-bindings/clock/mt2712-clk.h
++++ b/include/dt-bindings/clock/mt2712-clk.h
+@@ -222,7 +222,13 @@
+ #define CLK_TOP_APLL_DIV_PDN5		183
+ #define CLK_TOP_APLL_DIV_PDN6		184
+ #define CLK_TOP_APLL_DIV_PDN7		185
+-#define CLK_TOP_NR_CLK			186
++#define CLK_TOP_APLL1_D3		186
++#define CLK_TOP_APLL1_REF_SEL		187
++#define CLK_TOP_APLL2_REF_SEL		188
++#define CLK_TOP_NFI2X_EN		189
++#define CLK_TOP_NFIECC_EN		190
++#define CLK_TOP_NFI1X_CK_EN		191
++#define CLK_TOP_NR_CLK			192
  
- #endif /* _DT_BINDINGS_POWER_MT2712_POWER_H */
+ /* INFRACFG */
+ 
+@@ -281,7 +287,9 @@
+ #define CLK_PERI_MSDC30_3_EN		41
+ #define CLK_PERI_MSDC50_0_HCLK_EN	42
+ #define CLK_PERI_MSDC50_3_HCLK_EN	43
+-#define CLK_PERI_NR_CLK			44
++#define CLK_PERI_MSDC30_0_QTR_EN	44
++#define CLK_PERI_MSDC30_3_QTR_EN	45
++#define CLK_PERI_NR_CLK			46
+ 
+ /* MCUCFG */
+ 
 -- 
 2.12.5
