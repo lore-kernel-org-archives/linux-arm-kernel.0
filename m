@@ -1,71 +1,26 @@
-From: jitendra.bhivare@broadcom.com (Jitendra Bhivare)
-Date: Mon, 12 Mar 2018 12:33:24 +0530
-Subject: [RFC 2/5] dt-bindings: brcm: Add reserved-dma-region for iPROC
-In-Reply-To: <c2f30c0c-ff5e-2904-11f4-5351749381a9@arm.com>
-References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
- <1520312368-7068-3-git-send-email-jitendra.bhivare@broadcom.com>
- <c2f30c0c-ff5e-2904-11f4-5351749381a9@arm.com>
-Message-ID: <CAOA9gs32BqGiXD7R2v7=Xkv-PVLTzuU3VmG1dAm6HNd4=w-qQg@mail.gmail.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Mon, 12 Mar 2018 15:03:36 +0800
+Subject: [PATCH v2 0/5] update Mediatek MT2712 clock and scpsys support 
+Message-ID: <20180312070342.4335-1-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2018 at 5:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 06/03/18 04:59, Jitendra Bhivare wrote:
->>
->> With SoC wide DMA mask of 40-bit, the mappings for entire IOVA space can't
->> be specified in the PAXBv2 PCIe RC of SoC. The holes in IOVA space needs
->> to
->> be reserved to prevent any IOVA allocations in those spaces.
->
->
-> Can you clarify why? If this is the PCI inbound window thing again, let me
-> say once again that "dma-ranges" is the appropriate way for DT to describe
-> the hardware.
->
-> Robin.
-dma-ranges = < \
-0x43000000 0x00 0x00000000 0x00 0x80000000 0x00 0x80000000 \
-0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
-0x43000000 0x80 0x00000000 0x80 0x00000000 0x80 0x00000000>
+This series is based on v4.16-rc1 and composed of scpsys control (PATCH 1-2) and clock control (PATCH 3-5).
+Basically, all changes are for the ECO design change of MT2712.
 
-Yes, its for PCI inbound windows. In our HW, they are limited by sizes
-specified in
-ARM memory maps which was done for non-IOMMU cases to catch any transfer
-outside the ranges.
-dma-ranges are already being used to program these inbound windows and SoC
-wide DMA mask is already specified but IOMMU code can still allocate IOVAs
-in the gaps for which translation will fail in PCIe RC.
->
->
->> reserved-dma-region property is added to specify the ranges which should
->> never be mapped and given to devices sitting behind.
->>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
->> ---
->>   Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> index b8e48b4..3be0fe3 100644
->> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->> @@ -30,6 +30,9 @@ Optional properties:
->>   - dma-ranges: Some PAXB-based root complexes do not have inbound mapping
->> done
->>     by the ASIC after power on reset.  In this case, SW is required to
->> configure
->>   the mapping, based on inbound memory regions specified by this property.
->> +- reserved-dma-region: PAXBv2 with IOMMU enabled cannot provide mappings
->> for
->> +  entire IOVA space specified by DMA mask. Hence this is used to reserve
->> the
->> +  gaps in dma-ranges.
->>     - brcm,pcie-ob: Some iProc SoCs do not have the outbound address
->> mapping done
->>   by the ASIC after power on reset. In this case, SW needs to configure it
->>
->
+changes since v1:
+- Avoid renumbering clocks. Append new clocks at the bottom of each own subsystem.
+
+Weiyi Lu (5):
+  dt-bindings: soc: update MT2712 power dt-bindings
+  soc: mediatek: update power domain data of MT2712
+  dt-bindings: clock: add clocks for MT2712
+  arm64: dts: add clock device nodes of MT2712
+  clk: mediatek: update clock driver of MT2712
+
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 28 +++++++++++++
+ drivers/clk/mediatek/clk-mt2712.c         | 69 ++++++++++++++++++++++++-------
+ drivers/soc/mediatek/mtk-scpsys.c         | 42 ++++++++++++++++++-
+ include/dt-bindings/clock/mt2712-clk.h    | 12 +++++-
+ include/dt-bindings/power/mt2712-power.h  |  3 ++
+ 5 files changed, 136 insertions(+), 18 deletions(-)
