@@ -1,161 +1,184 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Mon, 12 Mar 2018 15:03:42 +0800
-Subject: [PATCH v2 5/5] clk: mediatek: update clock driver of MT2712
-In-Reply-To: <20180312070342.4335-1-weiyi.lu@mediatek.com>
-References: <20180312070342.4335-1-weiyi.lu@mediatek.com>
-Message-ID: <20180312070342.4335-7-weiyi.lu@mediatek.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 12 Mar 2018 08:06:42 +0100
+Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
+ <20180227071134.28063-2-a.hajda@samsung.com>
+ <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
+ <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+Message-ID: <3503bb79-e9aa-360d-adb8-767f68ba5330@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to ECO design change,
-1. add new clock mux data and change some
-2. add new clock gate data and clock factor data
-3. change status register offset of infra subsystem
+On 12.03.2018 08:02, Andrzej Hajda wrote:
+> On 09.03.2018 11:24, Roger Quadros wrote:
+>> Hi,
+>>
+>> On 27/02/18 09:11, Andrzej Hajda wrote:
+>>> These bindings allow to describe most known standard USB connectors
+>>> and it should be possible to extend it if necessary.
+>>> USB connectors, beside USB can be used to route other protocols,
+>>> for example UART, Audio, MHL. In such case every device passing data
+>>> through the connector should have appropriate graph bindings.
+>>>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>> v4:
+>>> - improved 'type' description (Rob),
+>>> - improved description of 2nd example (Rob).
+>>> v3:
+>>> - removed MHL port (samsung connector will have separate bindings),
+>>> - added 2nd example for USB-C,
+>>> - improved formatting.
+>>> v2:
+>>> - moved connector type(A,B,C) to compatible string (Rob),
+>>> - renamed size property to type (Rob),
+>>> - changed type description to be less confusing (Laurent),
+>>> - removed vendor specific compatibles (implied by graph port number),
+>>> - added requirement of connector being a child of IC (Rob),
+>>> - removed max-mode (subtly suggested by Rob, it should be detected anyway
+>>>   by USB Controller in runtime, downside is that device is not able to
+>>>   report its real capabilities, maybe better would be to make it optional(?)),
+>>> - assigned port numbers to data buses (Rob).
+>>>
+>>> Regards
+>>> Andrzej
+>>> ---
+>>>  .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
+>>>  1 file changed, 75 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+>>> new file mode 100644
+>>> index 000000000000..e1463f14af38
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+>>> @@ -0,0 +1,75 @@
+>>> +USB Connector
+>>> +=============
+>>> +
+>>> +USB connector node represents physical USB connector. It should be
+>>> +a child of USB interface controller.
+>>> +
+>>> +Required properties:
+>>> +- compatible: describes type of the connector, must be one of:
+>>> +    "usb-a-connector",
+>>> +    "usb-b-connector",
+>>> +    "usb-c-connector".
+>> compatible should be just "usb-connector"
+>>
+>> Type should be a property
+>>
+>> type: type of usb connector "A", "B", "AB", "C"
+>> AB is for dual-role connectors.
+> I have proposed such property (and size also) in my first RFC [1]. Rod
+> did not like it :)
 
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
----
- drivers/clk/mediatek/clk-mt2712.c | 69 +++++++++++++++++++++++++++++++--------
- 1 file changed, 55 insertions(+), 14 deletions(-)
+Ups, ugly typo, I meant Rob, of course.
 
-diff --git a/drivers/clk/mediatek/clk-mt2712.c b/drivers/clk/mediatek/clk-mt2712.c
-index 498d13799388..991d4093726e 100644
---- a/drivers/clk/mediatek/clk-mt2712.c
-+++ b/drivers/clk/mediatek/clk-mt2712.c
-@@ -221,6 +221,8 @@ static const struct mtk_fixed_factor top_divs[] = {
- 		4),
- 	FACTOR(CLK_TOP_D2A_ULCLK_6P5M, "d2a_ulclk_6p5m", "clk26m", 1,
- 		4),
-+	FACTOR(CLK_TOP_APLL1_D3, "apll1_d3", "apll1_ck", 1,
-+		3),
- };
- 
- static const char * const axi_parents[] = {
-@@ -625,7 +627,7 @@ static const char * const ether_125m_parents[] = {
- static const char * const ether_50m_parents[] = {
- 	"clk26m",
- 	"etherpll_50m",
--	"univpll_d26",
-+	"apll1_d3",
- 	"univpll3_d4"
- };
- 
-@@ -686,7 +688,7 @@ static const char * const i2c_parents[] = {
- 
- static const char * const msdc0p_aes_parents[] = {
- 	"clk26m",
--	"msdcpll_ck",
-+	"syspll_d2",
- 	"univpll_d3",
- 	"vcodecpll_ck"
- };
-@@ -719,6 +721,17 @@ static const char * const aud_apll2_parents[] = {
- 	"clkaud_ext_i_2"
- };
- 
-+static const char * const apll1_ref_parents[] = {
-+	"clkaud_ext_i_2",
-+	"clkaud_ext_i_1",
-+	"clki2si0_mck_i",
-+	"clki2si1_mck_i",
-+	"clki2si2_mck_i",
-+	"clktdmin_mclk_i",
-+	"clki2si2_mck_i",
-+	"clktdmin_mclk_i"
-+};
-+
- static const char * const audull_vtx_parents[] = {
- 	"d2a_ulclk_6p5m",
- 	"clkaud_ext_i_0"
-@@ -886,6 +899,10 @@ static struct mtk_composite top_muxes[] = {
- 		aud_apll2_parents, 0x134, 1, 1),
- 	MUX(CLK_TOP_DA_AUDULL_VTX_6P5M_SEL, "audull_vtx_sel",
- 		audull_vtx_parents, 0x134, 31, 1),
-+	MUX(CLK_TOP_APLL1_REF_SEL, "apll1_ref_sel",
-+		apll1_ref_parents, 0x134, 4, 3),
-+	MUX(CLK_TOP_APLL2_REF_SEL, "apll2_ref_sel",
-+		apll1_ref_parents, 0x134, 7, 3),
- };
- 
- static const char * const mcu_mp0_parents[] = {
-@@ -932,36 +949,56 @@ static const struct mtk_clk_divider top_adj_divs[] = {
- 	DIV_ADJ(CLK_TOP_APLL_DIV7, "apll_div7", "i2si3_sel", 0x128, 24, 8),
- };
- 
--static const struct mtk_gate_regs top_cg_regs = {
-+static const struct mtk_gate_regs top0_cg_regs = {
- 	.set_ofs = 0x120,
- 	.clr_ofs = 0x120,
- 	.sta_ofs = 0x120,
- };
- 
--#define GATE_TOP(_id, _name, _parent, _shift) {	\
-+static const struct mtk_gate_regs top1_cg_regs = {
-+	.set_ofs = 0x424,
-+	.clr_ofs = 0x424,
-+	.sta_ofs = 0x424,
-+};
-+
-+#define GATE_TOP0(_id, _name, _parent, _shift) {	\
- 		.id = _id,				\
- 		.name = _name,				\
- 		.parent_name = _parent,			\
--		.regs = &top_cg_regs,			\
-+		.regs = &top0_cg_regs,			\
- 		.shift = _shift,			\
- 		.ops = &mtk_clk_gate_ops_no_setclr,	\
- 	}
- 
-+#define GATE_TOP1(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &top1_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr_inv,	\
-+	}
-+
- static const struct mtk_gate top_clks[] = {
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN0, "apll_div_pdn0", "i2so1_sel", 0),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN1, "apll_div_pdn1", "i2so2_sel", 1),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN2, "apll_div_pdn2", "i2so3_sel", 2),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN3, "apll_div_pdn3", "tdmo0_sel", 3),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN4, "apll_div_pdn4", "tdmo1_sel", 4),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN5, "apll_div_pdn5", "i2si1_sel", 5),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN6, "apll_div_pdn6", "i2si2_sel", 6),
--	GATE_TOP(CLK_TOP_APLL_DIV_PDN7, "apll_div_pdn7", "i2si3_sel", 7),
-+	/* TOP0 */
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN0, "apll_div_pdn0", "i2so1_sel", 0),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN1, "apll_div_pdn1", "i2so2_sel", 1),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN2, "apll_div_pdn2", "i2so3_sel", 2),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN3, "apll_div_pdn3", "tdmo0_sel", 3),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN4, "apll_div_pdn4", "tdmo1_sel", 4),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN5, "apll_div_pdn5", "i2si1_sel", 5),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN6, "apll_div_pdn6", "i2si2_sel", 6),
-+	GATE_TOP0(CLK_TOP_APLL_DIV_PDN7, "apll_div_pdn7", "i2si3_sel", 7),
-+	/* TOP1 */
-+	GATE_TOP1(CLK_TOP_NFI2X_EN, "nfi2x_en", "nfi2x_sel", 0),
-+	GATE_TOP1(CLK_TOP_NFIECC_EN, "nfiecc_en", "nfiecc_sel", 1),
-+	GATE_TOP1(CLK_TOP_NFI1X_CK_EN, "nfi1x_ck_en", "nfi2x_sel", 2),
- };
- 
- static const struct mtk_gate_regs infra_cg_regs = {
- 	.set_ofs = 0x40,
- 	.clr_ofs = 0x44,
--	.sta_ofs = 0x40,
-+	.sta_ofs = 0x48,
- };
- 
- #define GATE_INFRA(_id, _name, _parent, _shift) {	\
-@@ -1120,6 +1157,10 @@ static const struct mtk_gate peri_clks[] = {
- 		"msdc50_0_h_sel", 4),
- 	GATE_PERI2(CLK_PERI_MSDC50_3_HCLK_EN, "per_msdc50_3_h",
- 		"msdc50_3_h_sel", 5),
-+	GATE_PERI2(CLK_PERI_MSDC30_0_QTR_EN, "per_msdc30_0_q",
-+		"axi_sel", 6),
-+	GATE_PERI2(CLK_PERI_MSDC30_3_QTR_EN, "per_msdc30_3_q",
-+		"mem_sel", 7),
- };
- 
- #define MT2712_PLL_FMAX		(3000UL * MHZ)
--- 
-2.12.5
+Regards
+Andrzej
+
+>
+> [1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
+>
+>
+>> micro super-speed and high-speed connectors are different. How do you differentiate that?
+> I am aware of it, and property differentiating it was also in my earlier
+> iterations.
+> If there will be need to differentiate such connectors, adding property
+> max-speed or max-mode would do the thing.
+>
+>>> +
+>>> +Optional properties:
+>>> +- label: symbolic name for the connector,
+>> Why do you need label? We can't maintain consistency as people will put creative names there.
+>> Device/bus driver could generate a valid label.
+> It follows convention for other connectors: HDMI, DVI, ....
+>
+>>> +- type: size of the connector, should be specified in case of USB-A, USB-B
+>>> +  non-fullsize connectors: "mini", "micro".
+>> type is misleading. Type is usually A/B/C. It should be size here instead.
+> As you can see in discussion for previous iterations it follows
+> convention already established for other connectors.
+>
+>> size: size of the connector if not standard size. "mini", "micro"
+>>
+>> If not specified it is treated as standard sized connector.
+>> e.g. for Type-C there is no mini/micro. so size doesn't have to be specificed
+> Few lines above it is described: should be specified in case of USB-A,
+> USB-B non-fullsize connectors.
+>
+>> What about Type-C connector?
+>>> +
+>>> +Required nodes:
+>>> +- any data bus to the connector should be modeled using the OF graph bindings
+>> s/modeled/modelled
+>>> +  specified in bindings/graph.txt, unless the bus is between parent node and
+>>> +  the connector. Since single connector can have multpile data buses every bus
+>> s/multpile/multiple
+> OK, I will fix both typos.
+>
+>>> +  has assigned OF graph port number as follows:
+>>> +    0: High Speed (HS), present in all connectors,
+>>> +    1: Super Speed (SS), present in SS capable connectors,
+>>> +    2: Sideband use (SBU), present in USB-C.
+>>> +
+>>> +Examples
+>>> +--------
+>>> +
+>>> +1. Micro-USB connector with HS lines routed via controller (MUIC):
+>>> +
+>>> +muic-max77843 at 66 {
+>>> +	...
+>>> +	usb_con: connector {
+>>> +		compatible = "usb-b-connector";
+>>> +		label = "micro-USB";
+>>> +		type = "micro";
+>>> +	};
+>>> +};
+>>> +
+>>> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
+>>> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
+>>> +DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
+>>> +
+>>> +ccic: s2mm005 at 33 {
+>>> +	...
+>>> +	usb_con: connector {
+>>> +		compatible = "usb-c-connector";
+>>> +		label = "USB-C";
+>> The label is not consistent with the earlier example.
+> Why?
+>
+> Regards
+> Andrzej
+>
+>>> +
+>>> +		ports {
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <0>;
+>>> +
+>>> +			port at 0 {
+>>> +				reg = <0>;
+>>> +				usb_con_hs: endpoint {
+>>> +					remote-endpoint = <&max77865_usbc_hs>;
+>>> +				};
+>>> +			};
+>>> +			port at 1 {
+>>> +				reg = <1>;
+>>> +				usb_con_ss: endpoint {
+>>> +					remote-endpoint = <&usbdrd_phy_ss>;
+>>> +				};
+>>> +			};
+>>> +			port at 2 {
+>>> +				reg = <2>;
+>>> +				usb_con_sbu: endpoint {
+>>> +					remote-endpoint = <&dp_aux>;
+>>> +				};
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +};
+>>>
