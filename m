@@ -1,34 +1,71 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 12 Mar 2018 12:03:57 +0100
-Subject: [PATCH v1 06/19] arm: dts: mt7623: fix USB initialization fails
- on bananapi-r2
-In-Reply-To: <bcb9dbeb1389e71f4eaba0c2def1c991703e10c4.1519378872.git.sean.wang@mediatek.com>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <bcb9dbeb1389e71f4eaba0c2def1c991703e10c4.1519378872.git.sean.wang@mediatek.com>
-Message-ID: <81aab78c-a921-3d80-1636-fc4b797b4517@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Mar 2018 12:10:21 +0100
+Subject: [PATCH] ARM64: dts: meson: bump mali450 clk to 744MHz
+Message-ID: <1520853021-5412-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Mali-450 IP can run up to 744MHz, bump the frequency using
+the GP0 PLL clock.
 
+Cc: Michal Lazo <michal.lazo@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi     | 11 +++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi | 11 +++++++----
+ 2 files changed, 14 insertions(+), 8 deletions(-)
 
-On 02/23/2018 11:16 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Fix that USB initialization fails as below runtime log is present during
-> booting on bananapi-r2 board by adding missing regulators the USB device
-> requires. Current regulators USB device uses are being updated with the
-> correct ones to reflect real configurations which are all from fixed
-> regulators rather than MT6323 one's output.
-> 
-> [    6.473958] xhci-mtk 1a1c0000.usb: fail to get vbus
-> [    6.479313] xhci-mtk 1a240000.usb: fail to get vbus
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: f4ff257cd160 ("arm: dts: mt7623: add support for Bananapi R2 (BPI-R2) board")
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
-> 
-
-Pushed to v4.16-next/dts32
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 3290a4dc..6013d32 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -284,14 +284,17 @@
+ 		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
+ 		 * free mux to safely change frequency while running.
+ 		 */
+-		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
++		assigned-clocks = <&clkc CLKID_GP0_PLL>,
++				  <&clkc CLKID_MALI_0_SEL>,
+ 				  <&clkc CLKID_MALI_0>,
+ 				  <&clkc CLKID_MALI>; /* Glitch free mux */
+-		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++		assigned-clock-parents = <0>, /* Do Nothing */
++					 <&clkc CLKID_GP0_PLL>,
+ 					 <0>, /* Do Nothing */
+ 					 <&clkc CLKID_MALI_0>;
+-		assigned-clock-rates = <0>, /* Do Nothing */
+-				       <666666666>,
++		assigned-clock-rates = <744000000>,
++				       <0>, /* Do Nothing */
++				       <744000000>,
+ 				       <0>; /* Do Nothing */
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+index f06cc234..972df67 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+@@ -30,14 +30,17 @@
+ 		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
+ 		 * free mux to safely change frequency while running.
+ 		 */
+-		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
++		assigned-clocks = <&clkc CLKID_GP0_PLL>,
++				  <&clkc CLKID_MALI_0_SEL>,
+ 				  <&clkc CLKID_MALI_0>,
+ 				  <&clkc CLKID_MALI>; /* Glitch free mux */
+-		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++		assigned-clock-parents = <0>, /* Do Nothing */
++					 <&clkc CLKID_GP0_PLL>,
+ 					 <0>, /* Do Nothing */
+ 					 <&clkc CLKID_MALI_0>;
+-		assigned-clock-rates = <0>, /* Do Nothing */
+-				       <666666666>,
++		assigned-clock-rates = <744000000>,
++				       <0>, /* Do Nothing */
++				       <744000000>,
+ 				       <0>; /* Do Nothing */
+ 	};
+ };
+-- 
+2.7.4
