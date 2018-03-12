@@ -1,25 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2018 15:26:34 +0100
-Subject: [GIT PULL] ARM: at91: SoC for 4.17
-In-Reply-To: <20180310052007.GA5536@piout.net>
-References: <20180310052007.GA5536@piout.net>
-Message-ID: <CAK8P3a0xgFsmXvCD-nizMeRL4=f0b+Rc5AY5ixCT+-0iA=zKTw@mail.gmail.com>
+Date: Mon, 12 Mar 2018 15:28:50 +0100
+Subject: [GIT PULL] pxa for v4.17
+In-Reply-To: <871sgq5psf.fsf@belgarion.home>
+References: <871sgq5psf.fsf@belgarion.home>
+Message-ID: <CAK8P3a04TQt-LqajPXYgw7V795S3OufuTZ_+8XWRKEUKMUk23w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2018 at 6:20 AM, Alexandre Belloni
-<alexandre.belloni@bootlin.com> wrote:
-> Arnd, Olof,
+On Sun, Mar 11, 2018 at 9:18 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 >
-> It has been two years that Atmel merge with Microchip, rename where
-> relevant.
+> Hi Arnd, Kevin, and Olof,
+>
+> This is the pxa pull request for 4.17. This one is a bit outstanding, as I was
+> expecting conflicts with the MTD tree from Boris, which was merged into my tree
+> from one of his imutable branches. I this is an issue, tell me and I'll query
+> another pull without this merge commit.
 
-Let's hope they don't rename themselves again next month after merging
-with Microsemi then ;-)
+I can't think of a better way to handle it, so it will have to do.
+Pulled into next/soc, thanks!
 
-> This is based on my fixes PR which is already in next/soc. Tell me if
-> this is not right.
-
-That's all good, thanks!
-
-      Arnd
+       Arnd
