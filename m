@@ -1,71 +1,54 @@
-From: jitendra.bhivare@broadcom.com (Jitendra Bhivare)
-Date: Mon, 12 Mar 2018 12:49:40 +0530
-Subject: [RFC 3/5] dt-bindings: arm-smmu: Add reserved-msi-region
-In-Reply-To: <9aeb8e14-2a14-d71b-7970-055ed04a131c@arm.com>
-References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
- <1520312368-7068-4-git-send-email-jitendra.bhivare@broadcom.com>
- <9aeb8e14-2a14-d71b-7970-055ed04a131c@arm.com>
-Message-ID: <CAOA9gs0_mUJcuthxon5Ru1B7FFK=_XuCh4E4D98DzPih8dey8w@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 12 Mar 2018 12:36:44 +0530
+Subject: [PATCH v5 3/4] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <CAD=FV=X6X+4J8KkKo+CNDF3a1_LP1CGzBDrVvBzXx9OdyYP+Dw@mail.gmail.com>
+References: <20180222061208.2031-1-rnayak@codeaurora.org>
+ <20180222061208.2031-4-rnayak@codeaurora.org>
+ <CAD=FV=X6X+4J8KkKo+CNDF3a1_LP1CGzBDrVvBzXx9OdyYP+Dw@mail.gmail.com>
+Message-ID: <0a0ab259-57d2-fce8-3903-514d6dc11c3d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2018 at 5:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 06/03/18 04:59, Jitendra Bhivare wrote:
->>
->> iPROC SoC has a special device window to treat GICv3 ITS MSI.
->
->
-> Ugh, really? After preferably printing out 100 copies of the SBSA, binding
-> them all together and dropping the lot onto the hardware designers from a
-> great height, could you clarify what exactly the special behaviour is here?
->
-> Robin.
->
-The special device window needs to programmed so that writes to
-specified address
-region helps for specific ordering of traffic prior to it.
->
->> Current code maps MSI to IOVA space. Add SMMU node property to use
->> direct mappings for MSI region.
->>
->> This property is read and reserved when arm_smmu_get_resv_regions
->> gets called.
->>
->> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
->> ---
->>   Documentation/devicetree/bindings/iommu/arm,smmu.txt | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> index 8a6ffce..13fa2b9 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> @@ -71,6 +71,15 @@ conditions.
->>                     or using stream matching with #iommu-cells = <2>, and
->>                     may be ignored if present in such cases.
->>   +- reserved-msi-region: MSI region to be reserved with specific prot in
->> IOVA
->> +                 space for direct mapping. The region is specified in
->> tuple
->> +                 of (busno,prot,bus_addr,size).
->> +
->> +- #region-address-cells: specifies number of cells needed to encode
->> bus_addr
->> +
->> +- #region-size-cells: specifies number of cells needed to encode size
->> +
->> +
->>   ** Deprecated properties:
->>     - mmu-masters (deprecated in favour of the generic "iommus" binding) :
->> @@ -95,6 +104,9 @@ conditions.
->>                                <0 36 4>,
->>                                <0 37 4>;
->>                   #iommu-cells = <1>;
->> +               #region-address-cells = <1>;
->> +               #region-size-cells = <1>;
->> +               reserved-msi-region = <0x0 0x1a 0x63c3000 0x8000>;
->>           };
->>             /* device with two stream IDs, 0 and 7 */
->>
->
+
+
+On 03/10/2018 02:30 AM, Doug Anderson wrote:
+> Hi,
+> 
+> On Wed, Feb 21, 2018 at 10:12 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+>> +               gcc: clock-controller at 100000 {
+>> +                       compatible = "qcom,gcc-sdm845";
+>> +                       reg = <0x100000 0x1f0000>;
+>> +                       #clock-cells = <1>;
+>> +                       #reset-cells = <1>;
+>> +               };
+> 
+> Seems like we need "#power-domain-cells = <1>;" in the gcc node.
+> 
+> It is true that the property is listed as "optional" in the bindings,
+> but we certainly know that the
+> "include/dt-bindings/clock/qcom,gcc-sdm845.h" that's posted [1]
+> contains several defines ending in "_GDSC" and once we start
+> referencing those we'll need "#power-domain-cells".  Seems like we
+> should just have it from the beginning.
+> 
+> NOTE: IMHO adding "#power-domain-cells" could be done as a follow-on
+> patch, but since (I think) this series still hasn't landed I guess we
+> could just send up v6?
+
+thanks for catching this, I'll send out v6 in a bit.
+
+> 
+> [1] https://patchwork.kernel.org/patch/10267093/
+> 
+> 
+> -Doug
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
