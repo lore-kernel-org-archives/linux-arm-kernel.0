@@ -1,82 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Mar 2018 11:16:32 +0000
-Subject: [PATCH v3 1/2] arm64: Documentation: cpu-feature-registers:
- Remove RES0 fields
-In-Reply-To: <20180312100414.6809-2-suzuki.poulose@arm.com>
-References: <20180312100414.6809-1-suzuki.poulose@arm.com>
- <20180312100414.6809-2-suzuki.poulose@arm.com>
-Message-ID: <20180312111631.6r7nofsazhha6lo7@lakrids.cambridge.arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Mar 2018 12:17:40 +0100
+Subject: [PATCH v2] amlogic: meson-gx-socinfo: Update soc ids
+Message-ID: <1520853460-6960-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2018 at 10:04:13AM +0000, Suzuki K Poulose wrote:
-> Remove the invisible RES0 field entries from the table, listing
-> fields in CPU ID feature registers, as :
->  1) We are only interested in the user visible fields.
->  2) The field description may not be up-to-date, as the
->     field could be assigned a new meaning.
->  3) We already explain the rules of the fields which are not
->     visible.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Dave Martin <dave.martin@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Updates the Amlogic Meson SoCs IDs for the Armv8 based SoCs.
+It includes the new families and packages.
 
-Sounds reasonable to me. FWIW:
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+Changes since v1 :
+ - Merge with S905H patch
+ - Add missing S905W package id
+ - Fix A113D package ID with jbrunet's comment
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+ drivers/soc/amlogic/meson-gx-socinfo.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Mark.
-
-> ---
->  Documentation/arm64/cpu-feature-registers.txt | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-> index a70090b28b07..22cfb86143ee 100644
-> --- a/Documentation/arm64/cpu-feature-registers.txt
-> +++ b/Documentation/arm64/cpu-feature-registers.txt
-> @@ -110,7 +110,6 @@ infrastructure:
->       x--------------------------------------------------x
->       | Name                         |  bits   | visible |
->       |--------------------------------------------------|
-> -     | RES0                         | [63-52] |    n    |
->       |--------------------------------------------------|
->       | FHM                          | [51-48] |    y    |
->       |--------------------------------------------------|
-> @@ -124,8 +123,6 @@ infrastructure:
->       |--------------------------------------------------|
->       | RDM                          | [31-28] |    y    |
->       |--------------------------------------------------|
-> -     | RES0                         | [27-24] |    n    |
-> -     |--------------------------------------------------|
->       | ATOMICS                      | [23-20] |    y    |
->       |--------------------------------------------------|
->       | CRC32                        | [19-16] |    y    |
-> @@ -135,8 +132,6 @@ infrastructure:
->       | SHA1                         | [11-8]  |    y    |
->       |--------------------------------------------------|
->       | AES                          | [7-4]   |    y    |
-> -     |--------------------------------------------------|
-> -     | RES0                         | [3-0]   |    n    |
->       x--------------------------------------------------x
->  
->  
-> @@ -144,12 +139,9 @@ infrastructure:
->       x--------------------------------------------------x
->       | Name                         |  bits   | visible |
->       |--------------------------------------------------|
-> -     | RES0                         | [63-36] |    n    |
->       |--------------------------------------------------|
->       | SVE                          | [35-32] |    y    |
->       |--------------------------------------------------|
-> -     | RES0                         | [31-28] |    n    |
-> -     |--------------------------------------------------|
->       | GIC                          | [27-24] |    n    |
->       |--------------------------------------------------|
->       | AdvSIMD                      | [23-20] |    y    |
-> -- 
-> 2.14.3
-> 
+diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
+index f2d8c3c..9f83c0c 100644
+--- a/drivers/soc/amlogic/meson-gx-socinfo.c
++++ b/drivers/soc/amlogic/meson-gx-socinfo.c
+@@ -33,6 +33,10 @@ static const struct meson_gx_soc_id {
+ 	{ "GXL", 0x21 },
+ 	{ "GXM", 0x22 },
+ 	{ "TXL", 0x23 },
++	{ "TXLX", 0x24 },
++	{ "AXG", 0x25 },
++	{ "GXLX", 0x26 },
++	{ "TXHD", 0x27 },
+ };
+ 
+ static const struct meson_gx_package_id {
+@@ -41,12 +45,18 @@ static const struct meson_gx_package_id {
+ 	unsigned int pack_id;
+ } soc_packages[] = {
+ 	{ "S905", 0x1f, 0 },
++	{ "S905H", 0x1f, 0x13 },
+ 	{ "S905M", 0x1f, 0x20 },
+ 	{ "S905D", 0x21, 0 },
+ 	{ "S905X", 0x21, 0x80 },
++	{ "S905W", 0x21, 0xa0 },
+ 	{ "S905L", 0x21, 0xc0 },
+ 	{ "S905M2", 0x21, 0xe0 },
+ 	{ "S912", 0x22, 0 },
++	{ "962X", 0x24, 0x10 },
++	{ "962E", 0x24, 0x20 },
++	{ "A113X", 0x25, 0x37 },
++	{ "A113D", 0x25, 0x22 },
+ };
+ 
+ static inline unsigned int socinfo_to_major(u32 socinfo)
+-- 
+2.7.4
