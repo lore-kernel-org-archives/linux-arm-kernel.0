@@ -1,43 +1,50 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 12 Mar 2018 09:45:32 -0700
-Subject: [PATCH] ARM: dts: msm8974: castor: Correct typo in touchscreen
- compatible string
-In-Reply-To: <20180312160734.5606-1-ctatlor97@gmail.com>
-References: <20180312160734.5606-1-ctatlor97@gmail.com>
-Message-ID: <20180312164532.GA1016@minitux>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2018 17:46:12 +0100
+Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
+In-Reply-To: <CAK8P3a06_zke6Zy77TCX6aUS1C0aK2btvnLA7APxRykkxS6S_w@mail.gmail.com>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-2-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1803112233070.28583@knanqh.ubzr>
+ <CAK8P3a06_zke6Zy77TCX6aUS1C0aK2btvnLA7APxRykkxS6S_w@mail.gmail.com>
+Message-ID: <CAK8P3a128iw+HB5Fp6ZOBCyuK0LypqSXqnkNPQs8sWR1pc8x3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 12 Mar 09:07 PDT 2018, Craig Tatlor wrote:
+On Mon, Mar 12, 2018 at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, Mar 12, 2018 at 3:40 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> On Tue, 20 Feb 2018, Arnd Bergmann wrote:
+>
+>>> Obviously we want to make the combination work, no idea why it doesn't.
+>>
+>> Well, it does work regardless of the noise. Here the nm output is piped
+>> into sed, and the later exits early when it finds what it is looking
+>> for, causing nm to complain about the broken pipe.
+>>
+>> Here's a patch silencing this bogus error message and fixing other minor
+>> issues.
+>>
+>> ----- >8
+>> Subject: [PATCH] ARM: deflate_xip_data.sh: minor fixes
+>>
+>> Send nm complaints about broken pipe (when sed exits early) to /dev/null.
+>> All errors should be printed to stderr.
+>> Don't trap on normal exit so the trap can return an error code.
+>>
+>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>
+> Ah, that explains it, thanks!
+>
+> Tested-by: Arnd Bergmann <arnd@arndb.de>
 
-> This was mistakenly pulled from the downstream tree.
-> 
-> Signed-off-by: Craig Tatlor <ctatlor97@gmail.com>
 
-Thanks Craig,
+Nevermind, I confused it with a different problem that I'm running into
+with randconfig builds:
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+arm-linux-gnueabi-nm: 'arch/arm/boot/compressed/../../../../vmlinux':
+No such file
 
-Regards,
-Bjorn
+I applied your patch, and it did not happen for a couple of randconfigs,
+but that is now back. So I did not test the bug you are fixing, and the
+thing that I thought you fixed is still there.
 
-> ---
->  arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-> index e87f2c99060d..d85311a0422c 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-> @@ -491,7 +491,7 @@
->  		pinctrl-0 = <&i2c8_pins>;
->  
->  		synaptics at 2c {
-> -			compatible = "syna,rmi-i2c";
-> +			compatible = "syna,rmi4-i2c";
->  			reg = <0x2c>;
->  
->  			interrupt-parent = <&msmgpio>;
-> -- 
-> 2.16.1
-> 
+        Arnd
