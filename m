@@ -1,22 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2018 15:28:50 +0100
-Subject: [GIT PULL] pxa for v4.17
-In-Reply-To: <871sgq5psf.fsf@belgarion.home>
-References: <871sgq5psf.fsf@belgarion.home>
-Message-ID: <CAK8P3a04TQt-LqajPXYgw7V795S3OufuTZ_+8XWRKEUKMUk23w@mail.gmail.com>
+Date: Mon, 12 Mar 2018 15:30:28 +0100
+Subject: [GIT PULL] i.MX fixes for 4.16, round 2
+In-Reply-To: <20180309061749.GK3217@dragon>
+References: <20180309061749.GK3217@dragon>
+Message-ID: <CAK8P3a34NZy=MkNF_6RLynamp-G9E_N1Z=x7vxVwQ9yGoZXebw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2018 at 9:18 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->
-> Hi Arnd, Kevin, and Olof,
->
-> This is the pxa pull request for 4.17. This one is a bit outstanding, as I was
-> expecting conflicts with the MTD tree from Boris, which was merged into my tree
-> from one of his imutable branches. I this is an issue, tell me and I'll query
-> another pull without this merge commit.
+On Fri, Mar 9, 2018 at 7:17 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> i.MX fixes for 4.16, 2nd round:
+>  - Fix a copy-paste error in imx7d-sdb device tree, which results in two
+>    usb-otg regulators are both named "regulator-usb-otg1-vbus" and
+>    override each other.
 
-I can't think of a better way to handle it, so it will have to do.
-Pulled into next/soc, thanks!
+Pulled into fixes, thanks!
 
-       Arnd
+      Arnd
