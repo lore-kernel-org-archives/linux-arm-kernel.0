@@ -1,65 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 12 Mar 2018 13:00:06 -0400 (EDT)
-Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
-In-Reply-To: <CAK8P3a128iw+HB5Fp6ZOBCyuK0LypqSXqnkNPQs8sWR1pc8x3g@mail.gmail.com>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-2-arnd@arndb.de>
- <nycvar.YSQ.7.76.1803112233070.28583@knanqh.ubzr>
- <CAK8P3a06_zke6Zy77TCX6aUS1C0aK2btvnLA7APxRykkxS6S_w@mail.gmail.com>
- <CAK8P3a128iw+HB5Fp6ZOBCyuK0LypqSXqnkNPQs8sWR1pc8x3g@mail.gmail.com>
-Message-ID: <nycvar.YSQ.7.76.1803121250360.28583@knanqh.ubzr>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Mar 2018 18:00:34 +0100
+Subject: [PATCH v5 01/36] drm/bridge: analogix_dp: detect Sink PSR state
+ after configuring the PSR
+In-Reply-To: <20180309222327.18689-2-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-2-enric.balletbo@collabora.com>
+Message-ID: <1575553.xWh7et7hg4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2018, Arnd Bergmann wrote:
-
-> On Mon, Mar 12, 2018 at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Mon, Mar 12, 2018 at 3:40 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> On Tue, 20 Feb 2018, Arnd Bergmann wrote:
-> >
-> >>> Obviously we want to make the combination work, no idea why it doesn't.
-> >>
-> >> Well, it does work regardless of the noise. Here the nm output is piped
-> >> into sed, and the later exits early when it finds what it is looking
-> >> for, causing nm to complain about the broken pipe.
-> >>
-> >> Here's a patch silencing this bogus error message and fixing other minor
-> >> issues.
-> >>
-> >> ----- >8
-> >> Subject: [PATCH] ARM: deflate_xip_data.sh: minor fixes
-> >>
-> >> Send nm complaints about broken pipe (when sed exits early) to /dev/null.
-> >> All errors should be printed to stderr.
-> >> Don't trap on normal exit so the trap can return an error code.
-> >>
-> >> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> >
-> > Ah, that explains it, thanks!
-> >
-> > Tested-by: Arnd Bergmann <arnd@arndb.de>
+Am Freitag, 9. M?rz 2018, 23:22:52 CET schrieb Enric Balletbo i Serra:
+> From: Yakir Yang <ykk@rock-chips.com>
 > 
+> Make sure the request PSR state takes effect in analogix_dp_send_psr_spd()
+> function, or print the sink PSR error state if we failed to apply the
+> requested PSR setting.
 > 
-> Nevermind, I confused it with a different problem that I'm running into
-> with randconfig builds:
+> Cc: ?? ? <wzz@rock-chips.com>
+> Cc: St?phane Marchesin <marcheu@chromium.org>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> [seanpaul changed timeout loop to a readx poll]
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-At least you no longer get the "broken pipe" warning as your initial 
-report showed, right?
-
-> arm-linux-gnueabi-nm: 'arch/arm/boot/compressed/../../../../vmlinux':
-> No such file
-
-That is weird. The Makefile has:
-
-cmd_mkxip = $(cmd_objcopy) && $(cmd_deflate_xip_data)
-
-$(obj)/xipImage: vmlinux FORCE
-        $(call if_changed,mkxip)
-
-So the objcopy must succeed at producing vmlinux for deflate_xip_data 
-(where nm is used) to be called.
-
-Do you have a .config for this issue?
-
-
-Nicolas
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
