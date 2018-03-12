@@ -1,71 +1,77 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 12 Mar 2018 20:35:29 +0100
-Subject: [PATCH v2] mtd: nand: marvell: Fix clock resource by adding a
- register clock
-In-Reply-To: <87vae11bep.fsf@bootlin.com>
-References: <20180307161316.14612-1-gregory.clement@bootlin.com>
- <20180307204418.014622b8@bbrezillon> <87vae11bep.fsf@bootlin.com>
-Message-ID: <20180312203529.7963ef29@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Mar 2018 19:43:30 +0000
+Subject: [PATCH v5 19/23] arm64: KVM: Allow far branches from vector slots
+ to the main vectors
+In-Reply-To: <5AA6C674.90607@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-20-marc.zyngier@arm.com> <5AA6C674.90607@arm.com>
+Message-ID: <5f76d3c3-ab68-8f46-7ffe-b3dea21c123c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2018 17:55:26 +0100
-Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Hi James,
 
-> >  
-> >>  	struct completion complete;
-> >>  	unsigned long assigned_cs;
-> >>  	struct list_head chips;
-> >> @@ -2747,12 +2748,24 @@ static int marvell_nfc_probe(struct platform_device *pdev)
-> >>  	if (ret)
-> >>  		return ret;
-> >>  
-> >> +	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
-> >> +	if (PTR_ERR(nfc->reg_clk) != -ENOENT) {
-> >> +		if (!IS_ERR(nfc->reg_clk)) {
-> >> +			ret = clk_prepare_enable(nfc->reg_clk);
-> >> +			if (ret)
-> >> +				goto unprepare_clk;  
-> >
-> > I already suggested to move the devm_clk_get(&pdev->dev, "reg") before
-> > the clk_prepare_enable(nfc->ecc_clk) one to simplify the error path.
-> >  
+On 12/03/18 18:27, James Morse wrote:
+> Hi Marc,
 > 
-> Actually I started to implement your suggestion but unlike what you
-> though it made the code less simpler. Indeed by having the mandatory
-> clock first than in case of failure we can directly exit the function.
+> On 01/03/18 15:55, Marc Zyngier wrote:
+>> So far, the branch from the vector slots to the main vectors can at
+>> most be 4GB from the main vectors (the reach of ADRP), and this
+>> distance is known at compile time. If we were to remap the slots
+>> to an unrelated VA, things would break badly.
+>>
+>> A way to achieve VA independence would be to load the absolute
+>> address of the vectors (__kvm_hyp_vector), either using a constant
+>> pool or a series of movs, followed by an indirect branch.
+>>
+>> This patches implements the latter solution, using another instance
+>> of a patching callback.
 > 
-> If the reg clock was initialized first, then if the core/ecc clock fail
-> in soem case we woudl need to daisbel the reg clock and in other case we
-> could directly exit.
-
-Well, it's pretty much the same problem if you do it in the order you
-propose here: if the core clk enable fails, you'll have to disable the
-reg clk. Plus, I'm not a big fan of if/else block imbrications when we
-can avoid them.
-
+>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>> index e000cb390618..e8d997788ad0 100644
+>> --- a/arch/arm64/kernel/bpi.S
+>> +++ b/arch/arm64/kernel/bpi.S
+>> @@ -19,6 +19,9 @@
+>>  #include <linux/linkage.h>
+>>  #include <linux/arm-smccc.h>
+>>  
+>> +#include <asm/alternative.h>
+>> +#include <asm/kvm_mmu.h>
+>> +
+>>  .macro hyp_ventry offset
+>>  	.align 7
+>>  	.rept 29
+>> @@ -64,9 +67,15 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>>  	.endr
+>>  
+>>  __kvm_enter_vectors:
+>> +alternative_cb	kvm_patch_vector_branch
+>> +	movz	x1, #0
+>> +	movk	x1, #0, lsl #16
+>> +	movk	x1, #0, lsl #32
+>> +	movk	x1, #0, lsl #48
+>> +alternative_cb_end
+>>  
+>> -	adr_l	x1, __kvm_hyp_vector
+>>  	add	x0, x1, x0
+>> +	kern_hyp_va x0
 > 
-> 
-> >> +		} else {
-> >> +			ret = PTR_ERR(nfc->reg_clk);
-> >> +			goto unprepare_clk;
-> >> +		}
-> >> +	}  
-> >
-> > So nfc->reg_clk stays assigned to -ENOENT if the clk is not present, and
-> > clk_disable_unprepare() will manipulate an invalid pointer when called
-> > from the error or ->remove() path.  
-> 
-> I think you missed the fact that the clk_disable_unprepare() function
-> managed the invalid pointer, have a look on the functions and you will
-> see that IS_ERR() is used, so there is no point to set the pointer to NULL.
+> Can't you patch the kern_hyp_va address into the movk block directly?
+> Obviously you can't call kern_hyp_va, but you could generate the layout and have
+> some slow __kern_hyp_va() to generate the value. This would avoid generating a
+> value, to then throw half of it away and patch something else in.
 
-Right. I just checked the clk_prepare() implementation which is
-checking for NULL value only and I thought clk_disable() and
-clk_unprepare() were doing the same, which apparently is not the case.
+Hmmm. That's pretty twisted. Actually, this is utterly terrifying. And
+thus absolutely mandatory. Irk. I really like it.
 
+> Does this code run for VHE systems too? (it not, is the x<<48 movk needed?)
 
+This is indeed VHE only, and if/when I adopt your suggestion, we'll be
+able to drop the last movk, effectively getting rid of 6 instructions on
+the exception path. Awesome!
+
+Thanks,
+
+	M.
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Jazz is not dead. It just smells funny...
