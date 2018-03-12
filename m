@@ -1,51 +1,40 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Mon, 12 Mar 2018 08:50:03 +0000
-Subject: [PATCH] can: m_can: select pinctrl state in each suspend/resume
- function
-In-Reply-To: <1519907380-15135-1-git-send-email-bich.hemon@st.com>
-References: <1519907380-15135-1-git-send-email-bich.hemon@st.com>
-Message-ID: <405c95e3-00e4-ad2a-f5b5-c5e7e2e5abdf@st.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 12 Mar 2018 09:51:20 +0100
+Subject: [PATCH v3 4/7] drm/panel: simple: Add support for KEO
+ TX31D200VM0BAA
+In-Reply-To: <1517766571-409-5-git-send-email-jagan@amarulasolutions.com>
+References: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
+ <1517766571-409-5-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <20180312085120.GI23060@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On 03/01/2018 01:29 PM, Bich HEMON wrote:
-> Make sure to apply the correct pin state in suspend/resume callbacks.
-> Putting pins in sleep state saves power.
+On Sun, Feb 04, 2018 at 11:19:28PM +0530, Jagan Teki wrote:
+> This adds support for the Kaohsiung Opto-Electronics.,
+> TX31D200VM0BAA 12.3" HSXGA LVDS panel, which can be
+> supported by the simple panel driver.
 > 
-> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
->   drivers/net/can/m_can/m_can.c | 4 ++++
->   1 file changed, 4 insertions(+)
+> Changes for v3:
+> - collect Rob reiew tag 
+> Changes for v2:
+> - Updated binding info about optional properties, node and example
 > 
-> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-> index 2594f77..a86ef69 100644
-> --- a/drivers/net/can/m_can/m_can.c
-> +++ b/drivers/net/can/m_can/m_can.c
-> @@ -1700,6 +1700,8 @@ static __maybe_unused int m_can_suspend(struct device *dev)
->   		m_can_clk_stop(priv);
->   	}
->   
-> +	pinctrl_pm_select_sleep_state(dev);
-> +
->   	priv->can.state = CAN_STATE_SLEEPING;
->   
->   	return 0;
-> @@ -1710,6 +1712,8 @@ static __maybe_unused int m_can_resume(struct device *dev)
->   	struct net_device *ndev = dev_get_drvdata(dev);
->   	struct m_can_priv *priv = netdev_priv(ndev);
->   
-> +	pinctrl_pm_select_default_state(dev);
-> +
->   	m_can_init_ram(priv);
->   
->   	priv->can.state = CAN_STATE_ERROR_ACTIVE;
-> 
+>  .../bindings/display/panel/koe,tx31d200vm0baa.txt  | 25 ++++++++++++++++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>  2 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt
 
-Sorry, my mistake. Of course this is the wrong mailing list. Please 
-ignore this patch.
+The koe vendor prefix is undocumented, please send a patch to add it to
+Documentation/devicetree/bindings/vendor-prefixes.txt.
 
-Best regards,
-
-Bich
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180312/e15f7917/attachment.sig>
