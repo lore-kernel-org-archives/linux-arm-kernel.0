@@ -1,25 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Mar 2018 14:11:00 +0000
-Subject: [PATCH] mfd: ab8500-debugfs: Use kasprintf
-In-Reply-To: <1520445961-12160-1-git-send-email-himanshujha199640@gmail.com>
-References: <1520445961-12160-1-git-send-email-himanshujha199640@gmail.com>
-Message-ID: <20180312141100.brfyw3kn5meamfcv@dell>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 12 Mar 2018 19:42:22 +0530
+Subject: [PATCH v7 1/3] dt-bindings: arm: Document kryo385 cpu
+In-Reply-To: <20180312141224.11907-1-rnayak@codeaurora.org>
+References: <20180312141224.11907-1-rnayak@codeaurora.org>
+Message-ID: <20180312141224.11907-2-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Mar 2018, Himanshu Jha wrote:
+Document the compatible string for the Kryo385 cpus found in qualcomm
+SoCs.
 
-> Use kasprintf instead of combination of kmalloc and sprintf.
-> 
-> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
-> ---
->  drivers/mfd/ab8500-debugfs.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Applied, thanks.
-
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index f4a777039f03..8b0328ff951d 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -185,6 +185,7 @@ described below.
+ 			    "nvidia,tegra186-denver"
+ 			    "qcom,krait"
+ 			    "qcom,kryo"
++			    "qcom,kryo385"
+ 			    "qcom,scorpion"
+ 	- enable-method
+ 		Value type: <stringlist>
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
