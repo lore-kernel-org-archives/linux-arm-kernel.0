@@ -1,102 +1,30 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 12 Mar 2018 16:57:52 +0100
-Subject: [PATCH v2 5/6] ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
-In-Reply-To: <20180312155753.9478-1-codekipper@gmail.com>
-References: <20180312155753.9478-1-codekipper@gmail.com>
-Message-ID: <20180312155753.9478-6-codekipper@gmail.com>
+From: ctatlor97@gmail.com (Craig Tatlor)
+Date: Mon, 12 Mar 2018 16:07:34 +0000
+Subject: [PATCH] ARM: dts: msm8974: castor: Correct typo in touchscreen
+ compatible string
+Message-ID: <20180312160734.5606-1-ctatlor97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+This was mistakenly pulled from the downstream tree.
 
-Extend the functionality of the driver to include support of 20 and
-24 bits per sample for the earlier SoCs.
-
-Newer SoCs can also handle 32bit samples.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Signed-off-by: Craig Tatlor <ctatlor97@gmail.com>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index 436480df1844..7cf4dfe440de 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -451,6 +451,11 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
- 	case 16:
- 		width = DMA_SLAVE_BUSWIDTH_2_BYTES;
- 		break;
-+	case 20:
-+	case 24:
-+	case 32:
-+		width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		break;
- 	default:
- 		dev_err(dai->dev, "Unsupported physical sample width: %d\n",
- 			params_physical_width(params));
-@@ -463,7 +468,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
- 		sr = 0;
- 		wss = 0;
- 		break;
--
-+	case 20:
-+		sr = 1;
-+		wss = 1;
-+		break;
-+	case 24:
-+		sr = 2;
-+		wss = 2;
-+		break;
-+	case 32:
-+		sr = 4;
-+		wss = 4;
-+		break;
- 	default:
- 		dev_err(dai->dev, "Unsupported sample width: %d\n",
- 			params_width(params));
-@@ -766,6 +782,13 @@ static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
+index e87f2c99060d..d85311a0422c 100644
+--- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
++++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
+@@ -491,7 +491,7 @@
+ 		pinctrl-0 = <&i2c8_pins>;
  
-+#define SUN4I_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | \
-+			 SNDRV_PCM_FMTBIT_S20_3LE | \
-+			 SNDRV_PCM_FMTBIT_S24_LE)
-+
-+#define SUN8I_FORMATS	(SUN4I_FORMATS | \
-+			 SNDRV_PCM_FMTBIT_S32_LE)
-+
- static struct snd_soc_dai_driver sun4i_i2s_dai = {
- 	.probe = sun4i_i2s_dai_probe,
- 	.capture = {
-@@ -773,14 +796,14 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
- 		.channels_min = 2,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
--		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		.formats = SUN4I_FORMATS,
- 	},
- 	.playback = {
- 		.stream_name = "Playback",
- 		.channels_min = 2,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
--		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		.formats = SUN4I_FORMATS,
- 	},
- 	.ops = &sun4i_i2s_dai_ops,
- 	.symmetric_rates = 1,
-@@ -1170,6 +1193,11 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
- 		goto err_pm_disable;
- 	}
+ 		synaptics at 2c {
+-			compatible = "syna,rmi-i2c";
++			compatible = "syna,rmi4-i2c";
+ 			reg = <0x2c>;
  
-+	if (i2s->variant->has_fmt_set_lrck_period) {
-+		soc_dai->playback.formats = SUN8I_FORMATS;
-+		soc_dai->capture.formats = SUN8I_FORMATS;
-+	}
-+
- 	if (!of_property_read_u32(pdev->dev.of_node,
- 				  "allwinner,playback-channels", &val)) {
- 		if (val >= 2 && val <= 8)
+ 			interrupt-parent = <&msmgpio>;
 -- 
-2.16.2
+2.16.1
