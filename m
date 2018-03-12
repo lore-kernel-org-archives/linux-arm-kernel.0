@@ -1,51 +1,78 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 12 Mar 2018 15:06:55 +0000
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.17
-In-Reply-To: <CAK8P3a18WiQFRkBhtB82kstTGx=WKjYzD+eDCv=BmvsCqP1gQA@mail.gmail.com>
-References: <5AA2AAC5.2000806@hisilicon.com>
- <CAK8P3a18WiQFRkBhtB82kstTGx=WKjYzD+eDCv=BmvsCqP1gQA@mail.gmail.com>
-Message-ID: <5AA6978F.3040704@hisilicon.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Mon, 12 Mar 2018 17:15:58 +0200
+Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
+In-Reply-To: <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <CAFd5g45h3wAZtx-4oJb_uLbtDTzSsD6eLM5G0VF=3BBHNmW8YQ@mail.gmail.com>
+ <CAP6Zq1jEAg2OrmnHzJdk9UBjPkDctu5oGHYyJ+QLBzN+E31sPw@mail.gmail.com>
+ <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
+Message-ID: <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-On 2018/3/12 13:58, Arnd Bergmann wrote:
-> On Fri, Mar 9, 2018 at 4:39 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
->> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->>
->>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->>
->> are available in the Git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.17
->>
->> for you to fetch changes up to 928c4a5ce8684d2c8a37543b3361cfc12d83b167:
->>
->>   arm64: dts: Hi3660: Remove 'CPU_NAP' idle state (2018-03-02 16:19:44 +0000)
->>
->> ----------------------------------------------------------------
->> ARM64: DT: Hisilicon SoC DT updates for 4.17
->>
->> - Add XGE CPLD control support for hip07 SoC
->> - Disable the SMMU on hip06 and hip07 SoCs becuase of
->>   the hardware limitation
->> - Enable HS200 mode for the MMC controller on hi6220 hikey board
->> - Remove "cooling-{min|max}-level" this kind unused properties
->>   for hi6220 SoC
->> - Add watchdog node for hi6220 SoC
->> - Remove "CPU_NAP" idle state on hikey960 board since it is
->>   not stable and useless with the updated firmware
-> 
-> Pulled into next/dt, thanks!
+I will send tomorrow new version with some modification we need to do
+once we use NPCM7XX and not NPCM750.
 
-Thanks!
+Brendan,
 
-Best Regards,
-Wei
+Is it O.K.?
 
-> 
->        Arnd
-> 
-> .
-> 
+
+
+On 12 March 2018 at 15:37, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, Mar 12, 2018 at 2:28 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
+>> Hi Brendan,
+>>
+>> According to the last mail I have with Arnd can you modify the Kconfig
+>> as follow:
+>>
+>> +menuconfig ARCH_NPCM
+>> +       bool "Nuvoton NPCM Architecture"
+>> +       depends on ARCH_MULTI_V7
+>> +       select PINCTRL
+>> +
+>> +if ARCH_NPCM
+>> +
+>> +config ARCH_NPCM7XX
+>> +       bool "Support for NPCM7xx BMC (Poleg)"
+>> +       depends on ARCH_MULTI_V7
+>> +       select PINCTRL_NPCM7XX
+>> +       select NPCM7XX_TIMER
+>> +       select ARCH_REQUIRE_GPIOLIB
+>> +       select CACHE_L2X0
+>> +       select ARM_GIC
+>> +       select HAVE_ARM_TWD if SMP
+>> +       select HAVE_ARM_SCU if SMP
+>> +       select ARM_ERRATA_764369 if SMP
+>> +       select ARM_ERRATA_720789
+>> +       select ARM_ERRATA_754322
+>> +       select ARM_ERRATA_794072
+>> +       select PL310_ERRATA_588369
+>> +       select PL310_ERRATA_727915
+>> +       select MFD_SYSCON
+>> +       help
+>> +         General support for NPCM7xx BMC (Poleg).
+>> +
+>> +         Nuvoton NPCM7xx BMC based on the Cortex A9.
+>> +
+>> +endif
+>
+> One more change is needed to avoid a link error without CONFIG_SMP:
+>
+> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+> index c7a1316d27c1..34d51f9f207c 100644
+> --- a/arch/arm/mach-npcm/Makefile
+> +++ b/arch/arm/mach-npcm/Makefile
+> @@ -1,3 +1,4 @@
+>  AFLAGS_headsmp.o               += -march=armv7-a
+>
+> -obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o platsmp.o headsmp.o
+> +obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o
+> +obj-$(CONFIG_SMP)              += platsmp.o headsmp.o
+>
+> Can one of you send me a pull request or the full patch series on top
+> of the version I have in arm-soc?
+>
+>       Arnd
