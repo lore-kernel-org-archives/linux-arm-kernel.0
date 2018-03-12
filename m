@@ -1,25 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Mar 2018 11:52:54 +0100
-Subject: [PATCH] arm64: dts: rockchip: assign clock rate for ACLK_VIO
-In-Reply-To: <1520819448-8316-1-git-send-email-zhengsq@rock-chips.com>
-References: <1520819448-8316-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <4610682.YhluMk2iks@phil>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Mon, 12 Mar 2018 11:53:37 +0100
+Subject: [RESEND PATCH v1 0/6] Add different features for I2C
+Message-ID: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. M?rz 2018, 02:50:48 CET schrieb Shunqian Zheng:
-> The ACLK_VIO is a parent clock used by a several children,
-> its suggested clock rate is 400MHz. Right now it gets 400MHz
-> because it sources from CPLL(800M) and divides by 2 after reset.
-> It's good not to rely on default values like this, so let's
-> explicitly set it.
-> NOTE: it's expected that at least one board may override cru node and
-> set the CPLL to 1.6 GHz. On that board it will be very important to be
-> explicit about aclk-vio being 400 MHz.
-> 
-> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Append new I2C STM32F7 feature set. This includes 10 bit support, slave
+support, SMBBus protocols support, DMA Support and eventually an I2C recovery
+mechanism.
+resend after rebasing on last kernel.
 
-applied for 4.17
+---
+  Version history:
+    v1:
+        * Initial
+---
+Pierre-Yves MORDRET (6):
+  i2c: i2c-stm32f7: Add 10-bit address support
+  i2c: i2c-stm32f7: Add slave support
+  i2c: i2c-stm32f7: Add initial SMBus protocols support
+  i2c: i2c-stm32: Add generic DMA API
+  i2c: i2c-stm32f7: Add DMA support
+  i2c: i2c-stm32f7: Implement I2C recovery mechanism
 
-Thanks
-Heiko
+ drivers/i2c/busses/Kconfig       |    1 +
+ drivers/i2c/busses/Makefile      |    3 +-
+ drivers/i2c/busses/i2c-stm32.c   |  153 ++++++
+ drivers/i2c/busses/i2c-stm32.h   |   37 ++
+ drivers/i2c/busses/i2c-stm32f7.c | 1047 +++++++++++++++++++++++++++++++++++++-
+ 5 files changed, 1214 insertions(+), 27 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-stm32.c
+
+-- 
+2.7.4
