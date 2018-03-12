@@ -1,32 +1,45 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 12 Mar 2018 09:06:11 +0000
-Subject: [PATCH v2 01/12] dt-bindings: Document STM32MP1 Reset Clock
- Controller (RCC) bindings
-In-Reply-To: <20180309235356.qd2wx6teeuxkwwjz@rob-hp-laptop>
-References: <1520528045-18330-1-git-send-email-gabriel.fernandez@st.com>
- <1520528045-18330-2-git-send-email-gabriel.fernandez@st.com>
- <20180309235356.qd2wx6teeuxkwwjz@rob-hp-laptop>
-Message-ID: <7d552f25-a7b8-c99a-8f28-eb9beb455724@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Mar 2018 09:12:14 +0000
+Subject: [RESEND PATCH v4 1/4] mfd: syscon: Set name of regmap_config
+In-Reply-To: <20180309084351.32009-2-jeffy.chen@rock-chips.com>
+References: <20180309084351.32009-1-jeffy.chen@rock-chips.com>
+ <20180309084351.32009-2-jeffy.chen@rock-chips.com>
+Message-ID: <20180312091214.f6dwq6q3eqqblfnf@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Rob !
+On Fri, 09 Mar 2018, Jeffy Chen wrote:
 
-Best Regards
+> We are now allowing to register debugfs without a valid device, and not
+> having a valid name will end up using "dummy*" to create debugfs dir.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3:
+> Modify commit message.
+> 
+>  drivers/mfd/syscon.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Gabriel
+Is this the RESEND I requested?  I can still only see this patch.
 
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index fc9ba0ea4e44..b6d05cd934e6 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -110,6 +110,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	syscon_config.reg_stride = reg_io_width;
+>  	syscon_config.val_bits = reg_io_width * 8;
+>  	syscon_config.max_register = resource_size(&res) - reg_io_width;
+> +	syscon_config.name = of_node_full_name(np);
+>  
+>  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+>  	if (IS_ERR(regmap)) {
 
-On 03/10/2018 12:53 AM, Rob Herring wrote:
-> On Thu, Mar 08, 2018 at 05:53:54PM +0100, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> The RCC block is responsible of the management of the clock and reset
->> generation for the complete circuit.
->>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->> ---
->>   .../devicetree/bindings/clock/st,stm32mp1-rcc.txt  | 60 ++++++++++++++++++++++
->>   1 file changed, 60 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
-> Reviewed-by: Rob Herring <robh@kernel.org>
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
