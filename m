@@ -1,164 +1,339 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 12 Mar 2018 08:39:33 +0100
-Subject: [PATCH v3 5/7] drm/panel: Add Ilitek ILI9881c panel driver
-In-Reply-To: <4ebd47038b1ee1cc6b7d9738313f43f985268463.1520344489.git-series.maxime.ripard@bootlin.com>
-References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
- <4ebd47038b1ee1cc6b7d9738313f43f985268463.1520344489.git-series.maxime.ripard@bootlin.com>
-Message-ID: <20180312073933.GD23060@ulmo>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 12 Mar 2018 13:36:56 +0530
+Subject: [PATCH v6 3/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <20180312080656.13247-1-rnayak@codeaurora.org>
+References: <20180312080656.13247-1-rnayak@codeaurora.org>
+Message-ID: <20180312080656.13247-4-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 02:56:02PM +0100, Maxime Ripard wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> The LHR050H41 panel is the panel shipped with the BananaPi M2-Magic, and is
-> based on the Ilitek ILI9881c Controller. Add a driver for it, modelled
-> after the other Ilitek controller drivers.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/panel/Kconfig                 |   9 +-
->  drivers/gpu/drm/panel/Makefile                |   1 +-
->  drivers/gpu/drm/panel/panel-ilitek-ili9881c.c | 506 +++++++++++++++++++-
->  3 files changed, 516 insertions(+)
->  create mode 100644 drivers/gpu/drm/panel/panel-ilitek-ili9881c.c
-[...]
-> diff --git a/drivers/gpu/drm/panel/panel-ilitek-ili9881c.c b/drivers/gpu/drm/panel/panel-ilitek-ili9881c.c
-[...]
-> +static int ili9881c_prepare(struct drm_panel *panel)
-> +{
-> +	struct ili9881c *ctx = panel_to_ili9881c(panel);
-> +	int i, ret;
+Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
 
-i can be unsigned.
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm64/boot/dts/qcom/Makefile       |   1 +
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  15 ++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi    | 278 ++++++++++++++++++++++++++++++++
+ 3 files changed, 294 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
 
-> +
-> +	/* Power the panel */
-> +	gpiod_set_value(ctx->power, 1);
-> +	mdelay(5);
-> +
-> +	/* And reset it */
-> +	gpiod_set_value(ctx->reset, 1);
-> +	mdelay(20);
-> +
-> +	gpiod_set_value(ctx->reset, 0);
-> +	mdelay(20);
-
-5 and 20 milliseconds are much too long to busy loop. Use usleep_range()
-and msleep() instead. It's probably fine to use msleep(5) in this case
-regardless of the advice in Documentation/timers/timers-howto.txt since
-a few milliseconds more aren't going to matter here.
-
-> +
-> +	for (i = 0; i < ARRAY_SIZE(ili9881c_init); i++) {
-> +		struct ili9881c_instr *instr = &ili9881c_init[i];
-> +
-> +		if (instr->op == ILI9881C_SWITCH_PAGE)
-> +			ret = ili9881c_switch_page(ctx, instr->arg.page);
-> +		else if (instr->op == ILI9881C_COMMAND)
-> +			ret = ili9881c_send_cmd_data(ctx, instr->arg.cmd.cmd,
-> +						      instr->arg.cmd.data);
-> +
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	ret = ili9881c_switch_page(ctx, 0);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = mipi_dsi_dcs_set_tear_on(ctx->dsi, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
-> +	if (ret)
-> +		return ret;
-> +
-> +	mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static void ili9881c_enable_bl(struct ili9881c *ctx, bool enable)
-> +{
-> +	if (!ctx->backlight)
-> +		return;
-> +
-> +	if (enable) {
-> +		ctx->backlight->props.state &= ~BL_CORE_FBBLANK;
-> +		ctx->backlight->props.power = FB_BLANK_UNBLANK;
-> +	} else {
-> +		ctx->backlight->props.power = FB_BLANK_POWERDOWN;
-> +		ctx->backlight->props.state |= BL_CORE_FBBLANK;
-> +	}
-> +
-> +	backlight_update_status(ctx->backlight);
-> +}
-
-There's a new pair of functions, backlight_enable() and
-backlight_disable() that do this now. Please use those. They also work
-fine when passed a NULL pointer, so should be perfect to replace this
-with.
-
-> +
-> +static int ili9881c_enable(struct drm_panel *panel)
-> +{
-> +	struct ili9881c *ctx = panel_to_ili9881c(panel);
-> +
-> +	mdelay(120);
-
-Hogging the CPU for 120 milliseconds like this is a really bad idea. Use
-msleep() instead.
-
-> +	mipi_dsi_dcs_set_display_on(ctx->dsi);
-> +
-> +	ili9881c_enable_bl(ctx, true);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ili9881c_disable(struct drm_panel *panel)
-> +{
-> +	struct ili9881c *ctx = panel_to_ili9881c(panel);
-> +
-> +	ili9881c_enable_bl(ctx, false);
-> +
-> +	return mipi_dsi_dcs_set_display_off(ctx->dsi);
-> +}
-> +
-> +static int ili9881c_unprepare(struct drm_panel *panel)
-> +{
-> +	struct ili9881c *ctx = panel_to_ili9881c(panel);
-> +
-> +	mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-> +	gpiod_set_value(ctx->power, 0);
-> +	gpiod_set_value(ctx->reset, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct drm_display_mode default_mode = {
-> +	.clock		= 62000,
-> +	.vrefresh	= 60,
-> +
-> +	.hdisplay	= 720,
-> +	.hsync_start	= 720 + 10,
-> +	.hsync_end	= 720 + 10 + 20,
-> +	.htotal		= 720 + 10 + 20 + 30,
-> +
-> +	.vdisplay	= 1280,
-> +	.vsync_start	= 1280 + 10,
-> +	.vsync_end	= 1280 + 10 + 10,
-> +	.vtotal		= 1280 + 10 + 10 + 20,
-> +};
-
-You may want to consider using struct display_timing instead, since that
-will allow the driver to be used on a broader range of devices.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180312/5519d059/attachment-0001.sig>
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index 55ec5ee7f7e8..9319e74b8906 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8992-bullhead-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-mtp.dtb
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+new file mode 100644
+index 000000000000..979ab49913f1
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+@@ -0,0 +1,15 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * SDM845 MTP board device tree source
++ *
++ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
++ */
++
++/dts-v1/;
++
++#include "sdm845.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. SDM845 MTP";
++	compatible = "qcom,sdm845-mtp";
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+new file mode 100644
+index 000000000000..d2407cd7a561
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -0,0 +1,278 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * SDM845 SoC device tree source
++ *
++ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	interrupt-parent = <&intc>;
++
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen { };
++
++	memory at 80000000 {
++		device_type = "memory";
++		/* We expect the bootloader to fill in the size */
++		reg = <0 0x80000000 0 0>;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			next-level-cache = <&L2_0>;
++			L2_0: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++				L3_0: l3-cache {
++				      compatible = "cache";
++				};
++			};
++		};
++
++		CPU1: cpu at 100 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			next-level-cache = <&L2_100>;
++			L2_100: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU2: cpu at 200 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x200>;
++			enable-method = "psci";
++			next-level-cache = <&L2_200>;
++			L2_200: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU3: cpu at 300 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x300>;
++			enable-method = "psci";
++			next-level-cache = <&L2_300>;
++			L2_300: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU4: cpu at 400 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x400>;
++			enable-method = "psci";
++			next-level-cache = <&L2_400>;
++			L2_400: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU5: cpu at 500 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x500>;
++			enable-method = "psci";
++			next-level-cache = <&L2_500>;
++			L2_500: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU6: cpu at 600 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x600>;
++			enable-method = "psci";
++			next-level-cache = <&L2_600>;
++			L2_600: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU7: cpu at 700 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x700>;
++			enable-method = "psci";
++			next-level-cache = <&L2_700>;
++			L2_700: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	clocks {
++		xo_board: xo-board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++		};
++
++		sleep_clk: sleep-clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32764>;
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0xffffffff>;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at 17a00000 {
++			compatible = "arm,gic-v3";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			#redistributor-regions = <1>;
++			redistributor-stride = <0x0 0x20000>;
++			reg = <0x17a00000 0x10000>,     /* GICD */
++			      <0x17a60000 0x100000>;    /* GICR * 8 */
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++			gic-its at 17a40000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				#msi-cells = <1>;
++				reg = <0x17a40000 0x20000>;
++				status = "disabled";
++			};
++		};
++
++		gcc: clock-controller at 100000 {
++			compatible = "qcom,gcc-sdm845";
++			reg = <0x100000 0x1f0000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			#power-domain-cells = <1>;
++		};
++
++		tlmm: pinctrl at 3400000 {
++			compatible = "qcom,sdm845-pinctrl";
++			reg = <0x03400000 0xc00000>;
++			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		timer at 17c90000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			compatible = "arm,armv7-timer-mem";
++			reg = <0x17c90000 0x1000>;
++
++			frame at 17ca0000 {
++				frame-number = <0>;
++				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17ca0000 0x1000>,
++				      <0x17cb0000 0x1000>;
++			};
++
++			frame at 17cc0000 {
++				frame-number = <1>;
++				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cc0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17cd0000 {
++				frame-number = <2>;
++				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cd0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17ce0000 {
++				frame-number = <3>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17ce0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17cf0000 {
++				frame-number = <4>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cf0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17d00000 {
++				frame-number = <5>;
++				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17d00000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17d10000 {
++				frame-number = <6>;
++				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17d10000 0x1000>;
++				status = "disabled";
++			};
++		};
++
++		spmi_bus: spmi at c440000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg = <0xc440000 0x1100>,
++			      <0xc600000 0x2000000>,
++			      <0xe600000 0x100000>,
++			      <0xe700000 0xa0000>,
++			      <0xc40a000 0x26000>;
++			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
++			interrupt-names = "periph_irq";
++			interrupts = <GIC_SPI 481 IRQ_TYPE_LEVEL_HIGH>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++			cell-index = <0>;
++		};
++	};
++};
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
