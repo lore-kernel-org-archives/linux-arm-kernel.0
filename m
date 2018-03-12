@@ -1,29 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 Mar 2018 18:02:39 +0100
-Subject: [PATCH v5 03/36] drm/bridge: analogix_dp: Don't change psr while
- bridge is disabled
-In-Reply-To: <20180309222327.18689-4-enric.balletbo@collabora.com>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-4-enric.balletbo@collabora.com>
-Message-ID: <11981411.JMsWtk38iA@diego>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 12 Mar 2018 13:05:31 -0400 (EDT)
+Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
+In-Reply-To: <nycvar.YSQ.7.76.1803121250360.28583@knanqh.ubzr>
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20180220215954.4092811-2-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1803112233070.28583@knanqh.ubzr>
+ <CAK8P3a06_zke6Zy77TCX6aUS1C0aK2btvnLA7APxRykkxS6S_w@mail.gmail.com>
+ <CAK8P3a128iw+HB5Fp6ZOBCyuK0LypqSXqnkNPQs8sWR1pc8x3g@mail.gmail.com>
+ <nycvar.YSQ.7.76.1803121250360.28583@knanqh.ubzr>
+Message-ID: <nycvar.YSQ.7.76.1803121303350.28583@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. M?rz 2018, 23:22:54 CET schrieb Enric Balletbo i Serra:
-> From: zain wang <wzz@rock-chips.com>
-> 
-> There is a race between AUX CH bring-up and enabling bridge which will
-> cause link training to fail. To avoid hitting it, don't change psr state
-> while enabling the bridge.
-> 
-> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: zain wang <wzz@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> [seanpaul fixed up the commit message a bit and renamed *_supported to
-> *_enabled] Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Mon, 12 Mar 2018, Nicolas Pitre wrote:
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> On Mon, 12 Mar 2018, Arnd Bergmann wrote:
+> 
+> > arm-linux-gnueabi-nm: 'arch/arm/boot/compressed/../../../../vmlinux':
+> > No such file
+> 
+> That is weird. The Makefile has:
+> 
+> cmd_mkxip = $(cmd_objcopy) && $(cmd_deflate_xip_data)
+> 
+> $(obj)/xipImage: vmlinux FORCE
+>         $(call if_changed,mkxip)
+> 
+> So the objcopy must succeed at producing vmlinux for deflate_xip_data 
+> (where nm is used) to be called.
+
+Correction: vmlinux is a dependency not a product, so it must be there 
+for this rule to be executed, and it is input to both objcopy and nm.
+
+
+Nicolas
