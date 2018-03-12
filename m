@@ -1,971 +1,562 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 12 Mar 2018 09:38:34 -0500
-Subject: [PATCHv6 3/3] clk: socfpga: stratix10: add clock driver for
- Stratix10 platform
-In-Reply-To: <3c264d7d-e3fd-a1fe-fabf-59bbc41dc096@kernel.org>
-References: <1519656455-14629-1-git-send-email-dinguyen@kernel.org>
- <1519656455-14629-3-git-send-email-dinguyen@kernel.org>
- <3c264d7d-e3fd-a1fe-fabf-59bbc41dc096@kernel.org>
-Message-ID: <77ccd325-c5ba-6a50-d51a-b89f93dd2c15@kernel.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Mar 2018 14:41:32 +0000
+Subject: [PATCH v2 2/4] mfd: add Gateworks System Controller core driver
+In-Reply-To: <1520287361-12569-3-git-send-email-tharvey@gateworks.com>
+References: <1520287361-12569-1-git-send-email-tharvey@gateworks.com>
+ <1520287361-12569-3-git-send-email-tharvey@gateworks.com>
+Message-ID: <20180312144132.kw4lowgnwsbblmuy@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 05 Mar 2018, Tim Harvey wrote:
 
-Another gentle ping on this patch?
+> The Gateworks System Controller (GSC) is an I2C slave controller
+> implemented with an MSP430 micro-controller whose firmware embeds the
+> following features:
+>  - I/O expander (16 GPIO's) using PCA955x protocol
+>  - Real Time Clock using DS1672 protocol
+>  - User EEPROM using AT24 protocol
+>  - HWMON using custom protocol
+>  - Interrupt controller with tamper detect, user pushbotton
+>  - Watchdog controller capable of full board power-cycle
+>  - Power Control capable of full board power-cycle
+> 
+> see http://trac.gateworks.com/wiki/gsc for more details
+> 
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+> v2:
+> - change license comment block style
+> - remove COMPILE_TEST (Randy)
+> - fixed whitespace issues
+> - replaced a printk with dev_err
+> 
+>  drivers/mfd/Kconfig     |  13 ++
+>  drivers/mfd/Makefile    |   1 +
+>  drivers/mfd/gsc.c       | 330 ++++++++++++++++++++++++++++++++++++++++++++++++
 
-Thanks,
-Dinh
+I'd prefer gateworks-sc.c
 
-On 03/05/2018 09:16 AM, Dinh Nguyen wrote:
-> Hi Mike and Stephen,
+>  include/linux/mfd/gsc.h |  82 ++++++++++++
+>  4 files changed, 426 insertions(+)
+>  create mode 100644 drivers/mfd/gsc.c
+>  create mode 100644 include/linux/mfd/gsc.h
 > 
-> Was wondering if you can review this patch when you get a chance?
-> 
-> Thanks so much,
-> 
-> Dinh
-> 
-> On 02/26/2018 08:47 AM, Dinh Nguyen wrote:
->> Add a clock driver for the Stratix10 SoC. The driver is similar to the
->> Cyclone5/Arria10 platforms, with the exception that this driver only uses
->> one single clock binding.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
->> ---
->> v6:
->> - minimize usage of strcmp
->> - use // as comment limiters for SPDX in c source file
->> v5:
->> - make SPDX license as a 1st separate first line comment
->> v4:
->> - move SPDX license first line of all files
->> v3:
->> - use fixed binding "intel,stratix10-clkmgr"
->> - Fix up SPDX license header
->> v2:
->> - Use a single clock binding
->> ---
->>  drivers/clk/Makefile                 |   1 +
->>  drivers/clk/socfpga/Makefile         |   5 +
->>  drivers/clk/socfpga/clk-gate-s10.c   | 124 ++++++++++++++
->>  drivers/clk/socfpga/clk-periph-s10.c | 148 ++++++++++++++++
->>  drivers/clk/socfpga/clk-pll-s10.c    | 145 ++++++++++++++++
->>  drivers/clk/socfpga/clk-s10.c        | 319 +++++++++++++++++++++++++++++++++++
->>  drivers/clk/socfpga/clk.h            |   4 +
->>  drivers/clk/socfpga/stratix10-clk.h  |  86 ++++++++++
->>  8 files changed, 832 insertions(+)
->>  create mode 100644 drivers/clk/socfpga/clk-gate-s10.c
->>  create mode 100644 drivers/clk/socfpga/clk-periph-s10.c
->>  create mode 100644 drivers/clk/socfpga/clk-pll-s10.c
->>  create mode 100644 drivers/clk/socfpga/clk-s10.c
->>  create mode 100644 drivers/clk/socfpga/stratix10-clk.h
->>
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index 71ec41e..80ab422 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -88,6 +88,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
->>  obj-$(CONFIG_PLAT_SPEAR)		+= spear/
->>  obj-$(CONFIG_ARCH_SPRD)			+= sprd/
->>  obj-$(CONFIG_ARCH_STI)			+= st/
->> +obj-$(CONFIG_ARCH_STRATIX10)		+= socfpga/
->>  obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
->>  obj-$(CONFIG_ARCH_SUNXI)		+= sunxi-ng/
->>  obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
->> diff --git a/drivers/clk/socfpga/Makefile b/drivers/clk/socfpga/Makefile
->> index 9146c20..87ef977 100644
->> --- a/drivers/clk/socfpga/Makefile
->> +++ b/drivers/clk/socfpga/Makefile
->> @@ -1,6 +1,11 @@
->>  # SPDX-License-Identifier: GPL-2.0
->> +ifeq ($(CONFIG_ARCH_SOCFPGA),y)
->>  obj-y += clk.o
->>  obj-y += clk-gate.o
->>  obj-y += clk-pll.o
->>  obj-y += clk-periph.o
->>  obj-y += clk-pll-a10.o clk-periph-a10.o clk-gate-a10.o
->> +else
->> +obj-y += clk-s10.o
->> +obj-y += clk-pll-s10.o clk-periph-s10.o clk-gate-s10.o
->> +endif
->> diff --git a/drivers/clk/socfpga/clk-gate-s10.c b/drivers/clk/socfpga/clk-gate-s10.c
->> new file mode 100644
->> index 0000000..5b09aef
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-gate-s10.c
->> @@ -0,0 +1,124 @@
->> +// SPDX-License-Identifier:	GPL-2.0
->> +/*
->> + * Copyright (C) 2017, Intel Corporation
->> + */
->> +#include <linux/clk-provider.h>
->> +#include <linux/slab.h>
->> +#include "clk.h"
->> +
->> +#define SOCFPGA_CS_PDBG_CLK	"cs_pdbg_clk"
->> +#define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
->> +
->> +static unsigned long socfpga_gate_clk_recalc_rate(struct clk_hw *hwclk,
->> +						  unsigned long parent_rate)
->> +{
->> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
->> +	u32 div = 1, val;
->> +
->> +	if (socfpgaclk->fixed_div) {
->> +		div = socfpgaclk->fixed_div;
->> +	} else if (socfpgaclk->div_reg) {
->> +		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
->> +		val &= GENMASK(socfpgaclk->width - 1, 0);
->> +		div = (1 << val);
->> +	}
->> +	return parent_rate / div;
->> +}
->> +
->> +static unsigned long socfpga_dbg_clk_recalc_rate(struct clk_hw *hwclk,
->> +						  unsigned long parent_rate)
->> +{
->> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
->> +	u32 div = 1, val;
->> +
->> +	val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
->> +	val &= GENMASK(socfpgaclk->width - 1, 0);
->> +	div = (1 << val);
->> +	div = div ? 4 : 1;
->> +
->> +	return parent_rate / div;
->> +}
->> +
->> +static u8 socfpga_gate_get_parent(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
->> +	u32 mask;
->> +	u8 parent = 0;
->> +
->> +	if (socfpgaclk->bypass_reg) {
->> +		mask = (0x1 << socfpgaclk->bypass_shift);
->> +		parent = ((readl(socfpgaclk->bypass_reg) & mask) >>
->> +			  socfpgaclk->bypass_shift);
->> +	}
->> +	return parent;
->> +}
->> +
->> +static struct clk_ops gateclk_ops = {
->> +	.recalc_rate = socfpga_gate_clk_recalc_rate,
->> +	.get_parent = socfpga_gate_get_parent,
->> +};
->> +
->> +static struct clk_ops dbgclk_ops = {
->> +	.recalc_rate = socfpga_dbg_clk_recalc_rate,
->> +	.get_parent = socfpga_gate_get_parent,
->> +};
->> +
->> +struct clk *s10_register_gate(char *name, const char *parent_name,
->> +			      const char * const *parent_names,
->> +			      u8 num_parents, unsigned long flags,
->> +			      void __iomem *regbase, unsigned long gate_reg,
->> +			      unsigned long gate_idx, unsigned long div_reg,
->> +			      unsigned long div_offset, u8 div_width,
->> +			      unsigned long bypass_reg, u8 bypass_shift,
->> +			      u8 fixed_div)
->> +{
->> +	struct clk *clk;
->> +	struct socfpga_gate_clk *socfpga_clk;
->> +	struct clk_init_data init;
->> +
->> +	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
->> +	if (WARN_ON(!socfpga_clk))
->> +		return NULL;
->> +
->> +	socfpga_clk->hw.reg = regbase + gate_reg;
->> +	socfpga_clk->hw.bit_idx = gate_idx;
->> +
->> +	gateclk_ops.enable = clk_gate_ops.enable;
->> +	gateclk_ops.disable = clk_gate_ops.disable;
->> +
->> +	socfpga_clk->fixed_div = fixed_div;
->> +
->> +	if (div_reg)
->> +		socfpga_clk->div_reg = regbase + div_reg;
->> +	else
->> +		socfpga_clk->div_reg = NULL;
->> +
->> +	socfpga_clk->width = div_width;
->> +	socfpga_clk->shift = div_offset;
->> +
->> +	if (bypass_reg)
->> +		socfpga_clk->bypass_reg = regbase + bypass_reg;
->> +	else
->> +		socfpga_clk->bypass_reg = NULL;
->> +	socfpga_clk->bypass_shift = bypass_shift;
->> +
->> +	if (streq(name, SOCFPGA_CS_PDBG_CLK))
->> +		init.ops = &dbgclk_ops;
->> +	else
->> +		init.ops = &gateclk_ops;
->> +
->> +	init.name = name;
->> +	init.flags = flags;
->> +
->> +	init.num_parents = num_parents;
->> +	init.parent_names = parent_names ? parent_names : &parent_name;
->> +	socfpga_clk->hw.hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &socfpga_clk->hw.hw);
->> +	if (WARN_ON(IS_ERR(clk))) {
->> +		kfree(socfpga_clk);
->> +		return NULL;
->> +	}
->> +
->> +	return clk;
->> +}
->> diff --git a/drivers/clk/socfpga/clk-periph-s10.c b/drivers/clk/socfpga/clk-periph-s10.c
->> new file mode 100644
->> index 0000000..6021ac1
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-periph-s10.c
->> @@ -0,0 +1,148 @@
->> +// SPDX-License-Identifier:	GPL-2.0
->> +/*
->> + * Copyright (C) 2017, Intel Corporation
->> + */
->> +#include <linux/slab.h>
->> +#include <linux/clk-provider.h>
->> +
->> +#include "clk.h"
->> +
->> +#define CLK_MGR_FREE_SHIFT		16
->> +#define CLK_MGR_FREE_MASK		0x7
->> +#define SWCTRLBTCLKSEN_SHIFT		8
->> +
->> +#define to_periph_clk(p) container_of(p, struct socfpga_periph_clk, hw.hw)
->> +
->> +static unsigned long clk_peri_c_clk_recalc_rate(struct clk_hw *hwclk,
->> +					     unsigned long parent_rate)
->> +{
->> +	struct socfpga_periph_clk *socfpgaclk = to_periph_clk(hwclk);
->> +	unsigned long div = 1;
->> +	u32 val;
->> +
->> +	val = readl(socfpgaclk->hw.reg);
->> +	val &= GENMASK(SWCTRLBTCLKSEN_SHIFT - 1, 0);
->> +	parent_rate /= val;
->> +
->> +	return parent_rate / div;
->> +}
->> +
->> +static unsigned long clk_peri_cnt_clk_recalc_rate(struct clk_hw *hwclk,
->> +					     unsigned long parent_rate)
->> +{
->> +	struct socfpga_periph_clk *socfpgaclk = to_periph_clk(hwclk);
->> +	unsigned long div = 1;
->> +
->> +	if (socfpgaclk->fixed_div) {
->> +		div = socfpgaclk->fixed_div;
->> +	} else {
->> +		if (!socfpgaclk->bypass_reg)
->> +			div = ((readl(socfpgaclk->hw.reg) & 0x7ff) + 1);
->> +	}
->> +
->> +	return parent_rate / div;
->> +}
->> +
->> +static u8 clk_periclk_get_parent(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_periph_clk *socfpgaclk = to_periph_clk(hwclk);
->> +	u32 clk_src, mask;
->> +	u8 parent;
->> +
->> +	if (socfpgaclk->bypass_reg) {
->> +		mask = (0x1 << socfpgaclk->bypass_shift);
->> +		parent = ((readl(socfpgaclk->bypass_reg) & mask) >>
->> +			   socfpgaclk->bypass_shift);
->> +	} else {
->> +		clk_src = readl(socfpgaclk->hw.reg);
->> +		parent = (clk_src >> CLK_MGR_FREE_SHIFT) &
->> +			CLK_MGR_FREE_MASK;
->> +	}
->> +	return parent;
->> +}
->> +
->> +static const struct clk_ops peri_c_clk_ops = {
->> +	.recalc_rate = clk_peri_c_clk_recalc_rate,
->> +	.get_parent = clk_periclk_get_parent,
->> +};
->> +
->> +static const struct clk_ops peri_cnt_clk_ops = {
->> +	.recalc_rate = clk_peri_cnt_clk_recalc_rate,
->> +	.get_parent = clk_periclk_get_parent,
->> +};
->> +
->> +struct clk *s10_register_periph(char *name, const char *parent_name,
->> +				const char * const *parent_names,
->> +				u8 num_parents, unsigned long flags,
->> +				void __iomem *reg, unsigned long offset)
->> +{
->> +	struct clk *clk;
->> +	struct socfpga_periph_clk *periph_clk;
->> +	struct clk_init_data init;
->> +
->> +	periph_clk = kzalloc(sizeof(*periph_clk), GFP_KERNEL);
->> +	if (WARN_ON(!periph_clk))
->> +		return NULL;
->> +
->> +	periph_clk->hw.reg = reg + offset;
->> +
->> +	init.name = name;
->> +	init.ops = &peri_c_clk_ops;
->> +	init.flags = flags;
->> +
->> +	init.num_parents = num_parents;
->> +	init.parent_names = parent_names ? parent_names : &parent_name;
->> +
->> +	periph_clk->hw.hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &periph_clk->hw.hw);
->> +	if (WARN_ON(IS_ERR(clk))) {
->> +		kfree(periph_clk);
->> +		return NULL;
->> +	}
->> +	return clk;
->> +}
->> +
->> +struct clk *s10_register_cnt_periph(char *name, const char *parent_name,
->> +				    const char * const *parent_names,
->> +				    u8 num_parents, unsigned long flags,
->> +				    void __iomem *regbase, unsigned long offset,
->> +				    u8 fixed_divider, unsigned long bypass_reg,
->> +				    unsigned long bypass_shift)
->> +{
->> +	struct clk *clk;
->> +	struct socfpga_periph_clk *periph_clk;
->> +	struct clk_init_data init;
->> +
->> +	periph_clk = kzalloc(sizeof(*periph_clk), GFP_KERNEL);
->> +	if (WARN_ON(!periph_clk))
->> +		return NULL;
->> +
->> +	if (offset)
->> +		periph_clk->hw.reg = regbase + offset;
->> +	else
->> +		periph_clk->hw.reg = NULL;
->> +
->> +	if (bypass_reg)
->> +		periph_clk->bypass_reg = regbase + bypass_reg;
->> +	else
->> +		periph_clk->bypass_reg = NULL;
->> +	periph_clk->bypass_shift = bypass_shift;
->> +	periph_clk->fixed_div = fixed_divider;
->> +
->> +	init.name = name;
->> +	init.ops = &peri_cnt_clk_ops;
->> +	init.flags = flags;
->> +
->> +	init.num_parents = num_parents;
->> +	init.parent_names = parent_names ? parent_names : &parent_name;
->> +
->> +	periph_clk->hw.hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &periph_clk->hw.hw);
->> +	if (WARN_ON(IS_ERR(clk))) {
->> +		kfree(periph_clk);
->> +		return NULL;
->> +	}
->> +	return clk;
->> +}
->> diff --git a/drivers/clk/socfpga/clk-pll-s10.c b/drivers/clk/socfpga/clk-pll-s10.c
->> new file mode 100644
->> index 0000000..ef24ca7
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-pll-s10.c
->> @@ -0,0 +1,145 @@
->> +// SPDX-License-Identifier:	GPL-2.0
->> +/*
->> + * Copyright (C) 2017, Intel Corporation
->> + */
->> +#include <linux/slab.h>
->> +#include <linux/clk-provider.h>
->> +
->> +#include "clk.h"
->> +
->> +/* Clock Manager offsets */
->> +#define CLK_MGR_PLL_CLK_SRC_SHIFT	16
->> +#define CLK_MGR_PLL_CLK_SRC_MASK	0x3
->> +
->> +/* PLL Clock enable bits */
->> +#define SOCFPGA_PLL_POWER		0
->> +#define SOCFPGA_PLL_RESET_MASK		0x2
->> +#define SOCFPGA_PLL_REFDIV_MASK		0x00003F00
->> +#define SOCFPGA_PLL_REFDIV_SHIFT	8
->> +#define SOCFPGA_PLL_MDIV_MASK		0xFF000000
->> +#define SOCFPGA_PLL_MDIV_SHIFT		24
->> +#define SWCTRLBTCLKSEL_MASK		0x200
->> +#define SWCTRLBTCLKSEL_SHIFT		9
->> +
->> +#define SOCFPGA_BOOT_CLK		"boot_clk"
->> +
->> +#define to_socfpga_clk(p) container_of(p, struct socfpga_pll, hw.hw)
->> +
->> +static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
->> +					 unsigned long parent_rate)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	unsigned long mdiv;
->> +	unsigned long refdiv;
->> +	unsigned long reg;
->> +	unsigned long long vco_freq;
->> +
->> +	/* read VCO1 reg for numerator and denominator */
->> +	reg = readl(socfpgaclk->hw.reg);
->> +	refdiv = (reg & SOCFPGA_PLL_REFDIV_MASK) >> SOCFPGA_PLL_REFDIV_SHIFT;
->> +	vco_freq = (unsigned long long)parent_rate / refdiv;
->> +
->> +	/* Read mdiv and fdiv from the fdbck register */
->> +	reg = readl(socfpgaclk->hw.reg + 0x4);
->> +	mdiv = (reg & SOCFPGA_PLL_MDIV_MASK) >> SOCFPGA_PLL_MDIV_SHIFT;
->> +	vco_freq = (unsigned long long)parent_rate * (mdiv + 6);
->> +
->> +	return (unsigned long)vco_freq;
->> +}
->> +
->> +static unsigned long clk_boot_clk_recalc_rate(struct clk_hw *hwclk,
->> +					 unsigned long parent_rate)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	u32 div = 1;
->> +
->> +	div = ((readl(socfpgaclk->hw.reg) &
->> +		SWCTRLBTCLKSEL_MASK) >>
->> +		SWCTRLBTCLKSEL_SHIFT);
->> +	div += 1;
->> +	return parent_rate /= div;
->> +}
->> +
->> +
->> +static u8 clk_pll_get_parent(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	u32 pll_src;
->> +
->> +	pll_src = readl(socfpgaclk->hw.reg);
->> +	return (pll_src >> CLK_MGR_PLL_CLK_SRC_SHIFT) &
->> +		CLK_MGR_PLL_CLK_SRC_MASK;
->> +}
->> +
->> +static u8 clk_boot_get_parent(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	u32 pll_src;
->> +
->> +	pll_src = readl(socfpgaclk->hw.reg);
->> +	return (pll_src >> SWCTRLBTCLKSEL_SHIFT) &
->> +		SWCTRLBTCLKSEL_MASK;
->> +}
->> +
->> +static int clk_pll_prepare(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	u32 reg;
->> +
->> +	/* Bring PLL out of reset */
->> +	reg = readl(socfpgaclk->hw.reg);
->> +	reg |= SOCFPGA_PLL_RESET_MASK;
->> +	writel(reg, socfpgaclk->hw.reg);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct clk_ops clk_pll_ops = {
->> +	.recalc_rate = clk_pll_recalc_rate,
->> +	.get_parent = clk_pll_get_parent,
->> +	.prepare = clk_pll_prepare,
->> +};
->> +
->> +static struct clk_ops clk_boot_ops = {
->> +	.recalc_rate = clk_boot_clk_recalc_rate,
->> +	.get_parent = clk_boot_get_parent,
->> +	.prepare = clk_pll_prepare,
->> +};
->> +
->> +struct clk *s10_register_pll(const char *name, const char * const *parent_names,
->> +				    u8 num_parents, unsigned long flags,
->> +				    void __iomem *reg, unsigned long offset)
->> +{
->> +	struct clk *clk;
->> +	struct socfpga_pll *pll_clk;
->> +	struct clk_init_data init;
->> +
->> +	pll_clk = kzalloc(sizeof(*pll_clk), GFP_KERNEL);
->> +	if (WARN_ON(!pll_clk))
->> +		return NULL;
->> +
->> +	pll_clk->hw.reg = reg + offset;
->> +
->> +	if (streq(name, SOCFPGA_BOOT_CLK))
->> +		init.ops = &clk_boot_ops;
->> +	else
->> +		init.ops = &clk_pll_ops;
->> +
->> +	init.name = name;
->> +	init.flags = flags;
->> +
->> +	init.num_parents = num_parents;
->> +	init.parent_names = parent_names;
->> +	pll_clk->hw.hw.init = &init;
->> +
->> +	pll_clk->hw.bit_idx = SOCFPGA_PLL_POWER;
->> +	clk_pll_ops.enable = clk_gate_ops.enable;
->> +	clk_pll_ops.disable = clk_gate_ops.disable;
->> +
->> +	clk = clk_register(NULL, &pll_clk->hw.hw);
->> +	if (WARN_ON(IS_ERR(clk))) {
->> +		kfree(pll_clk);
->> +		return NULL;
->> +	}
->> +	return clk;
->> +}
->> diff --git a/drivers/clk/socfpga/clk-s10.c b/drivers/clk/socfpga/clk-s10.c
->> new file mode 100644
->> index 0000000..31572cb
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-s10.c
->> @@ -0,0 +1,319 @@
->> +// SPDX-License-Identifier:	GPL-2.0
->> +/*
->> + * Copyright (C) 2017, Intel Corporation
->> + */
->> +#include <linux/kernel.h>
->> +#include <linux/slab.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +
->> +#include <dt-bindings/clock/stratix10-clock.h>
->> +
->> +#include "stratix10-clk.h"
->> +
->> +static const char * const pll_mux[] = { "osc1", "cb_intosc_hs_div2_clk",
->> +					"f2s_free_clk",};
->> +static const char * const cntr_mux[] = { "main_pll", "periph_pll",
->> +					 "osc1", "cb_intosc_hs_div2_clk",
->> +					 "f2s_free_clk"};
->> +static const char * const boot_mux[] = { "osc1", "cb_intosc_hs_div2_clk",};
->> +
->> +static const char * const noc_free_mux[] = {"main_noc_base_clk",
->> +					    "peri_noc_base_clk",
->> +					    "osc1", "cb_intosc_hs_div2_clk",
->> +					    "f2s_free_clk"};
->> +
->> +static const char * const emaca_free_mux[] = {"peri_emaca_clk", "boot_clk"};
->> +static const char * const emacb_free_mux[] = {"peri_emacb_clk", "boot_clk"};
->> +static const char * const emac_ptp_free_mux[] = {"peri_emac_ptp_clk", "boot_clk"};
->> +static const char * const gpio_db_free_mux[] = {"peri_gpio_db_clk", "boot_clk"};
->> +static const char * const sdmmc_free_mux[] = {"peri_sdmmc_clk", "boot_clk"};
->> +static const char * const s2f_usr1_free_mux[] = {"peri_s2f_usr1_clk", "boot_clk"};
->> +static const char * const psi_ref_free_mux[] = {"peri_psi_ref_clk", "boot_clk"};
->> +static const char * const mpu_mux[] = { "mpu_free_clk", "boot_clk",};
->> +
->> +static const char * const s2f_usr0_mux[] = {"f2s_free_clk", "boot_clk"};
->> +static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk"};
->> +static const char * const noc_mux[] = {"noc_free_clk", "boot_clk"};
->> +
->> +/* clocks in AO (always on) controller */
->> +static const struct stratix10_pll_clock s10_pll_clks[] = {
->> +	{ STRATIX10_BOOT_CLK, "boot_clk", boot_mux, ARRAY_SIZE(boot_mux), 0,
->> +	  0x0},
->> +	{ STRATIX10_MAIN_PLL_CLK, "main_pll", pll_mux, ARRAY_SIZE(pll_mux),
->> +	  0, 0x74},
->> +	{ STRATIX10_PERIPH_PLL_CLK, "periph_pll", pll_mux, ARRAY_SIZE(pll_mux),
->> +	  0, 0xe4},
->> +};
->> +
->> +static const struct stratix10_perip_c_clock s10_main_perip_c_clks[] = {
->> +	{ STRATIX10_MAIN_MPU_BASE_CLK, "main_mpu_base_clk", "main_pll", 0, 1, 0, 0x84},
->> +	{ STRATIX10_MAIN_NOC_BASE_CLK, "main_noc_base_clk", "main_pll", 0, 1, 0, 0x88},
->> +	{ STRATIX10_PERI_MPU_BASE_CLK, "peri_mpu_base_clk", "periph_pll", 0, 1, 0,
->> +	  0xF4},
->> +	{ STRATIX10_PERI_NOC_BASE_CLK, "peri_noc_base_clk", "periph_pll", 0, 1, 0,
->> +	  0xF8},
->> +};
->> +
->> +static const struct stratix10_perip_cnt_clock s10_main_perip_cnt_clks[] = {
->> +	{ STRATIX10_MPU_FREE_CLK, "mpu_free_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	   0, 0x48, 0, 0, 0},
->> +	{ STRATIX10_NOC_FREE_CLK, "noc_free_clk", NULL, noc_free_mux, ARRAY_SIZE(noc_free_mux),
->> +	  0, 0x4C, 0, 0, 0},
->> +	{ STRATIX10_MAIN_EMACA_CLK, "main_emaca_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x50, 0, 0, 0},
->> +	{ STRATIX10_MAIN_EMACB_CLK, "main_emacb_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x54, 0, 0, 0},
->> +	{ STRATIX10_MAIN_EMAC_PTP_CLK, "main_emac_ptp_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x58, 0, 0, 0},
->> +	{ STRATIX10_MAIN_GPIO_DB_CLK, "main_gpio_db_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x5C, 0, 0, 0},
->> +	{ STRATIX10_MAIN_SDMMC_CLK, "main_sdmmc_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x60, 0, 0, 0},
->> +	{ STRATIX10_MAIN_S2F_USR0_CLK, "main_s2f_usr0_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0x64, 0, 0, 0},
->> +	{ STRATIX10_MAIN_S2F_USR1_CLK, "main_s2f_usr1_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x68, 0, 0, 0},
->> +	{ STRATIX10_MAIN_PSI_REF_CLK, "main_psi_ref_clk", "main_noc_base_clk", NULL, 1, 0,
->> +	  0x6C, 0, 0, 0},
->> +	{ STRATIX10_PERI_EMACA_CLK, "peri_emaca_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xBC, 0, 0, 0},
->> +	{ STRATIX10_PERI_EMACB_CLK, "peri_emacb_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xC0, 0, 0, 0},
->> +	{ STRATIX10_PERI_EMAC_PTP_CLK, "peri_emac_ptp_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xC4, 0, 0, 0},
->> +	{ STRATIX10_PERI_GPIO_DB_CLK, "peri_gpio_db_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xC8, 0, 0, 0},
->> +	{ STRATIX10_PERI_SDMMC_CLK, "peri_sdmmc_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xCC, 0, 0, 0},
->> +	{ STRATIX10_PERI_S2F_USR0_CLK, "peri_s2f_usr0_clk", "peri_noc_base_clk", NULL, 1, 0,
->> +	  0xD0, 0, 0, 0},
->> +	{ STRATIX10_PERI_S2F_USR1_CLK, "peri_s2f_usr1_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
->> +	  0, 0xD4, 0, 0, 0},
->> +	{ STRATIX10_PERI_PSI_REF_CLK, "peri_psi_ref_clk", "peri_noc_base_clk", NULL, 1, 0,
->> +	  0xD8, 0, 0, 0},
->> +	{ STRATIX10_L4_SYS_FREE_CLK, "l4_sys_free_clk", "noc_free_clk", NULL, 1, 0,
->> +	  0, 4, 0, 0},
->> +	{ STRATIX10_NOC_CLK, "noc_clk", NULL, noc_mux, ARRAY_SIZE(noc_mux),
->> +	  0, 0, 0, 0x3C, 1},
->> +	{ STRATIX10_EMAC_A_FREE_CLK, "emaca_free_clk", NULL, emaca_free_mux, ARRAY_SIZE(emaca_free_mux),
->> +	  0, 0, 4, 0xB0, 0},
->> +	{ STRATIX10_EMAC_B_FREE_CLK, "emacb_free_clk", NULL, emacb_free_mux, ARRAY_SIZE(emacb_free_mux),
->> +	  0, 0, 4, 0xB0, 1},
->> +	{ STRATIX10_EMAC_PTP_FREE_CLK, "emac_ptp_free_clk", NULL, emac_ptp_free_mux,
->> +	  ARRAY_SIZE(emac_ptp_free_mux), 0, 0, 4, 0xB0, 2},
->> +	{ STRATIX10_GPIO_DB_FREE_CLK, "gpio_db_free_clk", NULL, gpio_db_free_mux,
->> +	  ARRAY_SIZE(gpio_db_free_mux), 0, 0, 0, 0xB0, 3},
->> +	{ STRATIX10_SDMMC_FREE_CLK, "sdmmc_free_clk", NULL, sdmmc_free_mux,
->> +	  ARRAY_SIZE(sdmmc_free_mux), 0, 0, 0, 0xB0, 4},
->> +	{ STRATIX10_S2F_USER1_FREE_CLK, "s2f_user1_free_clk", NULL, s2f_usr1_free_mux,
->> +	  ARRAY_SIZE(s2f_usr1_free_mux), 0, 0, 0, 0xB0, 5},
->> +	{ STRATIX10_PSI_REF_FREE_CLK, "psi_ref_free_clk", NULL, psi_ref_free_mux,
->> +	  ARRAY_SIZE(psi_ref_free_mux), 0, 0, 0, 0xB0, 6},
->> +};
->> +
->> +static const struct stratix10_gate_clock s10_gate_clks[] = {
->> +	{ STRATIX10_MPU_CLK, "mpu_clk", NULL, mpu_mux, ARRAY_SIZE(mpu_mux), 0, 0x30,
->> +	  0, 0, 0, 0, 0x3C, 0, 0},
->> +	{ STRATIX10_MPU_PERIPH_CLK, "mpu_periph_clk", "mpu_clk", NULL, 1, 0, 0x30,
->> +	  0, 0, 0, 0, 0, 0, 4},
->> +	{ STRATIX10_MPU_L2RAM_CLK, "mpu_l2ram_clk", "mpu_clk", NULL, 1, 0, 0x30,
->> +	  0, 0, 0, 0, 0, 0, 2},
->> +	{ STRATIX10_L4_MAIN_CLK, "l4_main_clk", "noc_clk", NULL, 1, 0, 0x30,
->> +	  1, 0x70, 0, 2, 0, 0, 0},
->> +	{ STRATIX10_L4_MP_CLK, "l4_mp_clk", "noc_clk", NULL, 1, 0, 0x30,
->> +	  2, 0x70, 8, 2, 0, 0, 0},
->> +	{ STRATIX10_L4_SP_CLK, "l4_sp_clk", "noc_clk", NULL, 1, CLK_IS_CRITICAL, 0x30,
->> +	  3, 0x70, 16, 2, 0, 0, 0},
->> +	{ STRATIX10_CS_AT_CLK, "cs_at_clk", "noc_clk", NULL, 1, 0, 0x30,
->> +	  4, 0x70, 24, 2, 0, 0, 0},
->> +	{ STRATIX10_CS_TRACE_CLK, "cs_trace_clk", "noc_clk", NULL, 1, 0, 0x30,
->> +	  4, 0x70, 26, 2, 0, 0, 0},
->> +	{ STRATIX10_CS_PDBG_CLK, "cs_pdbg_clk", "cs_at_clk", NULL, 1, 0, 0x30,
->> +	  4, 0x70, 28, 1, 0, 0, 0},
->> +	{ STRATIX10_CS_TIMER_CLK, "cs_timer_clk", "noc_clk", NULL, 1, 0, 0x30,
->> +	  5, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_S2F_USER0_CLK, "s2f_user0_clk", NULL, s2f_usr0_mux, ARRAY_SIZE(s2f_usr0_mux), 0, 0x30,
->> +	  6, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_EMAC0_CLK, "emac0_clk", NULL, emac_mux, ARRAY_SIZE(emac_mux), 0, 0xA4,
->> +	  0, 0, 0, 0, 0xDC, 26, 0},
->> +	{ STRATIX10_EMAC1_CLK, "emac1_clk", NULL, emac_mux, ARRAY_SIZE(emac_mux), 0, 0xA4,
->> +	  1, 0, 0, 0, 0xDC, 27, 0},
->> +	{ STRATIX10_EMAC2_CLK, "emac2_clk", NULL, emac_mux, ARRAY_SIZE(emac_mux), 0, 0xA4,
->> +	  2, 0, 0, 0, 0xDC, 28, 0},
->> +	{ STRATIX10_EMAC_PTP_CLK, "emac_ptp_clk", "emac_ptp_free_clk", NULL, 1, 0, 0xA4,
->> +	  3, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_GPIO_DB_CLK, "gpio_db_clk", "gpio_db_free_clk", NULL, 1, 0, 0xA4,
->> +	  4, 0xE0, 0, 16, 0, 0, 0},
->> +	{ STRATIX10_SDMMC_CLK, "sdmmc_clk", "sdmmc_free_clk", NULL, 1, 0, 0xA4,
->> +	  5, 0, 0, 0, 0, 0, 4},
->> +	{ STRATIX10_S2F_USER1_CLK, "s2f_user1_clk", "s2f_user1_free_clk", NULL, 1, 0, 0xA4,
->> +	  6, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_PSI_REF_CLK, "psi_ref_clk", "psi_ref_free_clk", NULL, 1, 0, 0xA4,
->> +	  7, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_USB_CLK, "usb_clk", "l4_mp_clk", NULL, 1, 0, 0xA4,
->> +	  8, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_SPI_M_CLK, "spi_m_clk", "l4_mp_clk", NULL, 1, 0, 0xA4,
->> +	  9, 0, 0, 0, 0, 0, 0},
->> +	{ STRATIX10_NAND_CLK, "nand_clk", "l4_main_clk", NULL, 1, 0, 0xA4,
->> +	  10, 0, 0, 0, 0, 0, 0},
->> +};
->> +
->> +static int s10_clk_register_c_perip(const struct stratix10_perip_c_clock *clks,
->> +				    int nums, struct stratix10_clock_data *data)
->> +{
->> +	struct clk *clk;
->> +	void __iomem *base = data->base;
->> +	int i;
->> +
->> +	for (i = 0; i < nums; i++) {
->> +		clk = s10_register_periph(clks[i].name, clks[i].parent_name,
->> +					  clks[i].parent_names, clks[i].num_parents,
->> +					  clks[i].flags, base, clks[i].offset);
->> +		if (IS_ERR(clk)) {
->> +			pr_err("%s: failed to register clock %s\n",
->> +			       __func__, clks[i].name);
->> +			continue;
->> +		}
->> +		data->clk_data.clks[clks[i].id] = clk;
->> +	}
->> +	return 0;
->> +}
->> +
->> +static int s10_clk_register_cnt_perip(const struct stratix10_perip_cnt_clock *clks,
->> +				      int nums, struct stratix10_clock_data *data)
->> +{
->> +	struct clk *clk;
->> +	void __iomem *base = data->base;
->> +	int i;
->> +
->> +	for (i = 0; i < nums; i++) {
->> +		clk = s10_register_cnt_periph(clks[i].name, clks[i].parent_name,
->> +					      clks[i].parent_names,
->> +					      clks[i].num_parents,
->> +					      clks[i].flags, base,
->> +					      clks[i].offset,
->> +					      clks[i].fixed_divider,
->> +					      clks[i].bypass_reg,
->> +					      clks[i].bypass_shift);
->> +		if (IS_ERR(clk)) {
->> +			pr_err("%s: failed to register clock %s\n",
->> +			       __func__, clks[i].name);
->> +			continue;
->> +		}
->> +		data->clk_data.clks[clks[i].id] = clk;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int s10_clk_register_gate(const struct stratix10_gate_clock *clks,
->> +				 int nums, struct stratix10_clock_data *data)
->> +{
->> +	struct clk *clk;
->> +	void __iomem *base = data->base;
->> +	int i;
->> +
->> +	for (i = 0; i < nums; i++) {
->> +		clk = s10_register_gate(clks[i].name, clks[i].parent_name,
->> +					clks[i].parent_names,
->> +					clks[i].num_parents,
->> +					clks[i].flags, base,
->> +					clks[i].gate_reg,
->> +					clks[i].gate_idx, clks[i].div_reg,
->> +					clks[i].div_offset, clks[i].div_width,
->> +					clks[i].bypass_reg,
->> +					clks[i].bypass_shift,
->> +					clks[i].fixed_div);
->> +		if (IS_ERR(clk)) {
->> +			pr_err("%s: failed to register clock %s\n",
->> +			       __func__, clks[i].name);
->> +			continue;
->> +		}
->> +		data->clk_data.clks[clks[i].id] = clk;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int s10_clk_register_pll(const struct stratix10_pll_clock *clks,
->> +				 int nums, struct stratix10_clock_data *data)
->> +{
->> +	struct clk *clk;
->> +	void __iomem *base = data->base;
->> +	int i;
->> +
->> +	for (i = 0; i < nums; i++) {
->> +		clk = s10_register_pll(clks[i].name, clks[i].parent_names,
->> +				    clks[i].num_parents,
->> +				    clks[i].flags, base,
->> +				    clks[i].offset);
->> +		if (IS_ERR(clk)) {
->> +			pr_err("%s: failed to register clock %s\n",
->> +			       __func__, clks[i].name);
->> +			continue;
->> +		}
->> +		data->clk_data.clks[clks[i].id] = clk;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +struct stratix10_clock_data *__socfpga_s10_clk_init(struct device_node *np,
->> +						    int nr_clks)
->> +{
->> +	struct stratix10_clock_data *clk_data;
->> +	struct clk **clk_table;
->> +	void __iomem *base;
->> +
->> +	base = of_iomap(np, 0);
->> +	if (!base) {
->> +		pr_err("%s: failed to map clock registers\n", __func__);
->> +		goto err;
->> +	}
->> +
->> +	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
->> +	if (!clk_data)
->> +		goto err;
->> +
->> +	clk_data->base = base;
->> +	clk_table = kcalloc(nr_clks, sizeof(*clk_table), GFP_KERNEL);
->> +	if (!clk_table)
->> +		goto err_data;
->> +
->> +	clk_data->clk_data.clks = clk_table;
->> +	clk_data->clk_data.clk_num = nr_clks;
->> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data->clk_data);
->> +	return clk_data;
->> +
->> +err_data:
->> +	kfree(clk_data);
->> +err:
->> +	return NULL;
->> +}
->> +
->> +
->> +void __init socfpga_s10_init(struct device_node *node)
->> +{
->> +	struct stratix10_clock_data *clk_data;
->> +
->> +	clk_data = __socfpga_s10_clk_init(node, STRATIX10_NUM_CLKS);
->> +	if (!clk_data)
->> +		return;
->> +
->> +	s10_clk_register_pll(s10_pll_clks, ARRAY_SIZE(s10_pll_clks), clk_data);
->> +
->> +	s10_clk_register_c_perip(s10_main_perip_c_clks,
->> +				 ARRAY_SIZE(s10_main_perip_c_clks), clk_data);
->> +
->> +	s10_clk_register_cnt_perip(s10_main_perip_cnt_clks,
->> +				   ARRAY_SIZE(s10_main_perip_cnt_clks),
->> +				   clk_data);
->> +
->> +	s10_clk_register_gate(s10_gate_clks, ARRAY_SIZE(s10_gate_clks),
->> +			      clk_data);
->> +}
->> +
->> +CLK_OF_DECLARE(stratix10_clock, "intel,stratix10-clkmgr", socfpga_s10_init);
->> diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
->> index 9cf1230..26c3a26 100644
->> --- a/drivers/clk/socfpga/clk.h
->> +++ b/drivers/clk/socfpga/clk.h
->> @@ -54,9 +54,11 @@ struct socfpga_gate_clk {
->>  	char *parent_name;
->>  	u32 fixed_div;
->>  	void __iomem *div_reg;
->> +	void __iomem *bypass_reg;
->>  	struct regmap *sys_mgr_base_addr;
->>  	u32 width;	/* only valid if div_reg != 0 */
->>  	u32 shift;	/* only valid if div_reg != 0 */
->> +	u32 bypass_shift;      /* only valid if bypass_reg != 0 */
->>  	u32 clk_phase[2];
->>  };
->>  
->> @@ -65,8 +67,10 @@ struct socfpga_periph_clk {
->>  	char *parent_name;
->>  	u32 fixed_div;
->>  	void __iomem *div_reg;
->> +	void __iomem *bypass_reg;
->>  	u32 width;      /* only valid if div_reg != 0 */
->>  	u32 shift;      /* only valid if div_reg != 0 */
->> +	u32 bypass_shift;      /* only valid if bypass_reg != 0 */
->>  };
->>  
->>  #endif /* SOCFPGA_CLK_H */
->> diff --git a/drivers/clk/socfpga/stratix10-clk.h b/drivers/clk/socfpga/stratix10-clk.h
->> new file mode 100644
->> index 0000000..10f1532
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/stratix10-clk.h
->> @@ -0,0 +1,86 @@
->> +/* SPDX-License-Identifier:    GPL-2.0 */
->> +/*
->> + * Copyright (C) 2017, Intel Corporation
->> + */
->> +
->> +#ifndef	__STRATIX10_CLK_H
->> +#define	__STRATIX10_CLK_H
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/io.h>
->> +#include <linux/spinlock.h>
->> +
->> +struct platform_device;
->> +
->> +struct stratix10_clock_data {
->> +	struct clk_onecell_data	clk_data;
->> +	void __iomem		*base;
->> +};
->> +
->> +struct stratix10_pll_clock {
->> +	unsigned int		id;
->> +	const char		*name;
->> +	const char		*const *parent_names;
->> +	u8			num_parents;
->> +	unsigned long		flags;
->> +	unsigned long		offset;
->> +};
->> +
->> +struct stratix10_perip_c_clock {
->> +	unsigned int		id;
->> +	const char		*name;
->> +	const char		*parent_name;
->> +	const char		*const *parent_names;
->> +	u8			num_parents;
->> +	unsigned long		flags;
->> +	unsigned long		offset;
->> +};
->> +
->> +struct stratix10_perip_cnt_clock {
->> +	unsigned int		id;
->> +	const char		*name;
->> +	const char		*parent_name;
->> +	const char		*const *parent_names;
->> +	u8			num_parents;
->> +	unsigned long		flags;
->> +	unsigned long		offset;
->> +	u8			fixed_divider;
->> +	unsigned long		bypass_reg;
->> +	unsigned long		bypass_shift;
->> +};
->> +
->> +struct stratix10_gate_clock {
->> +	unsigned int		id;
->> +	const char		*name;
->> +	const char		*parent_name;
->> +	const char		*const *parent_names;
->> +	u8			num_parents;
->> +	unsigned long		flags;
->> +	unsigned long		gate_reg;
->> +	u8			gate_idx;
->> +	unsigned long		div_reg;
->> +	u8			div_offset;
->> +	u8			div_width;
->> +	unsigned long		bypass_reg;
->> +	u8			bypass_shift;
->> +	u8			fixed_div;
->> +};
->> +
->> +struct clk *s10_register_pll(const char *, const char *const *, u8,
->> +			     unsigned long, void __iomem *, unsigned long);
->> +
->> +struct clk *s10_register_periph(const char *, const char *,
->> +				const char * const *, u8, unsigned long,
->> +				void __iomem *, unsigned long);
->> +struct clk *s10_register_cnt_periph(const char *, const char *,
->> +				    const char * const *, u8,
->> +				    unsigned long, void __iomem *,
->> +				    unsigned long, u8, unsigned long,
->> +				    unsigned long);
->> +struct clk *s10_register_gate(const char *, const char *,
->> +			      const char * const *, u8,
->> +			      unsigned long, void __iomem *,
->> +			      unsigned long, unsigned long,
->> +			      unsigned long, unsigned long, u8,
->> +			      unsigned long, unsigned long, u8);
->> +#endif	/* __STRATIX10_CLK_H */
->>
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 1d20a80..5694013 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -341,6 +341,19 @@ config MFD_EXYNOS_LPASS
+>  	  Select this option to enable support for Samsung Exynos Low Power
+>  	  Audio Subsystem.
+>  
+> +config MFD_GSC
+
+Prefer MFD_GATEWORKS_SC
+
+> +	tristate "Gateworks System Controller"
+> +	depends on (I2C && OF)
+> +	select MFD_CORE
+> +	select REGMAP_I2C
+> +	select REGMAP_IRQ
+> +	help
+> +	  Enable support for the Gateworks System Controller found
+> +	  on Gateworks Single Board Computers.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called gsc.
+> +
+>  config MFD_MC13XXX
+>  	tristate
+>  	depends on (SPI_MASTER || I2C)
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index d9474ad..aede0bc 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_MFD_CROS_EC)	+= cros_ec_core.o
+>  obj-$(CONFIG_MFD_CROS_EC_I2C)	+= cros_ec_i2c.o
+>  obj-$(CONFIG_MFD_CROS_EC_SPI)	+= cros_ec_spi.o
+>  obj-$(CONFIG_MFD_EXYNOS_LPASS)	+= exynos-lpass.o
+> +obj-$(CONFIG_MFD_GSC)		+= gsc.o
+>  
+>  rtsx_pci-objs			:= rtsx_pcr.o rts5209.o rts5229.o rtl8411.o rts5227.o rts5249.o
+>  obj-$(CONFIG_MFD_RTSX_PCI)	+= rtsx_pci.o
+> diff --git a/drivers/mfd/gsc.c b/drivers/mfd/gsc.c
+> new file mode 100644
+> index 0000000..4ac400a
+> --- /dev/null
+> +++ b/drivers/mfd/gsc.c
+> @@ -0,0 +1,330 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> + *
+> + * Copyright (C) 2018 Gateworks Corporation
+> + *
+> + * The Gateworks System Controller (GSC) is a family of a multi-function
+> + * "Power Management and System Companion Device" chips originally designed for
+> + * use in Gateworks Single Board Computers. The control interface is I2C,
+> + * at 100kbps, with an interrupt.
+> + *
+> + */
+> +#include <linux/device.h>
+> +#include <linux/i2c.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/mfd/core.h>
+
+What's this for?
+
+> +#include <linux/mfd/gsc.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+> +/*
+> + * The GSC suffers from an errata where occasionally during
+> + * ADC cycles the chip can NAK i2c transactions. To ensure we have reliable
+
+s/i2c/I2C/
+
+> + * register access we place retries around register access.
+> + */
+> +#define I2C_RETRIES	3
+> +
+> +static int gsc_regmap_regwrite(void *context, unsigned int reg,
+> +			       unsigned int val)
+> +{
+> +	struct i2c_client *client = context;
+> +	int retry, ret;
+> +
+> +	for (retry = 0; retry < I2C_RETRIES; retry++) {
+> +		ret = i2c_smbus_write_byte_data(client, reg, val);
+> +		/*
+> +		 * -EAGAIN returned when the i2c host controller is busy
+> +		 * -EIO returned when i2c device is busy
+> +		 */
+> +		if (ret != -EAGAIN && ret != -EIO)
+> +			break;
+> +	}
+> +	if (ret < 0) {
+> +		dev_err(&client->dev, ">> 0x%02x %d\n", reg, ret);
+
+">>" doesn't tell the user much.  To the unaware you are spitting out
+random characters/values.  Please provide more information in your
+error messages.
+
+
+> +		return ret;
+> +	}
+> +	dev_dbg(&client->dev, ">> 0x%02x=0x%02x (%d)\n", reg, val, retry);
+
+As above.  Or better still, consider removing this line completely.
+
+> +	return 0;
+> +}
+> +
+> +static int gsc_regmap_regread(void *context, unsigned int reg,
+> +			      unsigned int *val)
+> +{
+> +	struct i2c_client *client = context;
+> +	int retry, ret;
+> +
+> +	for (retry = 0; retry < I2C_RETRIES; retry++) {
+> +		ret = i2c_smbus_read_byte_data(client, reg);
+> +		/*
+> +		 * -EAGAIN returned when the i2c host controller is busy
+> +		 * -EIO returned when i2c device is busy
+> +		 */
+> +		if (ret != -EAGAIN && ret != -EIO)
+> +			break;
+> +	}
+> +	if (ret < 0) {
+> +		dev_err(&client->dev, "<< 0x%02x %d\n", reg, ret);
+
+As above.
+
+> +		return ret;
+> +	}
+> +
+> +	*val = ret & 0xff;
+> +	dev_dbg(&client->dev, "<< 0x%02x=0x%02x (%d)\n", reg, *val, retry);
+
+As above.
+
+> +	return 0;
+> +}
+> +
+> +static struct regmap_bus regmap_gsc = {
+> +	.reg_write = gsc_regmap_regwrite,
+> +	.reg_read = gsc_regmap_regread,
+> +};
+> +
+> +/*
+> + * gsc_powerdown - API to use GSC to power down board for a specific time
+> + *
+> + * secs - number of seconds to remain powered off
+> + */
+> +static int gsc_powerdown(struct gsc_dev *gsc, unsigned long secs)
+> +{
+> +	int ret;
+> +	unsigned char regs[4];
+> +
+> +	dev_info(&gsc->i2c->dev, "GSC powerdown for %ld seconds\n",
+> +		 secs);
+> +	regs[0] = secs & 0xff;
+> +	regs[1] = (secs >> 8) & 0xff;
+> +	regs[2] = (secs >> 16) & 0xff;
+> +	regs[3] = (secs >> 24) & 0xff;
+> +	ret = regmap_bulk_write(gsc->regmap, GSC_TIME_ADD, regs, 4);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * sysfs hooks
+> + */
+
+This comment is superfluous since we know what _show & _store functions
+do.
+
+> +static ssize_t gsc_show(struct device *dev, struct device_attribute *attr,
+> +			char *buf)
+> +{
+> +	struct gsc_dev *gsc = dev_get_drvdata(dev);
+> +	const char *name = attr->attr.name;
+> +	int rz = 0;
+> +
+> +	if (strcasecmp(name, "fw_version") == 0)
+> +		rz = sprintf(buf, "%d\n", gsc->fwver);
+> +	else if (strcasecmp(name, "fw_crc") == 0)
+> +		rz = sprintf(buf, "0x%04x\n", gsc->fwcrc);
+> +
+> +	return rz;
+> +}
+> +
+> +static ssize_t gsc_store(struct device *dev, struct device_attribute *attr,
+> +			 const char *buf, size_t count)
+> +{
+> +	struct gsc_dev *gsc = dev_get_drvdata(dev);
+> +	const char *name = attr->attr.name;
+> +	int ret;
+> +
+> +	if (strcasecmp(name, "powerdown") == 0) {
+> +		long value;
+> +
+> +		ret = kstrtol(buf, 0, &value);
+> +		if (ret == 0)
+> +			gsc_powerdown(gsc, value);
+> +	} else
+> +		dev_err(dev, "invalid name '%s\n", name);
+> +
+> +	return count;
+> +}
+> +
+> +
+
+Please remove 2nd '\n'.
+
+> +/*
+> + * Create a group of attributes so that we can create and destroy them all
+> + * at once.
+> + */
+
+No need for this comment.
+
+> +static struct device_attribute attr_fwver =
+> +	__ATTR(fw_version, 0440, gsc_show, NULL);
+> +static struct device_attribute attr_fwcrc =
+> +	__ATTR(fw_crc, 0440, gsc_show, NULL);
+> +static struct device_attribute attr_pwrdown =
+> +	__ATTR(powerdown, 0220, NULL, gsc_store);
+> +
+> +static struct attribute *gsc_attrs[] = {
+> +	&attr_fwver.attr,
+> +	&attr_fwcrc.attr,
+> +	&attr_pwrdown.attr,
+> +	NULL,
+> +};
+> +
+> +static struct attribute_group attr_group = {
+> +	.attrs = gsc_attrs,
+> +};
+> +
+> +static const struct i2c_device_id gsc_i2c_ids[] = {
+> +	{ "gsc_v1", gsc_v1 },
+> +	{ "gsc_v2", gsc_v2 },
+> +	{ "gsc_v3", gsc_v3 },
+> +	{ },
+> +};
+> +
+> +static const struct of_device_id gsc_of_match[] = {
+> +	{ .compatible = "gw,gsc_v1", .data = (void *)gsc_v1 },
+> +	{ .compatible = "gw,gsc_v2", .data = (void *)gsc_v2 },
+> +	{ .compatible = "gw,gsc_v3", .data = (void *)gsc_v3 },
+> +	{ }
+> +};
+> +
+> +static const struct regmap_config gsc_regmap_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.cache_type = REGCACHE_NONE,
+> +	.max_register = 0xf,
+> +};
+> +
+> +static const struct regmap_config gsc_regmap_hwmon_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.cache_type = REGCACHE_NONE,
+> +	.max_register = 0x37,
+> +};
+> +
+> +static const struct regmap_irq gsc_irqs[] = {
+> +	REGMAP_IRQ_REG(GSC_IRQ_PB, 0, BIT(GSC_IRQ_PB)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_KEY_ERASED, 0, BIT(GSC_IRQ_KEY_ERASED)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_EEPROM_WP, 0, BIT(GSC_IRQ_EEPROM_WP)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_RESV, 0, BIT(GSC_IRQ_RESV)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_GPIO, 0, BIT(GSC_IRQ_GPIO)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_TAMPER, 0, BIT(GSC_IRQ_TAMPER)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_WDT_TIMEOUT, 0, BIT(GSC_IRQ_WDT_TIMEOUT)),
+> +	REGMAP_IRQ_REG(GSC_IRQ_SWITCH_HOLD, 0, BIT(GSC_IRQ_SWITCH_HOLD)),
+> +};
+> +
+> +static const struct regmap_irq_chip gsc_irq_chip = {
+> +	.name = KBUILD_MODNAME,
+
+Please just type the name like "name".
+
+> +	.irqs = gsc_irqs,
+> +	.num_irqs = ARRAY_SIZE(gsc_irqs),
+> +	.num_regs = 1,
+> +	.status_base = GSC_IRQ_STATUS,
+> +	.mask_base = GSC_IRQ_ENABLE,
+> +	.mask_invert = true,
+> +	.ack_base = GSC_IRQ_STATUS,
+> +	.ack_invert = true,
+> +};
+> +
+> +static int gsc_of_probe(struct device_node *np, struct gsc_dev *gsc)
+> +{
+> +	const struct of_device_id *of_id;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	of_id = of_match_device(gsc_of_match, gsc->dev);
+> +	if (of_id)
+> +		gsc->type = (enum gsc_type)of_id->data;
+
+Isn't there any way that you can fetch version information from the
+device?
+
+What is this value/information actually used for?
+
+> +	return 0;
+> +}
+> +
+> +static int
+> +gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> +{
+> +	struct device *dev = &client->dev;
+> +	struct gsc_dev *gsc;
+> +	int ret;
+> +	unsigned int reg;
+> +
+> +	gsc = devm_kzalloc(dev, sizeof(*gsc), GFP_KERNEL);
+> +	if (!gsc)
+> +		return -ENOMEM;
+> +
+> +	gsc->dev = &client->dev;
+> +	gsc->i2c = client;
+> +	gsc->irq = client->irq;
+> +	i2c_set_clientdata(client, gsc);
+> +
+> +	gsc->regmap = devm_regmap_init(dev, &regmap_gsc, client,
+> +				       &gsc_regmap_config);
+> +	if (IS_ERR(gsc->regmap))
+> +		return PTR_ERR(gsc->regmap);
+> +
+> +	ret = gsc_of_probe(dev->of_node, gsc);
+> +	if (reg < 0)
+> +		return ret;
+> +
+> +	if (regmap_read(gsc->regmap, GSC_FW_VER, &reg))
+> +		return -EIO;
+> +	gsc->fwver = reg;
+
+'\n' here.
+
+> +	regmap_read(gsc->regmap, GSC_FW_CRC, &reg);
+> +	gsc->fwcrc = reg;
+> +	regmap_read(gsc->regmap, GSC_FW_CRC + 1, &reg);
+> +	gsc->fwcrc |= reg << 8;
+> +
+> +	gsc->i2c_hwmon = i2c_new_dummy(client->adapter, GSC_HWMON);
+> +	if (!gsc->i2c_hwmon) {
+> +		dev_err(dev, "Failed to allocate I2C device for HWMON\n");
+> +		return -ENODEV;
+> +	}
+> +	i2c_set_clientdata(gsc->i2c_hwmon, gsc);
+> +
+> +	gsc->regmap_hwmon = devm_regmap_init(dev, &regmap_gsc, gsc->i2c_hwmon,
+> +					     &gsc_regmap_hwmon_config);
+> +	if (IS_ERR(gsc->regmap_hwmon)) {
+> +		ret = PTR_ERR(gsc->regmap_hwmon);
+> +		dev_err(dev, "failed to allocate register map: %d\n", ret);
+> +		goto err_regmap;
+> +	}
+> +
+> +	ret = devm_regmap_add_irq_chip(dev, gsc->regmap, gsc->irq,
+> +				       IRQF_ONESHOT | IRQF_SHARED |
+> +				       IRQF_TRIGGER_FALLING, 0,
+> +				       &gsc_irq_chip, &gsc->irq_chip_data);
+> +	if (ret)
+> +		goto err_regmap;
+> +
+> +	dev_info(dev, "Gateworks System Controller v%d: fw v%02d 0x%04x\n",
+> +		 gsc->type, gsc->fwver, gsc->fwcrc);
+> +
+> +	/* sysfs hooks */
+
+Remove this comment please.
+
+> +	ret = sysfs_create_group(&dev->kobj, &attr_group);
+> +	if (ret)
+> +		dev_err(dev, "failed to create sysfs attrs\n");
+> +
+> +	ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
+> +	if (ret)
+> +		goto err_sysfs;
+> +
+> +	return 0;
+> +
+> +err_sysfs:
+> +	sysfs_remove_group(&dev->kobj, &attr_group);
+> +err_regmap:
+> +	i2c_unregister_device(gsc->i2c_hwmon);
+> +
+> +	return ret;
+> +}
+> +
+> +static int gsc_remove(struct i2c_client *client)
+> +{
+> +	sysfs_remove_group(&client->dev.kobj, &attr_group);
+
+i2c_unregister_device()?
+
+> +	return 0;
+> +}
+> +
+> +static struct i2c_driver gsc_driver = {
+> +	.driver = {
+> +		.name	= KBUILD_MODNAME,
+
+Just type the name please: "name".
+
+> +		.of_match_table = of_match_ptr(gsc_of_match),
+> +	},
+> +	.probe		= gsc_probe,
+> +	.remove		= gsc_remove,
+> +	.id_table	= gsc_i2c_ids,
+> +};
+> +
+> +module_i2c_driver(gsc_driver);
+> +
+> +MODULE_AUTHOR("Tim Harvey <tharvey@gateworks.com>");
+> +MODULE_DESCRIPTION("I2C Core interface for GSC");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/mfd/gsc.h b/include/linux/mfd/gsc.h
+> new file mode 100644
+> index 0000000..e0d8c8f
+> --- /dev/null
+> +++ b/include/linux/mfd/gsc.h
+> @@ -0,0 +1,82 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> + *
+> + * Copyright (C) 2018 Gateworks Corporation
+> + */
+> +#ifndef __LINUX_MFD_GSC_H_
+> +#define __LINUX_MFD_GSC_H_
+> +
+> +/* Device Addresses */
+> +#define GSC_MISC	0x20
+> +#define GSC_UPDATE	0x21
+> +#define GSC_GPIO	0x23
+> +#define GSC_HWMON	0x29
+> +#define GSC_EEPROM0	0x50
+> +#define GSC_EEPROM1	0x51
+> +#define GSC_EEPROM2	0x52
+> +#define GSC_EEPROM3	0x53
+> +#define GSC_RTC		0x68
+> +
+> +/* Register offsets */
+> +#define GSC_CTRL_0	0x00
+> +#define GSC_CTRL_1	0x01
+> +#define GSC_TIME	0x02
+> +#define GSC_TIME_ADD	0x06
+> +#define GSC_IRQ_STATUS	0x0A
+> +#define GSC_IRQ_ENABLE	0x0B
+> +#define GSC_FW_CRC	0x0C
+> +#define GSC_FW_VER	0x0E
+> +#define GSC_WP		0x0F
+> +
+> +/* Bit definitions */
+> +#define GSC_CTRL_0_PB_HARD_RESET	0
+> +#define GSC_CTRL_0_PB_CLEAR_SECURE_KEY	1
+> +#define GSC_CTRL_0_PB_SOFT_POWER_DOWN	2
+> +#define GSC_CTRL_0_PB_BOOT_ALTERNATE	3
+> +#define GSC_CTRL_0_PERFORM_CRC		4
+> +#define GSC_CTRL_0_TAMPER_DETECT	5
+> +#define GSC_CTRL_0_SWITCH_HOLD		6
+> +
+> +#define GSC_CTRL_1_SLEEP_ENABLE		0
+> +#define GSC_CTRL_1_ACTIVATE_SLEEP	1
+> +#define GSC_CTRL_1_LATCH_SLEEP_ADD	2
+> +#define GSC_CTRL_1_SLEEP_NOWAKEPB	3
+> +#define GSC_CTRL_1_WDT_TIME		4
+> +#define GSC_CTRL_1_WDT_ENABLE		5
+> +#define GSC_CTRL_1_SWITCH_BOOT_ENABLE	6
+> +#define GSC_CTRL_1_SWITCH_BOOT_CLEAR	7
+> +
+> +#define GSC_IRQ_PB			0
+> +#define GSC_IRQ_KEY_ERASED		1
+> +#define GSC_IRQ_EEPROM_WP		2
+> +#define GSC_IRQ_RESV			3
+> +#define GSC_IRQ_GPIO			4
+> +#define GSC_IRQ_TAMPER			5
+> +#define GSC_IRQ_WDT_TIMEOUT		6
+> +#define GSC_IRQ_SWITCH_HOLD		7
+> +
+> +/* Max registers */
+> +#define GSC_HWMON_MAX_REG	56
+> +
+> +enum gsc_type {
+> +	gsc_v1 = 1,
+> +	gsc_v2 = 2,
+> +	gsc_v3 = 3,
+> +};
+> +
+> +struct gsc_dev {
+> +	struct device *dev;
+> +
+> +	struct i2c_client *i2c;		/* 0x20: interrupt controller, WDT */
+> +	struct i2c_client *i2c_hwmon;	/* 0x29: hwmon, fan controller */
+> +
+> +	struct regmap *regmap;
+> +	struct regmap *regmap_hwmon;
+> +	struct regmap_irq_chip_data *irq_chip_data;
+> +
+> +	int irq;
+> +	enum gsc_type type;
+> +	unsigned int fwver;
+> +	unsigned short fwcrc;
+> +};
+> +
+> +#endif /* __LINUX_MFD_GSC_H_ */
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
