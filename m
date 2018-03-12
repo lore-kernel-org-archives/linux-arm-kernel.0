@@ -1,83 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 11 Mar 2018 22:40:53 -0400 (EDT)
-Subject: [PATCH 1/7] ARM: disallow combining XIP and LTO
-In-Reply-To: <20180220215954.4092811-2-arnd@arndb.de>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20180220215954.4092811-2-arnd@arndb.de>
-Message-ID: <nycvar.YSQ.7.76.1803112233070.28583@knanqh.ubzr>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 12 Mar 2018 11:18:55 +0800
+Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
+ architecutres
+In-Reply-To: <20180309093346.GF25863@linaro.org>
+References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+ <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
+ <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
+ <20180309064412.GA5327@dhcp-128-65.nay.redhat.com>
+ <20180309071813.GE25863@linaro.org>
+ <20180309074613.GA6331@dhcp-128-65.nay.redhat.com>
+ <20180309075547.GA6718@dhcp-128-65.nay.redhat.com>
+ <20180309093346.GF25863@linaro.org>
+Message-ID: <20180312031855.GA2136@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Feb 2018, Arnd Bergmann wrote:
+On 03/09/18 at 06:33pm, AKASHI Takahiro wrote:
 
-> This fails during deflate_xip_data.sh
+[snip]
+
+> Oops, please apply the fix below to my first patch ("kexec_file: make
+> an use of purgatory optional"). My screw-up is trivial here :)
+
+Wow, human eyes sometimes can not catch such issue, thanks for the fix.
+It works for me.
+
 > 
->   /home/arnd/cross-gcc/bin/arm-linux-gnueabi-objcopy -O binary -R .comment -S  vmlinux arch/arm/boot/xipImage && /bin/bash -c '/git/arm-soc/arch/arm/boot/deflate_xip_data.sh vmlinux arch/arm/boot/xipImage || { rm -f arch/arm/boot/xipImage; false; }'
-> make -f /git/arm-soc/scripts/Makefile.modpost
-> + sym_val __data_loc
-> + sed -n / __data_loc$/{s/ .*$//p;q}
-> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
-> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
-> + local val=ac74c0f4
-> + [ ac74c0f4 ]
-> + echo 2893332724
-> + __data_loc=2893332724
-> + sym_val _edata_loc
-> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
-> + sed -n / _edata_loc$/{s/ .*$//p;q}
-> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
-> + local val=ac7b8744
-> + [ ac7b8744 ]
-> + echo 2893776708
-> + _edata_loc=2893776708
-> + sym_val _xiprom
-> + sed -n / _xiprom$/{s/ .*$//p;q}
-> + /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-nm vmlinux
-> /home/arnd/cross-gcc/lib/gcc/arm-linux-gnueabi/8.0.1/../../../../arm-linux-gnueabi/bin/nm terminated with signal 13 [Broken pipe]
+> Please let me know if you think that I should repost my patch set.
 > 
-> Obviously we want to make the combination work, no idea why it doesn't.
 
-Well, it does work regardless of the noise. Here the nm output is piped 
-into sed, and the later exits early when it finds what it is looking 
-for, causing nm to complain about the broken pipe.
+Because akpm takes kexec patches,  this question should be passing to
+Andrew.  Andrew, do you need a repost?
 
-Here's a patch silencing this bogus error message and fixing other minor 
-issues.
+> Thanks,
+> -Takahiro AKASHI
+> 
+> ===8<===
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 6dbbb89cbbac..ab1dced677fd 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -532,7 +532,7 @@ static int kexec_calculate_store_digests(struct kimage *image)
+>  	struct kexec_sha_region *sha_regions;
+>  	struct purgatory_info *pi = &image->purgatory_info;
+>  
+> -	if (!IS_ENABLED(ARCH_HAS_KEXEC_PURGATORY))
+> +	if (!IS_ENABLED(CONFIG_ARCH_HAS_KEXEC_PURGATORY))
+>  		return 0;
+>  
+>  	zero_buf = __va(page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT);
+> ===>8===
+> 
 
------ >8
-Subject: [PATCH] ARM: deflate_xip_data.sh: minor fixes
-
-Send nm complaints about broken pipe (when sed exits early) to /dev/null.
-All errors should be printed to stderr.
-Don't trap on normal exit so the trap can return an error code.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/boot/deflate_xip_data.sh b/arch/arm/boot/deflate_xip_data.sh
-index 1189598a25..5e7d758ebd 100755
---- a/arch/arm/boot/deflate_xip_data.sh
-+++ b/arch/arm/boot/deflate_xip_data.sh
-@@ -30,7 +30,7 @@ esac
- 
- sym_val() {
- 	# extract hex value for symbol in $1
--	local val=$($NM "$VMLINUX" | sed -n "/ $1$/{s/ .*$//p;q}")
-+	local val=$($NM "$VMLINUX" 2>/dev/null | sed -n "/ $1\$/{s/ .*$//p;q}")
- 	[ "$val" ] || { echo "can't find $1 in $VMLINUX" 1>&2; exit 1; }
- 	# convert from hex to decimal
- 	echo $((0x$val))
-@@ -48,12 +48,12 @@ data_end=$(($_edata_loc - $base_offset))
- file_end=$(stat -c "%s" "$XIPIMAGE")
- if [ "$file_end" != "$data_end" ]; then
- 	printf "end of xipImage doesn't match with _edata_loc (%#x vs %#x)\n" \
--	       $(($file_end + $base_offset)) $_edata_loc 2>&1
-+	       $(($file_end + $base_offset)) $_edata_loc 1>&2
- 	exit 1;
- fi
- 
- # be ready to clean up
--trap 'rm -f "$XIPIMAGE.tmp"' 0 1 2 3
-+trap 'rm -f "$XIPIMAGE.tmp"; exit 1' 1 2 3
- 
- # substitute the data section by a compressed version
- $DD if="$XIPIMAGE" count=$data_start iflag=count_bytes of="$XIPIMAGE.tmp"
+Thanks
+Dave
