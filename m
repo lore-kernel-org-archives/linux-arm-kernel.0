@@ -1,81 +1,56 @@
-From: jitendra.bhivare@broadcom.com (Jitendra Bhivare)
-Date: Mon, 12 Mar 2018 12:14:06 +0530
-Subject: [RFC 1/5] dt-bindings: iommu: Add reserved-dma-region for IOMMU
- device
-In-Reply-To: <23f7c879-2dfe-dbdf-f259-dcc44f045c96@arm.com>
-References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
- <1520312368-7068-2-git-send-email-jitendra.bhivare@broadcom.com>
- <23f7c879-2dfe-dbdf-f259-dcc44f045c96@arm.com>
-Message-ID: <CAOA9gs2beHJJ11iHSTMdzNV7PkD5Qr=AGLpFiu2-6pbiZtV4ow@mail.gmail.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Mon, 12 Mar 2018 14:49:53 +0800
+Subject: [RFC PATCH 2/4] irqchip/gic-v3-its: replace alloc_pages() with
+ alloc_pages_node()
+In-Reply-To: <1520837395-10288-1-git-send-email-yangyingliang@huawei.com>
+References: <1520837395-10288-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1520837395-10288-3-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2018 at 5:11 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->
-> On 06/03/18 04:59, Jitendra Bhivare wrote:
->>
->> Certain regions in IO virtual address space may need to be reserved to be
->> not used for devices configured behind IOMMU.
->>
->> Add documentation of the property to allow such regions to be specified in
->> DT to be reserved using IOMMU_RESV_RESERVED type.
->
->
-> That sounds like software policy; DT is for describing hardware.
-It is to describe the holes in address space for which hardware can't
-provide mappings.
->
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
->> ---
->>   Documentation/devicetree/bindings/iommu/iommu.txt | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
->> index 5a8b462..5a58ef2 100644
->> --- a/Documentation/devicetree/bindings/iommu/iommu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
->> @@ -98,6 +98,20 @@ requirements of that use-case haven't been fully determined yet. Implementing
->>   this is therefore not recommended without further discussion and extension of
->>   this binding.
->>   +Optional properties:
->> +--------------------
->> +- reserved-dma-region: This specifies DMA region to be reserved with specific
->> +  prot in IOVA space. It is in tuples of (busno,prot,bus_addr,size).
->
->
-> What do busno and prot actually mean, and what are valid values for them?
->
-> Robin.
-busno was part of initial commit 4e0ee78f in implementation of
-of_get_dma_window.
-I am not sure what was the use of it in PowerPC. Similar
-implementation can be seen
-in of_parse_dma_window.
-prot is access permission flags for the region for reserving in SW.
-This I will remove.
->
->
->> +- #region-address-cells: specifies number of cells needed to encode bus_addr
->> +
->> +- #region-size-cells: specifies number of cells needed to encode size
->> +
->> +Notes:
->> +======
->> +This can be applied to IOMMU master node or to children (such as PCI host
->> +bridges) on the bus behind IOMMU.
->> +
->>     Examples:
->>   =========
->> @@ -173,6 +187,9 @@ Multiple-master IOMMU with configurable DMA window:
->>                          * master (i.e. the I/O virtual address space).
->>                          */
->>                         #iommu-cells = <4>;
->> +                       #region-address-cells = <2>;
->> +                       #region-size-cells = <2>;
->> +                       reserved-dma-region = <0x0 0x0 0x04 0x0 0x04 0x0>;
->>                 };
->>                 master {
->>
+Use alloc_pages_node() to allocate pages on current node.
+
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index a03e18e..4ebe131 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1557,11 +1557,11 @@ static void its_lpi_free_chunks(unsigned long *bitmap, int base, int nr_ids)
+ 	kfree(bitmap);
+ }
+ 
+-static struct page *its_allocate_prop_table(gfp_t gfp_flags)
++static struct page *its_allocate_prop_table(int nid, gfp_t gfp_flags)
+ {
+ 	struct page *prop_page;
+ 
+-	prop_page = alloc_pages(gfp_flags, get_order(LPI_PROPBASE_SZ));
++	prop_page = alloc_pages_node(nid, gfp_flags, get_order(LPI_PROPBASE_SZ));
+ 	if (!prop_page)
+ 		return NULL;
+ 
+@@ -1587,7 +1587,8 @@ static int __init its_alloc_lpi_tables(void)
+ 	phys_addr_t paddr;
+ 
+ 	lpi_id_bits = min_t(u32, gic_rdists->id_bits, ITS_MAX_LPI_NRBITS);
+-	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
++	gic_rdists->prop_page = its_allocate_prop_table(cpu_to_node(smp_processor_id()),
++							GFP_NOWAIT);
+ 	if (!gic_rdists->prop_page) {
+ 		pr_err("Failed to allocate PROPBASE\n");
+ 		return -ENOMEM;
+@@ -2829,7 +2830,7 @@ static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq
+ 		return -ENOMEM;
+ 	}
+ 
+-	vprop_page = its_allocate_prop_table(GFP_KERNEL);
++	vprop_page = its_allocate_prop_table(NUMA_NO_NODE, GFP_KERNEL);
+ 	if (!vprop_page) {
+ 		its_lpi_free_chunks(bitmap, base, nr_ids);
+ 		return -ENOMEM;
+-- 
+1.8.3
