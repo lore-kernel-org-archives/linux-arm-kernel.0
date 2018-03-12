@@ -1,45 +1,88 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Mar 2018 12:25:02 +0000
-Subject: [RFC PATCH 0/4] add support for CommonLPIAff field
-In-Reply-To: <5AA66ED7.7080007@huawei.com>
-References: <1520837395-10288-1-git-send-email-yangyingliang@huawei.com>
- <3b6997c9-761f-3f5e-79ac-6b785a9a14d9@arm.com> <5AA66ED7.7080007@huawei.com>
-Message-ID: <97382ff7-7f8f-f960-aa92-41a96c8e169f@arm.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 12 Mar 2018 18:12:01 +0530
+Subject: [PATCH v6 3/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <96fac632-8fb8-0933-cc1f-627acb38a595@arm.com>
+References: <20180312080656.13247-1-rnayak@codeaurora.org>
+ <20180312080656.13247-4-rnayak@codeaurora.org>
+ <96fac632-8fb8-0933-cc1f-627acb38a595@arm.com>
+Message-ID: <da996a5f-e498-1e21-d09e-c9827e99398b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/18 12:13, Yang Yingliang wrote:
-> 
-> 
-> On 2018/3/12 17:55, Marc Zyngier wrote:
->> On 12/03/18 06:49, Yang Yingliang wrote:
->>> This patch set adjust struct rdists to support CommonLPIAff field.
->>> This field is described in spec:
->>>
->>> CommonLPIAff, bits [25:24]
->>> The affinity level at which Redistributors share a LPI Configuration table.
->>> 00 All Redistributors must share a LPI Configuration table.
->>> 01 All Redistributors with the same Aff3 value must share an LPI Configurationt table.
->>> 10 All Redistributors with the same Aff3.Aff2 value must share an LPI Configuration table.
->>> 11 All Redistributors with the same Aff3.Aff2.Aff1 value must share an LPI Configuration
->>> table.
+
+On 03/12/2018 04:59 PM, Marc Zyngier wrote:
+> On 12/03/18 08:06, Rajendra Nayak wrote:
+>> Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
 >>
->> What are you trying to achieve here? We already share the same
->> configuration table across all the redistributors, irrelevant the of
->> CommonLPIAff. Why would we need to do anything else?
+>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+>> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/Makefile       |   1 +
+>>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  15 ++
+>>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 278 ++++++++++++++++++++++++++++++++
+>>  3 files changed, 294 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+>> index 55ec5ee7f7e8..9319e74b8906 100644
+>> --- a/arch/arm64/boot/dts/qcom/Makefile
+>> +++ b/arch/arm64/boot/dts/qcom/Makefile
+>> @@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+>>  dtb-$(CONFIG_ARCH_QCOM)	+= msm8992-bullhead-rev-101.dtb
+>>  dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
+>>  dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
+>> +dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-mtp.dtb
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>> new file mode 100644
+>> index 000000000000..979ab49913f1
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>> @@ -0,0 +1,15 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * SDM845 MTP board device tree source
+>> + *
+>> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "sdm845.dtsi"
+>> +
+>> +/ {
+>> +	model = "Qualcomm Technologies, Inc. SDM845 MTP";
+>> +	compatible = "qcom,sdm845-mtp";
+>> +};
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> new file mode 100644
+>> index 000000000000..d2407cd7a561
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
 > 
-> In some cases, such as "with the same Aff3.Aff2 value must share an LPI
-> Configuration table", redistributors will access local memory node
-> only, it may improve the performance. And I don't have any beneficial
-> data now. I may provide it later.
+> [...]
+> 
+>> +		intc: interrupt-controller at 17a00000 {
+>> +			compatible = "arm,gic-v3";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +			#interrupt-cells = <3>;
+>> +			interrupt-controller;
+>> +			#redistributor-regions = <1>;
+>> +			redistributor-stride = <0x0 0x20000>;
+> 
+> You shouldn't need redistributor-stride here, unless your GIC
+> implementation is not compliant with the architecture (i.e. really
+> buggy). I only know of one such implementation, and I'd rather you
+> remove this property unless your GIC is indeed non-compliant. If that's
+> the case, you should also document it.
 
-These are two different things.
-- "must share" is what the kernel does *today*. No changes are required.
-- NUMA behaviour has nothing to do with CommonLPIAff, and cannot be
-based on that field.
+Thanks Marc, I will drop the redistributor-stride and #redistributor-regions
+as the bindings document seems to suggest its optional and is needed only
+when more than 1 such region is present.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
