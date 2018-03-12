@@ -1,114 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Mar 2018 10:09:01 +0000
-Subject: [RFC PATCH] KVM: arm/arm64: vgic: change condition for level
- interrupt resampling
-In-Reply-To: <1520822024.2985.12.camel@hxt-semitech.com>
-References: <1520492490-7943-1-git-send-email-shunyong.yang@hxt-semitech.com>
- <9ad47673-068e-f732-d2ca-9c76a8fbdfbc@arm.com>
- <0a15633d-8944-cb9b-3e6b-b08ee5ec42b9@arm.com> <20180308161900.GC1917@lvm>
- <86r2oubho3.wl-marc.zyngier@arm.com> <20180309213612.GD1917@lvm>
- <86k1ukazr0.wl-marc.zyngier@arm.com>
- <CAEDV+g+29ZK6QQEn=2h_77dMZC7wmw+d4MZC-GU-CqeaK_xhMg@mail.gmail.com>
- <20180311121733.643fb1a5@why.wild-wind.fr.eu.org>
- <1520822024.2985.12.camel@hxt-semitech.com>
-Message-ID: <103f560a-d7ad-ba6c-e129-eda172312576@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 12 Mar 2018 11:11:04 +0100
+Subject: [PATCH v5 4/4] ARM: rockchip: Set name of regmap_config
+In-Reply-To: <20180312095142.30854-5-jeffy.chen@rock-chips.com>
+References: <20180312095142.30854-1-jeffy.chen@rock-chips.com>
+ <20180312095142.30854-5-jeffy.chen@rock-chips.com>
+Message-ID: <6419126.t34s1xtZxx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/18 02:33, Yang, Shunyong wrote:
-> Hi, Marc,
+Am Montag, 12. M?rz 2018, 10:51:42 CET schrieb Jeffy Chen:
+> We are now allowing to register debugfs without a valid device, and not
+> having a valid name will end up using "dummy*" to create debugfs dir.
 > 
-> On Sun, 2018-03-11 at 12:17 +0000, Marc Zyngier wrote:
->> On Sun, 11 Mar 2018 01:55:08 +0000
->> Christoffer Dall <cdall@kernel.org> wrote:
->>
->>>
->>> On Sat, Mar 10, 2018 at 12:20 PM, Marc Zyngier <marc.zyngier@arm.co
->>> m> wrote:
->>>>
->>>> On Fri, 09 Mar 2018 21:36:12 +0000,
->>>> Christoffer Dall wrote:??
->>>>>
->>>>>
->>>>> On Thu, Mar 08, 2018 at 05:28:44PM +0000, Marc Zyngier wrote:??
->>>>>>
->>>>>> I'd be more confident if we did forbid P+A for such
->>>>>> interrupts
->>>>>> altogether, as they really feel like another kind of HW
->>>>>> interrupt.??
->>>>> How about a slightly bigger hammer:??Can we avoid doing P+A for
->>>>> level
->>>>> interrupts completely???I don't think that really makes much
->>>>> sense, and
->>>>> I think we simply everything if we just come back out and
->>>>> resample the
->>>>> line.??For an edge, something like a network card, there's a
->>>>> potential
->>>>> performance win to appending a new pending state, but I doubt
->>>>> that this
->>>>> is the case for level interrupts.??
->>>> I started implementing the same thing yesterday. Somehow, it
->>>> feels
->>>> slightly better to have the same flow for all level interrupts,
->>>> including the timer, and we only use the MI on EOI as a way to
->>>> trigger
->>>> the next state of injection. Still testing, but looking good so
->>>> far.
->>>>
->>>> I'm still puzzled that we have this level-but-not-quite behaviour
->>>> for
->>>> VFIO interrupts. At some point, it is going to bite us badly.
->>>> ?
->>> Where is the departure from level-triggered behavior with VFIO???As
->>> far as I can tell, the GIC flow of the interrupts will be just a
->>> level
->>> interrupt,?
->> The GIC is fine, I believe. What is not exactly fine is the
->> signalling
->> from the device, which will never be dropped until the EOI has been
->> detected.
->>
->>>
->>> but we just need to make sure the resamplefd mechanism is
->>> supported for both types of interrupts.??Whether or not that's a
->>> decent mechanism seems orthogonal to me, but that's a discussion
->>> for
->>> another day I think.
->> Given that VFIO is built around this mechanism, I don't think we have
->> a
->> choice but to support it. Anyway, I came up with the following patch,
->> which I tested on Seattle with mtty. It also survived my usual
->> hammering of cyclictest, hackbench??and bulk VM installs.
->>
->> Shunyong, could you please give it a go?
->>
->> Thanks,
->>
->> 	M.
->>
-> 
-> I have tested the patch. It works on QDF2400 platform
-> and?kvm_notify_acked_irq() is called when state is idle.
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Thanks a lot for testing.
+applied for 4.17
 
-> 
-> BTW, I have following questions when I was debugging the issue.
-> Coud you please give me some help?
-> 1)what does "mi" mean in gic code? such as lr_signals_eoi_mi();
 
-MI stands for Maintenance Interrupts. Life is too short to write that
-all the time ;-)
-
-> 2)In some __hyp_text?code where printk() will cause "HYP panic:", such
-> as in __kvm_vcpu_run(). How can I output debug information?
-
-You can't. None of the kernel is mapped at EL2 on pre-VHE hardware.
-You'll need to find indirect ways of outputting information (store data
-in memory, and output it once you're back to EL1).
-
-Thanks again,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Heiko
