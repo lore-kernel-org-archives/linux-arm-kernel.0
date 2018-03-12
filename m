@@ -1,48 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Mar 2018 14:06:52 +0000
-Subject: [PATCH v5 1/4] mfd: syscon: Set name of regmap_config
-In-Reply-To: <20180312095142.30854-2-jeffy.chen@rock-chips.com>
-References: <20180312095142.30854-1-jeffy.chen@rock-chips.com>
- <20180312095142.30854-2-jeffy.chen@rock-chips.com>
-Message-ID: <20180312140652.7ffdls4pccih32vk@dell>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2018 15:07:52 +0100
+Subject: [GIT PULL] ARM: at91: DT for 4.17
+In-Reply-To: <20180310052601.GA6294@piout.net>
+References: <20180310052601.GA6294@piout.net>
+Message-ID: <CAK8P3a0LOjORi7f_YEp+zk28CTrvo7RLS-BmnooRL11MH2nh5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2018, Jeffy Chen wrote:
+On Sat, Mar 10, 2018 at 6:26 AM, Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+> Arnd, Olof,
+>
+> Not much this cycle, mainly changes on the Axentia boards from Peter and
+> a cleanup from Bartosz.
+...
+> AT91 DT for 4.17:
+>
+>  - use 'atmel' as at24 manufacturer
+>  - device addition and fixes for axentia boards
+>  - fix sama5d4 pinctrl compatible
 
-> We are now allowing to register debugfs without a valid device, and not
-> having a valid name will end up using "dummy*" to create debugfs dir.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v5:
-> CC lee.jones at linaro.org
-> 
-> Changes in v4: None
-> Changes in v3:
-> Modify commit message.
-> 
->  drivers/mfd/syscon.c | 1 +
->  1 file changed, 1 insertion(+)
+I added the first sentence to the commit log and pulled it into next/dt.
+Generally speaking, I find those cleartext descriptions are more helpful
+than a list that repeats the list of commits.
 
-Looks okay.  Applied, thanks.
-
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index fc9ba0ea4e44..b6d05cd934e6 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -110,6 +110,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	syscon_config.reg_stride = reg_io_width;
->  	syscon_config.val_bits = reg_io_width * 8;
->  	syscon_config.max_register = resource_size(&res) - reg_io_width;
-> +	syscon_config.name = of_node_full_name(np);
->  
->  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
->  	if (IS_ERR(regmap)) {
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+      Arnd
