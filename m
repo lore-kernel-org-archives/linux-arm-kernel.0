@@ -1,190 +1,71 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 12 Mar 2018 08:02:54 +0100
-Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
-References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
- <20180227071134.28063-2-a.hajda@samsung.com>
- <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
-Message-ID: <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+From: jitendra.bhivare@broadcom.com (Jitendra Bhivare)
+Date: Mon, 12 Mar 2018 12:33:24 +0530
+Subject: [RFC 2/5] dt-bindings: brcm: Add reserved-dma-region for iPROC
+In-Reply-To: <c2f30c0c-ff5e-2904-11f4-5351749381a9@arm.com>
+References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
+ <1520312368-7068-3-git-send-email-jitendra.bhivare@broadcom.com>
+ <c2f30c0c-ff5e-2904-11f4-5351749381a9@arm.com>
+Message-ID: <CAOA9gs32BqGiXD7R2v7=Xkv-PVLTzuU3VmG1dAm6HNd4=w-qQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.03.2018 11:24, Roger Quadros wrote:
-> Hi,
->
-> On 27/02/18 09:11, Andrzej Hajda wrote:
->> These bindings allow to describe most known standard USB connectors
->> and it should be possible to extend it if necessary.
->> USB connectors, beside USB can be used to route other protocols,
->> for example UART, Audio, MHL. In such case every device passing data
->> through the connector should have appropriate graph bindings.
+On Tue, Mar 6, 2018 at 5:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 06/03/18 04:59, Jitendra Bhivare wrote:
 >>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> With SoC wide DMA mask of 40-bit, the mappings for entire IOVA space can't
+>> be specified in the PAXBv2 PCIe RC of SoC. The holes in IOVA space needs
+>> to
+>> be reserved to prevent any IOVA allocations in those spaces.
+>
+>
+> Can you clarify why? If this is the PCI inbound window thing again, let me
+> say once again that "dma-ranges" is the appropriate way for DT to describe
+> the hardware.
+>
+> Robin.
+dma-ranges = < \
+0x43000000 0x00 0x00000000 0x00 0x80000000 0x00 0x80000000 \
+0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
+0x43000000 0x80 0x00000000 0x80 0x00000000 0x80 0x00000000>
+
+Yes, its for PCI inbound windows. In our HW, they are limited by sizes
+specified in
+ARM memory maps which was done for non-IOMMU cases to catch any transfer
+outside the ranges.
+dma-ranges are already being used to program these inbound windows and SoC
+wide DMA mask is already specified but IOMMU code can still allocate IOVAs
+in the gaps for which translation will fail in PCIe RC.
+>
+>
+>> reserved-dma-region property is added to specify the ranges which should
+>> never be mapped and given to devices sitting behind.
+>>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
 >> ---
->> v4:
->> - improved 'type' description (Rob),
->> - improved description of 2nd example (Rob).
->> v3:
->> - removed MHL port (samsung connector will have separate bindings),
->> - added 2nd example for USB-C,
->> - improved formatting.
->> v2:
->> - moved connector type(A,B,C) to compatible string (Rob),
->> - renamed size property to type (Rob),
->> - changed type description to be less confusing (Laurent),
->> - removed vendor specific compatibles (implied by graph port number),
->> - added requirement of connector being a child of IC (Rob),
->> - removed max-mode (subtly suggested by Rob, it should be detected anyway
->>   by USB Controller in runtime, downside is that device is not able to
->>   report its real capabilities, maybe better would be to make it optional(?)),
->> - assigned port numbers to data buses (Rob).
+>>   Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt | 3 +++
+>>   1 file changed, 3 insertions(+)
 >>
->> Regards
->> Andrzej
->> ---
->>  .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
->>  1 file changed, 75 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+>> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> index b8e48b4..3be0fe3 100644
+>> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> @@ -30,6 +30,9 @@ Optional properties:
+>>   - dma-ranges: Some PAXB-based root complexes do not have inbound mapping
+>> done
+>>     by the ASIC after power on reset.  In this case, SW is required to
+>> configure
+>>   the mapping, based on inbound memory regions specified by this property.
+>> +- reserved-dma-region: PAXBv2 with IOMMU enabled cannot provide mappings
+>> for
+>> +  entire IOVA space specified by DMA mask. Hence this is used to reserve
+>> the
+>> +  gaps in dma-ranges.
+>>     - brcm,pcie-ob: Some iProc SoCs do not have the outbound address
+>> mapping done
+>>   by the ASIC after power on reset. In this case, SW needs to configure it
 >>
->> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
->> new file mode 100644
->> index 000000000000..e1463f14af38
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
->> @@ -0,0 +1,75 @@
->> +USB Connector
->> +=============
->> +
->> +USB connector node represents physical USB connector. It should be
->> +a child of USB interface controller.
->> +
->> +Required properties:
->> +- compatible: describes type of the connector, must be one of:
->> +    "usb-a-connector",
->> +    "usb-b-connector",
->> +    "usb-c-connector".
-> compatible should be just "usb-connector"
 >
-> Type should be a property
->
-> type: type of usb connector "A", "B", "AB", "C"
-> AB is for dual-role connectors.
-
-I have proposed such property (and size also) in my first RFC [1]. Rod
-did not like it :)
-
-[1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
-
-
->
-> micro super-speed and high-speed connectors are different. How do you differentiate that?
-
-I am aware of it, and property differentiating it was also in my earlier
-iterations.
-If there will be need to differentiate such connectors, adding property
-max-speed or max-mode would do the thing.
-
->
->> +
->> +Optional properties:
->> +- label: symbolic name for the connector,
-> Why do you need label? We can't maintain consistency as people will put creative names there.
-> Device/bus driver could generate a valid label.
-
-It follows convention for other connectors: HDMI, DVI, ....
-
->
->> +- type: size of the connector, should be specified in case of USB-A, USB-B
->> +  non-fullsize connectors: "mini", "micro".
-> type is misleading. Type is usually A/B/C. It should be size here instead.
-
-As you can see in discussion for previous iterations it follows
-convention already established for other connectors.
-
->
-> size: size of the connector if not standard size. "mini", "micro"
->
-> If not specified it is treated as standard sized connector.
-> e.g. for Type-C there is no mini/micro. so size doesn't have to be specificed
-Few lines above it is described: should be specified in case of USB-A,
-USB-B non-fullsize connectors.
-
->
-> What about Type-C connector?
->> +
->> +Required nodes:
->> +- any data bus to the connector should be modeled using the OF graph bindings
-> s/modeled/modelled
-
->> +  specified in bindings/graph.txt, unless the bus is between parent node and
->> +  the connector. Since single connector can have multpile data buses every bus
-> s/multpile/multiple
-
-OK, I will fix both typos.
-
->
->> +  has assigned OF graph port number as follows:
->> +    0: High Speed (HS), present in all connectors,
->> +    1: Super Speed (SS), present in SS capable connectors,
->> +    2: Sideband use (SBU), present in USB-C.
->> +
->> +Examples
->> +--------
->> +
->> +1. Micro-USB connector with HS lines routed via controller (MUIC):
->> +
->> +muic-max77843 at 66 {
->> +	...
->> +	usb_con: connector {
->> +		compatible = "usb-b-connector";
->> +		label = "micro-USB";
->> +		type = "micro";
->> +	};
->> +};
->> +
->> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
->> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
->> +DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
->> +
->> +ccic: s2mm005 at 33 {
->> +	...
->> +	usb_con: connector {
->> +		compatible = "usb-c-connector";
->> +		label = "USB-C";
-> The label is not consistent with the earlier example.
-
-Why?
-
-Regards
-Andrzej
-
->
->> +
->> +		ports {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			port at 0 {
->> +				reg = <0>;
->> +				usb_con_hs: endpoint {
->> +					remote-endpoint = <&max77865_usbc_hs>;
->> +				};
->> +			};
->> +			port at 1 {
->> +				reg = <1>;
->> +				usb_con_ss: endpoint {
->> +					remote-endpoint = <&usbdrd_phy_ss>;
->> +				};
->> +			};
->> +			port at 2 {
->> +				reg = <2>;
->> +				usb_con_sbu: endpoint {
->> +					remote-endpoint = <&dp_aux>;
->> +				};
->> +			};
->> +		};
->> +	};
->> +};
->>
