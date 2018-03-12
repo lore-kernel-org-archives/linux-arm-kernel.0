@@ -1,76 +1,35 @@
-From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
-Date: Mon, 12 Mar 2018 17:15:00 +0000
-Subject: [linux-sunxi] [PATCH 5/9] media: platform: Add Sunxi Cedrus
- decoder driver
-In-Reply-To: <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
-References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
- <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
-Message-ID: <a133f4f9-8b99-323f-5e57-c2c6966d3ecb@iki.fi>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Mar 2018 18:27:03 +0100
+Subject: [PATCH v5 00/36] DRM Rockchip rk3399 (Kevin)
+In-Reply-To: <20180309222327.18689-1-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+Message-ID: <2145089.N3HHEgGPyY@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Kocialkowski:
-> diff --git a/drivers/media/platform/sunxi-cedrus/sunxi_cedrus_regs.h b/drivers/media/platform/sunxi-cedrus/sunxi_cedrus_regs.h
-> new file mode 100644
-> index 000000000000..7384daa94737
-> --- /dev/null
-> +++ b/drivers/media/platform/sunxi-cedrus/sunxi_cedrus_regs.h
-> @@ -0,0 +1,170 @@
-> +/*
-> + * Sunxi Cedrus codec driver
-> + *
-> + * Copyright (C) 2016 Florent Revest
-> + * Florent Revest <florent.revest@free-electrons.com>
-> + *
-> + * Based on Cedrus
-> + *
-> + * Copyright (c) 2013 Jens Kuske <jenskuske@gmail.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef SUNXI_CEDRUS_REGS_H
-> +#define SUNXI_CEDRUS_REGS_H
-> +
-> +/*
-> + * For more information consult http://linux-sunxi.org/VE_Register_guide
-> + */
-> +
-> +/* Special registers values */
-> +
-> +/* VE_CTRL:
-> + * The first 3 bits indicate the engine (0 for MPEG, 1 for H264, b for AVC...)
-> + * The 16th and 17th bits indicate the memory type (3 for DDR3 32 bits)
-> + * The 20th bit is unknown but needed
-> + */
-> +#define VE_CTRL_MPEG		0x130000
-> +#define VE_CTRL_H264		0x130001
-> +#define VE_CTRL_AVC		0x13000b
-> +#define VE_CTRL_REINIT		0x130007
-> +
-> +/* VE_MPEG_CTRL:
-> + * The bit 3 (0x8) is used to enable IRQs
-> + * The other bits are unknown but needed
-> + */
-> +#define VE_MPEG_CTRL_MPEG2	0x800001b8
-> +#define VE_MPEG_CTRL_MPEG4	(0x80084118 | BIT(7))
-> +#define VE_MPEG_CTRL_MPEG4_P	(VE_MPEG_CTRL_MPEG4 | BIT(12))
-> +
-> +/* VE_MPEG_VLD_ADDR:
-> + * The bits 27 to 4 are used for the address
-> + * The bits 31 to 28 (0x7) are used to select the MPEG or JPEG engine
-> + */
-> +#define VE_MPEG_VLD_ADDR_VAL(x)	((x & 0x0ffffff0) | (x >> 28) | (0x7 << 28))
-> +
-> +/* VE_MPEG_TRIGGER:
-> + * The first three bits are used to trigger the engine
-> + * The bits 24 to 26 are used to select the input format (1 for MPEG1, 2 for 
+Am Freitag, 9. M?rz 2018, 23:22:51 CET schrieb Enric Balletbo i Serra:
+> Hi,
+> 
+> This patchset includes cleanups, improvements, and bug fixes for
+> Rockchip DRM driver and PSR support.
+> 
+> This new version is the same as before removing some of the patches
+> already applied and fixing the Exynos issue due patch '[v4 15/38]
+> drm/bridge: analogix_dp: Ensure edp is disabled when shutting down
+> the panel' reported by Marek.
 
-Trailing whitespace.
+The series on both rk3288 (without psr) and rk3399 (with psr)
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+
+I've tried reviewing at least the Rockchip parts, so if  bridge-
+maintainers are going to apply patches to drm-misc they could
+pick up the interlinked Rockchip patches as well.
+
+I don't think it's necessary to wait for the full series to be mergeable
+and before I just picked things from the beginning that looked ready
+and worked, so I guess continuing this way could help making that
+chunk of patches smaller :-) .
+
+
+Heiko
