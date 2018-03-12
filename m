@@ -1,70 +1,337 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 12 Mar 2018 19:42:21 +0530
-Subject: [PATCH v7 0/3] Add DTS for SDM845 SoC and MTP
-Message-ID: <20180312141224.11907-1-rnayak@codeaurora.org>
+Date: Mon, 12 Mar 2018 19:42:24 +0530
+Subject: [PATCH v7 3/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <20180312141224.11907-1-rnayak@codeaurora.org>
+References: <20180312141224.11907-1-rnayak@codeaurora.org>
+Message-ID: <20180312141224.11907-4-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are basic device tree files needed to boot a SDM845 MTP
-board to a ramfs based serial console shell
+Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
 
-Bindings are based on whats proposed for pinctrl/serial/clock
-drivers for SDM845 SoC
-pinctrl: https://patchwork.kernel.org/patch/10157143/ (This is now pulled
-in by Linus Walleij for 4.17)
-clocks: https://lkml.org/lkml/2018/1/31/209 (under review)
-
-I have dropped the patch that adds the serial/geni nodes from v6/7, as that
-will be reposted along with the geni patch series by Karthik
-
-Since 'PATCH 3/3' also adds an ITS node and keeps it disabled, we also depend
-on https://lkml.org/lkml/2018/1/29/383
-
-Andy, since we aren't adding anything new for clocks (gcc) and pinctrl,
-do these look good to be pulled in for 4.17?
-
-changes in v7:
-* Dropped redistributor-stride and #redistributor-regions as suggested
-by Marc Zyngier
-
-changes in v6:
-* added the missing power-domain-cells property for gcc as reported
-by Doug Anderson 
-* Dropped the patch which added geni/serial nodes in dts. Karthik has
-agreed to carry that patch along with his GENI series. 
-
-changes in v5:
-* Removed all instances of IRQ_TYPE_NONE
-
-changes in v4:
-* pull config changes to uart pins
-* License in device tree files is still GPL-2.0
-
-changes in v3:
-* split the pinmux/pinconf nodes across SoC/Board files
-* Fixes for issues reported with 'make dtbs W=2'
-* other minor fixes based on review
- 
-changes in v2:
-* dropped cpu-map
-* dropped GIC_CPU_MASK_SIMPLE()
-* Added new cpu compatible for kryo385
-* added ITS node, marked as disabled
-
-Rajendra Nayak (3):
-  dt-bindings: arm: Document kryo385 cpu
-  dt-bindings: qcom: Add SDM845 bindings
-  arm64: dts: sdm845: Add minimal dts/dtsi files for sdm845 SoC and MTP
-
- Documentation/devicetree/bindings/arm/cpus.txt |   1 +
- Documentation/devicetree/bindings/arm/qcom.txt |   1 +
- arch/arm64/boot/dts/qcom/Makefile              |   1 +
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts        |  15 ++
- arch/arm64/boot/dts/qcom/sdm845.dtsi           | 276 +++++++++++++++++++++++++
- 5 files changed, 294 insertions(+)
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm64/boot/dts/qcom/Makefile       |   1 +
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  15 ++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi    | 276 ++++++++++++++++++++++++++++++++
+ 3 files changed, 292 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
 
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index 55ec5ee7f7e8..9319e74b8906 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8992-bullhead-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-mtp.dtb
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+new file mode 100644
+index 000000000000..979ab49913f1
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+@@ -0,0 +1,15 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * SDM845 MTP board device tree source
++ *
++ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
++ */
++
++/dts-v1/;
++
++#include "sdm845.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. SDM845 MTP";
++	compatible = "qcom,sdm845-mtp";
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+new file mode 100644
+index 000000000000..32f8561deb43
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -0,0 +1,276 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * SDM845 SoC device tree source
++ *
++ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	interrupt-parent = <&intc>;
++
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen { };
++
++	memory at 80000000 {
++		device_type = "memory";
++		/* We expect the bootloader to fill in the size */
++		reg = <0 0x80000000 0 0>;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			next-level-cache = <&L2_0>;
++			L2_0: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++				L3_0: l3-cache {
++				      compatible = "cache";
++				};
++			};
++		};
++
++		CPU1: cpu at 100 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			next-level-cache = <&L2_100>;
++			L2_100: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU2: cpu at 200 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x200>;
++			enable-method = "psci";
++			next-level-cache = <&L2_200>;
++			L2_200: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU3: cpu at 300 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x300>;
++			enable-method = "psci";
++			next-level-cache = <&L2_300>;
++			L2_300: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU4: cpu at 400 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x400>;
++			enable-method = "psci";
++			next-level-cache = <&L2_400>;
++			L2_400: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU5: cpu at 500 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x500>;
++			enable-method = "psci";
++			next-level-cache = <&L2_500>;
++			L2_500: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU6: cpu at 600 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x600>;
++			enable-method = "psci";
++			next-level-cache = <&L2_600>;
++			L2_600: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++
++		CPU7: cpu at 700 {
++			device_type = "cpu";
++			compatible = "qcom,kryo385";
++			reg = <0x0 0x700>;
++			enable-method = "psci";
++			next-level-cache = <&L2_700>;
++			L2_700: l2-cache {
++				compatible = "cache";
++				next-level-cache = <&L3_0>;
++			};
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	clocks {
++		xo_board: xo-board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++		};
++
++		sleep_clk: sleep-clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32764>;
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0xffffffff>;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at 17a00000 {
++			compatible = "arm,gic-v3";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x17a00000 0x10000>,     /* GICD */
++			      <0x17a60000 0x100000>;    /* GICR * 8 */
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++			gic-its at 17a40000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				#msi-cells = <1>;
++				reg = <0x17a40000 0x20000>;
++				status = "disabled";
++			};
++		};
++
++		gcc: clock-controller at 100000 {
++			compatible = "qcom,gcc-sdm845";
++			reg = <0x100000 0x1f0000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			#power-domain-cells = <1>;
++		};
++
++		tlmm: pinctrl at 3400000 {
++			compatible = "qcom,sdm845-pinctrl";
++			reg = <0x03400000 0xc00000>;
++			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		timer at 17c90000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			compatible = "arm,armv7-timer-mem";
++			reg = <0x17c90000 0x1000>;
++
++			frame at 17ca0000 {
++				frame-number = <0>;
++				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17ca0000 0x1000>,
++				      <0x17cb0000 0x1000>;
++			};
++
++			frame at 17cc0000 {
++				frame-number = <1>;
++				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cc0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17cd0000 {
++				frame-number = <2>;
++				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cd0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17ce0000 {
++				frame-number = <3>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17ce0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17cf0000 {
++				frame-number = <4>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17cf0000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17d00000 {
++				frame-number = <5>;
++				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17d00000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17d10000 {
++				frame-number = <6>;
++				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17d10000 0x1000>;
++				status = "disabled";
++			};
++		};
++
++		spmi_bus: spmi at c440000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg = <0xc440000 0x1100>,
++			      <0xc600000 0x2000000>,
++			      <0xe600000 0x100000>,
++			      <0xe700000 0xa0000>,
++			      <0xc40a000 0x26000>;
++			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
++			interrupt-names = "periph_irq";
++			interrupts = <GIC_SPI 481 IRQ_TYPE_LEVEL_HIGH>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++			cell-index = <0>;
++		};
++	};
++};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
