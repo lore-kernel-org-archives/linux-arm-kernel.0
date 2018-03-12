@@ -1,82 +1,59 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Mon, 12 Mar 2018 21:15:10 +0100
-Subject: [PATCH 3/3] drm/meson: Fix some error handling paths in
- 'meson_drv_bind_master()'
-In-Reply-To: <cover.1520885192.git.christophe.jaillet@wanadoo.fr>
-References: <cover.1520885192.git.christophe.jaillet@wanadoo.fr>
-Message-ID: <df47e03d36c2cf7bc37ec3105fc47c16555bd946.1520885192.git.christophe.jaillet@wanadoo.fr>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 13 Mar 2018 01:44:14 +0530
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+Message-ID: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If one of these functions fail, we whould free 'drm', as alreadry done in
-the other error handling paths, below and above.
+Hi Ard,
 
-Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
- drivers/gpu/drm/meson/meson_drv.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+I remember we had a discussion on this topic some time ago, but I was
+working on enabling KASLR support on arm64 boards internally and
+wanted to check your opinion on the following points (especially to
+understand if there are any changes in the opinions of the ARM
+maintainers now):
 
-diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-index 6ee3dd7fa450..3baceb744beb 100644
---- a/drivers/gpu/drm/meson/meson_drv.c
-+++ b/drivers/gpu/drm/meson/meson_drv.c
-@@ -189,35 +189,43 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vpu");
- 	regs = devm_ioremap_resource(dev, res);
--	if (IS_ERR(regs))
--		return PTR_ERR(regs);
-+	if (IS_ERR(regs)) {
-+		ret = PTR_ERR(regs);
-+		goto free_drm;
-+	}
- 
- 	priv->io_base = regs;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
- 	/* Simply ioremap since it may be a shared register zone */
- 	regs = devm_ioremap(dev, res->start, resource_size(res));
--	if (!regs)
--		return -EADDRNOTAVAIL;
-+	if (!regs) {
-+		ret = -EADDRNOTAVAIL;
-+		goto free_drm;
-+	}
- 
- 	priv->hhi = devm_regmap_init_mmio(dev, regs,
- 					  &meson_regmap_config);
- 	if (IS_ERR(priv->hhi)) {
- 		dev_err(&pdev->dev, "Couldn't create the HHI regmap\n");
--		return PTR_ERR(priv->hhi);
-+		ret = PTR_ERR(priv->hhi);
-+		goto free_drm;
- 	}
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
- 	/* Simply ioremap since it may be a shared register zone */
- 	regs = devm_ioremap(dev, res->start, resource_size(res));
--	if (!regs)
--		return -EADDRNOTAVAIL;
-+	if (!regs) {
-+		ret = -EADDRNOTAVAIL;
-+		goto free_drm;
-+	}
- 
- 	priv->dmc = devm_regmap_init_mmio(dev, regs,
- 					  &meson_regmap_config);
- 	if (IS_ERR(priv->dmc)) {
- 		dev_err(&pdev->dev, "Couldn't create the DMC regmap\n");
--		return PTR_ERR(priv->dmc);
-+		ret = PTR_ERR(priv->dmc);
-+		goto free_drm;
- 	}
- 
- 	priv->vsync_irq = platform_get_irq(pdev, 0);
--- 
-2.14.1
+A. Randomness / Seeding for arm64 kaslr:
 
+- Currently the arm64 kernel requires a bootloader to provide entropy,
+by passing a
+ random u64 value in '/chosen/kaslr-seed' at kernel entry (please see [1])
 
----
-L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
-https://www.avast.com/antivirus
+- On platforms which support UEFI firmware, its the responsibility of
+the UEFI firmware to implement EFI_RNG_PROTOCOL to supply the
+'/chosen/kaslr-seed' property.
+
+- I was wondering if we have any possibility to support a random seed
+generation like the x86 in the efistub only rather than relying on the
+UEFI firmwares with EFI_RNG_PROTOCOL for the same - for e.g. by using
+a randomness seed like the boot time or more proper entropy sources
+like arm64 system timer (see [2] for x86 example).
+
+- I guess that the main problem is that most arm64 UEFI firmware
+vendors still do not support EFI_RNG_PROTOCOL out of the box. We can
+use the ChaosKey (see [3]) EFI driver and use this USB key as the
+source of entropy on the arm64 systems for EFI firmwares which do not
+provide a EFI_RNG_PROTOCOL implementation, but it might not be very
+feasible to connect it to all boards in a production environment.
+
+B. Regarding the arm64 kaslr support in kdump (I have Cc'ed AKASHI and
+kexec list in this thread as well for their inputs), but currently we
+don't seem to have a way to support kaslr in arm64 kdump kernel:
+
+- '/chosen/kaslr-seed' a property is zeroed out in the primary kernel
+(to avoid leaking out randomness secret), but how should this be then
+handed over to the kdump kernel.
+- We pass the dtb over to the kdump kernel for arm64 kdump, but the
+'/chosen/kaslr-seed' property would be zeroed out already by the
+primary kernel and the secondary would work in a *nokaslr* environment
+due to the same (see [4] for example)
+
+[1]. https://elixir.bootlin.com/linux/v4.9/source/arch/arm64/Kconfig#L906
+[2]. https://github.com/torvalds/linux/blob/master/arch/x86/lib/kaslr.c#L49
+[3]. https://github.com/bhupesh-sharma/edk2-platforms/tree/master/Silicon/Openmoko/ChaosKeyDxe
+[4]. https://elixir.bootlin.com/linux/v4.12.9/source/arch/arm64/kernel/kaslr.c#L104
+
+Please share your views.
+
+Regards,
+Bhupesh
