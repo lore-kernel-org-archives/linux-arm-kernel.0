@@ -1,22 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2018 14:59:57 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.17 (#1)
-In-Reply-To: <87muzh2mzt.fsf@bootlin.com>
-References: <87muzh2mzt.fsf@bootlin.com>
-Message-ID: <CAK8P3a37r7SbM4uT0STLBddYiosryK8YuEEZ63mj6vyR2RMK9w@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Mar 2018 15:02:01 +0100
+Subject: [PATCH] arm: dts: rk3288: Add missing #sound-dai-cells
+In-Reply-To: <20180301202537.30571-3-robh@kernel.org>
+References: <20180301202537.30571-3-robh@kernel.org>
+Message-ID: <18111539.xZD6rPs4DF@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 6:10 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> ----------------------------------------------------------------
-> mvebu dt for 4.17 (part 1)
->
-> Most of them are small fixes or cleanup.
->
-> Only the change on the clearfog will have a noticeable effect allowing
-> to use the i2c at an higher frequency.
+Am Donnerstag, 1. M?rz 2018, 21:25:35 CET schrieb Rob Herring:
+> dtc now gives the following warning:
+> 
+> arch/arm/boot/dts/rk3288-tinker.dtb: Warning (sound_dai_property):
+> /sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in node
+> /hdmi at ff980000 or bad phandle (referred from sound-dai[0])
+> 
+> Add the missing #sound-dai-cells property.
+> 
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-rockchip at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Pulled into next/dt, thanks!
+applied as fix for 4.16 (on 2018-03-05 already)
 
-        Arnd
+Thanks for the catch
+Heiko
