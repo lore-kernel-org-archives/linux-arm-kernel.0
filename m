@@ -1,78 +1,48 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 12 Mar 2018 15:28:27 -0300
-Subject: [PATCH v3 04/11] perf vendor events: add support for pmu events
- vendor subdirectory
-In-Reply-To: <1520506716-197429-5-git-send-email-john.garry@huawei.com>
-References: <1520506716-197429-1-git-send-email-john.garry@huawei.com>
- <1520506716-197429-5-git-send-email-john.garry@huawei.com>
-Message-ID: <20180312182827.GA10004@kernel.org>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Mon, 12 Mar 2018 12:24:26 -0700 (PDT)
+Subject: Make set_handle_irq and handle_arch_irq generic, v3
+In-Reply-To: <alpine.DEB.2.21.1803092358120.1570@nanos.tec.linutronix.de>
+Message-ID: <mhng-da14b043-f8f5-4339-879e-aa45b877fcb1@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Mar 08, 2018 at 06:58:29PM +0800, John Garry escreveu:
-> index 1d02faf..7b9e210 100644
-> --- a/tools/perf/pmu-events/jevents.c
-> @@ -739,25 +739,77 @@ static int get_maxfds(void)
->  static FILE *eventsfp;
->  static char *mapfile;
->  
-> +static int is_leaf_dir(const char *fpath)
-> +{
-> +	DIR *d;
-> +	struct dirent *dir;
-> +	int res = 1;
-> +
-> +	d = opendir(fpath);
-> +	if (!d)
-> +		return 0;
-> +
-> +	while ((dir = readdir(d)) != NULL) {
-> +		if (dir->d_type == DT_DIR && dir->d_name[0] != '.') {
-> +			res = 0;
-> +			break;
-> +		} else if (dir->d_type == DT_UNKNOWN) {
-> +			char path[PATH_MAX];
+On Fri, 09 Mar 2018 15:00:56 PST (-0800), tglx at linutronix.de wrote:
+> On Fri, 9 Mar 2018, Palmer Dabbelt wrote:
+>> On Fri, 09 Mar 2018 02:20:12 PST (-0800), tglx at linutronix.de wrote:
+>> > This looks sensible. We have two options for getting this merged:
+>> >
+>> > 1)   I'll take the whole lot through tip/irq/core
+>> >
+>> > 2)   I'll apply patch 1/N to a special branch in tip. That branch will
+>> > contain
+>> >      only this commit on top of 4.16-rc4 and can be pulled by the relevant
+>> >      architecture maintainers, so they can apply their architecture specific
+>> >      patches.
+>>
+>> Option 1 seems like the lowest overhead, as that way we don't need to sequence
+>> the patches between multiple trees.  If all the other arch maintianers are OK
+>> with it then that works for me.
+>
+> Ok, I wait for someone to yell NO until tuesday. If that doesn't happen I
+> pick it up.
+>
+>> The 0-day robot found a new build warning on openrisc.  I was plannning
+>> on submitting a v4 with this fix in it
+>>
+>>    diff --git a/arch/openrisc/include/asm/irq.h
+>> b/arch/openrisc/include/asm/irq.h
+>>    index d9eee0a2b7b4..eb612b1865d2 100644
+>>    --- a/arch/openrisc/include/asm/irq.h
+>>    +++ b/arch/openrisc/include/asm/irq.h
+>>    @@ -24,6 +24,4 @@
+>>        #define NO_IRQ         (-1)
+>>       -extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>>    -
+>>     #endif /* __ASM_OPENRISC_IRQ_H__ */
+>>
+>> I can submit a v4, or you can just grab it from
+>
+> Just reply on the v3 openrisc patch with a v4 and I grab it from there.
 
-
-You forgot to add:
-
-#include <limits.h>
-
-Which broke the build on at least:
-
-[root at jouet ~]# time dm
-   1    13.78 alpine:3.4                    : FAIL gcc (Alpine 5.3.0) 5.3.0
-   2    14.40 alpine:3.5                    : FAIL gcc (Alpine 6.2.1) 6.2.1 20160822
-   3    13.59 alpine:3.6                    : FAIL gcc (Alpine 6.3.0) 6.3.0
-   4    14.94 alpine:3.7                    : FAIL gcc (Alpine 6.4.0) 6.4.0
-   5    14.70 alpine:edge                   : FAIL gcc (Alpine 6.4.0) 6.4.0
-   6: amazonlinux:1^C^C
-
-I just fixed it.
-
-build failure:
-
-  MKDIR    /tmp/build/perf/pmu-events/
-  HOSTCC   /tmp/build/perf/pmu-events/json.o
-  MKDIR    /tmp/build/perf/pmu-events/
-  HOSTCC   /tmp/build/perf/pmu-events/jsmn.o
-  HOSTCC   /tmp/build/perf/pmu-events/jevents.o
-  LD       /tmp/build/perf/libtraceevent-in.o
-  LINK     /tmp/build/perf/libtraceevent.a
-  LD       /tmp/build/perf/libsubcmd-in.o
-  CC       /tmp/build/perf/plugin_jbd2.o
-  CC       /tmp/build/perf/plugin_hrtimer.o
-pmu-events/jevents.c: In function 'is_leaf_dir':
-pmu-events/jevents.c:879:14: error: 'PATH_MAX' undeclared (first use in this function)
-    char path[PATH_MAX];
-              ^~~~~~~~
-pmu-events/jevents.c:879:14: note: each undeclared identifier is reported only once for each function it appears in
-  AR       /tmp/build/perf/libsubcmd.a
-mv: can't rename '/tmp/build/perf/pmu-events/.jevents.o.tmp': No such file or directory
-make[3]: *** [/git/linux/tools/build/Makefile.build:96: /tmp/build/perf/pmu-events/jevents.o] Error 1
-  CC       /tmp/build/perf/plugin_kmem.o
-  LD       /tmp/build/perf/plugin_jbd2-in.o
-make[2]: *** [Makefile.perf:501: /tmp/build/perf/pmu-events/jevents-in.o] Error 2
-make[2]: *** Waiting for unfinished jobs....
-  GEN      perf-archive
-  CC       /tmp/build/perf/plugin_kvm.o
+OK, I just did -- sorry it took a while, I had to prepare for the ELC
+hackathon.
