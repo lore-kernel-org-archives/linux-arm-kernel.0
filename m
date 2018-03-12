@@ -1,35 +1,45 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 12 Mar 2018 13:25:40 +0800
-Subject: [PATCH v2 3/3] dt-bindings: phy-mtk-tphy: add properties for U2 slew
- rate calibrate
-In-Reply-To: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520832210.git.chunfeng.yun@mediatek.com>
-References: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520832210.git.chunfeng.yun@mediatek.com>
-Message-ID: <94a7d3b1240297cd0cac82df52954d0a53d50d36.1520832210.git.chunfeng.yun@mediatek.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 12 Mar 2018 11:22:54 +0530
+Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
+In-Reply-To: <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-3-jcrouse@codeaurora.org>
+ <20180305044221.GC23018@vireshk-i7>
+ <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
+ <20180306042656.GJ23018@vireshk-i7>
+ <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
+ <20180307050624.GR23018@vireshk-i7>
+ <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
+ <20180309034332.GO6842@vireshk-i7>
+ <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
+Message-ID: <20180312055254.GY6842@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two properties of ref_clk and coefficient used by U2 slew rate
-calibrate which may vary on different SoCs
+On 09-03-18, 09:03, Jordan Crouse wrote:
+> I don't think we are understanding each other. The GMU is a separate
+> microcontroller. It is given a magic number (actually a combination of magic
+> numbers) that it then uses to directly interact with the other hardware to make
+> the vote. The only responsibility that the CPU has is to construct that magic
+> number (once, at init) and send it across when asked.
+> 
+> Looking at the sdhc code from the testing tree it makes perfect sense
+> that you have a device that needs to eventually do a RPMh vote from the CPU and
+> so the 'required-opp' and performance state come together to do the right thing.
+> This is good code.
+> 
+> None of this is true for the GPU. The CPU never votes for the GPU so there 
+> isn't any need to connect it to the power domain drivers. Even if you did
+> there isn't any current mechanism for the rpmpd driver to pass the right magic
+> number to the GPU driver which is what it really needs.
+> 
+> I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
+> then thats just a naming dispute. We still need a way for the GPU to query the
+> magic values.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+Okay, I get it. You can't (shouldn't) use genpd stuff here. I would still like
+you guys (You/Rajendra/Stephen) to conclude if qcom-corner and qcom,arc-level
+are eventually same values and we should use same property for them.
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-index 41e09ed..0d34b2b 100644
---- a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-@@ -27,6 +27,10 @@ Optional properties (controller (parent) node):
-  - reg		: offset and length of register shared by multiple ports,
- 		  exclude port's private register. It is needed on mt2701
- 		  and mt8173, but not on mt2712.
-+ - mediatek,src-ref-clk-mhz	: frequency of reference clock for slew rate
-+		  calibrate
-+ - mediatek,src-coef	: coefficient for slew rate calibrate, depends on
-+		  SoC process
- 
- Required properties (port (child) node):
- - reg		: address and length of the register set for the port.
 -- 
-1.9.1
+viresh
