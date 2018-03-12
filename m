@@ -1,167 +1,28 @@
-From: chenhc@lemote.com (Huacai Chen)
-Date: Mon, 12 Mar 2018 10:04:17 +0800
-Subject: [PATCH V2] ZBOOT: fix stack protector in compressed boot phase
-Message-ID: <1520820258-19225-1-git-send-email-chenhc@lemote.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Sun, 11 Mar 2018 19:14:42 -0700
+Subject: [PATCH] arm64: dts: rockchip: assign clock rate for ACLK_VIO
+In-Reply-To: <1520819448-8316-1-git-send-email-zhengsq@rock-chips.com>
+References: <1520819448-8316-1-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <CAD=FV=VG0CSaLGyyfHAdvn4Ud0D3tab0c3pMEvqcFxAJ+5c7Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call __stack_chk_guard_setup() in decompress_kernel() is too late that
-stack checking always fails for decompress_kernel() itself. So remove
-__stack_chk_guard_setup() and initialize __stack_chk_guard before we
-call decompress_kernel().
+Hi,
 
-Original code comes from ARM but also used for MIPS and SH, so fix them
-together. If without this fix, compressed booting of these archs will
-fail because stack checking is enabled by default (>=4.16).
+On Sun, Mar 11, 2018 at 6:50 PM, Shunqian Zheng <zhengsq@rock-chips.com> wrote:
+> The ACLK_VIO is a parent clock used by a several children,
+> its suggested clock rate is 400MHz. Right now it gets 400MHz
+> because it sources from CPLL(800M) and divides by 2 after reset.
+> It's good not to rely on default values like this, so let's
+> explicitly set it.
+> NOTE: it's expected that at least one board may override cru node and
+> set the CPLL to 1.6 GHz. On that board it will be very important to be
+> explicit about aclk-vio being 400 MHz.
+>
+> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 6 ++++--
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi     | 6 ++++--
+>  2 files changed, 8 insertions(+), 4 deletions(-)
 
-V2: Fix build on ARM.
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Huacai Chen <chenhc@lemote.com>
----
- arch/arm/boot/compressed/head.S        | 4 ++++
- arch/arm/boot/compressed/misc.c        | 7 -------
- arch/mips/boot/compressed/decompress.c | 7 -------
- arch/mips/boot/compressed/head.S       | 4 ++++
- arch/sh/boot/compressed/head_32.S      | 4 ++++
- arch/sh/boot/compressed/head_64.S      | 4 ++++
- arch/sh/boot/compressed/misc.c         | 7 -------
- 7 files changed, 16 insertions(+), 21 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 45c8823..bae1fc6 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -547,6 +547,10 @@ not_relocated:	mov	r0, #0
- 		bic	r4, r4, #1
- 		blne	cache_on
- 
-+		ldr	r0, =__stack_chk_guard
-+		ldr	r1, =0x000a0dff
-+		str	r1, [r0]
-+
- /*
-  * The C runtime environment should now be setup sufficiently.
-  * Set up some pointers, and start decompressing.
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 16a8a80..e518ef5 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -130,11 +130,6 @@ asmlinkage void __div0(void)
- 
- unsigned long __stack_chk_guard;
- 
--void __stack_chk_guard_setup(void)
--{
--	__stack_chk_guard = 0x000a0dff;
--}
--
- void __stack_chk_fail(void)
- {
- 	error("stack-protector: Kernel stack is corrupted\n");
-@@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- {
- 	int ret;
- 
--	__stack_chk_guard_setup();
--
- 	output_data		= (unsigned char *)output_start;
- 	free_mem_ptr		= free_mem_ptr_p;
- 	free_mem_end_ptr	= free_mem_ptr_end_p;
-diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
-index fdf99e9..5ba431c 100644
---- a/arch/mips/boot/compressed/decompress.c
-+++ b/arch/mips/boot/compressed/decompress.c
-@@ -78,11 +78,6 @@ void error(char *x)
- 
- unsigned long __stack_chk_guard;
- 
--void __stack_chk_guard_setup(void)
--{
--	__stack_chk_guard = 0x000a0dff;
--}
--
- void __stack_chk_fail(void)
- {
- 	error("stack-protector: Kernel stack is corrupted\n");
-@@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
- {
- 	unsigned long zimage_start, zimage_size;
- 
--	__stack_chk_guard_setup();
--
- 	zimage_start = (unsigned long)(&__image_begin);
- 	zimage_size = (unsigned long)(&__image_end) -
- 	    (unsigned long)(&__image_begin);
-diff --git a/arch/mips/boot/compressed/head.S b/arch/mips/boot/compressed/head.S
-index 409cb48..00d0ee0 100644
---- a/arch/mips/boot/compressed/head.S
-+++ b/arch/mips/boot/compressed/head.S
-@@ -32,6 +32,10 @@ start:
- 	bne	a2, a0, 1b
- 	 addiu	a0, a0, 4
- 
-+	PTR_LA	a0, __stack_chk_guard
-+	PTR_LI	a1, 0x000a0dff
-+	sw	a1, 0(a0)
-+
- 	PTR_LA	a0, (.heap)	     /* heap address */
- 	PTR_LA	sp, (.stack + 8192)  /* stack address */
- 
-diff --git a/arch/sh/boot/compressed/head_32.S b/arch/sh/boot/compressed/head_32.S
-index 7bb1681..a3fdb05 100644
---- a/arch/sh/boot/compressed/head_32.S
-+++ b/arch/sh/boot/compressed/head_32.S
-@@ -76,6 +76,10 @@ l1:
- 	mov.l	init_stack_addr, r0
- 	mov.l	@r0, r15
- 
-+	mov.l	__stack_chk_guard, r0
-+	mov	#0x000a0dff, r1
-+	mov.l	r1, @r0
-+
- 	/* Decompress the kernel */
- 	mov.l	decompress_kernel_addr, r0
- 	jsr	@r0
-diff --git a/arch/sh/boot/compressed/head_64.S b/arch/sh/boot/compressed/head_64.S
-index 9993113..8b4d540 100644
---- a/arch/sh/boot/compressed/head_64.S
-+++ b/arch/sh/boot/compressed/head_64.S
-@@ -132,6 +132,10 @@ startup:
- 	addi	r22, 4, r22
- 	bne	r22, r23, tr1
- 
-+	movi	datalabel __stack_chk_guard, r0
-+	movi	0x000a0dff, r1
-+	st.l	r0, 0, r1
-+
- 	/*
- 	 * Decompress the kernel.
- 	 */
-diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
-index 627ce8e..fe4c079 100644
---- a/arch/sh/boot/compressed/misc.c
-+++ b/arch/sh/boot/compressed/misc.c
-@@ -106,11 +106,6 @@ static void error(char *x)
- 
- unsigned long __stack_chk_guard;
- 
--void __stack_chk_guard_setup(void)
--{
--	__stack_chk_guard = 0x000a0dff;
--}
--
- void __stack_chk_fail(void)
- {
- 	error("stack-protector: Kernel stack is corrupted\n");
-@@ -130,8 +125,6 @@ void decompress_kernel(void)
- {
- 	unsigned long output_addr;
- 
--	__stack_chk_guard_setup();
--
- #ifdef CONFIG_SUPERH64
- 	output_addr = (CONFIG_MEMORY_START + 0x2000);
- #else
--- 
-2.7.0
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
