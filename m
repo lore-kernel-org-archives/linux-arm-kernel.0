@@ -1,66 +1,44 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 12 Mar 2018 13:36:53 +0530
-Subject: [PATCH v6 0/3] Add DTS for SDM845 SoC and MTP
-Message-ID: <20180312080656.13247-1-rnayak@codeaurora.org>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Mon, 12 Mar 2018 13:41:28 +0530
+Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness supports
+Message-ID: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are basic device tree files needed to boot a SDM845 MTP
-board to a ramfs based serial console shell
+Connection between flash and controller is not necessary to be always
+of same type. It may varies from platform to platform.
 
-Bindings are based on whats proposed for pinctrl/serial/clock
-drivers for SDM845 SoC
-pinctrl: https://patchwork.kernel.org/patch/10157143/ (This is now pulled
-in by Linus Walleij for 4.17)
-clocks: https://lkml.org/lkml/2018/1/31/209 (under review)
+Adding endianness (optional) property to provide connection type
+information.
 
-I have dropped the patch that adds the serial/geni nodes from v6, as that
-will be reposted along with the geni patch series by Karthik
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+Changes for v2: updated subject
+Changes for v3: fixed typo for "big-endian"
+Changes for v4: Moved binding definition in mtd-physmap.txt
+as discussed at https://patchwork.ozlabs.org/patch/842543/
+Changes for v5: Sending as it is
+Changes for v6: Updated binding when endianness property is absent
 
-Since 'PATCH 3/3' also adds an ITS node and keeps it disabled, we also depend
-on https://lkml.org/lkml/2018/1/29/383
+ Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Andy, since we aren't adding anything new for clocks (gcc) and pinctrl,
-do these look good to be pulled in for 4.17?
-
-changes in v6:
-* added the missing power-domain-cells property for gcc as reported
-by Doug Anderson 
-* Dropped the patch which added geni/serial nodes in dts. Karthik has
-agreed to carry that patch along with his GENI series. 
-
-changes in v5:
-* Removed all instances of IRQ_TYPE_NONE
-
-changes in v4:
-* pull config changes to uart pins
-* License in device tree files is still GPL-2.0
-
-changes in v3:
-* split the pinmux/pinconf nodes across SoC/Board files
-* Fixes for issues reported with 'make dtbs W=2'
-* other minor fixes based on review
+diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+index 4a0a48bf4ecb..691c98f7301d 100644
+--- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+@@ -41,6 +41,11 @@ additional (optional) property is defined:
  
-changes in v2:
-* dropped cpu-map
-* dropped GIC_CPU_MASK_SIMPLE()
-* Added new cpu compatible for kryo385
-* added ITS node, marked as disabled
-
-Rajendra Nayak (3):
-  dt-bindings: arm: Document kryo385 cpu
-  dt-bindings: qcom: Add SDM845 bindings
-  arm64: dts: sdm845: Add minimal dts/dtsi files for sdm845 SoC and MTP
-
- Documentation/devicetree/bindings/arm/cpus.txt |   1 +
- Documentation/devicetree/bindings/arm/qcom.txt |   1 +
- arch/arm64/boot/dts/qcom/Makefile              |   1 +
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts        |  15 ++
- arch/arm64/boot/dts/qcom/sdm845.dtsi           | 278 +++++++++++++++++++++++++
- 5 files changed, 296 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
- create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
-
+  - erase-size : The chip's physical erase block size in bytes.
+ 
++ The device tree may optionally contain endianness property.
++ little-endian or big-endian : It represents connection between controller and
++			flash. If this property is absent, connection is described
++			by the CFI_DEFAULT_ENDIAN.
++
+ The device tree may optionally contain sub-nodes describing partitions of the
+ address space. See partition.txt for more detail.
+ 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.14.1
