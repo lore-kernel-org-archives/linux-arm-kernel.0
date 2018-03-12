@@ -1,205 +1,68 @@
 From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Mon, 12 Mar 2018 23:05:39 +0000
-Subject: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <2fb8ee8c-35ac-b7e6-e691-84464b0c8745@arm.com>
+Date: Mon, 12 Mar 2018 23:07:56 +0000
+Subject: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <f6a416b7-542f-a3c3-538f-8549cf4e96c3@arm.com>
 References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-3-git-send-email-jollys@xilinx.com>
- <dab419e8-3afe-5bfe-240e-e9ee4f2300f2@arm.com>
- <DM2PR0201MB076735E33069DC6F0C84EFDCB8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
- <2fb8ee8c-35ac-b7e6-e691-84464b0c8745@arm.com>
-Message-ID: <DM2PR0201MB07673298E409D07F0F748316B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
+ <1519154467-2896-2-git-send-email-jollys@xilinx.com>
+ <778329dd-76a7-0151-26d9-30e87e0c888d@arm.com>
+ <CY1PR0201MB0764FB23021F5DC694C7F56DB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
+ <f6a416b7-542f-a3c3-538f-8549cf4e96c3@arm.com>
+Message-ID: <DM2PR0201MB07678A47B5380DC14E6F6126B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
 
 Hi Sudeep,
 
 > -----Original Message-----
 > From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: Thursday, March 08, 2018 4:19 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>; michal.simek at xilinx.com
-> Cc: Sudeep Holla <sudeep.holla@arm.com>; ard.biesheuvel at linaro.org;
-> mingo at kernel.org; gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
-> hkallweit1 at gmail.com; keescook at chromium.org;
-> dmitry.torokhov at gmail.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> Rajan Vaja <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
-> driver
+> Sent: Thursday, March 08, 2018 3:48 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> hkallweit1 at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; Sudeep Holla <sudeep.holla@arm.com>;
+> ard.biesheuvel at linaro.org; mingo at kernel.org; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; Rajan Vaja <RAJANV@xilinx.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+> firmware
 > 
 > 
 > 
-> On 07/03/18 00:44, Jolly Shah wrote:
+> On 07/03/18 22:25, Jolly Shah wrote:
 > > Hi Sudeep,
 > >
-> > Thanks for the review,
-> >
-> >> -----Original Message-----
-> >> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> >> Sent: Thursday, March 01, 2018 6:28 AM
-> >> To: Jolly Shah <JOLLYS@xilinx.com>; michal.simek at xilinx.com
-> >> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
-> >> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
-> >> hkallweit1 at gmail.com; keescook at chromium.org;
-> >> dmitry.torokhov at gmail.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> >> Sudeep Holla <sudeep.holla@arm.com>; Rajan Vaja <RAJANV@xilinx.com>;
-> >> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> >> devicetree at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>
-> >> Subject: Re: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP
-> >> firmware driver
-> >>
-> >>
-> >>
-> >> On 20/02/18 19:21, Jolly Shah wrote:
-> >>> This patch is adding communication layer with firmware.
-> >>> Firmware driver provides an interface to firmware APIs.
-> >>> Interface APIs can be used by any driver to communicate to
-> >>> PMUFW(Platform Management Unit). All requests go through ATF.
+> 
+> [...]
+> 
+> >>> +Examples:
+> >>> +	firmware {
+> >>> +		zynqmp_firmware: zynqmp-firmware {
+> >>> +			compatible = "xlnx,zynqmp-firmware";
+> >>> +			method = "smc";
+> >>> +		};
+> >>> +	};
 > >>>
-> >>> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> >>> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> >>> ---
-> >>>  arch/arm64/Kconfig.platforms                    |    1 +
-> >>>  drivers/firmware/Kconfig                        |    1 +
-> >>>  drivers/firmware/Makefile                       |    1 +
-> >>>  drivers/firmware/xilinx/Kconfig                 |    4 +
-> >>>  drivers/firmware/xilinx/Makefile                |    4 +
-> >>>  drivers/firmware/xilinx/zynqmp/Kconfig          |   16 +
-> >>>  drivers/firmware/xilinx/zynqmp/Makefile         |    4 +
-> >>>  drivers/firmware/xilinx/zynqmp/firmware.c       | 1051
-> >> +++++++++++++++++++++++
-> >>>  include/linux/firmware/xilinx/zynqmp/firmware.h |  590
-> >>> +++++++++++++
-> >>>  9 files changed, 1672 insertions(+)  create mode 100644
-> >>> drivers/firmware/xilinx/Kconfig  create mode
-> >>> 100644 drivers/firmware/xilinx/Makefile  create mode 100644
-> >>> drivers/firmware/xilinx/zynqmp/Kconfig
-> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
-> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
-> >>>  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
-> >>>
-> >>> +
-> >>> +/**
-> >>> + * zynqmp_pm_force_powerdown - PM call to request for another PU or
-> >> subsystem to
-> >>> + *				be powered down forcefully
-> >>> + * @target:	Node ID of the targeted PU or subsystem
-> >>> + * @ack:	Flag to specify whether acknowledge is requested
-> >>> + *
-> >>> + * Return:	Returns status, either success or error+reason
-> >>> + */
-> >>> +static int zynqmp_pm_force_powerdown(const u32 target,
-> >>> +				     const enum zynqmp_pm_request_ack ack) {
-> >>> +	return zynqmp_pm_invoke_fn(PM_FORCE_POWERDOWN, target, ack,
-> >> 0, 0,
-> >>> +NULL); }
-> >>> +
 > >>
-> >> [...]
-> >>
-> >>> +/**
-> >>> + * zynqmp_pm_system_shutdown - PM call to request a system shutdown
-> >>> +or
-> >> restart
-> >>> + * @type:	Shutdown or restart? 0 for shutdown, 1 for restart
-> >>> + * @subtype:	Specifies which system should be restarted or shut
-> down
-> >>> + *
-> >>> + * Return:	Returns status, either success or error+reason
-> >>> + */
-> >>> +static int zynqmp_pm_system_shutdown(const u32 type, const u32
-> >>> +subtype) {
-> >>> +	return zynqmp_pm_invoke_fn(PM_SYSTEM_SHUTDOWN, type, subtype,
-> >>> +				   0, 0, NULL);
-> >>> +}
-> >>> +
-> >>
-> >> I can't understand why you need above 2 APIs: PM_FORCE_POWERDOWN
-> and
-> >> PM_SYSTEM_SHUTDOWN. You should use PSCI_SYSTEM_OFF and
-> >> PSCI_SYSTEM_RESET and drop these two.
+> >> Do you foresee using SMC/HVC for this firmware even on future platforms?
+> >> If not, I suggest to keep the protocol part separate from the transport i.e.
+> >> smc/hvc via ATF. It could be replaced with mailbox or some h/w
+> >> mechanism in future ?
 > >>
 > >
-> > FORCE_POWERDOWN allows remote master to force power off other
-> > node/domain. SYSTEM_SHUTDOWN provides interface to shutdown/restart
-> > the subsystem. It supports system/subsystem restart with argument
-> > value.> PSCI doesn?t
-> support argument to identify between restart types.
-> 
-> OK, what are the types you are referring here ? or why PSCI is not sufficient ?
-> How do you plan to use these APIs in Linux ?
-
-It supports system/subsystem restart as types. For example, only APU restart, system restart, PS restart for ZynqMP
-PSCI doesn?t support any argument to identify these types.
-Linux, one can set the reset scope through debug interface and execute "reboot" then. Inside ATF, PSCI_SYSTEM_RESET mapped function will call EEMI API with that scope.
-
-> 
-> >>
-> >>> +static const struct zynqmp_eemi_ops eemi_ops = {
-> >>> +	.get_api_version = zynqmp_pm_get_api_version,
-> >>> +	.get_chipid = zynqmp_pm_get_chipid,
-> >>> +	.reset_assert = zynqmp_pm_reset_assert,
-> >>> +	.reset_get_status = zynqmp_pm_reset_get_status,
-> >>> +	.fpga_load = zynqmp_pm_fpga_load,
-> >>> +	.fpga_get_status = zynqmp_pm_fpga_get_status,
-> >>> +	.sha_hash = zynqmp_pm_sha_hash,
-> >>> +	.rsa = zynqmp_pm_rsa,
-> >>> +	.request_suspend = zynqmp_pm_request_suspend,
-> >>> +	.force_powerdown = zynqmp_pm_force_powerdown,
-> >>> +	.request_wakeup = zynqmp_pm_request_wakeup,
-> >>> +	.set_wakeup_source = zynqmp_pm_set_wakeup_source,
-> >>> +	.system_shutdown = zynqmp_pm_system_shutdown,
-> >>> +	.request_node = zynqmp_pm_request_node,
-> >>> +	.release_node = zynqmp_pm_release_node,
-> >>> +	.set_requirement = zynqmp_pm_set_requirement,
-> >>> +	.set_max_latency = zynqmp_pm_set_max_latency,
-> >>> +	.set_configuration = zynqmp_pm_set_configuration,
-> >>> +	.get_node_status = zynqmp_pm_get_node_status,
-> >>> +	.get_operating_characteristic =
-> >> zynqmp_pm_get_operating_characteristic,
-> >>> +	.init_finalize = zynqmp_pm_init_finalize,
-> >>> +	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
-> >>> +	.ioctl = zynqmp_pm_ioctl,
-> >>> +	.query_data = zynqmp_pm_query_data,
-> >>> +	.pinctrl_request = zynqmp_pm_pinctrl_request,
-> >>> +	.pinctrl_release = zynqmp_pm_pinctrl_release,
-> >>> +	.pinctrl_get_function = zynqmp_pm_pinctrl_get_function,
-> >>> +	.pinctrl_set_function = zynqmp_pm_pinctrl_set_function,
-> >>> +	.pinctrl_get_config = zynqmp_pm_pinctrl_get_config,
-> >>> +	.pinctrl_set_config = zynqmp_pm_pinctrl_set_config,
-> >>> +	.clock_enable = zynqmp_pm_clock_enable,
-> >>> +	.clock_disable = zynqmp_pm_clock_disable,
-> >>> +	.clock_getstate = zynqmp_pm_clock_getstate,
-> >>> +	.clock_setdivider = zynqmp_pm_clock_setdivider,
-> >>> +	.clock_getdivider = zynqmp_pm_clock_getdivider,
-> >>> +	.clock_setrate = zynqmp_pm_clock_setrate,
-> >>> +	.clock_getrate = zynqmp_pm_clock_getrate,
-> >>> +	.clock_setparent = zynqmp_pm_clock_setparent,
-> >>> +	.clock_getparent = zynqmp_pm_clock_getparent, };
-> >>> +
-> >> Instead of introducing all these in oneshot, add them as you have users of it.
-> >> IOW, show the users of these functions in the series. Also I asked to
-> >> split this into functional changes like clock, pinctrl, power, etc.
-> >
-> > It can be split into functional changes in same series but it will be
-> > difficult to split between users as there are more than 10 driver
-> > users for different EEMI APIs and also multiple driver users using
-> > specifc EEMI APIs. They all can't be submitted as single series.
+> > We have PSCI and EEMI interfaces exposed to linux from ATF. PSCI is an
+> > EEMI client. We do not have current plans to switch to mailbox as it
+> > will require 2 communication channels to PMU as PSCI is through ATF.
 > >
 > 
-> Why ? Start with basic EEMI and one functionality with it's user/client driver in
-> one series. Then you can top up with EEMI changes for other functionality with
-> it's user. If you introduce API's without the users in a series it's hard to review
-> and if there are more such unused APIs I will object it in future versions.
-> 
-> To start with add only clock or power APIs and functionality in this series, add
-> drivers using then. Drop other functionalities like pinctrl, fpga control and other
-> functionalities. IOW start something basic and simple.
-> 
+> OK, but I just saw some bindings that has mailbox interface, honestly it's getting
+> too confusing with multiple series on the same thing floating and hence I
+> requested to put it together as one series.
 
-I am ok to break it for clock/pinctrl with users but there are multiple users for some APIs. In that case, it will create dependency issues when different owners are involved.
-Also, it will hard to visualize a whole EEMI interface if its broken into such pieces. 
+Mailbox binding is used for power management driver. Mailbox is only used for PMU->APU communication.
+APU->PMU communication is always through EEMI firmware interface which is using SMC/HVC.
+
 
 > --
 > Regards,
