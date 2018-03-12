@@ -1,71 +1,75 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 12 Mar 2018 11:39:07 +0800
-Subject: [PATCH 2/3] phy: phy-mtk-tphy: add configurable parameters for slew
- rate calibrate
-In-Reply-To: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520824899.git.chunfeng.yun@mediatek.com>
-References: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520824899.git.chunfeng.yun@mediatek.com>
-Message-ID: <123d1a24659be168d0b040de4a67612acacf66f1.1520824899.git.chunfeng.yun@mediatek.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 12 Mar 2018 12:56:28 +0900
+Subject: [RFC PATCH v2 00/12] Rewrite asm-generic/bitops/{atomic,lock}.h
+ and use on arm64
+In-Reply-To: <CAK7LNATktPPTHDDhS0i=3o8p=XoVXBJ1KB+3VmDp_iqn239Z8g@mail.gmail.com>
+References: <1519657500-15094-1-git-send-email-will.deacon@arm.com>
+ <CAK7LNATktPPTHDDhS0i=3o8p=XoVXBJ1KB+3VmDp_iqn239Z8g@mail.gmail.com>
+Message-ID: <CAK7LNAT+DVCJ8CbxKYX0yEUdsp-vYU1J+az+yfM9h3-DzoWGgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two parameters, ref_clk and coefficient, for U2 slew rate
-calibrate which may vary on different SoCs, here allow them to be
-configurable
+Hi Will,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/mediatek/phy-mtk-tphy.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index 6073c25..38c281b 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -306,6 +306,8 @@ struct mtk_tphy {
- 	const struct mtk_phy_pdata *pdata;
- 	struct mtk_phy_instance **phys;
- 	int nphys;
-+	int src_ref_clk; /* MHZ, reference clock for slew rate calibrate */
-+	int src_coef; /* coefficient for slew rate calibrate */
- };
- 
- static void hs_slew_rate_calibrate(struct mtk_tphy *tphy,
-@@ -360,16 +362,17 @@ static void hs_slew_rate_calibrate(struct mtk_tphy *tphy,
- 	writel(tmp, fmreg + U3P_U2FREQ_FMMONR1);
- 
- 	if (fm_out) {
--		/* ( 1024 / FM_OUT ) x reference clock frequency x 0.028 */
--		tmp = U3P_FM_DET_CYCLE_CNT * U3P_REF_CLK * U3P_SLEW_RATE_COEF;
--		tmp /= fm_out;
-+		/* ( 1024 / FM_OUT ) x reference clock frequency x coef */
-+		tmp = tphy->src_ref_clk * tphy->src_coef;
-+		tmp = (tmp * U3P_FM_DET_CYCLE_CNT) / fm_out;
- 		calibration_val = DIV_ROUND_CLOSEST(tmp, U3P_SR_COEF_DIVISOR);
- 	} else {
- 		/* if FM detection fail, set default value */
- 		calibration_val = 4;
- 	}
--	dev_dbg(tphy->dev, "phy:%d, fm_out:%d, calib:%d\n",
--		instance->index, fm_out, calibration_val);
-+	dev_dbg(tphy->dev, "phy:%d, fm_out:%d, calib:%d (clk:%d, coef:%d)\n",
-+		instance->index, fm_out, calibration_val,
-+		tphy->src_ref_clk, tphy->src_coef);
- 
- 	/* set HS slew rate */
- 	tmp = readl(com + U3P_USBPHYACR5);
-@@ -1041,6 +1044,13 @@ static int mtk_tphy_probe(struct platform_device *pdev)
- 		tphy->u3phya_ref = NULL;
- 	}
- 
-+	tphy->src_ref_clk = U3P_REF_CLK;
-+	tphy->src_coef = U3P_SLEW_RATE_COEF;
-+	/* update parameters of slew rate calibrate if exist */
-+	device_property_read_u32(dev, "mediatek,src-ref-clk-mhz",
-+		&tphy->src_ref_clk);
-+	device_property_read_u32(dev, "mediatek,src-coef", &tphy->src_coef);
-+
- 	port = 0;
- 	for_each_child_of_node(np, child_np) {
- 		struct mtk_phy_instance *instance;
+2018-03-01 16:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> 2018-02-27 0:04 GMT+09:00 Will Deacon <will.deacon@arm.com>:
+>> Hi everyone,
+>>
+>> This is version two of the RFC I previously posted here:
+>>
+>>   https://www.spinics.net/lists/arm-kernel/msg634719.html
+>>
+>> Changes since v1 include:
+>>
+>>   * Fixed __clear_bit_unlock to work on archs with lock-based atomics
+>>   * Moved lock ops into bitops/lock.h
+>>   * Fixed build breakage on lesser-spotted architectures
+>>
+>> Trying to fix the circular #includes introduced by pulling atomic.h
+>> into btops/lock.h has been driving me insane. I've ended up moving some
+>> basic BIT definitions into bits.h, but this might all be better in
+>> const.h which is being proposed by Masahiro. Feedback is especially
+>> welcome on this part.
+>
+>
+> Info for reviewers:
+>
+> You can see my patches at the following:
+>
+> 1/5: https://patchwork.kernel.org/patch/10235457/
+> 2/5: https://patchwork.kernel.org/patch/10235461/
+> 3/5: https://patchwork.kernel.org/patch/10235463/
+> 4/5: https://patchwork.kernel.org/patch/10235469/
+> 5/5: https://patchwork.kernel.org/patch/10235471/
+>
+>
+> 5/5 has conflict with Will's 2/12.
+>
+> Fortunately, it is at the tail of the series.
+> It is easy to pick/drop/change
+> when we decide how to organize it.
+
+
+No comments so far about this part.
+
+I think your approach is better
+since putting BIT* macros into a single header
+is more consistent.
+
+So, I will ask Andrew to drop mine.
+
+
+However, I think <linux/bits.h> will make more sense
+than <asm-generic/bits.h>
+
+These macros are really arch-agnostic.
+So, we would not expect to have <asm/bits.h>
+that could fall back to <asm-generic/bits.h>, right?
+
+
+
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
