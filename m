@@ -1,38 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Mar 2018 10:02:47 +0000
-Subject: PSCI version misdetection
-In-Reply-To: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
-References: <CAOMZO5BbxFTfD_ZsL5zVhHU5Ue_J_YGBW35AwNx=PVpu6WsqwQ@mail.gmail.com>
-Message-ID: <20180312100247.qd2cph56bhypzwp7@salmiak>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 12 Mar 2018 10:04:12 +0000
+Subject: [PATCH v3 0/2] arm64: Expose v8.4 features
+Message-ID: <20180312100414.6809-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2018 at 01:46:30PM -0300, Fabio Estevam wrote:
-> Hi,
-> 
-> On a  imx7d-sdb board running 4.14-rc6:
-> 
-> [    0.000000] psci: probing for conduit method from DT.
-> [    0.000000] psci: PSCIv65535.65535 detected in firmware.
-> [    0.000000] psci: Using standard PSCI v0.2 function IDs
-> [    0.000000] psci: MIGRATE_INFO_TYPE not supported.
-> 
-> The PSCI version seems to be misdetected.
-> 
-> CONFIG_ARMV7_PSCI_1_0 is passed in U-Boot, so I would expect to see:
-> 
-> psci: PSCIv1.0 detected in firmware.
-> 
-> Any ideas?
+The series applies on arm64's for-next/core branch.
 
-It sounds like U-Boot hasn't implemented the PSCI_VERSION call, and is
-returning NOT_IMPLEMENTED (-1). If so, this is not a conforming PSCI 1.0
-implementation, as PSCI_VERSION is mandatory.
+Changes since V2:
+ - Dropped "arm64: Relax constraints on ID feature bits" patch
+ - Add stand alone patch for removing RES0 fields from the documentation.
+  (I have retained Dave's Reviewed-by, as the patch hasn't changed)
 
-AFAICT, The default implementation in arch/arm/cpu/armv7/psci.S returns
-NOT_SUPPORTED.
+Suzuki K Poulose (2):
+  arm64: Documentation: cpu-feature-registers: Remove RES0 fields
+  arm64: Expose Arm v8.4 features
 
-Where does the implementation for imx7d-sdb live? Is this upstream?
+ Documentation/arm64/cpu-feature-registers.txt | 18 ++++++++++--------
+ Documentation/arm64/elf_hwcaps.txt            | 16 ++++++++++++++++
+ arch/arm64/include/asm/sysreg.h               |  3 +++
+ arch/arm64/include/uapi/asm/hwcap.h           |  4 ++++
+ arch/arm64/kernel/cpufeature.c                |  7 +++++++
+ arch/arm64/kernel/cpuinfo.c                   |  4 ++++
+ 6 files changed, 44 insertions(+), 8 deletions(-)
 
-Thanks,
-Mark.
+-- 
+2.14.3
