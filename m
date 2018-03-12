@@ -1,34 +1,27 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Mar 2018 12:23:54 +0800
-Subject: [PATCH 2/4] ARM: dts: sun8i: a33: Drop sunxi-common-regulators.dtsi
- for A33-OLinuXino
-In-Reply-To: <20180312042356.18625-1-wens@csie.org>
-References: <20180312042356.18625-1-wens@csie.org>
-Message-ID: <20180312042356.18625-3-wens@csie.org>
+Date: Mon, 12 Mar 2018 12:23:52 +0800
+Subject: [PATCH 0/4] ARM: dts: sun8i: a33: Improvements for A33-OLinuXino
+Message-ID: <20180312042356.18625-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-None of the common regulators defined in sunxi-common-regulators.dtsi
-are used for the A33-OLinuXino.
+Hi,
 
-Drop the include.
+Here are some cleanup and improvements for the A33-OLinuXino device
+tree. The first two patches drop some unneeded bits. The latter two
+enable peripherals that we now support.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 1 -
- 1 file changed, 1 deletion(-)
+ChenYu
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-index 6349e0bec9a3..925a5339711f 100644
---- a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-@@ -43,7 +43,6 @@
- 
- /dts-v1/;
- #include "sun8i-a33.dtsi"
--#include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
+Chen-Yu Tsai (4):
+  ARM: dts: sun8i: a33: Drop GPIO pinmux settings for A33-OLinuXino
+  ARM: dts: sun8i: a33: Drop sunxi-common-regulators.dtsi for
+    A33-OLinuXino
+  ARM: dts: sun8i: a33: Enable PMIC power supplies on A33-OLinuXino
+  ARM: dts: sun8i: a33: Enable A33 internal audio codec on A33-OLinuXino
+
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 55 ++++++++++++++++++-------------
+ 1 file changed, 32 insertions(+), 23 deletions(-)
+
 -- 
 2.16.2
