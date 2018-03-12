@@ -1,29 +1,31 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 12 Mar 2018 09:55:26 -0500
-Subject: [PATCH] arm64: dts: stratix10: disable false USB overcurrent on devkit
-Message-ID: <1520866526-28650-1-git-send-email-dinguyen@kernel.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 12 Mar 2018 15:06:31 +0000
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.17
+In-Reply-To: <CAK8P3a1RLt1fo1TqENXPUzXwgn0Hqi0FbioOjj6nD04+ZssNLQ@mail.gmail.com>
+References: <5AA2AB67.7070106@hisilicon.com>
+ <CAK8P3a1RLt1fo1TqENXPUzXwgn0Hqi0FbioOjj6nD04+ZssNLQ@mail.gmail.com>
+Message-ID: <5AA69777.8080501@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the USB overcurrent condition that is falsely detected on the
-devkit.
+Hi Arnd,
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 1 +
- 1 file changed, 1 insertion(+)
+On 2018/3/12 14:18, Arnd Bergmann wrote:
+> On Fri, Mar 9, 2018 at 4:42 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
+>> ARM64: hisilicon: defconfig updates for 4.17
+>>
+>> - Enable deadline IO scheduler to improve the performnace for some
+>> usecaese without changing the default IO scheduler
+> 
+> Pulled into next/soc, thanks!
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index 95f8669..7644ddc 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -117,6 +117,7 @@
- 
- &usb0 {
- 	status = "okay";
-+	disable-over-current;
- };
- 
- &i2c1 {
--- 
-2.7.4
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+>       Arnd
+> 
+> .
+> 
