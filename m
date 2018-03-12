@@ -1,20 +1,34 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 12 Mar 2018 18:45:36 +0100 (CET)
-Subject: [PATCH] ARM: bcm2835: Add the DPI hardware to the device tree.
-In-Reply-To: <20180309233639.2029-1-eric@anholt.net>
-References: <20180309233639.2029-1-eric@anholt.net>
-Message-ID: <258037433.356163.1520876736286@email.1und1.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 12 Mar 2018 18:59:12 +0100
+Subject: [PATCH 4/9] ARM: dts: exynos: Fix "debounce-interval" property
+ misspelling
+In-Reply-To: <1518531335-5170-5-git-send-email-geert+renesas@glider.be>
+References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
+ <1518531335-5170-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180312175912.7mm5fnrtgmnltd4b@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Eric Anholt <eric@anholt.net> hat am 10. M?rz 2018 um 00:36 geschrieben:
+On Tue, Feb 13, 2018 at 03:15:30PM +0100, Geert Uytterhoeven wrote:
+> "debounce-inteval" was never supported.
 > 
-> 
-> It's currently marked disabled, as it's not useful without a panel
-> associated with it and the GPIO pins routed to ALT2.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
+> Please apply to your tree when appropriate.
+> 
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 
-FWIW, Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Oops, I am sorry, but that one slipped through my inbox and did not show
+up in patchwork because of missing linux-samsung-soc Cc.
+
+Anyway, I rebased it now (rename from trats2.dts -> midas.dtsi) and
+applied.
+
+Thanks!
+
+Best regards,
+Krzysztof
