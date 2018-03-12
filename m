@@ -1,18 +1,29 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Mon, 12 Mar 2018 10:02:22 -0700
-Subject: [PATCH v7 3/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
- sdm845 SoC and MTP
-In-Reply-To: <20180312141224.11907-4-rnayak@codeaurora.org>
-References: <20180312141224.11907-1-rnayak@codeaurora.org>
- <20180312141224.11907-4-rnayak@codeaurora.org>
-Message-ID: <CAE-0n51RfZfjRkE68pNh4bJjSSTuBALA_T7pmrjOA2FuVvm9vw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Mar 2018 18:02:39 +0100
+Subject: [PATCH v5 03/36] drm/bridge: analogix_dp: Don't change psr while
+ bridge is disabled
+In-Reply-To: <20180309222327.18689-4-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-4-enric.balletbo@collabora.com>
+Message-ID: <11981411.JMsWtk38iA@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2018 at 7:12 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
-> Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
+Am Freitag, 9. M?rz 2018, 23:22:54 CET schrieb Enric Balletbo i Serra:
+> From: zain wang <wzz@rock-chips.com>
+> 
+> There is a race between AUX CH bring-up and enabling bridge which will
+> cause link training to fail. To avoid hitting it, don't change psr state
+> while enabling the bridge.
+> 
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: zain wang <wzz@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> [seanpaul fixed up the commit message a bit and renamed *_supported to
+> *_enabled] Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Reviewed-by: Stephen Boyd <swboyd@chromium.org>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
