@@ -1,43 +1,63 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 12 Mar 2018 09:46:22 -0700
-Subject: [REPOST PATCH 0/2] ARM: dts: keystone WDT & ECC support
-In-Reply-To: <CAK8P3a1_OXYQ8yopSc6O2V0+6MP2P+XDrqkWNZ9wr549Cgh-Fg@mail.gmail.com>
-References: <1520838607-11709-1-git-send-email-t-kristo@ti.com>
- <39eb257b-ee8b-87a4-a414-61b312c5086e@oracle.com>
- <CAK8P3a1_OXYQ8yopSc6O2V0+6MP2P+XDrqkWNZ9wr549Cgh-Fg@mail.gmail.com>
-Message-ID: <ce1da565-6ce0-8157-62f0-38b20d9fd430@oracle.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 12 Mar 2018 11:52:07 -0500
+Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+Message-ID: <20180312165207.12436-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/12/2018 7:16 AM, Arnd Bergmann wrote:
-> On Mon, Mar 12, 2018 at 8:22 AM, santosh.shilimkar at oracle.com
-> <santosh.shilimkar@oracle.com> wrote:
->>
->> On 3/12/18 12:10 AM, Tero Kristo wrote:
->>>
->>> Hi Santosh,
->>>
->>> Reposted the ECC handler support as per your request, and applied
->>> your ack on that. Reposted also patch #1 as that was pending a minor
->>> cosmetic fix.
->>>
->> Thanks.
->>
->> Hi Arnd,
->> Will you be able to apply these two patches to arm-soc dts branch ?
->> Do let me know if you want me to send pull request for two patches
->> on top of earlier pull request [1]
-> 
-> I applied both now, but a pull request would have been easier since
-> I had to go hunting for the patches in the linux-arm-kernel mailing list.
-> 
-> My workflow makes it easier to pick up patches sent 'to:arm at kernel.org',
-> so if you want to avoid having to prepare a branch, you can always just
-> bounce individual patches there with your added 'Signed-off-by'.
-> 
-This patch just missed from my earlier pull request. Will send pull
-request in future and for individual patches if needed just bounce
-it with SOB. Thanks for taking care of it this time.
+The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+ARM DMA backend. The current code creates a dma_iommu_mapping and
+attaches this to the ISP device, but never detaches the mapping in
+either the probe failure paths or the driver remove path resulting
+in an unbalanced mapping refcount and a memory leak. Fix this properly.
 
-Regards,
-Santosh
+Reported-by: Pavel Machek <pavel@ucw.cz>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Tested-by: Pavel Machek <pavel@ucw.cz>
+---
+Hi Mauro, Laurent,
+
+This fixes an issue reported by Pavel and discussed on this
+thread,
+https://marc.info/?l=linux-omap&m=152051945803598&w=2
+
+Posting this again to the appropriate lists.
+
+regards
+Suman
+
+ drivers/media/platform/omap3isp/isp.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 8eb000e3d8fd..c7d667bfc2af 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
+ 
+ static void isp_detach_iommu(struct isp_device *isp)
+ {
++	arm_iommu_detach_device(isp->dev);
+ 	arm_iommu_release_mapping(isp->mapping);
+ 	isp->mapping = NULL;
+ }
+@@ -1971,13 +1972,15 @@ static int isp_attach_iommu(struct isp_device *isp)
+ 	ret = arm_iommu_attach_device(isp->dev, mapping);
+ 	if (ret < 0) {
+ 		dev_err(isp->dev, "failed to attach device to VA mapping\n");
+-		goto error;
++		goto error_attach;
+ 	}
+ 
+ 	return 0;
+ 
++error_attach:
++	arm_iommu_release_mapping(isp->mapping);
++	isp->mapping = NULL;
+ error:
+-	isp_detach_iommu(isp);
+ 	return ret;
+ }
+ 
+-- 
+2.16.2
