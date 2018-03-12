@@ -1,56 +1,35 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 12 Mar 2018 11:18:55 +0800
-Subject: [PATCH v2 0/7] kexec_file, x86, powerpc: refactoring for other
- architecutres
-In-Reply-To: <20180309093346.GF25863@linaro.org>
-References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
- <20180308010502.GA2600@dhcp-128-65.nay.redhat.com>
- <20180309060254.GA9728@dhcp-128-65.nay.redhat.com>
- <20180309064412.GA5327@dhcp-128-65.nay.redhat.com>
- <20180309071813.GE25863@linaro.org>
- <20180309074613.GA6331@dhcp-128-65.nay.redhat.com>
- <20180309075547.GA6718@dhcp-128-65.nay.redhat.com>
- <20180309093346.GF25863@linaro.org>
-Message-ID: <20180312031855.GA2136@dhcp-128-65.nay.redhat.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 12 Mar 2018 11:39:08 +0800
+Subject: [PATCH 3/3] phy: phy-mtk-tphy: add properties for U2 slew rate
+ calibrate
+In-Reply-To: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520824899.git.chunfeng.yun@mediatek.com>
+References: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520824899.git.chunfeng.yun@mediatek.com>
+Message-ID: <49dff54ceb0c2f4b820af48a87818e935e23447a.1520824899.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/18 at 06:33pm, AKASHI Takahiro wrote:
+Add two properties of ref_clk and coefficient used by U2 slew rate
+calibrate which may vary on different SoCs
 
-[snip]
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> Oops, please apply the fix below to my first patch ("kexec_file: make
-> an use of purgatory optional"). My screw-up is trivial here :)
-
-Wow, human eyes sometimes can not catch such issue, thanks for the fix.
-It works for me.
-
-> 
-> Please let me know if you think that I should repost my patch set.
-> 
-
-Because akpm takes kexec patches,  this question should be passing to
-Andrew.  Andrew, do you need a repost?
-
-> Thanks,
-> -Takahiro AKASHI
-> 
-> ===8<===
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 6dbbb89cbbac..ab1dced677fd 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -532,7 +532,7 @@ static int kexec_calculate_store_digests(struct kimage *image)
->  	struct kexec_sha_region *sha_regions;
->  	struct purgatory_info *pi = &image->purgatory_info;
->  
-> -	if (!IS_ENABLED(ARCH_HAS_KEXEC_PURGATORY))
-> +	if (!IS_ENABLED(CONFIG_ARCH_HAS_KEXEC_PURGATORY))
->  		return 0;
->  
->  	zero_buf = __va(page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT);
-> ===>8===
-> 
-
-Thanks
-Dave
+diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+index 41e09ed..0d34b2b 100644
+--- a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
++++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+@@ -27,6 +27,10 @@ Optional properties (controller (parent) node):
+  - reg		: offset and length of register shared by multiple ports,
+ 		  exclude port's private register. It is needed on mt2701
+ 		  and mt8173, but not on mt2712.
++ - mediatek,src-ref-clk-mhz	: frequency of reference clock for slew rate
++		  calibrate
++ - mediatek,src-coef	: coefficient for slew rate calibrate, depends on
++		  SoC process
+ 
+ Required properties (port (child) node):
+ - reg		: address and length of the register set for the port.
+-- 
+1.9.1
