@@ -1,28 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2018 15:05:25 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.17 (#1)
-In-Reply-To: <87lgf12mro.fsf@bootlin.com>
-References: <87lgf12mro.fsf@bootlin.com>
-Message-ID: <CAK8P3a3fJupbVAXVu6rjXA4+U6X4pO+WADiUWKp_m0jU65is5w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Mar 2018 14:06:52 +0000
+Subject: [PATCH v5 1/4] mfd: syscon: Set name of regmap_config
+In-Reply-To: <20180312095142.30854-2-jeffy.chen@rock-chips.com>
+References: <20180312095142.30854-1-jeffy.chen@rock-chips.com>
+ <20180312095142.30854-2-jeffy.chen@rock-chips.com>
+Message-ID: <20180312140652.7ffdls4pccih32vk@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 6:15 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> ----------------------------------------------------------------
-> mvebu dt64 for 4.17 (part 1)
->
-> - convert to the SPDX-License-Identifier
-> - add missing clocks (for the registers) on some of the peripherals
-> - use the new nand driver
-> - add more uart for Armada 7K/8K SoCs
+On Mon, 12 Mar 2018, Jeffy Chen wrote:
 
-Pulled into next/dt. I had to double-check the way that the nand binding
-changes are staged out, and found that it is intentionally done in a way
-that is bisectable and that still allows the use of old DTB files with new
-kernels, but that breaks new DTBs on old kernels. This is all fine, but
-it also helps to put that kind of information into the changelog.
+> We are now allowing to register debugfs without a valid device, and not
+> having a valid name will end up using "dummy*" to create debugfs dir.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v5:
+> CC lee.jones at linaro.org
+> 
+> Changes in v4: None
+> Changes in v3:
+> Modify commit message.
+> 
+>  drivers/mfd/syscon.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Thanks,
+Looks okay.  Applied, thanks.
 
-       Arnd
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index fc9ba0ea4e44..b6d05cd934e6 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -110,6 +110,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	syscon_config.reg_stride = reg_io_width;
+>  	syscon_config.val_bits = reg_io_width * 8;
+>  	syscon_config.max_register = resource_size(&res) - reg_io_width;
+> +	syscon_config.name = of_node_full_name(np);
+>  
+>  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+>  	if (IS_ERR(regmap)) {
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
