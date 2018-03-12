@@ -1,29 +1,58 @@
-From: ctatlor97@gmail.com (Craig Tatlor)
-Date: Mon, 12 Mar 2018 15:54:30 +0000
-Subject: [PATCH] arm/dts: Correct typo in touchscreen compatible string
-Message-ID: <20180312155430.3860-1-ctatlor97@gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon, 12 Mar 2018 16:57:47 +0100
+Subject: [PATCH v2 0/6] ASoC: sun4i-i2s: Updates to the driver
+Message-ID: <20180312155753.9478-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was mistakenly pulled from the downstream driver
+From: Marcus Cooper <codekipper@gmail.com>
 
-Signed-off-by: Craig Tatlor <ctatlor97@gmail.com>
+Hi All,
+
+here is a patch series to add some improvements to the sun4i-i2s driver
+found whilst getting slave clocking and hdmi audio working on the newer
+SoCs. The original attempt had some changes related to the slave work
+but I've left them out for this release as I would still like to do some
+more investigations.
+
+The functionality included with the new patch set has been extended to
+cover more sample resolutions, multi-lane data output for HDMI audio
+and loopback so block testing can be made without an external codec.
+
+I've also moved away from using tdm to set the slot width and now use
+a dedicated property.
+
+This has been tested on a Pine64 using the ES9023 audio POT board
+(https://github.com/codekipper/linux-sunxi/commits/upstream)
+and HDMI audio
+(https://github.com/codekipper/linux-sunxi/commits/sunxi-wip-a64)
+
+BR,
+CK
+
 ---
- arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v2 changes compared to v1 are:
+ - removed slave mode changes which didn't set mclk and bclk div.
+ - removed use of tdm and now use a dedicated property.
+ - fix commit message to better explain reason for sign extending
+ - add divider calculations for newer SoCs.
+ - add support for multi-lane i2s data output.
+ - add support for 20, 24 and 32 bit samples.
+ - add loopback property so blocks can be tested without a codec.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-index e87f2c99060d..d85311a0422c 100644
---- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-+++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-@@ -491,7 +491,7 @@
- 		pinctrl-0 = <&i2c8_pins>;
- 
- 		synaptics at 2c {
--			compatible = "syna,rmi-i2c";
-+			compatible = "syna,rmi4-i2c";
- 			reg = <0x2c>;
- 
- 			interrupt-parent = <&msmgpio>;
+---
+
+Marcus Cooper (6):
+  ASoC: sun4i-i2s: Add slot width override
+  ASoC: sun4i-i2s: Add regmap field to sign extend sample
+  ASoC: sun4i-i2s: Correct divider calculations
+  ASoC: sun4i-i2s: Add multi-lane functionality
+  ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
+  ASoC: sun4i-i2s: Add support for loopback
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |  11 ++
+ sound/soc/sunxi/sun4i-i2s.c                        | 199 ++++++++++++++++-----
+ 2 files changed, 170 insertions(+), 40 deletions(-)
+
 -- 
-2.16.1
+2.16.2
