@@ -1,38 +1,44 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Tue, 13 Mar 2018 19:24:59 +0100
-Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <CAKv+Gu8WeV+7U4omoMvECPa0LhF4Nrusvy+V0mirWVfejCebNg@mail.gmail.com>
-References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
- <20180313135314.18780-3-alexander.sverdlin@nokia.com>
- <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
- <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
- <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
- <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
- <CAKv+Gu9G9UNf_jif4ySw9iM9mYW_LNzKXyVv7mEAQP_Laaq3UA@mail.gmail.com>
- <ec84d8ee-8b90-5365-5be4-4b08d274c6e5@nokia.com>
- <CAKv+Gu8WeV+7U4omoMvECPa0LhF4Nrusvy+V0mirWVfejCebNg@mail.gmail.com>
-Message-ID: <a6a2afaa-566e-8376-7999-410c886211c6@nokia.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 13 Mar 2018 15:27:30 -0300
+Subject: [PATCH 18/31] perf vendor events arm64: Add armv8-recommended.json
+In-Reply-To: <20180313142618.36je6syqg6ppwhbp@gmail.com>
+References: <20180313120508.29327-1-acme@kernel.org>
+ <20180313120508.29327-19-acme@kernel.org>
+ <20180313142618.36je6syqg6ppwhbp@gmail.com>
+Message-ID: <20180313182730.GA7987@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Em Tue, Mar 13, 2018 at 03:26:18PM +0100, Ingo Molnar escreveu:
+> * Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> > From: John Garry <john.garry@huawei.com>
 
-On 13/03/18 18:51, Ard Biesheuvel wrote:
->>> if (IS_ENABLED(CONFIG_ARM_MODULE_PLTS))
->>>     module_plt_alloc_fixed();
->> Do you consider this a legal C code if without module-plts.o the function would not exist at all?
->> That's too much relying on optimizer I think...
->>
-> Yes, we rely on that in many different places in the kernel.
+> > Add JSON for ARMv8 IMPLEMENTATION DEFINED recommended events.
 
-https://www.kernel.org/doc/Documentation/process/coding-style.rst:
-"However, this approach still allows the C compiler to see the code
-inside the block, and check it for correctness (syntax, types, symbol
-references, etc).  Thus, you still have to use an #ifdef if the code inside the
-block references symbols that will not exist if the condition is not met."
+> > The JSON is copied from ARMv8 architecture reference manual, available
+> > here:
+
+> > 	https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf
+
+> > Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> > Cc: Andi Kleen <ak@linux.intel.com>
+> > Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > Cc: Jiri Olsa <jolsa@redhat.com>
+> > Cc: Namhyung Kim <namhyung@kernel.org>
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: William Cohen <wcohen@redhat.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linuxarm at huawei.com
+> > Link: http://lkml.kernel.org/r/1520506716-197429-9-git-send-email-john.garry at huawei.com
+> > Signed-off-by: John Garry <john.garry@huawei.com>
+> > Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
  
-But we can of course ignore it.
+> That's not a valid SOB chain, author != first-Signed-off-by.
 
--- 
-Best regards,
-Alexander Sverdlin.
+I removed that cset for now, can you please check if the
+perf-core-for-mingo-4.17-20180313-2 tag is allright?
+
+- Arnaldo
