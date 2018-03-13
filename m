@@ -1,67 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 13 Mar 2018 13:51:28 +0000
-Subject: [alsa-devel] [PATCH v4 07/24] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <3d750b29-d341-af4d-41b3-30260f8296b7@codeaurora.org>
-References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
- <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
- <3d750b29-d341-af4d-41b3-30260f8296b7@codeaurora.org>
-Message-ID: <e2c668dd-aad5-db06-cc92-e27c57cf598e@linaro.org>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Tue, 13 Mar 2018 14:53:12 +0100
+Subject: [PATCH v4 0/2] ARM: Implement MODULE_PLT support in FTRACE
+Message-ID: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Rohit for the review,
+FTRACE's function tracer currently doesn't always work on ARM with
+MODULE_PLT option enabled. If the module is loaded too far, FTRACE's
+code modifier cannot cope with introduced veneers and turns the
+function tracer off globally.
 
-On 13/03/18 11:29, Rohit Kumar wrote:
-> 
-> 
-> On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>
->> This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
->>
-> [..]
->> +        if (res->status) {
->> +            dev_err(afe->dev, "cmd = 0x%x returned error = 0x%x\n",
->> +                res->opcode, res->status);
->> +        }
->> +        switch (res->opcode) {
->> +        case AFE_PORT_CMD_SET_PARAM_V2:
->> +        case AFE_PORT_CMD_DEVICE_STOP:
->> +        case AFE_PORT_CMD_DEVICE_START:
-> 
-> case AFE_SVC_CMD_SET_PARAM: needs to be added
-thanks for spotting this, Will add this back
+ARM64 already has a solution for the problem, refer to the following
+patches:
 
->> +            port = afe_find_port(afe, data->token);
->> +            if (port) {
->> +                port->result = *res;
->> +                wake_up(&port->wait);
->> +            }
-> [..]
->> +
->> +static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
->> +                   int param_id, int psize)
->> +{
+arm64: ftrace: emit ftrace-mod.o contents through code
+arm64: module-plts: factor out PLT generation code for ftrace
+arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
+arm64: ftrace: fix building without CONFIG_MODULES
+arm64: ftrace: add support for far branches to dynamic ftrace
+arm64: ftrace: don't validate branch via PLT in ftrace_make_nop()
 
-...
->> +    ret = afe_apr_send_pkt(afe, data, port);
->> +    if (ret)
->> +        dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-> 
-> we should add %s to distinguish different functions with similar error 
-> logs. Also, q6afe_port_set_param_v2() can be called for different 
-> purpose.  AFE enable for port 0x%x failed is suitable only for port 
-> start failure. Error message needs to be updated here.
-> 
-q6afe_callback already has a extra level of error message which shows 
-the opcode and error code in failure cases.
+But the presented ARM variant has just a half of the footprint in terms of
+the changed LoCs. It also retains the code validation-before-modification
+instead of switching it off.
 
-thanks,
-srini
+Changelog:
+v4:
+* Fixed build without CONFIG_FUNCTION_TRACER
+* Reorganized pre-allocated PLTs handling in get_module_plt(),
+  now compiler eliminates the whole FTRACE-related handling code
+  if ARRAY_SIZE(fixed_plts) == 0
+v3:
+* Only extend struct dyn_arch_ftrace when ARM_MODULE_PLTS is enabled
+v2:
+* As suggested by Steven Rostedt, refrain from tree-wide API modification,
+  save module pointer in struct dyn_arch_ftrace instead (PowerPC way)
 
->> +               port_id, ret);
->> +
->> +
->> +    return ret;
->> +}
->> +
+Alexander Sverdlin (2):
+  ARM: PLT: Move struct plt_entries definition to header
+  ARM: ftrace: Add MODULE_PLTS support
+
+ arch/arm/include/asm/ftrace.h |  3 +++
+ arch/arm/include/asm/module.h | 10 +++++++
+ arch/arm/kernel/ftrace.c      | 62 ++++++++++++++++++++++++++++++++++++-------
+ arch/arm/kernel/module-plts.c | 52 ++++++++++++++++++++++++++++--------
+ 4 files changed, 107 insertions(+), 20 deletions(-)
+
+-- 
+2.4.6
