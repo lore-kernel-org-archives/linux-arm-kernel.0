@@ -1,91 +1,176 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 13 Mar 2018 10:47:08 -0500
-Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
-In-Reply-To: <20180313111407.egptbq5vbkny5q4d@valkosipuli.retiisi.org.uk>
-References: <20180312165207.12436-1-s-anna@ti.com>
- <20180313111407.egptbq5vbkny5q4d@valkosipuli.retiisi.org.uk>
-Message-ID: <5c3f99e2-001b-b80a-f840-bc3201addc93@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Mar 2018 16:12:34 +0000
+Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
+In-Reply-To: <20180313135314.18780-3-alexander.sverdlin@nokia.com>
+References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
+ <20180313135314.18780-3-alexander.sverdlin@nokia.com>
+Message-ID: <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On 13 March 2018 at 13:53, Alexander Sverdlin
+<alexander.sverdlin@nokia.com> wrote:
+> Teach ftrace_make_call() and ftrace_make_nop() about PLTs.
+> Teach PLT code about FTRACE and all its callbacks.
+> Otherwise the following might happen:
+>
+> ------------[ cut here ]------------
+> WARNING: CPU: 14 PID: 2265 at .../arch/arm/kernel/insn.c:14 __arm_gen_branch+0x83/0x8c()
+> ...
+> Hardware name: LSI Axxia AXM55XX
+> [<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
+> [<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
+> [<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
+> [<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
+> [<c03218f3>] (warn_slowpath_null) from [<c03143cf>] (__arm_gen_branch+0x83/0x8c)
+> [<c03143cf>] (__arm_gen_branch) from [<c0314337>] (ftrace_make_nop+0xf/0x24)
+> [<c0314337>] (ftrace_make_nop) from [<c038ebcb>] (ftrace_process_locs+0x27b/0x3e8)
+> [<c038ebcb>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
+> [<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
+> [<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
+> ---[ end trace e1b64ced7a89adcc ]---
+> ------------[ cut here ]------------
+> WARNING: CPU: 14 PID: 2265 at .../kernel/trace/ftrace.c:1979 ftrace_bug+0x1b1/0x234()
+> ...
+> Hardware name: LSI Axxia AXM55XX
+> [<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
+> [<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
+> [<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
+> [<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
+> [<c03218f3>] (warn_slowpath_null) from [<c038e87d>] (ftrace_bug+0x1b1/0x234)
+> [<c038e87d>] (ftrace_bug) from [<c038ebd5>] (ftrace_process_locs+0x285/0x3e8)
+> [<c038ebd5>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
+> [<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
+> [<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
+> ---[ end trace e1b64ced7a89adcd ]---
+> ftrace failed to modify [<e9ef7006>] 0xe9ef7006
+> actual: 02:f0:3b:fa
+> ftrace record flags: 0
+> (0) expected tramp: c0314265
+>
+> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> ---
+>  arch/arm/include/asm/ftrace.h |  3 +++
+>  arch/arm/include/asm/module.h |  1 +
+>  arch/arm/kernel/ftrace.c      | 62 ++++++++++++++++++++++++++++++++++++-------
+>  arch/arm/kernel/module-plts.c | 47 +++++++++++++++++++++++++++++---
+>  4 files changed, 100 insertions(+), 13 deletions(-)
+>
+...
+> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+> index f272711..0951270 100644
+> --- a/arch/arm/kernel/module-plts.c
+> +++ b/arch/arm/kernel/module-plts.c
+> @@ -7,6 +7,7 @@
+>   */
+>
+>  #include <linux/elf.h>
+> +#include <linux/ftrace.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/sort.h>
+> @@ -22,18 +23,54 @@
+>                                                     (PLT_ENT_STRIDE - 8))
+>  #endif
+>
+> +static const u32 fixed_plts[] = {
+> +#ifdef CONFIG_FUNCTION_TRACER
+> +       FTRACE_ADDR,
+> +       MCOUNT_ADDR,
+> +#ifdef CONFIG_OLD_MCOUNT
+> +       (unsigned long)ftrace_caller_old,
+> +       (unsigned long)mcount,
+> +#endif
+> +#endif
+> +};
+> +
+>  static bool in_init(const struct module *mod, unsigned long loc)
+>  {
+>         return loc - (u32)mod->init_layout.base < mod->init_layout.size;
+>  }
+>
+> +static void prealloc_fixed(struct mod_plt_sec *pltsec, struct plt_entries *plt)
+> +{
+> +       int i;
+> +
+> +       if (!ARRAY_SIZE(fixed_plts))
+> +               return;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(plt->ldr); ++i)
+> +               plt->ldr[i] = PLT_ENT_LDR;
+> +       memcpy(plt->lit, fixed_plts, sizeof(fixed_plts));
 
-On 03/13/2018 06:14 AM, Sakari Ailus wrote:
-> Hi Suman,
-> 
-> Thanks for the patch.
-> 
-> On Mon, Mar 12, 2018 at 11:52:07AM -0500, Suman Anna wrote:
->> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
->> ARM DMA backend. The current code creates a dma_iommu_mapping and
->> attaches this to the ISP device, but never detaches the mapping in
->> either the probe failure paths or the driver remove path resulting
->> in an unbalanced mapping refcount and a memory leak. Fix this properly.
->>
->> Reported-by: Pavel Machek <pavel@ucw.cz>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> Tested-by: Pavel Machek <pavel@ucw.cz>
->> ---
->> Hi Mauro, Laurent,
->>
->> This fixes an issue reported by Pavel and discussed on this
->> thread,
->> https://marc.info/?l=linux-omap&m=152051945803598&w=2
->>
->> Posting this again to the appropriate lists.
->>
->> regards
->> Suman
->>
->>  drivers/media/platform/omap3isp/isp.c | 7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
->> index 8eb000e3d8fd..c7d667bfc2af 100644
->> --- a/drivers/media/platform/omap3isp/isp.c
->> +++ b/drivers/media/platform/omap3isp/isp.c
->> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
->>  
->>  static void isp_detach_iommu(struct isp_device *isp)
->>  {
->> +	arm_iommu_detach_device(isp->dev);
->>  	arm_iommu_release_mapping(isp->mapping);
->>  	isp->mapping = NULL;
->>  }
->> @@ -1971,13 +1972,15 @@ static int isp_attach_iommu(struct isp_device *isp)
->>  	ret = arm_iommu_attach_device(isp->dev, mapping);
->>  	if (ret < 0) {
->>  		dev_err(isp->dev, "failed to attach device to VA mapping\n");
->> -		goto error;
->> +		goto error_attach;
-> 
-> Instead of changing the label here, could you return immediately where the
-> previous point of error handling is? No need to add another label.
+This is slightly dodgy. You are assuming that sizeof(plt->lit) >=
+sizeof(fixed_plts), which may change depending on configuration or
+future changes.
 
-Yeah, I debated about this while doing the patch, and chose to retain
-the previous common return on the error paths. There are only 2 error
-paths, so didn't want to mix them up. If you still prefer the mixed
-style, I can post a v2.
+Could you add a BUILD_BUG_ON() here to ensure that this remains the case?
 
-regards
-Suman
+> +       pltsec->plt_count = ARRAY_SIZE(fixed_plts);
+> +}
+> +
+>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>  {
+>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>                                                           &mod->arch.init;
+> +       struct plt_entries *plt;
+> +       int idx;
+>
+> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+> -       int idx = 0;
+> +       /* cache the address, ELF header is available only during module load */
+> +       if (!pltsec->plt_ent)
+> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
+> +       plt = pltsec->plt_ent;
+> +
 
-> 
-> After fixing that you can add:
-> 
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> 
->>  	}
->>  
->>  	return 0;
->>  
->> +error_attach:
->> +	arm_iommu_release_mapping(isp->mapping);
->> +	isp->mapping = NULL;
->>  error:
->> -	isp_detach_iommu(isp);
->>  	return ret;
->>  }
->>  
->>
-> 
+Where is plt_ent ever used?
+
+> +       if (!pltsec->plt_count)
+> +               prealloc_fixed(pltsec, plt);
+> +
+
+Please move the if () check into prealloc_fixed(), and only keep the loop below
+
+
+> +       idx = ARRAY_SIZE(fixed_plts);
+> +       while (idx)
+> +               if (plt->lit[--idx] == val)
+> +                       return (u32)&plt->ldr[idx];
+
+Please use a normal for loop here and iterate upward starting at 0
+
+
+>
+>         /*
+>          * Look for an existing entry pointing to 'val'. Given that the
+> @@ -182,8 +219,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+>  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>                               char *secstrings, struct module *mod)
+>  {
+> -       unsigned long core_plts = 0;
+> -       unsigned long init_plts = 0;
+> +       unsigned long core_plts = ARRAY_SIZE(fixed_plts);
+> +       unsigned long init_plts = ARRAY_SIZE(fixed_plts);
+>         Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
+>         Elf32_Sym *syms = NULL;
+>
+> @@ -238,6 +275,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>         mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
+>                                                sizeof(struct plt_entries));
+>         mod->arch.core.plt_count = 0;
+> +       mod->arch.core.plt_ent = NULL;
+>
+>         mod->arch.init.plt->sh_type = SHT_NOBITS;
+>         mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+> @@ -245,6 +283,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>         mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
+>                                                sizeof(struct plt_entries));
+>         mod->arch.init.plt_count = 0;
+> +       mod->arch.init.plt_ent = NULL;
+>
+>         pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
+>                  mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
+> --
+> 2.4.6
+>
