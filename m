@@ -1,55 +1,72 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue, 13 Mar 2018 12:36:57 +0100
-Subject: [PATCH v2] drm/sun4i: move rgb mode_valid from connector to encoder
-Message-ID: <1520941017-81177-1-git-send-email-giulio.benetti@micronovasrl.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Mar 2018 11:40:13 +0000
+Subject: [PATCH v5 09/23] KVM: arm/arm64: Keep GICv2 HYP VAs in
+ kvm_vgic_global_state
+In-Reply-To: <2dd9e07b-1fa7-72da-c10d-c4621294a886@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-10-marc.zyngier@arm.com>
+ <2dd9e07b-1fa7-72da-c10d-c4621294a886@arm.com>
+Message-ID: <0a583b26-c012-6ff6-780b-7b12af17eebd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mode_valid function must be connected to encoder.
-Otherwise it could get not be called by drm in the case there's a
-bridge connected to encoder instead of a panel.
+On 13/03/18 09:35, Suzuki K Poulose wrote:
+> On 01/03/18 15:55, Marc Zyngier wrote:
+>> As we're about to change the way we map devices at HYP, we need
+>> to move away from kern_hyp_va on an IO address.
+>>
+>> One way of achieving this is to store the VAs in kvm_vgic_global_state,
+>> and use that directly from the HYP code. This requires a small change
+>> to create_hyp_io_mappings so that it can also return a HYP VA.
+>>
+>> We take this opportunity to nuke the vctrl_base field in the emulated
+>> distributor, as it is not used anymore.
+>>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   arch/arm/include/asm/kvm_mmu.h   |  3 ++-
+>>   arch/arm64/include/asm/kvm_mmu.h |  3 ++-
+>>   include/kvm/arm_vgic.h           | 12 ++++++------
+>>   virt/kvm/arm/hyp/vgic-v2-sr.c    | 10 +++-------
+>>   virt/kvm/arm/mmu.c               | 20 +++++++++++++++-----
+>>   virt/kvm/arm/vgic/vgic-init.c    |  6 ------
+>>   virt/kvm/arm/vgic/vgic-v2.c      | 13 +++++++------
+>>   7 files changed, 35 insertions(+), 32 deletions(-)
+>>
+> 
+> ...
+> 
+>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+>> index 21f963f9780e..38406825e663 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+>> @@ -364,7 +364,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+>>   
+>>   		ret = create_hyp_io_mappings(info->vcpu.start,
+>>   					     resource_size(&info->vcpu),
+>> -					     &kvm_vgic_global_state.vcpu_base_va);
+>> +					     &kvm_vgic_global_state.vcpu_base_va,
+>> +					     &kvm_vgic_global_state.vcpu_hyp_va);
+>>   		if (ret) {
+>>   			kvm_err("Cannot map GICV into hyp\n");
+>>   			goto out;
+>> @@ -375,7 +376,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+>>   
+>>   	ret = create_hyp_io_mappings(info->vctrl.start,
+>>   				     resource_size(&info->vctrl),
+>> -				     &kvm_vgic_global_state.vctrl_base);
+>> +				     &kvm_vgic_global_state.vctrl_base,
+>> +				     &kvm_vgic_global_state.vctrl_hyp);
+> 
+> Now that we have the hyp VA, does it make sense to unmap the hyp VA, just
+> like we unmap the kernel io mapping if we fail to register the device ?
+Unfortunately, we don't have such facility to unmap a single range yet.
+All we can do is to teardown the whole HYP VA space, which is probably
+what is happening when returning an error.
 
-Move mode_valid function pointer to encoder helper functions,
-changing its prototype according to encoder helper function pointer.
+Thanks,
 
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index b8da5a5..f2fa1f2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -52,10 +52,10 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
- 	return drm_panel_get_modes(tcon->panel);
- }
- 
--static int sun4i_rgb_mode_valid(struct drm_connector *connector,
--				struct drm_display_mode *mode)
-+static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
-+						 const struct drm_display_mode *mode)
- {
--	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
-+	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(crtc);
- 	struct sun4i_tcon *tcon = rgb->tcon;
- 	u32 hsync = mode->hsync_end - mode->hsync_start;
- 	u32 vsync = mode->vsync_end - mode->vsync_start;
-@@ -108,7 +108,6 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
- 
- static struct drm_connector_helper_funcs sun4i_rgb_con_helper_funcs = {
- 	.get_modes	= sun4i_rgb_get_modes,
--	.mode_valid	= sun4i_rgb_mode_valid,
- };
- 
- static void
-@@ -158,6 +157,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
- 	.disable	= sun4i_rgb_encoder_disable,
- 	.enable		= sun4i_rgb_encoder_enable,
-+	.mode_valid	= sun4i_rgb_mode_valid,
- };
- 
- static void sun4i_rgb_enc_destroy(struct drm_encoder *encoder)
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
