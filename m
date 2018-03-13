@@ -1,92 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 20:19:50 +0000
-Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
-In-Reply-To: <CAGo_u6phePsj-CQsaJTzg7pXjNDXTcAKnAh1z3BNfYfjMszf-g@mail.gmail.com>
-References: <20171011094148.15674-4-punit.agrawal@arm.com>
- <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
- <8366ba39-a5a1-7734-752e-f3dce18e8007@arm.com>
- <CAGo_u6phePsj-CQsaJTzg7pXjNDXTcAKnAh1z3BNfYfjMszf-g@mail.gmail.com>
-Message-ID: <86fu53bue1.wl-marc.zyngier@arm.com>
+From: dbasehore@chromium.org (Derek Basehore)
+Date: Tue, 13 Mar 2018 13:37:19 -0700
+Subject: [PATCH] clk: rockchip: Add 1.6GHz PLL rate
+Message-ID: <20180313203719.75639-1-dbasehore@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Mar 2018 18:49:44 +0000,
-Nishanth Menon wrote:
-> 
-> Marc,
-> 
-> On Tue, Mar 13, 2018 at 9:21 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Hi Lokesh,
-> >
-> > On 13/03/18 13:38, Lokesh Vutla wrote:
-> >> Hi All,
-> >>
-> >> On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
-> >>> The kernel crashes while iterating over a redistributor that is
-> >>> in-correctly sized by the platform firmware or doesn't contain the last
-> >>> record.
-> >>>
-> >>> Prevent the crash by checking accesses against the size of the region
-> >>> provided by the firmware. While we are at it, warn the user about
-> >>> incorrect region size.
-> >>>
-> >>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>
-> >> Sorry to bring up an old thread. Just wanted to check what is the status
-> >> on this series.
-> >
-> > So far, I wasn't inclined to merge it, as it only allowed you to detect
-> > a broken system, as opposed to help with a working one.
-> 
-> Is'nt that a good reason to have it? Why not help an error in dtb with
-> a debug helper than an obtuse crash to debug painfully?
+We need this rate to generate 100, 200, and 228.57MHz from the same
+PLL. 228.57MHz is useful for a pixel clock when the VPLL is used for
+and external display.
 
-The kernel is not in the business of validating DTBs. And we both know
-that if we start papering over firmware bugs, these bugs become ABI,
-and we live with them forever. If you want to validate DTBs, you
-should use a tool that is actually validating it against your HW, and
-not use the kernel as the validation tool.
+Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3399.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> 
-> >
-> >> This will also be useful when we try to boot linux + hypervisor with
-> >> less number of cores than the SoC supports. For example:
-> >> - SoC has 4 cores and Linux tries to boot with 2 cores.
-> >> - then a type-2 hypervisor gets installed.
-> >> - Hypervisor tries to boot a VM with linux on core 1.
-> >>
-> >> Now the VM boot will fail while it iterates over all the GICR regions
-> >> till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
-> >> regions of any invalid cpus(cpu 2, cpu 3 in this case).
-> >
-> > It you're passing the redistributors to a guest, you're doing something
-> > terribly wrong. You're putting the guest in a position to do a DoS on
-> > the hypervisor (disabling its timer interrupt, for example). Not the
-> > greatest move. There is a number of other gotchas with this approach
-> > (virtual interrupts, distributor virtualization...).
-> >
-> >> If the $patch is not the right approach, can you suggest on how to
-> >> handle the above scenario?
-> >
-> > The proper way to handle this is to virtualize the distributor and
-> > redistributor by trap/emulate. The only thing you can safely pass to a
-> > guest is the CPU interface, either as system registers or in its MMIO
-> > form (if you have the GICv2 compatibility interface).
-> >
-> 
-> Dumb question: Would'nt a trap emulate be real expensive with hyp
-> context in v8 (all the context save/restore we'd have to do? (in the
-> context of discussion, GICV2 compat is disabled).
-
-How often do you hit the distributor and redistributors? Why do you
-need to context switch a distributor that you emulate (hint: you
-don't). I suggest you look at how real life hypervisor works (there's
-a pretty good one in the tree).
-
-Thanks,
-
-	M.
-
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 6847120b61cd..3e57c6eef93d 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -57,6 +57,7 @@ static struct rockchip_pll_rate_table rk3399_pll_rates[] = {
+ 	RK3036_PLL_RATE(1656000000, 1, 69, 1, 1, 1, 0),
+ 	RK3036_PLL_RATE(1632000000, 1, 68, 1, 1, 1, 0),
+ 	RK3036_PLL_RATE(1608000000, 1, 67, 1, 1, 1, 0),
++	RK3036_PLL_RATE(1600000000, 3, 200, 1, 1, 1, 0),
+ 	RK3036_PLL_RATE(1584000000, 1, 66, 1, 1, 1, 0),
+ 	RK3036_PLL_RATE(1560000000, 1, 65, 1, 1, 1, 0),
+ 	RK3036_PLL_RATE(1536000000, 1, 64, 1, 1, 1, 0),
 -- 
-Jazz is not dead, it just smell funny.
+2.16.2.660.g709887971b-goog
