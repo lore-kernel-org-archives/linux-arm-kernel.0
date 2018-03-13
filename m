@@ -1,81 +1,42 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 13 Mar 2018 13:14:08 +0200
-Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
-In-Reply-To: <20180312165207.12436-1-s-anna@ti.com>
-References: <20180312165207.12436-1-s-anna@ti.com>
-Message-ID: <20180313111407.egptbq5vbkny5q4d@valkosipuli.retiisi.org.uk>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 13 Mar 2018 12:14:04 +0100
+Subject: [PATCH v5 22/23] arm64: KVM: Allow mapping of vectors outside of
+ the RAM region
+In-Reply-To: <c795eca8-7a4f-b209-608d-1428c6dbda33@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-23-marc.zyngier@arm.com>
+ <20180308175412.rd63nkceqjg2yrcv@kamzik.brq.redhat.com>
+ <c795eca8-7a4f-b209-608d-1428c6dbda33@arm.com>
+Message-ID: <20180313111404.d35xpe7h24rzpsg5@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-Thanks for the patch.
-
-On Mon, Mar 12, 2018 at 11:52:07AM -0500, Suman Anna wrote:
-> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-> ARM DMA backend. The current code creates a dma_iommu_mapping and
-> attaches this to the ISP device, but never detaches the mapping in
-> either the probe failure paths or the driver remove path resulting
-> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+On Tue, Mar 13, 2018 at 10:30:12AM +0000, Marc Zyngier wrote:
+> >> +
+> >> +    if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR)) {
+> > 
+> > Moving the create_hyp_mappings() under this cap check looks like a fix
+> > that could be posted separately?
 > 
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> ---
-> Hi Mauro, Laurent,
-> 
-> This fixes an issue reported by Pavel and discussed on this
-> thread,
-> https://marc.info/?l=linux-omap&m=152051945803598&w=2
-> 
-> Posting this again to the appropriate lists.
-> 
-> regards
-> Suman
-> 
->  drivers/media/platform/omap3isp/isp.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-> index 8eb000e3d8fd..c7d667bfc2af 100644
-> --- a/drivers/media/platform/omap3isp/isp.c
-> +++ b/drivers/media/platform/omap3isp/isp.c
-> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
->  
->  static void isp_detach_iommu(struct isp_device *isp)
->  {
-> +	arm_iommu_detach_device(isp->dev);
->  	arm_iommu_release_mapping(isp->mapping);
->  	isp->mapping = NULL;
->  }
-> @@ -1971,13 +1972,15 @@ static int isp_attach_iommu(struct isp_device *isp)
->  	ret = arm_iommu_attach_device(isp->dev, mapping);
->  	if (ret < 0) {
->  		dev_err(isp->dev, "failed to attach device to VA mapping\n");
-> -		goto error;
-> +		goto error_attach;
+> We could. Not sure that's a big deal though.
 
-Instead of changing the label here, could you return immediately where the
-previous point of error handling is? No need to add another label.
+Nah, it isn't worth the fuss.
 
-After fixing that you can add:
-
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-
->  	}
->  
->  	return 0;
->  
-> +error_attach:
-> +	arm_iommu_release_mapping(isp->mapping);
-> +	isp->mapping = NULL;
->  error:
-> -	isp_detach_iommu(isp);
->  	return ret;
->  }
->  
+> >> +
+> >> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
+> >> +		__kvm_harden_el2_vector_slot = atomic_inc_return(&arm64_el2_vector_last_slot);
+> > 
+> > If I understood the logic in the above function correctly, then we won't
+> > be using this slot when we have the ARM64_HARDEN_BRANCH_PREDICTOR cap.
+> > Should we even bother allocating it when we don't intend to use it?
 > 
+> You could be on a system with a mix of affected and non-affected CPUs,
+> and the capability only tells you that at least one of the CPUs is
+> affected. For the non affected CPUs, we won't have a slot (since there
+> is no workaround to provide), unless we actually allocated one.
+>
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Ah yes, the heterogeneous considerations that I always forget to consider.
+
+Thanks,
+drew
