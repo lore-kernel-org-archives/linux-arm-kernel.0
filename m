@@ -1,68 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 17:21:01 +0000
-Subject: [PATCH 1/3] irqchip/gic-v2: Reset APRn registers at boot time
-In-Reply-To: <20180313172103.24281-1-marc.zyngier@arm.com>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
-Message-ID: <20180313172103.24281-2-marc.zyngier@arm.com>
+Date: Tue, 13 Mar 2018 17:21:00 +0000
+Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
+Message-ID: <20180313172103.24281-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting a crash kernel while in an interrupt handler is likely
-to leave the Active Priority Registers with some state that
-is not relevant to the new kernel, and is likely to lead
-to erratic behaviours such as interrupts not firing as their
-priority is already active.
+As kexec and kdump are getting used a bit more intensively, I've been
+made aware of a number of shortcomings.
 
-As a sanity measure, wipe the APRs clean on startup.
+The main gripe is from folks trying to launch a kdump kernel from
+within an interrupt handler. If using EOImode==1, things work as
+expected. If using EOImode==0 (such as in a guest), the secondary
+kernel hangs as the previous interrupt hasn't been EOI'd, and the
+active priority is still set. The first two patches are addressing
+this situation for both GICv2 and GICv3 by reseting the APRs to their
+default value.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+The last patch is introduced to workaround an annoying shortcoming on
+some GICv3 implementations, where LPIs cannot be disabled once they've
+been enabled. This completely kills the whole kexec story, as the
+secondary kernel will not be able to configure LPIs, and may
+experience random single bit corruption due to interrupts being made
+pending in the now reallocated pending tables. Fun!
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 121af5cf688f..79801c24800b 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -453,15 +453,26 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
- 	return mask;
- }
- 
-+static bool gic_check_gicv2(void __iomem *base)
-+{
-+	u32 val = readl_relaxed(base + GIC_CPU_IDENT);
-+	return (val & 0xff0fff) == 0x02043B;
-+}
-+
- static void gic_cpu_if_up(struct gic_chip_data *gic)
- {
- 	void __iomem *cpu_base = gic_data_cpu_base(gic);
- 	u32 bypass = 0;
- 	u32 mode = 0;
-+	int i;
- 
- 	if (gic == &gic_data[0] && static_key_true(&supports_deactivate))
- 		mode = GIC_CPU_CTRL_EOImodeNS;
- 
-+	if (gic_check_gicv2(cpu_base))
-+		for (i = 0; i < 4; i++)
-+			writel_relaxed(0, cpu_base + GIC_CPU_ACTIVEPRIO + i * 4);
-+
- 	/*
- 	* Preserve bypass disable bits to be written back later
- 	*/
-@@ -1264,12 +1275,6 @@ static int __init gicv2_force_probe_cfg(char *buf)
- }
- early_param("irqchip.gicv2_force_probe", gicv2_force_probe_cfg);
- 
--static bool gic_check_gicv2(void __iomem *base)
--{
--	u32 val = readl_relaxed(base + GIC_CPU_IDENT);
--	return (val & 0xff0fff) == 0x02043B;
--}
--
- static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
- {
- 	struct resource cpuif_res;
+This is quite annoying in those (limited) situations where you'd like
+Linux to act as your bootloader. For this particular use case, we
+introduce a kernel command line option "irqchip.gicv3_nolpi=1", which
+will force the kernel to ignore LPIs altogether, leaving them intact
+to the secondary kernel to enjoy. This has proved to be quite useful
+on my Chromebook.
+
+I'd welcome any testing and reviewing. If nobody fundamentaly
+disagrees with this, I plan to get it merged in 4.17.
+
+Marc Zyngier (3):
+  irqchip/gic-v2: Reset APRn registers at boot time
+  irqchip/gic-v3: Reset APgRn registers at boot time
+  irqchip/gic-v3: Allow LPIs to be disabled from the command line
+
+ Documentation/admin-guide/kernel-parameters.txt |  8 +++++
+ arch/arm/include/asm/arch_gicv3.h               | 41 +++++++++++++++++++------
+ drivers/irqchip/irq-gic-v3.c                    | 33 +++++++++++++++++++-
+ drivers/irqchip/irq-gic.c                       | 17 ++++++----
+ 4 files changed, 82 insertions(+), 17 deletions(-)
+
 -- 
 2.14.2
