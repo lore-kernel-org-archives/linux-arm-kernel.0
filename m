@@ -1,42 +1,52 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 13 Mar 2018 12:14:04 +0100
-Subject: [PATCH v5 22/23] arm64: KVM: Allow mapping of vectors outside of
- the RAM region
-In-Reply-To: <c795eca8-7a4f-b209-608d-1428c6dbda33@arm.com>
-References: <20180301155538.26860-1-marc.zyngier@arm.com>
- <20180301155538.26860-23-marc.zyngier@arm.com>
- <20180308175412.rd63nkceqjg2yrcv@kamzik.brq.redhat.com>
- <c795eca8-7a4f-b209-608d-1428c6dbda33@arm.com>
-Message-ID: <20180313111404.d35xpe7h24rzpsg5@kamzik.brq.redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Mar 2018 11:20:17 +0000
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+In-Reply-To: <20180313110747.GJ25863@linaro.org>
+References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
+ <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
+ <20180313102158.GI25863@linaro.org>
+ <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
+ <20180313110747.GJ25863@linaro.org>
+Message-ID: <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 10:30:12AM +0000, Marc Zyngier wrote:
-> >> +
-> >> +    if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR)) {
+On Tue, Mar 13, 2018 at 08:07:49PM +0900, AKASHI Takahiro wrote:
+> On Tue, Mar 13, 2018 at 10:47:15AM +0000, Mark Rutland wrote:
+> > On Tue, Mar 13, 2018 at 07:22:03PM +0900, AKASHI Takahiro wrote:
+> > > On Mon, Mar 12, 2018 at 08:58:00PM +0000, Ard Biesheuvel wrote:
+> > > > On 12 March 2018 at 20:14, Bhupesh Sharma <bhsharma@redhat.com> wrote:
 > > 
-> > Moving the create_hyp_mappings() under this cap check looks like a fix
-> > that could be posted separately?
-> 
-> We could. Not sure that's a big deal though.
-
-Nah, it isn't worth the fuss.
-
-> >> +
-> >> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
-> >> +		__kvm_harden_el2_vector_slot = atomic_inc_return(&arm64_el2_vector_last_slot);
+> > > More importantly, neither arm64 _kexec_ supports kaslr.
 > > 
-> > If I understood the logic in the above function correctly, then we won't
-> > be using this slot when we have the ARM64_HARDEN_BRANCH_PREDICTOR cap.
-> > Should we even bother allocating it when we don't intend to use it?
+> > The below is just considering this, and ignoring kdump (where I don't
+> > think we care at all about KASLR).
+> > 
+> > > Currently kexec-tools is set to determine where the kernel actually be
+> > > loaded, using a constant offset, text_offset, which comes from an image's
+> > > boot header and relocation of an image to the load address is performed
+> > > at the very end of the first kernel without knowing whether the 2nd kernel
+> > > has kaslr support enabled or not.
+> > 
+> > The kexec tools shouldn't need to know whether the kernel supports KASLR
+> > at all.
+> > 
+> > If the new kernel image has bit 3 (Kernel physical placement) set, kexec
+> > tools can choose to randomize the physical load address, regardless of
+> > whether that kernel has KASLR enabled.
 > 
-> You could be on a system with a mix of affected and non-affected CPUs,
-> and the capability only tells you that at least one of the CPUs is
-> affected. For the non affected CPUs, we won't have a slot (since there
-> is no workaround to provide), unless we actually allocated one.
->
+> So, by definition, is randomness, if we say so, in physical address not
+> part of KASLR?
 
-Ah yes, the heterogeneous considerations that I always forget to consider.
+Physical randomization is not part of the kernel's KASLR implementation.
+
+We happen to do it in the EFI stub, because we can in that context. But
+generally, physical randomization is not part of arm64's in-kernel
+KASLR.
+
+For various reasons, the physical address that the kernel is loaded to
+may be arbitrary, so we have to cope with physical randomization
+regardless.
 
 Thanks,
-drew
+Mark.
