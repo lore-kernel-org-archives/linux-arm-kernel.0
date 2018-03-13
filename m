@@ -1,38 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 13 Mar 2018 20:23:40 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: Add missing SYS-DMAC2 dmas
-In-Reply-To: <20180313184330.67oh6gyjwxv44q2i@verge.net.au>
-References: <1520518205-23351-1-git-send-email-geert+renesas@glider.be>
- <20180313184330.67oh6gyjwxv44q2i@verge.net.au>
-Message-ID: <CAMuHMdU3DPfq6TJdzbRskiQKGJZM-8MBPUn9cF+SAtyxGCNvrA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Mar 2018 22:26:01 +0300
+Subject: [PATCH] arm64: dts: renesas: v3msk: add SCIF0 pins
+Message-ID: <d21e29c9-1364-357e-dd64-af14b0068cbd@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Add the (previously omitted) SCIF0 pin data to the V3M Starter Kit board's
+device tree.
 
-On Tue, Mar 13, 2018 at 7:43 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Mar 08, 2018 at 03:10:05PM +0100, Geert Uytterhoeven wrote:
->> On R-Car H3, on-chip peripheral modules that can make use of DMA are
->> wired to either SYS-DMAC0 only, or to both SYS-DMAC1 and SYS-DMAC2.
->>
->> Add the missing DMA properties pointing to SYS-DMAC2 for HSCIF[0-2],
->> SCIF[015], and I2C[0-2].  These were initially left out because early
->> firmware versions prohibited using SYS-DMAC2.  This restriction has been
->> lifted in IPL and Secure Monitor Rev1.0.6 (released on Feb 25, 2016).
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Thanks, applied.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This one, or v2?
+---
+The patch is against the 'renesas-devel-20180308-v4.16-rc4' tag of Simon's
+'renesas.git repo...
 
-Gr{oetje,eeting}s,
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+@@ -51,6 +51,16 @@
+ 	clock-frequency = <32768>;
+ };
+ 
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data";
++		function = "scif0";
++	};
++};
++
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
