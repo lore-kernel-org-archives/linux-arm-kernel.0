@@ -1,519 +1,422 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Mar 2018 11:50:59 +0000
-Subject: [PATCH v4 01/22] arm64: capabilities: Update prototype for enable
- call back
+Date: Tue, 13 Mar 2018 11:51:02 +0000
+Subject: [PATCH v4 04/22] arm64: capabilities: Prepare for fine grained
+ capabilities
 In-Reply-To: <20180313115120.17256-1-suzuki.poulose@arm.com>
 References: <20180313115120.17256-1-suzuki.poulose@arm.com>
-Message-ID: <20180313115120.17256-2-suzuki.poulose@arm.com>
+Message-ID: <20180313115120.17256-5-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@arm.com>
+We use arm64_cpu_capabilities to represent CPU ELF HWCAPs exposed
+to the userspace and the CPU hwcaps used by the kernel, which
+include cpu features and CPU errata work arounds. Capabilities
+have some properties that decide how they should be treated :
 
-We issue the enable() call back for all CPU hwcaps capabilities
-available on the system, on all the CPUs. So far we have ignored
-the argument passed to the call back, which had a prototype to
-accept a "void *" for use with on_each_cpu() and later with
-stop_machine(). However, with commit 0a0d111d40fd1
-("arm64: cpufeature: Pass capability structure to ->enable callback"),
-there are some users of the argument who wants the matching capability
-struct pointer where there are multiple matching criteria for a single
-capability. Clean up the declaration of the call back to make it clear.
+ 1) Detection, i.e scope : A cap could be "detected" either :
+    - if it is present on at least one CPU (SCOPE_LOCAL_CPU)
+	Or
+    - if it is present on all the CPUs (SCOPE_SYSTEM)
 
- 1) Renamed to cpu_enable(), to imply taking necessary actions on the
-    called CPU for the entry.
- 2) Pass const pointer to the capability, to allow the call back to
-    check the entry. (e.,g to check if any action is needed on the CPU)
- 3) We don't care about the result of the call back, turning this to
-    a void.
+ 2) When is it enabled ? - A cap is treated as "enabled" when the
+  system takes some action based on whether the capability is detected or
+  not. e.g, setting some control register, patching the kernel code.
+  Right now, we treat all caps are enabled at boot-time, after all
+  the CPUs are brought up by the kernel. But there are certain caps,
+  which are enabled early during the boot (e.g, VHE, GIC_CPUIF for NMI)
+  and kernel starts using them, even before the secondary CPUs are brought
+  up. We would need a way to describe this for each capability.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+ 3) Conflict on a late CPU - When a CPU is brought up, it is checked
+  against the caps that are known to be enabled on the system (via
+  verify_local_cpu_capabilities()). Based on the state of the capability
+  on the CPU vs. that of System we could have the following combinations
+  of conflict.
+
+	x-----------------------------x
+	| Type	| System   | Late CPU |
+	------------------------------|
+	|  a    |   y      |    n     |
+	------------------------------|
+	|  b    |   n      |    y     |
+	x-----------------------------x
+
+  Case (a) is not permitted for caps which are system features, which the
+  system expects all the CPUs to have (e.g VHE). While (a) is ignored for
+  all errata work arounds. However, there could be exceptions to the plain
+  filtering approach. e.g, KPTI is an optional feature for a late CPU as
+  long as the system already enables it.
+
+  Case (b) is not permitted for errata work arounds which requires some
+  work around, which cannot be delayed. And we ignore (b) for features.
+  Here, yet again, KPTI is an exception, where if a late CPU needs KPTI we
+  are too late to enable it (because we change the allocation of ASIDs
+  etc).
+
+So this calls for a lot more fine grained behavior for each capability.
+And if we define all the attributes to control their behavior properly,
+we may be able to use a single table for the CPU hwcaps (which cover
+errata and features, not the ELF HWCAPs). This is a prepartory step
+to get there. More bits would be added for the properties listed above.
+
+We are going to use a bit-mask to encode all the properties of a
+capabilities. This patch encodes the "SCOPE" of the capability.
+
+As such there is no change in how the capabilities are treated.
+
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-Signed-off-by: Dave Martin <dave.martin@arm.com>
-[
- Rebased to for-next/core converting more users, rename call back,
- drop call back results
-]
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  7 ++++-
- arch/arm64/include/asm/fpsimd.h     |  4 ++-
- arch/arm64/include/asm/processor.h  |  7 ++---
- arch/arm64/kernel/cpu_errata.c      | 53 +++++++++++++++++--------------------
- arch/arm64/kernel/cpufeature.c      | 42 ++++++++++++++++-------------
- arch/arm64/kernel/fpsimd.c          |  5 ++--
- arch/arm64/kernel/traps.c           |  4 +--
- arch/arm64/mm/fault.c               |  3 +--
- 8 files changed, 67 insertions(+), 58 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 105 +++++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/cpu_errata.c      |   8 +--
+ arch/arm64/kernel/cpufeature.c      |  42 +++++++--------
+ 3 files changed, 124 insertions(+), 31 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index fbf0aab94d67..cba67cb24b22 100644
+index 8efbda2858a8..13fde0952c31 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -100,7 +100,12 @@ struct arm64_cpu_capabilities {
- 	u16 capability;
- 	int def_scope;			/* default scope */
- 	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
--	int (*enable)(void *);		/* Called on all active CPUs */
-+	/*
-+	 * Take the appropriate actions to enable this capability for this CPU.
-+	 * For each successfully booted CPU, this method is called for each
-+	 * globally detected capability.
-+	 */
-+	void (*cpu_enable)(const struct arm64_cpu_capabilities *cap);
- 	union {
- 		struct {	/* To be used for erratum handling only */
- 			u32 midr_model;
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 8857a0f0d0f7..7623762f7fa6 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -83,7 +83,9 @@ extern void sve_save_state(void *state, u32 *pfpsr);
- extern void sve_load_state(void const *state, u32 const *pfpsr,
- 			   unsigned long vq_minus_1);
- extern unsigned int sve_get_vl(void);
--extern int sve_kernel_enable(void *);
+@@ -89,16 +89,104 @@ struct arm64_ftr_reg {
+ 
+ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+ 
+-/* scope of capability check */
+-enum {
+-	SCOPE_SYSTEM,
+-	SCOPE_LOCAL_CPU,
+-};
++/*
++ * CPU capabilities:
++ *
++ * We use arm64_cpu_capabilities to represent system features, errata work
++ * arounds (both used internally by kernel and tracked in cpu_hwcaps) and
++ * ELF HWCAPs (which are exposed to user).
++ *
++ * To support systems with heterogeneous CPUs, we need to make sure that we
++ * detect the capabilities correctly on the system and take appropriate
++ * measures to ensure there are no incompatibilities.
++ *
++ * This comment tries to explain how we treat the capabilities.
++ * Each capability has the following list of attributes :
++ *
++ * 1) Scope of Detection : The system detects a given capability by
++ *    performing some checks at runtime. This could be, e.g, checking the
++ *    value of a field in CPU ID feature register or checking the cpu
++ *    model. The capability provides a call back ( @matches() ) to
++ *    perform the check. Scope defines how the checks should be performed.
++ *    There are two cases:
++ *
++ *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
++ *        matches. This implies, we have to run the check on all the
++ *        booting CPUs, until the system decides that state of the
++ *        capability is finalised. (See section 2 below)
++ *		Or
++ *     b) SCOPE_SYSTEM: check all the CPUs and "detect" if all the CPUs
++ *        matches. This implies, we run the check only once, when the
++ *        system decides to finalise the state of the capability. If the
++ *        capability relies on a field in one of the CPU ID feature
++ *        registers, we use the sanitised value of the register from the
++ *        CPU feature infrastructure to make the decision.
++ *
++ *    The process of detection is usually denoted by "update" capability
++ *    state in the code.
++ *
++ * 2) Finalise the state : The kernel should finalise the state of a
++ *    capability at some point during its execution and take necessary
++ *    actions if any. Usually, this is done, after all the boot-time
++ *    enabled CPUs are brought up by the kernel, so that it can make
++ *    better decision based on the available set of CPUs. However, there
++ *    are some special cases, where the action is taken during the early
++ *    boot by the primary boot CPU. (e.g, running the kernel at EL2 with
++ *    Virtualisation Host Extensions). The kernel usually disallows any
++ *    changes to the state of a capability once it finalises the capability
++ *    and takes any action, as it may be impossible to execute the actions
++ *    safely. A CPU brought up after a capability is "finalised" is
++ *    referred to as "Late CPU" w.r.t the capability. e.g, all secondary
++ *    CPUs are treated "late CPUs" for capabilities determined by the boot
++ *    CPU.
++ *
++ * 3) Verification: When a CPU is brought online (e.g, by user or by the
++ *    kernel), the kernel should make sure that it is safe to use the CPU,
++ *    by verifying that the CPU is compliant with the state of the
++ *    capabilities finalised already. This happens via :
++ *
++ *	secondary_start_kernel()-> check_local_cpu_capabilities()
++ *
++ *    As explained in (2) above, capabilities could be finalised at
++ *    different points in the execution. Each CPU is verified against the
++ *    "finalised" capabilities and if there is a conflict, the kernel takes
++ *    an action, based on the severity (e.g, a CPU could be prevented from
++ *    booting or cause a kernel panic). The CPU is allowed to "affect" the
++ *    state of the capability, if it has not been finalised already.
++ *
++ * 4) Action: As mentioned in (2), the kernel can take an action for each
++ *    detected capability, on all CPUs on the system. Appropriate actions
++ *    include, turning on an architectural feature, modifying the control
++ *    registers (e.g, SCTLR, TCR etc.) or patching the kernel via
++ *    alternatives. The kernel patching is batched and performed at later
++ *    point. The actions are always initiated only after the capability
++ *    is finalised. This is usally denoted by "enabling" the capability.
++ *    The actions are initiated as follows :
++ *	a) Action is triggered on all online CPUs, after the capability is
++ *	finalised, invoked within the stop_machine() context from
++ *	enable_cpu_capabilitie().
++ *
++ *	b) Any late CPU, brought up after (1), the action is triggered via:
++ *
++ *	  check_local_cpu_capabilities() -> verify_local_cpu_capabilities()
++ *
++ */
 +
-+struct arm64_cpu_capabilities;
-+extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
++
++/* Decide how the capability is detected. On a local CPU vs System wide */
++#define ARM64_CPUCAP_SCOPE_LOCAL_CPU		((u16)BIT(0))
++#define ARM64_CPUCAP_SCOPE_SYSTEM		((u16)BIT(1))
++#define ARM64_CPUCAP_SCOPE_MASK			\
++	(ARM64_CPUCAP_SCOPE_SYSTEM	|	\
++	 ARM64_CPUCAP_SCOPE_LOCAL_CPU)
++
++#define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
++#define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
  
- extern int __ro_after_init sve_max_vl;
+ struct arm64_cpu_capabilities {
+ 	const char *desc;
+ 	u16 capability;
+-	int def_scope;			/* default scope */
++	u16 type;
+ 	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+ 	/*
+ 	 * Take the appropriate actions to enable this capability for this CPU.
+@@ -127,6 +215,11 @@ struct arm64_cpu_capabilities {
+ 	};
+ };
  
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index fce604e3e599..4fc8867fde4d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -37,6 +37,7 @@
- #include <linux/string.h>
- 
- #include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
-@@ -227,9 +228,9 @@ static inline void spin_lock_prefetch(const void *ptr)
- 
- #endif
- 
--int cpu_enable_pan(void *__unused);
--int cpu_enable_cache_maint_trap(void *__unused);
--int cpu_clear_disr(void *__unused);
-+void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
-+void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
-+void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
++static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
++{
++	return cap->type & ARM64_CPUCAP_SCOPE_MASK;
++}
++
+ extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
+ extern struct static_key_false arm64_const_caps_ready;
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 186c0fc61dcd..74f058421dd8 100644
+index 0de0ab6a874c..2b5233157af1 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -65,11 +65,11 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
- 		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
- }
- 
--static int cpu_enable_trap_ctr_access(void *__unused)
-+static void
-+cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
- {
- 	/* Clear SCTLR_EL1.UCT */
- 	config_sctlr_el1(SCTLR_EL1_UCT, 0);
--	return 0;
- }
- 
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-@@ -173,25 +173,25 @@ static void call_hvc_arch_workaround_1(void)
- 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
- }
- 
--static int enable_smccc_arch_workaround_1(void *data)
-+static void
-+enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- {
--	const struct arm64_cpu_capabilities *entry = data;
- 	bp_hardening_cb_t cb;
- 	void *smccc_start, *smccc_end;
- 	struct arm_smccc_res res;
- 
- 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
--		return 0;
-+		return;
- 
- 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
--		return 0;
-+		return;
- 
- 	switch (psci_ops.conduit) {
- 	case PSCI_CONDUIT_HVC:
- 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 		if (res.a0)
--			return 0;
-+			return;
- 		cb = call_hvc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_hvc_start;
- 		smccc_end = __smccc_workaround_1_hvc_end;
-@@ -201,19 +201,19 @@ static int enable_smccc_arch_workaround_1(void *data)
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 		if (res.a0)
--			return 0;
-+			return;
- 		cb = call_smc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_smc_start;
- 		smccc_end = __smccc_workaround_1_smc_end;
- 		break;
- 
- 	default:
--		return 0;
-+		return;
- 	}
- 
- 	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
- 
--	return 0;
-+	return;
- }
- 
- static void qcom_link_stack_sanitization(void)
-@@ -228,15 +228,12 @@ static void qcom_link_stack_sanitization(void)
- 		     : "=&r" (tmp));
- }
- 
--static int qcom_enable_link_stack_sanitization(void *data)
-+static void
-+qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
- {
--	const struct arm64_cpu_capabilities *entry = data;
--
- 	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
- 				__qcom_hyp_sanitize_link_stack_start,
- 				__qcom_hyp_sanitize_link_stack_end);
--
--	return 0;
- }
+@@ -238,14 +238,14 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
  
-@@ -266,7 +263,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.desc = "ARM errata 826319, 827319, 824069",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
- 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
--		.enable = cpu_enable_cache_maint_trap,
-+		.cpu_enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_819472
-@@ -275,7 +272,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.desc = "ARM errata 819472",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
- 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
--		.enable = cpu_enable_cache_maint_trap,
-+		.cpu_enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_832075
-@@ -365,7 +362,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #define MIDR_RANGE(model, min, max) \
+-	.def_scope = SCOPE_LOCAL_CPU, \
++	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
+ 	.matches = is_affected_midr_range, \
+ 	.midr_model = model, \
+ 	.midr_range_min = min, \
+ 	.midr_range_max = max
+ 
+ #define MIDR_ALL_VERSIONS(model) \
+-	.def_scope = SCOPE_LOCAL_CPU, \
++	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
+ 	.matches = is_affected_midr_range, \
+ 	.midr_model = model, \
+ 	.midr_range_min = 0, \
+@@ -361,7 +361,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.desc = "Mismatched cache line size",
  		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
  		.matches = has_mismatched_cache_line_size,
- 		.def_scope = SCOPE_LOCAL_CPU,
--		.enable = cpu_enable_trap_ctr_access,
-+		.cpu_enable = cpu_enable_trap_ctr_access,
+-		.def_scope = SCOPE_LOCAL_CPU,
++		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+ 		.cpu_enable = cpu_enable_trap_ctr_access,
  	},
  #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+@@ -375,7 +375,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
  	{
-@@ -404,27 +401,27 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
+ 		.desc = "Qualcomm Technologies Kryo erratum 1003",
+ 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
+-		.def_scope = SCOPE_LOCAL_CPU,
++		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+ 		.midr_model = MIDR_QCOM_KRYO,
+ 		.matches = is_kryo_midr,
  	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
--		.enable = qcom_enable_link_stack_sanitization,
-+		.cpu_enable = qcom_enable_link_stack_sanitization,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-@@ -433,7 +430,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
--		.enable = qcom_enable_link_stack_sanitization,
-+		.cpu_enable = qcom_enable_link_stack_sanitization,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-@@ -442,12 +439,12 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
--		.enable = enable_smccc_arch_workaround_1,
-+		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- #endif
- 	{
-@@ -465,8 +462,8 @@ void verify_local_cpu_errata_workarounds(void)
- 
- 	for (; caps->matches; caps++) {
- 		if (cpus_have_cap(caps->capability)) {
--			if (caps->enable)
--				caps->enable((void *)caps);
-+			if (caps->cpu_enable)
-+				caps->cpu_enable(caps);
- 		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
- 			pr_crit("CPU%d: Requires work around for %s, not detected"
- 					" at boot time\n",
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index bdab55223866..b8821234bc68 100644
+index 5fc500c13cfc..1e51fb94125f 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -906,7 +906,8 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 						     ID_AA64PFR0_CSV3_SHIFT);
- }
- 
--static int kpti_install_ng_mappings(void *__unused)
-+static void
-+kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
- {
- 	typedef void (kpti_remap_fn)(int, int, phys_addr_t);
- 	extern kpti_remap_fn idmap_kpti_install_ng_mappings;
-@@ -916,7 +917,7 @@ static int kpti_install_ng_mappings(void *__unused)
- 	int cpu = smp_processor_id();
- 
- 	if (kpti_applied)
--		return 0;
-+		return;
- 
- 	remap_fn = (void *)__pa_symbol(idmap_kpti_install_ng_mappings);
- 
-@@ -927,7 +928,7 @@ static int kpti_install_ng_mappings(void *__unused)
- 	if (!cpu)
- 		kpti_applied = true;
- 
--	return 0;
-+	return;
- }
- 
- static int __init parse_kpti(char *str)
-@@ -944,7 +945,7 @@ static int __init parse_kpti(char *str)
- __setup("kpti=", parse_kpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
--static int cpu_copy_el2regs(void *__unused)
-+static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
- {
- 	/*
- 	 * Copy register values that aren't redirected by hardware.
-@@ -956,8 +957,6 @@ static int cpu_copy_el2regs(void *__unused)
- 	 */
- 	if (!alternatives_applied)
- 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
--
--	return 0;
- }
- 
- static const struct arm64_cpu_capabilities arm64_features[] = {
-@@ -981,7 +980,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+@@ -972,7 +972,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_useable_gicv3_cpuif,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+@@ -983,7 +983,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "Privileged Access Never",
+ 		.capability = ARM64_HAS_PAN,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cpuid_feature,
+ 		.sys_reg = SYS_ID_AA64MMFR1_EL1,
  		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
- 		.sign = FTR_UNSIGNED,
- 		.min_field_value = 1,
--		.enable = cpu_enable_pan,
-+		.cpu_enable = cpu_enable_pan,
+@@ -996,7 +996,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "LSE atomic instructions",
+ 		.capability = ARM64_HAS_LSE_ATOMICS,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cpuid_feature,
+ 		.sys_reg = SYS_ID_AA64ISAR0_EL1,
+ 		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
+@@ -1007,14 +1007,14 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "Software prefetching using PRFM",
+ 		.capability = ARM64_HAS_NO_HW_PREFETCH,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_no_hw_prefetch,
+ 	},
+ #ifdef CONFIG_ARM64_UAO
+ 	{
+ 		.desc = "User Access Override",
+ 		.capability = ARM64_HAS_UAO,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cpuid_feature,
+ 		.sys_reg = SYS_ID_AA64MMFR2_EL1,
+ 		.field_pos = ID_AA64MMFR2_UAO_SHIFT,
+@@ -1028,21 +1028,21 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ #ifdef CONFIG_ARM64_PAN
+ 	{
+ 		.capability = ARM64_ALT_PAN_NOT_UAO,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = cpufeature_pan_not_uao,
  	},
  #endif /* CONFIG_ARM64_PAN */
- #if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
-@@ -1029,7 +1028,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "Virtualization Host Extensions",
  		.capability = ARM64_HAS_VIRT_HOST_EXTN,
- 		.def_scope = SCOPE_SYSTEM,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
  		.matches = runs_at_el2,
--		.enable = cpu_copy_el2regs,
-+		.cpu_enable = cpu_copy_el2regs,
+ 		.cpu_enable = cpu_copy_el2regs,
  	},
  	{
  		.desc = "32-bit EL0 Support",
-@@ -1053,7 +1052,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = unmap_kernel_at_el0,
--		.enable = kpti_install_ng_mappings,
-+		.cpu_enable = kpti_install_ng_mappings,
- 	},
- #endif
- 	{
-@@ -1084,7 +1083,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.field_pos = ID_AA64PFR0_SVE_SHIFT,
- 		.min_field_value = ID_AA64PFR0_SVE,
+ 		.capability = ARM64_HAS_32BIT_EL0,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
  		.matches = has_cpuid_feature,
--		.enable = sve_kernel_enable,
-+		.cpu_enable = sve_kernel_enable,
- 	},
- #endif /* CONFIG_ARM64_SVE */
- #ifdef CONFIG_ARM64_RAS_EXTN
-@@ -1097,7 +1096,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
  		.sign = FTR_UNSIGNED,
- 		.field_pos = ID_AA64PFR0_RAS_SHIFT,
- 		.min_field_value = ID_AA64PFR0_RAS_V1,
--		.enable = cpu_clear_disr,
-+		.cpu_enable = cpu_clear_disr,
- 	},
- #endif /* CONFIG_ARM64_RAS_EXTN */
+@@ -1052,14 +1052,14 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
  	{
-@@ -1253,6 +1252,14 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 		.desc = "Reduced HYP mapping offset",
+ 		.capability = ARM64_HYP_OFFSET_LOW,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = hyp_offset_low,
+ 	},
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	{
+ 		.desc = "Kernel page table isolation (KPTI)",
+ 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = unmap_kernel_at_el0,
+ 		.cpu_enable = kpti_install_ng_mappings,
+ 	},
+@@ -1067,7 +1067,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		/* FP/SIMD is not implemented */
+ 		.capability = ARM64_HAS_NO_FPSIMD,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.min_field_value = 0,
+ 		.matches = has_no_fpsimd,
+ 	},
+@@ -1075,7 +1075,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "Data cache clean to Point of Persistence",
+ 		.capability = ARM64_HAS_DCPOP,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cpuid_feature,
+ 		.sys_reg = SYS_ID_AA64ISAR1_EL1,
+ 		.field_pos = ID_AA64ISAR1_DPB_SHIFT,
+@@ -1085,8 +1085,8 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ #ifdef CONFIG_ARM64_SVE
+ 	{
+ 		.desc = "Scalable Vector Extension",
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.capability = ARM64_SVE,
+-		.def_scope = SCOPE_SYSTEM,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.sign = FTR_UNSIGNED,
+ 		.field_pos = ID_AA64PFR0_SVE_SHIFT,
+@@ -1099,7 +1099,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "RAS Extension Support",
+ 		.capability = ARM64_HAS_RAS_EXTN,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cpuid_feature,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.sign = FTR_UNSIGNED,
+@@ -1111,28 +1111,28 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "Data cache clean to the PoU not required for I/D coherence",
+ 		.capability = ARM64_HAS_CACHE_IDC,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cache_idc,
+ 	},
+ 	{
+ 		.desc = "Instruction cache invalidation not required for I/D coherence",
+ 		.capability = ARM64_HAS_CACHE_DIC,
+-		.def_scope = SCOPE_SYSTEM,
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
+ 		.matches = has_cache_dic,
+ 	},
+ 	{},
+ };
+ 
+-#define HWCAP_CAP(reg, field, s, min_value, type, cap)	\
++#define HWCAP_CAP(reg, field, s, min_value, cap_type, cap)	\
+ 	{							\
+ 		.desc = #cap,					\
+-		.def_scope = SCOPE_SYSTEM,			\
++		.type = ARM64_CPUCAP_SCOPE_SYSTEM,		\
+ 		.matches = has_cpuid_feature,			\
+ 		.sys_reg = reg,					\
+ 		.field_pos = field,				\
+ 		.sign = s,					\
+ 		.min_field_value = min_value,			\
+-		.hwcap_type = type,				\
++		.hwcap_type = cap_type,				\
+ 		.hwcap = cap,					\
  	}
+ 
+@@ -1225,7 +1225,7 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
+ 	/* We support emulation of accesses to CPU ID feature registers */
+ 	elf_hwcap |= HWCAP_CPUID;
+ 	for (; hwcaps->matches; hwcaps++)
+-		if (hwcaps->matches(hwcaps, hwcaps->def_scope))
++		if (hwcaps->matches(hwcaps, cpucap_default_scope(hwcaps)))
+ 			cap_set_elf_hwcap(hwcaps);
  }
  
-+static int __enable_cpu_capability(void *arg)
-+{
-+	const struct arm64_cpu_capabilities *cap = arg;
-+
-+	cap->cpu_enable(cap);
-+	return 0;
-+}
-+
- /*
-  * Run through the enabled capabilities and enable() it on all active
-  * CPUs
-@@ -1268,14 +1275,15 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 		/* Ensure cpus_have_const_cap(num) works */
- 		static_branch_enable(&cpu_hwcap_keys[num]);
- 
--		if (caps->enable) {
-+		if (caps->cpu_enable) {
- 			/*
- 			 * Use stop_machine() as it schedules the work allowing
- 			 * us to modify PSTATE, instead of on_each_cpu() which
- 			 * uses an IPI, giving us a PSTATE that disappears when
- 			 * we return.
- 			 */
--			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
-+			stop_machine(__enable_cpu_capability, (void *)caps,
-+				     cpu_online_mask);
- 		}
- 	}
- }
-@@ -1318,8 +1326,8 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
- 					smp_processor_id(), caps->desc);
- 			cpu_die_early();
- 		}
--		if (caps->enable)
--			caps->enable((void *)caps);
-+		if (caps->cpu_enable)
-+			caps->cpu_enable(caps);
- 	}
- }
- 
-@@ -1537,10 +1545,8 @@ static int __init enable_mrs_emulation(void)
- 
- core_initcall(enable_mrs_emulation);
- 
--int cpu_clear_disr(void *__unused)
-+void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+@@ -1252,7 +1252,7 @@ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 				    const char *info)
  {
- 	/* Firmware may have left a deferred SError in this register. */
- 	write_sysreg_s(0, SYS_DISR_EL1);
--
--	return 0;
- }
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 65fc87645ec6..fc19e741b5c8 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -40,6 +40,7 @@
- #include <linux/sysctl.h>
+ 	for (; caps->matches; caps++) {
+-		if (!caps->matches(caps, caps->def_scope))
++		if (!caps->matches(caps, cpucap_default_scope(caps)))
+ 			continue;
  
- #include <asm/fpsimd.h>
-+#include <asm/cpufeature.h>
- #include <asm/cputype.h>
- #include <asm/simd.h>
- #include <asm/sigcontext.h>
-@@ -756,12 +757,10 @@ static void __init sve_efi_setup(void)
-  * Enable SVE for EL1.
-  * Intended for use by the cpufeatures code during CPU boot.
-  */
--int sve_kernel_enable(void *__always_unused p)
-+void sve_kernel_enable(const struct arm64_cpu_capabilities *__always_unused p)
- {
- 	write_sysreg(read_sysreg(CPACR_EL1) | CPACR_EL1_ZEN_EL1EN, CPACR_EL1);
- 	isb();
--
--	return 0;
- }
- 
- void __init sve_setup(void)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 2b478565d774..ba964da31a25 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -38,6 +38,7 @@
- 
- #include <asm/atomic.h>
- #include <asm/bug.h>
-+#include <asm/cpufeature.h>
- #include <asm/daifflags.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
-@@ -407,10 +408,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	force_signal_inject(SIGILL, ILL_ILLOPC, regs->pc);
- }
- 
--int cpu_enable_cache_maint_trap(void *__unused)
-+void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
- {
- 	config_sctlr_el1(SCTLR_EL1_UCI, 0);
--	return 0;
- }
- 
- #define __user_cache_maint(insn, address, res)			\
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 551d044fb31f..4165485e8b6e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -804,7 +804,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- NOKPROBE_SYMBOL(do_debug_exception);
- 
- #ifdef CONFIG_ARM64_PAN
--int cpu_enable_pan(void *__unused)
-+void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
- {
- 	/*
- 	 * We modify PSTATE. This won't work from irq context as the PSTATE
-@@ -814,6 +814,5 @@ int cpu_enable_pan(void *__unused)
- 
- 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
- 	asm(SET_PSTATE_PAN(1));
--	return 0;
- }
- #endif /* CONFIG_ARM64_PAN */
+ 		if (!cpus_have_cap(caps->capability) && caps->desc)
 -- 
 2.14.3
