@@ -1,55 +1,38 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Tue, 13 Mar 2018 11:23:18 -0700
-Subject: [Freedreno] [PATCH 2/2] arm64: dts: sdm845: Support GPU/GMU
-In-Reply-To: <20180312055254.GY6842@vireshk-i7>
-References: <20180302215638.6145-1-jcrouse@codeaurora.org>
- <20180302215638.6145-3-jcrouse@codeaurora.org>
- <20180305044221.GC23018@vireshk-i7>
- <20180305152818.GC15200@jcrouse-lnx.qualcomm.com>
- <20180306042656.GJ23018@vireshk-i7>
- <20180306153757.GD15200@jcrouse-lnx.qualcomm.com>
- <20180307050624.GR23018@vireshk-i7>
- <20180308201438.GA10589@jcrouse-lnx.qualcomm.com>
- <20180309034332.GO6842@vireshk-i7>
- <20180309160355.GC10589@jcrouse-lnx.qualcomm.com>
- <20180312055254.GY6842@vireshk-i7>
-Message-ID: <CAE-0n52k7FijaRsAAuYM0xXvfyJ2g+coz9WFPNyGij6uC8_8Lg@mail.gmail.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Tue, 13 Mar 2018 19:24:59 +0100
+Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
+In-Reply-To: <CAKv+Gu8WeV+7U4omoMvECPa0LhF4Nrusvy+V0mirWVfejCebNg@mail.gmail.com>
+References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
+ <20180313135314.18780-3-alexander.sverdlin@nokia.com>
+ <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
+ <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
+ <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
+ <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
+ <CAKv+Gu9G9UNf_jif4ySw9iM9mYW_LNzKXyVv7mEAQP_Laaq3UA@mail.gmail.com>
+ <ec84d8ee-8b90-5365-5be4-4b08d274c6e5@nokia.com>
+ <CAKv+Gu8WeV+7U4omoMvECPa0LhF4Nrusvy+V0mirWVfejCebNg@mail.gmail.com>
+Message-ID: <a6a2afaa-566e-8376-7999-410c886211c6@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2018 at 10:52 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 09-03-18, 09:03, Jordan Crouse wrote:
->> I don't think we are understanding each other. The GMU is a separate
->> microcontroller. It is given a magic number (actually a combination of magic
->> numbers) that it then uses to directly interact with the other hardware to make
->> the vote. The only responsibility that the CPU has is to construct that magic
->> number (once, at init) and send it across when asked.
->>
->> Looking at the sdhc code from the testing tree it makes perfect sense
->> that you have a device that needs to eventually do a RPMh vote from the CPU and
->> so the 'required-opp' and performance state come together to do the right thing.
->> This is good code.
->>
->> None of this is true for the GPU. The CPU never votes for the GPU so there
->> isn't any need to connect it to the power domain drivers. Even if you did
->> there isn't any current mechanism for the rpmpd driver to pass the right magic
->> number to the GPU driver which is what it really needs.
->>
->> I suppose that instead of using 'qcom,arc-level' we could use 'qcom-corner' but
->> then thats just a naming dispute. We still need a way for the GPU to query the
->> magic values.
->
-> Okay, I get it. You can't (shouldn't) use genpd stuff here. I would still like
-> you guys (You/Rajendra/Stephen) to conclude if qcom-corner and qcom,arc-level
-> are eventually same values and we should use same property for them.
->
+Hi!
 
-It sounds like it's qcom,{corner,level} from Jordan's description. In
-my mind 'level' and 'corner' are the same but they got a name change
-with the new RPM interface. Then another number space was introduced
-with the new RPM interface, 'arc-level', which represents the numbers
-that the hardware deals with. It may be that DT doesn't ever care to
-express the 'arc-level', because cmd db hides the numberspace by
-requiring software to translate the software 'level' to the hardware
-'arc-level'. So the whole thing may be a moot point and we can decide
-to use qcom,level everywhere because it's the future.
+On 13/03/18 18:51, Ard Biesheuvel wrote:
+>>> if (IS_ENABLED(CONFIG_ARM_MODULE_PLTS))
+>>>     module_plt_alloc_fixed();
+>> Do you consider this a legal C code if without module-plts.o the function would not exist at all?
+>> That's too much relying on optimizer I think...
+>>
+> Yes, we rely on that in many different places in the kernel.
+
+https://www.kernel.org/doc/Documentation/process/coding-style.rst:
+"However, this approach still allows the C compiler to see the code
+inside the block, and check it for correctness (syntax, types, symbol
+references, etc).  Thus, you still have to use an #ifdef if the code inside the
+block references symbols that will not exist if the condition is not met."
+ 
+But we can of course ignore it.
+
+-- 
+Best regards,
+Alexander Sverdlin.
