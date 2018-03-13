@@ -1,80 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2018 13:13:09 +0100
-Subject: [PATCH] arm64: dts: qcom: rename qcom,pcie devices to pcie
-Message-ID: <20180313121345.2749183-1-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Mar 2018 12:48:42 +0000
+Subject: [PATCH] arm64: fix undefined reference to 'printk'
+In-Reply-To: <20180313114202.1977512-1-arnd@arndb.de>
+References: <20180313114202.1977512-1-arnd@arndb.de>
+Message-ID: <CAKv+Gu-6s1tqBzAEgL63WxXrc9SuF2C9PtADqmEcUKWxP8eZUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node name for a PCIe host bridge must be "pcie" as required by
-the binging. dtc now warns about it:
+On 13 March 2018 at 11:41, Arnd Bergmann <arnd@arndb.de> wrote:
+> The printk symbol was intended as a generic address that is always
+> exported, however that turned out to be false with CONFIG_PRINTK=n:
+>
+> ERROR: "printk" [arch/arm64/kernel/arm64-reloc-test.ko] undefined!
+>
+> This changes the references to memstart_addr, which should be there
+> regardless of configuration.
+>
+> Fixes: a257e02579e4 ("arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419")
+> Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-arch/arm64/boot/dts/qcom/apq8096-db820c.dtb: Warning (pci_bridge): /soc/agnoc at 0/qcom,pcie at 610000: node name is not "pci" or "pcie"
-arch/arm64/boot/dts/qcom/apq8096-db820c.dtb: Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
-arch/arm64/boot/dts/qcom/msm8996-mtp.dtb: Warning (pci_bridge): /soc/agnoc at 0/qcom,pcie at 610000: node name is not "pci" or "pcie"
-arch/arm64/boot/dts/qcom/msm8996-mtp.dtb: Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
+Acked-by: ^^^
 
-This renames the nodes as appropriate.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 +++---
- arch/arm64/boot/dts/qcom/msm8996.dtsi        | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 1c8f1b86472d..e82f821a4e0e 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -140,16 +140,16 @@
- 		};
- 
- 		agnoc at 0 {
--			qcom,pcie at 600000 {
-+			pcie at 600000 {
- 				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
- 			};
- 
--			qcom,pcie at 608000 {
-+			pcie at 608000 {
- 				status = "okay";
- 				perst-gpio = <&msmgpio 130 GPIO_ACTIVE_LOW>;
- 			};
- 
--			qcom,pcie at 610000 {
-+			pcie at 610000 {
- 				status = "okay";
- 				perst-gpio = <&msmgpio 114 GPIO_ACTIVE_LOW>;
- 			};
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 410ae787ebb4..cd08c8c5248e 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -851,7 +851,7 @@
- 			#size-cells = <1>;
- 			ranges;
- 
--			pcie0: qcom,pcie at 600000 {
-+			pcie0: pcie at 600000 {
- 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
- 				status = "disabled";
- 				power-domains = <&gcc PCIE0_GDSC>;
-@@ -904,7 +904,7 @@
- 
- 			};
- 
--			pcie1: qcom,pcie at 608000 {
-+			pcie1: pcie at 608000 {
- 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
- 				power-domains = <&gcc PCIE1_GDSC>;
- 				bus-range = <0x00 0xff>;
-@@ -957,7 +957,7 @@
- 						"bus_slave";
- 			};
- 
--			pcie2: qcom,pcie at 610000 {
-+			pcie2: pcie at 610000 {
- 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
- 				power-domains = <&gcc PCIE2_GDSC>;
- 				bus-range = <0x00 0xff>;
--- 
-2.9.0
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm64/kernel/reloc_test_core.c | 2 +-
+>  arch/arm64/kernel/reloc_test_syms.S | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/reloc_test_core.c b/arch/arm64/kernel/reloc_test_core.c
+> index a70489c584c7..5915ce5759cc 100644
+> --- a/arch/arm64/kernel/reloc_test_core.c
+> +++ b/arch/arm64/kernel/reloc_test_core.c
+> @@ -45,7 +45,7 @@ static struct {
+>         { "R_AARCH64_MOVW_SABS_Gn",     signed_movw, UL(SYM64_ABS_VAL) },
+>         { "R_AARCH64_MOVW_UABS_Gn",     unsigned_movw, UL(SYM64_ABS_VAL) },
+>         { "R_AARCH64_ADR_PREL_PG_HI21", relative_adrp, (u64)&sym64_rel },
+> -       { "R_AARCH64_ADR_PREL_PG_HI21", relative_adrp_far, (u64)&printk },
+> +       { "R_AARCH64_ADR_PREL_PG_HI21", relative_adrp_far, (u64)&memstart_addr },
+>         { "R_AARCH64_ADR_PREL_LO21",    relative_adr, (u64)&sym64_rel },
+>         { "R_AARCH64_PREL64",           relative_data64, (u64)&sym64_rel },
+>         { "R_AARCH64_PREL32",           relative_data32, (u64)&sym64_rel },
+> diff --git a/arch/arm64/kernel/reloc_test_syms.S b/arch/arm64/kernel/reloc_test_syms.S
+> index f333b4b7880d..2b8d9cb8b078 100644
+> --- a/arch/arm64/kernel/reloc_test_syms.S
+> +++ b/arch/arm64/kernel/reloc_test_syms.S
+> @@ -54,8 +54,8 @@ ENDPROC(relative_adrp)
+>         .align  12
+>         .space  0xffc
+>  ENTRY(relative_adrp_far)
+> -       adrp    x0, printk
+> -       add     x0, x0, #:lo12:printk
+> +       adrp    x0, memstart_addr
+> +       add     x0, x0, #:lo12:memstart_addr
+>         ret
+>  ENDPROC(relative_adrp_far)
+>
+> --
+> 2.9.0
+>
