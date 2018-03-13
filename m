@@ -1,56 +1,69 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Tue, 13 Mar 2018 18:32:53 +0100
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Mar 2018 17:39:59 +0000
 Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
+In-Reply-To: <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
 References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
  <20180313135314.18780-3-alexander.sverdlin@nokia.com>
  <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
  <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
  <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
-Message-ID: <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
+ <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
+Message-ID: <CAKv+Gu9G9UNf_jif4ySw9iM9mYW_LNzKXyVv7mEAQP_Laaq3UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard!
-
-On 13/03/18 18:18, Ard Biesheuvel wrote:
->>>>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->>>>  {
->>>>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->>>>                                                           &mod->arch.init;
->>>> +       struct plt_entries *plt;
->>>> +       int idx;
->>>>
->>>> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
->>                                                            ^^^^^^^^^^^ (*)
+On 13 March 2018 at 17:32, Alexander Sverdlin
+<alexander.sverdlin@nokia.com> wrote:
+> Hi Ard!
+>
+> On 13/03/18 18:18, Ard Biesheuvel wrote:
+>>>>>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>>>>>  {
+>>>>>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>>>>>                                                           &mod->arch.init;
+>>>>> +       struct plt_entries *plt;
+>>>>> +       int idx;
+>>>>>
+>>>>> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+>>>                                                            ^^^^^^^^^^^ (*)
+>>>
+>>>>> -       int idx = 0;
+>>>>> +       /* cache the address, ELF header is available only during module load */
+>>>>> +       if (!pltsec->plt_ent)
+>>>>> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
+>>>>> +       plt = pltsec->plt_ent;
+>>>>> +
+>>>> Where is plt_ent ever used?
+>>> Above is exactly the place it's used.
+>>> I need to cache it because after the module load is finished the ELF header is freed,
+>>> pltsec->plt pointer (*) is not valid any more.
+>>> With the above modification it's possible to call the function during the whole life
+>>> time of the module.
+>>>
+>> Right, ok. That's a problem.
 >>
->>>> -       int idx = 0;
->>>> +       /* cache the address, ELF header is available only during module load */
->>>> +       if (!pltsec->plt_ent)
->>>> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
->>>> +       plt = pltsec->plt_ent;
->>>> +
->>> Where is plt_ent ever used?
->> Above is exactly the place it's used.
->> I need to cache it because after the module load is finished the ELF header is freed,
->> pltsec->plt pointer (*) is not valid any more.
->> With the above modification it's possible to call the function during the whole life
->> time of the module.
->>
-> Right, ok. That's a problem.
-> 
-> This means that you are relying on get_module_plt() being called at
-> least once at module load time, which is not guaranteed.
+>> This means that you are relying on get_module_plt() being called at
+>> least once at module load time, which is not guaranteed.
+>
+> This is indeed guaranteed. For FTRACE use case. If it's being called from FTRACE in
+> run time, this would mean there were long calls in this module section, which in
+> turn means, get_module_plt() was called at least once for this module and this
+> section.
+>
+> This doesn't hold in general, though.
+>
+> In any case, if you insist, I can try to rework the whole stuff implementing module_finalize().
+>
 
-This is indeed guaranteed. For FTRACE use case. If it's being called from FTRACE in
-run time, this would mean there were long calls in this module section, which in
-turn means, get_module_plt() was called at least once for this module and this
-section.
+I think it would be much better to use the module_finalize() hook for
+this, given that it is only called once already, and all the data you
+need is still available.
 
-This doesn't hold in general, though.
+Note that ARM already has such a function, so you'll need to add a
+call there, i.e.,
 
-In any case, if you insist, I can try to rework the whole stuff implementing module_finalize().
+if (IS_ENABLED(CONFIG_ARM_MODULE_PLTS))
+    module_plt_alloc_fixed();
 
--- 
-Best regards,
-Alexander Sverdlin.
+or something like that. The CONFIG_FTRACE dependency can be kept local
+to module-plts.c
