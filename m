@@ -1,46 +1,27 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 13 Mar 2018 09:39:06 +0800
-Subject: [GIT PULL] i.MX new clock additions for 4.17
-Message-ID: <20180313013905.GF26859@dragon>
+From: dyoung@redhat.com (Dave Young)
+Date: Tue, 13 Mar 2018 09:54:58 +0800
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+In-Reply-To: <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
+References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
+ <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
+Message-ID: <20180313015458.GA4352@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Mike,
+On 03/12/18 at 08:58pm, Ard Biesheuvel wrote:
+[snip]
+> > - We pass the dtb over to the kdump kernel for arm64 kdump, but the
+> > '/chosen/kaslr-seed' property would be zeroed out already by the
+> > primary kernel and the secondary would work in a *nokaslr* environment
+> > due to the same (see [4] for example)
+> >
+> 
+> What would be the point of randomizing the placement of the kdump
+> kernel? And don't say 'because x86 does it', because that is not a
+> good reason.
 
-This pull request includes a few new clock additions for i.MX7D clock
-driver.  Please consider to pull it for 4.17.  As I have a DT branch
-built on top of this pull request to resolve the dependency on these new
-clock IDs, please keep the tag stable.  Thanks.
+Kdump kernel does not need kaslr. Actually in Fedora we use 'nokaslr'
+even for x86_64
 
-Shawn
-
-
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/clk-imx-4.17-newid
-
-for you to fetch changes up to 1691cc375a39d13a70829cabdd87ca9116a16907:
-
-  clk: imx: imx7d: add the Keypad Port module clock (2018-02-28 14:43:00 +0800)
-
-----------------------------------------------------------------
-i.MX new clock additions for 4.17:
- - New clocks for i.MX7D SNVS, CAAM and Keypad.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      clk: imx: imx7d: add the snvs clock
-
-Rui Miguel Silva (1):
-      clk: imx7d: add CAAM clock
-
-Stefan Agner (1):
-      clk: imx: imx7d: add the Keypad Port module clock
-
- drivers/clk/imx/clk-imx7d.c             | 3 +++
- include/dt-bindings/clock/imx7d-clock.h | 5 ++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+Thanks
+Dave
