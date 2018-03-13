@@ -1,30 +1,30 @@
-From: dbasehore@chromium.org (Derek Basehore)
-Date: Tue, 13 Mar 2018 13:37:19 -0700
-Subject: [PATCH] clk: rockchip: Add 1.6GHz PLL rate
-Message-ID: <20180313203719.75639-1-dbasehore@chromium.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 13 Mar 2018 21:54:25 +0100
+Subject: [PATCH v4 5/5] drm/docs: Remove the rcar alpha from the csv file
+In-Reply-To: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+References: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+Message-ID: <be055447ca764ace36b71d2c2520578f89705176.1520974361.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need this rate to generate 100, 200, and 228.57MHz from the same
-PLL. 228.57MHz is useful for a pixel clock when the VPLL is used for
-and external display.
+Now that we moved the rcar-du DRM driver has been switched to the generic
+alpha property, remove the former property documentation from the
+deperecated CSV file.
 
-Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/clk/rockchip/clk-rk3399.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/gpu/kms-properties.csv | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 6847120b61cd..3e57c6eef93d 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -57,6 +57,7 @@ static struct rockchip_pll_rate_table rk3399_pll_rates[] = {
- 	RK3036_PLL_RATE(1656000000, 1, 69, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1632000000, 1, 68, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1608000000, 1, 67, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1600000000, 3, 200, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1584000000, 1, 66, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1560000000, 1, 65, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1536000000, 1, 64, 1, 1, 1, 0),
+diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
+index 6b28b014cb7d..07ed22ea3bd6 100644
+--- a/Documentation/gpu/kms-properties.csv
++++ b/Documentation/gpu/kms-properties.csv
+@@ -98,5 +98,4 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
+ ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+ ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+ ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+-rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+ ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
 -- 
-2.16.2.660.g709887971b-goog
+git-series 0.9.1
