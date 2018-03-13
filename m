@@ -1,16 +1,14 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 13 Mar 2018 17:42:04 +0100
-Subject: [PATCH v1 5/8] dmaengine: stm32-dma: fix max items per transfer
+Date: Tue, 13 Mar 2018 17:42:07 +0100
+Subject: [PATCH v1 8/8] dmaengine: stm32-dma: fix typo and reported checkpatch
+ warnings
 In-Reply-To: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1520959327-25760-6-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1520959327-25760-9-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having 0 in item counter register is valid and stands for a "No or Ended
-transfer". Therefore valid transfer starts from @+0 to @+0xFFFE leading to
-unaligned scatter gather at boundary. Thus it's safer to round down this
-value on its FIFO size (16 Bytes).
+Fix typo in a comment and solved reported checkpatch warnings.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -19,73 +17,51 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- drivers/dma/stm32-dma.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ drivers/dma/stm32-dma.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 0685961..f9d3c84 100644
+index 38c545d..8c58073 100644
 --- a/drivers/dma/stm32-dma.c
 +++ b/drivers/dma/stm32-dma.c
-@@ -38,10 +38,6 @@
- #define STM32_DMA_TEI			BIT(3) /* Transfer Error Interrupt */
- #define STM32_DMA_DMEI			BIT(2) /* Direct Mode Error Interrupt */
- #define STM32_DMA_FEI			BIT(0) /* FIFO Error Interrupt */
--#define STM32_DMA_MASKI			(STM32_DMA_TCI \
--					 | STM32_DMA_TEI \
--					 | STM32_DMA_DMEI \
--					 | STM32_DMA_FEI)
+@@ -66,7 +66,8 @@
+ #define STM32_DMA_SCR_PINC		BIT(9) /* Peripheral increment mode */
+ #define STM32_DMA_SCR_CIRC		BIT(8) /* Circular mode */
+ #define STM32_DMA_SCR_PFCTRL		BIT(5) /* Peripheral Flow Controller */
+-#define STM32_DMA_SCR_TCIE		BIT(4) /* Transfer Cplete Int Enable*/
++#define STM32_DMA_SCR_TCIE		BIT(4) /* Transfer Complete Int Enable
++						*/
+ #define STM32_DMA_SCR_TEIE		BIT(2) /* Transfer Error Int Enable */
+ #define STM32_DMA_SCR_DMEIE		BIT(1) /* Direct Mode Err Int Enable */
+ #define STM32_DMA_SCR_EN		BIT(0) /* Stream Enable */
+@@ -1094,7 +1095,7 @@ static enum dma_status stm32_dma_tx_status(struct dma_chan *c,
+ 	u32 residue = 0;
  
- /* DMA Stream x Configuration Register */
- #define STM32_DMA_SCR(x)		(0x0010 + 0x18 * (x)) /* x = 0..7 */
-@@ -117,6 +113,13 @@
- #define STM32_DMA_FIFO_THRESHOLD_FULL			0x03
+ 	status = dma_cookie_status(c, cookie, state);
+-	if ((status == DMA_COMPLETE) || (!state))
++	if (status == DMA_COMPLETE || !state)
+ 		return status;
  
- #define STM32_DMA_MAX_DATA_ITEMS	0xffff
-+/*
-+ * Valid transfer starts from @0 to @0xFFFE leading to unaligned scatter
-+ * gather at boundary. Thus it's safer to round down this value on FIFO
-+ * size (16 Bytes)
-+ */
-+#define STM32_DMA_ALIGNED_MAX_DATA_ITEMS	\
-+	ALIGN_DOWN(STM32_DMA_MAX_DATA_ITEMS, 16)
- #define STM32_DMA_MAX_CHANNELS		0x08
- #define STM32_DMA_MAX_REQUEST_ID	0x08
- #define STM32_DMA_MAX_DATA_PARAM	0x03
-@@ -864,7 +867,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_slave_sg(
- 		desc->sg_req[i].len = sg_dma_len(sg);
+ 	spin_lock_irqsave(&chan->vchan.lock, flags);
+@@ -1158,7 +1159,7 @@ static void stm32_dma_desc_free(struct virt_dma_desc *vdesc)
+ }
  
- 		nb_data_items = desc->sg_req[i].len / buswidth;
--		if (nb_data_items > STM32_DMA_MAX_DATA_ITEMS) {
-+		if (nb_data_items > STM32_DMA_ALIGNED_MAX_DATA_ITEMS) {
- 			dev_err(chan2dev(chan), "nb items not supported\n");
- 			goto err;
- 		}
-@@ -930,7 +933,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_cyclic(
- 		return NULL;
+ static void stm32_dma_set_config(struct stm32_dma_chan *chan,
+-			  struct stm32_dma_cfg *cfg)
++				 struct stm32_dma_cfg *cfg)
+ {
+ 	stm32_dma_clear_reg(&chan->chan_reg);
  
- 	nb_data_items = period_len / buswidth;
--	if (nb_data_items > STM32_DMA_MAX_DATA_ITEMS) {
-+	if (nb_data_items > STM32_DMA_ALIGNED_MAX_DATA_ITEMS) {
- 		dev_err(chan2dev(chan), "number of items not supported\n");
+@@ -1190,8 +1191,8 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
+ 	cfg.stream_config = dma_spec->args[2];
+ 	cfg.features = dma_spec->args[3];
+ 
+-	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
+-	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
++	if (cfg.channel_id >= STM32_DMA_MAX_CHANNELS ||
++	    cfg.request_line >= STM32_DMA_MAX_REQUEST_ID) {
+ 		dev_err(dev, "Bad channel and/or request id\n");
  		return NULL;
  	}
-@@ -980,7 +983,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_memcpy(
- 	u32 num_sgs, best_burst, dma_burst, threshold;
- 	int i;
- 
--	num_sgs = DIV_ROUND_UP(len, STM32_DMA_MAX_DATA_ITEMS);
-+	num_sgs = DIV_ROUND_UP(len, STM32_DMA_ALIGNED_MAX_DATA_ITEMS);
- 	desc = stm32_dma_alloc_desc(num_sgs);
- 	if (!desc)
- 		return NULL;
-@@ -989,7 +992,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_memcpy(
- 
- 	for (offset = 0, i = 0; offset < len; offset += xfer_count, i++) {
- 		xfer_count = min_t(size_t, len - offset,
--				   STM32_DMA_MAX_DATA_ITEMS);
-+				   STM32_DMA_ALIGNED_MAX_DATA_ITEMS);
- 
- 		/* Compute best burst size */
- 		max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
 -- 
 2.7.4
