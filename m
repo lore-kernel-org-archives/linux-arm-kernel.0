@@ -1,176 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Mar 2018 16:12:34 +0000
-Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <20180313135314.18780-3-alexander.sverdlin@nokia.com>
-References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
- <20180313135314.18780-3-alexander.sverdlin@nokia.com>
-Message-ID: <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2018 17:23:18 +0100
+Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
+In-Reply-To: <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <CAFd5g45h3wAZtx-4oJb_uLbtDTzSsD6eLM5G0VF=3BBHNmW8YQ@mail.gmail.com>
+ <CAP6Zq1jEAg2OrmnHzJdk9UBjPkDctu5oGHYyJ+QLBzN+E31sPw@mail.gmail.com>
+ <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
+ <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
+ <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
+Message-ID: <CAK8P3a3jfUf9by9SxR8JQQjUuOFydR_uHTfKH=_eYPrsW7AFTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2018 at 13:53, Alexander Sverdlin
-<alexander.sverdlin@nokia.com> wrote:
-> Teach ftrace_make_call() and ftrace_make_nop() about PLTs.
-> Teach PLT code about FTRACE and all its callbacks.
-> Otherwise the following might happen:
+On Tue, Mar 13, 2018 at 2:35 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
+> Hi Arnd,
 >
-> ------------[ cut here ]------------
-> WARNING: CPU: 14 PID: 2265 at .../arch/arm/kernel/insn.c:14 __arm_gen_branch+0x83/0x8c()
-> ...
-> Hardware name: LSI Axxia AXM55XX
-> [<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
-> [<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
-> [<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
-> [<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
-> [<c03218f3>] (warn_slowpath_null) from [<c03143cf>] (__arm_gen_branch+0x83/0x8c)
-> [<c03143cf>] (__arm_gen_branch) from [<c0314337>] (ftrace_make_nop+0xf/0x24)
-> [<c0314337>] (ftrace_make_nop) from [<c038ebcb>] (ftrace_process_locs+0x27b/0x3e8)
-> [<c038ebcb>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
-> [<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
-> [<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
-> ---[ end trace e1b64ced7a89adcc ]---
-> ------------[ cut here ]------------
-> WARNING: CPU: 14 PID: 2265 at .../kernel/trace/ftrace.c:1979 ftrace_bug+0x1b1/0x234()
-> ...
-> Hardware name: LSI Axxia AXM55XX
-> [<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
-> [<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
-> [<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
-> [<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
-> [<c03218f3>] (warn_slowpath_null) from [<c038e87d>] (ftrace_bug+0x1b1/0x234)
-> [<c038e87d>] (ftrace_bug) from [<c038ebd5>] (ftrace_process_locs+0x285/0x3e8)
-> [<c038ebd5>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
-> [<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
-> [<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
-> ---[ end trace e1b64ced7a89adcd ]---
-> ftrace failed to modify [<e9ef7006>] 0xe9ef7006
-> actual: 02:f0:3b:fa
-> ftrace record flags: 0
-> (0) expected tramp: c0314265
+> I sent now Full patch for the NPCM BMC's V12,
 >
-> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> ---
->  arch/arm/include/asm/ftrace.h |  3 +++
->  arch/arm/include/asm/module.h |  1 +
->  arch/arm/kernel/ftrace.c      | 62 ++++++++++++++++++++++++++++++++++++-------
->  arch/arm/kernel/module-plts.c | 47 +++++++++++++++++++++++++++++---
->  4 files changed, 100 insertions(+), 13 deletions(-)
->
-...
-> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-> index f272711..0951270 100644
-> --- a/arch/arm/kernel/module-plts.c
-> +++ b/arch/arm/kernel/module-plts.c
-> @@ -7,6 +7,7 @@
->   */
->
->  #include <linux/elf.h>
-> +#include <linux/ftrace.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/sort.h>
-> @@ -22,18 +23,54 @@
->                                                     (PLT_ENT_STRIDE - 8))
->  #endif
->
-> +static const u32 fixed_plts[] = {
-> +#ifdef CONFIG_FUNCTION_TRACER
-> +       FTRACE_ADDR,
-> +       MCOUNT_ADDR,
-> +#ifdef CONFIG_OLD_MCOUNT
-> +       (unsigned long)ftrace_caller_old,
-> +       (unsigned long)mcount,
-> +#endif
-> +#endif
-> +};
-> +
->  static bool in_init(const struct module *mod, unsigned long loc)
->  {
->         return loc - (u32)mod->init_layout.base < mod->init_layout.size;
->  }
->
-> +static void prealloc_fixed(struct mod_plt_sec *pltsec, struct plt_entries *plt)
-> +{
-> +       int i;
-> +
-> +       if (!ARRAY_SIZE(fixed_plts))
-> +               return;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(plt->ldr); ++i)
-> +               plt->ldr[i] = PLT_ENT_LDR;
-> +       memcpy(plt->lit, fixed_plts, sizeof(fixed_plts));
+> Is it O.K.? or do you want me to send the same patch to ARM: npcm:
+> drop extraneous 'select' statements as well?
 
-This is slightly dodgy. You are assuming that sizeof(plt->lit) >=
-sizeof(fixed_plts), which may change depending on configuration or
-future changes.
+The patch series you just sent contains a new version of the patches
+I already applied. What I need instead is a patch series that
+does the changes on top, since I don't rebase the my next/* branches.
 
-Could you add a BUILD_BUG_ON() here to ensure that this remains the case?
-
-> +       pltsec->plt_count = ARRAY_SIZE(fixed_plts);
-> +}
-> +
->  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->  {
->         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->                                                           &mod->arch.init;
-> +       struct plt_entries *plt;
-> +       int idx;
->
-> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
-> -       int idx = 0;
-> +       /* cache the address, ELF header is available only during module load */
-> +       if (!pltsec->plt_ent)
-> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
-> +       plt = pltsec->plt_ent;
-> +
-
-Where is plt_ent ever used?
-
-> +       if (!pltsec->plt_count)
-> +               prealloc_fixed(pltsec, plt);
-> +
-
-Please move the if () check into prealloc_fixed(), and only keep the loop below
-
-
-> +       idx = ARRAY_SIZE(fixed_plts);
-> +       while (idx)
-> +               if (plt->lit[--idx] == val)
-> +                       return (u32)&plt->ldr[idx];
-
-Please use a normal for loop here and iterate upward starting at 0
-
-
->
->         /*
->          * Look for an existing entry pointing to 'val'. Given that the
-> @@ -182,8 +219,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
->  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                               char *secstrings, struct module *mod)
->  {
-> -       unsigned long core_plts = 0;
-> -       unsigned long init_plts = 0;
-> +       unsigned long core_plts = ARRAY_SIZE(fixed_plts);
-> +       unsigned long init_plts = ARRAY_SIZE(fixed_plts);
->         Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
->         Elf32_Sym *syms = NULL;
->
-> @@ -238,6 +275,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->         mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
->                                                sizeof(struct plt_entries));
->         mod->arch.core.plt_count = 0;
-> +       mod->arch.core.plt_ent = NULL;
->
->         mod->arch.init.plt->sh_type = SHT_NOBITS;
->         mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> @@ -245,6 +283,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->         mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
->                                                sizeof(struct plt_entries));
->         mod->arch.init.plt_count = 0;
-> +       mod->arch.init.plt_ent = NULL;
->
->         pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
->                  mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
-> --
-> 2.4.6
->
+      Arnd
