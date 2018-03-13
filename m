@@ -1,39 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 18:35:07 +0000
-Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
-In-Reply-To: <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
- <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
-Message-ID: <72c7a6d2-a4c4-26b2-2982-c1d1ffb39b81@arm.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Tue, 13 Mar 2018 18:39:13 +0000
+Subject: [PATCH 2/3] dt-bindings: clock: Add bindings for ZynqMP clock
+ driver
+In-Reply-To: <CAL_JsqKUC47xB5O2Y6c3efVCjJY=V+XO3xyLTU9rNia40bdZkg@mail.gmail.com>
+References: <1519856861-31384-1-git-send-email-jollys@xilinx.com>
+ <1519856861-31384-3-git-send-email-jollys@xilinx.com>
+ <20180306014549.6t3ae5adzc3cpi5v@rob-hp-laptop>
+ <DM2PR0201MB0767031248A9F773620722FDB8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
+ <CAL_JsqKUC47xB5O2Y6c3efVCjJY=V+XO3xyLTU9rNia40bdZkg@mail.gmail.com>
+Message-ID: <DM2PR0201MB0767FFBAECF3A0B30251DBB8B8D20@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/18 17:51, Mark Rutland wrote:
-> On Tue, Mar 13, 2018 at 05:21:00PM +0000, Marc Zyngier wrote:
->> As kexec and kdump are getting used a bit more intensively, I've been
->> made aware of a number of shortcomings.
->>
->> The main gripe is from folks trying to launch a kdump kernel from
->> within an interrupt handler. If using EOImode==1, things work as
->> expected. If using EOImode==0 (such as in a guest), the secondary
->> kernel hangs as the previous interrupt hasn't been EOI'd, and the
->> active priority is still set. The first two patches are addressing
->> this situation for both GICv2 and GICv3 by reseting the APRs to their
->> default value.
+Hi Rob,
+
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Wednesday, March 07, 2018 5:20 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: mturquette at baylibre.com; sboyd at codeaurora.org;
+> michal.simek at xilinx.com; mark.rutland at arm.com; linux-clk at vger.kernel.org;
+> devicetree at vger.kernel.org; Shubhrajyoti Datta <shubhraj@xilinx.com>; linux-
+> kernel at vger.kernel.org; Rajan Vaja <RAJANV@xilinx.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/3] dt-bindings: clock: Add bindings for ZynqMP clock
+> driver
 > 
-> As a more general thing, if irqchip drivers have state that needs to be
-> reset in their init code, can we live all this irqchip reset to the
-> crashdump kernel, and kill machine_kexec_mask_interrupts() entirely?
+> On Wed, Mar 7, 2018 at 4:47 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
+> > Hi Rob,
+> >
+> >
+> >> -----Original Message-----
+> >> From: Rob Herring [mailto:robh at kernel.org]
+> >> Sent: Monday, March 05, 2018 5:46 PM
+> >> To: Jolly Shah <JOLLYS@xilinx.com>
+> >> Cc: mturquette at baylibre.com; sboyd at codeaurora.org;
+> >> michal.simek at xilinx.com; mark.rutland at arm.com;
+> >> linux-clk at vger.kernel.org; devicetree at vger.kernel.org; Shubhrajyoti
+> >> Datta <shubhraj@xilinx.com>; linux- kernel at vger.kernel.org; Jolly
+> >> Shah <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>;
+> >> linux-arm-kernel at lists.infradead.org
+> >> Subject: Re: [PATCH 2/3] dt-bindings: clock: Add bindings for ZynqMP
+> >> clock driver
+> >>
+> >> On Wed, Feb 28, 2018 at 02:27:40PM -0800, Jolly Shah wrote:
+> >> > Add documentation to describe Xilinx ZynqMP clock driver bindings.
+> >> >
+> >> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> >> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> >> > Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+> >> > ---
+> 
+> >> > +95         dpll_post_src
+> >> > +96         vpll_int
+> >> > +97         vpll_pre_src
+> >> > +98         vpll_half
+> >> > +99         vpll_int_mux
+> >> > +100                vpll_post_src
+> >> > +101                can0_mio
+> >> > +102                can1_mio
+> >> > +
+> >> > +Example:
+> >> > +
+> >> > +clk: clk {
+> >> > +   #clock-cells = <1>;
+> >> > +   compatible = "xlnx,zynqmp-clk";
+> >>
+> >> How do you control the clocks?
+> >
+> > Clocks are controlled by a dedicated platform management controller. Above
+> clock ids are used to identify clocks between master and PMU.
+> 
+> What is the interface to the "platform management controller"? Because you
+> have no registers, I'm guessing a firmware interface? If so, then just define the
+> firmware node as a clock provider.
 
-We could, once we know for sure that all the potential irqchips have
-been fixed. Or we could just remove it immediately, and see what breaks.
-
-> That would avoid some work (including pointer chasing on potentially
-> corrupt memory) in the kernel that crashed, making it more likely that
-> we get to the crashkernel intact...
-
-Seems perfectly sensible to me.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yes it is firmware interface. Along with clocks, firmware interface also controls power and pinctrl operations as major.
+I am not sure if I understand you correctly. Do you suggest to register clocks through Firmware driver or just use firmware DT node as clock provider and clock driver DT node can reference clocks from FW node to register same?
+ 
+> 
+> Rob
