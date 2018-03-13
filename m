@@ -1,72 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 11:40:13 +0000
-Subject: [PATCH v5 09/23] KVM: arm/arm64: Keep GICv2 HYP VAs in
- kvm_vgic_global_state
-In-Reply-To: <2dd9e07b-1fa7-72da-c10d-c4621294a886@arm.com>
-References: <20180301155538.26860-1-marc.zyngier@arm.com>
- <20180301155538.26860-10-marc.zyngier@arm.com>
- <2dd9e07b-1fa7-72da-c10d-c4621294a886@arm.com>
-Message-ID: <0a583b26-c012-6ff6-780b-7b12af17eebd@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2018 12:41:41 +0100
+Subject: [PATCH] arm64: fix undefined reference to 'printk'
+Message-ID: <20180313114202.1977512-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/18 09:35, Suzuki K Poulose wrote:
-> On 01/03/18 15:55, Marc Zyngier wrote:
->> As we're about to change the way we map devices at HYP, we need
->> to move away from kern_hyp_va on an IO address.
->>
->> One way of achieving this is to store the VAs in kvm_vgic_global_state,
->> and use that directly from the HYP code. This requires a small change
->> to create_hyp_io_mappings so that it can also return a HYP VA.
->>
->> We take this opportunity to nuke the vctrl_base field in the emulated
->> distributor, as it is not used anymore.
->>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h   |  3 ++-
->>   arch/arm64/include/asm/kvm_mmu.h |  3 ++-
->>   include/kvm/arm_vgic.h           | 12 ++++++------
->>   virt/kvm/arm/hyp/vgic-v2-sr.c    | 10 +++-------
->>   virt/kvm/arm/mmu.c               | 20 +++++++++++++++-----
->>   virt/kvm/arm/vgic/vgic-init.c    |  6 ------
->>   virt/kvm/arm/vgic/vgic-v2.c      | 13 +++++++------
->>   7 files changed, 35 insertions(+), 32 deletions(-)
->>
-> 
-> ...
-> 
->> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->> index 21f963f9780e..38406825e663 100644
->> --- a/virt/kvm/arm/vgic/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->> @@ -364,7 +364,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->>   
->>   		ret = create_hyp_io_mappings(info->vcpu.start,
->>   					     resource_size(&info->vcpu),
->> -					     &kvm_vgic_global_state.vcpu_base_va);
->> +					     &kvm_vgic_global_state.vcpu_base_va,
->> +					     &kvm_vgic_global_state.vcpu_hyp_va);
->>   		if (ret) {
->>   			kvm_err("Cannot map GICV into hyp\n");
->>   			goto out;
->> @@ -375,7 +376,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->>   
->>   	ret = create_hyp_io_mappings(info->vctrl.start,
->>   				     resource_size(&info->vctrl),
->> -				     &kvm_vgic_global_state.vctrl_base);
->> +				     &kvm_vgic_global_state.vctrl_base,
->> +				     &kvm_vgic_global_state.vctrl_hyp);
-> 
-> Now that we have the hyp VA, does it make sense to unmap the hyp VA, just
-> like we unmap the kernel io mapping if we fail to register the device ?
-Unfortunately, we don't have such facility to unmap a single range yet.
-All we can do is to teardown the whole HYP VA space, which is probably
-what is happening when returning an error.
+The printk symbol was intended as a generic address that is always
+exported, however that turned out to be false with CONFIG_PRINTK=n:
 
-Thanks,
+ERROR: "printk" [arch/arm64/kernel/arm64-reloc-test.ko] undefined!
 
-	M.
+This changes the references to memstart_addr, which should be there
+regardless of configuration.
+
+Fixes: a257e02579e4 ("arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419")
+Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/kernel/reloc_test_core.c | 2 +-
+ arch/arm64/kernel/reloc_test_syms.S | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/reloc_test_core.c b/arch/arm64/kernel/reloc_test_core.c
+index a70489c584c7..5915ce5759cc 100644
+--- a/arch/arm64/kernel/reloc_test_core.c
++++ b/arch/arm64/kernel/reloc_test_core.c
+@@ -45,7 +45,7 @@ static struct {
+ 	{ "R_AARCH64_MOVW_SABS_Gn",	signed_movw, UL(SYM64_ABS_VAL) },
+ 	{ "R_AARCH64_MOVW_UABS_Gn",	unsigned_movw, UL(SYM64_ABS_VAL) },
+ 	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp, (u64)&sym64_rel },
+-	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp_far, (u64)&printk },
++	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp_far, (u64)&memstart_addr },
+ 	{ "R_AARCH64_ADR_PREL_LO21",	relative_adr, (u64)&sym64_rel },
+ 	{ "R_AARCH64_PREL64",		relative_data64, (u64)&sym64_rel },
+ 	{ "R_AARCH64_PREL32",		relative_data32, (u64)&sym64_rel },
+diff --git a/arch/arm64/kernel/reloc_test_syms.S b/arch/arm64/kernel/reloc_test_syms.S
+index f333b4b7880d..2b8d9cb8b078 100644
+--- a/arch/arm64/kernel/reloc_test_syms.S
++++ b/arch/arm64/kernel/reloc_test_syms.S
+@@ -54,8 +54,8 @@ ENDPROC(relative_adrp)
+ 	.align	12
+ 	.space	0xffc
+ ENTRY(relative_adrp_far)
+-	adrp	x0, printk
+-	add	x0, x0, #:lo12:printk
++	adrp	x0, memstart_addr
++	add	x0, x0, #:lo12:memstart_addr
+ 	ret
+ ENDPROC(relative_adrp_far)
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.9.0
