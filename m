@@ -1,82 +1,255 @@
-From: rohitkr@codeaurora.org (Rohit Kumar)
-Date: Tue, 13 Mar 2018 16:59:27 +0530
-Subject: [alsa-devel] [PATCH v4 07/24] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
-References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
- <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
-Message-ID: <3d750b29-d341-af4d-41b3-30260f8296b7@codeaurora.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 13 Mar 2018 12:32:47 +0100
+Subject: [PATCH] clk: mvebu: cp110: Fix clock tree representation
+In-Reply-To: <20180228140751.10819-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Wed, 28 Feb 2018 15:07:51 +0100")
+References: <20180228140751.10819-1-gregory.clement@bootlin.com>
+Message-ID: <87bmfs1a8w.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+ 
+ On mer., f?vr. 28 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-
-On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Thanks to new documentation, we have a better view of the clock tree.
+> There were few mistakes in the first version of this driver, the main one
+> being the parental link between the clocks. Actually the tree is more
+> flat that we though. Most of the IP blocks require two clocks: one for
+> the IP itself and one for accessing the registers, and unlike what we
+> wrote there is no link between these two clocks.
 >
-> This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
+> The other mistakes were about the name of the clocks: the root clock is
+> not the Audio PLL but the PLL0, and what we called the EIP clock is named
+> the x2 Core clock and is used by other IP block than the EIP ones.
+
+Do you have any feedback on this patch?
+
+I would like to have time to address them if you have any remark.
+
+Else do you want a Pull Request or could you apply it directly?
+
+The only other patch around the mvebu clocks was set a few days ago [1]
+and seems to be eventually a fix patch. That means that there would be
+only one patch in the Pull Request for 4.17, but I can do it if you
+prefer.
+
+Thanks,
+
+Gregory
+
+[1]: "[PATCH] clk: mvebu: armada-38x: add support for missing clocks"
+https://lkml.org/lkml/2018/3/8/812
+
+
 >
-[..]
-> +		if (res->status) {
-> +			dev_err(afe->dev, "cmd = 0x%x returned error = 0x%x\n",
-> +				res->opcode, res->status);
-> +		}
-> +		switch (res->opcode) {
-> +		case AFE_PORT_CMD_SET_PARAM_V2:
-> +		case AFE_PORT_CMD_DEVICE_STOP:
-> +		case AFE_PORT_CMD_DEVICE_START:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  drivers/clk/mvebu/cp110-system-controller.c | 94 ++++++++++++-----------------
+>  1 file changed, 39 insertions(+), 55 deletions(-)
+>
+> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+> index ca9a0a536174..75bf7b8f282f 100644
+> --- a/drivers/clk/mvebu/cp110-system-controller.c
+> +++ b/drivers/clk/mvebu/cp110-system-controller.c
+> @@ -13,18 +13,17 @@
+>  /*
+>   * CP110 has 6 core clocks:
+>   *
+> - *  - APLL		(1 Ghz)
+> - *    - PPv2 core	(1/3 APLL)
+> - *    - EIP		(1/2 APLL)
+> - *     - Core		(1/2 EIP)
+> - *    - SDIO		(2/5 APLL)
+> + *  - PLL0		(1 Ghz)
+> + *    - PPv2 core	(1/3 PLL0)
+> + *    - x2 Core		(1/2 PLL0)
+> + *	- Core		(1/2 x2 Core)
+> + *    - SDIO		(2/5 PLL0)
+>   *
+>   *  - NAND clock, which is either:
+>   *    - Equal to SDIO clock
+> - *    - 2/5 APLL
+> + *    - 2/5 PLL0
+>   *
+> - * CP110 has 32 gatable clocks, for the various peripherals in the
+> - * IP. They have fairly complicated parent/child relationships.
+> + * CP110 has 32 gatable clocks, for the various peripherals in the IP.
+>   */
+>  
+>  #define pr_fmt(fmt) "cp110-system-controller: " fmt
+> @@ -53,9 +52,9 @@ enum {
+>  #define CP110_CLK_NUM \
+>  	(CP110_MAX_CORE_CLOCKS + CP110_MAX_GATABLE_CLOCKS)
+>  
+> -#define CP110_CORE_APLL			0
+> +#define CP110_CORE_PLL0			0
+>  #define CP110_CORE_PPV2			1
+> -#define CP110_CORE_EIP			2
+> +#define CP110_CORE_X2CORE		2
+>  #define CP110_CORE_CORE			3
+>  #define CP110_CORE_NAND			4
+>  #define CP110_CORE_SDIO			5
+> @@ -237,7 +236,7 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  	struct regmap *regmap;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+> -	const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name,
+> +	const char *ppv2_name, *pll0_name, *core_name, *x2core_name, *nand_name,
+>  		*sdio_name;
+>  	struct clk_hw_onecell_data *cp110_clk_data;
+>  	struct clk_hw *hw, **cp110_clks;
+> @@ -263,20 +262,20 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  	cp110_clks = cp110_clk_data->hws;
+>  	cp110_clk_data->num = CP110_CLK_NUM;
+>  
+> -	/* Register the APLL which is the root of the hw tree */
+> -	apll_name = cp110_unique_name(dev, syscon_node, "apll");
+> -	hw = clk_hw_register_fixed_rate(NULL, apll_name, NULL, 0,
+> +	/* Register the PLL0 which is the root of the hw tree */
+> +	pll0_name = cp110_unique_name(dev, syscon_node, "pll0");
+> +	hw = clk_hw_register_fixed_rate(NULL, pll0_name, NULL, 0,
+>  					1000 * 1000 * 1000);
+>  	if (IS_ERR(hw)) {
+>  		ret = PTR_ERR(hw);
+> -		goto fail_apll;
+> +		goto fail_pll0;
+>  	}
+>  
+> -	cp110_clks[CP110_CORE_APLL] = hw;
+> +	cp110_clks[CP110_CORE_PLL0] = hw;
+>  
+> -	/* PPv2 is APLL/3 */
+> +	/* PPv2 is PLL0/3 */
+>  	ppv2_name = cp110_unique_name(dev, syscon_node, "ppv2-core");
+> -	hw = clk_hw_register_fixed_factor(NULL, ppv2_name, apll_name, 0, 1, 3);
+> +	hw = clk_hw_register_fixed_factor(NULL, ppv2_name, pll0_name, 0, 1, 3);
+>  	if (IS_ERR(hw)) {
+>  		ret = PTR_ERR(hw);
+>  		goto fail_ppv2;
+> @@ -284,30 +283,32 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  
+>  	cp110_clks[CP110_CORE_PPV2] = hw;
+>  
+> -	/* EIP clock is APLL/2 */
+> -	eip_name = cp110_unique_name(dev, syscon_node, "eip");
+> -	hw = clk_hw_register_fixed_factor(NULL, eip_name, apll_name, 0, 1, 2);
+> +	/* X2CORE clock is PLL0/2 */
+> +	x2core_name = cp110_unique_name(dev, syscon_node, "x2core");
+> +	hw = clk_hw_register_fixed_factor(NULL, x2core_name, pll0_name,
+> +					  0, 1, 2);
+>  	if (IS_ERR(hw)) {
+>  		ret = PTR_ERR(hw);
+>  		goto fail_eip;
+>  	}
+>  
+> -	cp110_clks[CP110_CORE_EIP] = hw;
+> +	cp110_clks[CP110_CORE_X2CORE] = hw;
+>  
+> -	/* Core clock is EIP/2 */
+> +	/* Core clock is X2CORE/2 */
+>  	core_name = cp110_unique_name(dev, syscon_node, "core");
+> -	hw = clk_hw_register_fixed_factor(NULL, core_name, eip_name, 0, 1, 2);
+> +	hw = clk_hw_register_fixed_factor(NULL, core_name, x2core_name,
+> +					  0, 1, 2);
+>  	if (IS_ERR(hw)) {
+>  		ret = PTR_ERR(hw);
+>  		goto fail_core;
+>  	}
+>  
+>  	cp110_clks[CP110_CORE_CORE] = hw;
+> -	/* NAND can be either APLL/2.5 or core clock */
+> +	/* NAND can be either PLL0/2.5 or core clock */
+>  	nand_name = cp110_unique_name(dev, syscon_node, "nand-core");
+>  	if (nand_clk_ctrl & NF_CLOCK_SEL_400_MASK)
+>  		hw = clk_hw_register_fixed_factor(NULL, nand_name,
+> -						   apll_name, 0, 2, 5);
+> +						   pll0_name, 0, 2, 5);
+>  	else
+>  		hw = clk_hw_register_fixed_factor(NULL, nand_name,
+>  						   core_name, 0, 1, 1);
+> @@ -318,10 +319,10 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  
+>  	cp110_clks[CP110_CORE_NAND] = hw;
+>  
+> -	/* SDIO clock is APLL/2.5 */
+> +	/* SDIO clock is PLL0/2.5 */
+>  	sdio_name = cp110_unique_name(dev, syscon_node, "sdio-core");
+>  	hw = clk_hw_register_fixed_factor(NULL, sdio_name,
+> -					  apll_name, 0, 2, 5);
+> +					  pll0_name, 0, 2, 5);
+>  	if (IS_ERR(hw)) {
+>  		ret = PTR_ERR(hw);
+>  		goto fail_sdio;
+> @@ -341,40 +342,23 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  			continue;
+>  
+>  		switch (i) {
+> -		case CP110_GATE_AUDIO:
+> -		case CP110_GATE_COMM_UNIT:
+> -		case CP110_GATE_EIP150:
+> -		case CP110_GATE_EIP197:
+> -		case CP110_GATE_SLOW_IO:
+> -			parent = gate_name[CP110_GATE_MAIN];
+> -			break;
+> -		case CP110_GATE_MG:
+> -			parent = gate_name[CP110_GATE_MG_CORE];
+> -			break;
+>  		case CP110_GATE_NAND:
+>  			parent = nand_name;
+>  			break;
+> +		case CP110_GATE_MG:
+> +		case CP110_GATE_GOP_DP:
+>  		case CP110_GATE_PPV2:
+>  			parent = ppv2_name;
+>  			break;
+>  		case CP110_GATE_SDIO:
+>  			parent = sdio_name;
+>  			break;
+> -		case CP110_GATE_GOP_DP:
+> -			parent = gate_name[CP110_GATE_SDMMC_GOP];
+> -			break;
+> -		case CP110_GATE_XOR1:
+> -		case CP110_GATE_XOR0:
+> -		case CP110_GATE_PCIE_X1_0:
+> -		case CP110_GATE_PCIE_X1_1:
+> +		case CP110_GATE_MAIN:
+> +		case CP110_GATE_PCIE_XOR:
+>  		case CP110_GATE_PCIE_X4:
+> -			parent = gate_name[CP110_GATE_PCIE_XOR];
+> -			break;
+> -		case CP110_GATE_SATA:
+> -		case CP110_GATE_USB3H0:
+> -		case CP110_GATE_USB3H1:
+> -		case CP110_GATE_USB3DEV:
+> -			parent = gate_name[CP110_GATE_SATA_USB];
+> +		case CP110_GATE_EIP150:
+> +		case CP110_GATE_EIP197:
+> +			parent = x2core_name;
+>  			break;
+>  		default:
+>  			parent = core_name;
+> @@ -413,12 +397,12 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
+>  fail_nand:
+>  	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_CORE]);
+>  fail_core:
+> -	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_EIP]);
+> +	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_X2CORE]);
+>  fail_eip:
+>  	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_PPV2]);
+>  fail_ppv2:
+> -	clk_hw_unregister_fixed_rate(cp110_clks[CP110_CORE_APLL]);
+> -fail_apll:
+> +	clk_hw_unregister_fixed_rate(cp110_clks[CP110_CORE_PLL0]);
+> +fail_pll0:
+>  	return ret;
+>  }
+>  
+> -- 
+> 2.16.1
+>
 
-case AFE_SVC_CMD_SET_PARAM: needs to be added
-> +			port = afe_find_port(afe, data->token);
-> +			if (port) {
-> +				port->result = *res;
-> +				wake_up(&port->wait);
-> +			}
-[..]
-> +
-> +static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
-> +				   int param_id, int psize)
-> +{
-> +	struct apr_hdr *hdr;
-> +	struct afe_port_cmd_set_param_v2 *param;
-> +	struct afe_port_param_data_v2 *pdata;
-> +	struct q6afe *afe = port->afe;
-> +	u16 port_id = port->id;
-> +	int ret;
-> +
-> +	hdr = data;
-> +	param = data + sizeof(*hdr);
-> +	pdata = data + sizeof(*hdr) + sizeof(*param);
-> +
-> +	hdr->hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-> +					      APR_HDR_LEN(APR_HDR_SIZE),
-> +					      APR_PKT_VER);
-> +	hdr->pkt_size = sizeof(*hdr) + sizeof(*param) +
-> +			sizeof(*pdata) + psize;
-> +	hdr->src_port = 0;
-> +	hdr->dest_port = 0;
-> +	hdr->token = port->token;
-> +	hdr->opcode = AFE_PORT_CMD_SET_PARAM_V2;
-> +	param->port_id = port_id;
-> +	param->payload_size = sizeof(*pdata) + psize;
-> +	param->payload_address_lsw = 0x00;
-> +	param->payload_address_msw = 0x00;
-> +	param->mem_map_handle = 0x00;
-> +	pdata->module_id = AFE_MODULE_AUDIO_DEV_INTERFACE;
-> +	pdata->param_id = param_id;
-> +	pdata->param_size = psize;
-> +
-> +	ret = afe_apr_send_pkt(afe, data, port);
-> +	if (ret)
-> +		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-
-we should add %s to distinguish different functions with similar error 
-logs. Also, q6afe_port_set_param_v2() can be called for different 
-purpose.? AFE enable for port 0x%x failed is suitable only for port 
-start failure. Error message needs to be updated here.
-
-> +		       port_id, ret);
-> +
-> +
-> +	return ret;
-> +}
-> +
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
