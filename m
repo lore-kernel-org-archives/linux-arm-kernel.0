@@ -1,46 +1,67 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Mar 2018 10:16:03 +0000
-Subject: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP
- firmware
-In-Reply-To: <DM2PR0201MB07678A47B5380DC14E6F6126B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
-References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-2-git-send-email-jollys@xilinx.com>
- <778329dd-76a7-0151-26d9-30e87e0c888d@arm.com>
- <CY1PR0201MB0764FB23021F5DC694C7F56DB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
- <f6a416b7-542f-a3c3-538f-8549cf4e96c3@arm.com>
- <DM2PR0201MB07678A47B5380DC14E6F6126B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
-Message-ID: <755770ba-d110-8b2e-3c1f-9b65686dc51f@arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue, 13 Mar 2018 11:16:45 +0100
+Subject: [PATCH] ARM: dts: sun8i-h3: Add Mali node
+Message-ID: <1520936205-64723-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The H3 has an ARM Mali 400 GPU, so add binding to our DT.
 
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |  1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 27 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-On 12/03/18 23:07, Jolly Shah wrote:
-> Hi Sudeep,
-
->>>> Do you foresee using SMC/HVC for this firmware even on future platforms?
->>>> If not, I suggest to keep the protocol part separate from the transport i.e.
->>>> smc/hvc via ATF. It could be replaced with mailbox or some h/w
->>>> mechanism in future ?
->>>>
->>>
->>> We have PSCI and EEMI interfaces exposed to linux from ATF. PSCI is an
->>> EEMI client. We do not have current plans to switch to mailbox as it
->>> will require 2 communication channels to PMU as PSCI is through ATF.
->>>
->>
->> OK, but I just saw some bindings that has mailbox interface, honestly it's getting
->> too confusing with multiple series on the same thing floating and hence I
->> requested to put it together as one series.
-> 
-> Mailbox binding is used for power management driver. Mailbox is only
-> used for PMU->APU communication. APU->PMU communication is always
-> through EEMI firmware interface which is using SMC/HVC.
-> 
-
-Ah OK, is it because there's no non-secure mailbox or to avoid races,
-all non-secure EEMI is channeled through SMC ?
-
+diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+index ad87654..c1f65d1 100644
+--- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
++++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+@@ -10,6 +10,7 @@ Required properties:
+     * And, optionally, one of the vendor specific compatible:
+       + allwinner,sun4i-a10-mali
+       + allwinner,sun7i-a20-mali
++      + allwinner,sun8i-h3-mali
+       + allwinner,sun50i-h5-mali
+       + amlogic,meson-gxbb-mali
+       + amlogic,meson-gxl-mali
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 8495dee..10da8ed 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -79,6 +79,33 @@
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
++
++	soc {
++		mali: gpu at 1c40000 {
++			compatible = "allwinner,sun8i-h3-mali", "arm,mali-400";
++			reg = <0x01c40000 0x10000>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gp",
++					  "gpmmu",
++					  "pp0",
++					  "ppmmu0",
++					  "pp1",
++					  "ppmmu1",
++					  "pmu";
++			clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
++			clock-names = "bus", "core";
++			resets = <&ccu RST_BUS_GPU>;
++
++			assigned-clocks = <&ccu CLK_GPU>;
++			assigned-clock-rates = <384000000>;
++		};
++	};
+ };
+ 
+ &ccu {
 -- 
-Regards,
-Sudeep
+2.7.4
