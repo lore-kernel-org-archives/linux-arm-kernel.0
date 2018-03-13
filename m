@@ -1,31 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Mar 2018 17:51:56 +0000
-Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
-In-Reply-To: <20180313172103.24281-1-marc.zyngier@arm.com>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
-Message-ID: <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue, 13 Mar 2018 18:54:37 +0100
+Subject: [PATCH v2] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE
+Message-ID: <1520963677-124239-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 05:21:00PM +0000, Marc Zyngier wrote:
-> As kexec and kdump are getting used a bit more intensively, I've been
-> made aware of a number of shortcomings.
-> 
-> The main gripe is from folks trying to launch a kdump kernel from
-> within an interrupt handler. If using EOImode==1, things work as
-> expected. If using EOImode==0 (such as in a guest), the secondary
-> kernel hangs as the previous interrupt hasn't been EOI'd, and the
-> active priority is still set. The first two patches are addressing
-> this situation for both GICv2 and GICv3 by reseting the APRs to their
-> default value.
+Handle both positive and negative dclk polarity,
+according to bus_flags, taking care of this:
 
-As a more general thing, if irqchip drivers have state that needs to be
-reset in their init code, can we live all this irqchip reset to the
-crashdump kernel, and kill machine_kexec_mask_interrupts() entirely?
+On A20 and similar SoCs, the only way to achieve Positive Edge
+(Rising Edge), is setting dclk clock phase to 2/3(240?).
+By default TCON works in Negative Edge(Falling Edge), this is why phase
+is set to 0 in that case.
+Unfortunately there's no way to logically invert dclk through IO_POL
+register.
+The only acceptable way to work, triple checked with scope,
+is using clock phase set to 0? for Negative Edge and set to 240? for
+Positive Edge.
+On A33 and similar SoCs there would be a 90? phase option, but it divides
+also dclk by 2.
+This patch is a way to avoid quirks all around TCON and DOTCLOCK drivers
+for using A33 90? phase divided by 2 and consequently increase code
+complexity.
 
-That would avoid some work (including pointer chasing on potentially
-corrupt memory) in the kernel that crashed, making it more likely that
-we get to the crashkernel intact...
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-Thanks,
-Mark
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 8ee87c2..3f1455d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -17,6 +17,7 @@
+ #include <drm/drm_encoder.h>
+ #include <drm/drm_modes.h>
+ #include <drm/drm_of.h>
++#include <drm/drm_panel.h>
+ 
+ #include <uapi/drm/drm_mode.h>
+ 
+@@ -345,6 +346,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 				     const struct drm_display_mode *mode)
+ {
++	struct drm_panel *panel = tcon->panel;
++	struct drm_connector *connector = panel->connector;
++	struct drm_display_info display_info = connector->display_info;
+ 	unsigned int bp, hsync, vsync;
+ 	u8 clk_delay;
+ 	u32 val = 0;
+@@ -400,6 +404,27 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+ 
++	/*
++	 * On A20 and similar SoCs, the only way to achieve Positive Edge
++	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
++	 * By default TCON works in Negative Edge(Falling Edge),
++	 * this is why phase is set to 0 in that case.
++	 * Unfortunately there's no way to logically invert dclk through
++	 * IO_POL register.
++	 * The only acceptable way to work, triple checked with scope,
++	 * is using clock phase set to 0? for Negative Edge and set to 240?
++	 * for Positive Edge.
++	 * On A33 and similar SoCs there would be a 90? phase option,
++	 * but it divides also dclk by 2.
++	 * Following code is a way to avoid quirks all around TCON
++	 * and DOTCLOCK drivers.
++	 */
++	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
++		clk_set_phase(tcon->dclk, 240);
++
++	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
++		clk_set_phase(tcon->dclk, 0);
++
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
+ 			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
+ 			   val);
+-- 
+2.7.4
