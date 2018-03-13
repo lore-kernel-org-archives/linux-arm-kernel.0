@@ -1,170 +1,209 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Mar 2018 11:51:19 +0000
-Subject: [PATCH v4 21/22] arm64: Delay enabling hardware DBM feature
+Date: Tue, 13 Mar 2018 11:51:16 +0000
+Subject: [PATCH v4 18/22] arm64: capabilities: Add support for checks based on
+ a list of MIDRs
 In-Reply-To: <20180313115120.17256-1-suzuki.poulose@arm.com>
 References: <20180313115120.17256-1-suzuki.poulose@arm.com>
-Message-ID: <20180313115120.17256-22-suzuki.poulose@arm.com>
+Message-ID: <20180313115120.17256-19-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable hardware DBM bit in a capable CPU, very early in the
-boot via __cpu_setup. This doesn't give us a flexibility of
-optionally disable the feature, as the clearing the bit
-is a bit costly as the TLB can cache the settings. Instead,
-we delay enabling the feature until the CPU is brought up
-into the kernel. We use the feature capability mechanism
-to handle it.
+Add helpers for detecting an errata on list of midr ranges
+of affected CPUs, with the same work around.
 
-The hardware DBM is a non-conflicting feature. i.e, the kernel
-can safely run with a mix of CPUs with some using the feature
-and the others don't. So, it is safe for a late CPU to have
-this capability and enable it, even if the active CPUs don't.
-
-To get this handled properly by the infrastructure, we
-unconditionally set the capability and only enable it
-on CPUs which really have the feature. Also, we print the
-feature detection from the "matches" call back to make sure
-we don't mislead the user when none of the CPUs could use the
-feature.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 +-
- arch/arm64/kernel/cpufeature.c   | 71 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc.S             | 13 ++++----
- 3 files changed, 79 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  1 +
+ arch/arm64/include/asm/cputype.h    |  9 +++++
+ arch/arm64/kernel/cpu_errata.c      | 81 ++++++++++++++++++++-----------------
+ arch/arm64/kernel/cpufeature.c      | 10 +++--
+ 4 files changed, 60 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index ff9fb3aba17b..21bb624e0a7a 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -48,7 +48,8 @@
- #define ARM64_WORKAROUND_843419			27
- #define ARM64_HAS_CACHE_IDC			28
- #define ARM64_HAS_CACHE_DIC			29
-+#define ARM64_HW_DBM				30
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index cd245871b578..a16eb0731290 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -314,6 +314,7 @@ struct arm64_cpu_capabilities {
+ 			} * const fixed_revs;
+ 		};
  
--#define ARM64_NCAPS				30
-+#define ARM64_NCAPS				31
++		const struct midr_range *midr_range_list;
+ 		struct {	/* Feature register checking */
+ 			u32 sys_reg;
+ 			u8 field_pos;
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index bf6cfdab743f..e86e65c187f8 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -147,6 +147,15 @@ static inline bool is_midr_in_range(u32 midr, struct midr_range const *range)
+ 				 range->rv_min, range->rv_max);
+ }
  
- #endif /* __ASM_CPUCAPS_H */
++static inline bool
++is_midr_in_range_list(u32 midr, struct midr_range const *ranges)
++{
++	while (ranges->model)
++		if (is_midr_in_range(midr, ranges++))
++			return true;
++	return false;
++}
++
+ /*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 3c0bb6c4ed02..9490b560d3fe 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -40,6 +40,14 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
+ 	return true;
+ }
+ 
++static bool __maybe_unused
++is_affected_midr_range_list(const struct arm64_cpu_capabilities *entry,
++			    int scope)
++{
++	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++	return is_midr_in_range_list(read_cpuid_id(), entry->midr_range_list);
++}
++
+ static bool __maybe_unused
+ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
+ {
+@@ -250,6 +258,10 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
+ 	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,				\
+ 	CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)
+ 
++#define CAP_MIDR_RANGE_LIST(list)				\
++	.matches = is_affected_midr_range_list,			\
++	.midr_range_list = list
++
+ /* Errata affecting a range of revisions of  given model variant */
+ #define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max)	 \
+ 	ERRATA_MIDR_RANGE(m, var, r_min, var, r_max)
+@@ -263,6 +275,35 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
+ 	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
+ 	CAP_MIDR_ALL_VERSIONS(model)
+ 
++/* Errata affecting a list of midr ranges, with same work around */
++#define ERRATA_MIDR_RANGE_LIST(midr_list)			\
++	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
++	CAP_MIDR_RANGE_LIST(midr_list)
++
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++
++/*
++ * List of CPUs where we need to issue a psci call to
++ * harden the branch predictor.
++ */
++static const struct midr_range arm64_bp_harden_smccc_cpus[] = {
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
++	MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
++	MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
++	{},
++};
++
++static const struct midr_range qcom_bp_harden_cpus[] = {
++	MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
++	MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
++	{},
++};
++
++#endif
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+@@ -406,51 +447,17 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
++		ERRATA_MIDR_RANGE_LIST(arm64_bp_harden_smccc_cpus),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+-		.cpu_enable = enable_smccc_arch_workaround_1,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+-		.cpu_enable = enable_smccc_arch_workaround_1,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+-		.cpu_enable = enable_smccc_arch_workaround_1,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
++		ERRATA_MIDR_RANGE_LIST(qcom_bp_harden_cpus),
+ 		.cpu_enable = qcom_enable_link_stack_sanitization,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+-		.cpu_enable = qcom_enable_link_stack_sanitization,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+-		.cpu_enable = enable_smccc_arch_workaround_1,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+-		.cpu_enable = enable_smccc_arch_workaround_1,
++		ERRATA_MIDR_RANGE_LIST(qcom_bp_harden_cpus),
+ 	},
+ #endif
+ 	{
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 53273e79f7ce..4e73c610a409 100644
+index 006e95d46a4a..fdf6fa5b2f29 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -954,6 +954,57 @@ static int __init parse_kpti(char *str)
- __setup("kpti=", parse_kpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
-+#ifdef CONFIG_ARM64_HW_AFDBM
-+static inline void __cpu_enable_hw_dbm(void)
-+{
-+	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
-+
-+	write_sysreg(tcr, tcr_el1);
-+	isb();
-+}
-+
-+static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
-+{
-+	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
-+}
-+
-+static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
-+{
-+	if (cpu_can_use_dbm(cap))
-+		__cpu_enable_hw_dbm();
-+}
-+
-+static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
-+		       int __unused)
-+{
-+	static bool detected = false;
-+	/*
-+	 * DBM is a non-conflicting feature. i.e, the kernel can safely
-+	 * run a mix of CPUs with and without the feature. So, we
-+	 * unconditionally enable the capability to allow any late CPU
-+	 * to use the feature. We only enable the control bits on the
-+	 * CPU, if it actually supports.
-+	 *
-+	 * We have to make sure we print the "feature" detection only
-+	 * when at least one CPU actually uses it. So check if this CPU
-+	 * can actually use it and print the message exactly once.
-+	 *
-+	 * This is safe as all CPUs (including secondary CPUs - due to the
-+	 * LOCAL_CPU scope - and the hotplugged CPUs - via verification)
-+	 * goes through the "matches" check exactly once. Also if a CPU
-+	 * matches the criteria, it is guaranteed that the CPU will turn
-+	 * the DBM on, as the capability is unconditionally enabled.
-+	 */
-+	if (!detected && cpu_can_use_dbm(cap)) {
-+		detected = true;
-+		pr_info("detected: Hardware dirty bit management\n");
-+	}
-+
-+	return true;
-+}
-+
-+#endif
-+
- static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+@@ -879,6 +879,11 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 				int scope)
  {
- 	/*
-@@ -1130,6 +1181,26 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
- 		.matches = has_cache_dic,
- 	},
-+#ifdef CONFIG_ARM64_HW_AFDBM
-+	{
-+		/*
-+		 * Since we turn this on always, we don't want the user to
-+		 * think that the feature is available when it may not be.
-+		 * So hide the description.
-+		 *
-+		 * .desc = "Hardware pagetable Dirty Bit Management",
-+		 *
-+		 */
-+		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
-+		.capability = ARM64_HW_DBM,
-+		.sys_reg = SYS_ID_AA64MMFR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
-+		.min_field_value = 2,
-+		.matches = has_hw_dbm,
-+		.cpu_enable = cpu_enable_hw_dbm,
-+	},
-+#endif
- 	{},
- };
++	/* List of CPUs that are not vulnerable and don't need KPTI */
++	static const struct midr_range kpti_safe_list[] = {
++		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
++		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
++	};
+ 	char const *str = "command line option";
  
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 8f074d64b760..5f9a73a4452c 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -448,16 +448,15 @@ ENTRY(__cpu_setup)
- 	tcr_compute_pa_size x10, #TCR_IPS_SHIFT, x5, x6
- #ifdef CONFIG_ARM64_HW_AFDBM
  	/*
--	 * Hardware update of the Access and Dirty bits.
-+	 * Enable hardware update of the Access Flags bit.
-+	 * Hardware dirty bit management is enabled later,
-+	 * via capabilities.
- 	 */
- 	mrs	x9, ID_AA64MMFR1_EL1
- 	and	x9, x9, #0xf
--	cbz	x9, 2f
--	cmp	x9, #2
--	b.lt	1f
--	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
--1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
--2:
-+	cbz	x9, 1f
-+	orr	x10, x10, #TCR_HA		// hardware Access flag update
-+1:
- #endif	/* CONFIG_ARM64_HW_AFDBM */
- 	msr	tcr_el1, x10
- 	ret					// return to head.S
+@@ -903,11 +908,8 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 		return true;
+ 
+ 	/* Don't force KPTI for CPUs that are not vulnerable */
+-	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
+-	case MIDR_CAVIUM_THUNDERX2:
+-	case MIDR_BRCM_VULCAN:
++	if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
+ 		return false;
+-	}
+ 
+ 	/* Defer to CPU feature registers */
+ 	return !has_cpuid_feature(entry, scope);
 -- 
 2.14.3
