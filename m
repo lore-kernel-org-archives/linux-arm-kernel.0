@@ -1,36 +1,45 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 13 Mar 2018 14:05:34 +0000
-Subject: [PATCH 3/5] pwm: sun4i: Introduce (optional) reset support
-In-Reply-To: <20180307074516.dbak7ztkua4p7mr5@flea.lan>
-References: <20180307020719.6675-1-andre.przywara@arm.com>
- <20180307020719.6675-4-andre.przywara@arm.com>
- <20180307074516.dbak7ztkua4p7mr5@flea.lan>
-Message-ID: <f001134a-987d-2491-a22e-d1d634f7b024@arm.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Tue, 13 Mar 2018 15:32:11 +0200
+Subject: [PATCH v12 3/3] MAINTAINERS: Add entry for the Nuvoton NPCM
+ architecture
+In-Reply-To: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
+References: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
+Message-ID: <1520947931-15426-4-git-send-email-tmaimon77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Add maintainers and reviewers for the Nuvoton NPCM architecture.
 
-thanks for looking into this and for the Acks!
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+---
+ MAINTAINERS | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-On 07/03/18 07:45, Maxime Ripard wrote:
-> On Wed, Mar 07, 2018 at 02:07:17AM +0000, Andre Przywara wrote:
->> While the PWM IP in the Allwinner H6 SoC is fully compatible to those
->> used in older SoCs (H3, A64), it features a dedicated reset line which
->> needs to be de-asserted.
->> Add support for an optional "resets" DT property in our pwm-sun4i probe
->> routine, and assert and de-assert the reset line, where needed.
->> This allows to enable PWM support on the H6.
-> 
-> This isn't optional then. It's mandatory on the H6, and unneeded on
-> everything else. This is what we should have.
-
-So are you aiming at:
-	if (of_device_is_compatible(np, "allwinner,sun50i-h6-pwm")) {
-		... devm_reset_control_get() ...
-
-I guess this is preferable over coding something based on a new member
-in struct sun4i_pwm_data?
-
-Cheers,
-Andre.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 93a12af4f180..71cccfd9e26f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1700,6 +1700,20 @@ F:	Documentation/devicetree/bindings/arm/ste-*
+ F:	Documentation/devicetree/bindings/arm/ux500/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+ 
++ARM/NUVOTON NPCM ARCHITECTURE
++M:	Avi Fishman <avifishman70@gmail.com>
++M:	Tomer Maimon <tmaimon77@gmail.com>
++R:	Patrick Venture <venture@google.com>
++R:	Nancy Yuen <yuenn@google.com>
++R:	Brendan Higgins <brendanhiggins@google.com>
++L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
++S:	Supported
++F:	arch/arm/mach-npcm/
++F:	arch/arm/boot/dts/nuvoton-npcm*
++F:	include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
++F:	drivers/*/*npcm*
++F:	Documentation/*/*npcm*
++
+ ARM/NUVOTON W90X900 ARM ARCHITECTURE
+ M:	Wan ZongShun <mcuos.com@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+2.14.1
