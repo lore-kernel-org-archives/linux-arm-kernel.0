@@ -1,85 +1,58 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Mar 2018 11:51:08 +0000
-Subject: [PATCH v4 10/22] arm64: capabilities: Allow features based on local
- CPU scope
+Date: Tue, 13 Mar 2018 11:51:07 +0000
+Subject: [PATCH v4 09/22] arm64: capabilities: Split the processing of errata
+ work arounds
 In-Reply-To: <20180313115120.17256-1-suzuki.poulose@arm.com>
 References: <20180313115120.17256-1-suzuki.poulose@arm.com>
-Message-ID: <20180313115120.17256-11-suzuki.poulose@arm.com>
+Message-ID: <20180313115120.17256-10-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we have treated the feature capabilities as system wide
-and this wouldn't help with features that could be detected locally
-on one or more CPUs (e.g, KPTI, Software prefetch). This patch
-splits the feature detection to two phases :
+Right now we run through the errata workarounds check on all boot
+active CPUs, with SCOPE_ALL. This wouldn't help for detecting erratum
+workarounds with a SYSTEM_SCOPE. There are none yet, but we plan to
+introduce some: let us clean this up so that such workarounds can be
+detected and enabled correctly.
 
- 1) Local CPU features are checked on all boot time active CPUs.
- 2) System wide features are checked only once after all CPUs are
-    active.
+So, we run the checks with SCOPE_LOCAL_CPU on all CPUs and SCOPE_SYSTEM
+checks are run only once after all the boot time CPUs are active.
 
 Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f2152858c05..0a286be446c3 100644
+index 4386675af189..9f2152858c05 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -507,6 +507,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- }
- 
- extern const struct arm64_cpu_capabilities arm64_errata[];
-+static const struct arm64_cpu_capabilities arm64_features[];
- static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 				    u16 scope_mask, const char *info);
- 
-@@ -554,11 +555,12 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	}
- 
- 	/*
--	 * Run the errata work around checks on the boot CPU, once we have
--	 * initialised the cpu feature infrastructure.
-+	 * Run the errata work around and local feature checks on the
-+	 * boot CPU, once we have initialised the cpu feature infrastructure.
+@@ -557,7 +557,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 	 * Run the errata work around checks on the boot CPU, once we have
+ 	 * initialised the cpu feature infrastructure.
  	 */
- 	update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+-	update_cpu_capabilities(arm64_errata, SCOPE_ALL,
++	update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
  				"enabling workaround for");
-+	update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU, "detected:");
  }
  
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -1440,15 +1442,18 @@ void check_local_cpu_capabilities(void)
- 
- 	/*
- 	 * If we haven't finalised the system capabilities, this CPU gets
--	 * a chance to update the errata work arounds.
-+	 * a chance to update the errata work arounds and local features.
- 	 * Otherwise, this CPU should verify that it has all the system
+@@ -1445,7 +1445,7 @@ void check_local_cpu_capabilities(void)
  	 * advertised capabilities.
  	 */
--	if (!sys_caps_initialised)
-+	if (!sys_caps_initialised) {
- 		update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+ 	if (!sys_caps_initialised)
+-		update_cpu_capabilities(arm64_errata, SCOPE_ALL,
++		update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
  					"enabling workaround for");
--	else
-+		update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU,
-+					"detected:");
-+	} else {
+ 	else
  		verify_local_cpu_capabilities();
-+	}
- }
- 
- DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-@@ -1472,7 +1477,7 @@ void __init setup_cpu_features(void)
- 	u32 cwg;
+@@ -1473,6 +1473,8 @@ void __init setup_cpu_features(void)
  
  	/* Set the CPU feature capabilies */
--	update_cpu_capabilities(arm64_features, SCOPE_ALL, "detected:");
-+	update_cpu_capabilities(arm64_features, SCOPE_SYSTEM, "detected:");
- 	update_cpu_capabilities(arm64_errata, SCOPE_SYSTEM,
- 				"enabling workaround for");
+ 	update_cpu_capabilities(arm64_features, SCOPE_ALL, "detected:");
++	update_cpu_capabilities(arm64_errata, SCOPE_SYSTEM,
++				"enabling workaround for");
  	enable_cpu_capabilities(arm64_features, SCOPE_ALL);
+ 	enable_cpu_capabilities(arm64_errata, SCOPE_ALL);
+ 	mark_const_caps_ready();
 -- 
 2.14.3
