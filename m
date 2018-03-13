@@ -1,45 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Mar 2018 15:03:03 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 6/6] ASoC: sun4i-i2s: Add support
- for loopback
-In-Reply-To: <CAP03XeoaYcMrzv3+K83wGUaDn6ZcCDzePdVNcjAqJ4QrF-WLSA@mail.gmail.com>
-References: <20180312155753.9478-1-codekipper@gmail.com>
- <20180312155753.9478-7-codekipper@gmail.com>
- <20180312183521.GP2186@sirena.org.uk>
- <CAP03XeoaYcMrzv3+K83wGUaDn6ZcCDzePdVNcjAqJ4QrF-WLSA@mail.gmail.com>
-Message-ID: <20180313140303.wkwsxhhm5lxbzp5a@flea>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 13 Mar 2018 14:05:34 +0000
+Subject: [PATCH 3/5] pwm: sun4i: Introduce (optional) reset support
+In-Reply-To: <20180307074516.dbak7ztkua4p7mr5@flea.lan>
+References: <20180307020719.6675-1-andre.przywara@arm.com>
+ <20180307020719.6675-4-andre.przywara@arm.com>
+ <20180307074516.dbak7ztkua4p7mr5@flea.lan>
+Message-ID: <f001134a-987d-2491-a22e-d1d634f7b024@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 01:39:44PM +0000, Chris Obbard wrote:
-> >> +- loopback:  if this property is present then the dai is configured in
-> >> +             loopback mode where the output fifo is redirected to the input
-> >> +             fifo.
-> >
-> > This really doesn't seem like something that ought to go into the DT
-> > and hence ABI given that there's obviously no reason to use this in
-> > production.  Just make it be a #define in the code or something.
+Hi Maxime,
+
+thanks for looking into this and for the Acks!
+
+On 07/03/18 07:45, Maxime Ripard wrote:
+> On Wed, Mar 07, 2018 at 02:07:17AM +0000, Andre Przywara wrote:
+>> While the PWM IP in the Allwinner H6 SoC is fully compatible to those
+>> used in older SoCs (H3, A64), it features a dedicated reset line which
+>> needs to be de-asserted.
+>> Add support for an optional "resets" DT property in our pwm-sun4i probe
+>> routine, and assert and de-assert the reset line, where needed.
+>> This allows to enable PWM support on the H6.
 > 
-> It would be nice to have this as an optional devicetree property so
-> when testing JACK latency etc I don't have to manually re-compile a
-> kernel...
+> This isn't optional then. It's mandatory on the H6, and unneeded on
+> everything else. This is what we should have.
 
-Another one might also argue that having to recompile the DT and
-reflash the whole firmware or EEPROM is overkill for just testing JACK
-latency.
+So are you aiming at:
+	if (of_device_is_compatible(np, "allwinner,sun50i-h6-pwm")) {
+		... devm_reset_control_get() ...
 
-Can't we create a module parameter for it?
+I guess this is preferable over coding something based on a new member
+in struct sun4i_pwm_data?
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/5d97445b/attachment-0001.sig>
+Cheers,
+Andre.
