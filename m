@@ -1,65 +1,58 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 13 Mar 2018 14:11:18 +1100
-Subject: linux-next: manual merge of the tip tree with the arm-soc tree
-Message-ID: <20180313141118.41cd6419@canb.auug.org.au>
+From: jinb.park@samsung.com (Jinbum Park)
+Date: Tue, 13 Mar 2018 13:53:57 +0900
+Subject: [PATCH] arm: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
+References: <CGME20180313045357epcms1p34fb1e2ad09a8288017058c414c21ce26@epcms1p3>
+Message-ID: <20180313045357epcms1p34fb1e2ad09a8288017058c414c21ce26@epcms1p3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+To enable UBSAN on arm, ARCH_HAS_UBSAN_SANITIZE_ALL is needed to be selected.
 
-Today's linux-next merge of the tip tree got a conflict in:
+Basic test has passed on Raspberry Pi2, Raspbian jessi lite with
+CONFIG_UBSAN_SANITIZE_ALL, CONFIG_UBSAN_NULL.
 
-  drivers/bus/arm-cci.c
-
-between commit:
-
-  3de6be7a3dd8 ("drivers/bus: Split Arm CCI driver")
-
-from the arm-soc tree and commit:
-
-  8343aae66167 ("perf/core: Remove perf_event::group_entry")
-
-from the tip tree.
-
-I fixed it up (I have added the following merge fix patch) and can
-carry the fix as necessary. This is now fixed as far as linux-next is
-concerned, but any non trivial conflicts should be mentioned to your
-upstream maintainer when your tree is submitted for merging.  You may
-also want to consider cooperating with the maintainer of the conflicting
-tree to minimise any particularly complex conflicts.
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Tue, 13 Mar 2018 14:08:01 +1100
-Subject: [PATCH] perf/core: merge fix for "drivers/bus: Split Arm CCI driver"
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: Jinbum Park <jinb.park@samsung.com>
 ---
- drivers/perf/arm-cci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Kconfig                  | 1 +
+ arch/arm/boot/compressed/Makefile | 1 +
+ arch/arm/vdso/Makefile            | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-index 67a74c48c7c2..192d23b760a0 100644
---- a/drivers/perf/arm-cci.c
-+++ b/drivers/perf/arm-cci.c
-@@ -1265,7 +1265,7 @@ static int validate_group(struct perf_event *event)
- 	if (!validate_event(event->pmu, &fake_pmu, leader))
- 		return -EINVAL;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1878083..bdd1561 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -7,6 +7,7 @@ config ARM
+ 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
++	select ARCH_HAS_UBSAN_SANITIZE_ALL
+ 	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 45a6b9b..1b374ba 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -24,6 +24,7 @@ OBJS		+= hyp-stub.o
+ endif
  
--	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
-+	list_for_each_entry(sibling, &leader->sibling_list, sibling_list) {
- 		if (!validate_event(event->pmu, &fake_pmu, sibling))
- 			return -EINVAL;
- 	}
+ GCOV_PROFILE		:= n
++UBSAN_SANITIZE		:= n
+ 
+ #
+ # Architecture dependencies
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index bb411821..05597f7 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -29,6 +29,7 @@ CFLAGS_vgettimeofday.o = -O2
+ 
+ # Disable gcov profiling for VDSO code
+ GCOV_PROFILE := n
++UBSAN_SANITIZE := n
+ 
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
 -- 
-2.16.1
-
--- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/157fa9f6/attachment.sig>
+1.9.1
