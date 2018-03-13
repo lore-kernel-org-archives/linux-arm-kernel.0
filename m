@@ -1,35 +1,20 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Mar 2018 11:45:04 -0700
-Subject: [GIT PULL] bcm2835-dt-next-2018-03-13
-In-Reply-To: <20180313173022.30314-1-eric@anholt.net>
-References: <20180313173022.30314-1-eric@anholt.net>
-Message-ID: <43c4a703-efef-b03e-9dde-f340881b40e1@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 Mar 2018 19:46:12 +0100
+Subject: [PATCH 0/3] Add R8A77980/Condor PFC support
+In-Reply-To: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
+References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
+Message-ID: <20180313184612.e4z3dkmsjbmnh252@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2018 10:30 AM, Eric Anholt wrote:
-> Hi Florian,
+On Fri, Mar 09, 2018 at 03:04:56PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> The following changes since commit bcc76c4014dce4e3834dbd5b7f6593cbcfbfebe0:
-> 
->   ARM: dts: bcm2835-rpi-zero-w: Enable OTG mode (2018-02-26 15:02:23 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2018-03-13
-> 
-> for you to fetch changes up to ae67cfc4f6abb379e5bbe9a5616f00b23bbecb01:
-> 
->   ARM: bcm2835: Add the DPI hardware to the device tree. (2018-03-12 11:44:29 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in one last patch to add the BCM2835 DPI
-> controller to the device tree.
-> 
-> ----------------------------------------------------------------
-> Eric Anholt (1):
->       ARM: bcm2835: Add the DPI hardware to the device tree.
+> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180308-v4.16-rc4' tag.  We're adding the R8A77980 PFC node
+> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
+> These patches depend on the R8A77980 PFC support in order to work properly.
 
-Merged, thanks Eric!
--- 
-Florian
+I have marked these patches as Deferred. Please repost or ping me
+once the dependencies are in an RC release. If looser dependency handling
+is appropriate please let me know.
