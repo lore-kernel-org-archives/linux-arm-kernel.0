@@ -1,216 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 Mar 2018 21:05:50 +0100
-Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-In-Reply-To: <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
- <20180221161326.ktvf3mlzzxith5kw@verge.net.au>
- <CAMuHMdUTSmrWggMK4ehSL3Ux-JUzVpamTuToveuXogjuvGKkaw@mail.gmail.com>
- <20180221183223.qacrmmuzoqlzzbpo@verge.net.au>
- <CAMuHMdXCt1-coXGgtgFBm4rZLGBRMvSjbgeBSweiyKrOfCF0Xg@mail.gmail.com>
- <20180223081443.ak6kl3z72kamcxob@verge.net.au>
- <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
-Message-ID: <20180313200548.fgexoxlha3coa7hs@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Mar 2018 20:19:50 +0000
+Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
+In-Reply-To: <CAGo_u6phePsj-CQsaJTzg7pXjNDXTcAKnAh1z3BNfYfjMszf-g@mail.gmail.com>
+References: <20171011094148.15674-4-punit.agrawal@arm.com>
+ <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
+ <8366ba39-a5a1-7734-752e-f3dce18e8007@arm.com>
+ <CAGo_u6phePsj-CQsaJTzg7pXjNDXTcAKnAh1z3BNfYfjMszf-g@mail.gmail.com>
+Message-ID: <86fu53bue1.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 11:20:11AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Tue, 13 Mar 2018 18:49:44 +0000,
+Nishanth Menon wrote:
 > 
-> On Fri, Feb 23, 2018 at 9:14 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Feb 22, 2018 at 09:38:39AM +0100, Geert Uytterhoeven wrote:
-> >> On Wed, Feb 21, 2018 at 7:32 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Wed, Feb 21, 2018 at 05:30:12PM +0100, Geert Uytterhoeven wrote:
-> >> >> On Wed, Feb 21, 2018 at 5:13 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> >> > On Tue, Feb 20, 2018 at 01:51:28PM +0100, Geert Uytterhoeven wrote:
-> >> >> >> On Mon, Feb 12, 2018 at 6:44 PM, Fabrizio Castro
-> >> >> >> <fabrizio.castro@bp.renesas.com> wrote:
-> >> >> >> > this series has been around for some time as RFC, and it has collected
-> >> >> >> > useful comments from the community along the way.
-> >> >> >> > The solution proposed by this patch set works for most R-Car Gen2 and
-> >> >> >> > RZ/G1 devices, but not all of them. We now know that for some R-Car
-> >> >> >> > Gen2 early revisions there is no proper software fix. Anyway, no
-> >> >> >> > product has been built around early revisions, but development boards
-> >> >> >> > mounting early revisions (basically prototypes) are still out there.
-> >> >> >> > As a result, this series isn't enabling the internal watchdog on R-Car
-> >> >> >> > Gen2 boards, developers may enable it in board specific device trees
-> >> >> >> > if needed.
-> >> >> >> > This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
-> >> >> >> > and Koelsch boards.
-> >> >> >> >
-> >> >> >> > The problem
-> >> >> >> > ===========
-> >> >> >> > To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
-> >> >> >> > to ICRAM1 and we program the [S]BAR registers so that when we turn ON
-> >> >> >> > the non-boot CPUs they are redirected to the reset vector installed by
-> >> >> >> > Linux in ICRAM1, and eventually they continue the execution to RAM,
-> >> >> >> > where the SMP bring-up code will take care of the rest.
-> >> >> >> > The content of the [S]BAR registers survives a watchdog triggered reset,
-> >> >> >> > and as such after the watchdog fires the boot core will try and execute
-> >> >> >> > the SMP bring-up code instead of jumping to the bootrom code.
-> >> >> >> >
-> >> >> >> > The fix
-> >> >> >> > =======
-> >> >> >> > The main strategy for the solution is to let the reset vector decide
-> >> >> >> > if it needs to jump to shmobile_boot_fn or to the bootrom code.
-> >> >> >> > In a watchdog triggered reset scenario, since the [S]BAR registers keep
-> >> >> >> > their values, the boot CPU will jump into the newly designed reset
-> >> >> >> > vector, the assembly routine will eventually test WOVF (a bit in register
-> >> >> >> > RWTCSRA that indicates if the watchdog counter has overflown, the value
-> >> >> >> > of this bit gets retained in this scenario), and jump to the bootrom code
-> >> >> >> > which will in turn load up the bootloader, etc.
-> >> >> >> > When bringing up SMP or using CPU hotplug, the reset vector will jump
-> >> >> >> > to shmobile_boot_fn instead.
-> >> >> >> >
-> >> >> >> > Thank you All for your help.
-> >> >> >> >
-> >> >> >> > Best regards,
-> >> >> >> >
-> >> >> >> > Fabrizio Castro (26):
-> >> >> >> >   ARM: shmobile: Add watchdog support
-> >> >> >> >   ARM: dts: r8a7743: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7745: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7790: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7791: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7792: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7793: Adjust SMP routine size
-> >> >> >> >   ARM: dts: r8a7794: Adjust SMP routine size
-> >> >> >> >   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
-> >> >> >> >   ARM: shmobile: rcar-gen2: Add watchdog support
-> >> >> >> >   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
-> >> >> >> >   watchdog: renesas_wdt: Add R-Car Gen2 support
-> >> >> >> >   watchdog: renesas_wdt: Add restart handler
-> >> >> >> >   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
-> >> >> >> >   clk: renesas: r8a7743: Add rwdt clock
-> >> >> >> >   clk: renesas: r8a7745: Add rwdt clock
-> >> >> >> >   clk: renesas: r8a7790: Add rwdt clock
-> >> >> >> >   clk: renesas: r8a7791/r8a7793: Add rwdt clock
-> >> >> >> >   clk: renesas: r8a7794: Add rwdt clock
-> >> >> >> >   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-> >> >> >> >   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
-> >> >> >> >   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
-> >> >> >> >   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
-> >> >> >> >   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
-> >> >> >> >   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
-> >> >> >> >   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
-> >> >> >> >
-> >> >> >> >  .../devicetree/bindings/watchdog/renesas-wdt.txt   | 19 ++++++--
-> >> >> >> >  arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  5 ++
-> >> >> >> >  arch/arm/boot/dts/r8a7743.dtsi                     | 12 ++++-
-> >> >> >> >  arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |  5 ++
-> >> >> >> >  arch/arm/boot/dts/r8a7745.dtsi                     | 12 ++++-
-> >> >> >> >  arch/arm/boot/dts/r8a7790.dtsi                     | 12 ++++-
-> >> >> >> >  arch/arm/boot/dts/r8a7791.dtsi                     | 12 ++++-
-> >> >> >> >  arch/arm/boot/dts/r8a7792.dtsi                     |  2 +-
-> >> >> >> >  arch/arm/boot/dts/r8a7793.dtsi                     |  2 +-
-> >> >> >> >  arch/arm/boot/dts/r8a7794.dtsi                     | 12 ++++-
-> >> >> >> >  arch/arm/configs/shmobile_defconfig                |  1 +
-> >> >> >> >  arch/arm/mach-shmobile/common.h                    |  6 +++
-> >> >> >> >  arch/arm/mach-shmobile/headsmp.S                   | 55 ++++++++++++++++++++++
-> >> >> >> >  arch/arm/mach-shmobile/platsmp-apmu.c              |  1 +
-> >> >> >> >  arch/arm/mach-shmobile/pm-rcar-gen2.c              | 15 ++++--
-> >> >> >> >  drivers/clk/renesas/r8a7743-cpg-mssr.c             |  2 +
-> >> >> >> >  drivers/clk/renesas/r8a7745-cpg-mssr.c             |  2 +
-> >> >> >> >  drivers/clk/renesas/r8a7790-cpg-mssr.c             |  2 +
-> >> >> >> >  drivers/clk/renesas/r8a7791-cpg-mssr.c             |  2 +
-> >> >> >> >  drivers/clk/renesas/r8a7794-cpg-mssr.c             |  2 +
-> >> >> >> >  drivers/soc/renesas/rcar-rst.c                     | 35 +++++++++++---
-> >> >> >> >  drivers/watchdog/renesas_wdt.c                     | 39 +++++++++++++--
-> >> >> >>
-> >> >> >> Thanks, I've queued the clock patches in clk-renesas-for-v4.17, as they are
-> >> >> >> a hard dependency for:
-> >> >> >>   (1) The new reset vector in arch/arm/mach-shmobile/
-> >> >> >>   (2) The watchdog driver.
-> >> >> >>
-> >> >> >> Note that the watchdog driver itself (2) has a hard dependency on the
-> >> >> >> new reset vector (1).
-> >> >> >
-> >> >> > Thanks, I have marked the watchdog driver patch as Deferred.
-> >> >> > Please resubmit or otherwise ping me once they dependencies
-> >> >> > are in an rc release.
-> >> >>
-> >> >> I gave the dependencies a bit more thought.
-> >> >>
-> >> >> I think we can gain once release cycle if you would postpone the DTS patches
-> >> >> (both SMP routine size adjustments and RWDT device node additions) to v4.18.
-> >> >> Then all other parts can be upstreamed in parallel in v4.17, as nothing
-> >> >> will be activated before the DTS parts are in.
-> >> >>
-> >> >> Does this look sane?
-> >> >
-> >> > What about new DTS on old kernels of a specific vintage?
+> Marc,
+> 
+> On Tue, Mar 13, 2018 at 9:21 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Hi Lokesh,
+> >
+> > On 13/03/18 13:38, Lokesh Vutla wrote:
+> >> Hi All,
 > >>
-> >> New DTS would work fine on v4.16 and older, which don't have any of the
-> >> other patches from this series.
-> >> New DTS would work fine on v4.17, assumed all other patches from this
-> >> series get into v4.17.
+> >> On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
+> >>> The kernel crashes while iterating over a redistributor that is
+> >>> in-correctly sized by the platform firmware or doesn't contain the last
+> >>> record.
+> >>>
+> >>> Prevent the crash by checking accesses against the size of the region
+> >>> provided by the firmware. While we are at it, warn the user about
+> >>> incorrect region size.
+> >>>
+> >>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > >>
-> >> The only issue would be a new DTS on a kernel that has some but not all
-> >> other patches from this series.
+> >> Sorry to bring up an old thread. Just wanted to check what is the status
+> >> on this series.
 > >
-> > Thanks for the analysis. I think this is the key point. What is the risk of
-> > that happening?
+> > So far, I wasn't inclined to merge it, as it only allowed you to detect
+> > a broken system, as opposed to help with a working one.
 > 
-> I think the risk is fairly low.
-> You control when the DTS changes go in, and also when they are backported
-> to LTSI.
+> Is'nt that a good reason to have it? Why not help an error in dtb with
+> a debug helper than an obtuse crash to debug painfully?
+
+The kernel is not in the business of validating DTBs. And we both know
+that if we start papering over firmware bugs, these bugs become ABI,
+and we live with them forever. If you want to validate DTBs, you
+should use a tool that is actually validating it against your HW, and
+not use the kernel as the validation tool.
+
 > 
-> >> If we want to fast-track everything into v4.17, we need a stable branch, to be
-> >> pulled by all 5 actors (clk-renesas, mach-shmobile, soc-renesas, watchdog,
-> >> renesas-dts).
 > >
-> > It seems that watchdog is the only item on that list that neither you nor I
-> > sign off on. So I conclude that if the watchdog patch goes in early enough
-> > in the cycle then we ought to be in good shape.
+> >> This will also be useful when we try to boot linux + hypervisor with
+> >> less number of cores than the SoC supports. For example:
+> >> - SoC has 4 cores and Linux tries to boot with 2 cores.
+> >> - then a type-2 hypervisor gets installed.
+> >> - Hypervisor tries to boot a VM with linux on core 1.
+> >>
+> >> Now the VM boot will fail while it iterates over all the GICR regions
+> >> till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
+> >> regions of any invalid cpus(cpu 2, cpu 3 in this case).
 > >
-> > None the less, is it worth the risk?
+> > It you're passing the redistributors to a guest, you're doing something
+> > terribly wrong. You're putting the guest in a position to do a DoS on
+> > the hypervisor (disabling its timer interrupt, for example). Not the
+> > greatest move. There is a number of other gotchas with this approach
+> > (virtual interrupts, distributor virtualization...).
+> >
+> >> If the $patch is not the right approach, can you suggest on how to
+> >> handle the above scenario?
+> >
+> > The proper way to handle this is to virtualize the distributor and
+> > redistributor by trap/emulate. The only thing you can safely pass to a
+> > guest is the CPU interface, either as system registers or in its MMIO
+> > form (if you have the GICv2 compatibility interface).
+> >
 > 
-> Do we want the functionality early, or can we wait until v4.19?
+> Dumb question: Would'nt a trap emulate be real expensive with hyp
+> context in v8 (all the context save/restore we'd have to do? (in the
+> context of discussion, GICV2 compat is disabled).
 
-I understand that the watchdog driver has been accepted and that as things
-currently stand if it is enabled in the build it will be enabled in DT and
-a crash will result. From my POV that is a regression so I have decided
-to adopt the alternate plan proposed by Geert above: in short drop DT
-patches (to avoid enabling broken driver) and enqueue mach-shmobile
-patches (which don't make things any worse.
+How often do you hit the distributor and redistributors? Why do you
+need to context switch a distributor that you emulate (hint: you
+don't). I suggest you look at how real life hypervisor works (there's
+a pretty good one in the tree).
 
-Patch-by-patch things are as follows.
+Thanks,
 
-Dropped from "[PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1":
+	M.
 
-979d28f29742 ARM: dts: r8a7743: Adjust SMP routine size
-0b205f679f5d ARM: dts: r8a7745: Adjust SMP routine size
-2ad21a1d78b3 ARM: dts: r8a7790: Adjust SMP routine size
-82c978459c77 ARM: dts: r8a7791: Adjust SMP routine size
-d303698e6ff3 ARM: dts: r8a7792: Adjust SMP routine size
-d8b8b9a1e295 ARM: dts: r8a7793: Adjust SMP routine size
-70b3ab369773 ARM: dts: r8a7794: Adjust SMP routine size
-
-ebf26cf1b1de ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-5a4566ab3777 ARM: dts: r8a7745: Add watchdog support to SoC dtsi
-acd58e2bb1e5 ARM: dts: r8a7790: Add watchdog support to SoC dtsi
-e3f89168e72f ARM: dts: r8a7791: Add watchdog support to SoC dtsi
-e76a6a69a1fc ARM: dts: r8a7794: Add watchdog support to SoC dtsi
-242cc1ab7f7c ARM: dts: iwg20m: Add watchdog support to SoM dtsi
-748ed07f6c7c ARM: dts: iwg22m: Add watchdog support to SoM dtsi
-
-
-Dropped from "[PATCH/RFC 00/11] ARM: dts: rcar-gen2: Enable watchdog support":
-
-c257202482e2 ARM: dts: r8a7792: Add RWDT node
-01ec04dec8eb ARM: dts: r8a7793: Add RWDT node
-8e6ebe4f2f94 ARM: dts: lager: Enable watchdog support
-f223ad0198f6 ARM: dts: koelsch: Enable watchdog support
-1d14d2bb700d ARM: dts: porter: Enable watchdog support
-bf71652fc955 ARM: dts: blanche: Enable watchdog support
-13a0b10aeea4 ARM: dts: wheat: Enable watchdog support
-4e247bf110b8 ARM: dts: gose: Enable watchdog support
-2dcbd24bbf5e ARM: dts: alt: Enable watchdog support
-7f6844c900b4 ARM: dts: silk: Enable watchdog support
-
-And applied:
-
-[v5] ARM: shmobile: rcar-gen2: Add watchdog support
-[v5] ARM: shmobile: Add watchdog support
-
-In the case of the last patch above I removed the #ifdef from the header file.
+-- 
+Jazz is not dead, it just smell funny.
