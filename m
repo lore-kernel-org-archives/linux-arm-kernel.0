@@ -1,71 +1,91 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Mar 2018 09:29:09 +0100
-Subject: [PATCH 4/5] arm64: dts: allwinner: a64: Add pwm device
-In-Reply-To: <20180312161050.7647-5-harald@ccbib.org>
-References: <20180312161050.7647-1-harald@ccbib.org>
- <20180312161050.7647-5-harald@ccbib.org>
-Message-ID: <20180313082909.236etgyrtkr3o432@flea>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 13 Mar 2018 17:39:23 +0900
+Subject: [PATCH v3 5/5] linux/const.h: move BIT(_ULL) to linux/const.h for
+ use in assembly
+In-Reply-To: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
+References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
+ <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAR+Bio=ukXGMJYT=YrZ7k0XfkxRv4fPbbvNi33RLLToSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2018 at 04:10:49PM +0000, Harald Geyer wrote:
-> This device is compatible with A13, so no new driver is needed.
-> 
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
+Hi Andrew,
+
+2018-02-22 21:15 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Commit 2fc016c5bd8a ("linux/const.h: Add _BITUL() and _BITULL()")
+> introduced _BITUL() and _BITULL().  Its git-log says the difference
+> from the already existing BIT() are:
+>
+>   1. The namespace is such that they can be used in uapi definitions.
+>   2. The type is set with the _AC() macro to allow it to be used in
+>      assembly.
+>   3. The type is explicitly specified to be UL or ULL.
+>
+> However, I found _BITUL() is mostly used in kernel-space since it is
+> handy to share headers between C and assembly.  If we only need '2.',
+> we can improve the existing BIT() for use in assembly, allowing us to
+> avoid unnecessary underscore prefixes.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> I saw that Andre Przywara has been working on A64 pwm too and has
-> submitted some patches a few days ago. I think his patches are functionally
-> equivalent to this one here, but clean up things a bit and thus are
-> preferable. See:
-> 
-> https://groups.google.com/forum/#!topic/linux-sunxi/hQFeteP591k
-> 
-> I'm including my patch here mostly to have a consistent series for others
-> to test. OTOH you might merge the device tree changes here and pick up
-> the cleanup patches from him. Either way should work fine.
-> 
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 05d5e8def68a..95d52f6aa07f 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -364,6 +364,11 @@
->  				bias-pull-up;
->  			};
->  
-> +			pwm_pin: pwm_pin {
-> +				pins = "PD22";
-> +				function = "pwm";
-> +			};
+
+This patch conflicts with the one from Will Deacon.
+(https://patchwork.kernel.org/patch/10242531/)
+
+I think his patch is better than mine.
+
+So, could you drop this one from your tree, please?
+(only this one from the series.)
+
+Thanks
+
+
+
+
+> V2: https://patchwork.kernel.org/patch/9498271/
+>
+> Changes in v3: None
+> Changes in v2: None
+>
+>  include/linux/bitops.h | 3 +--
+>  include/linux/const.h  | 3 +++
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/include/linux/bitops.h b/include/linux/bitops.h
+> index 4cac4e1..8a856be 100644
+> --- a/include/linux/bitops.h
+> +++ b/include/linux/bitops.h
+> @@ -1,11 +1,10 @@
+>  /* SPDX-License-Identifier: GPL-2.0 */
+>  #ifndef _LINUX_BITOPS_H
+>  #define _LINUX_BITOPS_H
+> +#include <linux/const.h>
+>  #include <asm/types.h>
+>
+>  #ifdef __KERNEL__
+> -#define BIT(nr)                        (1UL << (nr))
+> -#define BIT_ULL(nr)            (1ULL << (nr))
+>  #define BIT_MASK(nr)           (1UL << ((nr) % BITS_PER_LONG))
+>  #define BIT_WORD(nr)           ((nr) / BITS_PER_LONG)
+>  #define BIT_ULL_MASK(nr)       (1ULL << ((nr) % BITS_PER_LONG_LONG))
+> diff --git a/include/linux/const.h b/include/linux/const.h
+> index 7b55a55..200892d 100644
+> --- a/include/linux/const.h
+> +++ b/include/linux/const.h
+> @@ -6,4 +6,7 @@
+>  #define UL(x)          (_UL(x))
+>  #define ULL(x)         (_ULL(x))
+>
+> +#define BIT(x)         (_BITUL(x))
+> +#define BIT_ULL(x)     (_BITULL(x))
 > +
->  			rmii_pins: rmii_pins {
->  				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
->  				       "PD18", "PD19", "PD20", "PD22", "PD23";
-> @@ -629,6 +634,14 @@
->  			#interrupt-cells = <3>;
->  		};
->  
-> +		pwm: pwm at 1c21400 {
-> +			compatible = "allwinner,sun5i-a13-pwm";
+>  #endif /* _LINUX_CONST_H */
+> --
+> 2.7.4
+>
 
-Just like for the watchdog, you should have an A64 compatible there.
 
-> +			reg = <0x01c21400 0x8>;
-
-And you should use the full memory range here.
-
-Maxime
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/6752e2bc/attachment.sig>
+Best Regards
+Masahiro Yamada
