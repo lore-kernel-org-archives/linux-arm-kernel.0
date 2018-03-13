@@ -1,92 +1,124 @@
-From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Tue, 13 Mar 2018 15:35:20 +0200
-Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
-In-Reply-To: <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
-References: <20180307162430.2664523-1-arnd@arndb.de>
- <CAFd5g45h3wAZtx-4oJb_uLbtDTzSsD6eLM5G0VF=3BBHNmW8YQ@mail.gmail.com>
- <CAP6Zq1jEAg2OrmnHzJdk9UBjPkDctu5oGHYyJ+QLBzN+E31sPw@mail.gmail.com>
- <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
- <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
-Message-ID: <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 13 Mar 2018 19:08:46 +0530
+Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
+In-Reply-To: <20171011094148.15674-4-punit.agrawal@arm.com>
+References: <20171011094148.15674-4-punit.agrawal@arm.com>
+Message-ID: <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi All,
 
-I sent now Full patch for the NPCM BMC's V12,
+On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
+> The kernel crashes while iterating over a redistributor that is
+> in-correctly sized by the platform firmware or doesn't contain the last
+> record.
+> 
+> Prevent the crash by checking accesses against the size of the region
+> provided by the firmware. While we are at it, warn the user about
+> incorrect region size.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Is it O.K.? or do you want me to send the same patch to ARM: npcm:
-drop extraneous 'select' statements as well?
+Sorry to bring up an old thread. Just wanted to check what is the status
+on this series.
 
-Thanks
+This will also be useful when we try to boot linux + hypervisor with
+less number of cores than the SoC supports. For example:
+- SoC has 4 cores and Linux tries to boot with 2 cores.
+- then a type-2 hypervisor gets installed.
+- Hypervisor tries to boot a VM with linux on core 1.
 
-Tomer
+Now the VM boot will fail while it iterates over all the GICR regions
+till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
+regions of any invalid cpus(cpu 2, cpu 3 in this case).
 
+If the $patch is not the right approach, can you suggest on how to
+handle the above scenario?
 
-On 12 March 2018 at 17:15, Tomer Maimon <tmaimon77@gmail.com> wrote:
-> Hi Arnd,
->
-> I will send tomorrow new version with some modification we need to do
-> once we use NPCM7XX and not NPCM750.
->
-> Brendan,
->
-> Is it O.K.?
->
->
->
-> On 12 March 2018 at 15:37, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Mon, Mar 12, 2018 at 2:28 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
->>> Hi Brendan,
->>>
->>> According to the last mail I have with Arnd can you modify the Kconfig
->>> as follow:
->>>
->>> +menuconfig ARCH_NPCM
->>> +       bool "Nuvoton NPCM Architecture"
->>> +       depends on ARCH_MULTI_V7
->>> +       select PINCTRL
->>> +
->>> +if ARCH_NPCM
->>> +
->>> +config ARCH_NPCM7XX
->>> +       bool "Support for NPCM7xx BMC (Poleg)"
->>> +       depends on ARCH_MULTI_V7
->>> +       select PINCTRL_NPCM7XX
->>> +       select NPCM7XX_TIMER
->>> +       select ARCH_REQUIRE_GPIOLIB
->>> +       select CACHE_L2X0
->>> +       select ARM_GIC
->>> +       select HAVE_ARM_TWD if SMP
->>> +       select HAVE_ARM_SCU if SMP
->>> +       select ARM_ERRATA_764369 if SMP
->>> +       select ARM_ERRATA_720789
->>> +       select ARM_ERRATA_754322
->>> +       select ARM_ERRATA_794072
->>> +       select PL310_ERRATA_588369
->>> +       select PL310_ERRATA_727915
->>> +       select MFD_SYSCON
->>> +       help
->>> +         General support for NPCM7xx BMC (Poleg).
->>> +
->>> +         Nuvoton NPCM7xx BMC based on the Cortex A9.
->>> +
->>> +endif
->>
->> One more change is needed to avoid a link error without CONFIG_SMP:
->>
->> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
->> index c7a1316d27c1..34d51f9f207c 100644
->> --- a/arch/arm/mach-npcm/Makefile
->> +++ b/arch/arm/mach-npcm/Makefile
->> @@ -1,3 +1,4 @@
->>  AFLAGS_headsmp.o               += -march=armv7-a
->>
->> -obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o platsmp.o headsmp.o
->> +obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o
->> +obj-$(CONFIG_SMP)              += platsmp.o headsmp.o
->>
->> Can one of you send me a pull request or the full patch series on top
->> of the version I have in arm-soc?
->>
->>       Arnd
+Thanks and regards,
+Lokesh
+
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 48 ++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 40 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 881d327c53fa..754d936c95e5 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -429,11 +429,21 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+>  	int i;
+>  
+>  	for (i = 0; i < gic_data.nr_redist_regions; i++) {
+> -		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
+>  		struct resource *res = &gic_data.redist_regions[i].res;
+> -		u64 typer;
+> +		void __iomem *ptr, *base;
+> +		u64 typer, size, stride;
+>  		u32 reg;
+>  
+> +		ptr = base = gic_data.redist_regions[i].redist_base;
+> +		size = resource_size(res);
+> +
+> +		stride = gic_data.redist_stride ?: SZ_64K * 2;
+> +		if (ptr + stride > base + size) {
+> +			pr_warn("Insufficient size for redistributor region @%llx. Skipping\n",
+> +				res->start);
+> +			continue;
+> +		}
+> +
+>  		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>  		if (reg != GIC_PIDR2_ARCH_GICv3 &&
+>  		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
+> @@ -442,7 +452,28 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+>  		}
+>  
+>  		do {
+> +			/*
+> +			 * We can access GICR_TYPER as we have already
+> +			 * checked that we have atleast 128kB or
+> +			 * redist_stride
+> +			 */
+>  			typer = gic_read_typer(ptr + GICR_TYPER);
+> +			if (!gic_data.redist_stride &&
+> +			    (typer & GICR_TYPER_VLPIS)) {
+> +				/* VLPI_base + reserved page */
+> +				stride += SZ_64K * 2;
+> +
+> +				/*
+> +				 * We are larger than we thought, do
+> +				 * we still fit?
+> +				 */
+> +				if (ptr + stride > base + size) {
+> +					pr_warn("No last record found in redistributor region @%llx\n",
+> +						gic_data.redist_regions[i].res.start);
+> +					break;
+> +				}
+> +			}
+> +
+>  			ret = fn(gic_data.redist_regions + i, ptr);
+>  			if (!ret)
+>  				return 0;
+> @@ -450,12 +481,13 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+>  			if (gic_data.redist_regions[i].single_redist)
+>  				break;
+>  
+> -			if (gic_data.redist_stride) {
+> -				ptr += gic_data.redist_stride;
+> -			} else {
+> -				ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
+> -				if (typer & GICR_TYPER_VLPIS)
+> -					ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
+> +			ptr += stride;
+> +
+> +			stride = gic_data.redist_stride ?: SZ_64K * 2;
+> +			if (ptr + stride > base + size) {
+> +				pr_warn("No last record found in redistributor region @%llx\n",
+> +					gic_data.redist_regions[i].res.start);
+> +				break;
+>  			}
+>  		} while (!(typer & GICR_TYPER_LAST));
+>  	}
+> 
