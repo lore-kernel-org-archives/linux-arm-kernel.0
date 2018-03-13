@@ -1,52 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Mar 2018 11:20:17 +0000
-Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
-In-Reply-To: <20180313110747.GJ25863@linaro.org>
-References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
- <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
- <20180313102158.GI25863@linaro.org>
- <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
- <20180313110747.GJ25863@linaro.org>
-Message-ID: <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue, 13 Mar 2018 12:20:19 +0100
+Subject: [PATCH v2] drm/sun4i: add lvds mode_valid function
+Message-ID: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 08:07:49PM +0900, AKASHI Takahiro wrote:
-> On Tue, Mar 13, 2018 at 10:47:15AM +0000, Mark Rutland wrote:
-> > On Tue, Mar 13, 2018 at 07:22:03PM +0900, AKASHI Takahiro wrote:
-> > > On Mon, Mar 12, 2018 at 08:58:00PM +0000, Ard Biesheuvel wrote:
-> > > > On 12 March 2018 at 20:14, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> > 
-> > > More importantly, neither arm64 _kexec_ supports kaslr.
-> > 
-> > The below is just considering this, and ignoring kdump (where I don't
-> > think we care at all about KASLR).
-> > 
-> > > Currently kexec-tools is set to determine where the kernel actually be
-> > > loaded, using a constant offset, text_offset, which comes from an image's
-> > > boot header and relocation of an image to the load address is performed
-> > > at the very end of the first kernel without knowing whether the 2nd kernel
-> > > has kaslr support enabled or not.
-> > 
-> > The kexec tools shouldn't need to know whether the kernel supports KASLR
-> > at all.
-> > 
-> > If the new kernel image has bit 3 (Kernel physical placement) set, kexec
-> > tools can choose to randomize the physical load address, regardless of
-> > whether that kernel has KASLR enabled.
-> 
-> So, by definition, is randomness, if we say so, in physical address not
-> part of KASLR?
+mode_valid function is missing for lvds.
 
-Physical randomization is not part of the kernel's KASLR implementation.
+Add it making it pointed by encoder helper functions.
 
-We happen to do it in the EFI stub, because we can in that context. But
-generally, physical randomization is not part of arm64's in-kernel
-KASLR.
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-For various reasons, the physical address that the kernel is loaded to
-may be arbitrary, so we have to cope with physical randomization
-regardless.
-
-Thanks,
-Mark.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+index be3f14d..bffff4c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
++++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+@@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
+ 	}
+ }
+ 
++static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
++							  const struct drm_display_mode *mode)
++{
++	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
++	struct sun4i_tcon *tcon = lvds->tcon;
++	u32 hsync = mode->hsync_end - mode->hsync_start;
++	u32 vsync = mode->vsync_end - mode->vsync_start;
++	unsigned long rate = mode->clock * 1000;
++	long rounded_rate;
++
++	DRM_DEBUG_DRIVER("Validating modes...\n");
++
++	if (hsync < 1)
++		return MODE_HSYNC_NARROW;
++
++	if (hsync > 0x3ff)
++		return MODE_HSYNC_WIDE;
++
++	if ((mode->hdisplay < 1) || (mode->htotal < 1))
++		return MODE_H_ILLEGAL;
++
++	if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
++		return MODE_BAD_HVALUE;
++
++	DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
++
++	if (vsync < 1)
++		return MODE_VSYNC_NARROW;
++
++	if (vsync > 0x3ff)
++		return MODE_VSYNC_WIDE;
++
++	if ((mode->vdisplay < 1) || (mode->vtotal < 1))
++		return MODE_V_ILLEGAL;
++
++	if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
++		return MODE_BAD_VVALUE;
++
++	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
++
++	tcon->dclk_min_div = 7;
++	tcon->dclk_max_div = 7;
++	rounded_rate = clk_round_rate(tcon->dclk, rate);
++	if (rounded_rate < rate)
++		return MODE_CLOCK_LOW;
++
++	if (rounded_rate > rate)
++		return MODE_CLOCK_HIGH;
++
++	DRM_DEBUG_DRIVER("Clock rate OK\n");
++
++	return MODE_OK;
++}
++
+ static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
+ 	.disable	= sun4i_lvds_encoder_disable,
+ 	.enable		= sun4i_lvds_encoder_enable,
++	.mode_valid	= sun4i_lvds_encoder_mode_valid,
+ };
+ 
+ static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
+-- 
+2.7.4
