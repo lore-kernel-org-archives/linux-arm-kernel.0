@@ -1,31 +1,56 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 13 Mar 2018 10:30:22 -0700
-Subject: [GIT PULL] bcm2835-dt-next-2018-03-13
-Message-ID: <20180313173022.30314-1-eric@anholt.net>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Tue, 13 Mar 2018 18:32:53 +0100
+Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
+In-Reply-To: <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
+References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
+ <20180313135314.18780-3-alexander.sverdlin@nokia.com>
+ <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
+ <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
+ <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
+Message-ID: <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Ard!
 
-The following changes since commit bcc76c4014dce4e3834dbd5b7f6593cbcfbfebe0:
+On 13/03/18 18:18, Ard Biesheuvel wrote:
+>>>>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>>>>  {
+>>>>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>>>>                                                           &mod->arch.init;
+>>>> +       struct plt_entries *plt;
+>>>> +       int idx;
+>>>>
+>>>> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+>>                                                            ^^^^^^^^^^^ (*)
+>>
+>>>> -       int idx = 0;
+>>>> +       /* cache the address, ELF header is available only during module load */
+>>>> +       if (!pltsec->plt_ent)
+>>>> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
+>>>> +       plt = pltsec->plt_ent;
+>>>> +
+>>> Where is plt_ent ever used?
+>> Above is exactly the place it's used.
+>> I need to cache it because after the module load is finished the ELF header is freed,
+>> pltsec->plt pointer (*) is not valid any more.
+>> With the above modification it's possible to call the function during the whole life
+>> time of the module.
+>>
+> Right, ok. That's a problem.
+> 
+> This means that you are relying on get_module_plt() being called at
+> least once at module load time, which is not guaranteed.
 
-  ARM: dts: bcm2835-rpi-zero-w: Enable OTG mode (2018-02-26 15:02:23 -0800)
+This is indeed guaranteed. For FTRACE use case. If it's being called from FTRACE in
+run time, this would mean there were long calls in this module section, which in
+turn means, get_module_plt() was called at least once for this module and this
+section.
 
-are available in the Git repository at:
+This doesn't hold in general, though.
 
-  git://github.com/anholt/linux tags/bcm2835-dt-next-2018-03-13
+In any case, if you insist, I can try to rework the whole stuff implementing module_finalize().
 
-for you to fetch changes up to ae67cfc4f6abb379e5bbe9a5616f00b23bbecb01:
-
-  ARM: bcm2835: Add the DPI hardware to the device tree. (2018-03-12 11:44:29 -0700)
-
-----------------------------------------------------------------
-This pull request brings in one last patch to add the BCM2835 DPI
-controller to the device tree.
-
-----------------------------------------------------------------
-Eric Anholt (1):
-      ARM: bcm2835: Add the DPI hardware to the device tree.
-
- arch/arm/boot/dts/bcm283x.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+-- 
+Best regards,
+Alexander Sverdlin.
