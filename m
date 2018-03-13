@@ -1,27 +1,47 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Tue, 13 Mar 2018 09:54:58 +0800
-Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
-In-Reply-To: <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
-References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
- <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
-Message-ID: <20180313015458.GA4352@dhcp-128-65.nay.redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 13 Mar 2018 10:05:46 +0800
+Subject: [GIT PULL] i.MX clock misc updates for 4.17
+Message-ID: <20180313020545.GG26859@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/18 at 08:58pm, Ard Biesheuvel wrote:
-[snip]
-> > - We pass the dtb over to the kdump kernel for arm64 kdump, but the
-> > '/chosen/kaslr-seed' property would be zeroed out already by the
-> > primary kernel and the secondary would work in a *nokaslr* environment
-> > due to the same (see [4] for example)
-> >
-> 
-> What would be the point of randomizing the placement of the kdump
-> kernel? And don't say 'because x86 does it', because that is not a
-> good reason.
+Hi Stephen, Michael,
 
-Kdump kernel does not need kaslr. Actually in Fedora we use 'nokaslr'
-even for x86_64
+This pull request includes a few random misc i.MX clock driver updates.
+As there is no dependency involved, you are free to merge the tag or
+cherry-pick the patches.  Thanks.
 
-Thanks
-Dave
+Shawn
+
+
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/clk-imx-4.17-misc
+
+for you to fetch changes up to a5510399e9535b9348adb70c09faa3de51541f9b:
+
+  clk: imx6ull: Add epdc_podf instead of sim_podf (2018-03-13 09:03:14 +0800)
+
+----------------------------------------------------------------
+i.MX clock misc updates for 4.17:
+ - A correction on i.MX6SX CKO clock mux options.
+ - A fix on i.MX7D Video PLL clock tree to include the missing dividers.
+ - Update i.MX6UL/ULL clock driver to add epdc_podf instead of sim_podf
+   clock for i.MX6ULL.
+
+----------------------------------------------------------------
+Anson Huang (2):
+      clk: imx: imx6sx: update cko mux options
+      clk: imx: imx7d: correct video pll clock tree
+
+Leonard Crestez (1):
+      clk: imx6ull: Add epdc_podf instead of sim_podf
+
+ drivers/clk/imx/clk-imx6sx.c | 14 ++++----
+ drivers/clk/imx/clk-imx6ul.c |  5 ++-
+ drivers/clk/imx/clk-imx7d.c  | 84 +++++++++++++++++++++++---------------------
+ 3 files changed, 55 insertions(+), 48 deletions(-)
