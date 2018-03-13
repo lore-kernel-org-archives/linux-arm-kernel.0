@@ -1,27 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2018 17:23:18 +0100
-Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
-In-Reply-To: <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
-References: <20180307162430.2664523-1-arnd@arndb.de>
- <CAFd5g45h3wAZtx-4oJb_uLbtDTzSsD6eLM5G0VF=3BBHNmW8YQ@mail.gmail.com>
- <CAP6Zq1jEAg2OrmnHzJdk9UBjPkDctu5oGHYyJ+QLBzN+E31sPw@mail.gmail.com>
- <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
- <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
- <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
-Message-ID: <CAK8P3a3jfUf9by9SxR8JQQjUuOFydR_uHTfKH=_eYPrsW7AFTA@mail.gmail.com>
+From: olivier.moysan@st.com (Olivier Moysan)
+Date: Tue, 13 Mar 2018 17:27:08 +0100
+Subject: [PATCH 3/3] ASoC: dmaengine_pcm: document process callback
+In-Reply-To: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+References: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1520958428-10930-4-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 2:35 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
-> Hi Arnd,
->
-> I sent now Full patch for the NPCM BMC's V12,
->
-> Is it O.K.? or do you want me to send the same patch to ARM: npcm:
-> drop extraneous 'select' statements as well?
+Add missing description of process callback.
 
-The patch series you just sent contains a new version of the patches
-I already applied. What I need instead is a patch series that
-does the changes on top, since I don't rebase the my next/* branches.
+Fixes: 78648092ef46 ("ASoC: dmaengine_pcm: add processing support")
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+---
+ include/sound/dmaengine_pcm.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-      Arnd
+diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+index 47ef486852ed..e3481eebdd98 100644
+--- a/include/sound/dmaengine_pcm.h
++++ b/include/sound/dmaengine_pcm.h
+@@ -118,6 +118,8 @@ void snd_dmaengine_pcm_set_config_from_dai_data(
+  *   PCM substream. Will be called from the PCM drivers hwparams callback.
+  * @compat_request_channel: Callback to request a DMA channel for platforms
+  *   which do not use devicetree.
++ * @process: Callback used to apply processing on samples transferred from/to
++ *   user space.
+  * @compat_filter_fn: Will be used as the filter function when requesting a
+  *  channel for platforms which do not use devicetree. The filter parameter
+  *  will be the DAI's DMA data.
+-- 
+1.9.1
