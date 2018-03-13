@@ -1,87 +1,82 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue, 13 Mar 2018 12:20:19 +0100
-Subject: [PATCH v2] drm/sun4i: add lvds mode_valid function
-Message-ID: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Tue, 13 Mar 2018 16:59:27 +0530
+Subject: [alsa-devel] [PATCH v4 07/24] ASoC: qdsp6: q6afe: Add q6afe driver
+In-Reply-To: <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
+References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
+ <20180310022456.26739-8-srinivas.kandagatla@linaro.org>
+Message-ID: <3d750b29-d341-af4d-41b3-30260f8296b7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mode_valid function is missing for lvds.
 
-Add it making it pointed by encoder helper functions.
 
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
- drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
+>
+[..]
+> +		if (res->status) {
+> +			dev_err(afe->dev, "cmd = 0x%x returned error = 0x%x\n",
+> +				res->opcode, res->status);
+> +		}
+> +		switch (res->opcode) {
+> +		case AFE_PORT_CMD_SET_PARAM_V2:
+> +		case AFE_PORT_CMD_DEVICE_STOP:
+> +		case AFE_PORT_CMD_DEVICE_START:
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-index be3f14d..bffff4c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-@@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
- 	}
- }
- 
-+static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
-+							  const struct drm_display_mode *mode)
-+{
-+	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+	u32 hsync = mode->hsync_end - mode->hsync_start;
-+	u32 vsync = mode->vsync_end - mode->vsync_start;
-+	unsigned long rate = mode->clock * 1000;
-+	long rounded_rate;
-+
-+	DRM_DEBUG_DRIVER("Validating modes...\n");
-+
-+	if (hsync < 1)
-+		return MODE_HSYNC_NARROW;
-+
-+	if (hsync > 0x3ff)
-+		return MODE_HSYNC_WIDE;
-+
-+	if ((mode->hdisplay < 1) || (mode->htotal < 1))
-+		return MODE_H_ILLEGAL;
-+
-+	if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
-+		return MODE_BAD_HVALUE;
-+
-+	DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
-+
-+	if (vsync < 1)
-+		return MODE_VSYNC_NARROW;
-+
-+	if (vsync > 0x3ff)
-+		return MODE_VSYNC_WIDE;
-+
-+	if ((mode->vdisplay < 1) || (mode->vtotal < 1))
-+		return MODE_V_ILLEGAL;
-+
-+	if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
-+		return MODE_BAD_VVALUE;
-+
-+	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-+
-+	tcon->dclk_min_div = 7;
-+	tcon->dclk_max_div = 7;
-+	rounded_rate = clk_round_rate(tcon->dclk, rate);
-+	if (rounded_rate < rate)
-+		return MODE_CLOCK_LOW;
-+
-+	if (rounded_rate > rate)
-+		return MODE_CLOCK_HIGH;
-+
-+	DRM_DEBUG_DRIVER("Clock rate OK\n");
-+
-+	return MODE_OK;
-+}
-+
- static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
- 	.disable	= sun4i_lvds_encoder_disable,
- 	.enable		= sun4i_lvds_encoder_enable,
-+	.mode_valid	= sun4i_lvds_encoder_mode_valid,
- };
- 
- static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
--- 
-2.7.4
+case AFE_SVC_CMD_SET_PARAM: needs to be added
+> +			port = afe_find_port(afe, data->token);
+> +			if (port) {
+> +				port->result = *res;
+> +				wake_up(&port->wait);
+> +			}
+[..]
+> +
+> +static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
+> +				   int param_id, int psize)
+> +{
+> +	struct apr_hdr *hdr;
+> +	struct afe_port_cmd_set_param_v2 *param;
+> +	struct afe_port_param_data_v2 *pdata;
+> +	struct q6afe *afe = port->afe;
+> +	u16 port_id = port->id;
+> +	int ret;
+> +
+> +	hdr = data;
+> +	param = data + sizeof(*hdr);
+> +	pdata = data + sizeof(*hdr) + sizeof(*param);
+> +
+> +	hdr->hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+> +					      APR_HDR_LEN(APR_HDR_SIZE),
+> +					      APR_PKT_VER);
+> +	hdr->pkt_size = sizeof(*hdr) + sizeof(*param) +
+> +			sizeof(*pdata) + psize;
+> +	hdr->src_port = 0;
+> +	hdr->dest_port = 0;
+> +	hdr->token = port->token;
+> +	hdr->opcode = AFE_PORT_CMD_SET_PARAM_V2;
+> +	param->port_id = port_id;
+> +	param->payload_size = sizeof(*pdata) + psize;
+> +	param->payload_address_lsw = 0x00;
+> +	param->payload_address_msw = 0x00;
+> +	param->mem_map_handle = 0x00;
+> +	pdata->module_id = AFE_MODULE_AUDIO_DEV_INTERFACE;
+> +	pdata->param_id = param_id;
+> +	pdata->param_size = psize;
+> +
+> +	ret = afe_apr_send_pkt(afe, data, port);
+> +	if (ret)
+> +		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
+
+we should add %s to distinguish different functions with similar error 
+logs. Also, q6afe_port_set_param_v2() can be called for different 
+purpose.? AFE enable for port 0x%x failed is suitable only for port 
+start failure. Error message needs to be updated here.
+
+> +		       port_id, ret);
+> +
+> +
+> +	return ret;
+> +}
+> +
