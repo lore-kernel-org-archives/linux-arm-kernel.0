@@ -1,18 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 13 Mar 2018 09:03:32 +0800
-Subject: [PATCH] clk: imx6ull: Add epdc_podf instead of sim_podf
-In-Reply-To: <64c4bc079a59002931a92e00b38b455d957ce169.1520866479.git.leonard.crestez@nxp.com>
-References: <64c4bc079a59002931a92e00b38b455d957ce169.1520866479.git.leonard.crestez@nxp.com>
-Message-ID: <20180313010331.GE26859@dragon>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Tue, 13 Mar 2018 01:35:39 +0000
+Subject: [PATCH 1/5] arm64: dts: allwinner: a64: Add i2c0 pins
+In-Reply-To: <20180312161050.7647-2-harald@ccbib.org>
+References: <20180312161050.7647-1-harald@ccbib.org>
+ <20180312161050.7647-2-harald@ccbib.org>
+Message-ID: <5b7f1a15-011f-c386-4813-f0fb8a91dfd8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2018 at 04:59:25PM +0200, Leonard Crestez wrote:
-> This is one of the differences between 6ul and 6ull: imx6ull has no sim
-> but has epdc and this clock is redefined on the same bit.
+On 12/03/18 16:10, Harald Geyer wrote:
+> Add the proper pin group node to reference in board files.
 > 
-> This can be verified in the Reference Manuals.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Signed-off-by: Harald Geyer <harald@ccbib.org>
 
-Applied, thanks.
+That looks correct to me, so:
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+But out of curiosity, what is this used for? In patch 5/5 I see it being
+used, but without a clue for what? Shouldn't enabling an I2C node be
+accompanied by some child node, presenting the device on the bus?
+I guess this I2C is not on some kind of "header" on that laptop?
+
+Cheers,
+Andre.
+
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1b6dc31e7d91..64e452a758fa 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -309,6 +309,11 @@
+>  			interrupt-controller;
+>  			#interrupt-cells = <3>;
+>  
+> +			i2c0_pins: i2c0_pins {
+> +				pins = "PH0", "PH1";
+> +				function = "i2c0";
+> +			};
+> +
+>  			i2c1_pins: i2c1_pins {
+>  				pins = "PH2", "PH3";
+>  				function = "i2c1";
+> 
