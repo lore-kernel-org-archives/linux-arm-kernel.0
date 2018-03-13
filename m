@@ -1,255 +1,173 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 13 Mar 2018 12:32:47 +0100
-Subject: [PATCH] clk: mvebu: cp110: Fix clock tree representation
-In-Reply-To: <20180228140751.10819-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Wed, 28 Feb 2018 15:07:51 +0100")
-References: <20180228140751.10819-1-gregory.clement@bootlin.com>
-Message-ID: <87bmfs1a8w.fsf@bootlin.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 13 Mar 2018 11:31:44 +0000
+Subject: [PATCH v5 14/23] arm64: KVM: Introduce EL2 VA randomisation
+In-Reply-To: <20180301155538.26860-15-marc.zyngier@arm.com>
+References: <20180301155538.26860-1-marc.zyngier@arm.com>
+ <20180301155538.26860-15-marc.zyngier@arm.com>
+Message-ID: <5AA7B6A0.3000905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., f?vr. 28 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Hi Marc,
 
-> Thanks to new documentation, we have a better view of the clock tree.
-> There were few mistakes in the first version of this driver, the main one
-> being the parental link between the clocks. Actually the tree is more
-> flat that we though. Most of the IP blocks require two clocks: one for
-> the IP itself and one for accessing the registers, and unlike what we
-> wrote there is no link between these two clocks.
->
-> The other mistakes were about the name of the clocks: the root clock is
-> not the Audio PLL but the PLL0, and what we called the EIP clock is named
-> the x2 Core clock and is used by other IP block than the EIP ones.
+On 01/03/18 15:55, Marc Zyngier wrote:
+> The main idea behind randomising the EL2 VA is that we usually have
+> a few spare bits between the most significant bit of the VA mask
+> and the most significant bit of the linear mapping.
+> 
+> Those bits could be a bunch of zeroes, and could be useful
+> to move things around a bit. Of course, the more memory you have,
+> the less randomisation you get...
+> 
+> Alternatively, these bits could be the result of KASLR, in which
+> case they are already random. But it would be nice to have a
+> *different* randomization, just to make the job of a potential
+> attacker a bit more difficult.
+> 
+> Inserting these random bits is a bit involved. We don't have a spare
+> register (short of rewriting all the kern_hyp_va call sites), and
+> the immediate we want to insert is too random to be used with the
+> ORR instruction. The best option I could come up with is the following
+> sequence:
+> 
+> 	and x0, x0, #va_mask
+> 	ror x0, x0, #first_random_bit
+> 	add x0, x0, #(random & 0xfff)
+> 	add x0, x0, #(random >> 12), lsl #12
+> 	ror x0, x0, #(63 - first_random_bit)
+> 
+> making it a fairly long sequence, but one that a decent CPU should
+> be able to execute without breaking a sweat. It is of course NOPed
+> out on VHE. The last 4 instructions can also be turned into NOPs
+> if it appears that there is no free bits to use.
 
-Do you have any feedback on this patch?
+> diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+> index 2bcbc1d33b64..a73e47804972 100644
+> --- a/arch/arm64/kvm/va_layout.c
+> +++ b/arch/arm64/kvm/va_layout.c
+> @@ -16,24 +16,62 @@
+>   */
+>  
+>  #include <linux/kvm_host.h>
+> +#include <linux/random.h>
+> +#include <linux/memblock.h>
+>  #include <asm/alternative.h>
+>  #include <asm/debug-monitors.h>
+>  #include <asm/insn.h>
+>  #include <asm/kvm_mmu.h>
+>  
+> +/*
+> + * The LSB of the random hyp VA tag or 0 if no randomization is used.
+> + */
+> +static u8 tag_lsb;
+> +/*
+> + * The random hyp VA tag value with the region bit if hyp randomization is used
+> + */
+> +static u64 tag_val;
+>  static u64 va_mask;
+>  
+>  static void compute_layout(void)
+>  {
+>  	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
+>  	u64 hyp_va_msb;
+> +	int kva_msb;
+>  
+>  	/* Where is my RAM region? */
+>  	hyp_va_msb  = idmap_addr & BIT(VA_BITS - 1);
+>  	hyp_va_msb ^= BIT(VA_BITS - 1);
+>  
+> -	va_mask  = GENMASK_ULL(VA_BITS - 2, 0);
+> -	va_mask |= hyp_va_msb;
+> +	kva_msb = fls64((u64)phys_to_virt(memblock_start_of_DRAM()) ^
+> +			(u64)(high_memory - 1));
+> +	if (kva_msb == (VA_BITS - 1)) {
+> +		/*
+> +		 * No space in the address, let's compute the mask so
+> +		 * that it covers (VA_BITS - 1) bits, and the region
+> +		 * bit. The tag stays set to zero.
+> +		 */
+> +		va_mask  = BIT(VA_BITS - 1) - 1;
+> +		va_mask |= hyp_va_msb;
+> +	} else {
+> +		/*
+> +		 * We do have some free bits to insert a random tag.
+> +		 * Hyp VAs are now created from kernel linear map VAs
+> +		 * using the following formula (with V == VA_BITS):
+> +		 *
+> +		 *  63 ... V |     V-1    | V-2 .. tag_lsb | tag_lsb - 1 .. 0
+> +		 *  ---------------------------------------------------------
+> +		 * | 0000000 | hyp_va_msb |    random tag  |  kern linear VA |
+> +		 */
+> +		u64 mask = GENMASK_ULL(VA_BITS - 2, tag_lsb);
 
-I would like to have time to address them if you have any remark.
+(tag_lsb is 0 at this point, but you shift out the bits you didn't want later)
 
-Else do you want a Pull Request or could you apply it directly?
+> +
+> +		tag_lsb = kva_msb;
+> +		va_mask = GENMASK_ULL(tag_lsb - 1, 0);
+> +		tag_val  = get_random_long() & mask;
+> +		tag_val |= hyp_va_msb;
+> +		tag_val >>= tag_lsb;
+> +	}
+>  }
 
-The only other patch around the mvebu clocks was set a few days ago [1]
-and seems to be eventually a fix patch. That means that there would be
-only one patch in the Pull Request for 4.17, but I can do it if you
-prefer.
+
+>  static u32 compute_instruction(int n, u32 rd, u32 rn)
+> @@ -46,6 +84,33 @@ static u32 compute_instruction(int n, u32 rd, u32 rn)
+>  							  AARCH64_INSN_VARIANT_64BIT,
+>  							  rn, rd, va_mask);
+>  		break;
+> +
+> +	case 1:
+> +		/* ROR is a variant of EXTR with Rm = Rn */
+> +		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
+> +					     rn, rn, rd,
+> +					     tag_lsb);
+> +		break;
+> +
+> +	case 2:
+> +		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
+> +						    tag_val & (SZ_4K - 1),
+> +						    AARCH64_INSN_VARIANT_64BIT,
+> +						    AARCH64_INSN_ADSB_ADD);
+> +		break;
+> +
+> +	case 3:
+> +		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
+> +						    tag_val & GENMASK(23, 12),
+> +						    AARCH64_INSN_VARIANT_64BIT,
+> +						    AARCH64_INSN_ADSB_ADD);
+> +		break;
+
+(This mix of GENMASK() and (SZ_4K - 1) feels a bit odd)
+
+
+> @@ -68,8 +132,12 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
+>  		/*
+>  		 * VHE doesn't need any address translation, let's NOP
+>  		 * everything.
+> +		 *
+> +		 * Alternatively, if we don't have any spare bits in
+> +		 * the address, NOP everything after masking that
+> +		 * kernel VA.
+>  		 */
+
+> -		if (has_vhe()) {
+> +		if (has_vhe() || (!tag_lsb && i > 1)) {
+>  			updptr[i] = aarch64_insn_gen_nop();
+>  			continue;
+>  		}
+
+Typo? Won't this keep the first ror too, instead of just the 'and'?
+| (!tag_lsb && i > 0)
+
+(I agree 'ROR #0' is still a NOP)
+
+
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
 
 Thanks,
 
-Gregory
-
-[1]: "[PATCH] clk: mvebu: armada-38x: add support for missing clocks"
-https://lkml.org/lkml/2018/3/8/812
-
-
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  drivers/clk/mvebu/cp110-system-controller.c | 94 ++++++++++++-----------------
->  1 file changed, 39 insertions(+), 55 deletions(-)
->
-> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
-> index ca9a0a536174..75bf7b8f282f 100644
-> --- a/drivers/clk/mvebu/cp110-system-controller.c
-> +++ b/drivers/clk/mvebu/cp110-system-controller.c
-> @@ -13,18 +13,17 @@
->  /*
->   * CP110 has 6 core clocks:
->   *
-> - *  - APLL		(1 Ghz)
-> - *    - PPv2 core	(1/3 APLL)
-> - *    - EIP		(1/2 APLL)
-> - *     - Core		(1/2 EIP)
-> - *    - SDIO		(2/5 APLL)
-> + *  - PLL0		(1 Ghz)
-> + *    - PPv2 core	(1/3 PLL0)
-> + *    - x2 Core		(1/2 PLL0)
-> + *	- Core		(1/2 x2 Core)
-> + *    - SDIO		(2/5 PLL0)
->   *
->   *  - NAND clock, which is either:
->   *    - Equal to SDIO clock
-> - *    - 2/5 APLL
-> + *    - 2/5 PLL0
->   *
-> - * CP110 has 32 gatable clocks, for the various peripherals in the
-> - * IP. They have fairly complicated parent/child relationships.
-> + * CP110 has 32 gatable clocks, for the various peripherals in the IP.
->   */
->  
->  #define pr_fmt(fmt) "cp110-system-controller: " fmt
-> @@ -53,9 +52,9 @@ enum {
->  #define CP110_CLK_NUM \
->  	(CP110_MAX_CORE_CLOCKS + CP110_MAX_GATABLE_CLOCKS)
->  
-> -#define CP110_CORE_APLL			0
-> +#define CP110_CORE_PLL0			0
->  #define CP110_CORE_PPV2			1
-> -#define CP110_CORE_EIP			2
-> +#define CP110_CORE_X2CORE		2
->  #define CP110_CORE_CORE			3
->  #define CP110_CORE_NAND			4
->  #define CP110_CORE_SDIO			5
-> @@ -237,7 +236,7 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  	struct regmap *regmap;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
-> -	const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name,
-> +	const char *ppv2_name, *pll0_name, *core_name, *x2core_name, *nand_name,
->  		*sdio_name;
->  	struct clk_hw_onecell_data *cp110_clk_data;
->  	struct clk_hw *hw, **cp110_clks;
-> @@ -263,20 +262,20 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  	cp110_clks = cp110_clk_data->hws;
->  	cp110_clk_data->num = CP110_CLK_NUM;
->  
-> -	/* Register the APLL which is the root of the hw tree */
-> -	apll_name = cp110_unique_name(dev, syscon_node, "apll");
-> -	hw = clk_hw_register_fixed_rate(NULL, apll_name, NULL, 0,
-> +	/* Register the PLL0 which is the root of the hw tree */
-> +	pll0_name = cp110_unique_name(dev, syscon_node, "pll0");
-> +	hw = clk_hw_register_fixed_rate(NULL, pll0_name, NULL, 0,
->  					1000 * 1000 * 1000);
->  	if (IS_ERR(hw)) {
->  		ret = PTR_ERR(hw);
-> -		goto fail_apll;
-> +		goto fail_pll0;
->  	}
->  
-> -	cp110_clks[CP110_CORE_APLL] = hw;
-> +	cp110_clks[CP110_CORE_PLL0] = hw;
->  
-> -	/* PPv2 is APLL/3 */
-> +	/* PPv2 is PLL0/3 */
->  	ppv2_name = cp110_unique_name(dev, syscon_node, "ppv2-core");
-> -	hw = clk_hw_register_fixed_factor(NULL, ppv2_name, apll_name, 0, 1, 3);
-> +	hw = clk_hw_register_fixed_factor(NULL, ppv2_name, pll0_name, 0, 1, 3);
->  	if (IS_ERR(hw)) {
->  		ret = PTR_ERR(hw);
->  		goto fail_ppv2;
-> @@ -284,30 +283,32 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  
->  	cp110_clks[CP110_CORE_PPV2] = hw;
->  
-> -	/* EIP clock is APLL/2 */
-> -	eip_name = cp110_unique_name(dev, syscon_node, "eip");
-> -	hw = clk_hw_register_fixed_factor(NULL, eip_name, apll_name, 0, 1, 2);
-> +	/* X2CORE clock is PLL0/2 */
-> +	x2core_name = cp110_unique_name(dev, syscon_node, "x2core");
-> +	hw = clk_hw_register_fixed_factor(NULL, x2core_name, pll0_name,
-> +					  0, 1, 2);
->  	if (IS_ERR(hw)) {
->  		ret = PTR_ERR(hw);
->  		goto fail_eip;
->  	}
->  
-> -	cp110_clks[CP110_CORE_EIP] = hw;
-> +	cp110_clks[CP110_CORE_X2CORE] = hw;
->  
-> -	/* Core clock is EIP/2 */
-> +	/* Core clock is X2CORE/2 */
->  	core_name = cp110_unique_name(dev, syscon_node, "core");
-> -	hw = clk_hw_register_fixed_factor(NULL, core_name, eip_name, 0, 1, 2);
-> +	hw = clk_hw_register_fixed_factor(NULL, core_name, x2core_name,
-> +					  0, 1, 2);
->  	if (IS_ERR(hw)) {
->  		ret = PTR_ERR(hw);
->  		goto fail_core;
->  	}
->  
->  	cp110_clks[CP110_CORE_CORE] = hw;
-> -	/* NAND can be either APLL/2.5 or core clock */
-> +	/* NAND can be either PLL0/2.5 or core clock */
->  	nand_name = cp110_unique_name(dev, syscon_node, "nand-core");
->  	if (nand_clk_ctrl & NF_CLOCK_SEL_400_MASK)
->  		hw = clk_hw_register_fixed_factor(NULL, nand_name,
-> -						   apll_name, 0, 2, 5);
-> +						   pll0_name, 0, 2, 5);
->  	else
->  		hw = clk_hw_register_fixed_factor(NULL, nand_name,
->  						   core_name, 0, 1, 1);
-> @@ -318,10 +319,10 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  
->  	cp110_clks[CP110_CORE_NAND] = hw;
->  
-> -	/* SDIO clock is APLL/2.5 */
-> +	/* SDIO clock is PLL0/2.5 */
->  	sdio_name = cp110_unique_name(dev, syscon_node, "sdio-core");
->  	hw = clk_hw_register_fixed_factor(NULL, sdio_name,
-> -					  apll_name, 0, 2, 5);
-> +					  pll0_name, 0, 2, 5);
->  	if (IS_ERR(hw)) {
->  		ret = PTR_ERR(hw);
->  		goto fail_sdio;
-> @@ -341,40 +342,23 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  			continue;
->  
->  		switch (i) {
-> -		case CP110_GATE_AUDIO:
-> -		case CP110_GATE_COMM_UNIT:
-> -		case CP110_GATE_EIP150:
-> -		case CP110_GATE_EIP197:
-> -		case CP110_GATE_SLOW_IO:
-> -			parent = gate_name[CP110_GATE_MAIN];
-> -			break;
-> -		case CP110_GATE_MG:
-> -			parent = gate_name[CP110_GATE_MG_CORE];
-> -			break;
->  		case CP110_GATE_NAND:
->  			parent = nand_name;
->  			break;
-> +		case CP110_GATE_MG:
-> +		case CP110_GATE_GOP_DP:
->  		case CP110_GATE_PPV2:
->  			parent = ppv2_name;
->  			break;
->  		case CP110_GATE_SDIO:
->  			parent = sdio_name;
->  			break;
-> -		case CP110_GATE_GOP_DP:
-> -			parent = gate_name[CP110_GATE_SDMMC_GOP];
-> -			break;
-> -		case CP110_GATE_XOR1:
-> -		case CP110_GATE_XOR0:
-> -		case CP110_GATE_PCIE_X1_0:
-> -		case CP110_GATE_PCIE_X1_1:
-> +		case CP110_GATE_MAIN:
-> +		case CP110_GATE_PCIE_XOR:
->  		case CP110_GATE_PCIE_X4:
-> -			parent = gate_name[CP110_GATE_PCIE_XOR];
-> -			break;
-> -		case CP110_GATE_SATA:
-> -		case CP110_GATE_USB3H0:
-> -		case CP110_GATE_USB3H1:
-> -		case CP110_GATE_USB3DEV:
-> -			parent = gate_name[CP110_GATE_SATA_USB];
-> +		case CP110_GATE_EIP150:
-> +		case CP110_GATE_EIP197:
-> +			parent = x2core_name;
->  			break;
->  		default:
->  			parent = core_name;
-> @@ -413,12 +397,12 @@ static int cp110_syscon_common_probe(struct platform_device *pdev,
->  fail_nand:
->  	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_CORE]);
->  fail_core:
-> -	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_EIP]);
-> +	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_X2CORE]);
->  fail_eip:
->  	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_PPV2]);
->  fail_ppv2:
-> -	clk_hw_unregister_fixed_rate(cp110_clks[CP110_CORE_APLL]);
-> -fail_apll:
-> +	clk_hw_unregister_fixed_rate(cp110_clks[CP110_CORE_PLL0]);
-> +fail_pll0:
->  	return ret;
->  }
->  
-> -- 
-> 2.16.1
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+James
