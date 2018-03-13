@@ -1,178 +1,82 @@
-From: chenhc@lemote.com (Huacai Chen)
-Date: Tue, 13 Mar 2018 16:55:53 +0800
-Subject: [PATCH V2] ZBOOT: fix stack protector in compressed boot phase
-In-Reply-To: <1520820258-19225-1-git-send-email-chenhc@lemote.com>
-References: <1520820258-19225-1-git-send-email-chenhc@lemote.com>
-Message-ID: <CAAhV-H4zFAMjg9W2f1VfYrgLnDfNDPaUHUechGDT+v3o_8WNTg@mail.gmail.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Tue, 13 Mar 2018 09:59:03 +0100
+Subject: [PATCH v2 4/6] ASoC: sun4i-i2s: Add multi-lane functionality
+In-Reply-To: <20180313082337.zekrzyx5utx5lkj6@flea>
+References: <20180312155753.9478-1-codekipper@gmail.com>
+ <20180312155753.9478-5-codekipper@gmail.com>
+ <20180313080026.jtag4w46koxzeqe2@flea>
+ <CAEKpxBkE_Aipa3Z6r0HnVNuU-kmfr1zandotZzQ9Z0AkShR=rw@mail.gmail.com>
+ <20180313082337.zekrzyx5utx5lkj6@flea>
+Message-ID: <CAEKpxBn6Zxy5nuMPYkPU_UweCqBm+P4M2fd2UqepdojBiOErbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yoshinori, Rich and SuperH developers,
+On 13 March 2018 at 09:23, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Tue, Mar 13, 2018 at 09:15:49AM +0100, Code Kipper wrote:
+>> On 13 March 2018 at 09:00, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>> > On Mon, Mar 12, 2018 at 04:57:51PM +0100, codekipper at gmail.com wrote:
+>> >> From: Marcus Cooper <codekipper@gmail.com>
+>> >>
+>> >> The i2s block supports multi-lane i2s output however this functionality
+>> >> is only possible in earlier SoCs where the pins are exposed and for
+>> >> the i2s block used for HDMI audio on the later SoCs.
+>> >>
+>> >> To enable this functionality, an optional property has been added to
+>> >> the bindings.
+>> >>
+>> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> >> ---
+>> >>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  3 ++
+>> >>  sound/soc/sunxi/sun4i-i2s.c                        | 48 +++++++++++++++++-----
+>> >>  2 files changed, 41 insertions(+), 10 deletions(-)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> >> index 48addef65b8f..3f966ac61b9e 100644
+>> >> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> >> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> >> @@ -33,6 +33,9 @@ Optional properties:
+>> >>                               configured to extend the slot width to the
+>> >>                               value specified. Min 8, Max 32.
+>> >>
+>> >> +- allwinner,playback-channels:  if this property is present then the number
+>> >> +                             of available channels is extended and the
+>> >> +                             outputs enabled.
+>> >
+>> > Isn't it something that is fixed for each generation of SoCs? Can't we
+>> > attach it to the compatible?
+>>
+>> I'm not sure as the documentation is pretty poor. It looks like it is
+>> supported by all of the variations that we've seen but only exposed as
+>> pins on A10 and A20. I'm also not sure who would ever use it with
+>> external devices.
+>
+> Well, you were saying that it was the case on the older SoCs in your
+> commit log, so this needs to be figured out.
+>
+>> The reason why I've added it is that it is required by HDMI for
+>> supporting surround sound on the newer SoCs.
+>
+> Why isn't that mentionned in your commit log?
+>
+> Can you post the whole set of changes needed for HDMI audio? this
+> would make things much easier to see where you're going.
 
-I'm not familiar with SuperH assembly, but SuperH has the same bug
-obviously. Could you please fix that?
+Maybe we should drop this change for now as basic HDMI audio for two
+channels doesn't require it. I've also not tested multi-channel audio
+yet.
 
-Huacai
+To get HDMI audio working the following patches are required for the dts
+https://github.com/codekipper/linux-sunxi/commit/997c622ae10ef136bae0a35a0e9bf9c6dd27910a
+and
+https://github.com/codekipper/linux-sunxi/commit/4a81676d30a0262c57ffc0827e46c7934fb3b358
 
-On Mon, Mar 12, 2018 at 10:04 AM, Huacai Chen <chenhc@lemote.com> wrote:
-> Call __stack_chk_guard_setup() in decompress_kernel() is too late that
-> stack checking always fails for decompress_kernel() itself. So remove
-> __stack_chk_guard_setup() and initialize __stack_chk_guard before we
-> call decompress_kernel().
+they don't need this patch but do need the slot-width-override patch.
+
+CK
 >
-> Original code comes from ARM but also used for MIPS and SH, so fix them
-> together. If without this fix, compressed booting of these archs will
-> fail because stack checking is enabled by default (>=4.16).
+> Maxime
 >
-> V2: Fix build on ARM.
->
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Huacai Chen <chenhc@lemote.com>
-> ---
->  arch/arm/boot/compressed/head.S        | 4 ++++
->  arch/arm/boot/compressed/misc.c        | 7 -------
->  arch/mips/boot/compressed/decompress.c | 7 -------
->  arch/mips/boot/compressed/head.S       | 4 ++++
->  arch/sh/boot/compressed/head_32.S      | 4 ++++
->  arch/sh/boot/compressed/head_64.S      | 4 ++++
->  arch/sh/boot/compressed/misc.c         | 7 -------
->  7 files changed, 16 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 45c8823..bae1fc6 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -547,6 +547,10 @@ not_relocated:     mov     r0, #0
->                 bic     r4, r4, #1
->                 blne    cache_on
->
-> +               ldr     r0, =__stack_chk_guard
-> +               ldr     r1, =0x000a0dff
-> +               str     r1, [r0]
-> +
->  /*
->   * The C runtime environment should now be setup sufficiently.
->   * Set up some pointers, and start decompressing.
-> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-> index 16a8a80..e518ef5 100644
-> --- a/arch/arm/boot/compressed/misc.c
-> +++ b/arch/arm/boot/compressed/misc.c
-> @@ -130,11 +130,6 @@ asmlinkage void __div0(void)
->
->  unsigned long __stack_chk_guard;
->
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> -
->  void __stack_chk_fail(void)
->  {
->         error("stack-protector: Kernel stack is corrupted\n");
-> @@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
->  {
->         int ret;
->
-> -       __stack_chk_guard_setup();
-> -
->         output_data             = (unsigned char *)output_start;
->         free_mem_ptr            = free_mem_ptr_p;
->         free_mem_end_ptr        = free_mem_ptr_end_p;
-> diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
-> index fdf99e9..5ba431c 100644
-> --- a/arch/mips/boot/compressed/decompress.c
-> +++ b/arch/mips/boot/compressed/decompress.c
-> @@ -78,11 +78,6 @@ void error(char *x)
->
->  unsigned long __stack_chk_guard;
->
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> -
->  void __stack_chk_fail(void)
->  {
->         error("stack-protector: Kernel stack is corrupted\n");
-> @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
->  {
->         unsigned long zimage_start, zimage_size;
->
-> -       __stack_chk_guard_setup();
-> -
->         zimage_start = (unsigned long)(&__image_begin);
->         zimage_size = (unsigned long)(&__image_end) -
->             (unsigned long)(&__image_begin);
-> diff --git a/arch/mips/boot/compressed/head.S b/arch/mips/boot/compressed/head.S
-> index 409cb48..00d0ee0 100644
-> --- a/arch/mips/boot/compressed/head.S
-> +++ b/arch/mips/boot/compressed/head.S
-> @@ -32,6 +32,10 @@ start:
->         bne     a2, a0, 1b
->          addiu  a0, a0, 4
->
-> +       PTR_LA  a0, __stack_chk_guard
-> +       PTR_LI  a1, 0x000a0dff
-> +       sw      a1, 0(a0)
-> +
->         PTR_LA  a0, (.heap)          /* heap address */
->         PTR_LA  sp, (.stack + 8192)  /* stack address */
->
-> diff --git a/arch/sh/boot/compressed/head_32.S b/arch/sh/boot/compressed/head_32.S
-> index 7bb1681..a3fdb05 100644
-> --- a/arch/sh/boot/compressed/head_32.S
-> +++ b/arch/sh/boot/compressed/head_32.S
-> @@ -76,6 +76,10 @@ l1:
->         mov.l   init_stack_addr, r0
->         mov.l   @r0, r15
->
-> +       mov.l   __stack_chk_guard, r0
-> +       mov     #0x000a0dff, r1
-> +       mov.l   r1, @r0
-> +
->         /* Decompress the kernel */
->         mov.l   decompress_kernel_addr, r0
->         jsr     @r0
-> diff --git a/arch/sh/boot/compressed/head_64.S b/arch/sh/boot/compressed/head_64.S
-> index 9993113..8b4d540 100644
-> --- a/arch/sh/boot/compressed/head_64.S
-> +++ b/arch/sh/boot/compressed/head_64.S
-> @@ -132,6 +132,10 @@ startup:
->         addi    r22, 4, r22
->         bne     r22, r23, tr1
->
-> +       movi    datalabel __stack_chk_guard, r0
-> +       movi    0x000a0dff, r1
-> +       st.l    r0, 0, r1
-> +
->         /*
->          * Decompress the kernel.
->          */
-> diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
-> index 627ce8e..fe4c079 100644
-> --- a/arch/sh/boot/compressed/misc.c
-> +++ b/arch/sh/boot/compressed/misc.c
-> @@ -106,11 +106,6 @@ static void error(char *x)
->
->  unsigned long __stack_chk_guard;
->
-> -void __stack_chk_guard_setup(void)
-> -{
-> -       __stack_chk_guard = 0x000a0dff;
-> -}
-> -
->  void __stack_chk_fail(void)
->  {
->         error("stack-protector: Kernel stack is corrupted\n");
-> @@ -130,8 +125,6 @@ void decompress_kernel(void)
->  {
->         unsigned long output_addr;
->
-> -       __stack_chk_guard_setup();
-> -
->  #ifdef CONFIG_SUPERH64
->         output_addr = (CONFIG_MEMORY_START + 0x2000);
->  #else
 > --
-> 2.7.0
->
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
