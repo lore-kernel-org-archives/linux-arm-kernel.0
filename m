@@ -1,10 +1,10 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 13 Mar 2018 14:13:23 +0900
+Date: Tue, 13 Mar 2018 14:18:45 +0900
 Subject: [PATCH] arm: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
 In-Reply-To: <20180313045357epcms1p34fb1e2ad09a8288017058c414c21ce26@epcms1p3>
 References: <CGME20180313045357epcms1p34fb1e2ad09a8288017058c414c21ce26@epcms1p3>
  <20180313045357epcms1p34fb1e2ad09a8288017058c414c21ce26@epcms1p3>
-Message-ID: <e279a3cf-c231-65b8-f966-de35e7df3035@samsung.com>
+Message-ID: <4eb795d0-42ce-a8e1-00c5-b779a5fe282c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +13,14 @@ On 03/13/2018 01:53 PM, Jinbum Park wrote:
 > 
 > Basic test has passed on Raspberry Pi2, Raspbian jessi lite with
 > CONFIG_UBSAN_SANITIZE_ALL, CONFIG_UBSAN_NULL.
+
+This patch had been already sent from Seungwoo.
+
+https://patchwork.kernel.org/patch/9344477/
+
+Best Regards,
+Jaehoon Chung
+
 > 
 > Signed-off-by: Jinbum Park <jinb.park@samsung.com>
 > ---
