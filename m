@@ -1,243 +1,317 @@
 From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Tue, 13 Mar 2018 15:32:09 +0200
-Subject: [PATCH v12 1/3] arm: npcm: add basic support for Nuvoton BMCs
+Date: Tue, 13 Mar 2018 15:32:10 +0200
+Subject: [PATCH v12 2/3] arm: dts: add Nuvoton NPCM750 device tree
 In-Reply-To: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
 References: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
-Message-ID: <1520947931-15426-2-git-send-email-tmaimon77@gmail.com>
+Message-ID: <1520947931-15426-3-git-send-email-tmaimon77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic support for the Nuvoton NPCM750 BMC.
+Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+specific device tree for the NPCM750 (Poleg) evaluation board.
 
 Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
 Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+Reviewed-by: Joel Stanley <joel@jms.id.au>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Tested-by: Avi Fishman <avifishman70@gmail.com>
+Tested-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/Kconfig             |  2 ++
- arch/arm/Makefile            |  1 +
- arch/arm/mach-npcm/Kconfig   | 30 ++++++++++++++++
- arch/arm/mach-npcm/Makefile  |  6 ++++
- arch/arm/mach-npcm/headsmp.S | 17 ++++++++++
- arch/arm/mach-npcm/npcm7xx.c | 23 +++++++++++++
- arch/arm/mach-npcm/platsmp.c | 81 ++++++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 160 insertions(+)
- create mode 100644 arch/arm/mach-npcm/Kconfig
- create mode 100644 arch/arm/mach-npcm/Makefile
- create mode 100644 arch/arm/mach-npcm/headsmp.S
- create mode 100644 arch/arm/mach-npcm/npcm7xx.c
- create mode 100644 arch/arm/mach-npcm/platsmp.c
+ .../arm/cpu-enable-method/nuvoton,npcm750-smp      |  42 ++++++
+ .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  35 +++++
+ arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 165 +++++++++++++++++++++
+ 5 files changed, 250 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
+ create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
+ create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+ create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7e3d53575486..6a8404cd5150 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -779,6 +779,8 @@ source "arch/arm/mach-netx/Kconfig"
- 
- source "arch/arm/mach-nomadik/Kconfig"
- 
-+source "arch/arm/mach-npcm/Kconfig"
-+
- source "arch/arm/mach-nspire/Kconfig"
- 
- source "arch/arm/plat-omap/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index e83f5161fdd8..e4e537f27339 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -196,6 +196,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
- machine-$(CONFIG_ARCH_MXS)		+= mxs
- machine-$(CONFIG_ARCH_NETX)		+= netx
- machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
-+machine-$(CONFIG_ARCH_NPCM)		+= npcm
- machine-$(CONFIG_ARCH_NSPIRE)		+= nspire
- machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
- machine-$(CONFIG_ARCH_OMAP1)		+= omap1
-diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
+diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
 new file mode 100644
-index 000000000000..684c9c9a32bd
+index 000000000000..8e043301e28e
 --- /dev/null
-+++ b/arch/arm/mach-npcm/Kconfig
-@@ -0,0 +1,30 @@
-+menuconfig ARCH_NPCM
-+	bool "Nuvoton NPCM Architecture"
-+	depends on ARCH_MULTI_V7
-+	select PINCTRL
++++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
+@@ -0,0 +1,42 @@
++=========================================================
++Secondary CPU enable-method "nuvoton,npcm750-smp" binding
++=========================================================
 +
-+if ARCH_NPCM
++To apply to all CPUs, a single "nuvoton,npcm750-smp" enable method should be
++defined in the "cpus" node.
 +
-+config ARCH_NPCM7XX
-+	bool "Support for NPCM7xx BMC (Poleg)"
-+	depends on ARCH_MULTI_V7
-+	select PINCTRL_NPCM7XX
-+	select NPCM7XX_TIMER
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CACHE_L2X0
-+	select ARM_GIC
-+	select HAVE_ARM_TWD if SMP
-+	select HAVE_ARM_SCU if SMP
-+	select ARM_ERRATA_764369 if SMP
-+	select ARM_ERRATA_720789
-+	select ARM_ERRATA_754322
-+	select ARM_ERRATA_794072
-+	select PL310_ERRATA_588369
-+	select PL310_ERRATA_727915
-+	select MFD_SYSCON
-+	help
-+	  General support for NPCM7xx BMC (Poleg).
++Enable method name:	"nuvoton,npcm750-smp"
++Compatible machines:	"nuvoton,npcm750"
++Compatible CPUs:	"arm,cortex-a9"
++Related properties:	(none)
 +
-+	  Nuvoton NPCM7xx BMC based on the Cortex A9.
++Note:
++This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
++"nuvoton,npcm750-gcr".
 +
-+endif
-diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
++Example:
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "nuvoton,npcm750-smp";
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			clocks = <&clk NPCM7XX_CLK_CPU>;
++			clock-names = "clk_cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			clocks = <&clk NPCM7XX_CLK_CPU>;
++			clock-names = "clk_cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++	};
++
+diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
 new file mode 100644
-index 000000000000..227aebbfeb40
+index 000000000000..2d87d9ecea85
 --- /dev/null
-+++ b/arch/arm/mach-npcm/Makefile
++++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
 @@ -0,0 +1,6 @@
-+AFLAGS_headsmp.o		+= -march=armv7-a
++NPCM Platforms Device Tree Bindings
++-----------------------------------
++NPCM750 SoC
++Required root node properties:
++	- compatible = "nuvoton,npcm750";
 +
-+obj-$(CONFIG_ARCH_NPCM7XX)	+= npcm7xx.o
-+obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+
-+
-diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ade7a38543dc..eeab5dac50ab 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -304,6 +304,8 @@ dtb-$(CONFIG_ARCH_LPC18XX) += \
+ dtb-$(CONFIG_ARCH_LPC32XX) += \
+ 	lpc3250-ea3250.dtb \
+ 	lpc3250-phy3250.dtb
++dtb-$(CONFIG_ARCH_NPCM750) += \
++	nuvoton-npcm750-evb.dtb
+ dtb-$(CONFIG_MACH_MESON6) += \
+ 	meson6-atv1200.dtb
+ dtb-$(CONFIG_MACH_MESON8) += \
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
 new file mode 100644
-index 000000000000..c083fe09a07b
+index 000000000000..cabde3d5be8a
 --- /dev/null
-+++ b/arch/arm/mach-npcm/headsmp.S
-@@ -0,0 +1,17 @@
++++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+@@ -0,0 +1,35 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2018 Nuvoton Technology corporation.
 +// Copyright 2018 Google, Inc.
 +
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+#include <asm/assembler.h>
++/dts-v1/;
++#include "nuvoton-npcm750.dtsi"
 +
-+/*
-+ * The boot ROM does not start secondary CPUs in SVC mode, so we need to do that
-+ * here.
-+ */
-+ENTRY(npcm7xx_secondary_startup)
-+	safe_svcmode_maskall r0
++/ {
++	model = "Nuvoton npcm750 Development Board (Device Tree)";
++	compatible = "nuvoton,npcm750";
 +
-+	b	secondary_startup
-+ENDPROC(npcm7xx_secondary_startup)
-diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
-new file mode 100644
-index 000000000000..a039dc755561
---- /dev/null
-+++ b/arch/arm/mach-npcm/npcm7xx.c
-@@ -0,0 +1,23 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology corporation.
-+// Copyright 2018 Google, Inc.
++	chosen {
++		stdout-path = &serial3;
++	};
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/map.h>
-+#include <asm/hardware/cache-l2x0.h>
-+
-+static const char *const npcm7xx_dt_match[] = {
-+	"nuvoton,npcm750",
-+	"nuvoton,npcm730",
-+	NULL
++	memory {
++		reg = <0 0x40000000>;
++	};
 +};
 +
-+DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
-+	.atag_offset	= 0x100,
-+	.dt_compat	= npcm7xx_dt_match,
-+	.l2c_aux_val	= 0x0,
-+	.l2c_aux_mask	= ~0x0,
-+MACHINE_END
-diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
++&serial0 {
++	status = "okay";
++};
++
++&serial1 {
++	status = "okay";
++};
++
++&serial2 {
++	status = "okay";
++};
++
++&serial3 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
 new file mode 100644
-index 000000000000..21633c70fe7f
+index 000000000000..839e45cfd695
 --- /dev/null
-+++ b/arch/arm/mach-npcm/platsmp.c
-@@ -0,0 +1,81 @@
++++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+@@ -0,0 +1,165 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2018 Nuvoton Technology corporation.
 +// Copyright 2018 Google, Inc.
 +
-+#define pr_fmt(fmt) "nuvoton,npcm7xx-smp: " fmt
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&gic>;
 +
-+#define NPCM7XX_SCRPAD_REG 0x13c
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "nuvoton,npcm750-smp";
 +
-+extern void npcm7xx_secondary_startup(void);
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			clocks = <&clk 10>;
++			clock-names = "clk_cpu";
++			reg = <0>;
++			next-level-cache = <&l2>;
++		};
 +
-+static int npcm7xx_smp_boot_secondary(unsigned int cpu,
-+				      struct task_struct *idle)
-+{
-+	struct device_node *gcr_np;
-+	void __iomem *gcr_base;
-+	int ret = 0;
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			clocks = <&clk 10>;
++			clock-names = "clk_cpu";
++			reg = <1>;
++			next-level-cache = <&l2>;
++		};
++	};
 +
-+	gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
-+	if (!gcr_np) {
-+		pr_err("no gcr device node\n");
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+	gcr_base = of_iomap(gcr_np, 0);
-+	if (!gcr_base) {
-+		pr_err("could not iomap gcr");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
++	/* external clock signal rg1refck, supplied by the phy */
++	clk-rg1refck {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++	};
 +
-+	/* give boot ROM kernel start address. */
-+	iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
-+		  NPCM7XX_SCRPAD_REG);
-+	/* make sure the previous write is seen by all observers. */
-+	dsb_sev();
++	/* external clock signal rg2refck, supplied by the phy */
++	clk-rg2refck {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++	};
 +
-+	iounmap(gcr_base);
-+out:
-+	return ret;
-+}
++	clk-xin {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <50000000>;
++	};
 +
-+static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *scu_np;
-+	void __iomem *scu_base;
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		ranges = <0x0 0xf0000000 0x00900000>;
 +
-+	scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	if (!scu_np) {
-+		pr_err("no scu device node\n");
-+		return;
-+	}
-+	scu_base = of_iomap(scu_np, 0);
-+	if (!scu_base) {
-+		pr_err("could not iomap scu");
-+		return;
-+	}
++		gcr: gcr at 800000 {
++			compatible = "nuvoton,npcm750-gcr", "syscon",
++				"simple-mfd";
++			reg = <0x800000 0x1000>;
++		};
 +
-+	scu_enable(scu_base);
++		scu: scu at 3fe000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0x3fe000 0x1000>;
++		};
 +
-+	iounmap(scu_base);
-+}
++		l2: cache-controller at 3fc000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x3fc000 0x1000>;
++			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++			cache-unified;
++			cache-level = <2>;
++			clocks = <&clk 22>;
++			arm,shared-override;
++		};
 +
-+static struct smp_operations npcm7xx_smp_ops __initdata = {
-+	.smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
-+	.smp_boot_secondary = npcm7xx_smp_boot_secondary,
++		gic: interrupt-controller at 3ff000 {
++			compatible = "arm,cortex-a9-gic";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x3ff000 0x1000>,
++			    <0x3fe100 0x100>;
++		};
++
++		timer at 3fe600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x3fe600 0x20>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++						  IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&clk 15>;
++		};
++	};
++
++	ahb {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		ranges;
++
++		clk: clock-controller at f0801000 {
++			compatible = "nuvoton,npcm750-clk";
++			#clock-cells = <1>;
++			reg = <0xf0801000 0x1000>;
++		};
++
++		apb {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			interrupt-parent = <&gic>;
++			ranges = <0x0 0xf0000000 0x00300000>;
++
++			timer0: timer at 8000 {
++				compatible = "nuvoton,npcm750-timer";
++				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x8000 0x1000>;
++				clocks = <&clk 15>;
++			};
++
++			serial0: serial at 1000 {
++				compatible = "ns16550a";
++				reg = <0x1000 0x1000>;
++				clocks = <&clk 14>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++
++			serial1: serial at 2000 {
++				compatible = "ns16550a";
++				reg = <0x2000 0x1000>;
++				clocks = <&clk 14>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++
++			serial2: serial at 3000 {
++				compatible = "ns16550a";
++				reg = <0x3000 0x1000>;
++				clocks = <&clk 14>;
++				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++
++			serial3: serial at 4000 {
++				compatible = "ns16550a";
++				reg = <0x4000 0x1000>;
++				clocks = <&clk 14>;
++				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++				reg-shift = <2>;
++				status = "disabled";
++			};
++		};
++	};
 +};
-+
-+CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm750-smp", &npcm7xx_smp_ops);
 -- 
 2.14.1
