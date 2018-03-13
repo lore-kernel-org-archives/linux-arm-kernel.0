@@ -1,53 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2018 12:41:41 +0100
-Subject: [PATCH] arm64: fix undefined reference to 'printk'
-Message-ID: <20180313114202.1977512-1-arnd@arndb.de>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Tue, 13 Mar 2018 17:16:33 +0530
+Subject: [alsa-devel] [PATCH v4 15/24] ASoC: qdsp6: q6core: Add q6core
+ driver
+In-Reply-To: <20180310022456.26739-16-srinivas.kandagatla@linaro.org>
+References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
+ <20180310022456.26739-16-srinivas.kandagatla@linaro.org>
+Message-ID: <21207441-4e81-284e-343c-bdeb01c9d06f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The printk symbol was intended as a generic address that is always
-exported, however that turned out to be false with CONFIG_PRINTK=n:
 
-ERROR: "printk" [arch/arm64/kernel/arm64-reloc-test.ko] undefined!
 
-This changes the references to memstart_addr, which should be there
-regardless of configuration.
+On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+[..]
+> +static int q6core_get_svc_versions(struct q6core *core)
+> +{
+> +	struct apr_device *adev = core->adev;
+> +	struct apr_hdr hdr = {0};
+> +	int rc;
+> +
+> +	core->get_version_supported = true;
 
-Fixes: a257e02579e4 ("arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419")
-Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/kernel/reloc_test_core.c | 2 +-
- arch/arm64/kernel/reloc_test_syms.S | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+core->get_version_supported should be set to true only after we get proper response from adsp in callback(). In case,we get wrong response from adsp, memory for g_core->svc_version
+  will not get allocated and there will be NULL pointer dereference in  q6core_get_svc_api_info() in below statement
++	} else if (g_core->get_version_supported) {
++		for (i = 0; i < g_core->svc_version->num_services; i++) {
+  
 
-diff --git a/arch/arm64/kernel/reloc_test_core.c b/arch/arm64/kernel/reloc_test_core.c
-index a70489c584c7..5915ce5759cc 100644
---- a/arch/arm64/kernel/reloc_test_core.c
-+++ b/arch/arm64/kernel/reloc_test_core.c
-@@ -45,7 +45,7 @@ static struct {
- 	{ "R_AARCH64_MOVW_SABS_Gn",	signed_movw, UL(SYM64_ABS_VAL) },
- 	{ "R_AARCH64_MOVW_UABS_Gn",	unsigned_movw, UL(SYM64_ABS_VAL) },
- 	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp, (u64)&sym64_rel },
--	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp_far, (u64)&printk },
-+	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp_far, (u64)&memstart_addr },
- 	{ "R_AARCH64_ADR_PREL_LO21",	relative_adr, (u64)&sym64_rel },
- 	{ "R_AARCH64_PREL64",		relative_data64, (u64)&sym64_rel },
- 	{ "R_AARCH64_PREL32",		relative_data32, (u64)&sym64_rel },
-diff --git a/arch/arm64/kernel/reloc_test_syms.S b/arch/arm64/kernel/reloc_test_syms.S
-index f333b4b7880d..2b8d9cb8b078 100644
---- a/arch/arm64/kernel/reloc_test_syms.S
-+++ b/arch/arm64/kernel/reloc_test_syms.S
-@@ -54,8 +54,8 @@ ENDPROC(relative_adrp)
- 	.align	12
- 	.space	0xffc
- ENTRY(relative_adrp_far)
--	adrp	x0, printk
--	add	x0, x0, #:lo12:printk
-+	adrp	x0, memstart_addr
-+	add	x0, x0, #:lo12:memstart_addr
- 	ret
- ENDPROC(relative_adrp_far)
- 
--- 
-2.9.0
+> +	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+> +				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+> +	hdr.pkt_size = APR_HDR_SIZE;
+> +	hdr.opcode = AVCS_GET_VERSIONS;
+> +
+> +	rc = apr_send_pkt(adev, &hdr);
+> +	if (rc < 0)
+> +		return rc;
+> +
