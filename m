@@ -1,87 +1,66 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Tue, 13 Mar 2018 17:51:29 +0100
-Subject: [PATCH 3/5] arm64: dts: allwinner: a64: add simplefb for A64 SoC
-In-Reply-To: <20180313153522.haeemlqbtuei5zb3@flea>
-References: <20180312161050.7647-1-harald@ccbib.org>
- <20180312161050.7647-4-harald@ccbib.org>
- <20180313082724.7optc2xwgqoiibtx@flea>
- <E1evg4e-0000Qj-2w@stardust.g4.wien.funkfeuer.at>
- <20180313153522.haeemlqbtuei5zb3@flea>
-Message-ID: <E1evn97-0000U0-Fp@stardust.g4.wien.funkfeuer.at>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Tue, 13 Mar 2018 17:55:35 +0100
+Subject: [PATCH v1 1/1] dmaengine: stm32-dmamux: fix a potential buffer
+ overflow
+Message-ID: <1520960135-26575-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard writes:
-> Hi,
-> 
-> On Tue, Mar 13, 2018 at 10:18:22AM +0100, Harald Geyer wrote:
->> Maxime Ripard writes:
->>> On Mon, Mar 12, 2018 at 04:10:48PM +0000, Harald Geyer wrote:
->>>> The A64 SoC features two display pipelines, one has a LCD output, the
->>>> other has a HDMI output.
->>>>
->>>> Add support for simplefb for the LCD output. Tested on Teres I.
->>>>
->>>> This patch was inspired by work of Icenowy Zheng.
->>>>
->>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
->>>> ---
->>>> arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 ++++++++++++++++++++
->>>> 1 file changed, 20 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> index ca1b365bc722..05d5e8def68a 100644
->>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>>> @@ -52,6 +52,26 @@
->>>> 	#address-cells = <1>;
->>>> 	#size-cells = <1>;
->>>>
->>>> +	chosen {
->>>> +		#address-cells = <1>;
->>>> +		#size-cells = <1>;
->>>> +		ranges;
->>>> +
->>>> +/*
->>>> + * The pipeline mixer0-lcd0 depends on clock CLK_MIXER0 from DE2 CCU.
->>>> + * However there is no support for this clock on A64 yet, so we depend
->>>> + * on the upstream clocks here to keep them (and thus CLK_MIXER0) up.
->>>> + */
->>> 
->>> There's definitely support for the CLK_MIXER0 clock in the DE2 CCU
->>> driver, so I guess this would need to be amended / fixed
->> 
->> AFAIK on the A64 a special sram quirk is necessary, that never got merged:
->> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574303.html
->> 
->> I asked Icenowy if I should resubmit her patch as part of this series,
->> but was told further discussion is necessary. I'm sure she can better
->> explain the details than me.
->> 
->> Actually if it wasn't for the sram quirk, there is a simplefb patch by
->> her, that could have been merged long ago:
->> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574304.html
-> 
-> The issue with your patch is that, as soon as that clock is
-> functional, the DT with the node you were introducing here will no
-> longer be.
-> 
-> And since people use their firmware DT or put them in NOR these days,
-> you can't really expect them to update them every release either.
+The bitfield dma_inuse is allocated of size dma_requests bits, thus a
+valid bit address is from 0 to (dma_requests - 1).
+When find_first_zero_bit() fails, it returns dma_requests as invalid
+address.
+Using such address for the following set_bit() is incorrect and, if
+dma_requests is a multiple of BITS_PER_LONG, it will cause a buffer
+overflow.
+Currently this driver is only used in DT stm32h743.dtsi where a safe value
+dma_requests=16 is not triggering the buffer overflow.
 
-How is this a problem? - The clock can't be functional without adding
-a DT node for it's driver. So the breakage can only happen on DT update,
-which means we can avoid it, by moving the clocks to the proper places
-when we add the node actually using them for real.
+Fixed by checking the return value of find_first_zero_bit() _before_
+using it.
 
-> I guess a proper solution would be to respin that patch.
+Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+    v1:
+       * Initial
+---
+---
+ drivers/dma/stm32-dmamux.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Sure, but as mentioned above I offered to do that and was told not to.
-
-As a compromise I could also move the simple framebuffer node from the
-A64 dtsi to the teres-i dts, where we know that the DT can be updated
-easily?
-
-Thanks for your consideration,
-Harald
+diff --git a/drivers/dma/stm32-dmamux.c b/drivers/dma/stm32-dmamux.c
+index 4dbb30c..b922db9 100644
+--- a/drivers/dma/stm32-dmamux.c
++++ b/drivers/dma/stm32-dmamux.c
+@@ -118,14 +118,15 @@ static void *stm32_dmamux_route_allocate(struct of_phandle_args *dma_spec,
+ 	spin_lock_irqsave(&dmamux->lock, flags);
+ 	mux->chan_id = find_first_zero_bit(dmamux->dma_inuse,
+ 					   dmamux->dma_requests);
+-	set_bit(mux->chan_id, dmamux->dma_inuse);
+-	spin_unlock_irqrestore(&dmamux->lock, flags);
+ 
+ 	if (mux->chan_id == dmamux->dma_requests) {
++		spin_unlock_irqrestore(&dmamux->lock, flags);
+ 		dev_err(&pdev->dev, "Run out of free DMA requests\n");
+ 		ret = -ENOMEM;
+-		goto error;
++		goto error_chan_id;
+ 	}
++	set_bit(mux->chan_id, dmamux->dma_inuse);
++	spin_unlock_irqrestore(&dmamux->lock, flags);
+ 
+ 	/* Look for DMA Master */
+ 	for (i = 1, min = 0, max = dmamux->dma_reqs[i];
+@@ -173,6 +174,8 @@ static void *stm32_dmamux_route_allocate(struct of_phandle_args *dma_spec,
+ 
+ error:
+ 	clear_bit(mux->chan_id, dmamux->dma_inuse);
++
++error_chan_id:
+ 	kfree(mux);
+ 	return ERR_PTR(ret);
+ }
+-- 
+2.7.4
