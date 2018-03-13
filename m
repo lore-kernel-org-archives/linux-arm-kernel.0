@@ -1,55 +1,43 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 13 Mar 2018 15:23:06 +0100
-Subject: [PATCH 2/2] iio: adc: stm32-dfsdm: fix sample rate for div2 spi clock
-In-Reply-To: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
-References: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1520950986-23116-3-git-send-email-fabrice.gasnier@st.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 13 Mar 2018 15:26:18 +0100
+Subject: [PATCH 18/31] perf vendor events arm64: Add armv8-recommended.json
+In-Reply-To: <20180313120508.29327-19-acme@kernel.org>
+References: <20180313120508.29327-1-acme@kernel.org>
+ <20180313120508.29327-19-acme@kernel.org>
+Message-ID: <20180313142618.36je6syqg6ppwhbp@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When channel clk source is set to "CLKOUT_F" or "CLKOUT_R" (e.g. div2),
-sample rate is currently set to half the requested value.
 
-Fixes: eca949800d2d ("IIO: ADC: add stm32 DFSDM support for PDM
-microphone")
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-dfsdm-adc.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+> From: John Garry <john.garry@huawei.com>
+> 
+> Add JSON for ARMv8 IMPLEMENTATION DEFINED recommended events.
+> 
+> The JSON is copied from ARMv8 architecture reference manual, available
+> here:
+> 
+> 	https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf
+> 
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Cc: Andi Kleen <ak@linux.intel.com>
+> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> Cc: Jiri Olsa <jolsa@redhat.com>
+> Cc: Namhyung Kim <namhyung@kernel.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: William Cohen <wcohen@redhat.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linuxarm at huawei.com
+> Link: http://lkml.kernel.org/r/1520506716-197429-9-git-send-email-john.garry at huawei.com
+> Signed-off-by: John Garry <john.garry@huawei.com>
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index dc911b6..b28a716 100644
---- a/drivers/iio/adc/stm32-dfsdm-adc.c
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -771,7 +771,7 @@ static int stm32_dfsdm_write_raw(struct iio_dev *indio_dev,
- 	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
- 	struct stm32_dfsdm_filter *fl = &adc->dfsdm->fl_list[adc->fl_id];
- 	struct stm32_dfsdm_channel *ch = &adc->dfsdm->ch_list[chan->channel];
--	unsigned int spi_freq = adc->spi_freq;
-+	unsigned int spi_freq;
- 	int ret = -EINVAL;
- 
- 	switch (mask) {
-@@ -785,8 +785,18 @@ static int stm32_dfsdm_write_raw(struct iio_dev *indio_dev,
- 	case IIO_CHAN_INFO_SAMP_FREQ:
- 		if (!val)
- 			return -EINVAL;
--		if (ch->src != DFSDM_CHANNEL_SPI_CLOCK_EXTERNAL)
-+
-+		switch (ch->src) {
-+		case DFSDM_CHANNEL_SPI_CLOCK_INTERNAL:
- 			spi_freq = adc->dfsdm->spi_master_freq;
-+			break;
-+		case DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_FALLING:
-+		case DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_RISING:
-+			spi_freq = adc->dfsdm->spi_master_freq / 2;
-+			break;
-+		default:
-+			spi_freq = adc->spi_freq;
-+		}
- 
- 		if (spi_freq % val)
- 			dev_warn(&indio_dev->dev,
--- 
-1.9.1
+That's not a valid SOB chain, author != first-Signed-off-by.
+
+Thanks,
+
+	Ingo
