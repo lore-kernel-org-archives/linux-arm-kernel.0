@@ -1,41 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2018 22:38:57 +0100
-Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.17
-In-Reply-To: <20180313195259.20496-1-f.fainelli@gmail.com>
+Date: Tue, 13 Mar 2018 22:42:28 +0100
+Subject: [GIT PULL 2/2] Broadcom defconfig changes for 4.17
+In-Reply-To: <20180313195259.20496-2-f.fainelli@gmail.com>
 References: <20180313195259.20496-1-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a224VHwAW3j1WAAxe7G50ctaiHSfaqj2mU_aheWMoA_NQ@mail.gmail.com>
+ <20180313195259.20496-2-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a1VNpBLrdfB178errkiLaCn7D_1V-wXb-DWR-N6OcVHtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Mar 13, 2018 at 8:52 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.17/defconfig
+>
+> for you to fetch changes up to 437fe668ab5ecdfd312605b0da15cf9138101d3f:
+>
+>   Merge tag 'bcm2835-defconfig-next-2018-02-28' into defconfig/next (2018-02-28 15:36:51 -0800)
+>
 > ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoCs devicetree changes
-> for 4.17, please pull the following:
+> This pull request contains multi_v7_defconfig changes for Broadcom
+> ARM-based SoC for 4.17, please pull the following:
 >
-> - Henry fixes the pin functions for the JTAG pins, nothing uses this for
->   now, but it could be backported eventually if deemed appropriate
+> - Tuomas enables the BCM2835 AUX driver which is necessary to provide
+>   console on the Raspberry Pi 3
 >
-> - Stefan fixes the register ranges for the bcm2835-i2s nodes in the
->   binding document definition, he then fixes the probing of the
->   bcm2835-i2s driver by providing an appropriate register range and a
->   missing clock. Stefan also makes sure that the appropriate pull
->   settings are applied to the pins used on the Raspberry Pi Zero
->   Wireless, he then adds the necessary UART node to connected to the
->   BCM43438 Bluetooth adapter on the Pi Zero W. He finally enables USB
->   OTG mode on the Pi Zero W since he became usable again
+> - Stefan turns on support for the BCM43438 Bluetooth adapter connected
+>   via UART on the Raspberry Pi Zero Wireless and he also turns on
+>   support for the thermal driver on the Pi 2 and 3.
 >
-> - Baruch adds the necessary Device Tree nodes to support the Raspberry
->   Pi GPIO expander which is controlled via the VC4 firmware
->
-> - Hiroshi adds the missing LEDs on the Buffalo WZR-900DHP router
->
-> - Eric adds the DPI hardware block into the BCM283x Device Tree include
->   file for future use when an actual panel is available
->
-> - Florian updates the Northstar Plus platforms to use port 8 of the
->   internal switch as the CPU/management port since necessary code was
->   added in the b53 switch driver to support that
 
-Pulled into next/dt, thanks!
+Pulled into next/soc, thanks!
 
-      Arnd
+       Arnd
