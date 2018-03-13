@@ -1,81 +1,57 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Tue, 13 Mar 2018 11:03:33 +0100
-Subject: [PATCH 2/5] arm64: dts: allwinner: a64: Add watchdog
-In-Reply-To: <29bb31fc-dd3d-e9c5-c78e-f8e80f7a95fa@arm.com>
-References: <20180312161050.7647-1-harald@ccbib.org>
- <20180312161050.7647-3-harald@ccbib.org>
- <29bb31fc-dd3d-e9c5-c78e-f8e80f7a95fa@arm.com>
-Message-ID: <E1evgmL-0000KW-JP@stardust.g4.wien.funkfeuer.at>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 13 Mar 2018 11:04:42 +0100
+Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
+In-Reply-To: <CAKv+Gu-HdLkjYeNBQOW=JuWt3GjdZJFjyXCHCbGU01hkO81BNg@mail.gmail.com>
+References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
+ <20180301152450.GA4061@kroah.com>
+ <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
+ <20180302165415.GB8704@kroah.com>
+ <CAKv+Gu-HdLkjYeNBQOW=JuWt3GjdZJFjyXCHCbGU01hkO81BNg@mail.gmail.com>
+Message-ID: <20180313100442.GB1999@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Andr? Przywara writes:
-> On 12/03/18 16:10, Harald Geyer wrote:
-> > Add a watchdog node for the A64, automatically enabled on all boards.
-> > Tested on Olimex Teres I.
-> > 
-> > Signed-off-by: Harald Geyer <harald@ccbib.org>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > index 64e452a758fa..ca1b365bc722 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > @@ -665,5 +665,11 @@
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> >  		};
-> > +
-> > +		wdt0: watchdog at 1c20ca0 {
-> > +			compatible = "allwinner,sun6i-a31-wdt";
+On Wed, Mar 07, 2018 at 06:24:09PM +0000, Ard Biesheuvel wrote:
+> On 2 March 2018 at 16:54, Greg KH <greg@kroah.com> wrote:
+> > On Fri, Mar 02, 2018 at 05:14:50PM +0800, Alex Shi wrote:
+> >>
+> >>
+> >> On 03/01/2018 11:24 PM, Greg KH wrote:
+> >> > On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
+> >> >> Hi All,
+> >> >>
+> >> >> This backport patchset fixed the meltdown issue, it's original branch:
+> >> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+> >> >> A few dependency or fixingpatches are also picked up, if they are necessary
+> >> >>  and no functional changes.
+> >> >>
+> >> >> The patchset also on repository:
+> >> >>    git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2
+> >> >>
+> >> >> No bug found yet from kernelci.org and lkft testing.
+> >> >
+> >> > No bugs is good, but does it actually fix the meltdown problem?  What
+> >> > did you test it on?
+> >>
+> >> Oh, I have no A73/A75 cpu, so I can not reproduce meltdown bug.
+> >
+> > Then why should I trust this backport at all?
+> >
+> > Please test on the hardware that is affected, otherwise you do not know
+> > if your patches do anything or not.
+> >
 > 
-> Please use the recommended way, adding a specific compatible first:
-> 
-> 			compatible = "allwinner,sun50i-a64-wdt",
-> 				     "allwinner,sun6i-a31-wdt";
+> I don't think it is feasible to test these backports by confirming
+> that they make the fundamental issue go away. We simply don't have the
+> code to reproduce all the variants, and we have to rely on the
+> information provided by ARM Ltd. regarding which cores are affected
+> and which aren't.
 
-I tried to follow the style most commonly used in the rest of the file,
-but I can add the new string to the binding documentation and use it here.
+You really don't have the reproducers?  Please work with ARM to resolve
+that, this should not be a non-tested set of patches.  That's really
+worse than no patches at all, as if they were applied, that would
+provide a false-sense of "all is fixed".
 
-> The rest looks correct.
-> 
-> I am just a bit puzzled what's the use of a watchdog on a laptop?
+thanks,
 
-I guess the same as the watchdog on my x86 PC - debugging/testing software
-using watchdogs. ;)
-
-> I
-> would expect it being more used in embedded systems? Or is that patch
-> here actually independent from the Teres I?
-
-Yes, I could have sent it as independent patch, but I figured merging
-is easier if there aren't independent patches touching the same file at
-the same time.
-
-I mostly added support for the watchdog because it was listed in the
-wiki as untested and it cost me virtually no time to run a few tests while
-working on the teres.
-
-Thanks,
-Harald
-
-> Cheers,
-> Andre.
-> 
-> > +			reg = <0x01c20ca0 0x20>;
-> > +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> > +		};
-> >  	};
-> >  };
-> > 
-> 
-
--- 
-If you want to support my work:
-see http://friends.ccbib.org/harald/supporting/
-or donate via CLAM to xASPBtezLNqj4cUe8MT5nZjthRSEjrRQXN
-or via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+greg k-h
