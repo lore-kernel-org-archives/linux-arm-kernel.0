@@ -1,124 +1,26 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 13 Mar 2018 19:08:46 +0530
-Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
-In-Reply-To: <20171011094148.15674-4-punit.agrawal@arm.com>
-References: <20171011094148.15674-4-punit.agrawal@arm.com>
-Message-ID: <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
+From: chris@64studio.com (Chris Obbard)
+Date: Tue, 13 Mar 2018 13:39:44 +0000
+Subject: [linux-sunxi] Re: [PATCH v2 6/6] ASoC: sun4i-i2s: Add support for
+ loopback
+In-Reply-To: <20180312183521.GP2186@sirena.org.uk>
+References: <20180312155753.9478-1-codekipper@gmail.com>
+ <20180312155753.9478-7-codekipper@gmail.com>
+ <20180312183521.GP2186@sirena.org.uk>
+Message-ID: <CAP03XeoaYcMrzv3+K83wGUaDn6ZcCDzePdVNcjAqJ4QrF-WLSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Mark,
 
-On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
-> The kernel crashes while iterating over a redistributor that is
-> in-correctly sized by the platform firmware or doesn't contain the last
-> record.
-> 
-> Prevent the crash by checking accesses against the size of the region
-> provided by the firmware. While we are at it, warn the user about
-> incorrect region size.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>
+>> +- loopback:  if this property is present then the dai is configured in
+>> +             loopback mode where the output fifo is redirected to the input
+>> +             fifo.
+>
+> This really doesn't seem like something that ought to go into the DT
+> and hence ABI given that there's obviously no reason to use this in
+> production.  Just make it be a #define in the code or something.
 
-Sorry to bring up an old thread. Just wanted to check what is the status
-on this series.
-
-This will also be useful when we try to boot linux + hypervisor with
-less number of cores than the SoC supports. For example:
-- SoC has 4 cores and Linux tries to boot with 2 cores.
-- then a type-2 hypervisor gets installed.
-- Hypervisor tries to boot a VM with linux on core 1.
-
-Now the VM boot will fail while it iterates over all the GICR regions
-till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
-regions of any invalid cpus(cpu 2, cpu 3 in this case).
-
-If the $patch is not the right approach, can you suggest on how to
-handle the above scenario?
-
-Thanks and regards,
-Lokesh
-
-> ---
->  drivers/irqchip/irq-gic-v3.c | 48 ++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 40 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 881d327c53fa..754d936c95e5 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -429,11 +429,21 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
->  	int i;
->  
->  	for (i = 0; i < gic_data.nr_redist_regions; i++) {
-> -		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
->  		struct resource *res = &gic_data.redist_regions[i].res;
-> -		u64 typer;
-> +		void __iomem *ptr, *base;
-> +		u64 typer, size, stride;
->  		u32 reg;
->  
-> +		ptr = base = gic_data.redist_regions[i].redist_base;
-> +		size = resource_size(res);
-> +
-> +		stride = gic_data.redist_stride ?: SZ_64K * 2;
-> +		if (ptr + stride > base + size) {
-> +			pr_warn("Insufficient size for redistributor region @%llx. Skipping\n",
-> +				res->start);
-> +			continue;
-> +		}
-> +
->  		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
->  		if (reg != GIC_PIDR2_ARCH_GICv3 &&
->  		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
-> @@ -442,7 +452,28 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
->  		}
->  
->  		do {
-> +			/*
-> +			 * We can access GICR_TYPER as we have already
-> +			 * checked that we have atleast 128kB or
-> +			 * redist_stride
-> +			 */
->  			typer = gic_read_typer(ptr + GICR_TYPER);
-> +			if (!gic_data.redist_stride &&
-> +			    (typer & GICR_TYPER_VLPIS)) {
-> +				/* VLPI_base + reserved page */
-> +				stride += SZ_64K * 2;
-> +
-> +				/*
-> +				 * We are larger than we thought, do
-> +				 * we still fit?
-> +				 */
-> +				if (ptr + stride > base + size) {
-> +					pr_warn("No last record found in redistributor region @%llx\n",
-> +						gic_data.redist_regions[i].res.start);
-> +					break;
-> +				}
-> +			}
-> +
->  			ret = fn(gic_data.redist_regions + i, ptr);
->  			if (!ret)
->  				return 0;
-> @@ -450,12 +481,13 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
->  			if (gic_data.redist_regions[i].single_redist)
->  				break;
->  
-> -			if (gic_data.redist_stride) {
-> -				ptr += gic_data.redist_stride;
-> -			} else {
-> -				ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
-> -				if (typer & GICR_TYPER_VLPIS)
-> -					ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
-> +			ptr += stride;
-> +
-> +			stride = gic_data.redist_stride ?: SZ_64K * 2;
-> +			if (ptr + stride > base + size) {
-> +				pr_warn("No last record found in redistributor region @%llx\n",
-> +					gic_data.redist_regions[i].res.start);
-> +				break;
->  			}
->  		} while (!(typer & GICR_TYPER_LAST));
->  	}
-> 
+It would be nice to have this as an optional devicetree property so
+when testing JACK latency etc I don't have to manually re-compile a
+kernel...
