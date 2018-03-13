@@ -1,69 +1,92 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 13 Mar 2018 14:25:10 +0100
-Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
-In-Reply-To: <CAKv+Gu8ratRYnGzNm5qppUetEFt4Dief_3_Dj6yaW==DJemeHQ@mail.gmail.com>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
- <20180301152450.GA4061@kroah.com>
- <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
- <20180302165415.GB8704@kroah.com>
- <CAKv+Gu-HdLkjYeNBQOW=JuWt3GjdZJFjyXCHCbGU01hkO81BNg@mail.gmail.com>
- <20180313100442.GB1999@kroah.com>
- <CAKv+Gu-v6U49_OZyt6HHmCJ7srYnNw040LpVkFnzx+BGKVC0aA@mail.gmail.com>
- <20180313103843.GA29908@kroah.com>
- <CAKv+Gu8ratRYnGzNm5qppUetEFt4Dief_3_Dj6yaW==DJemeHQ@mail.gmail.com>
-Message-ID: <20180313132510.GA3629@kroah.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Tue, 13 Mar 2018 15:35:20 +0200
+Subject: [PATCH 1/2] ARM: npcm: add CONFIG_ARCH_MULTI_V7 dependency
+In-Reply-To: <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
+References: <20180307162430.2664523-1-arnd@arndb.de>
+ <CAFd5g45h3wAZtx-4oJb_uLbtDTzSsD6eLM5G0VF=3BBHNmW8YQ@mail.gmail.com>
+ <CAP6Zq1jEAg2OrmnHzJdk9UBjPkDctu5oGHYyJ+QLBzN+E31sPw@mail.gmail.com>
+ <CAK8P3a2=0ZUqyhmKVa4u_VvOg4rtd6vUWdpRojfsoP3OSvGyeQ@mail.gmail.com>
+ <CAP6Zq1iOxFTuUvp02qOtgpmfH7HA-1eZ9KG6AtU0zn6CpPCrzw@mail.gmail.com>
+Message-ID: <CAP6Zq1h+6GGrnUEcjZWtBPBKDGxL+6+OG0itJD_FHD1MAcYmsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 01:01:43PM +0000, Ard Biesheuvel wrote:
-> On 13 March 2018 at 10:38, Greg KH <greg@kroah.com> wrote:
-> > On Tue, Mar 13, 2018 at 10:13:26AM +0000, Ard Biesheuvel wrote:
-> >> On 13 March 2018 at 10:04, Greg KH <greg@kroah.com> wrote:
-> >> > On Wed, Mar 07, 2018 at 06:24:09PM +0000, Ard Biesheuvel wrote:
-> >> >> On 2 March 2018 at 16:54, Greg KH <greg@kroah.com> wrote:
-> ...
-> >> >> > Please test on the hardware that is affected, otherwise you do not know
-> >> >> > if your patches do anything or not.
-> >> >> >
-> >> >>
-> >> >> I don't think it is feasible to test these backports by confirming
-> >> >> that they make the fundamental issue go away. We simply don't have the
-> >> >> code to reproduce all the variants, and we have to rely on the
-> >> >> information provided by ARM Ltd. regarding which cores are affected
-> >> >> and which aren't.
-> >> >
-> >> > You really don't have the reproducers?  Please work with ARM to resolve
-> >> > that, this should not be a non-tested set of patches.  That's really
-> >> > worse than no patches at all, as if they were applied, that would
-> >> > provide a false-sense of "all is fixed".
-> >> >
-> >>
-> >> I know that on x86, the line between architecture and platform is
-> >> blurry. That is not the case on ARM, though.
-> >>
-> >> Unlike platform firmware, the OS is built on top of an abstracted
-> >> platform which is described by ARM's Architecture Reference Manual. If
-> >> ARM Ltd. issues recommendations regarding what firmware PSCI methods
-> >> to call when doing a context switch, or which barrier instruction to
-> >> issue in certain circumstances, they do so because a certain class of
-> >> hardware may require it in some cases. It is really not up to me to go
-> >> find some exploit code on GitHub, run it before and after applying the
-> >> patch and conclude that the problem is fixed. Instead, what I should
-> >> do is confirm that the changes result in the recommended actions to be
-> >> taken at the appropriate times.
-> >
-> > To _not_ take that exploit code and run it to _verify_ that your patches
-> > work, would be foolish, right?
-> >
-> 
-> Oh, absolutely. But that presupposes access to both the affected
-> hardware and the exploit code.
+Hi Arnd,
 
-If you all don't have access to both, then someone is doing something
-seriously wrong.  Go complain to ARM please, we all know they have both.
+I sent now Full patch for the NPCM BMC's V12,
 
-I just got done yelling at a whole bunch of vendors last week about this
-whole mess at a very large meeting of a lot of different Linux-based
-companies.  It's crazy that the disfunction is still happening.
+Is it O.K.? or do you want me to send the same patch to ARM: npcm:
+drop extraneous 'select' statements as well?
 
-greg k-h
+Thanks
+
+Tomer
+
+
+On 12 March 2018 at 17:15, Tomer Maimon <tmaimon77@gmail.com> wrote:
+> Hi Arnd,
+>
+> I will send tomorrow new version with some modification we need to do
+> once we use NPCM7XX and not NPCM750.
+>
+> Brendan,
+>
+> Is it O.K.?
+>
+>
+>
+> On 12 March 2018 at 15:37, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Mon, Mar 12, 2018 at 2:28 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
+>>> Hi Brendan,
+>>>
+>>> According to the last mail I have with Arnd can you modify the Kconfig
+>>> as follow:
+>>>
+>>> +menuconfig ARCH_NPCM
+>>> +       bool "Nuvoton NPCM Architecture"
+>>> +       depends on ARCH_MULTI_V7
+>>> +       select PINCTRL
+>>> +
+>>> +if ARCH_NPCM
+>>> +
+>>> +config ARCH_NPCM7XX
+>>> +       bool "Support for NPCM7xx BMC (Poleg)"
+>>> +       depends on ARCH_MULTI_V7
+>>> +       select PINCTRL_NPCM7XX
+>>> +       select NPCM7XX_TIMER
+>>> +       select ARCH_REQUIRE_GPIOLIB
+>>> +       select CACHE_L2X0
+>>> +       select ARM_GIC
+>>> +       select HAVE_ARM_TWD if SMP
+>>> +       select HAVE_ARM_SCU if SMP
+>>> +       select ARM_ERRATA_764369 if SMP
+>>> +       select ARM_ERRATA_720789
+>>> +       select ARM_ERRATA_754322
+>>> +       select ARM_ERRATA_794072
+>>> +       select PL310_ERRATA_588369
+>>> +       select PL310_ERRATA_727915
+>>> +       select MFD_SYSCON
+>>> +       help
+>>> +         General support for NPCM7xx BMC (Poleg).
+>>> +
+>>> +         Nuvoton NPCM7xx BMC based on the Cortex A9.
+>>> +
+>>> +endif
+>>
+>> One more change is needed to avoid a link error without CONFIG_SMP:
+>>
+>> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
+>> index c7a1316d27c1..34d51f9f207c 100644
+>> --- a/arch/arm/mach-npcm/Makefile
+>> +++ b/arch/arm/mach-npcm/Makefile
+>> @@ -1,3 +1,4 @@
+>>  AFLAGS_headsmp.o               += -march=armv7-a
+>>
+>> -obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o platsmp.o headsmp.o
+>> +obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o
+>> +obj-$(CONFIG_SMP)              += platsmp.o headsmp.o
+>>
+>> Can one of you send me a pull request or the full patch series on top
+>> of the version I have in arm-soc?
+>>
+>>       Arnd
