@@ -1,21 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 Mar 2018 19:43:31 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: Add missing SYS-DMAC2 dmas
-In-Reply-To: <1520518205-23351-1-git-send-email-geert+renesas@glider.be>
-References: <1520518205-23351-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180313184330.67oh6gyjwxv44q2i@verge.net.au>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 13 Mar 2018 11:45:04 -0700
+Subject: [GIT PULL] bcm2835-dt-next-2018-03-13
+In-Reply-To: <20180313173022.30314-1-eric@anholt.net>
+References: <20180313173022.30314-1-eric@anholt.net>
+Message-ID: <43c4a703-efef-b03e-9dde-f340881b40e1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 03:10:05PM +0100, Geert Uytterhoeven wrote:
-> On R-Car H3, on-chip peripheral modules that can make use of DMA are
-> wired to either SYS-DMAC0 only, or to both SYS-DMAC1 and SYS-DMAC2.
+On 03/13/2018 10:30 AM, Eric Anholt wrote:
+> Hi Florian,
 > 
-> Add the missing DMA properties pointing to SYS-DMAC2 for HSCIF[0-2],
-> SCIF[015], and I2C[0-2].  These were initially left out because early
-> firmware versions prohibited using SYS-DMAC2.  This restriction has been
-> lifted in IPL and Secure Monitor Rev1.0.6 (released on Feb 25, 2016).
+> The following changes since commit bcc76c4014dce4e3834dbd5b7f6593cbcfbfebe0:
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>   ARM: dts: bcm2835-rpi-zero-w: Enable OTG mode (2018-02-26 15:02:23 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2018-03-13
+> 
+> for you to fetch changes up to ae67cfc4f6abb379e5bbe9a5616f00b23bbecb01:
+> 
+>   ARM: bcm2835: Add the DPI hardware to the device tree. (2018-03-12 11:44:29 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in one last patch to add the BCM2835 DPI
+> controller to the device tree.
+> 
+> ----------------------------------------------------------------
+> Eric Anholt (1):
+>       ARM: bcm2835: Add the DPI hardware to the device tree.
 
-Thanks, applied.
+Merged, thanks Eric!
+-- 
+Florian
