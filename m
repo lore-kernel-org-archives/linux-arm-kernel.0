@@ -1,151 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 21:31:10 +0000
-Subject: [PATCH] KVM: arm/arm64: replacing per-VM's per-CPU variable
-In-Reply-To: <01c88eaa-e863-1103-8bb1-b723b4d3ab87@arm.com>
-References: <1520974993-40423-1-git-send-email-peng.hao2@zte.com.cn>
- <37d19d6c-8787-d190-0ef0-c6709cb9e976@arm.com>
- <01c88eaa-e863-1103-8bb1-b723b4d3ab87@arm.com>
-Message-ID: <86efknbr35.wl-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2018 22:38:57 +0100
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.17
+In-Reply-To: <20180313195259.20496-1-f.fainelli@gmail.com>
+References: <20180313195259.20496-1-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a224VHwAW3j1WAAxe7G50ctaiHSfaqj2mU_aheWMoA_NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Mar 2018 19:33:55 +0000,
-Robin Murphy wrote:
-> 
-> On 13/03/18 13:01, Marc Zyngier wrote:
-> > [You're repeatedly posting to the kvmarm mailing list without being
-> > subscribed to it. I've flushed the queue now, but please consider
-> > subscribing to the list, it will help everyone]
-> > 
-> > On 13/03/18 21:03, Peng Hao wrote:
-> >> Using a global per-CPU variable instead of per-VM's per-CPU variable.
-> >> 
-> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> >> ---
-> >>   arch/arm/include/asm/kvm_host.h   |  3 ---
-> >>   arch/arm64/include/asm/kvm_host.h |  3 ---
-> >>   virt/kvm/arm/arm.c                | 26 ++++++--------------------
-> >>   3 files changed, 6 insertions(+), 26 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 248b930..4224f3b 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -59,9 +59,6 @@ struct kvm_arch {
-> >>   	/* VTTBR value associated with below pgd and vmid */
-> >>   	u64    vttbr;
-> >>   -	/* The last vcpu id that ran on each physical CPU */
-> >> -	int __percpu *last_vcpu_ran;
-> >> -
-> >>   	/*
-> >>   	 * Anything that is not used directly from assembly code goes
-> >>   	 * here.
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index 596f8e4..5035a08 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -67,9 +67,6 @@ struct kvm_arch {
-> >>   	/* VTTBR value associated with above pgd and vmid */
-> >>   	u64    vttbr;
-> >>   -	/* The last vcpu id that ran on each physical CPU */
-> >> -	int __percpu *last_vcpu_ran;
-> >> -
-> >>   	/* The maximum number of vCPUs depends on the used GIC model */
-> >>   	int max_vcpus;
-> >>   diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> >> index 86941f6..a67ffb0 100644
-> >> --- a/virt/kvm/arm/arm.c
-> >> +++ b/virt/kvm/arm/arm.c
-> >> @@ -59,6 +59,8 @@
-> >>   /* Per-CPU variable containing the currently running vcpu. */
-> >>   static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
-> >>   +static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_last_ran_vcpu);
-> >> +
-> >>   /* The VMID used in the VTTBR */
-> >>   static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
-> >>   static u32 kvm_next_vmid;
-> >> @@ -115,18 +117,11 @@ void kvm_arch_check_processor_compat(void *rtn)
-> >>    */
-> >>   int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
-> >>   {
-> >> -	int ret, cpu;
-> >> +	int ret;
-> >>     	if (type)
-> >>   		return -EINVAL;
-> >>   -	kvm->arch.last_vcpu_ran =
-> >> alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
-> >> -	if (!kvm->arch.last_vcpu_ran)
-> >> -		return -ENOMEM;
-> >> -
-> >> -	for_each_possible_cpu(cpu)
-> >> -		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
-> >> -
-> >>   	ret = kvm_alloc_stage2_pgd(kvm);
-> >>   	if (ret)
-> >>   		goto out_fail_alloc;
-> >> @@ -147,9 +142,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
-> >>   	return ret;
-> >>   out_free_stage2_pgd:
-> >>   	kvm_free_stage2_pgd(kvm);
-> >> -out_fail_alloc:
-> >> -	free_percpu(kvm->arch.last_vcpu_ran);
-> >> -	kvm->arch.last_vcpu_ran = NULL;
-> >> +out_fail_alloc:
-> >>   	return ret;
-> >>   }
-> >>   @@ -179,9 +172,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
-> >>     	kvm_vgic_destroy(kvm);
-> >>   -	free_percpu(kvm->arch.last_vcpu_ran);
-> >> -	kvm->arch.last_vcpu_ran = NULL;
-> >> -
-> >>   	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
-> >>   		if (kvm->vcpus[i]) {
-> >>   			kvm_arch_vcpu_free(kvm->vcpus[i]);
-> >> @@ -343,17 +333,13 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-> >>     void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-> >>   {
-> >> -	int *last_ran;
-> >> -
-> >> -	last_ran = this_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran);
-> >> -
-> >>   	/*
-> >>   	 * We might get preempted before the vCPU actually runs, but
-> >>   	 * over-invalidation doesn't affect correctness.
-> >>   	 */
-> >> -	if (*last_ran != vcpu->vcpu_id) {
-> >> +	if (per_cpu(kvm_last_ran_vcpu, cpu) != vcpu) {
-> >>   		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vcpu);
-> >> -		*last_ran = vcpu->vcpu_id;
-> >> +		per_cpu(kvm_last_ran_vcpu, cpu) = vcpu;
-> >>   	}
-> >>     	vcpu->cpu = cpu;
-> >> 
-> > 
-> > Have you read and understood what this code is about? The whole point of
-> > this code is to track physical CPUs on a per-VM basis. Making it global
-> > completely defeats the point, and can result in guest memory corruption.
-> > Please see commit 94d0e5980d67.
-> 
-> I won't comment on the patch itself (AFAICS it is rather broken), but
-> I suppose there is a grain of sense in the general idea, since the set
-> of physical CPUs itself is fundamentally a global thing. Given a large
-> number of pCPUs and a large number of VMs it could well be more
-> space-efficient to keep a single per-pCPU record of a {vmid,vcpu_id}
-> tuple or some other *globally-unique* vCPU namespace (I guess just the
-> struct kvm_vcpu pointer might work, but then it would be hard to avoid
-> unnecessary invalidation when switching VMIDs entirely).
+On Tue, Mar 13, 2018 at 8:52 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoCs devicetree changes
+> for 4.17, please pull the following:
+>
+> - Henry fixes the pin functions for the JTAG pins, nothing uses this for
+>   now, but it could be backported eventually if deemed appropriate
+>
+> - Stefan fixes the register ranges for the bcm2835-i2s nodes in the
+>   binding document definition, he then fixes the probing of the
+>   bcm2835-i2s driver by providing an appropriate register range and a
+>   missing clock. Stefan also makes sure that the appropriate pull
+>   settings are applied to the pins used on the Raspberry Pi Zero
+>   Wireless, he then adds the necessary UART node to connected to the
+>   BCM43438 Bluetooth adapter on the Pi Zero W. He finally enables USB
+>   OTG mode on the Pi Zero W since he became usable again
+>
+> - Baruch adds the necessary Device Tree nodes to support the Raspberry
+>   Pi GPIO expander which is controlled via the VC4 firmware
+>
+> - Hiroshi adds the missing LEDs on the Buffalo WZR-900DHP router
+>
+> - Eric adds the DPI hardware block into the BCM283x Device Tree include
+>   file for future use when an actual panel is available
+>
+> - Florian updates the Northstar Plus platforms to use port 8 of the
+>   internal switch as the CPU/management port since necessary code was
+>   added in the b53 switch driver to support that
 
-The main issue with this approach is to come up with a data structure
-that allows quick retrieval/replacement, doesn't have weird locking
-requirements and doesn't require to allocate memory unexpectedly.
+Pulled into next/dt, thanks!
 
-The advantage of the current approach is to sidestep these potential
-issues altogether by having a single, up-front allocation and zero
-locking requirements. I fully appreciate that in the long run, we may
-need to move away from it. I'm not quite sure what to replace it
-with. Something like a per-CPU btree seems like a possibility.
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+      Arnd
