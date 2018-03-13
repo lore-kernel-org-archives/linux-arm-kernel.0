@@ -1,46 +1,80 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 13 Mar 2018 09:05:01 -0300
-Subject: [PATCH 24/31] perf vendor events arm64: Enable JSON events for
- ThunderX2 B0
-In-Reply-To: <20180313120508.29327-1-acme@kernel.org>
-References: <20180313120508.29327-1-acme@kernel.org>
-Message-ID: <20180313120508.29327-25-acme@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2018 13:13:09 +0100
+Subject: [PATCH] arm64: dts: qcom: rename qcom,pcie devices to pcie
+Message-ID: <20180313121345.2749183-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+The node name for a PCIe host bridge must be "pcie" as required by
+the binging. dtc now warns about it:
 
-There is MIDR change on ThunderX2 B0, adding an entry to mapfile to
-enable JSON events for B0.
+arch/arm64/boot/dts/qcom/apq8096-db820c.dtb: Warning (pci_bridge): /soc/agnoc at 0/qcom,pcie at 610000: node name is not "pci" or "pcie"
+arch/arm64/boot/dts/qcom/apq8096-db820c.dtb: Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
+arch/arm64/boot/dts/qcom/msm8996-mtp.dtb: Warning (pci_bridge): /soc/agnoc at 0/qcom,pcie at 610000: node name is not "pci" or "pcie"
+arch/arm64/boot/dts/qcom/msm8996-mtp.dtb: Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Ganapatrao Kulkarni <gpkulkarni@gklkml16.com>
-Cc: Jayachandran C <jnair@caviumnetworks.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: John Garry <john.garry@huawei.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Richter <robert.richter@cavium.com>
-Cc: William Cohen <wcohen@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20180307110803.32418-1-ganapatrao.kulkarni at cavium.com
-[ Fixup wrt recent patchset by John Garry ]
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+This renames the nodes as appropriate.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- tools/perf/pmu-events/arch/arm64/mapfile.csv | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 +++---
+ arch/arm64/boot/dts/qcom/msm8996.dtsi        | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-index 8f11aeb003a9..f03e26ecb658 100644
---- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -14,4 +14,5 @@
- #Family-model,Version,Filename,EventType
- 0x00000000410fd03[[:xdigit:]],v1,arm/cortex-a53,core
- 0x00000000420f5160,v1,cavium/thunderx2,core
-+0x00000000430f0af0,v1,cavium/thunderx2,core
- 0x00000000480fd010,v1,hisilicon/hip08,core
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 1c8f1b86472d..e82f821a4e0e 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -140,16 +140,16 @@
+ 		};
+ 
+ 		agnoc at 0 {
+-			qcom,pcie at 600000 {
++			pcie at 600000 {
+ 				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
+ 			};
+ 
+-			qcom,pcie at 608000 {
++			pcie at 608000 {
+ 				status = "okay";
+ 				perst-gpio = <&msmgpio 130 GPIO_ACTIVE_LOW>;
+ 			};
+ 
+-			qcom,pcie at 610000 {
++			pcie at 610000 {
+ 				status = "okay";
+ 				perst-gpio = <&msmgpio 114 GPIO_ACTIVE_LOW>;
+ 			};
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 410ae787ebb4..cd08c8c5248e 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -851,7 +851,7 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 
+-			pcie0: qcom,pcie at 600000 {
++			pcie0: pcie at 600000 {
+ 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
+ 				status = "disabled";
+ 				power-domains = <&gcc PCIE0_GDSC>;
+@@ -904,7 +904,7 @@
+ 
+ 			};
+ 
+-			pcie1: qcom,pcie at 608000 {
++			pcie1: pcie at 608000 {
+ 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
+ 				power-domains = <&gcc PCIE1_GDSC>;
+ 				bus-range = <0x00 0xff>;
+@@ -957,7 +957,7 @@
+ 						"bus_slave";
+ 			};
+ 
+-			pcie2: qcom,pcie at 610000 {
++			pcie2: pcie at 610000 {
+ 				compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
+ 				power-domains = <&gcc PCIE2_GDSC>;
+ 				bus-range = <0x00 0xff>;
 -- 
-2.14.3
+2.9.0
