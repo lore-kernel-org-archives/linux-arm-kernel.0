@@ -1,91 +1,208 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 13 Mar 2018 17:39:23 +0900
-Subject: [PATCH v3 5/5] linux/const.h: move BIT(_ULL) to linux/const.h for
- use in assembly
-In-Reply-To: <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
-References: <1519301715-31798-1-git-send-email-yamada.masahiro@socionext.com>
- <1519301715-31798-6-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAR+Bio=ukXGMJYT=YrZ7k0XfkxRv4fPbbvNi33RLLToSQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 13 Mar 2018 09:41:08 +0100
+Subject: [PATCH 5/5] arm64: allwinner: a64: Add support for TERES I laptop
+In-Reply-To: <20180312161050.7647-6-harald@ccbib.org>
+References: <20180312161050.7647-1-harald@ccbib.org>
+ <20180312161050.7647-6-harald@ccbib.org>
+Message-ID: <20180313084108.uh3ui5jwin2knvuu@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-2018-02-22 21:15 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Commit 2fc016c5bd8a ("linux/const.h: Add _BITUL() and _BITULL()")
-> introduced _BITUL() and _BITULL().  Its git-log says the difference
-> from the already existing BIT() are:
->
->   1. The namespace is such that they can be used in uapi definitions.
->   2. The type is set with the _AC() macro to allow it to be used in
->      assembly.
->   3. The type is explicitly specified to be UL or ULL.
->
-> However, I found _BITUL() is mostly used in kernel-space since it is
-> handy to share headers between C and assembly.  If we only need '2.',
-> we can improve the existing BIT() for use in assembly, allowing us to
-> avoid unnecessary underscore prefixes.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Mon, Mar 12, 2018 at 04:10:50PM +0000, Harald Geyer wrote:
+> The TERES I is an open hardware laptop built by Olimex using the
+> Allwinner A64 SoC.
+> 
+> Add the board specific .dts file, which includes the A64 .dtsi and
+> enables the peripherals that we support so far.
+> 
+> Signed-off-by: Harald Geyer <harald@ccbib.org>
 > ---
+>  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+>  .../boot/dts/allwinner/sun50i-a64-teres-i.dts      | 308 +++++++++++++++++++++
+>  2 files changed, 309 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> index f505227b0250..5f073f7423b7 100644
+> --- a/arch/arm64/boot/dts/allwinner/Makefile
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -5,6 +5,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> new file mode 100644
+> index 000000000000..0d42b5111f0f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> @@ -0,0 +1,308 @@
+> +/*
+> + * Copyright (C) Harald Geyer <harald@ccbib.org>
+> + * based on sun50i-a64-olinuxino.dts by Jagan Teki <jteki@openedev.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
-This patch conflicts with the one from Will Deacon.
-(https://patchwork.kernel.org/patch/10242531/)
+you should use an SPDX header here to define the license
 
-I think his patch is better than mine.
-
-So, could you drop this one from your tree, please?
-(only this one from the series.)
-
-Thanks
-
-
-
-
-> V2: https://patchwork.kernel.org/patch/9498271/
->
-> Changes in v3: None
-> Changes in v2: None
->
->  include/linux/bitops.h | 3 +--
->  include/linux/const.h  | 3 +++
->  2 files changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/include/linux/bitops.h b/include/linux/bitops.h
-> index 4cac4e1..8a856be 100644
-> --- a/include/linux/bitops.h
-> +++ b/include/linux/bitops.h
-> @@ -1,11 +1,10 @@
->  /* SPDX-License-Identifier: GPL-2.0 */
->  #ifndef _LINUX_BITOPS_H
->  #define _LINUX_BITOPS_H
-> +#include <linux/const.h>
->  #include <asm/types.h>
->
->  #ifdef __KERNEL__
-> -#define BIT(nr)                        (1UL << (nr))
-> -#define BIT_ULL(nr)            (1ULL << (nr))
->  #define BIT_MASK(nr)           (1UL << ((nr) % BITS_PER_LONG))
->  #define BIT_WORD(nr)           ((nr) / BITS_PER_LONG)
->  #define BIT_ULL_MASK(nr)       (1ULL << ((nr) % BITS_PER_LONG_LONG))
-> diff --git a/include/linux/const.h b/include/linux/const.h
-> index 7b55a55..200892d 100644
-> --- a/include/linux/const.h
-> +++ b/include/linux/const.h
-> @@ -6,4 +6,7 @@
->  #define UL(x)          (_UL(x))
->  #define ULL(x)         (_ULL(x))
->
-> +#define BIT(x)         (_BITUL(x))
-> +#define BIT_ULL(x)     (_BITULL(x))
 > +
->  #endif /* _LINUX_CONST_H */
-> --
-> 2.7.4
->
+> +/dts-v1/;
+> +
+> +#include "sun50i-a64.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pwm/pwm.h>
+> +
+> +/ {
+> +	model = "Olimex Teres I A64";
 
+It's called the Teres-I, there's no need for the A64 here
 
+> +	compatible = "olimex,a64-teres-i", "allwinner,sun50i-a64";
+
+Or in the compatible
+
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm 0 50000 0>;
+> +		brightness-levels = <0 10 20 30 40 50 60 70 100>;
+> +		default-brightness-level = <3>;
+> +		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 */
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +
+> +		framebuffer-lcd {
+> +			eDP25-supply = <&reg_dldo2>;
+> +			eDP12-supply = <&reg_dldo3>;
+> +		};
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +
+> +		lid-switch {
+> +			label = "Lid Switch";
+> +			gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 */
+> +			linux,input-type = <EV_SW>;
+> +			linux,code = <SW_LID>;
+> +		};
+> +	};
+> +
+> +	leds: leds {
+
+Do you need a label?
+
+> +		compatible = "gpio-leds";
+> +
+> +		led_capslock: capslock {
+
+Same thing here
+
+> +			gpios = <&pio 2 7 GPIO_ACTIVE_HIGH>; /* PC7 */
+
+Ideally you should have LED labels here, following the scheme
+devicename:colour:function
+
+> +		};
+> +
+> +		led_numlock: numlock {
+> +			gpios = <&pio 2 4 GPIO_ACTIVE_HIGH>; /* PC4 */
+> +		};
+> +	};
+> +
+> +	reg_usb1_vbus: usb1-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb1-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
+> +		status = "okay";
+
+I guess this one has a parent regulator too?
+
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+> +	};
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins>;
+> +	status = "okay";
+> +};
+
+What is this used for?
+
+Looks good otherwise, thanks!
+Maxime
 
 -- 
-Best Regards
-Masahiro Yamada
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/d5aeb8d8/attachment.sig>
