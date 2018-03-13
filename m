@@ -1,52 +1,45 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 13 Mar 2018 13:55:40 +0000
-Subject: [alsa-devel] [PATCH v4 15/24] ASoC: qdsp6: q6core: Add q6core
- driver
-In-Reply-To: <21207441-4e81-284e-343c-bdeb01c9d06f@codeaurora.org>
-References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
- <20180310022456.26739-16-srinivas.kandagatla@linaro.org>
- <21207441-4e81-284e-343c-bdeb01c9d06f@codeaurora.org>
-Message-ID: <e1d119f8-146a-b549-3dd9-da6d8b0f3e9f@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 13 Mar 2018 15:03:03 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 6/6] ASoC: sun4i-i2s: Add support
+ for loopback
+In-Reply-To: <CAP03XeoaYcMrzv3+K83wGUaDn6ZcCDzePdVNcjAqJ4QrF-WLSA@mail.gmail.com>
+References: <20180312155753.9478-1-codekipper@gmail.com>
+ <20180312155753.9478-7-codekipper@gmail.com>
+ <20180312183521.GP2186@sirena.org.uk>
+ <CAP03XeoaYcMrzv3+K83wGUaDn6ZcCDzePdVNcjAqJ4QrF-WLSA@mail.gmail.com>
+Message-ID: <20180313140303.wkwsxhhm5lxbzp5a@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Rohit for review comments,
+On Tue, Mar 13, 2018 at 01:39:44PM +0000, Chris Obbard wrote:
+> >> +- loopback:  if this property is present then the dai is configured in
+> >> +             loopback mode where the output fifo is redirected to the input
+> >> +             fifo.
+> >
+> > This really doesn't seem like something that ought to go into the DT
+> > and hence ABI given that there's obviously no reason to use this in
+> > production.  Just make it be a #define in the code or something.
+> 
+> It would be nice to have this as an optional devicetree property so
+> when testing JACK latency etc I don't have to manually re-compile a
+> kernel...
 
-On 13/03/18 11:46, Rohit Kumar wrote:
-> 
-> 
-> On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> [..]
->> +static int q6core_get_svc_versions(struct q6core *core)
->> +{
->> +    struct apr_device *adev = core->adev;
->> +    struct apr_hdr hdr = {0};
->> +    int rc;
->> +
->> +    core->get_version_supported = true;
-> 
-> core->get_version_supported should be set to true only after we get 
-> proper response from adsp in callback(). In case,we get wrong response 
-> from adsp, memory for g_core->svc_version
->   will not get allocated and there will be NULL pointer dereference in  
-> q6core_get_svc_api_info() in below statement
+Another one might also argue that having to recompile the DT and
+reflash the whole firmware or EEPROM is overkill for just testing JACK
+latency.
 
-I totally agree with you , this line seems to be a leftover from 
-previous patches, It should be removed.
+Can't we create a module parameter for it?
 
-thanks,
-srini
-> +    } else if (g_core->get_version_supported) {
-> +        for (i = 0; i < g_core->svc_version->num_services; i++) {
-> 
-> 
->> +    hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
->> +                      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
->> +    hdr.pkt_size = APR_HDR_SIZE;
->> +    hdr.opcode = AVCS_GET_VERSIONS;
->> +
->> +    rc = apr_send_pkt(adev, &hdr);
->> +    if (rc < 0)
->> +        return rc;
->> +
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/5d97445b/attachment-0001.sig>
