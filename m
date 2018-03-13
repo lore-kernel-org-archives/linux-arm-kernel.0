@@ -1,27 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Mar 2018 17:51:02 +0000
-Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
-In-Reply-To: <ec84d8ee-8b90-5365-5be4-4b08d274c6e5@nokia.com>
-References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
- <20180313135314.18780-3-alexander.sverdlin@nokia.com>
- <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
- <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
- <CAKv+Gu-Z58VseyCQBe_3KqgKn4s9dNBxR8wGyZ7JFrLB=EX8jw@mail.gmail.com>
- <60156300-b74a-628c-d296-7fb71a0eeb4f@nokia.com>
- <CAKv+Gu9G9UNf_jif4ySw9iM9mYW_LNzKXyVv7mEAQP_Laaq3UA@mail.gmail.com>
- <ec84d8ee-8b90-5365-5be4-4b08d274c6e5@nokia.com>
-Message-ID: <CAKv+Gu8WeV+7U4omoMvECPa0LhF4Nrusvy+V0mirWVfejCebNg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Mar 2018 17:51:56 +0000
+Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
+In-Reply-To: <20180313172103.24281-1-marc.zyngier@arm.com>
+References: <20180313172103.24281-1-marc.zyngier@arm.com>
+Message-ID: <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2018 at 17:49, Alexander Sverdlin
-<alexander.sverdlin@nokia.com> wrote:
-> On 13/03/18 18:39, Ard Biesheuvel wrote:
->> if (IS_ENABLED(CONFIG_ARM_MODULE_PLTS))
->>     module_plt_alloc_fixed();
->
-> Do you consider this a legal C code if without module-plts.o the function would not exist at all?
-> That's too much relying on optimizer I think...
->
+On Tue, Mar 13, 2018 at 05:21:00PM +0000, Marc Zyngier wrote:
+> As kexec and kdump are getting used a bit more intensively, I've been
+> made aware of a number of shortcomings.
+> 
+> The main gripe is from folks trying to launch a kdump kernel from
+> within an interrupt handler. If using EOImode==1, things work as
+> expected. If using EOImode==0 (such as in a guest), the secondary
+> kernel hangs as the previous interrupt hasn't been EOI'd, and the
+> active priority is still set. The first two patches are addressing
+> this situation for both GICv2 and GICv3 by reseting the APRs to their
+> default value.
 
-Yes, we rely on that in many different places in the kernel.
+As a more general thing, if irqchip drivers have state that needs to be
+reset in their init code, can we live all this irqchip reset to the
+crashdump kernel, and kill machine_kexec_mask_interrupts() entirely?
+
+That would avoid some work (including pointer chasing on potentially
+corrupt memory) in the kernel that crashed, making it more likely that
+we get to the crashkernel intact...
+
+Thanks,
+Mark
