@@ -1,40 +1,91 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 13 Mar 2018 17:41:59 +0100
-Subject: [PATCH v1 0/8] Append several fixes and improvements in STM32 DMA
-Message-ID: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Tue, 13 Mar 2018 17:42:04 +0100
+Subject: [PATCH v1 5/8] dmaengine: stm32-dma: fix max items per transfer
+In-Reply-To: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1520959327-25760-6-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset appends several fixes and some improvements for STM32 DMAv2.
-This includes:
-        * Introduce DMA features bitfield
-        * Threshold manages with bitfield feature
-        * Improve memory burst management
-        * Improve DMA IRQ status handling
-        * Fix max items per transfer to match FIFO Size
-        * Properly mask irq bits to avoid overlaping
-        * Fix incomplete configuration in cyclic mode
-        * Fix typo and reported checkpatch warnings
+Having 0 in item counter register is valid and stands for a "No or Ended
+transfer". Therefore valid transfer starts from @+0 to @+0xFFFE leading to
+unaligned scatter gather at boundary. Thus it's safer to round down this
+value on its FIFO size (16 Bytes).
 
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
     v1:
-        * Initial
+       * Initial
 ---
+---
+ drivers/dma/stm32-dma.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-Pierre-Yves MORDRET (8):
-  dt-bindings: stm32-dma: introduce DMA features bitfield
-  dmaengine: stm32-dma: threshold manages with bitfield feature
-  dmaengine: stm32-dma: Improve memory burst management
-  dmaengine: stm32-dma: fix DMA IRQ status handling
-  dmaengine: stm32-dma: fix max items per transfer
-  dmaengine: stm32-dma: properly mask irq bits
-  dmaengine: stm32-dma: fix incomplete configuration in cyclic mode
-  dmaengine: stm32-dma: fix typo and reported checkpatch warnings
-
- .../devicetree/bindings/dma/stm32-dma.txt          |   6 +-
- drivers/dma/stm32-dma.c                            | 287 +++++++++++++++++----
- 2 files changed, 243 insertions(+), 50 deletions(-)
-
+diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+index 0685961..f9d3c84 100644
+--- a/drivers/dma/stm32-dma.c
++++ b/drivers/dma/stm32-dma.c
+@@ -38,10 +38,6 @@
+ #define STM32_DMA_TEI			BIT(3) /* Transfer Error Interrupt */
+ #define STM32_DMA_DMEI			BIT(2) /* Direct Mode Error Interrupt */
+ #define STM32_DMA_FEI			BIT(0) /* FIFO Error Interrupt */
+-#define STM32_DMA_MASKI			(STM32_DMA_TCI \
+-					 | STM32_DMA_TEI \
+-					 | STM32_DMA_DMEI \
+-					 | STM32_DMA_FEI)
+ 
+ /* DMA Stream x Configuration Register */
+ #define STM32_DMA_SCR(x)		(0x0010 + 0x18 * (x)) /* x = 0..7 */
+@@ -117,6 +113,13 @@
+ #define STM32_DMA_FIFO_THRESHOLD_FULL			0x03
+ 
+ #define STM32_DMA_MAX_DATA_ITEMS	0xffff
++/*
++ * Valid transfer starts from @0 to @0xFFFE leading to unaligned scatter
++ * gather at boundary. Thus it's safer to round down this value on FIFO
++ * size (16 Bytes)
++ */
++#define STM32_DMA_ALIGNED_MAX_DATA_ITEMS	\
++	ALIGN_DOWN(STM32_DMA_MAX_DATA_ITEMS, 16)
+ #define STM32_DMA_MAX_CHANNELS		0x08
+ #define STM32_DMA_MAX_REQUEST_ID	0x08
+ #define STM32_DMA_MAX_DATA_PARAM	0x03
+@@ -864,7 +867,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_slave_sg(
+ 		desc->sg_req[i].len = sg_dma_len(sg);
+ 
+ 		nb_data_items = desc->sg_req[i].len / buswidth;
+-		if (nb_data_items > STM32_DMA_MAX_DATA_ITEMS) {
++		if (nb_data_items > STM32_DMA_ALIGNED_MAX_DATA_ITEMS) {
+ 			dev_err(chan2dev(chan), "nb items not supported\n");
+ 			goto err;
+ 		}
+@@ -930,7 +933,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_cyclic(
+ 		return NULL;
+ 
+ 	nb_data_items = period_len / buswidth;
+-	if (nb_data_items > STM32_DMA_MAX_DATA_ITEMS) {
++	if (nb_data_items > STM32_DMA_ALIGNED_MAX_DATA_ITEMS) {
+ 		dev_err(chan2dev(chan), "number of items not supported\n");
+ 		return NULL;
+ 	}
+@@ -980,7 +983,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_memcpy(
+ 	u32 num_sgs, best_burst, dma_burst, threshold;
+ 	int i;
+ 
+-	num_sgs = DIV_ROUND_UP(len, STM32_DMA_MAX_DATA_ITEMS);
++	num_sgs = DIV_ROUND_UP(len, STM32_DMA_ALIGNED_MAX_DATA_ITEMS);
+ 	desc = stm32_dma_alloc_desc(num_sgs);
+ 	if (!desc)
+ 		return NULL;
+@@ -989,7 +992,7 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_dma_memcpy(
+ 
+ 	for (offset = 0, i = 0; offset < len; offset += xfer_count, i++) {
+ 		xfer_count = min_t(size_t, len - offset,
+-				   STM32_DMA_MAX_DATA_ITEMS);
++				   STM32_DMA_ALIGNED_MAX_DATA_ITEMS);
+ 
+ 		/* Compute best burst size */
+ 		max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
 -- 
 2.7.4
