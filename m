@@ -1,33 +1,45 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 13 Mar 2018 16:20:05 +0100
-Subject: [PATCH] ARM: dts: at91: at91sam9g25: fix mux-mask pinctrl property
-Message-ID: <20180313152005.21132-1-nicolas.ferre@microchip.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 13 Mar 2018 12:22:04 -0300
+Subject: [PATCH 18/31] perf vendor events arm64: Add armv8-recommended.json
+In-Reply-To: <20180313142618.36je6syqg6ppwhbp@gmail.com>
+References: <20180313120508.29327-1-acme@kernel.org>
+ <20180313120508.29327-19-acme@kernel.org>
+ <20180313142618.36je6syqg6ppwhbp@gmail.com>
+Message-ID: <20180313152204.GC29837@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are only 19 PIOB pins having primary names PB0-PB18. Not all of them
-have a 'C' function. So the pinctrl property mask ends up being the same as the
-other SoC of the at91sam9x5 series.
+Em Tue, Mar 13, 2018 at 03:26:18PM +0100, Ingo Molnar escreveu:
+> 
+> * Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> 
+> > From: John Garry <john.garry@huawei.com>
+> > 
+> > Add JSON for ARMv8 IMPLEMENTATION DEFINED recommended events.
+> > 
+> > The JSON is copied from ARMv8 architecture reference manual, available
+> > here:
+> > 
+> > 	https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf
+> > 
+> > Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> > Cc: Andi Kleen <ak@linux.intel.com>
+> > Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > Cc: Jiri Olsa <jolsa@redhat.com>
+> > Cc: Namhyung Kim <namhyung@kernel.org>
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: William Cohen <wcohen@redhat.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linuxarm at huawei.com
+> > Link: http://lkml.kernel.org/r/1520506716-197429-9-git-send-email-john.garry at huawei.com
+> > Signed-off-by: John Garry <john.garry@huawei.com>
+> > Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> That's not a valid SOB chain, author != first-Signed-off-by.
 
-Reported-by: Marek Sieranski <marek.sieranski@microchip.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: <stable@vger.kernel.org> # v3.8+
----
- arch/arm/boot/dts/at91sam9g25.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Ok, I'll fix that.
 
-diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-index a7da0dd0c98f..0898213f3bb2 100644
---- a/arch/arm/boot/dts/at91sam9g25.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-@@ -21,7 +21,7 @@
- 				atmel,mux-mask = <
- 				      /*    A         B          C     */
- 				       0xffffffff 0xffe0399f 0xc000001c  /* pioA */
--				       0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
-+				       0x0007ffff 0x00047e3f 0x00000000  /* pioB */
- 				       0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
- 				       0x003fffff 0x003f8000 0x00000000  /* pioD */
- 				      >;
--- 
-2.15.1
+- Arnaldo
