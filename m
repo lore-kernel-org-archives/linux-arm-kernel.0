@@ -1,29 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 13 Mar 2018 08:28:39 +0100
-Subject: [PATCH v3 2/2] ASoC: samsung: Add HDMI audio support for Snow
-In-Reply-To: <06ddf7cf-02dc-f50c-37bb-157f4d643c07@samsung.com>
-References: <20180312184939.11327-1-s.nawrocki@samsung.com>
- <CGME20180312185000epcas1p2ae13436139bee76311206ac3fd74267c@epcas1p2.samsung.com>
- <20180312184939.11327-2-s.nawrocki@samsung.com>
- <06ddf7cf-02dc-f50c-37bb-157f4d643c07@samsung.com>
-Message-ID: <CAJKOXPdnEfi16D0=r6r6efnEBPxjVCeXzwvBGeb=UFu+AFDMCg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 13 Mar 2018 09:00:26 +0100
+Subject: [PATCH v2 4/6] ASoC: sun4i-i2s: Add multi-lane functionality
+In-Reply-To: <20180312155753.9478-5-codekipper@gmail.com>
+References: <20180312155753.9478-1-codekipper@gmail.com>
+ <20180312155753.9478-5-codekipper@gmail.com>
+Message-ID: <20180313080026.jtag4w46koxzeqe2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2018 at 7:54 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 03/12/2018 07:49 PM, Sylwester Nawrocki wrote:
->> This patch updates the driver so, in addition to current DT bindings, it
->> also can also use the new DT bindings with cpu, codec subnodes which allow
->> to support sound on the HDMI interface.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->
-> I've forgotten to add Krzysztof's tag:
->
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Mon, Mar 12, 2018 at 04:57:51PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> The i2s block supports multi-lane i2s output however this functionality
+> is only possible in earlier SoCs where the pins are exposed and for
+> the i2s block used for HDMI audio on the later SoCs.
+> 
+> To enable this functionality, an optional property has been added to
+> the bindings.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  3 ++
+>  sound/soc/sunxi/sun4i-i2s.c                        | 48 +++++++++++++++++-----
+>  2 files changed, 41 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> index 48addef65b8f..3f966ac61b9e 100644
+> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> @@ -33,6 +33,9 @@ Optional properties:
+>  				configured to extend the slot width to the
+>  				value specified. Min 8, Max 32.
+>  
+> +- allwinner,playback-channels:  if this property is present then the number
+> +				of available channels is extended and the
+> +				outputs enabled.
 
-Yes, thanks :)
+Isn't it something that is fixed for each generation of SoCs? Can't we
+attach it to the compatible?
 
-Best regards,
-Krzysztof
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/85fc37d0/attachment.sig>
