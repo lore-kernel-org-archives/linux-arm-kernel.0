@@ -1,47 +1,46 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 13 Mar 2018 18:12:20 +0100
-Subject: [PATCH] ARM: dts: exynos: Add #sound-dai-cells property to
- exynos5250 i2s nodes
-References: <CGME20180313171232epcas1p4425993ba6042b06051cc7590d3dbeab4@epcas1p4.samsung.com>
-Message-ID: <20180313171220.26333-1-s.nawrocki@samsung.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Tue, 13 Mar 2018 18:13:25 +0100
+Subject: [PATCH v4 2/2] ARM: ftrace: Add MODULE_PLTS support
+In-Reply-To: <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
+References: <20180313135314.18780-1-alexander.sverdlin@nokia.com>
+ <20180313135314.18780-3-alexander.sverdlin@nokia.com>
+ <CAKv+Gu-g+2y6Ej0cvLcz0R571HAnj2VXXDF0agWizDzReYMymg@mail.gmail.com>
+Message-ID: <5d3ae760-45bd-3588-500f-1b352e1722de@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The #sound-dai-cells property may be required to reference the CPU DAI
-properly. This change is required for Snow HDMI audio.
+Hello Ard,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+On 13/03/18 17:12, Ard Biesheuvel wrote:
+>>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>>  {
+>>         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+>>                                                           &mod->arch.init;
+>> +       struct plt_entries *plt;
+>> +       int idx;
+>>
+>> -       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+                                                           ^^^^^^^^^^^ (*)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index ebc79114b0ce..45283a6c5eee 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -499,6 +499,7 @@
- 			pinctrl-0 = <&i2s0_bus>;
- 			power-domains = <&pd_mau>;
- 			#clock-cells = <1>;
-+			#sound-dai-cells = <1>;
- 		};
- 
- 		i2s1: i2s at 12d60000 {
-@@ -513,6 +514,7 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2s1_bus>;
- 			power-domains = <&pd_mau>;
-+			#sound-dai-cells = <1>;
- 		};
- 
- 		i2s2: i2s at 12d70000 {
-@@ -527,6 +529,7 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2s2_bus>;
- 			power-domains = <&pd_mau>;
-+			#sound-dai-cells = <1>;
- 		};
- 
- 		usb_dwc3 {
+>> -       int idx = 0;
+>> +       /* cache the address, ELF header is available only during module load */
+>> +       if (!pltsec->plt_ent)
+>> +               pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
+>> +       plt = pltsec->plt_ent;
+>> +
+> Where is plt_ent ever used?
+
+Above is exactly the place it's used.
+I need to cache it because after the module load is finished the ELF header is freed,
+pltsec->plt pointer (*) is not valid any more.
+With the above modification it's possible to call the function during the whole life
+time of the module.
+
+>> +       if (!pltsec->plt_count)
+>> +               prealloc_fixed(pltsec, plt);
+
+I'll prepare v5 based on your other comments.
+
 -- 
-2.14.2
+Best regards,
+Alexander Sverdlin.
