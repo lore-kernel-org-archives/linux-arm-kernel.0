@@ -1,66 +1,176 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Mar 2018 21:54:20 +0100
-Subject: [PATCH v4 0/5] drm/blend: Support generic plane-wide alpha
-Message-ID: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+Date: Tue, 13 Mar 2018 21:54:21 +0100
+Subject: [PATCH v4 1/5] drm/blend: Add a generic alpha property
+In-Reply-To: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+References: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+Message-ID: <402e596049beb3429faf5981682d902c70325274.1520974361.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some drivers duplicate the logic to create a property to store a per-plane
+alpha.
 
-This serie aims at enhancing the support for plane-wide alpha in the
-drivers that are implementing it at the moment, by turning it into a
-generic property and converting the drivers (rcar-du and atmel-hclcdc). It
-also introduces support for it in the sun4i driver.
+This is especially useful if we ever want to support extra protocols for
+Wayland like:
+https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
 
-Let me know what you think,
-Maxime
+Let's create a helper in order to move that to the core.
 
-Changes from v3:
-  - Rebased on current drm-misc-next
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/gpu/drm/drm_atomic.c        |  4 +++-
+ drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
+ drivers/gpu/drm/drm_blend.c         | 38 ++++++++++++++++++++++++++++++-
+ include/drm/drm_blend.h             |  3 ++-
+ include/drm/drm_plane.h             |  6 +++++-
+ 5 files changed, 55 insertions(+)
 
-  - Made the alpha property a 16 bits property, and have the drivers
-    drop the lowest 8 bits
-  - Removed the csv documentation, and documented it in the doc instead
-
-Changes from v2:
-  - Rebased on current drm-misc-next
-  - Removed the patches already applied
-  - Split the patch implementing the automatic pipe assignment in two
-
-Changes from v1:
-  - Document the behaviour on concurrent usage of the alpha property and an
-    alpha component in the format
-  - Allowed for higher alpha values
-  - Moved the alpha value from a helper to the struct drm_format_info
-  - Collected tags
-  - Rebased on current drm-misc-next
-
-Maxime Ripard (5):
-  drm/blend: Add a generic alpha property
-  drm/atmel-hclcdc: Convert to the new generic alpha property
-  drm/rcar-du: Convert to the new generic alpha property
-  drm/sun4i: Add support for plane alpha
-  drm/docs: Remove the rcar alpha from the csv file
-
- Documentation/gpu/kms-properties.csv            |  1 +-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
- drivers/gpu/drm/drm_atomic.c                    |  4 +-
- drivers/gpu/drm/drm_atomic_helper.c             |  4 +-
- drivers/gpu/drm/drm_blend.c                     | 38 ++++++++-
- drivers/gpu/drm/rcar-du/rcar_du_drv.h           |  1 +-
- drivers/gpu/drm/rcar-du/rcar_du_kms.c           |  5 +-
- drivers/gpu/drm/rcar-du/rcar_du_plane.c         | 15 +--
- drivers/gpu/drm/rcar-du/rcar_du_plane.h         |  2 +-
- drivers/gpu/drm/rcar-du/rcar_du_vsp.c           | 42 +--------
- drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |  2 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c           | 16 ++-
- drivers/gpu/drm/sun4i/sun4i_backend.h           |  3 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c             |  2 +-
- include/drm/drm_blend.h                         |  3 +-
- include/drm/drm_plane.h                         |  6 +-
- 17 files changed, 96 insertions(+), 150 deletions(-)
-
-base-commit: 9c936b12f15019b38edb5f8bae77bb5b0046d1b7
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index 34b7d420e555..39204c88d2c5 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -753,6 +753,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
+ 		state->src_w = val;
+ 	} else if (property == config->prop_src_h) {
+ 		state->src_h = val;
++	} else if (property == plane->alpha_property) {
++		state->alpha = val;
+ 	} else if (property == plane->rotation_property) {
+ 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
+ 			return -EINVAL;
+@@ -818,6 +820,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
+ 		*val = state->src_w;
+ 	} else if (property == config->prop_src_h) {
+ 		*val = state->src_h;
++	} else if (property == plane->alpha_property) {
++		*val = state->alpha;
+ 	} else if (property == plane->rotation_property) {
+ 		*val = state->rotation;
+ 	} else if (property == plane->zpos_property) {
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index 00c78c1c9681..ac4c3f18a0b1 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -3484,6 +3484,10 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
+ 	if (plane->state) {
+ 		plane->state->plane = plane;
+ 		plane->state->rotation = DRM_MODE_ROTATE_0;
++
++		/* Reset the alpha value to fully opaque if it matters */
++		if (plane->alpha_property)
++			plane->state->alpha = plane->alpha_property->values[1];
+ 	}
+ }
+ EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
+diff --git a/drivers/gpu/drm/drm_blend.c b/drivers/gpu/drm/drm_blend.c
+index 5a81e1b4c076..05eda2d57c77 100644
+--- a/drivers/gpu/drm/drm_blend.c
++++ b/drivers/gpu/drm/drm_blend.c
+@@ -88,6 +88,12 @@
+  * On top of this basic transformation additional properties can be exposed by
+  * the driver:
+  *
++ * alpha:
++ * 	Alpha is setup with drm_plane_create_alpha_property(). It controls the
++ * 	plane-wide opacity, from transparent (0) to opaque (0xffff). It can be
++ * 	combined with pixel alpha.
++ * 	The alpha value is represented as premultiplied alpha.
++ *
+  * rotation:
+  *	Rotation is set up with drm_plane_create_rotation_property(). It adds a
+  *	rotation and reflection step between the source and destination rectangles.
+@@ -106,6 +112,38 @@
+  */
+ 
+ /**
++ * drm_plane_create_alpha_property - create a new alpha property
++ * @plane: drm plane
++ *
++ * This function creates a generic, mutable, alpha property and enables support
++ * for it in the DRM core. It is attached to @plane.
++ *
++ * The alpha property will be allowed to be within the bounds of 0
++ * (transparent) to 0xffff (opaque).
++ *
++ * Returns:
++ * 0 on success, negative error code on failure.
++ */
++int drm_plane_create_alpha_property(struct drm_plane *plane)
++{
++	struct drm_property *prop;
++
++	prop = drm_property_create_range(plane->dev, 0, "alpha",
++					 0, DRM_BLEND_ALPHA_OPAQUE);
++	if (!prop)
++		return -ENOMEM;
++
++	drm_object_attach_property(&plane->base, prop, DRM_BLEND_ALPHA_OPAQUE);
++	plane->alpha_property = prop;
++
++	if (plane->state)
++		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
++
++	return 0;
++}
++EXPORT_SYMBOL(drm_plane_create_alpha_property);
++
++/**
+  * drm_plane_create_rotation_property - create a new rotation property
+  * @plane: drm plane
+  * @rotation: initial value of the rotation property
+diff --git a/include/drm/drm_blend.h b/include/drm/drm_blend.h
+index 17606026590b..330c561c4c11 100644
+--- a/include/drm/drm_blend.h
++++ b/include/drm/drm_blend.h
+@@ -36,6 +36,9 @@ static inline bool drm_rotation_90_or_270(unsigned int rotation)
+ 	return rotation & (DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_270);
+ }
+ 
++#define DRM_BLEND_ALPHA_OPAQUE		0xffff
++
++int drm_plane_create_alpha_property(struct drm_plane *plane);
+ int drm_plane_create_rotation_property(struct drm_plane *plane,
+ 				       unsigned int rotation,
+ 				       unsigned int supported_rotations);
+diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
+index f7bf4a48b1c3..8af573615c5f 100644
+--- a/include/drm/drm_plane.h
++++ b/include/drm/drm_plane.h
+@@ -43,6 +43,7 @@ struct drm_modeset_acquire_ctx;
+  *	plane (in 16.16)
+  * @src_w: width of visible portion of plane (in 16.16)
+  * @src_h: height of visible portion of plane (in 16.16)
++ * @alpha: opacity of the plane
+  * @rotation: rotation of the plane
+  * @zpos: priority of the given plane on crtc (optional)
+  *	Note that multiple active planes on the same crtc can have an identical
+@@ -106,6 +107,9 @@ struct drm_plane_state {
+ 	uint32_t src_x, src_y;
+ 	uint32_t src_h, src_w;
+ 
++	/* Plane opacity */
++	u16 alpha;
++
+ 	/* Plane rotation */
+ 	unsigned int rotation;
+ 
+@@ -496,6 +500,7 @@ enum drm_plane_type {
+  * @funcs: helper functions
+  * @properties: property tracking for this plane
+  * @type: type of plane (overlay, primary, cursor)
++ * @alpha_property: alpha property for this plane
+  * @zpos_property: zpos property for this plane
+  * @rotation_property: rotation property for this plane
+  * @helper_private: mid-layer private data
+@@ -571,6 +576,7 @@ struct drm_plane {
+ 	 */
+ 	struct drm_plane_state *state;
+ 
++	struct drm_property *alpha_property;
+ 	struct drm_property *zpos_property;
+ 	struct drm_property *rotation_property;
+ 
 -- 
 git-series 0.9.1
