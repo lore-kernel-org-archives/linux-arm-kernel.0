@@ -1,48 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 17:21:00 +0000
-Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
-Message-ID: <20180313172103.24281-1-marc.zyngier@arm.com>
+Date: Tue, 13 Mar 2018 17:21:03 +0000
+Subject: [PATCH 3/3] irqchip/gic-v3: Allow LPIs to be disabled from the
+ command line
+In-Reply-To: <20180313172103.24281-1-marc.zyngier@arm.com>
+References: <20180313172103.24281-1-marc.zyngier@arm.com>
+Message-ID: <20180313172103.24281-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As kexec and kdump are getting used a bit more intensively, I've been
-made aware of a number of shortcomings.
+For most GICv3 implementations, enabling LPIs is a one way switch.
+Once they're on, there is no turning back, which completely kills
+kexec (pending tables will always be live, and we can't tell the
+secondary kernel where they are).
 
-The main gripe is from folks trying to launch a kdump kernel from
-within an interrupt handler. If using EOImode==1, things work as
-expected. If using EOImode==0 (such as in a guest), the secondary
-kernel hangs as the previous interrupt hasn't been EOI'd, and the
-active priority is still set. The first two patches are addressing
-this situation for both GICv2 and GICv3 by reseting the APRs to their
-default value.
+This is really annoying if you plan to use Linux as a bootloader,
+as it pretty much guarantees that the secondary kernel won't be
+able to use MSIs, and may even see some memory corruption. Bad.
 
-The last patch is introduced to workaround an annoying shortcoming on
-some GICv3 implementations, where LPIs cannot be disabled once they've
-been enabled. This completely kills the whole kexec story, as the
-secondary kernel will not be able to configure LPIs, and may
-experience random single bit corruption due to interrupts being made
-pending in the now reallocated pending tables. Fun!
+A workaround for this unfortunate situation is to allow the kernel
+not to enable LPIs, even if the feature is present in the HW. This
+would allow Linux-as-a-bootloader to leave LPIs alone, and let the
+secondary kernel to do whatever it wants with them.
 
-This is quite annoying in those (limited) situations where you'd like
-Linux to act as your bootloader. For this particular use case, we
-introduce a kernel command line option "irqchip.gicv3_nolpi=1", which
-will force the kernel to ignore LPIs altogether, leaving them intact
-to the secondary kernel to enjoy. This has proved to be quite useful
-on my Chromebook.
+Let's introduce a boolean "irqchip.gicv3_nolpi" command line option
+that serves that purpose.
 
-I'd welcome any testing and reviewing. If nobody fundamentaly
-disagrees with this, I plan to get it merged in 4.17.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/admin-guide/kernel-parameters.txt |  8 ++++++++
+ drivers/irqchip/irq-gic-v3.c                    | 10 +++++++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-Marc Zyngier (3):
-  irqchip/gic-v2: Reset APRn registers at boot time
-  irqchip/gic-v3: Reset APgRn registers at boot time
-  irqchip/gic-v3: Allow LPIs to be disabled from the command line
-
- Documentation/admin-guide/kernel-parameters.txt |  8 +++++
- arch/arm/include/asm/arch_gicv3.h               | 41 +++++++++++++++++++------
- drivers/irqchip/irq-gic-v3.c                    | 33 +++++++++++++++++++-
- drivers/irqchip/irq-gic.c                       | 17 ++++++----
- 4 files changed, 82 insertions(+), 17 deletions(-)
-
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 1d1d53f85ddd..60130231db3b 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1743,6 +1743,14 @@
+ 			of a GICv2 controller even if the memory range
+ 			exposed by the device tree is too small.
+ 
++	irqchip.gicv3_nolpi=
++			[ARM, ARM64]
++			Force the kernel to ignore the availability of
++			LPIs (and by consequence ITSs). Intended for system
++			that use the kernel as a bootloader, and thus want
++			to let secondary kernels in charge of setting up
++			LPIs.
++
+ 	irqfixup	[HW]
+ 			When an interrupt is not handled search all handlers
+ 			for it. Intended to get systems with badly broken
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 0ea02504115d..3e9eeb6cb294 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -613,9 +613,17 @@ static void gic_cpu_sys_reg_init(void)
+ 		pr_crit_once("RSS is required but GICD doesn't support it\n");
+ }
+ 
++static bool gicv3_nolpi;
++
++static int __init gicv3_nolpi_cfg(char *buf)
++{
++	return strtobool(buf, &gicv3_nolpi);
++}
++early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
++
+ static int gic_dist_supports_lpis(void)
+ {
+-	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
++	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS) && !gicv3_nolpi;
+ }
+ 
+ static void gic_cpu_init(void)
 -- 
 2.14.2
