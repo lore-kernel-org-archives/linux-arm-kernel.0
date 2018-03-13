@@ -1,66 +1,48 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 13 Mar 2018 17:42:05 +0100
-Subject: [PATCH v1 6/8] dmaengine: stm32-dma: properly mask irq bits
+Date: Tue, 13 Mar 2018 17:42:00 +0100
+Subject: [PATCH v1 1/8] dt-bindings: stm32-dma: introduce DMA features bitfield
 In-Reply-To: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1520959327-25760-7-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1520959327-25760-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A single register of the controller holds the information for four dma
-channels.
-The functions stm32_dma_irq_status() don't mask the relevant bits after
-the shift, thus adjacent channel's status is also reported in the returned
-value.
-Fixed by masking the value before returning it.
-
-Similarly, the function stm32_dma_irq_clear() don't mask the input value
-before shifting it, thus an incorrect input value could disable the
-interrupts of adjacent channels.
-Fixed by masking the input value before using it.
+This bitfield intends to address features to be activated within the
+driver. Initially the mask was only meant for FIFO Threshold management.
+Backward compatibility is preserved but the meaning of this field has been
+extended to features instead of only threshold.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
 ---
   Version history:
     v1:
        * Initial
 ---
 ---
- drivers/dma/stm32-dma.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/dma/stm32-dma.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index f9d3c84..a11cbee 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -38,6 +38,10 @@
- #define STM32_DMA_TEI			BIT(3) /* Transfer Error Interrupt */
- #define STM32_DMA_DMEI			BIT(2) /* Direct Mode Error Interrupt */
- #define STM32_DMA_FEI			BIT(0) /* FIFO Error Interrupt */
-+#define STM32_DMA_MASKI			(STM32_DMA_TCI \
-+					 | STM32_DMA_TEI \
-+					 | STM32_DMA_DMEI \
-+					 | STM32_DMA_FEI)
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+index 0b55718..c5f5190 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -62,14 +62,14 @@ channel: a phandle to the DMA controller plus the following four integer cells:
+ 	0x1: medium
+ 	0x2: high
+ 	0x3: very high
+-4. A 32bit mask specifying the DMA FIFO threshold configuration which are device
+-   dependent:
+- -bit 0-1: Fifo threshold
++4. A 32bit bitfield value specifying DMA features which are device dependent:
++ -bit 0-1: DMA FIFO threshold selection
+ 	0x0: 1/4 full FIFO
+ 	0x1: 1/2 full FIFO
+ 	0x2: 3/4 full FIFO
+ 	0x3: full FIFO
  
- /* DMA Stream x Configuration Register */
- #define STM32_DMA_SCR(x)		(0x0010 + 0x18 * (x)) /* x = 0..7 */
-@@ -404,7 +408,7 @@ static u32 stm32_dma_irq_status(struct stm32_dma_chan *chan)
++
+ Example:
  
- 	flags = dma_isr >> (((chan->id & 2) << 3) | ((chan->id & 1) * 6));
- 
--	return flags;
-+	return flags & STM32_DMA_MASKI;
- }
- 
- static void stm32_dma_irq_clear(struct stm32_dma_chan *chan, u32 flags)
-@@ -419,6 +423,7 @@ static void stm32_dma_irq_clear(struct stm32_dma_chan *chan, u32 flags)
- 	 * If (ch % 4) is 2 or 3, left shift the mask by 16 bits.
- 	 * If (ch % 4) is 1 or 3, additionally left shift the mask by 6 bits.
- 	 */
-+	flags &= STM32_DMA_MASKI;
- 	dma_ifcr = flags << (((chan->id & 2) << 3) | ((chan->id & 1) * 6));
- 
- 	if (chan->id & 4)
+ 	usart1: serial at 40011000 {
 -- 
 2.7.4
