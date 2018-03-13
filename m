@@ -1,62 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Mar 2018 14:21:50 +0000
-Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
-In-Reply-To: <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
-References: <20171011094148.15674-4-punit.agrawal@arm.com>
- <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
-Message-ID: <8366ba39-a5a1-7734-752e-f3dce18e8007@arm.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 13 Mar 2018 15:23:05 +0100
+Subject: [PATCH 1/2] iio: adc: stm32-dfsdm: fix successive oversampling
+ settings
+In-Reply-To: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
+References: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1520950986-23116-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lokesh,
+When doing successive oversampling settings, it may fail to update filter
+parameters silently:
+- First time oversampling is being set, it will be successful, as fl->res
+is 0 initially.
+- Next attempts with various oversamp value may return 0 (success), but
+keep previous filter parameters, due to 'res' never reaches above or
+equal current 'fl->res'.
 
-On 13/03/18 13:38, Lokesh Vutla wrote:
-> Hi All,
-> 
-> On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
->> The kernel crashes while iterating over a redistributor that is
->> in-correctly sized by the platform firmware or doesn't contain the last
->> record.
->>
->> Prevent the crash by checking accesses against the size of the region
->> provided by the firmware. While we are at it, warn the user about
->> incorrect region size.
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Sorry to bring up an old thread. Just wanted to check what is the status
-> on this series.
+This is particularly true when setting sampling frequency (that relies on
+oversamp). Typical failure without error:
+- run 1st test @16kHz samp freq will succeed
+- run new test @8kHz will succeed as well
+- run new test @16kHz (again): sample rate will remain 8kHz without error
 
-So far, I wasn't inclined to merge it, as it only allowed you to detect
-a broken system, as opposed to help with a working one.
+Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
 
-> This will also be useful when we try to boot linux + hypervisor with
-> less number of cores than the SoC supports. For example:
-> - SoC has 4 cores and Linux tries to boot with 2 cores.
-> - then a type-2 hypervisor gets installed.
-> - Hypervisor tries to boot a VM with linux on core 1.
-> 
-> Now the VM boot will fail while it iterates over all the GICR regions
-> till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
-> regions of any invalid cpus(cpu 2, cpu 3 in this case).
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/stm32-dfsdm-adc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-It you're passing the redistributors to a guest, you're doing something
-terribly wrong. You're putting the guest in a position to do a DoS on
-the hypervisor (disabling its timer interrupt, for example). Not the
-greatest move. There is a number of other gotchas with this approach
-(virtual interrupts, distributor virtualization...).
-
-> If the $patch is not the right approach, can you suggest on how to
-> handle the above scenario?
-
-The proper way to handle this is to virtualize the distributor and
-redistributor by trap/emulate. The only thing you can safely pass to a
-guest is the CPU interface, either as system registers or in its MMIO
-form (if you have the GICv2 compatibility interface).
-
-Thanks,
-
-	M.
+diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+index 01422d1..dc911b6 100644
+--- a/drivers/iio/adc/stm32-dfsdm-adc.c
++++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+@@ -144,6 +144,7 @@ static int stm32_dfsdm_set_osrs(struct stm32_dfsdm_filter *fl,
+ 	 * Leave as soon as if exact resolution if reached.
+ 	 * Otherwise the higher resolution below 32 bits is kept.
+ 	 */
++	fl->res = 0;
+ 	for (fosr = 1; fosr <= DFSDM_MAX_FL_OVERSAMPLING; fosr++) {
+ 		for (iosr = 1; iosr <= DFSDM_MAX_INT_OVERSAMPLING; iosr++) {
+ 			if (fast)
+@@ -193,7 +194,7 @@ static int stm32_dfsdm_set_osrs(struct stm32_dfsdm_filter *fl,
+ 		}
+ 	}
+ 
+-	if (!fl->fosr)
++	if (!fl->res)
+ 		return -EINVAL;
+ 
+ 	return 0;
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
