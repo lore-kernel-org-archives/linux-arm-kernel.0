@@ -1,144 +1,265 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Mar 2018 19:33:55 +0000
-Subject: [PATCH] KVM: arm/arm64: replacing per-VM's per-CPU variable
-In-Reply-To: <37d19d6c-8787-d190-0ef0-c6709cb9e976@arm.com>
-References: <1520974993-40423-1-git-send-email-peng.hao2@zte.com.cn>
- <37d19d6c-8787-d190-0ef0-c6709cb9e976@arm.com>
-Message-ID: <01c88eaa-e863-1103-8bb1-b723b4d3ab87@arm.com>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Tue, 13 Mar 2018 20:34:14 +0100
+Subject: [PATCH v2] staging: bcm2835-audio: Release resources on module_exit()
+In-Reply-To: <63ee611d-9fd7-a67a-45aa-229cc4a83ed2@gmail.com>
+References: <63ee611d-9fd7-a67a-45aa-229cc4a83ed2@gmail.com>
+Message-ID: <20180313193414.11535-1-k.marinushkin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/18 13:01, Marc Zyngier wrote:
-> [You're repeatedly posting to the kvmarm mailing list without being
-> subscribed to it. I've flushed the queue now, but please consider
-> subscribing to the list, it will help everyone]
-> 
-> On 13/03/18 21:03, Peng Hao wrote:
->> Using a global per-CPU variable instead of per-VM's per-CPU variable.
->>
->> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->> ---
->>   arch/arm/include/asm/kvm_host.h   |  3 ---
->>   arch/arm64/include/asm/kvm_host.h |  3 ---
->>   virt/kvm/arm/arm.c                | 26 ++++++--------------------
->>   3 files changed, 6 insertions(+), 26 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 248b930..4224f3b 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -59,9 +59,6 @@ struct kvm_arch {
->>   	/* VTTBR value associated with below pgd and vmid */
->>   	u64    vttbr;
->>   
->> -	/* The last vcpu id that ran on each physical CPU */
->> -	int __percpu *last_vcpu_ran;
->> -
->>   	/*
->>   	 * Anything that is not used directly from assembly code goes
->>   	 * here.
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 596f8e4..5035a08 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -67,9 +67,6 @@ struct kvm_arch {
->>   	/* VTTBR value associated with above pgd and vmid */
->>   	u64    vttbr;
->>   
->> -	/* The last vcpu id that ran on each physical CPU */
->> -	int __percpu *last_vcpu_ran;
->> -
->>   	/* The maximum number of vCPUs depends on the used GIC model */
->>   	int max_vcpus;
->>   
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index 86941f6..a67ffb0 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -59,6 +59,8 @@
->>   /* Per-CPU variable containing the currently running vcpu. */
->>   static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
->>   
->> +static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_last_ran_vcpu);
->> +
->>   /* The VMID used in the VTTBR */
->>   static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
->>   static u32 kvm_next_vmid;
->> @@ -115,18 +117,11 @@ void kvm_arch_check_processor_compat(void *rtn)
->>    */
->>   int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->>   {
->> -	int ret, cpu;
->> +	int ret;
->>   
->>   	if (type)
->>   		return -EINVAL;
->>   
->> -	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
->> -	if (!kvm->arch.last_vcpu_ran)
->> -		return -ENOMEM;
->> -
->> -	for_each_possible_cpu(cpu)
->> -		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
->> -
->>   	ret = kvm_alloc_stage2_pgd(kvm);
->>   	if (ret)
->>   		goto out_fail_alloc;
->> @@ -147,9 +142,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->>   	return ret;
->>   out_free_stage2_pgd:
->>   	kvm_free_stage2_pgd(kvm);
->> -out_fail_alloc:
->> -	free_percpu(kvm->arch.last_vcpu_ran);
->> -	kvm->arch.last_vcpu_ran = NULL;
->> +out_fail_alloc:
->>   	return ret;
->>   }
->>   
->> @@ -179,9 +172,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
->>   
->>   	kvm_vgic_destroy(kvm);
->>   
->> -	free_percpu(kvm->arch.last_vcpu_ran);
->> -	kvm->arch.last_vcpu_ran = NULL;
->> -
->>   	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
->>   		if (kvm->vcpus[i]) {
->>   			kvm_arch_vcpu_free(kvm->vcpus[i]);
->> @@ -343,17 +333,13 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
->>   
->>   void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->>   {
->> -	int *last_ran;
->> -
->> -	last_ran = this_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran);
->> -
->>   	/*
->>   	 * We might get preempted before the vCPU actually runs, but
->>   	 * over-invalidation doesn't affect correctness.
->>   	 */
->> -	if (*last_ran != vcpu->vcpu_id) {
->> +	if (per_cpu(kvm_last_ran_vcpu, cpu) != vcpu) {
->>   		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vcpu);
->> -		*last_ran = vcpu->vcpu_id;
->> +		per_cpu(kvm_last_ran_vcpu, cpu) = vcpu;
->>   	}
->>   
->>   	vcpu->cpu = cpu;
->>
-> 
-> Have you read and understood what this code is about? The whole point of
-> this code is to track physical CPUs on a per-VM basis. Making it global
-> completely defeats the point, and can result in guest memory corruption.
-> Please see commit 94d0e5980d67.
+In the current implementation, `rmmod snd_bcm2835` does not release
+resources properly. It causes an oops when trying to list sound devices.
 
-I won't comment on the patch itself (AFAICS it is rather broken), but I 
-suppose there is a grain of sense in the general idea, since the set of 
-physical CPUs itself is fundamentally a global thing. Given a large 
-number of pCPUs and a large number of VMs it could well be more 
-space-efficient to keep a single per-pCPU record of a {vmid,vcpu_id} 
-tuple or some other *globally-unique* vCPU namespace (I guess just the 
-struct kvm_vcpu pointer might work, but then it would be hard to avoid 
-unnecessary invalidation when switching VMIDs entirely).
+This commit fixes it.
 
-Robin.
+The details WRT allocation / free are described below.
+
+Device structure WRT allocation:
+
+pdev
+  \childdev[]
+    \card
+      \chip
+        \pcm
+        \ctl
+
+Allocation / register sequence:
+
+* childdev: devm_kzalloc      - freed during driver detach
+* childdev: device_initialize - freed during device_unregister
+* pdev: devres_alloc          - freed during driver detach
+* childdev: device_add        - removed during device_unregister
+* pdev, childdev: devres_add  - freed during driver detach
+* card: snd_card_new          - freed during snd_card_free
+* chip: kzalloc               - freed during kfree
+* card, chip: snd_device_new  - freed during snd_device_free
+* chip: new_pcm               - TODO: free pcm
+* chip: new_ctl               - TODO: free ctl
+* card: snd_card_register     - unregistered during snd_card_free
+
+Free / unregister sequence:
+
+* card: snd_card_free
+* card, chip: snd_device_free
+* childdev: device_unregister
+* chip: kfree
+
+Steps to reproduce the issue before this commit:
+
+~~~~
+$ rmmod snd_bcm2835
+$ aplay -L
+[  138.648130] Unable to handle kernel paging request at virtual address 7f1343c0
+[  138.660415] pgd = ad8f0000
+[  138.665567] [7f1343c0] *pgd=3864c811, *pte=00000000, *ppte=00000000
+[  138.674887] Internal error: Oops: 7 [#1] SMP ARM
+[  138.683571] Modules linked in: sha256_generic cfg80211 rfkill snd_pcm snd_timer
+ snd fixed uio_pdrv_genirq uio ip_tables x_tables ipv6 [last unloaded: snd_bcm2835
+]
+[  138.706594] CPU: 3 PID: 463 Comm: aplay Tainted: G        WC       4.15.0-rc1-v
+7+ #6
+[  138.719833] Hardware name: BCM2835
+[  138.726016] task: b877ac00 task.stack: aebec000
+[  138.733408] PC is at try_module_get+0x38/0x24c
+[  138.740813] LR is at snd_ctl_open+0x58/0x194 [snd]
+[  138.748485] pc : [<801c4d5c>]    lr : [<7f0e6b2c>]    psr: 20000013
+[  138.757709] sp : aebedd60  ip : aebedd88  fp : aebedd84
+[  138.765884] r10: 00000000  r9 : 00000004  r8 : 7f0ed440
+[  138.774040] r7 : b7e469b0  r6 : 7f0e6b2c  r5 : afd91900  r4 : 7f1343c0
+[  138.783571] r3 : aebec000  r2 : 00000001  r1 : b877ac00  r0 : 7f1343c0
+[  138.793084] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[  138.803300] Control: 10c5387d  Table: 2d8f006a  DAC: 00000055
+[  138.812064] Process aplay (pid: 463, stack limit = 0xaebec210)
+[  138.820868] Stack: (0xaebedd60 to 0xaebee000)
+[  138.828207] dd60: 00000000 b848d000 afd91900 00000000 b7e469b0 7f0ed440 aebedda4 aebedd88
+[  138.842371] dd80: 7f0e6b2c 801c4d30 afd91900 7f0ea4dc 00000000 b7e469b0 aebeddcc aebedda8
+[  138.856611] dda0: 7f0e250c 7f0e6ae0 7f0e2464 b8478ec0 b7e469b0 afd91900 7f0ea388 00000000
+[  138.870864] ddc0: aebeddf4 aebeddd0 802ce590 7f0e2470 8090ab64 afd91900 afd91900 b7e469b0
+[  138.885301] dde0: afd91908 802ce4e4 aebede1c aebeddf8 802c57b4 802ce4f0 afd91900 aebedea8
+[  138.900110] de00: b7fa4c00 00000000 00000000 00000004 aebede3c aebede20 802c6ba8 802c56b4
+[  138.915260] de20: aebedea8 00000000 aebedf5c 00000000 aebedea4 aebede40 802d9a68 802c6b58
+[  138.930661] de40: b874ddd0 00000000 00000000 00000001 00000041 00000000 afd91900 aebede70
+[  138.946402] de60: 00000000 00000000 00000002 b7e469b0 b8a87610 b8d6ab80 801852f8 00080000
+[  138.962314] de80: aebedf5c aebedea8 00000001 80108464 aebec000 00000000 aebedf4c aebedea8
+[  138.978414] dea0: 802dacd4 802d970c b8a87610 b8d6ab80 a7982bc6 00000009 af363019 b9231480
+[  138.994617] dec0: 00000000 b8c038a0 b7e469b0 00000101 00000002 00000238 00000000 00000000
+[  139.010823] dee0: 00000000 aebedee8 00080000 0000000f aebedf3c aebedf00 802ed7e4 80843f94
+[  139.027025] df00: 00000003 00080000 b9231490 b9231480 00000000 00080000 af363000 00000000
+[  139.043229] df20: 00000005 00000002 ffffff9c 00000000 00080000 ffffff9c af363000 00000003
+[  139.059430] df40: aebedf94 aebedf50 802c6f70 802dac70 aebec000 00000000 00000001 00000000
+[  139.075629] df60: 00020000 00000004 00000100 00000001 7ebe577c 0002e038 00000000 00000005
+[  139.091828] df80: 80108464 aebec000 aebedfa4 aebedf98 802c7060 802c6e6c 00000000 aebedfa8
+[  139.108025] dfa0: 801082c0 802c7040 7ebe577c 0002e038 7ebe577c 00080000 00000b98 e81c8400
+[  139.124222] dfc0: 7ebe577c 0002e038 00000000 00000005 7ebe57e4 00a20af8 7ebe57f0 76f87394
+[  139.140419] dfe0: 00000000 7ebe55c4 76ec88e8 76df1d9c 60000010 7ebe577c 00000000 00000000
+[  139.156715] [<801c4d5c>] (try_module_get) from [<7f0e6b2c>] (snd_ctl_open+0x58/0x194 [snd])
+[  139.173222] [<7f0e6b2c>] (snd_ctl_open [snd]) from [<7f0e250c>] (snd_open+0xa8/0x14c [snd])
+[  139.189683] [<7f0e250c>] (snd_open [snd]) from [<802ce590>] (chrdev_open+0xac/0x188)
+[  139.205465] [<802ce590>] (chrdev_open) from [<802c57b4>] (do_dentry_open+0x10c/0x314)
+[  139.221347] [<802c57b4>] (do_dentry_open) from [<802c6ba8>] (vfs_open+0x5c/0x88)
+[  139.236788] [<802c6ba8>] (vfs_open) from [<802d9a68>] (path_openat+0x368/0x944)
+[  139.248270] [<802d9a68>] (path_openat) from [<802dacd4>] (do_filp_open+0x70/0xc4)
+[  139.263731] [<802dacd4>] (do_filp_open) from [<802c6f70>] (do_sys_open+0x110/0x1d4)
+[  139.279378] [<802c6f70>] (do_sys_open) from [<802c7060>] (SyS_open+0x2c/0x30)
+[  139.290647] [<802c7060>] (SyS_open) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+[  139.306021] Code: e3c3303f e5932004 e2822001 e5832004 (e5943000)
+[  139.316265] ---[ end trace 7f3f7f6193b663ed ]---
+[  139.324956] note: aplay[463] exited with preempt_count 1
+~~~~
+
+Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Michael Zoran <mzoran@crowfest.net>
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devel at driverdev.osuosl.org
+Cc: linux-kernel at vger.kernel.org
+---
+ .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 58 ++++++++++++----------
+ 1 file changed, 31 insertions(+), 27 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+index 8f2d508183b2..477cf4798a6e 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+@@ -36,6 +36,11 @@ MODULE_PARM_DESC(enable_compat_alsa,
+ static void snd_devm_unregister_child(struct device *dev, void *res)
+ {
+ 	struct device *childdev = *(struct device **)res;
++	struct bcm2835_chip *chip = dev_get_drvdata(childdev);
++	struct snd_card *card = chip->card;
++
++	snd_card_free(card);
++	dev_set_drvdata(childdev, NULL);
+ 
+ 	device_unregister(childdev);
+ }
+@@ -61,6 +66,13 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
+ 	return 0;
+ }
+ 
++static void snd_devm_release(struct device *dev)
++{
++	struct bcm2835_chip *chip = dev_get_drvdata(dev);
++
++	kfree(chip);
++}
++
+ static struct device *
+ snd_create_device(struct device *parent,
+ 		  struct device_driver *driver,
+@@ -76,6 +88,7 @@ snd_create_device(struct device *parent,
+ 	device_initialize(device);
+ 	device->parent = parent;
+ 	device->driver = driver;
++	device->release = snd_devm_release;
+ 
+ 	dev_set_name(device, "%s", name);
+ 
+@@ -86,18 +99,19 @@ snd_create_device(struct device *parent,
+ 	return device;
+ }
+ 
+-static int snd_bcm2835_free(struct bcm2835_chip *chip)
+-{
+-	kfree(chip);
+-	return 0;
+-}
+-
+ /* component-destructor
+  * (see "Management of Cards and Components")
+  */
+ static int snd_bcm2835_dev_free(struct snd_device *device)
+ {
+-	return snd_bcm2835_free(device->device_data);
++	struct bcm2835_chip *chip = device->device_data;
++	struct snd_card *card = chip->card;
++
++	/* TODO: free pcm, ctl */
++
++	snd_device_free(card, chip);
++
++	return 0;
+ }
+ 
+ /* chip-specific constructor
+@@ -122,7 +136,7 @@ static int snd_bcm2835_create(struct snd_card *card,
+ 
+ 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
+ 	if (err) {
+-		snd_bcm2835_free(chip);
++		kfree(chip);
+ 		return err;
+ 	}
+ 
+@@ -130,31 +144,14 @@ static int snd_bcm2835_create(struct snd_card *card,
+ 	return 0;
+ }
+ 
+-static void snd_devm_card_free(struct device *dev, void *res)
+-{
+-	struct snd_card *snd_card = *(struct snd_card **)res;
+-
+-	snd_card_free(snd_card);
+-}
+-
+ static struct snd_card *snd_devm_card_new(struct device *dev)
+ {
+-	struct snd_card **dr;
+ 	struct snd_card *card;
+ 	int ret;
+ 
+-	dr = devres_alloc(snd_devm_card_free, sizeof(*dr), GFP_KERNEL);
+-	if (!dr)
+-		return ERR_PTR(-ENOMEM);
+-
+ 	ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+-	if (ret) {
+-		devres_free(dr);
++	if (ret)
+ 		return ERR_PTR(ret);
+-	}
+-
+-	*dr = card;
+-	devres_add(dev, dr);
+ 
+ 	return card;
+ }
+@@ -313,7 +310,7 @@ static int snd_add_child_device(struct device *device,
+ 		return err;
+ 	}
+ 
+-	dev_set_drvdata(child, card);
++	dev_set_drvdata(child, chip);
+ 	dev_info(child, "card created with %d channels\n", numchans);
+ 
+ 	return 0;
+@@ -414,6 +411,12 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int snd_bcm2835_alsa_remove(struct platform_device *pdev)
++{
++	/* trigger snd_devm_unregister_child() */
++	return 0;
++}
++
+ #ifdef CONFIG_PM
+ 
+ static int snd_bcm2835_alsa_suspend(struct platform_device *pdev,
+@@ -437,6 +440,7 @@ MODULE_DEVICE_TABLE(of, snd_bcm2835_of_match_table);
+ 
+ static struct platform_driver bcm2835_alsa0_driver = {
+ 	.probe = snd_bcm2835_alsa_probe_dt,
++	.remove = snd_bcm2835_alsa_remove,
+ #ifdef CONFIG_PM
+ 	.suspend = snd_bcm2835_alsa_suspend,
+ 	.resume = snd_bcm2835_alsa_resume,
+-- 
+2.13.6
