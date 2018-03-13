@@ -1,317 +1,62 @@
-From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Tue, 13 Mar 2018 15:32:10 +0200
-Subject: [PATCH v12 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
-References: <1520947931-15426-1-git-send-email-tmaimon77@gmail.com>
-Message-ID: <1520947931-15426-3-git-send-email-tmaimon77@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Mar 2018 14:21:50 +0000
+Subject: [3/3] irqchip/gic-v3: Bounds check redistributor accesses
+In-Reply-To: <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
+References: <20171011094148.15674-4-punit.agrawal@arm.com>
+ <28f9c1cd-e1df-f4db-32b4-c9ca0f0f256a@ti.com>
+Message-ID: <8366ba39-a5a1-7734-752e-f3dce18e8007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+Hi Lokesh,
 
-Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-Reviewed-by: Joel Stanley <joel@jms.id.au>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Tested-by: Avi Fishman <avifishman70@gmail.com>
-Tested-by: Joel Stanley <joel@jms.id.au>
----
- .../arm/cpu-enable-method/nuvoton,npcm750-smp      |  42 ++++++
- .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  35 +++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 165 +++++++++++++++++++++
- 5 files changed, 250 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
+On 13/03/18 13:38, Lokesh Vutla wrote:
+> Hi All,
+> 
+> On Wednesday 11 October 2017 03:11 PM, Punit Agrawal wrote:
+>> The kernel crashes while iterating over a redistributor that is
+>> in-correctly sized by the platform firmware or doesn't contain the last
+>> record.
+>>
+>> Prevent the crash by checking accesses against the size of the region
+>> provided by the firmware. While we are at it, warn the user about
+>> incorrect region size.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Sorry to bring up an old thread. Just wanted to check what is the status
+> on this series.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
-new file mode 100644
-index 000000000000..8e043301e28e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm750-smp
-@@ -0,0 +1,42 @@
-+=========================================================
-+Secondary CPU enable-method "nuvoton,npcm750-smp" binding
-+=========================================================
-+
-+To apply to all CPUs, a single "nuvoton,npcm750-smp" enable method should be
-+defined in the "cpus" node.
-+
-+Enable method name:	"nuvoton,npcm750-smp"
-+Compatible machines:	"nuvoton,npcm750"
-+Compatible CPUs:	"arm,cortex-a9"
-+Related properties:	(none)
-+
-+Note:
-+This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
-+"nuvoton,npcm750-gcr".
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm750-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..2d87d9ecea85
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..eeab5dac50ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -304,6 +304,8 @@ dtb-$(CONFIG_ARCH_LPC18XX) += \
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	lpc3250-ea3250.dtb \
- 	lpc3250-phy3250.dtb
-+dtb-$(CONFIG_ARCH_NPCM750) += \
-+	nuvoton-npcm750-evb.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
- 	meson6-atv1200.dtb
- dtb-$(CONFIG_MACH_MESON8) += \
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..cabde3d5be8a
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,35 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology corporation.
-+// Copyright 2018 Google, Inc.
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+};
-+
-+&serial0 {
-+	status = "okay";
-+};
-+
-+&serial1 {
-+	status = "okay";
-+};
-+
-+&serial2 {
-+	status = "okay";
-+};
-+
-+&serial3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..839e45cfd695
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,165 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology corporation.
-+// Copyright 2018 Google, Inc.
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm750-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 10>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 10>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	/* external clock signal rg1refck, supplied by the phy */
-+	clk-rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	/* external clock signal rg2refck, supplied by the phy */
-+	clk-rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+	};
-+
-+	clk-xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0x0 0xf0000000 0x00900000>;
-+
-+		gcr: gcr at 800000 {
-+			compatible = "nuvoton,npcm750-gcr", "syscon",
-+				"simple-mfd";
-+			reg = <0x800000 0x1000>;
-+		};
-+
-+		scu: scu at 3fe000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0x3fe000 0x1000>;
-+		};
-+
-+		l2: cache-controller at 3fc000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x3fc000 0x1000>;
-+			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			cache-unified;
-+			cache-level = <2>;
-+			clocks = <&clk 22>;
-+			arm,shared-override;
-+		};
-+
-+		gic: interrupt-controller at 3ff000 {
-+			compatible = "arm,cortex-a9-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x3ff000 0x1000>,
-+			    <0x3fe100 0x100>;
-+		};
-+
-+		timer at 3fe600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x3fe600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&clk 15>;
-+		};
-+	};
-+
-+	ahb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		clk: clock-controller at f0801000 {
-+			compatible = "nuvoton,npcm750-clk";
-+			#clock-cells = <1>;
-+			reg = <0xf0801000 0x1000>;
-+		};
-+
-+		apb {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			interrupt-parent = <&gic>;
-+			ranges = <0x0 0xf0000000 0x00300000>;
-+
-+			timer0: timer at 8000 {
-+				compatible = "nuvoton,npcm750-timer";
-+				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0x8000 0x1000>;
-+				clocks = <&clk 15>;
-+			};
-+
-+			serial0: serial at 1000 {
-+				compatible = "ns16550a";
-+				reg = <0x1000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial1: serial at 2000 {
-+				compatible = "ns16550a";
-+				reg = <0x2000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial2: serial at 3000 {
-+				compatible = "ns16550a";
-+				reg = <0x3000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial3: serial at 4000 {
-+				compatible = "ns16550a";
-+				reg = <0x4000 0x1000>;
-+				clocks = <&clk 14>;
-+				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
+So far, I wasn't inclined to merge it, as it only allowed you to detect
+a broken system, as opposed to help with a working one.
+
+> This will also be useful when we try to boot linux + hypervisor with
+> less number of cores than the SoC supports. For example:
+> - SoC has 4 cores and Linux tries to boot with 2 cores.
+> - then a type-2 hypervisor gets installed.
+> - Hypervisor tries to boot a VM with linux on core 1.
+> 
+> Now the VM boot will fail while it iterates over all the GICR regions
+> till GICR_TYPER is found. Hypervisor will trap any accesses to GICR
+> regions of any invalid cpus(cpu 2, cpu 3 in this case).
+
+It you're passing the redistributors to a guest, you're doing something
+terribly wrong. You're putting the guest in a position to do a DoS on
+the hypervisor (disabling its timer interrupt, for example). Not the
+greatest move. There is a number of other gotchas with this approach
+(virtual interrupts, distributor virtualization...).
+
+> If the $patch is not the right approach, can you suggest on how to
+> handle the above scenario?
+
+The proper way to handle this is to virtualize the distributor and
+redistributor by trap/emulate. The only thing you can safely pass to a
+guest is the CPU interface, either as system registers or in its MMIO
+form (if you have the GICv2 compatibility interface).
+
+Thanks,
+
+	M.
 -- 
-2.14.1
+Jazz is not dead. It just smells funny...
