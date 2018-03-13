@@ -1,82 +1,91 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Mar 2018 16:41:54 +0100
-Subject: [PATCH 5/5] arm64: allwinner: a64: Add support for TERES I laptop
-In-Reply-To: <E1evhmK-0000OI-Nw@stardust.g4.wien.funkfeuer.at>
-References: <20180312161050.7647-1-harald@ccbib.org>
- <20180312161050.7647-6-harald@ccbib.org>
- <20180313084108.uh3ui5jwin2knvuu@flea>
- <E1evhmK-0000OI-Nw@stardust.g4.wien.funkfeuer.at>
-Message-ID: <20180313154154.lnzomhknzfuv7gqy@flea>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 13 Mar 2018 10:47:08 -0500
+Subject: [PATCH] media: omap3isp: fix unbalanced dma_iommu_mapping
+In-Reply-To: <20180313111407.egptbq5vbkny5q4d@valkosipuli.retiisi.org.uk>
+References: <20180312165207.12436-1-s-anna@ti.com>
+ <20180313111407.egptbq5vbkny5q4d@valkosipuli.retiisi.org.uk>
+Message-ID: <5c3f99e2-001b-b80a-f840-bc3201addc93@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 12:07:36PM +0100, Harald Geyer wrote:
-> >> +/ {
-> >> +	model = "Olimex Teres I A64";
-> > 
-> > It's called the Teres-I, there's no need for the A64 here
+Hi Sakari,
+
+On 03/13/2018 06:14 AM, Sakari Ailus wrote:
+> Hi Suman,
 > 
-> Olimex said in the past they want the Teres to be very modular, with
-> boards for different SoCs compatible with each other on the level of
-> external pins. The PCBs we have right now are labled like
-> TERES_PCB1-A64-MAIN, TERES-PCB2-IO, etc. - I wouldn't be surprised if
-> they start selling TERES_PCB1-x86-MAIN to be put into your average Teres I,
-> so I felt this naming was safer.
+> Thanks for the patch.
 > 
-> However I specifically CCed them on this series, so they can comment on
-> issues such as this one...
-
-Then maybe call it A64 Teres-I to be consistent with the compatible?
-
-> >> +		compatible = "gpio-leds";
-> >> +
-> >> +		led_capslock: capslock {
-> > 
-> > Same thing here
+> On Mon, Mar 12, 2018 at 11:52:07AM -0500, Suman Anna wrote:
+>> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+>> ARM DMA backend. The current code creates a dma_iommu_mapping and
+>> attaches this to the ISP device, but never detaches the mapping in
+>> either the probe failure paths or the driver remove path resulting
+>> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+>>
+>> Reported-by: Pavel Machek <pavel@ucw.cz>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> Tested-by: Pavel Machek <pavel@ucw.cz>
+>> ---
+>> Hi Mauro, Laurent,
+>>
+>> This fixes an issue reported by Pavel and discussed on this
+>> thread,
+>> https://marc.info/?l=linux-omap&m=152051945803598&w=2
+>>
+>> Posting this again to the appropriate lists.
+>>
+>> regards
+>> Suman
+>>
+>>  drivers/media/platform/omap3isp/isp.c | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+>> index 8eb000e3d8fd..c7d667bfc2af 100644
+>> --- a/drivers/media/platform/omap3isp/isp.c
+>> +++ b/drivers/media/platform/omap3isp/isp.c
+>> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
+>>  
+>>  static void isp_detach_iommu(struct isp_device *isp)
+>>  {
+>> +	arm_iommu_detach_device(isp->dev);
+>>  	arm_iommu_release_mapping(isp->mapping);
+>>  	isp->mapping = NULL;
+>>  }
+>> @@ -1971,13 +1972,15 @@ static int isp_attach_iommu(struct isp_device *isp)
+>>  	ret = arm_iommu_attach_device(isp->dev, mapping);
+>>  	if (ret < 0) {
+>>  		dev_err(isp->dev, "failed to attach device to VA mapping\n");
+>> -		goto error;
+>> +		goto error_attach;
 > 
-> I was kind of hoping I could use it to link the led to the keyboard,
-> so that it goes on when the capslock key is pressed. But no such luck:
-> 1) There seems to be no binding for external leds in the input subsystem.
-> 2) The keyboard is a usb one and get enumerated automatically, so not DT
->    node by default.
+> Instead of changing the label here, could you return immediately where the
+> previous point of error handling is? No need to add another label.
+
+Yeah, I debated about this while doing the patch, and chose to retain
+the previous common return on the error paths. There are only 2 error
+paths, so didn't want to mix them up. If you still prefer the mixed
+style, I can post a v2.
+
+regards
+Suman
+
 > 
-> I guess I can remove it, but then I guess labels for the leds might be
-> helpful when further customizing the DT locally, so why not just keep them?
-
-I'm not sure that would be useful either. I'd expect someone modifying
-the DT locally that they would modify the DT directly, and you already
-have the node there.
-
-> >> +	reg_usb1_vbus: usb1-vbus {
-> >> +		compatible = "regulator-fixed";
-> >> +		regulator-name = "usb1-vbus";
-> >> +		regulator-min-microvolt = <5000000>;
-> >> +		regulator-max-microvolt = <5000000>;
-> >> +		enable-active-high;
-> >> +		gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
-> >> +		status = "okay";
-> > 
-> > I guess this one has a parent regulator too?
+> After fixing that you can add:
 > 
-> Unless I failed to read the schematic correctly: No.
-> The step-up converter providing 5V power for the usb1-vbus is connected
-> directly to the IPS (intelligent power source) output of the PMIC and
-> enabled directly by the 3.3V supply. So technically of course there is
-> a parent regulator, but nothing we can control from software.
-
-Ok
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/88dec0ca/attachment.sig>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> 
+>>  	}
+>>  
+>>  	return 0;
+>>  
+>> +error_attach:
+>> +	arm_iommu_release_mapping(isp->mapping);
+>> +	isp->mapping = NULL;
+>>  error:
+>> -	isp_detach_iommu(isp);
+>>  	return ret;
+>>  }
+>>  
+>>
+> 
