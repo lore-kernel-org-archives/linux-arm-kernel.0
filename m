@@ -1,70 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Mar 2018 10:13:26 +0000
-Subject: [PATCH 0/29] arm meltdown fix backporting review for lts 4.9
-In-Reply-To: <20180313100442.GB1999@kroah.com>
-References: <1519790211-16582-1-git-send-email-alex.shi@linaro.org>
- <20180301152450.GA4061@kroah.com>
- <5cf40379-9098-da02-a471-8abd7d8f0be8@linaro.org>
- <20180302165415.GB8704@kroah.com>
- <CAKv+Gu-HdLkjYeNBQOW=JuWt3GjdZJFjyXCHCbGU01hkO81BNg@mail.gmail.com>
- <20180313100442.GB1999@kroah.com>
-Message-ID: <CAKv+Gu-v6U49_OZyt6HHmCJ7srYnNw040LpVkFnzx+BGKVC0aA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Mar 2018 10:16:03 +0000
+Subject: [PATCH v5 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <DM2PR0201MB07678A47B5380DC14E6F6126B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
+References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
+ <1519154467-2896-2-git-send-email-jollys@xilinx.com>
+ <778329dd-76a7-0151-26d9-30e87e0c888d@arm.com>
+ <CY1PR0201MB0764FB23021F5DC694C7F56DB8D80@CY1PR0201MB0764.namprd02.prod.outlook.com>
+ <f6a416b7-542f-a3c3-538f-8549cf4e96c3@arm.com>
+ <DM2PR0201MB07678A47B5380DC14E6F6126B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
+Message-ID: <755770ba-d110-8b2e-3c1f-9b65686dc51f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2018 at 10:04, Greg KH <greg@kroah.com> wrote:
-> On Wed, Mar 07, 2018 at 06:24:09PM +0000, Ard Biesheuvel wrote:
->> On 2 March 2018 at 16:54, Greg KH <greg@kroah.com> wrote:
->> > On Fri, Mar 02, 2018 at 05:14:50PM +0800, Alex Shi wrote:
->> >>
->> >>
->> >> On 03/01/2018 11:24 PM, Greg KH wrote:
->> >> > On Wed, Feb 28, 2018 at 11:56:22AM +0800, Alex Shi wrote:
->> >> >> Hi All,
->> >> >>
->> >> >> This backport patchset fixed the meltdown issue, it's original branch:
->> >> >> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
->> >> >> A few dependency or fixingpatches are also picked up, if they are necessary
->> >> >>  and no functional changes.
->> >> >>
->> >> >> The patchset also on repository:
->> >> >>    git://git.linaro.org/kernel/linux-linaro-stable.git lts-4.9-spectrevv2
->> >> >>
->> >> >> No bug found yet from kernelci.org and lkft testing.
->> >> >
->> >> > No bugs is good, but does it actually fix the meltdown problem?  What
->> >> > did you test it on?
->> >>
->> >> Oh, I have no A73/A75 cpu, so I can not reproduce meltdown bug.
->> >
->> > Then why should I trust this backport at all?
->> >
->> > Please test on the hardware that is affected, otherwise you do not know
->> > if your patches do anything or not.
->> >
+
+
+On 12/03/18 23:07, Jolly Shah wrote:
+> Hi Sudeep,
+
+>>>> Do you foresee using SMC/HVC for this firmware even on future platforms?
+>>>> If not, I suggest to keep the protocol part separate from the transport i.e.
+>>>> smc/hvc via ATF. It could be replaced with mailbox or some h/w
+>>>> mechanism in future ?
+>>>>
+>>>
+>>> We have PSCI and EEMI interfaces exposed to linux from ATF. PSCI is an
+>>> EEMI client. We do not have current plans to switch to mailbox as it
+>>> will require 2 communication channels to PMU as PSCI is through ATF.
+>>>
 >>
->> I don't think it is feasible to test these backports by confirming
->> that they make the fundamental issue go away. We simply don't have the
->> code to reproduce all the variants, and we have to rely on the
->> information provided by ARM Ltd. regarding which cores are affected
->> and which aren't.
->
-> You really don't have the reproducers?  Please work with ARM to resolve
-> that, this should not be a non-tested set of patches.  That's really
-> worse than no patches at all, as if they were applied, that would
-> provide a false-sense of "all is fixed".
->
+>> OK, but I just saw some bindings that has mailbox interface, honestly it's getting
+>> too confusing with multiple series on the same thing floating and hence I
+>> requested to put it together as one series.
+> 
+> Mailbox binding is used for power management driver. Mailbox is only
+> used for PMU->APU communication. APU->PMU communication is always
+> through EEMI firmware interface which is using SMC/HVC.
+> 
 
-I know that on x86, the line between architecture and platform is
-blurry. That is not the case on ARM, though.
+Ah OK, is it because there's no non-secure mailbox or to avoid races,
+all non-secure EEMI is channeled through SMC ?
 
-Unlike platform firmware, the OS is built on top of an abstracted
-platform which is described by ARM's Architecture Reference Manual. If
-ARM Ltd. issues recommendations regarding what firmware PSCI methods
-to call when doing a context switch, or which barrier instruction to
-issue in certain circumstances, they do so because a certain class of
-hardware may require it in some cases. It is really not up to me to go
-find some exploit code on GitHub, run it before and after applying the
-patch and conclude that the problem is fixed. Instead, what I should
-do is confirm that the changes result in the recommended actions to be
-taken at the appropriate times.
+-- 
+Regards,
+Sudeep
