@@ -1,48 +1,74 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Mar 2018 16:32:35 +0100
-Subject: [PATCH 3/5] pwm: sun4i: Introduce (optional) reset support
-In-Reply-To: <f001134a-987d-2491-a22e-d1d634f7b024@arm.com>
-References: <20180307020719.6675-1-andre.przywara@arm.com>
- <20180307020719.6675-4-andre.przywara@arm.com>
- <20180307074516.dbak7ztkua4p7mr5@flea.lan>
- <f001134a-987d-2491-a22e-d1d634f7b024@arm.com>
-Message-ID: <20180313153235.zyuelfcmayc6s73z@flea>
+Date: Tue, 13 Mar 2018 16:35:22 +0100
+Subject: [PATCH 3/5] arm64: dts: allwinner: a64: add simplefb for A64 SoC
+In-Reply-To: <E1evg4e-0000Qj-2w@stardust.g4.wien.funkfeuer.at>
+References: <20180312161050.7647-1-harald@ccbib.org>
+ <20180312161050.7647-4-harald@ccbib.org>
+ <20180313082724.7optc2xwgqoiibtx@flea>
+ <E1evg4e-0000Qj-2w@stardust.g4.wien.funkfeuer.at>
+Message-ID: <20180313153522.haeemlqbtuei5zb3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 02:05:34PM +0000, Andre Przywara wrote:
-> Hi Maxime,
-> 
-> thanks for looking into this and for the Acks!
-> 
-> On 07/03/18 07:45, Maxime Ripard wrote:
-> > On Wed, Mar 07, 2018 at 02:07:17AM +0000, Andre Przywara wrote:
-> >> While the PWM IP in the Allwinner H6 SoC is fully compatible to those
-> >> used in older SoCs (H3, A64), it features a dedicated reset line which
-> >> needs to be de-asserted.
-> >> Add support for an optional "resets" DT property in our pwm-sun4i probe
-> >> routine, and assert and de-assert the reset line, where needed.
-> >> This allows to enable PWM support on the H6.
+Hi,
+
+On Tue, Mar 13, 2018 at 10:18:22AM +0100, Harald Geyer wrote:
+> Maxime Ripard writes:
+> > On Mon, Mar 12, 2018 at 04:10:48PM +0000, Harald Geyer wrote:
+> >> The A64 SoC features two display pipelines, one has a LCD output, the
+> >> other has a HDMI output.
+> >>
+> >> Add support for simplefb for the LCD output. Tested on Teres I.
+> >>
+> >> This patch was inspired by work of Icenowy Zheng.
+> >>
+> >> Signed-off-by: Harald Geyer <harald@ccbib.org>
+> >> ---
+> >> arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 ++++++++++++++++++++
+> >> 1 file changed, 20 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> > b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> index ca1b365bc722..05d5e8def68a 100644
+> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> @@ -52,6 +52,26 @@
+> >> 	#address-cells = <1>;
+> >> 	#size-cells = <1>;
+> >>
+> >> +	chosen {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <1>;
+> >> +		ranges;
+> >> +
+> >> +/*
+> >> + * The pipeline mixer0-lcd0 depends on clock CLK_MIXER0 from DE2 CCU.
+> >> + * However there is no support for this clock on A64 yet, so we depend
+> >> + * on the upstream clocks here to keep them (and thus CLK_MIXER0) up.
+> >> + */
 > > 
-> > This isn't optional then. It's mandatory on the H6, and unneeded on
-> > everything else. This is what we should have.
+> > There's definitely support for the CLK_MIXER0 clock in the DE2 CCU
+> > driver, so I guess this would need to be amended / fixed
 > 
-> So are you aiming at:
-> 	if (of_device_is_compatible(np, "allwinner,sun50i-h6-pwm")) {
-> 		... devm_reset_control_get() ...
+> AFAIK on the A64 a special sram quirk is necessary, that never got merged:
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574303.html
 > 
-> I guess this is preferable over coding something based on a new member
-> in struct sun4i_pwm_data?
+> I asked Icenowy if I should resubmit her patch as part of this series,
+> but was told further discussion is necessary. I'm sure she can better
+> explain the details than me.
+> 
+> Actually if it wasn't for the sram quirk, there is a simplefb patch by
+> her, that could have been merged long ago:
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574304.html
 
-It's basically a long term vs short term debate :)
+The issue with your patch is that, as soon as that clock is
+functional, the DT with the node you were introducing here will no
+longer be.
 
-If we're thinking short term, then yes, sure it would make
-sense. However, if we start having more and more SoCs, we'll have a
-longer and longer condition.
+And since people use their firmware DT or put them in NOR these days,
+you can't really expect them to update them every release either.
 
-Since we already have a structure available, I'd still prefer to go
-for the structure flag. This is faster (no string comparison), it'll
-be easier to extend, and the patch size is pretty much the same.
+I guess a proper solution would be to respin that patch.
 
 Maxime
 
@@ -56,4 +82,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/deccedfc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180313/da36b48b/attachment.sig>
