@@ -1,97 +1,85 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Mar 2018 11:51:20 +0000
-Subject: [PATCH v4 22/22] arm64: Add work around for Arm Cortex-A55 Erratum
- 1024718
+Date: Tue, 13 Mar 2018 11:51:08 +0000
+Subject: [PATCH v4 10/22] arm64: capabilities: Allow features based on local
+ CPU scope
 In-Reply-To: <20180313115120.17256-1-suzuki.poulose@arm.com>
 References: <20180313115120.17256-1-suzuki.poulose@arm.com>
-Message-ID: <20180313115120.17256-23-suzuki.poulose@arm.com>
+Message-ID: <20180313115120.17256-11-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-from an erratum 1024718, which causes incorrect updates when DBM/AP
-bits in a page table entry is modified without a break-before-make
-sequence. The work around is to skip enabling the hardware DBM feature
-on the affected cores. The hardware Access Flag management features
-is not affected. There are some other cores suffering from this
-errata, which could be added to the midr_list to trigger the work
-around.
+So far we have treated the feature capabilities as system wide
+and this wouldn't help with features that could be detected locally
+on one or more CPUs (e.g, KPTI, Software prefetch). This patch
+splits the feature detection to two phases :
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: ckadabi at codeaurora.org
-Cc: Dave Martin <dave.martin@arm.com>
+ 1) Local CPU features are checked on all boot time active CPUs.
+ 2) System wide features are checked only once after all CPUs are
+    active.
+
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 14 ++++++++++++++
- arch/arm64/kernel/cpufeature.c         | 16 +++++++++++++++-
- 3 files changed, 30 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cpufeature.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index c1d520de6dfe..3b2f2dd82225 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -55,6 +55,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
- | ARM            | Cortex-A72      | #853709         | N/A                         |
- | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-+| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
- | ARM            | MMU-500         | #841119,#826419 | N/A                         |
- |                |                 |                 |                             |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f350b80aa84..9331baf8135c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -465,6 +465,20 @@ config ARM64_ERRATUM_843419
- 
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_1024718
-+	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-+	default y
-+	help
-+	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
-+
-+	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
-+	  update of the hardware dirty bit when the DBM/AP bits are updated
-+	  without a break-before-make. The work around is to disable the usage
-+	  of hardware DBM locally on the affected cores. CPUs not affected by
-+	  erratum will continue to use the feature.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 4e73c610a409..0fc097e2b72e 100644
+index 9f2152858c05..0a286be446c3 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -963,9 +963,23 @@ static inline void __cpu_enable_hw_dbm(void)
- 	isb();
+@@ -507,6 +507,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
  }
  
-+static bool cpu_has_broken_dbm(void)
-+{
-+	/* List of CPUs which have broken DBM support. */
-+	static const struct midr_range cpus[] = {
-+#ifdef CONFIG_ARM64_ERRATUM_1024718
-+		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),  // A55 r0p0 -r1p0
-+#endif
-+		{},
-+	};
-+
-+	return is_midr_in_range_list(read_cpuid_id(), cpus);
-+}
-+
- static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
- {
--	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
-+	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU) &&
-+	       !cpu_has_broken_dbm();
+ extern const struct arm64_cpu_capabilities arm64_errata[];
++static const struct arm64_cpu_capabilities arm64_features[];
+ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 				    u16 scope_mask, const char *info);
+ 
+@@ -554,11 +555,12 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 	}
+ 
+ 	/*
+-	 * Run the errata work around checks on the boot CPU, once we have
+-	 * initialised the cpu feature infrastructure.
++	 * Run the errata work around and local feature checks on the
++	 * boot CPU, once we have initialised the cpu feature infrastructure.
+ 	 */
+ 	update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+ 				"enabling workaround for");
++	update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU, "detected:");
  }
  
- static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
+ static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+@@ -1440,15 +1442,18 @@ void check_local_cpu_capabilities(void)
+ 
+ 	/*
+ 	 * If we haven't finalised the system capabilities, this CPU gets
+-	 * a chance to update the errata work arounds.
++	 * a chance to update the errata work arounds and local features.
+ 	 * Otherwise, this CPU should verify that it has all the system
+ 	 * advertised capabilities.
+ 	 */
+-	if (!sys_caps_initialised)
++	if (!sys_caps_initialised) {
+ 		update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+ 					"enabling workaround for");
+-	else
++		update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU,
++					"detected:");
++	} else {
+ 		verify_local_cpu_capabilities();
++	}
+ }
+ 
+ DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+@@ -1472,7 +1477,7 @@ void __init setup_cpu_features(void)
+ 	u32 cwg;
+ 
+ 	/* Set the CPU feature capabilies */
+-	update_cpu_capabilities(arm64_features, SCOPE_ALL, "detected:");
++	update_cpu_capabilities(arm64_features, SCOPE_SYSTEM, "detected:");
+ 	update_cpu_capabilities(arm64_errata, SCOPE_SYSTEM,
+ 				"enabling workaround for");
+ 	enable_cpu_capabilities(arm64_features, SCOPE_ALL);
 -- 
 2.14.3
