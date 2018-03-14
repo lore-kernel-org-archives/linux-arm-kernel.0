@@ -1,116 +1,254 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:21 +0100
-Subject: [PATCH v6 11/25] of: base: Add of_get_cpu_state_node() to get idle
- states for a CPU node
+Date: Wed, 14 Mar 2018 17:58:29 +0100
+Subject: [PATCH v6 19/25] drivers: firmware: psci: Add support for PM domains
+ using genpd
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-12-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-20-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU's idle state nodes are currently parsed at the common cpuidle DT
-library, but also when initializing back-end data for the arch specific CPU
-operations, as in the PSCI driver case.
+When the hierarchical layout is used in DT, as to describe the PM topology
+for the CPUs, which are managed by PSCI, we want to be able to initialize
+and setup the corresponding PM domain data structures.
 
-To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
-the device node for the CPU and the index to the requested idle state node,
-as in-parameters. In case a corresponding idle state node is found, it
-returns the node with the refcount incremented for it, else it returns
-NULL.
+Let's make this possible via adding a new file, psci_pm_domains.c and
+implement the needed interface towards the generic PM domain (aka genpd).
+Share a helper function, psci_dt_init_pm_domains(), which the regular PSCI
+firmware driver may call when it needs to initialize the PM topology using
+genpd.
 
-Moreover, for ARM, there are two generic methods, to describe the CPU's
-idle states, either via the flattened description through the
-"cpu-idle-states" binding [1] or via the hierarchical layout, using the
-"power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
-take both options into account.
+In principle, the implementation consists of allocating/initializing the
+genpd data structures, parsing the domain-idle states DT bindings via
+calling of_genpd_parse_idle_states() and to call pm_genpd_init() for the
+allocated genpds.
 
-[1]
-Documentation/devicetree/bindings/arm/idle-states.txt
-[2]
-Documentation/devicetree/bindings/arm/psci.txt
+Finally, one genpd OF provider is added per genpd. Via DT, this enables
+devices, including CPU devices, to be attached to the created genpds.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
 Cc: Lina Iyer <ilina@codeaurora.org>
-Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/of.h |  8 ++++++++
- 2 files changed, 43 insertions(+)
+ drivers/firmware/Makefile         |   2 +-
+ drivers/firmware/psci.h           |   6 ++
+ drivers/firmware/psci_pm_domain.c | 180 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 187 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/psci_pm_domain.c
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index ad28de9..88d36a3 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -338,6 +338,41 @@ int of_cpu_node_to_id(struct device_node *cpu_node)
- EXPORT_SYMBOL(of_cpu_node_to_id);
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index b248238..877260e 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -2,7 +2,7 @@
+ #
+ # Makefile for the linux kernel.
+ #
+-obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
++obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o psci_pm_domain.o
+ obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
+ obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= arm_scpi.o
+ obj-$(CONFIG_ARM_SCPI_POWER_DOMAIN) += scpi_pm_domain.o
+diff --git a/drivers/firmware/psci.h b/drivers/firmware/psci.h
+index a2b4be5..8b6fe51 100644
+--- a/drivers/firmware/psci.h
++++ b/drivers/firmware/psci.h
+@@ -10,4 +10,10 @@ void psci_set_domain_state(u32 state);
  
- /**
-+ * of_get_cpu_state_node - Get CPU's idle state node at the given index
+ int psci_dt_parse_state_node(struct device_node *np, u32 *state);
+ 
++#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
++int psci_dt_init_pm_domains(struct device_node *np);
++#else
++static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
++#endif
++
+ #endif /* __PSCI_H */
+diff --git a/drivers/firmware/psci_pm_domain.c b/drivers/firmware/psci_pm_domain.c
+new file mode 100644
+index 0000000..f54819e
+--- /dev/null
++++ b/drivers/firmware/psci_pm_domain.c
+@@ -0,0 +1,180 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * PM domains for CPUs via genpd - managed by PSCI.
 + *
-+ * @cpu_node: The device node for the CPU
-+ * @index: The index in the list of the idle states
++ * Copyright (C) 2018 Linaro Ltd.
++ * Author: Ulf Hansson <ulf.hansson@linaro.org>
 + *
-+ * Two generic methods can be used to describe a CPU's idle states, either via
-+ * a flattened description through the "cpu-idle-states" binding or via the
-+ * hierarchical layout, using the "power-domains" and the "domain-idle-states"
-+ * bindings. This function check for both and returns the idle state node for
-+ * the requested index.
-+ *
-+ * In case and idle state node is found at index, the refcount incremented for
-+ * it, so call of_node_put() on it when done. Returns NULL if not found.
 + */
-+struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+					  int index)
++
++#define pr_fmt(fmt) "psci: " fmt
++
++#include <linux/device.h>
++#include <linux/kernel.h>
++#include <linux/pm_domain.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++
++#include "psci.h"
++
++#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
++static int psci_pd_power_off(struct generic_pm_domain *pd)
 +{
-+	struct of_phandle_args args;
-+	int err;
++	struct genpd_power_state *state = &pd->states[pd->state_idx];
++	u32 *pd_state;
++	u32 composite_pd_state;
 +
-+	err = of_parse_phandle_with_args(cpu_node, "power-domains",
-+					"#power-domain-cells", 0, &args);
-+	if (!err) {
-+		struct device_node *state_node =
-+			of_parse_phandle(args.np, "domain-idle-states", index);
++	if (!state->data)
++		return 0;
 +
-+		of_node_put(args.np);
-+		return state_node;
++	pd_state = state->data;
++	composite_pd_state = *pd_state | psci_get_domain_state();
++	psci_set_domain_state(composite_pd_state);
++
++	return 0;
++}
++
++static int psci_dt_parse_pd_states(struct genpd_power_state *states,
++				   int state_count)
++{
++	int i, err;
++	u32 *psci_states;
++
++	if (!state_count)
++		return 0;
++
++	psci_states = kcalloc(state_count, sizeof(psci_states), GFP_KERNEL);
++	if (!psci_states)
++		return -ENOMEM;
++
++	for (i = 0; i < state_count; i++) {
++		err = psci_dt_parse_state_node(to_of_node(states[i].fwnode),
++					       &psci_states[i]);
++		if (err) {
++			kfree(psci_states);
++			return err;
++		}
 +	}
 +
-+	return of_parse_phandle(cpu_node, "cpu-idle-states", index);
-+}
-+EXPORT_SYMBOL(of_get_cpu_state_node);
++	for (i = 0; i < state_count; i++)
++		states[i].data = &psci_states[i];
 +
-+/**
-  * __of_device_is_compatible() - Check if the node matches given constraints
-  * @device: pointer to node
-  * @compat: required compatible string, NULL or "" for any match
-diff --git a/include/linux/of.h b/include/linux/of.h
-index da1ee95..288233c 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -348,6 +348,8 @@ extern const void *of_get_property(const struct device_node *node,
- 				const char *name,
- 				int *lenp);
- extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
-+extern struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+						 int index);
- #define for_each_property_of_node(dn, pp) \
- 	for (pp = dn->properties; pp != NULL; pp = pp->next)
- 
-@@ -730,6 +732,12 @@ static inline struct device_node *of_get_cpu_node(int cpu,
- 	return NULL;
- }
- 
-+static inline struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-+					int index)
++	return 0;
++}
++
++static int psci_dt_init_genpd(struct device_node *np,
++			      struct genpd_power_state *states,
++			      unsigned int state_count)
 +{
-+	return NULL;
++	struct generic_pm_domain *pd;
++	struct dev_power_governor *pd_gov;
++	int ret = -ENOMEM;
++
++	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++
++	pd->name = kasprintf(GFP_KERNEL, "%pOF", np);
++	if (!pd->name)
++		goto free_pd;
++
++	pd->name = kbasename(pd->name);
++	pd->power_off = psci_pd_power_off;
++	pd->states = states;
++	pd->state_count = state_count;
++	pd->flags |= GENPD_FLAG_IRQ_SAFE | GENPD_FLAG_CPU_DOMAIN;
++
++	/* Use governor for CPU PM domains if it has some states to manage. */
++	pd_gov = state_count > 0 ? &pm_domain_cpu_gov : NULL;
++
++	ret = pm_genpd_init(pd, pd_gov, false);
++	if (ret)
++		goto free_name;
++
++	ret = of_genpd_add_provider_simple(np, pd);
++	if (ret)
++		goto remove_pd;
++
++	pr_info("init PM domain %s\n", pd->name);
++	return 0;
++
++remove_pd:
++	pm_genpd_remove(pd);
++free_name:
++	kfree(pd->name);
++free_pd:
++	kfree(pd);
++	pr_err("failed to init PM domain ret=%d %pOF\n", ret, np);
++	return ret;
 +}
 +
- static inline int of_n_addr_cells(struct device_node *np)
- {
- 	return 0;
++static int psci_dt_set_genpd_topology(struct device_node *np)
++{
++	struct device_node *node;
++	struct of_phandle_args child, parent;
++	int ret;
++
++	for_each_child_of_node(np, node) {
++		if (of_parse_phandle_with_args(node, "power-domains",
++					       "#power-domain-cells", 0,
++					       &parent))
++			continue;
++
++		child.np = node;
++		child.args_count = 0;
++
++		ret = of_genpd_add_subdomain(&parent, &child);
++		of_node_put(parent.np);
++		if (ret) {
++			of_node_put(node);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++int psci_dt_init_pm_domains(struct device_node *np)
++{
++	struct device_node *node;
++	struct genpd_power_state *states;
++	int state_count;
++	int pd_count = 0;
++	int ret;
++
++	/* Parse child nodes for "#power-domain-cells". */
++	for_each_child_of_node(np, node) {
++		if (!of_find_property(node, "#power-domain-cells", NULL))
++			continue;
++
++		ret = of_genpd_parse_idle_states(node, &states, &state_count);
++		if (ret)
++			goto err_put;
++
++		ret = psci_dt_parse_pd_states(states, state_count);
++		if (ret)
++			goto err_put;
++
++		ret = psci_dt_init_genpd(node, states, state_count);
++		if (ret)
++			goto err_put;
++
++		pd_count++;
++	}
++
++	if (!pd_count)
++		return 0;
++
++	ret = psci_dt_set_genpd_topology(np);
++	if (ret)
++		goto err_msg;
++
++	return pd_count;
++
++err_put:
++	of_node_put(node);
++err_msg:
++	pr_err("failed to create PM domains ret=%d\n", ret);
++	return ret;
++}
++#endif
 -- 
 2.7.4
