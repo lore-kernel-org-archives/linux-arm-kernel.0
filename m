@@ -1,37 +1,139 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:13 +0100
-Subject: [PATCH v6 03/25] PM / Domains: Add generic data pointer to
- genpd_power_state struct
+Date: Wed, 14 Mar 2018 17:58:15 +0100
+Subject: [PATCH v6 05/25] PM / Domains: Add helper functions to attach/detach
+ CPUs to/from genpd
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lina Iyer <lina.iyer@linaro.org>
+Introduce two new genpd helper functions, of_genpd_attach|detach_cpu(),
+which takes the CPU-number as an in-parameter.
 
-Let's add a data pointer to the genpd_power_state struct, to allow
-platforms to store per state specific data.
+To attach a CPU to a genpd, of_genpd_attach_cpu() starts by fetching the
+struct device belonging to the CPU. Then it calls genpd_dev_pm_attach(),
+which via DT tries to hook up the CPU device to its corresponding PM
+domain. If it succeeds, of_genpd_attach_cpu() continues to prepare/enable
+runtime PM of the device.
+
+To detach a CPU from its PM domain, of_genpd_attach_cpu() reverse the
+operations made from of_genpd_attach_cpu(). However, first it checks that
+the CPU device has a valid PM domain pointer assigned, as to make sure it
+belongs to genpd.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- include/linux/pm_domain.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/base/power/domain.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  9 ++++++
+ 2 files changed, 76 insertions(+)
 
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e178521..91ea9b2 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2324,6 +2324,73 @@ int genpd_dev_pm_attach(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
++/**
++ * of_genpd_attach_cpu() - Attach a CPU to its PM domain
++ * @cpu: The CPU to be attached.
++ *
++ * Try to find the corresponding PM domain provider for the CPU's device. Use
++ * it to attach the CPU's device to its PM domain. If attaching is completed
++ * successfully, we enable runtime PM for the CPU's device.
++ *
++ * Returns zero on success else a negative error code.
++ */
++int of_genpd_attach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++	int ret;
++
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return -ENODEV;
++	}
++
++	ret = genpd_dev_pm_attach(dev);
++	if (ret) {
++		dev_warn(dev, "genpd: attach cpu failed %d\n", ret);
++		return ret;
++	}
++
++	pm_runtime_irq_safe(dev);
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	dev_info(dev, "genpd: attached cpu\n");
++	return 0;
++}
++EXPORT_SYMBOL(of_genpd_attach_cpu);
++
++/**
++ * of_genpd_detach_cpu() - Detach a CPU from its PM domain
++ * @cpu: The CPU to be detached.
++ *
++ * Detach the CPU's device from its corresponding PM domain. If detaching is
++ * completed successfully, disable runtime PM and restore the runtime PM usage
++ * count for the CPU's device.
++ */
++void of_genpd_detach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return;
++	}
++
++	/* Check that the device is attached to a genpd. */
++	if (!(dev->pm_domain && dev->pm_domain->detach == genpd_dev_pm_detach))
++		return;
++
++	genpd_dev_pm_detach(dev, true);
++
++	pm_runtime_disable(dev);
++	pm_runtime_put_noidle(dev);
++	pm_runtime_reinit(dev);
++
++	dev_info(dev, "genpd: detached cpu\n");
++}
++EXPORT_SYMBOL(of_genpd_detach_cpu);
++
+ static const struct of_device_id idle_state_match[] = {
+ 	{ .compatible = "domain-idle-state", },
+ 	{ }
 diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 04dbef9..55ad34d 100644
+index 29ab00c..ccd7c94 100644
 --- a/include/linux/pm_domain.h
 +++ b/include/linux/pm_domain.h
-@@ -44,6 +44,7 @@ struct genpd_power_state {
- 	s64 residency_ns;
- 	struct fwnode_handle *fwnode;
- 	ktime_t idle_time;
-+	void *data;
- };
+@@ -249,6 +249,8 @@ extern int of_genpd_parse_idle_states(struct device_node *dn,
+ 			struct genpd_power_state **states, int *n);
  
- struct genpd_lock_ops;
+ int genpd_dev_pm_attach(struct device *dev);
++int of_genpd_attach_cpu(int cpu);
++void of_genpd_detach_cpu(int cpu);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+ static inline int of_genpd_add_provider_simple(struct device_node *np,
+ 					struct generic_pm_domain *genpd)
+@@ -287,6 +289,13 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+ 	return -ENODEV;
+ }
+ 
++static inline int of_genpd_attach_cpu(int cpu)
++{
++	return -ENODEV;
++}
++
++static inline void of_genpd_detach_cpu(int cpu) {}
++
+ static inline
+ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+ {
 -- 
 2.7.4
