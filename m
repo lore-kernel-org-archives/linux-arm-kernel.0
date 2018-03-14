@@ -1,80 +1,67 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 14 Mar 2018 12:22:24 +0530
-Subject: [PATCH v5 25/36] drm/bridge: analogix_dp: Properly log AUX CH
- errors
-In-Reply-To: <20180309222327.18689-26-enric.balletbo@collabora.com>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-26-enric.balletbo@collabora.com>
-Message-ID: <b6541348-6539-4ace-fdeb-58d263e5ba4b@codeaurora.org>
+From: mdharm-usb@one-eyed-alien.net (Matthew Dharm)
+Date: Tue, 13 Mar 2018 23:53:15 -0700
+Subject: [PATCH] Add Apple Carplay driver
+In-Reply-To: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <CAA6KcBAnLYZ2UyUB6Ecv96D0zWhmce2BMmA_iWx04njeNYsd9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Why is this a kernel-level driver, rather than a userspace application
+that uses libusb to send the single vendor-specific command required?
+Since this command would be applicable to many CarPlay devices, with
+many different VID/PIDs, it would seem to make more sense as a
+userspace app that took a reference to a USB device or VID/PID.
+
+Matt
+
+On Tue, Mar 13, 2018 at 11:02 PM, Chunfeng Yun
+<chunfeng.yun@mediatek.com> wrote:
+> From bf48dcd9cb254576cfea373c9a5d2ab996408895 Mon Sep 17 00:00:00 2001
+> From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Date: Tue, 13 Mar 2018 11:47:38 +0800
+> Subject: [PATCH] Add Apple Carplay driver
+>
+> Some Apple devices which support Carplay can enter USB Host Mode from USB
+> Device Mode after receiving a specific USB Vendor Request. There is a
+> requirement apply to accesssories that support the USB dual role switch
+> feature, and must have a USB-A receptacle that is capable of functioning
+> in both USB Host and USB Device roles.
+> It means that the driver should supports manual Dual-Role switch, due to
+> no IDDIG pin is avaliable.
+>
+> There is no suitable place to add this spicific USB Vendor Request, so
+> here I extract a single driver which allow user force to send it by a debug
+> interface when need it, and keep it independent on USB Dual-Role Controller
+> Drivers.
+> But to implement carplay feature, there are some requirments for USB Dual-Role
+> Driver:
+> 1. supports manual dual-role switch, such as, by a debug interface;
+> 2. keep vbus alive even when switch host into device mode;
+>
+> More information please refer to "Chapter 46. USB Role Switch" in
+> MFI Accessroy Interface Specification.pdf
+>
+> Chunfeng Yun (1):
+>   usb: misc: supports Apple Carplay driver
+>
+>  drivers/usb/misc/Kconfig   |    9 +++
+>  drivers/usb/misc/Makefile  |    1 +
+>  drivers/usb/misc/carplay.c |  193 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 203 insertions(+)
+>  create mode 100644 drivers/usb/misc/carplay.c
+>
+> --
+> 1.7.9.5
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-On Saturday 10 March 2018 03:53 AM, Enric Balletbo i Serra wrote:
-> From: Douglas Anderson <dianders@chromium.org>
-> 
-> The code in analogix_dp_transfer() that was supposed to print out:
->    AUX CH error happened
-> 
-> Was actually dead code. That's because the previous check (whether
-> the interrupt status indicated any errors) would have hit for all
-> errors anyway.
-> 
-> Let's combine the two error checks so we can actually see AUX CH
-> errors.  We'll also downgrade the message to a warning since some of
-> these types of errors might be expected for some displays.  If this
-> gets too noisy we can downgrade again to debug.
 
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
-
-Thanks,
-Archit
-
-> 
-> Cc: ?? ? <wzz@rock-chips.com>
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> 
->   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 13 +++++--------
->   1 file changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> index 4eae206ec31b..58e8a28e99aa 100644
-> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> @@ -1105,6 +1105,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
->   			     struct drm_dp_aux_msg *msg)
->   {
->   	u32 reg;
-> +	u32 status_reg;
->   	u8 *buffer = msg->buffer;
->   	unsigned int i;
->   	int num_transferred = 0;
-> @@ -1193,16 +1194,12 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
->   
->   	/* Clear interrupt source for AUX CH access error */
->   	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> -	if (reg & AUX_ERR) {
-> +	status_reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_STA);
-> +	if ((reg & AUX_ERR) || (status_reg & AUX_STATUS_MASK)) {
->   		writel(AUX_ERR, dp->reg_base + ANALOGIX_DP_INT_STA);
-> -		goto aux_error;
-> -	}
->   
-> -	/* Check AUX CH error access status */
-> -	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_STA);
-> -	if ((reg & AUX_STATUS_MASK)) {
-> -		dev_err(dp->dev, "AUX CH error happened: %d\n\n",
-> -			reg & AUX_STATUS_MASK);
-> +		dev_warn(dp->dev, "AUX CH error happened: %#x (%d)\n",
-> +			 status_reg & AUX_STATUS_MASK, !!(reg & AUX_ERR));
->   		goto aux_error;
->   	}
->   
-> 
+-- 
+Matthew Dharm
+Former Maintainer, USB Mass Storage driver for Linux
