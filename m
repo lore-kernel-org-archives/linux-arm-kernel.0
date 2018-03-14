@@ -1,149 +1,100 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Wed, 14 Mar 2018 17:30:00 +0100
-Subject: [PATCH v2 1/2] dt-bindings: reset: add STM32MP1 resets
-In-Reply-To: <1521045001-30788-1-git-send-email-gabriel.fernandez@st.com>
-References: <1521045001-30788-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1521045001-30788-2-git-send-email-gabriel.fernandez@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Mar 2018 16:41:47 +0000
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+ <20180314145450.GI23100@dhcp22.suse.cz>
+ <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+Message-ID: <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 14 March 2018 at 15:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
+>> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+>>> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+>>> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+>>> > fix your issue? From the debugging info you provided it should because
+>>> > the patch prevents jumping backwards.
+>>> >
+>>>
+>>> The patch does fix the boot hang.
+>>>
+>>> But I am concerned that we are papering over a fundamental flaw in
+>>> memblock_next_valid_pfn().
+>>
+>> It seems that memblock_next_valid_pfn is doing the right thing here. It
+>> is the alignment which moves the pfn back AFAICS. I am not really
+>> impressed about the original patch either, to be completely honest.
+>> It just looks awfully tricky. I still didn't manage to wrap my head
+>> around the original issue though so I do not have much better ideas to
+>> be honest.
+>
+> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
+> argument, which is odd nut easily fixed.
+> Then, the whole idea of substracting one so that the pfn++ will
+> produce the expected value is rather hacky,
+>
+> But the real problem is that rounding down pfn for the next iteration
+> is dodgy, because early_pfn_valid() isn't guaranteed to return true
+> for the rounded down value. I know it is probably fine in reality, but
+> dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
+>
+> So how about something like this (apologies on Gmail's behalf for the
+> whitespace damage, I can resend it as a proper patch)
+>
+>
+> ---------8<-----------
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 3d974cb2a1a1..b89ca999ee3b 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -5352,28 +5352,29 @@
+>                  * function.  They do not exist on hotplugged memory.
+>                  */
+>                 if (context != MEMMAP_EARLY)
+>                         goto not_early;
+>
+> -               if (!early_pfn_valid(pfn)) {
+> +               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
+>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>                         /*
+>                          * Skip to the pfn preceding the next valid one (or
+>                          * end_pfn), such that we hit a valid pfn (or end_pfn)
+>                          * on our next iteration of the loop. Note that it needs
+>                          * to be pageblock aligned even when the region itself
+>                          * is not. move_freepages_block() can shift ahead of
+>                          * the valid region but still depends on correct page
+>                          * metadata.
+>                          */
+> -                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+> -                                       ~(pageblock_nr_pages-1)) - 1;
+> -#endif
+> +                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
+> +                       if (pfn >= end_pfn)
+> +                               break;
+> +                       pfn &= ~(pageblock_nr_pages - 1);
+> +#else
+>                         continue;
+> +#endif
+>                 }
+> -               if (!early_pfn_in_nid(pfn, nid))
+> -                       continue;
+>                 if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+>                         break;
+>
+>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>                 /*
+> ---------8<-----------
+>
+> This ensures that we enter the remainder of the loop with a properly
+> aligned pfn, rather than tweaking the value of pfn so it assumes the
+> expected value after 'pfn++'
 
-This patch adds the reset binding entry for STM32MP1
-
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |   6 ++
- include/dt-bindings/reset/stm32mp1-resets.h        | 108 +++++++++++++++++++++
- 2 files changed, 114 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
- create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
-
-diff --git a/Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
-new file mode 100644
-index 0000000..b4edaf7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
-@@ -0,0 +1,6 @@
-+STMicroelectronics STM32MP1 Peripheral Reset Controller
-+=======================================================
-+
-+The RCC IP is both a reset and a clock controller.
-+
-+Please see Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
-diff --git a/include/dt-bindings/reset/stm32mp1-resets.h b/include/dt-bindings/reset/stm32mp1-resets.h
-new file mode 100644
-index 0000000..f0c3aae
---- /dev/null
-+++ b/include/dt-bindings/reset/stm32mp1-resets.h
-@@ -0,0 +1,108 @@
-+/* SPDX-License-Identifier: GPL-2.0 or BSD-3-Clause */
-+/*
-+ * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
-+ * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
-+ */
-+
-+#ifndef _DT_BINDINGS_STM32MP1_RESET_H_
-+#define _DT_BINDINGS_STM32MP1_RESET_H_
-+
-+#define LTDC_R		3072
-+#define DSI_R		3076
-+#define DDRPERFM_R	3080
-+#define USBPHY_R	3088
-+#define SPI6_R		3136
-+#define I2C4_R		3138
-+#define I2C6_R		3139
-+#define USART1_R	3140
-+#define STGEN_R		3156
-+#define GPIOZ_R		3200
-+#define CRYP1_R		3204
-+#define HASH1_R		3205
-+#define RNG1_R		3206
-+#define AXIM_R		3216
-+#define GPU_R		3269
-+#define ETHMAC_R	3274
-+#define FMC_R		3276
-+#define QSPI_R		3278
-+#define SDMMC1_R	3280
-+#define SDMMC2_R	3281
-+#define CRC1_R		3284
-+#define USBH_R		3288
-+#define MDMA_R		3328
-+#define MCU_R		8225
-+#define TIM2_R		19456
-+#define TIM3_R		19457
-+#define TIM4_R		19458
-+#define TIM5_R		19459
-+#define TIM6_R		19460
-+#define TIM7_R		19461
-+#define TIM12_R		16462
-+#define TIM13_R		16463
-+#define TIM14_R		16464
-+#define LPTIM1_R	19465
-+#define SPI2_R		19467
-+#define SPI3_R		19468
-+#define USART2_R	19470
-+#define USART3_R	19471
-+#define UART4_R		19472
-+#define UART5_R		19473
-+#define UART7_R		19474
-+#define UART8_R		19475
-+#define I2C1_R		19477
-+#define I2C2_R		19478
-+#define I2C3_R		19479
-+#define I2C5_R		19480
-+#define SPDIF_R		19482
-+#define CEC_R		19483
-+#define DAC12_R		19485
-+#define MDIO_R		19847
-+#define TIM1_R		19520
-+#define TIM8_R		19521
-+#define TIM15_R		19522
-+#define TIM16_R		19523
-+#define TIM17_R		19524
-+#define SPI1_R		19528
-+#define SPI4_R		19529
-+#define SPI5_R		19530
-+#define USART6_R	19533
-+#define SAI1_R		19536
-+#define SAI2_R		19537
-+#define SAI3_R		19538
-+#define DFSDM_R		19540
-+#define FDCAN_R		19544
-+#define LPTIM2_R	19584
-+#define LPTIM3_R	19585
-+#define LPTIM4_R	19586
-+#define LPTIM5_R	19587
-+#define SAI4_R		19592
-+#define SYSCFG_R	19595
-+#define VREF_R		19597
-+#define TMPSENS_R	19600
-+#define PMBCTRL_R	19601
-+#define DMA1_R		19648
-+#define DMA2_R		19649
-+#define DMAMUX_R	19650
-+#define ADC12_R		19653
-+#define USBO_R		19656
-+#define SDMMC3_R	19664
-+#define CAMITF_R	19712
-+#define CRYP2_R		19716
-+#define HASH2_R		19717
-+#define RNG2_R		19718
-+#define CRC2_R		19719
-+#define HSEM_R		19723
-+#define MBOX_R		19724
-+#define GPIOA_R		19776
-+#define GPIOB_R		19777
-+#define GPIOC_R		19778
-+#define GPIOD_R		19779
-+#define GPIOE_R		19780
-+#define GPIOF_R		19781
-+#define GPIOG_R		19782
-+#define GPIOH_R		19783
-+#define GPIOI_R		19784
-+#define GPIOJ_R		19785
-+#define GPIOK_R		19786
-+
-+#endif /* _DT_BINDINGS_STM32MP1_RESET_H_ */
--- 
-1.9.1
+Um, this does not actually solve the issue. I guess this is due to the
+fact that a single pageblock size chunk could have both valid and
+invalid PFNs, and so rounding down the first PFN of the second valid
+chunk moves you back to the first chunk.
