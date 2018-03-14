@@ -1,8 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 Mar 2018 14:39:35 -0300
-Subject: [PATCH 1/2] ARM: dts: imx25-pdk: Remove unneeded 'codec-handle'
+Date: Wed, 14 Mar 2018 14:39:36 -0300
+Subject: [PATCH 2/2] ARM: dts: imx53-tx53: Remove unneeded 'codec-handle'
  property
-Message-ID: <1521049176-22870-1-git-send-email-festevam@gmail.com>
+In-Reply-To: <1521049176-22870-1-git-send-email-festevam@gmail.com>
+References: <1521049176-22870-1-git-send-email-festevam@gmail.com>
+Message-ID: <1521049176-22870-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,18 +22,18 @@ machine driver's probe()."
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx25-pdk.dts | 1 -
+ arch/arm/boot/dts/imx53-tx53.dtsi | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-index 7f9bd05..7696e0c0 100644
---- a/arch/arm/boot/dts/imx25-pdk.dts
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -291,7 +291,6 @@
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 69a2af7..77f2ce9 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -550,7 +550,6 @@
  };
  
  &ssi1 {
--	codec-handle = <&codec>;
+-	codec-handle = <&sgtl5000>;
  	status = "okay";
  };
  
