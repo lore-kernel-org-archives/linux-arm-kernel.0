@@ -1,179 +1,107 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 14 Mar 2018 11:40:59 +0000
-Subject: [PATCH v5 22/23] arm64: KVM: Allow mapping of vectors outside
- of the RAM region
-In-Reply-To: <20180301155538.26860-23-marc.zyngier@arm.com>
-References: <20180301155538.26860-1-marc.zyngier@arm.com>
- <20180301155538.26860-23-marc.zyngier@arm.com>
-Message-ID: <5AA90A4B.2020900@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Mar 2018 11:48:15 +0000
+Subject: [PATCH v1 2/4] ioremap: Invalidate TLB after huge mappings
+In-Reply-To: <a278b3ca-b54f-ee5e-5828-b8859eea5cc6@codeaurora.org>
+References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
+ <1521017305-28518-3-git-send-email-cpandya@codeaurora.org>
+ <20180314104823.yumqomzmbu3cj442@lakrids.cambridge.arm.com>
+ <a278b3ca-b54f-ee5e-5828-b8859eea5cc6@codeaurora.org>
+Message-ID: <20180314114814.mzgwlzkwzxijiv54@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Mar 14, 2018 at 04:50:35PM +0530, Chintan Pandya wrote:
+> On 3/14/2018 4:18 PM, Mark Rutland wrote:
+> > On Wed, Mar 14, 2018 at 02:18:23PM +0530, Chintan Pandya wrote:
+> > As has been noted in previous threads, the ARM architecture requires a
+> > Break-Before-Make sequence when changing an entry from a table to a
+> > block, as is the case here.
+> > 
+> > The means the necessary sequence is:
+> > 
+> > 	1. Make the entry invalid
+> > 	2. Invalidate relevant TLB entries
+> > 	3. Write the new entry
+> > 
+> We do this for PTEs. I don't see this applicable to PMDs.
 
-On 01/03/18 15:55, Marc Zyngier wrote:
-> We're now ready to map our vectors in weird and wonderful locations.
-> On enabling ARM64_HARDEN_EL2_VECTORS, a vector slots gets allocated
-> if this hasn't been already done via ARM64_HARDEN_BRANCH_PREDICTOR
-> and gets mapped outside of the normal RAM region, next to the
-> idmap.
+The architecture requires this for *all* levels of page table, when
+certain changes are made. Switching an entry from a table to block (or
+vice versa) is one of those changes, and this definitely applies to
+PMDs.
+
+> Because,
 > 
-> That way, being able to obtain VBAR_EL2 doesn't reveal the mapping
-> of the rest of the hypervisor code.
+> 1) To mark any PMD invalid, we need to be sure that next level page
+>    table (I mean all the 512 PTEs) should be zero. That requires us
+>    to scan entire last level page. A big perf hit !
 
-> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> index c58cc5dbe667..c5dab30d3389 100644
-> --- a/Documentation/arm64/memory.txt
-> +++ b/Documentation/arm64/memory.txt
-> @@ -90,7 +90,8 @@ When using KVM without the Virtualization Host Extensions, the
->  hypervisor maps kernel pages in EL2 at a fixed (and potentially
->  random) offset from the linear mapping. See the kern_hyp_va macro and
->  kvm_update_va_mask function for more details. MMIO devices such as
-> -GICv2 gets mapped next to the HYP idmap page.
-> +GICv2 gets mapped next to the HYP idmap page, as do vectors when
-> +ARM64_HARDEN_EL2_VECTORS is selected for particular CPUs.
->  
->  When using KVM with the Virtualization Host Extensions, no additional
->  mappings are created, since the host kernel runs directly in EL2.
+This is in ioremap code. Under what workload does this constitute a perf
+hit?
 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 3da9e5aea936..433d13d0c271 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -360,33 +360,90 @@ static inline unsigned int kvm_get_vmid_bits(void)
->  	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
->  }
->  
-> -#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-> +#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
-> +     defined(CONFIG_HARDEN_EL2_VECTORS))
-> +/*
-> + * EL2 vectors can be mapped and rerouted in a number of ways,
-> + * depending on the kernel configuration and CPU present:
-> + *
-> + * - If the CPU has the ARM64_HARDEN_BRANCH_PREDICTOR cap, the
-> + *   hardening sequence is placed in one of the vector slots, which is
-> + *   executed before jumping to the real vectors.
-> + *
-> + * - If the CPU has both the ARM64_HARDEN_EL2_VECTORS and BP
-> + *   hardening, the slot containing the hardening sequence is mapped
-> + *   next to the idmap page, and executed before jumping to the real
-> + *   vectors.
-> + *
-> + * - If the CPU only has ARM64_HARDEN_EL2_VECTORS, then an empty slot
-> + *   is selected, mapped next to the idmap page, and executed before
-> + *   jumping to the real vectors.
+Regardless, so long as we mark the pmd entry invalid before the TLB
+invalidation, we don't need to touch the next level table at all. We
+just require a sequence like:
 
-> + * Note that ARM64_HARDEN_EL2_VECTORS is somewhat incompatible with
-> + * VHE, as we don't have hypervisor-specific mappings. If the system
-> + * is VHE and yet selects this capability, it will be ignored.
-
-Silently? This isn't a problem as the CPUs you enable this for don't have VHE.
-Is it worth a warning? If we did ever need to support it, we can pull the same
-trick the arch code uses, using a fixmap entry for the vectors.
+	pmd_clear(*pmdp);
+	flush_tlb_kernel_range(pmd_start_addr, pmd_end_addr);
+	pmd_set_huge(*pmdp, phys, prot);
 
 
-> + */
->  #include <asm/mmu.h>
->  
-> +extern void *__kvm_bp_vect_base;
-> +extern int __kvm_harden_el2_vector_slot;
-> +
->  static inline void *kvm_get_hyp_vector(void)
->  {
->  	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
-> -	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
-> +	int slot = -1;
-> +
-> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn)
-> +		slot = data->hyp_vectors_slot;
-> +
-> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS) &&
-> +	    !has_vhe() && slot == -1)
-> +		slot = __kvm_harden_el2_vector_slot;
->  
-> -	if (data->fn) {
-> -		vect = __bp_harden_hyp_vecs_start +
-> -		       data->hyp_vectors_slot * SZ_2K;
-> +	if (slot != -1) {
-> +		void *vect;
->  
->  		if (!has_vhe())
-> -			vect = lm_alias(vect);
-> +			vect = __kvm_bp_vect_base;
-> +		else
-> +			vect = __bp_harden_hyp_vecs_start;
-> +		vect += slot * SZ_2K;
-> +
-> +		return vect;
->  	}
->  
-> -	vect = kern_hyp_va(vect);
-> -	return vect;
-> +	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
->  }
->  
-> +/*  This is only called on a !VHE system */
->  static inline int kvm_map_vectors(void)
->  {
-> -	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
-> -				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
-> -				   PAGE_HYP_EXEC);
-> -}
-> +	phys_addr_t vect_pa = virt_to_phys(__bp_harden_hyp_vecs_start);
-> +	unsigned long size = __bp_harden_hyp_vecs_end - __bp_harden_hyp_vecs_start;
-> +
-> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR)) {
-> +		int ret;
-> +
-> +		ret = create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
-> +					  kvm_ksym_ref(__bp_harden_hyp_vecs_end),
-> +					  PAGE_HYP_EXEC);
+> 2) We need to perform step 1 for every unmap as we never know which
+>    unmap will make last level page table empty.
 
-We don't have to do this for the regular vectors, as they are part of the
-__hyp_text. How come these aren't?
+Sorry, I don't follow. Could you elaborate on the problem?
 
-The existing Makefile depends on KVM to build these. How come it isn't under
-arch/arm64/kvm?
+> Moreover, problem comes only when 4K mapping was followed by 2M
+> mapping. In all other cases, retaining valid PMD has obvious perf
+> gain. That's what walk-cache is supposed to be introduced for.
 
+Retaining a valid PMD in the TLB that *differs* from a valid PMD in the
+page tables is a big problem.
 
-> +		if (ret)
-> +			return ret;
-> +
-> +		__kvm_bp_vect_base = kvm_ksym_ref(__bp_harden_hyp_vecs_start);
-> +		__kvm_bp_vect_base = kern_hyp_va(__kvm_bp_vect_base);
-> +	}
-> +
-> +	if (cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
-> +		__kvm_harden_el2_vector_slot = atomic_inc_return(&arm64_el2_vector_last_slot);
-> +		BUG_ON(__kvm_harden_el2_vector_slot >= BP_HARDEN_EL2_SLOTS);
-> +		return create_hyp_exec_mappings(vect_pa, size,
-> +						&__kvm_bp_vect_base);
-> +	}
->  
-> +	return 0;
-> +}
->  #else
->  static inline void *kvm_get_hyp_vector(void)
->  {
+The architecture requires BBM, as this permits CPUs to allocate PMDs
+into TLBs at *any* time, even if there's already PMD in the TLB for a
+given address.
 
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index b87541360f43..e7fc471c91a6 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -54,8 +54,8 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
->  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
->  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
->  
-> -ifeq ($(CONFIG_KVM),y)
-> -arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
-> +ifneq ($(filter y,$(CONFIG_HARDEN_BRANCH_PREDICTOR) $(CONFIG_HARDEN_EL2_VECTORS)),)
-> +arm64-obj-$(CONFIG_KVM)			+= bpi.o
->  endif
+Thus, CPUs can allocate *both* valid PMDs into the TLBs. When this
+happens, a TLB lookup can:
 
-Isn't Kconfig 'select'ing a hidden-option the usual way this is done?
+1) return either of the PMDs.
 
+2) raise a TLB conflict abort.
+
+3) return an amalgamation of the two entries (e.g. provide an erroneous
+   address).
+
+Note that (3) is particularly scary:
+
+* The CPU could raise an SError if the amalgamated entry is junk.
+
+* If a memory access hits an amalgamated entry, it may use the wrong
+  physical address, attributes, or permissions, resulting in a number of
+  potential problems.
+
+* If the amalgamated entry looks like a partial walk, the TLB might try
+  to perform a walk starting at the physical address in the amalgamated
+  entry. This would cause page table walks to access bogus addresses,
+  allocating junk into TLBs, and may result in SErrors or other aborts.
+
+> > Whereas above, the sequence is
+> > 
+> > 	1. Write the new entry
+> > 	2. invalidate relevant TLB entries
+> > 
+> > Which is insufficient, and will lead to a number of problems.
+> I couldn't think of new problems with this approach. Could you share
+> any problematic scenarios ?
+
+Please see above.
+
+> Also, my test-case runs fine with these patches for 10+ hours.
+
+While this may happen to work on particular platforms, it is not
+guaranteed per the architecture, and will fail on others.
 
 Thanks,
-
-James
+Mark.
