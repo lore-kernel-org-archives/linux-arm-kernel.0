@@ -1,82 +1,94 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:16 +0100
-Subject: [PATCH v6 06/25] timer: Export next wakeup time of a CPU
+Date: Wed, 14 Mar 2018 17:58:25 +0100
+Subject: [PATCH v6 15/25] drivers: firmware: psci: Simplify error path of
+ psci_dt_init()
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-16-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lina Iyer <lina.iyer@linaro.org>
+Instead of having each psci init function taking care of the of_node_put(),
+let's deal with that from psci_dt_init(), as this enables a bit simpler
+error path for each psci init function.
 
-Knowing the sleep duration of CPUs, is known to be needed while selecting
-the most energy efficient idle state for a CPU or a group of CPUs.
-
-However, to be able to compute the sleep duration, we need to know at what
-time the next expected wakeup is for the CPU. Therefore, let's export this
-information via a new function, tick_nohz_get_next_wakeup(). Following
-changes make use of it.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lina Iyer <ilina@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- include/linux/tick.h     | 10 ++++++++++
- kernel/time/tick-sched.c | 11 +++++++++++
- 2 files changed, 21 insertions(+)
+ drivers/firmware/psci.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/tick.h b/include/linux/tick.h
-index 7cc3592..e51cf2c 100644
---- a/include/linux/tick.h
-+++ b/include/linux/tick.h
-@@ -120,6 +120,7 @@ extern void tick_nohz_irq_exit(void);
- extern ktime_t tick_nohz_get_sleep_length(void);
- extern unsigned long tick_nohz_get_idle_calls(void);
- extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
-+extern ktime_t tick_nohz_get_next_wakeup(int cpu);
- extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
- extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
- #else /* !CONFIG_NO_HZ_COMMON */
-@@ -132,6 +133,15 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
- {
- 	return NSEC_PER_SEC / HZ;
- }
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 256b4ed..3888100 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	int err;
+ 
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
 +
-+static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	ktime_t len = NSEC_PER_SEC/HZ;
-+
-+	/* Next wake up is the tick period, assume it starts now */
-+	return ktime_add(len, ktime_get());
-+}
-+
- static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
- static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
- #endif /* !CONFIG_NO_HZ_COMMON */
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 29a5733..da1bff3 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -1025,6 +1025,17 @@ unsigned long tick_nohz_get_idle_calls(void)
- 	return ts->idle_calls;
+ 	/*
+ 	 * Starting with v0.2, the PSCI specification introduced a call
+ 	 * (PSCI_VERSION) that allows probing the firmware version, so
+@@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	 * can be carried out according to the specific version reported
+ 	 * by firmware
+ 	 */
+-	err = psci_probe();
+-
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return psci_probe();
  }
  
-+/**
-+ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-+ */
-+ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	struct clock_event_device *dev =
-+			per_cpu(tick_cpu_device.evtdev, cpu);
+ /*
+@@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	int err;
+ 
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
+ 
+ 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+ 
+@@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
+ 		psci_ops.migrate = psci_migrate;
+ 	}
+ 
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return 0;
+ }
+ 
+ static const struct of_device_id psci_of_match[] __initconst = {
+@@ -677,6 +670,7 @@ int __init psci_dt_init(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *matched_np;
+ 	psci_initcall_t init_fn;
++	int ret;
+ 
+ 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+ 
+@@ -684,7 +678,10 @@ int __init psci_dt_init(void)
+ 		return -ENODEV;
+ 
+ 	init_fn = (psci_initcall_t)matched_np->data;
+-	return init_fn(np);
++	ret = init_fn(np);
 +
-+	return dev->next_event;
-+}
-+
- static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
- {
- #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
++	of_node_put(np);
++	return ret;
+ }
+ 
+ #ifdef CONFIG_ACPI
 -- 
 2.7.4
