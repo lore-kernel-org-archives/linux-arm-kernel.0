@@ -1,21 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 14 Mar 2018 15:44:23 +0100
-Subject: [PATCH] arm64: dts: renesas: v3msk: add SCIF0 pins
-In-Reply-To: <CAMuHMdW6CwF25pPXQqMKy=ZdV0oPDrxyEnt8p_NWjDT=ZSOS8Q@mail.gmail.com>
-References: <d21e29c9-1364-357e-dd64-af14b0068cbd@cogentembedded.com>
- <CAMuHMdW6CwF25pPXQqMKy=ZdV0oPDrxyEnt8p_NWjDT=ZSOS8Q@mail.gmail.com>
-Message-ID: <20180314144420.3vlufrr45amuzokw@verge.net.au>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 14 Mar 2018 15:52:39 +0100
+Subject: [RESEND PATCH v4 3/3] ARM: dts: STi: Remove console=ttyASN from
+ bootargs for STi boards] ARM: dts: STi: Remove "console=ttyASN" from bootargs
+ for STi boards
+Message-ID: <1521039159-16655-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 02:14:27PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Mar 13, 2018 at 8:26 PM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Add the (previously omitted) SCIF0 pin data to the V3M Starter Kit board's
-> > device tree.
-> >
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Thanks, applied.
+As serial interface is already specified into stdout-path property,
+"console=ttyASN,115200" from bootargs can be removed.
+
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+
+v4: _ none
+v3: _ remove "console=serialN,115200" from bootargs and use prefered 
+      stdout-path property
+v2: _ none
+
+ arch/arm/boot/dts/stih407-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410-b2260.dts | 2 +-
+ arch/arm/boot/dts/stih418-b2199.dts | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+index 37f2ddbfa099..a7a0f76e9cbc 100644
+--- a/arch/arm/boot/dts/stih407-b2120.dts
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih407-b2120", "st,stih407";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		linux,stdout-path = &sbc_serial0;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index a6f00a6687a9..6c6b4cc37e97 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih410-b2120", "st,stih410";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		linux,stdout-path = &sbc_serial0;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+index 62770496e328..50d36758391c 100644
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -15,7 +15,7 @@
+ 	compatible = "st,stih410-b2260", "st,stih410";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		linux,stdout-path = &uart1;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
+index 36f40f58155d..7f5f3252bfc7 100644
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -14,7 +14,7 @@
+ 	compatible = "st,stih418-b2199", "st,stih418";
+ 
+ 	chosen {
+-		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		bootargs = "clk_ignore_unused";
+ 		linux,stdout-path = &sbc_serial0;
+ 	};
+ 
+-- 
+1.9.1
