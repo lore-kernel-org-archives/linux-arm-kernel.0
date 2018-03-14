@@ -1,68 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Mar 2018 17:44:43 +0000
-Subject: [RFC PATCH 3/6] mm, arm64: untag user addresses in memory syscalls
-In-Reply-To: <CAAeHK+y3hJ4jAByvfGDYyNb_RZ3_As4r-FCyZL9u69Vv_HS2AA@mail.gmail.com>
-References: <cover.1520600533.git.andreyknvl@google.com>
- <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
- <20180309155315.4x44sbp3darractt@armageddon.cambridge.arm.com>
- <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
- <CAFKCwrgPEhBEbXn95ugxVuxHw7UTiQWuo3+HJ_t7UBG69fbUcw@mail.gmail.com>
- <CAAeHK+y3hJ4jAByvfGDYyNb_RZ3_As4r-FCyZL9u69Vv_HS2AA@mail.gmail.com>
-Message-ID: <20180314174442.lclslnqc3egfjg4c@armageddon.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 Mar 2018 17:58:23 +0100
+Subject: [PATCH v6 13/25] drivers: firmware: psci: Split
+ psci_dt_cpu_init_idle()
+In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-14-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:45:20PM +0100, Andrey Konovalov wrote:
-> On Fri, Mar 9, 2018 at 6:42 PM, Evgenii Stepanov <eugenis@google.com> wrote:
-> > On Fri, Mar 9, 2018 at 9:31 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> >> On Fri, Mar 9, 2018 at 4:53 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >>> I'm not yet convinced these functions need to allow tagged pointers.
-> >>> They are not doing memory accesses but rather dealing with the memory
-> >>> range, hence an untagged pointer is better suited. There is probably a
-> >>> reason why the "start" argument is "unsigned long" vs "void __user *"
-> >>> (in the kernel, not the man page).
-> >>
-> >> So that would make the user to untag pointers before passing to these syscalls.
-> >>
-> >> Evgeniy, would that be possible to untag pointers in HWASan before
-> >> using memory subsystem syscalls? Is there a reason for untagging them
-> >> in the kernel?
-> >
-> > Generally, no. It's possible to intercept a libc call using symbol
-> > interposition, but I don't know how to rewrite arguments of a raw
-> > system call other than through ptrace, and that creates more problems
-> > than it solves.
+Let's split psci_dt_cpu_init_idle() function into two functions, as to
+allow following changes to re-use some of the code.
 
-With these patches, we are trying to relax the user/kernel ABI so that
-tagged pointers can be passed into the kernel. Since this is a new ABI
-(or an extension to the existing one), it might be ok to change the libc
-so that the top byte is zeroed on specific syscalls before issuing the
-SVC.
+Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/firmware/psci.c | 42 +++++++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 19 deletions(-)
 
-I agree that it is problematic for HWASan if it only relies on
-overriding malloc/free.
-
-> > AFAIU, it's valid for a program to pass an address obtained from
-> > malloc or, better, posix_memalign to an mm syscall like mprotect().
-> > These arguments are pointers from the userspace point of view.
-> 
-> Catalin, do you think this is a good reason to have the untagging done
-> in the kernel?
-
-malloc() or posix_memalign() are C library implementations and it's the
-C library (or overridden functions) setting a tag on the returned
-pointers. Since the TBI hardware feature allows memory accesses with a
-non-zero tag, we could allow them in the kernel for syscalls performing
-such accesses on behalf of the user (e.g. get_user/put_user would not
-need to clear the tag).
-
-madvise(), OTOH, does not perform a memory access on behalf of the user,
-it's just advising the kernel about a range of virtual addresses. That's
-where I think, from an ABI perspective, it doesn't make much sense to
-allow tags into the kernel for these syscalls (even if it's simpler from
-a user space perspective).
-
-(but I don't have a very strong opinion on this ;))
-
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index c80ec1d..9788bfc 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -270,9 +270,26 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+ 
++static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
++{
++	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
++
++	if (err) {
++		pr_warn("%pOF missing arm,psci-suspend-param property\n", np);
++		return err;
++	}
++
++	if (!psci_power_state_is_valid(*state)) {
++		pr_warn("Invalid PSCI power state %#x\n", *state);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+-	int i, ret, count = 0;
++	int i, ret = 0, count = 0;
+ 	u32 *psci_states;
+ 	struct device_node *state_node;
+ 
+@@ -291,29 +308,16 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < count; i++) {
+-		u32 state;
+-
+ 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
++		of_node_put(state_node);
+ 
+-		ret = of_property_read_u32(state_node,
+-					   "arm,psci-suspend-param",
+-					   &state);
+-		if (ret) {
+-			pr_warn(" * %pOF missing arm,psci-suspend-param property\n",
+-				state_node);
+-			of_node_put(state_node);
++		if (ret)
+ 			goto free_mem;
+-		}
+ 
+-		of_node_put(state_node);
+-		pr_debug("psci-power-state %#x index %d\n", state, i);
+-		if (!psci_power_state_is_valid(state)) {
+-			pr_warn("Invalid PSCI power state %#x\n", state);
+-			ret = -EINVAL;
+-			goto free_mem;
+-		}
+-		psci_states[i] = state;
++		pr_debug("psci-power-state %#x index %d\n", psci_states[i], i);
+ 	}
++
+ 	/* Idle states parsed correctly, initialize per-cpu pointer */
+ 	per_cpu(psci_power_state, cpu) = psci_states;
+ 	return 0;
 -- 
-Catalin
+2.7.4
