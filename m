@@ -1,216 +1,140 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:27 +0000
-Subject: [PATCH v6 04/26] arm64: KVM: Dynamically patch the kernel/hyp VA mask
-In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-5-marc.zyngier@arm.com>
+Date: Wed, 14 Mar 2018 16:50:23 +0000
+Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
+ mitigation)
+Message-ID: <20180314165049.30105-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we're using a complicated sequence of alternatives to
-patch the kernel/hyp VA mask on non-VHE, and NOP out the
-masking altogether when on VHE.
+Whilst KVM benefits from the kernel randomisation via KASLR, there is
+no additional randomisation when the kernel is running at EL1, as we
+directly use a fixed offset from the linear mapping. This is not
+necessarily a problem, but we could do a bit better by independently
+randomizing the HYP placement.
 
-The newly introduced dynamic patching gives us the opportunity
-to simplify that code by patching a single instruction with
-the correct mask (instead of the mind bending cummulative masking
-we have at the moment) or even a single NOP on VHE. This also
-adds some initial code that will allow the patching callback
-to switch to a more complex patching.
+This series proposes to randomise the offset by inserting a few random
+bits between the MSB of the RAM linear mapping and the top of the HYP
+VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
+get 13 bits), but that's better than nothing.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_mmu.h | 46 ++++++--------------
- arch/arm64/kvm/Makefile          |  2 +-
- arch/arm64/kvm/va_layout.c       | 91 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 105 insertions(+), 34 deletions(-)
+In order to achieve this, we need to be able to patch dynamic values
+in the kernel text. This results in a bunch of changes to the
+alternative framework, the insn library, and a few more hacks in KVM
+itself (we get a new way to map the GIC at EL2).
+
+Another (and more recent) goal of this series is to work around what
+has been described as "variant 3a", which covers speculative reads of
+privileged system registers. Randomizing the location of the
+hypervisor would be pointless if one could simply obtain VBAR_EL2. In
+order to work around this, we place the vectors at a fairly static
+location (next to the idmap), independently of the hypervisor's own
+mappings. This ensures that we can leak VBAR_EL2 without disclosing
+much about HYP itself (and is similar to what the rest of the kernel
+does with KPTI). This is only enabled at runtime for Cortex-A57 and
+Cortex-A72.
+
+This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
+Mustang and Thunder-X. I've also done a sanity check on 32bit (which
+is only impacted by the HYP IO VA stuff).
+
+Thanks,
+
+	M.
+
+* From v5:
+  - Countless fixes, thanks to James excellent review
+  - Additional patch to address 52bit PA HYP idmap unmap
+  - Additional patch for HYP idmap page alignment/size
+  - Additional patch to move the BP hardening slots into .hyp.text
+  - New and improved far branch into the vectors (shorter epilogue)
+  - Some extra tidying up thanks to Drew's review
+  - Collected AB/RB tags
+
+* From v4:
+  - Added some more patches to work around speculative reads of
+    VBAR_EL2
+  - Bunch of cleanups and clarifications thanks to Christoffer's review
+  - Dropped the initial asm-offsets rework on which this series
+    didn't really rely anymore
+
+* From v3:
+  - Reworked the alternative code to leave the actual patching to
+    the callback function. This should allow for more flexibility
+    should someone or something require it
+  - Now detects underflows in the IOVA allocator
+  - Moved the VA patching code to va_layout.c
+
+* From v2:
+  - Fixed a crapload of bugs in the immediate generation patch
+    I now have a test harness for it, making sure it generates the
+    same thing as GAS...
+  - Fixed a bug in the asm-offsets.h exclusion patch
+  - Reworked the alternative_cb code to be nicer and avoid generating
+    pointless nops
+
+* From v1:
+  - Now works correctly with KASLR
+  - Dropped the callback field from alt_instr, and reuse one of the
+    existing fields to store an offset to the callback
+  - Fix HYP teardown path (depends on fixes previously posted)
+  - Dropped the VA offset macros
+
+
+Marc Zyngier (26):
+  arm64: alternatives: Add dynamic patching feature
+  arm64: insn: Add N immediate encoding
+  arm64: insn: Add encoder for bitwise operations using literals
+  arm64: KVM: Dynamically patch the kernel/hyp VA mask
+  arm64: cpufeatures: Drop the ARM64_HYP_OFFSET_LOW feature flag
+  KVM: arm/arm64: Do not use kern_hyp_va() with kvm_vgic_global_state
+  KVM: arm/arm64: Demote HYP VA range display to being a debug feature
+  KVM: arm/arm64: Move ioremap calls to create_hyp_io_mappings
+  KVM: arm/arm64: Keep GICv2 HYP VAs in kvm_vgic_global_state
+  KVM: arm/arm64: Fix idmap size and alignment
+  KVM: arm64: Fix HYP idmap unmap when using 52bit PA
+  KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+  arm64; insn: Add encoder for the EXTR instruction
+  arm64: insn: Allow ADD/SUB (immediate) with LSL #12
+  arm64: KVM: Dynamically compute the HYP VA mask
+  arm64: KVM: Introduce EL2 VA randomisation
+  arm64: Update the KVM memory map documentation
+  arm64: KVM: Move vector offsetting from hyp-init.S to
+    kvm_get_hyp_vector
+  arm64: KVM: Move stashing of x0/x1 into the vector code itself
+  arm64: KVM: Move BP hardening vectors into .hyp.text section
+  arm64: KVM: Reserve 4 additional instructions in the BPI template
+  arm64: KVM: Allow far branches from vector slots to the main vectors
+  arm/arm64: KVM: Introduce EL2-specific executable mappings
+  arm64: Make BP hardening slot counter available
+  arm64: KVM: Allow mapping of vectors outside of the RAM region
+  arm64: Enable ARM64_HARDEN_EL2_VECTORS on Cortex-A57 and A72
+
+ Documentation/arm64/memory.txt       |   9 +-
+ arch/arm/include/asm/kvm_mmu.h       |  16 ++-
+ arch/arm64/Kconfig                   |  16 +++
+ arch/arm64/include/asm/alternative.h |  41 ++++++-
+ arch/arm64/include/asm/cpucaps.h     |   2 +-
+ arch/arm64/include/asm/insn.h        |  16 +++
+ arch/arm64/include/asm/kvm_mmu.h     | 163 ++++++++++++++++++-------
+ arch/arm64/include/asm/mmu.h         |   8 +-
+ arch/arm64/kernel/Makefile           |   4 +-
+ arch/arm64/kernel/alternative.c      |  43 +++++--
+ arch/arm64/kernel/bpi.S              |  67 +++++++----
+ arch/arm64/kernel/cpu_errata.c       |  21 +++-
+ arch/arm64/kernel/cpufeature.c       |  19 ---
+ arch/arm64/kernel/insn.c             | 190 ++++++++++++++++++++++++++++-
+ arch/arm64/kvm/Kconfig               |   3 +
+ arch/arm64/kvm/Makefile              |   2 +-
+ arch/arm64/kvm/hyp-init.S            |   1 -
+ arch/arm64/kvm/hyp/hyp-entry.S       |  58 +++++----
+ arch/arm64/kvm/va_layout.c           | 227 +++++++++++++++++++++++++++++++++++
+ include/kvm/arm_vgic.h               |  12 +-
+ virt/kvm/arm/hyp/vgic-v2-sr.c        |  12 +-
+ virt/kvm/arm/mmu.c                   | 175 ++++++++++++++++++++++-----
+ virt/kvm/arm/vgic/vgic-init.c        |   6 -
+ virt/kvm/arm/vgic/vgic-v2.c          |  40 ++----
+ 24 files changed, 929 insertions(+), 222 deletions(-)
  create mode 100644 arch/arm64/kvm/va_layout.c
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7faed6e48b46..e3bc1d0a5e93 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -69,9 +69,6 @@
-  * mappings, and none of this applies in that case.
-  */
- 
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
- #ifdef __ASSEMBLY__
- 
- #include <asm/alternative.h>
-@@ -81,28 +78,15 @@
-  * Convert a kernel VA into a HYP VA.
-  * reg: VA to be converted.
-  *
-- * This generates the following sequences:
-- * - High mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		nop
-- * - Low mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
-- * - VHE:
-- *		nop
-- *		nop
-- *
-- * The "low mask" version works because the mask is a strict subset of
-- * the "high mask", hence performing the first mask for nothing.
-- * Should be completely invisible on any viable CPU.
-+ * The actual code generation takes place in kvm_update_va_mask, and
-+ * the instructions below are only there to reserve the space and
-+ * perform the register allocation (kvm_update_va_mask uses the
-+ * specific registers encoded in the instructions).
-  */
- .macro kern_hyp_va	reg
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
--alternative_else_nop_endif
--alternative_if ARM64_HYP_OFFSET_LOW
--	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
--alternative_else_nop_endif
-+alternative_cb kvm_update_va_mask
-+	and     \reg, \reg, #1
-+alternative_cb_end
- .endm
- 
- #else
-@@ -113,18 +97,14 @@ alternative_else_nop_endif
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- 
-+void kvm_update_va_mask(struct alt_instr *alt,
-+			__le32 *origptr, __le32 *updptr, int nr_inst);
-+
- static inline unsigned long __kern_hyp_va(unsigned long v)
- {
--	asm volatile(ALTERNATIVE("and %0, %0, %1",
--				 "nop",
--				 ARM64_HAS_VIRT_HOST_EXTN)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
--	asm volatile(ALTERNATIVE("nop",
--				 "and %0, %0, %1",
--				 ARM64_HYP_OFFSET_LOW)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
-+	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
-+				    kvm_update_va_mask)
-+		     : "+r" (v));
- 	return v;
- }
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 87c4f7ae24de..93afff91cb7c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,7 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-new file mode 100644
-index 000000000000..45e7802328d4
---- /dev/null
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm_host.h>
-+#include <asm/alternative.h>
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/kvm_mmu.h>
-+
-+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
-+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
-+
-+static u64 va_mask;
-+
-+static void compute_layout(void)
-+{
-+	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+
-+	/*
-+	 * Activate the lower HYP offset only if the idmap doesn't
-+	 * clash with it,
-+	 */
-+	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
-+		mask = HYP_PAGE_OFFSET_LOW_MASK;
-+
-+	va_mask = mask;
-+}
-+
-+static u32 compute_instruction(int n, u32 rd, u32 rn)
-+{
-+	u32 insn = AARCH64_BREAK_FAULT;
-+
-+	switch (n) {
-+	case 0:
-+		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
-+							  AARCH64_INSN_VARIANT_64BIT,
-+							  rn, rd, va_mask);
-+		break;
-+	}
-+
-+	return insn;
-+}
-+
-+void __init kvm_update_va_mask(struct alt_instr *alt,
-+			       __le32 *origptr, __le32 *updptr, int nr_inst)
-+{
-+	int i;
-+
-+	/* We only expect a single instruction in the alternative sequence */
-+	BUG_ON(nr_inst != 1);
-+
-+	if (!has_vhe() && !va_mask)
-+		compute_layout();
-+
-+	for (i = 0; i < nr_inst; i++) {
-+		u32 rd, rn, insn, oinsn;
-+
-+		/*
-+		 * VHE doesn't need any address translation, let's NOP
-+		 * everything.
-+		 */
-+		if (has_vhe()) {
-+			updptr[i] = aarch64_insn_gen_nop();
-+			continue;
-+		}
-+
-+		oinsn = le32_to_cpu(origptr[i]);
-+		rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
-+		rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
-+
-+		insn = compute_instruction(i, rd, rn);
-+		BUG_ON(insn == AARCH64_BREAK_FAULT);
-+
-+		updptr[i] = cpu_to_le32(insn);
-+	}
-+}
 -- 
 2.14.2
