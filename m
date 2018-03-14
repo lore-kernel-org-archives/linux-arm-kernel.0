@@ -1,66 +1,29 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 14 Mar 2018 11:16:32 +0100
-Subject: [PATCH] ARM: dts: sun8i-h3: Add Mali node
-In-Reply-To: <20180314080500.whywwskhp5546z7m@flea>
-References: <1520936205-64723-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180314080500.whywwskhp5546z7m@flea>
-Message-ID: <1269750b-5190-a167-8d34-91794e6d0a8c@micronovasrl.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 14 Mar 2018 11:32:42 +0100
+Subject: [PATCH v5 02/36] drm/rockchip: Remove analogix psr worker
+In-Reply-To: <20180309222327.18689-3-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-3-enric.balletbo@collabora.com>
+Message-ID: <3214934.ZBQRvzMx2H@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Il 14/03/2018 09:05, Maxime Ripard ha scritto:
-> On Tue, Mar 13, 2018 at 11:16:45AM +0100, Giulio Benetti wrote:
->> The H3 has an ARM Mali 400 GPU, so add binding to our DT.
->>
->> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Am Freitag, 9. M?rz 2018, 23:22:53 CET schrieb Enric Balletbo i Serra:
+> From: Sean Paul <seanpaul@chromium.org>
 > 
-> How was this tested?
-
-I wanted you asked me about this to ask you:
-if I can't test it on HW, but others tested it all around,
-for example using this patch:
-https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/32-h3-DT-add-mali-node.patch
-
-Is it enough? Or do I have to test it directly?
-Or maybe I can invite those people to tag this patch as tested-by ?
-
+> Now that the spinlocks and timers are gone, we can remove the psr
+> worker located in rockchip's analogix driver and do the enable/disable
+> directly. This should simplify the code and remove races on disable.
 > 
-> Is there any specific reason not to share it with the H5?
+> Cc: ?? ? <wzz@rock-chips.com>
+> Cc: St?phane Marchesin <marcheu@chromium.org>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Yes, H5 has dual GPU but quad PP and on IRQ you can clearly see:
-- GPU_GP
-- GPU_GPMMU
-- GPU_PMU
-- GPU_PP
-- GPU_PP0
-- GPU_PPMMU0
-- GPU_PP1
-- GPU_PPMMU1
-- GPU_PP2
-- GPU_PPMMU2
-- GPU_PP3
-- GPU_PPMMU3
 
-So I think they should be placed in specific dts files.
-What do you think?
+applied to drm-misc-next
 
 Thanks
-
-> 
-> Maxime
-> 
-
-
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Heiko
