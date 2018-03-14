@@ -1,8 +1,8 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 13 Mar 2018 23:20:22 -0400
+Date: Tue, 13 Mar 2018 23:19:52 -0400
 Subject: [PATCH 1/7] i40e/i40evf: Eliminate duplicate barriers on
  weakly-ordered archs
-Message-ID: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1520997599-17298-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
