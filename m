@@ -1,36 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Mar 2018 16:57:09 +0000
-Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
-In-Reply-To: <72c7a6d2-a4c4-26b2-2982-c1d1ffb39b81@arm.com>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
- <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
- <72c7a6d2-a4c4-26b2-2982-c1d1ffb39b81@arm.com>
-Message-ID: <20180314165708.daoui66waxvicciq@lakrids.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 Mar 2018 17:58:16 +0100
+Subject: [PATCH v6 06/25] timer: Export next wakeup time of a CPU
+In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 06:35:07PM +0000, Marc Zyngier wrote:
-> On 13/03/18 17:51, Mark Rutland wrote:
-> > On Tue, Mar 13, 2018 at 05:21:00PM +0000, Marc Zyngier wrote:
-> >> As kexec and kdump are getting used a bit more intensively, I've been
-> >> made aware of a number of shortcomings.
-> >>
-> >> The main gripe is from folks trying to launch a kdump kernel from
-> >> within an interrupt handler. If using EOImode==1, things work as
-> >> expected. If using EOImode==0 (such as in a guest), the secondary
-> >> kernel hangs as the previous interrupt hasn't been EOI'd, and the
-> >> active priority is still set. The first two patches are addressing
-> >> this situation for both GICv2 and GICv3 by reseting the APRs to their
-> >> default value.
-> > 
-> > As a more general thing, if irqchip drivers have state that needs to be
-> > reset in their init code, can we live all this irqchip reset to the
-> > crashdump kernel, and kill machine_kexec_mask_interrupts() entirely?
-> 
-> We could, once we know for sure that all the potential irqchips have
-> been fixed. Or we could just remove it immediately, and see what breaks.
+From: Lina Iyer <lina.iyer@linaro.org>
 
-I would be very tempted to do the latter.
+Knowing the sleep duration of CPUs, is known to be needed while selecting
+the most energy efficient idle state for a CPU or a group of CPUs.
 
-Thanks,
-Mark.
+However, to be able to compute the sleep duration, we need to know at what
+time the next expected wakeup is for the CPU. Therefore, let's export this
+information via a new function, tick_nohz_get_next_wakeup(). Following
+changes make use of it.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Lina Iyer <ilina@codeaurora.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ include/linux/tick.h     | 10 ++++++++++
+ kernel/time/tick-sched.c | 11 +++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/include/linux/tick.h b/include/linux/tick.h
+index 7cc3592..e51cf2c 100644
+--- a/include/linux/tick.h
++++ b/include/linux/tick.h
+@@ -120,6 +120,7 @@ extern void tick_nohz_irq_exit(void);
+ extern ktime_t tick_nohz_get_sleep_length(void);
+ extern unsigned long tick_nohz_get_idle_calls(void);
+ extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
++extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+ extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
+ #else /* !CONFIG_NO_HZ_COMMON */
+@@ -132,6 +133,15 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
+ {
+ 	return NSEC_PER_SEC / HZ;
+ }
++
++static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	ktime_t len = NSEC_PER_SEC/HZ;
++
++	/* Next wake up is the tick period, assume it starts now */
++	return ktime_add(len, ktime_get());
++}
++
+ static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+ #endif /* !CONFIG_NO_HZ_COMMON */
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 29a5733..da1bff3 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -1025,6 +1025,17 @@ unsigned long tick_nohz_get_idle_calls(void)
+ 	return ts->idle_calls;
+ }
+ 
++/**
++ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
++ */
++ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	struct clock_event_device *dev =
++			per_cpu(tick_cpu_device.evtdev, cpu);
++
++	return dev->next_event;
++}
++
+ static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+ {
+ #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+-- 
+2.7.4
