@@ -1,22 +1,51 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 13 Mar 2018 19:44:39 -0700
-Subject: [PATCH] arm64: dts: msm8992: add pstore-ramoops support
-In-Reply-To: <1520843817-9667-1-git-send-email-jeremymc@redhat.com>
-References: <1520843817-9667-1-git-send-email-jeremymc@redhat.com>
-Message-ID: <20180314024439.GC11034@tuxbook-pro>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 13 Mar 2018 23:20:22 -0400
+Subject: [PATCH 1/7] i40e/i40evf: Eliminate duplicate barriers on
+ weakly-ordered archs
+Message-ID: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 12 Mar 01:36 PDT 2018, Jeremy McNicoll wrote:
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
-> With the addition of this ramoops node it enables post mortem
-> analysis if a debug cable is not attached and/or not available.
-> 
-> All addresses and values were extracted from CAF AOSP marshmallow
-> DR 1.6.
-> 
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
-Regards,
-Bjorn
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/net/ethernet/intel/i40e/i40e_txrx.c   | 2 +-
+ drivers/net/ethernet/intel/i40evf/i40e_txrx.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+index e554aa6cf..7028516 100644
+--- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+@@ -1375,7 +1375,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
+ 	 */
+ 	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
+ }
+ 
+ /**
+diff --git a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+index 357d605..2d323fc 100644
+--- a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+@@ -667,7 +667,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
+ 	 */
+ 	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
+ }
+ 
+ /**
+-- 
+2.7.4
