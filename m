@@ -1,34 +1,70 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Wed, 14 Mar 2018 08:37:32 -0500
-Subject: [PATCH 5/5] dpaa_eth: remove duplicate increment of the tx_errors
- counter
+Date: Wed, 14 Mar 2018 08:37:28 -0500
+Subject: [PATCH 1/5] soc/fsl/qbman: fix issue in qman_delete_cgr_safe()
 In-Reply-To: <20180314133732.24068-1-madalin.bucur@nxp.com>
 References: <20180314133732.24068-1-madalin.bucur@nxp.com>
-Message-ID: <20180314133732.24068-6-madalin.bucur@nxp.com>
+Message-ID: <20180314133732.24068-2-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Camelia Groza <camelia.groza@nxp.com>
+The wait_for_completion() call in qman_delete_cgr_safe()
+was triggering a scheduling while atomic bug, replacing the
+kthread with a smp_call_function_single() call to fix it.
 
-The tx_errors counter is incremented by the dpaa_xmit caller.
-
-Signed-off-by: Camelia Groza <camelia.groza@nxp.com>
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/soc/fsl/qbman/qman.c | 28 +++++-----------------------
+ 1 file changed, 5 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-index 76b3c9e..fd43f98 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-@@ -2021,7 +2021,6 @@ static inline int dpaa_xmit(struct dpaa_priv *priv,
- 	}
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index e4f5bb0..ba3cfa8 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -2443,39 +2443,21 @@ struct cgr_comp {
+ 	struct completion completion;
+ };
  
- 	if (unlikely(err < 0)) {
--		percpu_stats->tx_errors++;
- 		percpu_stats->tx_fifo_errors++;
- 		return err;
+-static int qman_delete_cgr_thread(void *p)
++static void qman_delete_cgr_smp_call(void *p)
+ {
+-	struct cgr_comp *cgr_comp = (struct cgr_comp *)p;
+-	int ret;
+-
+-	ret = qman_delete_cgr(cgr_comp->cgr);
+-	complete(&cgr_comp->completion);
+-
+-	return ret;
++	qman_delete_cgr((struct qman_cgr *)p);
+ }
+ 
+ void qman_delete_cgr_safe(struct qman_cgr *cgr)
+ {
+-	struct task_struct *thread;
+-	struct cgr_comp cgr_comp;
+-
+ 	preempt_disable();
+ 	if (qman_cgr_cpus[cgr->cgrid] != smp_processor_id()) {
+-		init_completion(&cgr_comp.completion);
+-		cgr_comp.cgr = cgr;
+-		thread = kthread_create(qman_delete_cgr_thread, &cgr_comp,
+-					"cgr_del");
+-
+-		if (IS_ERR(thread))
+-			goto out;
+-
+-		kthread_bind(thread, qman_cgr_cpus[cgr->cgrid]);
+-		wake_up_process(thread);
+-		wait_for_completion(&cgr_comp.completion);
++		smp_call_function_single(qman_cgr_cpus[cgr->cgrid],
++					 qman_delete_cgr_smp_call, cgr, true);
+ 		preempt_enable();
+ 		return;
  	}
+-out:
++
+ 	qman_delete_cgr(cgr);
+ 	preempt_enable();
+ }
 -- 
 2.1.0
