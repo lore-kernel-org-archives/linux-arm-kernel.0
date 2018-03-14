@@ -1,82 +1,44 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 14 Mar 2018 15:52:39 +0100
-Subject: [RESEND PATCH v4 3/3] ARM: dts: STi: Remove console=ttyASN from
- bootargs for STi boards] ARM: dts: STi: Remove "console=ttyASN" from bootargs
- for STi boards
-Message-ID: <1521039159-16655-1-git-send-email-patrice.chotard@st.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Wed, 14 Mar 2018 14:53:17 +0000
+Subject: [PATCH v4 3/3] ARM: dts: STi: Remove "console=ttyASN" from
+ bootargs for STi boards
+In-Reply-To: <20180314135701.GA20286@kroah.com>
+References: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
+ <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
+ <20180314135701.GA20286@kroah.com>
+Message-ID: <55befee5-dd68-c175-6d20-29ccda6f323f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+Hi Greg
 
-As serial interface is already specified into stdout-path property,
-"console=ttyASN,115200" from bootargs can be removed.
+On 03/14/2018 02:57 PM, Greg KH wrote:
+> On Wed, Mar 07, 2018 at 06:35:34PM +0100, patrice.chotard at st.com wrote:
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> As serial interface is already specified into stdout-path property,
+>> "console=ttyASN,115200" from bootargs can be removed.
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> ---
+>> v4: _ none
+>> v3: _ remove "console=serialN,115200" from bootargs and use prefered
+>>        stdout-path property
+>> v2: _ none
+>>
+> 
+> This patch does not apply at all, are you sure you made it correctly?
+> 
+> Can you please fix it up and resend?
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
+No problem, the patch has just been sent.
 
-v4: _ none
-v3: _ remove "console=serialN,115200" from bootargs and use prefered 
-      stdout-path property
-v2: _ none
+Thanks
 
- arch/arm/boot/dts/stih407-b2120.dts | 2 +-
- arch/arm/boot/dts/stih410-b2120.dts | 2 +-
- arch/arm/boot/dts/stih410-b2260.dts | 2 +-
- arch/arm/boot/dts/stih418-b2199.dts | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Patrice
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index 37f2ddbfa099..a7a0f76e9cbc 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih407-b2120", "st,stih407";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index a6f00a6687a9..6c6b4cc37e97 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih410-b2120", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index 62770496e328..50d36758391c 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -15,7 +15,7 @@
- 	compatible = "st,stih410-b2260", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &uart1;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 36f40f58155d..7f5f3252bfc7 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih418-b2199", "st,stih418";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
--- 
-1.9.1
+> 
+> thanks,
+> 
+> greg k-h
+> 
