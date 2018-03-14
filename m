@@ -1,88 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 07:41:35 +0000
-Subject: [PATCH] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
- before enabling
-In-Reply-To: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
-References: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <86bmfrayts.wl-marc.zyngier@arm.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Wed, 14 Mar 2018 15:43:23 +0800
+Subject: [PATCH 8/8] ARM: dts: berlin2cd: add Valve Steam Link board
+In-Reply-To: <alpine.LNX.2.20.13.1803141013040.21514@monopod.intra.ispras.ru>
+References: <20180311160008.22928-1-amonakov@ispras.ru>
+ <20180311160008.22928-9-amonakov@ispras.ru>
+ <20180314142326.572642c3@xhacker.debian>
+ <alpine.LNX.2.20.13.1803141013040.21514@monopod.intra.ispras.ru>
+Message-ID: <20180314154323.184cf435@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+On Wed, 14 Mar 2018 10:22:11 +0300 Alexander Monakov wrote:
 
-On Wed, 14 Mar 2018 00:50:01 +0000,
-Shanker Donthineni wrote:
+> On Wed, 14 Mar 2018, Jisheng Zhang wrote:
 > 
-> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
-> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
-> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
-> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
-> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
+> > > +/*
+> > > + * Copyright 2018 Alexander Monakov <amonakov@gmail.com>
+> > > + *
+> > > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)  
+> > 
+> > Mind to license it under GPL2 or X11?  
 > 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c   | 30 +++++++++++++++++++++++-------
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  2 files changed, 24 insertions(+), 7 deletions(-)
+> MIT is the same as X11 but without the references to the X Consortium that
+> do not make sense in the kernel context: please see [1] and [2]. The MIT
+> license is present under LICENSES/preferred in the kernel tree, but not the
+> X11 license.
+
+Understood.
+
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 1d3056f..85cd158 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1875,15 +1875,31 @@ static void its_cpu_init_lpis(void)
->  		gic_data_rdist()->pend_page = pend_page;
->  	}
->  
-> -	/* Disable LPIs */
->  	val = readl_relaxed(rbase + GICR_CTLR);
-> -	val &= ~GICR_CTLR_ENABLE_LPIS;
-> -	writel_relaxed(val, rbase + GICR_CTLR);
->  
-> -	/*
-> -	 * Make sure any change to the table is observable by the GIC.
-> -	 */
-> -	dsb(sy);
-> +	/* Make sure LPIs are disabled before programming PEND/PROP registers */
-> +	if (val & GICR_CTLR_ENABLE_LPIS) {
-> +		u32 count = 1000000; /* 1s! */
-> +
-> +		/* Disable LPIs */
-> +		val &= ~GICR_CTLR_ENABLE_LPIS;
-> +		writel_relaxed(val, rbase + GICR_CTLR);
-> +
-> +		/* Make sure any change to GICR_CTLR is observable by the GIC */
-> +		dsb(sy);
-> +
-> +		/* Wait for GICR_CTLR.RWP==0 or timeout */
-> +		while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
-> +			if (!count) {
-> +				pr_err("CPU%d: Failed to disable LPIs\n",
-> +				       smp_processor_id());
-> +				return;
-> +			}
-> +			cpu_relax();
-> +			udelay(1);
-> +			count--;
-> +		};
-> +	}
+> The berlin2cd.dtsi file first says "the X11 license", but then the actual
+> license text appearing in the file is the MIT license.
 
-I can see a couple of issues with this patch:
+Yes, I'll send patches to add SPDX tags to all berlin SoC dtsi and s/X11/MIT.
 
-- Entering the kernel with GICR_CTLR.EnableLPIs set is a recipe for
-  memory corruption and is likely to lead to Bad Things(tm). A loud
-  warning would be in order, I believe.
+Thanks for pointing this out.
 
-- If you're on a system that doesn't allow GICR_CTLR.Enable_LPIs to be
-  cleared, we end-up going down the polling path for nothing. It'd be
-  worth checking that the bit can be cleared the first place (and
-  shout again if it cannot).
+> 
+> [1] https://spdx.org/licenses/MIT.html
+> [2] https://spdx.org/licenses/X11.html
+> 
+> > Other source usually tag as:
+> > // SPDX-License-Identifier: (GPL-2.0 OR X11)
+> > 
+> > And the tag is put into the first line, could we keep the style?  
+> 
+> Right. With the clarification regarding X11/MIT above, I'll change to
+> 
+> // SPDX-License-Identifier: GPL-2.0 OR MIT
+> // Copyright 2018 Alexander Monakov <amonakov@gmail.com>
+> 
+> Is that okay?
 
-- From a cosmetic PoV, please move this to a redist_disable_lpis()
-  function.
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+Yes, it's OK.
