@@ -1,59 +1,24 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Mar 2018 17:22:58 +0100
-Subject: [PATCH 0/6] Add the registers clock for most of the peripherals
-In-Reply-To: <20180314161928.7239-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Wed, 14 Mar 2018 17:19:22 +0100")
-References: <20180314161928.7239-1-gregory.clement@bootlin.com>
-Message-ID: <8737121va5.fsf@bootlin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Mar 2018 09:26:09 -0700
+Subject: [PATCH] ASoC: uniphier: evea: add switch for changing source of
+ line-in
+In-Reply-To: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
+References: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180314162609.GV2186@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., mars 14 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+On Wed, Mar 14, 2018 at 09:39:00PM +0900, Katsuhiro Suzuki wrote:
+> This patch adds mixer switch for changing audio source of line-in.
+> We can choose one of LIN1, 2, 3, default is LIN1.
 
-> Hi,
->
-> Thanks to new documentation, we have a better view of the clock
-> tree. It made us realized that most of the peripherals needs a second
-> clock to enable their registers.
-
-I forgot to mention that this series was for the Armada 7K/8K SoCs from
-Marvell!
-
->
-> Now that most of the binding change had been applied or are in the way
-> to be applied, we can update the device tree.
->
-> Gregory
->
-> Gregory CLEMENT (6):
->   ARM64: dts: marvell: armada-cp110: Add registers clock for USB host
->     nodes
->   ARM64: dts: marvell: armada-cp110: Add registers clock for XOR engine
->     nodes
->   ARM64: dts: marvell: armada-cp110: Add registers clock for the trng
->     node
->   ARM64: dts: marvell: armada-cp110: Add registers clock for the crypto
->     node
->   ARM64: dts: marvell: armada-cp110: Add registers clock for the NAND
->     node
->   ARM64: dts: marvell: armada-cp110: Add registers clock for the PCIe
->     nodes
->
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 37 +++++++++++++++++++--------
->  1 file changed, 27 insertions(+), 10 deletions(-)
->
-> -- 
-> 2.16.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+I'll apply for now but this should really be a DAPM control so that we
+can power down things connected to the disconnected line inputs when
+recording.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180314/81ff8062/attachment.sig>
