@@ -1,15 +1,14 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 13 Mar 2018 23:20:24 -0400
-Subject: [PATCH 3/7] RDMA/qedr: eliminate duplicate barriers on weakly-ordered
- archs
+Date: Tue, 13 Mar 2018 23:20:26 -0400
+Subject: [PATCH 5/7] igb: eliminate duplicate barriers on weakly-ordered archs
 In-Reply-To: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
 References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1520997629-17361-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1520997629-17361-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel() in multiple places. writel()
-already has a barrier on some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
@@ -19,30 +18,21 @@ writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/infiniband/hw/qedr/verbs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/intel/igb/igb_main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
-index 53f00db..ccd55f4 100644
---- a/drivers/infiniband/hw/qedr/verbs.c
-+++ b/drivers/infiniband/hw/qedr/verbs.c
-@@ -1870,7 +1870,7 @@ static int qedr_update_qp_state(struct qedr_dev *dev,
+diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
+index b88fae7..ba8ccb5 100644
+--- a/drivers/net/ethernet/intel/igb/igb_main.c
++++ b/drivers/net/ethernet/intel/igb/igb_main.c
+@@ -8072,7 +8072,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, rx_ring->tail);
++		writel_relaxed(i, rx_ring->tail);
+ 	}
+ }
  
- 			if (rdma_protocol_roce(&dev->ibdev, 1)) {
- 				wmb();
--				writel(qp->rq.db_data.raw, qp->rq.db);
-+				writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
- 				/* Make sure write takes effect */
- 				mmiowb();
- 			}
-@@ -3247,7 +3247,7 @@ int qedr_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
- 	 * redundant doorbell.
- 	 */
- 	wmb();
--	writel(qp->sq.db_data.raw, qp->sq.db);
-+	writel_relaxed(qp->sq.db_data.raw, qp->sq.db);
- 
- 	/* Make sure write sticks */
- 	mmiowb();
 -- 
 2.7.4
