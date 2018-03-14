@@ -1,29 +1,31 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 14 Mar 2018 11:32:31 +0100
-Subject: [PATCH v5 01/36] drm/bridge: analogix_dp: detect Sink PSR state
- after configuring the PSR
-In-Reply-To: <20180309222327.18689-2-enric.balletbo@collabora.com>
+Date: Wed, 14 Mar 2018 11:32:56 +0100
+Subject: [PATCH v5 03/36] drm/bridge: analogix_dp: Don't change psr while
+ bridge is disabled
+In-Reply-To: <20180309222327.18689-4-enric.balletbo@collabora.com>
 References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-2-enric.balletbo@collabora.com>
-Message-ID: <3256074.V8N7sWxg0l@diego>
+ <20180309222327.18689-4-enric.balletbo@collabora.com>
+Message-ID: <2007370.FhFqbYQVrQ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. M?rz 2018, 23:22:52 CET schrieb Enric Balletbo i Serra:
-> From: Yakir Yang <ykk@rock-chips.com>
+Am Freitag, 9. M?rz 2018, 23:22:54 CET schrieb Enric Balletbo i Serra:
+> From: zain wang <wzz@rock-chips.com>
 > 
-> Make sure the request PSR state takes effect in analogix_dp_send_psr_spd()
-> function, or print the sink PSR error state if we failed to apply the
-> requested PSR setting.
+> There is a race between AUX CH bring-up and enabling bridge which will
+> cause link training to fail. To avoid hitting it, don't change psr state
+> while enabling the bridge.
 > 
-> Cc: ?? ? <wzz@rock-chips.com>
-> Cc: St?phane Marchesin <marcheu@chromium.org>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> [seanpaul changed timeout loop to a readx poll]
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: zain wang <wzz@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> [seanpaul fixed up the commit message a bit and renamed *_supported to
+> *_enabled] Signed-off-by: Sean Paul <seanpaul@chromium.org>
 > Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 > Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
 
 applied to drm-misc-next
 
