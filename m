@@ -1,45 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 14 Mar 2018 18:17:17 +0300
-Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
- PMIC for DDR Backup Power
-In-Reply-To: <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
-References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
- <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 14 Mar 2018 10:41:36 -0500
+Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
+Message-ID: <20180314154136.16468-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+ARM DMA backend. The current code creates a dma_iommu_mapping and
+attaches this to the ISP device, but never detaches the mapping in
+either the probe failure paths or the driver remove path resulting
+in an unbalanced mapping refcount and a memory leak. Fix this properly.
 
-On 03/14/2018 03:09 PM, Geert Uytterhoeven wrote:
+Reported-by: Pavel Machek <pavel@ucw.cz>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+---
+v2 Changes:
+ - Dropped the error_attach label, and returned directly from the
+   first error path (comments from Sakari)
+ - Added Sakari's Acked-by
+v1: https://patchwork.kernel.org/patch/10276759/
 
-> On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
-> need to be kept powered when backup mode is enabled.  Reflect this in
-> the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
-> 
-> The accessory power switch (SW23) is a toggle switch, hense specify
-> "rohm,rstbmode-level".
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Add rohm,rstbmode-level.
-> ---
->  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> index 2a7f36abd2dd85c6..80794c38c2669d75 100644
-> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> @@ -376,6 +376,8 @@
->  		#interrupt-cells = <2>;
->  		gpio-controller;
->  		#gpio-cells = <2>;
-> +		rohm,ddr-backup-power = <15>;
+Pavel,
+I dropped your Tested-by from v2 since I modified the patch, can you
+recheck the new patch again? Thanks.
 
-  Why not 0xf if those are all bit flags?
+regards
+Suman
 
-[...]
+ drivers/media/platform/omap3isp/isp.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-MBR, Sergei
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 8eb000e3d8fd..f2db5128d786 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
+ 
+ static void isp_detach_iommu(struct isp_device *isp)
+ {
++	arm_iommu_detach_device(isp->dev);
+ 	arm_iommu_release_mapping(isp->mapping);
+ 	isp->mapping = NULL;
+ }
+@@ -1961,8 +1962,7 @@ static int isp_attach_iommu(struct isp_device *isp)
+ 	mapping = arm_iommu_create_mapping(&platform_bus_type, SZ_1G, SZ_2G);
+ 	if (IS_ERR(mapping)) {
+ 		dev_err(isp->dev, "failed to create ARM IOMMU mapping\n");
+-		ret = PTR_ERR(mapping);
+-		goto error;
++		return PTR_ERR(mapping);
+ 	}
+ 
+ 	isp->mapping = mapping;
+@@ -1977,7 +1977,8 @@ static int isp_attach_iommu(struct isp_device *isp)
+ 	return 0;
+ 
+ error:
+-	isp_detach_iommu(isp);
++	arm_iommu_release_mapping(isp->mapping);
++	isp->mapping = NULL;
+ 	return ret;
+ }
+ 
+-- 
+2.16.2
