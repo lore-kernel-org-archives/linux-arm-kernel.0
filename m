@@ -1,91 +1,109 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Wed, 14 Mar 2018 02:17:51 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjggMi81XSBkdC1iaW5kaW5nczogc2NzaTogdWZz?=
- =?utf-8?Q?:_add_document_for_hisi-ufs?=
-References: <20180213101412.5717-1-liwei213@huawei.com>
- <20180213101412.5717-3-liwei213@huawei.com>
- <CAK8P3a2b3rLHyM+vMppCkAR3VYbhw-b0LpuWfLCqjs7z9n+hyw@mail.gmail.com>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA57B80@DGGEMM506-MBS.china.huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 14 Mar 2018 11:31:47 +0900
+Subject: [PATCH] crypto: arm,arm64 - Fix random regeneration of S_shipped
+In-Reply-To: <db77e20709db11b951a28c3303feb63990ef82d7.1520972030.git.leonard.crestez@nxp.com>
+References: <db77e20709db11b951a28c3303feb63990ef82d7.1520972030.git.leonard.crestez@nxp.com>
+Message-ID: <CAK7LNARF6vEXVxABcdQtcx0TxNaiX9_vWho1XVG0+51bu05RUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi?Arnd
-
-Sorry to bother you again, please take the time to review the patch. Are there any other suggestions?
-Looking forward to your reply.
-
-Thanks!
-
-
-
------????-----
-???: liwei (CM) 
-????: 2018?2?23? 16:36
-???: 'Arnd Bergmann'
-??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; zangleigang; Gengjianfeng; Guodong Xu; Zhangfei Gao; Fengbaopeng (kevin, Kirin Solution Dept)
-??: ??: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-
-Hi, Arnd
-
-Sorry late for you.
-The following two suggestions we have really discussed
-https://lkml.org/lkml/2017/11/30/1077
-
------????-----
-???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd Bergmann
-????: 2018?2?19? 17:58
-???: liwei (CM)
-??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; zangleigang; Gengjianfeng; Guodong Xu; Zhangfei Gao; Fengbaopeng (kevin, Kirin Solution Dept)
-??: Re: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-
-On Tue, Feb 13, 2018 at 11:14 AM, Li Wei <liwei213@huawei.com> wrote:
-> add ufs node document for Hisilicon.
+2018-03-14 5:17 GMT+09:00 Leonard Crestez <leonard.crestez@nxp.com>:
+> The decision to rebuild .S_shipped is made based on the relative
+> timestamps of .S_shipped and .pl files but git makes this essentially
+> random. This means that the perl script might run anyway (usually at
+> most once per checkout), defeating the whole purpose of _shipped.
 >
-> Signed-off-by: Li Wei <liwei213@huawei.com>
+> Fix by skipping the rule unless explicit make variables are provided:
+> REGENERATE_ARM_CRYPTO or REGENERATE_ARM64_CRYPTO.
+>
+> This can produce nasty occasional build failures downstream, for example
+> for toolchains with broken perl. The solution is minimally intrusive to
+> make it easier to push into stable.
+>
+> Another report on a similar issue here: https://lkml.org/lkml/2018/3/8/1379
+>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: <stable@vger.kernel.org>
 > ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 37 
-> ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 
 
-I'm pretty sure we've discussed it before, but can you make this so that the generic properties are part of the ufshcd binding, and you refer to it from here, only describing in what ways the hisi ufs binding differs from the standard?
 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt 
-> b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..0d21b57496cf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,37 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +                                       "hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
-> +                                       host controller present on Hi36xx chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks               : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +                                       order as the clocks property. 
-> +"ref_clk", "phy_clk" is optional
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-The clock names sound generic enough, should we have both in the generic binding?
 
-"ref_clk" is in the ufshcd-pltfrm binding, but "phy_clk" is not; what do you mean is that these two don't need to document here?
 
-> +- resets            : reset node register, one reset the clk and the other reset the controller
-> +- reset-names       : describe reset node register
+>  arch/arm/crypto/Makefile   | 2 ++
+>  arch/arm64/crypto/Makefile | 2 ++
+>  2 files changed, 4 insertions(+)
+>
+> Not clear if this needs to go through crypto or arm but all commits in these
+> directories start with "crypto:".
+>
+> My problems were only on arm64 because of a yocto toolchain which ships a version
+> of perl which fails on "use integer;".
+>
+> CC stable because this can cause trouble for downstream packagers.
+>
+> diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+> index 30ef8e2..c9919c2 100644
+> --- a/arch/arm/crypto/Makefile
+> +++ b/arch/arm/crypto/Makefile
+> @@ -47,20 +47,22 @@ sha256-arm-y        := sha256-core.o sha256_glue.o $(sha256-arm-neon-y)
+>  sha512-arm-neon-$(CONFIG_KERNEL_MODE_NEON) := sha512-neon-glue.o
+>  sha512-arm-y   := sha512-core.o sha512-glue.o $(sha512-arm-neon-y)
+>  sha1-arm-ce-y  := sha1-ce-core.o sha1-ce-glue.o
+>  sha2-arm-ce-y  := sha2-ce-core.o sha2-ce-glue.o
+>  aes-arm-ce-y   := aes-ce-core.o aes-ce-glue.o
+>  ghash-arm-ce-y := ghash-ce-core.o ghash-ce-glue.o
+>  crct10dif-arm-ce-y     := crct10dif-ce-core.o crct10dif-ce-glue.o
+>  crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+>  chacha20-neon-y := chacha20-neon-core.o chacha20-neon-glue.o
+>
+> +ifdef REGENERATE_ARM_CRYPTO
+>  quiet_cmd_perl = PERL    $@
+>        cmd_perl = $(PERL) $(<) > $(@)
+>
+>  $(src)/sha256-core.S_shipped: $(src)/sha256-armv4.pl
+>         $(call cmd,perl)
+>
+>  $(src)/sha512-core.S_shipped: $(src)/sha512-armv4.pl
+>         $(call cmd,perl)
+> +endif
+>
+>  .PRECIOUS: $(obj)/sha256-core.S $(obj)/sha512-core.S
+> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+> index cee9b8d9..dfe651b 100644
+> --- a/arch/arm64/crypto/Makefile
+> +++ b/arch/arm64/crypto/Makefile
+> @@ -60,20 +60,22 @@ obj-$(CONFIG_CRYPTO_AES_ARM64_BS) += aes-neon-bs.o
+>  aes-neon-bs-y := aes-neonbs-core.o aes-neonbs-glue.o
+>
+>  AFLAGS_aes-ce.o                := -DINTERLEAVE=4
+>  AFLAGS_aes-neon.o      := -DINTERLEAVE=4
+>
+>  CFLAGS_aes-glue-ce.o   := -DUSE_V8_CRYPTO_EXTENSIONS
+>
+>  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+>         $(call if_changed_rule,cc_o_c)
+>
+> +ifdef REGENERATE_ARM64_CRYPTO
+>  quiet_cmd_perlasm = PERLASM $@
+>        cmd_perlasm = $(PERL) $(<) void $(@)
+>
+>  $(src)/sha256-core.S_shipped: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+>
+>  $(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
+>         $(call cmd,perlasm)
+> +endif
+>
+>  .PRECIOUS: $(obj)/sha256-core.S $(obj)/sha512-core.S
+> --
+> 2.7.4
+>
 
-This looks incomplete. What is the name of the reset line supposed to be?
-I'd also suggest you document it in the ufshcd binding instead.
 
-As discussed in https://lkml.org/lkml/2017/11/30/1077;
-If document it in the ufshcd binding, I think it needs some codes to parse them in ufshcd.c/ufshcd-pltfrm.c, but I think these codes may not be applicable to other SOC manufacturers.
 
-      Arnd
+-- 
+Best Regards
+Masahiro Yamada
