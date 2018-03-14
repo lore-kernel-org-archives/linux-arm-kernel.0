@@ -1,74 +1,51 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:19 +0100
-Subject: [PATCH v6 09/25] kernel/cpu_pm: Manage runtime PM in the idle path
- for CPUs
+Date: Wed, 14 Mar 2018 17:58:12 +0100
+Subject: [PATCH v6 02/25] PM / Domains: Deal with multiple states but no
+ governor in genpd
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-10-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow CPUs being power managed by PM domains, let's deploy support for
-runtime PM for the CPU's corresponding struct device.
+A caller of pm_genpd_init() that provides some states for the genpd via the
+->states pointer in the struct generic_pm_domain, should also provide a
+governor. This because it's the job of the governor to pick a state that
+satisfies the constraints.
 
-More precisely, at the point when the CPU is about to enter an idle state,
-decrease the runtime PM usage count for its corresponding struct device,
-via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
-resumes from idle, let's increase the runtime PM usage count, via calling
-pm_runtime_get_sync().
+Therefore, let's print a warning to inform the user about such bogus
+configuration and avoid to bail out, by instead picking the shallowest
+state before genpd invokes the ->power_off() callback.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- kernel/cpu_pm.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/base/power/domain.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-index 67b02e1..71317ff 100644
---- a/kernel/cpu_pm.c
-+++ b/kernel/cpu_pm.c
-@@ -16,9 +16,11 @@
-  */
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index c2ef944..9aff79d 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -466,6 +466,10 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
+ 			return -EAGAIN;
+ 	}
  
- #include <linux/kernel.h>
-+#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/module.h>
- #include <linux/notifier.h>
-+#include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/syscore_ops.h>
- 
-@@ -91,6 +93,7 @@ int cpu_pm_enter(void)
- {
- 	int nr_calls;
- 	int ret = 0;
-+	struct device *dev = get_cpu_device(smp_processor_id());
- 
- 	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
- 	if (ret)
-@@ -100,6 +103,9 @@ int cpu_pm_enter(void)
- 		 */
- 		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
- 
-+	if (!ret && dev)
-+		pm_runtime_put_sync_suspend(dev);
++	/* Default to shallowest state. */
++	if (!genpd->gov)
++		genpd->state_idx = 0;
 +
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(cpu_pm_enter);
-@@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
-  */
- int cpu_pm_exit(void)
- {
-+	struct device *dev = get_cpu_device(smp_processor_id());
-+
-+	if (dev)
-+		pm_runtime_get_sync(dev);
-+
- 	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
- }
- EXPORT_SYMBOL_GPL(cpu_pm_exit);
+ 	if (genpd->power_off) {
+ 		int ret;
+ 
+@@ -1694,6 +1698,8 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+ 		ret = genpd_set_default_power_state(genpd);
+ 		if (ret)
+ 			return ret;
++	} else if (!gov) {
++		pr_warn("%s : no governor for states\n", genpd->name);
+ 	}
+ 
+ 	mutex_lock(&gpd_list_lock);
 -- 
 2.7.4
