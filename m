@@ -1,108 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Mar 2018 17:30:43 +0000
-Subject: [PATCH v6 18/25] drivers: firmware: psci: Share a few internal
- PSCI functions
-In-Reply-To: <1521046715-30683-19-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <1521046715-30683-19-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20180314173042.ln44gb6s4wxqm2hq@lakrids.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Mar 2018 17:36:27 +0000
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+ <20180314145450.GI23100@dhcp22.suse.cz>
+ <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+ <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
+Message-ID: <CAKv+Gu_ubc0RomckZbH5-fEUYeOOqziAQM96uCecoKfWy_mCfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 05:58:28PM +0100, Ulf Hansson wrote:
-> Following changes needs to be able to call psci_get|set_domain_state() and
-> psci_dt_parse_state_node(), but from a separate file. Let's make that
-> possible by sharing them via a new internal PSCI header file.
-> 
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/firmware/psci.c | 14 ++++++++------
->  drivers/firmware/psci.h | 13 +++++++++++++
->  2 files changed, 21 insertions(+), 6 deletions(-)
->  create mode 100644 drivers/firmware/psci.h
+On 14 March 2018 at 16:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 14 March 2018 at 15:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
+>>> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+>>>> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+>>>> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+>>>> > fix your issue? From the debugging info you provided it should because
+>>>> > the patch prevents jumping backwards.
+>>>> >
+>>>>
+>>>> The patch does fix the boot hang.
+>>>>
+>>>> But I am concerned that we are papering over a fundamental flaw in
+>>>> memblock_next_valid_pfn().
+>>>
+>>> It seems that memblock_next_valid_pfn is doing the right thing here. It
+>>> is the alignment which moves the pfn back AFAICS. I am not really
+>>> impressed about the original patch either, to be completely honest.
+>>> It just looks awfully tricky. I still didn't manage to wrap my head
+>>> around the original issue though so I do not have much better ideas to
+>>> be honest.
+>>
+>> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
+>> argument, which is odd nut easily fixed.
+>> Then, the whole idea of substracting one so that the pfn++ will
+>> produce the expected value is rather hacky,
+>>
+>> But the real problem is that rounding down pfn for the next iteration
+>> is dodgy, because early_pfn_valid() isn't guaranteed to return true
+>> for the rounded down value. I know it is probably fine in reality, but
+>> dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
+>>
+>> So how about something like this (apologies on Gmail's behalf for the
+>> whitespace damage, I can resend it as a proper patch)
+>>
+>>
+>> ---------8<-----------
+>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>> index 3d974cb2a1a1..b89ca999ee3b 100644
+>> --- a/mm/page_alloc.c
+>> +++ b/mm/page_alloc.c
+>> @@ -5352,28 +5352,29 @@
+>>                  * function.  They do not exist on hotplugged memory.
+>>                  */
+>>                 if (context != MEMMAP_EARLY)
+>>                         goto not_early;
+>>
+>> -               if (!early_pfn_valid(pfn)) {
+>> +               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
+>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>                         /*
+>>                          * Skip to the pfn preceding the next valid one (or
+>>                          * end_pfn), such that we hit a valid pfn (or end_pfn)
+>>                          * on our next iteration of the loop. Note that it needs
+>>                          * to be pageblock aligned even when the region itself
+>>                          * is not. move_freepages_block() can shift ahead of
+>>                          * the valid region but still depends on correct page
+>>                          * metadata.
+>>                          */
+>> -                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+>> -                                       ~(pageblock_nr_pages-1)) - 1;
+>> -#endif
+>> +                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
+>> +                       if (pfn >= end_pfn)
+>> +                               break;
+>> +                       pfn &= ~(pageblock_nr_pages - 1);
+>> +#else
+>>                         continue;
+>> +#endif
+>>                 }
+>> -               if (!early_pfn_in_nid(pfn, nid))
+>> -                       continue;
+>>                 if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+>>                         break;
+>>
+>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>                 /*
+>> ---------8<-----------
+>>
+>> This ensures that we enter the remainder of the loop with a properly
+>> aligned pfn, rather than tweaking the value of pfn so it assumes the
+>> expected value after 'pfn++'
+>
+> Um, this does not actually solve the issue. I guess this is due to the
+> fact that a single pageblock size chunk could have both valid and
+> invalid PFNs, and so rounding down the first PFN of the second valid
+> chunk moves you back to the first chunk.
 
-To mimimize the clutter in drivers/firmware/, it might be better to
-move this into a drivers/firmware/psci/ directory, which would also
-simplify the MAINTAINERS modification.
+OK, so the original patch attempted to ensure that of each pageblock,
+at least the first struct page gets initialized, even though the PFN
+may not be valid. Unfortunately, this code is not complete, given that
+start_pfn itself may be misaligned, and so the issue it attempts to
+solve may still occur.
 
-Thanks,
-Mark.
+Then, I think it is absolutely dodgy to settle for only initializing
+the first struct page, rather than all of them, only because a
+specific VM_BUG_ON() references the flag field of the first struct
+page.
 
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 40b2b89..463f78c 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -34,6 +34,8 @@
->  #include <asm/smp_plat.h>
->  #include <asm/suspend.h>
->  
-> +#include "psci.h"
-> +
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
->   * calls it is necessary to use SMC64 to pass or return 64-bit values.
-> @@ -90,12 +92,12 @@ static u32 psci_function_id[PSCI_FN_MAX];
->  static DEFINE_PER_CPU(u32, domain_state);
->  static u32 psci_cpu_suspend_feature;
->  
-> -static inline u32 psci_get_domain_state(void)
-> +u32 psci_get_domain_state(void)
->  {
->  	return this_cpu_read(domain_state);
->  }
->  
-> -static inline void psci_set_domain_state(u32 state)
-> +void psci_set_domain_state(u32 state)
->  {
->  	this_cpu_write(domain_state, state);
->  }
-> @@ -285,10 +287,7 @@ static int __init psci_features(u32 psci_func_id)
->  			      psci_func_id, 0, 0);
->  }
->  
-> -#ifdef CONFIG_CPU_IDLE
-> -static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-> -
-> -static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
-> +int psci_dt_parse_state_node(struct device_node *np, u32 *state)
->  {
->  	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
->  
-> @@ -305,6 +304,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_CPU_IDLE
-> +static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-> +
->  static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
->  {
->  	int i, ret = 0, count = 0;
-> diff --git a/drivers/firmware/psci.h b/drivers/firmware/psci.h
-> new file mode 100644
-> index 0000000..a2b4be5
-> --- /dev/null
-> +++ b/drivers/firmware/psci.h
-> @@ -0,0 +1,13 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +#ifndef __PSCI_H
-> +#define __PSCI_H
-> +
-> +struct device_node;
-> +
-> +u32 psci_get_domain_state(void);
-> +void psci_set_domain_state(u32 state);
-> +
-> +int psci_dt_parse_state_node(struct device_node *np, u32 *state);
-> +
-> +#endif /* __PSCI_H */
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+IMO, we should fix this by initializing all struct page entries for
+each pageblock sized chunk that has any valid PFNs.
