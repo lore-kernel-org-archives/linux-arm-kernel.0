@@ -1,136 +1,32 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:35 +0100
-Subject: [PATCH v6 25/25] arm64: dts: Convert to the hierarchical CPU topology
- layout for MSM8916
+Date: Wed, 14 Mar 2018 17:58:33 +0100
+Subject: [PATCH v6 23/25] MAINTAINERS: Update files for PSCI
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-26-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-24-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lina Iyer <lina.iyer@linaro.org>
+Some new files have been for the PSCI firmware driver, let's make the
+expression more generic to cover them all.
 
-In the hierarchical layout, we are creating power domains around each CPU
-and describes the idle states for them inside the power domain provider
-node.  Note that, the CPU's idle states still needs to be compatible with
-"arm,idle-state".
-
-Furthermore, represent the CPU cluster as a separate master power domain,
-powering the CPU's power domains. The cluster node, contains the idle
-states for the cluster and each idle state needs to be compatible with the
-"domain-idle-state".
-
-If the running platform is using a PSCI FW that supports the OS initiated
-CPU suspend mode, which likely should be the case unless the PSCI FW is
-very old, this change makes the PSCI driver to enable it.
-
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Lina Iyer <ilina@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 53 ++++++++++++++++++++++++++++++++---
- 1 file changed, 49 insertions(+), 4 deletions(-)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index e51b049..d0bb0b9 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -112,7 +112,7 @@
- 			reg = <0x0>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD0>;
- 		};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4623caf..dda16cf 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11082,7 +11082,7 @@ M:	Mark Rutland <mark.rutland@arm.com>
+ M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+-F:	drivers/firmware/psci*.c
++F:	drivers/firmware/psci*
+ F:	include/linux/psci.h
+ F:	include/uapi/linux/psci.h
  
- 		CPU1: cpu at 1 {
-@@ -121,7 +121,7 @@
- 			reg = <0x1>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD1>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -130,7 +130,7 @@
- 			reg = <0x2>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD2>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -139,7 +139,7 @@
- 			reg = <0x3>;
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
--			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD3>;
- 		};
- 
- 		L2_0: l2-cache {
-@@ -156,12 +156,57 @@
- 				min-residency-us = <2000>;
- 				local-timer-stop;
- 			};
-+
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWRDN: cluster-gdhs {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
- 		};
- 	};
- 
- 	psci {
- 		compatible = "arm,psci-1.0";
- 		method = "smc";
-+
-+		CPU_PD0: cpu-pd0 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD1: cpu-pd1 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD2: cpu-pd2 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CPU_PD3: cpu-pd3 {
-+			#power-domain-cells = <0>;
-+			power-domains = <&CLUSTER_PD>;
-+			domain-idle-states = <&CPU_SPC>;
-+		};
-+
-+		CLUSTER_PD: cluster-pd {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWRDN>;
-+		};
- 	};
- 
- 	pmu {
 -- 
 2.7.4
