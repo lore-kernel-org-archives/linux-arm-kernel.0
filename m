@@ -1,70 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 12:04:50 +0000
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <CAFvLkMSZjgFMAe0VRc0AEpG89BgXkfMb9+ivJ8V+PFighOoDRA@mail.gmail.com>
-References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
- <a709e416-4024-f804-b2ff-ae6c2171a7c8@arm.com>
- <CAFvLkMSZjgFMAe0VRc0AEpG89BgXkfMb9+ivJ8V+PFighOoDRA@mail.gmail.com>
-Message-ID: <118e66b4-3137-7af5-b93d-b1949fad575c@arm.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Wed, 14 Mar 2018 08:06:32 -0400
+Subject: [PATCH 3/7] RDMA/qedr: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <20180314041249.GA18314@ziepe.ca>
+References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+ <1520997629-17361-3-git-send-email-okaya@codeaurora.org>
+ <20180314041249.GA18314@ziepe.ca>
+Message-ID: <c65f0d329aa50067a2c57ed71bba9131@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/18 11:46, Rados?aw Pietrzyk wrote:
-> Hi Marc,
-> We had a quite fruitful discussion in this mail thread regarding this
-> topic and Ludovic acked it so recently I have asked Thomas if he still
-> needs this v3 patch with detailed explanation especially as v2 version
-> of stm32-gpio patch has been already taken by Linus. However if you
-> require I can resend v3 of this patch only with this detailed explanation.
+On 2018-03-14 00:12, Jason Gunthorpe wrote:
+> On Tue, Mar 13, 2018 at 11:20:24PM -0400, Sinan Kaya wrote:
+>> Code includes wmb() followed by writel() in multiple places. writel()
+>> already has a barrier on some architectures like arm64.
+>> 
+>> This ends up CPU observing two barriers back to back before executing 
+>> the
+>> register write.
+>> 
+>> Since code already has an explicit barrier call, changing writel() to
+>> writel_relaxed().
+>> 
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>  drivers/infiniband/hw/qedr/verbs.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> Sure matches my understanding of writel_relaxed
+> 
+> This is part of a series, should we take just this patch through the
+> rdma tree? If not:
+> 
+> Acked-by: Jason Gunthorpe <jgg@mellanox.com>
 
-That'd be useful. The changelog is the only thing that will be left from
-this discussion, so it'd better be complete and accurate. If you quickly
-send a v3 for this single patch, I'll queue it right away.
-
-Thanks,
-
-	M.
-
-> 
-> 2018-03-14 12:09 GMT+01:00 Marc Zyngier <marc.zyngier@arm.com
-> <mailto:marc.zyngier@arm.com>>:
-> 
->     Radoslaw,
-> 
->     On 23/02/18 08:42, Thomas Gleixner wrote:
->     > Radoslaw,
->     >
->     > On Fri, 23 Feb 2018, Radoslaw Pietrzyk wrote:
->     >
->     >> - discards setting handle_simple_irq handler for hierarchy interrupts
->     >> - removes acking in chained irq handler as this is done by
->     >> irq_chip itself inside handle_edge_irq
->     >> - removes unneeded irq_domain_ops.xlate callback
->     >
->     > if that's all functionally correct, then this is a nice cleanup. Though
->     > from the above changelog its hard to tell because it merily tells WHAT the
->     > patch does, but not WHY. The WHY is the important information for a
->     > reviewer who is not familiar with the particular piece of code/hardware.
->     >
->     > Can you please amend the changelog with proper explanations why a
->     > particular piece of code is not needed or has to be changed to something
->     > else?
-> 
->     Any update on this? I'd like to queue this for 4.17, but Thomas'
->     comments should be addressed before that happens. Ca you please respin a
->     version with a better change log and the various review tags?
-> 
->     Thanks,
-> 
->     ? ? ? ? M.
->     --
->     Jazz is not dead. It just smells funny...
-> 
-> 
+Feel free to take pieces.
 
 
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks,
+> Jason
