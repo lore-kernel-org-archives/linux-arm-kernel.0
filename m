@@ -1,75 +1,108 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 14 Mar 2018 18:22:07 +0100
-Subject: [RESEND PATCH v4 3/3]] ARM: dts: STi: Remove "console=ttyASN" from
- bootargs for STi boards
-Message-ID: <1521048127-20298-1-git-send-email-patrice.chotard@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Mar 2018 17:25:58 +0000
+Subject: [PATCH v6 15/25] drivers: firmware: psci: Simplify error path of
+ psci_dt_init()
+In-Reply-To: <1521046715-30683-16-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+ <1521046715-30683-16-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20180314172558.akbzw6c7cwnah3sb@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On Wed, Mar 14, 2018 at 05:58:25PM +0100, Ulf Hansson wrote:
+> Instead of having each psci init function taking care of the of_node_put(),
+> let's deal with that from psci_dt_init(), as this enables a bit simpler
+> error path for each psci init function.
+> 
+> Cc: Lina Iyer <ilina@codeaurora.org>
+> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-As serial interface is already specified into stdout-path property,
-"console=ttyASN,115200" from bootargs can be removed.
+Nice cleanup!
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/boot/dts/stih407-b2120.dts | 2 +-
- arch/arm/boot/dts/stih410-b2120.dts | 2 +-
- arch/arm/boot/dts/stih410-b2260.dts | 2 +-
- arch/arm/boot/dts/stih418-b2199.dts | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index 37f2ddbfa099..a7a0f76e9cbc 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih407-b2120", "st,stih407";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index a6f00a6687a9..6c6b4cc37e97 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih410-b2120", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index 62770496e328..50d36758391c 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -15,7 +15,7 @@
- 	compatible = "st,stih410-b2260", "st,stih410";
- 
- 	chosen {
--		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &uart1;
- 	};
- 
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 36f40f58155d..7f5f3252bfc7 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -14,7 +14,7 @@
- 	compatible = "st,stih418-b2199", "st,stih418";
- 
- 	chosen {
--		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-+		bootargs = "clk_ignore_unused";
- 		linux,stdout-path = &sbc_serial0;
- 	};
- 
--- 
-1.9.1
+Mark.
+
+> ---
+>  drivers/firmware/psci.c | 23 ++++++++++-------------
+>  1 file changed, 10 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 256b4ed..3888100 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
+>  	int err;
+>  
+>  	err = get_set_conduit_method(np);
+> -
+>  	if (err)
+> -		goto out_put_node;
+> +		return err;
+> +
+>  	/*
+>  	 * Starting with v0.2, the PSCI specification introduced a call
+>  	 * (PSCI_VERSION) that allows probing the firmware version, so
+> @@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
+>  	 * can be carried out according to the specific version reported
+>  	 * by firmware
+>  	 */
+> -	err = psci_probe();
+> -
+> -out_put_node:
+> -	of_node_put(np);
+> -	return err;
+> +	return psci_probe();
+>  }
+>  
+>  /*
+> @@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
+>  	int err;
+>  
+>  	err = get_set_conduit_method(np);
+> -
+>  	if (err)
+> -		goto out_put_node;
+> +		return err;
+>  
+>  	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+>  
+> @@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
+>  		psci_ops.migrate = psci_migrate;
+>  	}
+>  
+> -out_put_node:
+> -	of_node_put(np);
+> -	return err;
+> +	return 0;
+>  }
+>  
+>  static const struct of_device_id psci_of_match[] __initconst = {
+> @@ -677,6 +670,7 @@ int __init psci_dt_init(void)
+>  	struct device_node *np;
+>  	const struct of_device_id *matched_np;
+>  	psci_initcall_t init_fn;
+> +	int ret;
+>  
+>  	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+>  
+> @@ -684,7 +678,10 @@ int __init psci_dt_init(void)
+>  		return -ENODEV;
+>  
+>  	init_fn = (psci_initcall_t)matched_np->data;
+> -	return init_fn(np);
+> +	ret = init_fn(np);
+> +
+> +	of_node_put(np);
+> +	return ret;
+>  }
+>  
+>  #ifdef CONFIG_ACPI
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
