@@ -1,63 +1,32 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 14 Mar 2018 17:43:12 +1030
-Subject: [PATCH] ARM: dts: aspeed: Add default memory node
-Message-ID: <20180314071312.17492-1-joel@jms.id.au>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 14 Mar 2018 08:17:51 +0100
+Subject: [PATCH 18/31] perf vendor events arm64: Add armv8-recommended.json
+In-Reply-To: <20180314015417.GB19781@kernel.org>
+References: <20180313120508.29327-1-acme@kernel.org>
+ <20180313120508.29327-19-acme@kernel.org>
+ <20180313142618.36je6syqg6ppwhbp@gmail.com>
+ <20180313182730.GA7987@kernel.org>
+ <20180314015417.GB19781@kernel.org>
+Message-ID: <20180314071751.aglkde77apjjffku@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we removed the inclusion of skeleton.dtsi from the device trees, we
-broke booting for systems with bootloaders that aren't device tre aware.
-This can be seen, for example, when appending the device tree blob to
-the kernel image.
 
-The reason booting broke was that the kernel lacked the device_type
-label in the memory node. Add in a default memory node wth the
-device_type. It can contain the memory address as the location is fixed
-for each SoC generation, but the size needs to be added by the
-bootloader or the board specific dts.
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Fixes: 73102d6fdc32 ("ARM: dts: aspeed: Remove skeleton.dtsi")
-Cc: <stable@vger.kernel.org>
-Reported-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
-Arnd, can you please merge this as a fix for 4.16?
+> Em Tue, Mar 13, 2018 at 03:27:30PM -0300, Arnaldo Carvalho de Melo escreveu:
+> > Em Tue, Mar 13, 2018 at 03:26:18PM +0100, Ingo Molnar escreveu:
+> > > That's not a valid SOB chain, author != first-Signed-off-by.
+>  
+> > I removed that cset for now, can you please check if the
+> > perf-core-for-mingo-4.17-20180313-2 tag is allright?
+> 
+> So, since there is this problem with powerpc and jevents, Ingo, please
+> hold on a bit more... Hopefully tomorrow things will be in a better
+> shape.
 
- arch/arm/boot/dts/aspeed-g4.dtsi | 5 +++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 5 +++++
- 2 files changed, 10 insertions(+)
+Sure, no problem!
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 36ae23aa3b48..518d2bc7c7fc 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -42,6 +42,11 @@
- 		};
- 	};
- 
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0x40000000 0>;
-+	};
-+
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 17ee0fa33a14..f9917717dd08 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -42,6 +42,11 @@
- 		};
- 	};
- 
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0>;
-+	};
-+
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
--- 
-2.15.1
+Thanks,
+
+	Ingo
