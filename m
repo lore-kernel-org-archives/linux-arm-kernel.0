@@ -1,100 +1,217 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:29 +0000
-Subject: [PATCH v6 06/26] KVM: arm/arm64: Do not use kern_hyp_va() with
- kvm_vgic_global_state
+Date: Wed, 14 Mar 2018 16:50:24 +0000
+Subject: [PATCH v6 01/26] arm64: alternatives: Add dynamic patching feature
 In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
 References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-7-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_vgic_global_state is part of the read-only section, and is
-usually accessed using a PC-relative address generation (adrp + add).
+We've so far relied on a patching infrastructure that only gave us
+a single alternative, without any way to provide a range of potential
+replacement instructions. For a single feature, this is an all or
+nothing thing.
 
-It is thus useless to use kern_hyp_va() on it, and actively problematic
-if kern_hyp_va() becomes non-idempotent. On the other hand, there is
-no way that the compiler is going to guarantee that such access is
-always PC relative.
+It would be interesting to have a more flexible grained way of patching
+the kernel though, where we could dynamically tune the code that gets
+injected.
 
-So let's bite the bullet and provide our own accessor.
+In order to achive this, let's introduce a new form of dynamic patching,
+assiciating a callback to a patching site. This callback gets source and
+target locations of the patching request, as well as the number of
+instructions to be patched.
 
+Dynamic patching is declared with the new ALTERNATIVE_CB and alternative_cb
+directives:
+
+	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
+		     : "r" (v));
+or
+	alternative_cb callback
+		mov	x0, #0
+	alternative_cb_end
+
+where callback is the C function computing the alternative.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  7 +++++++
- arch/arm64/include/asm/kvm_mmu.h | 20 ++++++++++++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c    |  4 ++--
- 3 files changed, 29 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/alternative.h | 41 ++++++++++++++++++++++++++++++----
+ arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++---------
+ 2 files changed, 69 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index de1b919404e4..a6808d2869f5 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -28,6 +28,13 @@
-  */
- #define kern_hyp_va(kva)	(kva)
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index 669028172fd6..a91933b1e2e6 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -5,6 +5,8 @@
+ #include <asm/cpucaps.h>
+ #include <asm/insn.h>
  
-+/* Resolving symbol addresses in a PC-relative way is easy... */
-+#define hyp_symbol_addr(s)						\
-+	({								\
-+		typeof(s) *addr = &(s);					\
-+		addr;							\
-+	})
++#define ARM64_CB_PATCH ARM64_NCAPS
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/init.h>
+@@ -22,12 +24,19 @@ struct alt_instr {
+ 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+ };
+ 
++typedef void (*alternative_cb_t)(struct alt_instr *alt,
++				 __le32 *origptr, __le32 *updptr, int nr_inst);
++
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
+ 
+-#define ALTINSTR_ENTRY(feature)						      \
++#define ALTINSTR_ENTRY(feature,cb)					      \
+ 	" .word 661b - .\n"				/* label           */ \
++	" .if " __stringify(cb) " == 0\n"				      \
+ 	" .word 663f - .\n"				/* new instruction */ \
++	" .else\n"							      \
++	" .word " __stringify(cb) "- .\n"		/* callback */	      \
++	" .endif\n"							      \
+ 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
+ 	" .byte 662b-661b\n"				/* source len      */ \
+ 	" .byte 664f-663f\n"				/* replacement len */
+@@ -45,15 +54,18 @@ void apply_alternatives(void *start, size_t length);
+  * but most assemblers die if insn1 or insn2 have a .inst. This should
+  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
+  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
++ *
++ * Alternatives with callbacks do not generate replacement instructions.
+  */
+-#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
++#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled, cb)	\
+ 	".if "__stringify(cfg_enabled)" == 1\n"				\
+ 	"661:\n\t"							\
+ 	oldinstr "\n"							\
+ 	"662:\n"							\
+ 	".pushsection .altinstructions,\"a\"\n"				\
+-	ALTINSTR_ENTRY(feature)						\
++	ALTINSTR_ENTRY(feature,cb)					\
+ 	".popsection\n"							\
++	" .if " __stringify(cb) " == 0\n"				\
+ 	".pushsection .altinstr_replacement, \"a\"\n"			\
+ 	"663:\n\t"							\
+ 	newinstr "\n"							\
+@@ -61,11 +73,17 @@ void apply_alternatives(void *start, size_t length);
+ 	".popsection\n\t"						\
+ 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
+ 	".org	. - (662b-661b) + (664b-663b)\n"			\
++	".else\n\t"							\
++	"663:\n\t"							\
++	"664:\n\t"							\
++	".endif\n"							\
+ 	".endif\n"
+ 
+ #define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
+-	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
++	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
+ 
++#define ALTERNATIVE_CB(oldinstr, cb) \
++	__ALTERNATIVE_CFG(oldinstr, "NOT_AN_INSTRUCTION", ARM64_CB_PATCH, 1, cb)
+ #else
+ 
+ #include <asm/assembler.h>
+@@ -132,6 +150,14 @@ void apply_alternatives(void *start, size_t length);
+ 661:
+ .endm
+ 
++.macro alternative_cb cb
++	.set .Lasm_alt_mode, 0
++	.pushsection .altinstructions, "a"
++	altinstruction_entry 661f, \cb, ARM64_CB_PATCH, 662f-661f, 0
++	.popsection
++661:
++.endm
 +
  /*
-  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
+  * Provide the other half of the alternative code sequence.
   */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e3bc1d0a5e93..7120bf3f22c7 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -110,6 +110,26 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- 
- #define kern_hyp_va(v) 	((typeof(v))(__kern_hyp_va((unsigned long)(v))))
+@@ -157,6 +183,13 @@ void apply_alternatives(void *start, size_t length);
+ 	.org	. - (662b-661b) + (664b-663b)
+ .endm
  
 +/*
-+ * Obtain the PC-relative address of a kernel symbol
-+ * s: symbol
-+ *
-+ * The goal of this macro is to return a symbol's address based on a
-+ * PC-relative computation, as opposed to a loading the VA from a
-+ * constant pool or something similar. This works well for HYP, as an
-+ * absolute VA is guaranteed to be wrong. Only use this if trying to
-+ * obtain the address of a symbol (i.e. not something you obtained by
-+ * following a pointer).
++ * Callback-based alternative epilogue
 + */
-+#define hyp_symbol_addr(s)						\
-+	({								\
-+		typeof(s) *addr;					\
-+		asm volatile("adrp	%0, %1\n"			\
-+			     "add	%0, %0, :lo12:%1\n"		\
-+			     : "=r" (addr) : "S" (&s));			\
-+		addr;							\
-+	})
++.macro alternative_cb_end
++662:
++.endm
 +
  /*
-  * We currently only support a 40bit IPA.
-  */
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 4fe6e797e8b3..a6ca049d9651 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -26,7 +26,7 @@
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+  * Provides a trivial alternative or default sequence consisting solely
+  * of NOPs. The number of NOPs is chosen automatically to match the
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 414288a558c8..5c4bce4ac381 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -107,32 +107,53 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
+ 	return insn;
+ }
+ 
++static void patch_alternative(struct alt_instr *alt,
++			      __le32 *origptr, __le32 *updptr, int nr_inst)
++{
++	__le32 *replptr;
++	int i;
++
++	replptr = ALT_REPL_PTR(alt);
++	for (i = 0; i < nr_inst; i++) {
++		u32 insn;
++
++		insn = get_alt_insn(alt, origptr + i, replptr + i);
++		updptr[i] = cpu_to_le32(insn);
++	}
++}
++
+ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
  {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
-+	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
- 	u32 elrsr0, elrsr1;
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+-	__le32 *origptr, *replptr, *updptr;
++	__le32 *origptr, *updptr;
++	alternative_cb_t alt_cb;
  
- 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-@@ -140,7 +140,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		return -1;
+ 	for (alt = region->begin; alt < region->end; alt++) {
+-		u32 insn;
+-		int i, nr_inst;
++		int nr_inst;
  
- 	rd = kvm_vcpu_dabt_get_rd(vcpu);
--	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
-+	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
- 	addr += fault_ipa - vgic->vgic_cpu_base;
+-		if (!cpus_have_cap(alt->cpufeature))
++		/* Use ARM64_CB_PATCH as an unconditional patch */
++		if (alt->cpufeature < ARM64_CB_PATCH &&
++		    !cpus_have_cap(alt->cpufeature))
+ 			continue;
  
- 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
+-		BUG_ON(alt->alt_len != alt->orig_len);
++		if (alt->cpufeature == ARM64_CB_PATCH)
++			BUG_ON(alt->alt_len != 0);
++		else
++			BUG_ON(alt->alt_len != alt->orig_len);
+ 
+ 		pr_info_once("patching kernel code\n");
+ 
+ 		origptr = ALT_ORIG_PTR(alt);
+-		replptr = ALT_REPL_PTR(alt);
+ 		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
+-		nr_inst = alt->alt_len / sizeof(insn);
++		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
+ 
+-		for (i = 0; i < nr_inst; i++) {
+-			insn = get_alt_insn(alt, origptr + i, replptr + i);
+-			updptr[i] = cpu_to_le32(insn);
+-		}
++		if (alt->cpufeature < ARM64_CB_PATCH)
++			alt_cb = patch_alternative;
++		else
++			alt_cb  = ALT_REPL_PTR(alt);
++
++		alt_cb(alt, origptr, updptr, nr_inst);
+ 
+ 		flush_icache_range((uintptr_t)origptr,
+ 				   (uintptr_t)(origptr + nr_inst));
 -- 
 2.14.2
