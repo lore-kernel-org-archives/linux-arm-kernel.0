@@ -1,40 +1,43 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 14 Mar 2018 13:08:15 +0000
-Subject: [PATCH 17/37] iommu/arm-smmu-v3: Move context descriptor code
-In-Reply-To: <20180309124445.00005e08@huawei.com>
+Date: Wed, 14 Mar 2018 13:08:25 +0000
+Subject: [PATCH 27/37] iommu/arm-smmu-v3: Register fault workqueue
+In-Reply-To: <20180308184454.00000b4e@huawei.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-18-jean-philippe.brucker@arm.com>
- <20180309124445.00005e08@huawei.com>
-Message-ID: <04ae7f27-08b3-47c1-3d62-6dcc1fe79c1f@arm.com>
+ <20180212183352.22730-28-jean-philippe.brucker@arm.com>
+ <20180308184454.00000b4e@huawei.com>
+Message-ID: <78551b46-2a54-76cf-da61-72aeae4b0002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/18 11:44, Jonathan Cameron wrote:
-> On Mon, 12 Feb 2018 18:33:32 +0000
-> Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
+On 08/03/18 17:44, Jonathan Cameron wrote:
+>> @@ -3168,6 +3260,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> +	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
+>> +		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
+>> +		ret = iommu_fault_queue_register(&smmu->faultq_nb);
+> Here you register only if this smmu supports stalls or pri which is fine, but
+> see the unregister path.
 > 
->> In order to add support for substream ID, move the context descriptor code
->> into a separate library. At the moment it only manages context descriptor
->> 0, which is used for non-PASID translations.
->>
->> One important behavior change is the ASID allocator, which is now global
->> instead of per-SMMU. If we end up needing per-SMMU ASIDs after all, it
->> would be relatively simple to move back to per-device allocator instead
->> of a global one. Sharing ASIDs will require an IDR, so implement the
->> ASID allocator with an IDA instead of porting the bitmap, to ease the
->> transition.
->>
->> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Hi Jean-Philippe,
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>>  	/* And we're up. Go go go! */
+>>  	ret = iommu_device_sysfs_add(&smmu->iommu, dev, NULL,
+>>  				     "smmu3.%pa", &ioaddr);
+>> @@ -3210,6 +3309,8 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>  {
+>>  	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+>>  
+>> +	iommu_fault_queue_unregister(&smmu->faultq_nb);
 > 
-> This would have been easier to review if split into a 'move' and additional
-> patches actually making the changes described.
-> 
-> Superficially it looks like there may be more going on in here than the
-> above description suggests.  I'm unsure why we are gaining 
-> the CFGI_CD_ALL and similar in this patch as there is just to much going on.
+> Here you unregister from the fault queue unconditionally.  That is mostly
+> safe but it seems to decrement and potentially destroy the work queue that
+> is in use by another smmu instance that does support page faulting.
 
-Ok I'll try to split this
+Ah yes, we'll need to check this
 
 Thanks,
 Jean
