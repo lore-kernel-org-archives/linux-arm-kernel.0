@@ -1,33 +1,45 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 14 Mar 2018 15:54:50 +0100
-Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
-References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
- <20180314141323.GD23100@dhcp22.suse.cz>
- <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
-Message-ID: <20180314145450.GI23100@dhcp22.suse.cz>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 14 Mar 2018 18:17:17 +0300
+Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
+ PMIC for DDR Backup Power
+In-Reply-To: <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
+References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
+ <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
-> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
-> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
-> > fix your issue? From the debugging info you provided it should because
-> > the patch prevents jumping backwards.
-> >
-> 
-> The patch does fix the boot hang.
-> 
-> But I am concerned that we are papering over a fundamental flaw in
-> memblock_next_valid_pfn().
+Hello!
 
-It seems that memblock_next_valid_pfn is doing the right thing here. It
-is the alignment which moves the pfn back AFAICS. I am not really
-impressed about the original patch either, to be completely honest.
-It just looks awfully tricky. I still didn't manage to wrap my head
-around the original issue though so I do not have much better ideas to
-be honest.
--- 
-Michal Hocko
-SUSE Labs
+On 03/14/2018 03:09 PM, Geert Uytterhoeven wrote:
+
+> On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
+> need to be kept powered when backup mode is enabled.  Reflect this in
+> the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
+> 
+> The accessory power switch (SW23) is a toggle switch, hense specify
+> "rohm,rstbmode-level".
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v2:
+>   - Add rohm,rstbmode-level.
+> ---
+>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> index 2a7f36abd2dd85c6..80794c38c2669d75 100644
+> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> @@ -376,6 +376,8 @@
+>  		#interrupt-cells = <2>;
+>  		gpio-controller;
+>  		#gpio-cells = <2>;
+> +		rohm,ddr-backup-power = <15>;
+
+  Why not 0xf if those are all bit flags?
+
+[...]
+
+MBR, Sergei
