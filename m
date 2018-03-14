@@ -1,43 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 14 Mar 2018 18:11:06 +0100 (CET)
-Subject: [PATCH 0/3] irqchip: GIC kexec/kdump improvement and workarounds
-In-Reply-To: <20180314165708.daoui66waxvicciq@lakrids.cambridge.arm.com>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
- <20180313175156.gmncij4rnqcdl5ie@lakrids.cambridge.arm.com>
- <72c7a6d2-a4c4-26b2-2982-c1d1ffb39b81@arm.com>
- <20180314165708.daoui66waxvicciq@lakrids.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.21.1803141808350.2481@nanos.tec.linutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Mar 2018 17:19:15 +0000
+Subject: [PATCH v6 00/25] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM)
+In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20180314171914.tdwtppsvjsgxiqlv@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Mar 2018, Mark Rutland wrote:
-> On Tue, Mar 13, 2018 at 06:35:07PM +0000, Marc Zyngier wrote:
-> > On 13/03/18 17:51, Mark Rutland wrote:
-> > > On Tue, Mar 13, 2018 at 05:21:00PM +0000, Marc Zyngier wrote:
-> > >> As kexec and kdump are getting used a bit more intensively, I've been
-> > >> made aware of a number of shortcomings.
-> > >>
-> > >> The main gripe is from folks trying to launch a kdump kernel from
-> > >> within an interrupt handler. If using EOImode==1, things work as
-> > >> expected. If using EOImode==0 (such as in a guest), the secondary
-> > >> kernel hangs as the previous interrupt hasn't been EOI'd, and the
-> > >> active priority is still set. The first two patches are addressing
-> > >> this situation for both GICv2 and GICv3 by reseting the APRs to their
-> > >> default value.
-> > > 
-> > > As a more general thing, if irqchip drivers have state that needs to be
-> > > reset in their init code, can we live all this irqchip reset to the
-> > > crashdump kernel, and kill machine_kexec_mask_interrupts() entirely?
-> > 
-> > We could, once we know for sure that all the potential irqchips have
-> > been fixed. Or we could just remove it immediately, and see what breaks.
-> 
-> I would be very tempted to do the latter.
+Hi Ulf,
 
-Makes sense. Do we have any indicator that tells us that a particular irq
-chip is missing something in the init code or do we have to rely on crash
-reports?
+On Wed, Mar 14, 2018 at 05:58:10PM +0100, Ulf Hansson wrote:
+> For ARM, the PSCI firmware interface may be managing the power to the CPUs.
+> Depending on the SoC, CPUs may also be arranged in hierarchical manner, which
+> could add another level of complexity from a CPU idle management point of view.
+> 
+> PSCI v1.0+ adds support for the so called OS initiated CPU suspend mode, which
+> enables a more fine grained method, allowing Linux to get more control, in
+> regards to being energy efficient. This is typically useful for these kind of
+> complex battery driven platforms.
+
+> The series is based on v4.16-rc5, but applies also as of today to Rafael's
+> linux-pm.git next branch. The code has been tested on a QCOM 410c dragonboard
+> and I except that test coverage should be increased by some more boards
+> shortly (for ARM64 with PSCI OSI support - only a few DT changes are needed).
+
+Do we have any numbers to show how this affects energy efficiency?
+
+Are there any other platforms with OSI support?
 
 Thanks,
-
-	tglx
+Mark.
