@@ -1,24 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Mar 2018 09:26:09 -0700
-Subject: [PATCH] ASoC: uniphier: evea: add switch for changing source of
- line-in
-In-Reply-To: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
-References: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180314162609.GV2186@sirena.org.uk>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Wed, 14 Mar 2018 17:29:59 +0100
+Subject: [PATCH v2 0/2] Introduce STM32MP1 Reset driver
+Message-ID: <1521045001-30788-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 09:39:00PM +0900, Katsuhiro Suzuki wrote:
-> This patch adds mixer switch for changing audio source of line-in.
-> We can choose one of LIN1, 2, 3, default is LIN1.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-I'll apply for now but this should really be a DAPM control so that we
-can power down things connected to the disconnected line inputs when
-recording.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180314/81ff8062/attachment.sig>
+v2:
+Don't use reset-simple driver but a custom reset driver.
+add dt-binding documentation.
+
+This patch-set enables the reset of STM32MP1.
+STM32MP1 reset IP has a register to assert by writing '1' and another
+register to de-assert by writing '1'.
+
+The patch 'dt-bindings: reset: add STM32MP1 resets' could be squashed
+with the patch:
+'dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings'
+commit 3830681d354f
+
+Gabriel Fernandez (2):
+  dt-bindings: reset: add STM32MP1 resets
+  reset: stm32mp1: Enable stm32mp1 reset driver
+
+ .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |   6 +
+ drivers/reset/Kconfig                              |   6 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-stm32mp1.c                     | 122 +++++++++++++++++++++
+ include/dt-bindings/reset/stm32mp1-resets.h        | 108 ++++++++++++++++++
+ 5 files changed, 243 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
+ create mode 100644 drivers/reset/reset-stm32mp1.c
+ create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
+
+-- 
+1.9.1
