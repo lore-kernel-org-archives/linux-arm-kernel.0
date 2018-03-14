@@ -1,61 +1,66 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Mar 2018 11:10:48 +0100
-Subject: [PATCH] ARM: dts: exynos: Add #sound-dai-cells property to
- exynos5250 i2s nodes
-In-Reply-To: <20180313171220.26333-1-s.nawrocki@samsung.com>
-References: <CGME20180313171232epcas1p4425993ba6042b06051cc7590d3dbeab4@epcas1p4.samsung.com>
- <20180313171220.26333-1-s.nawrocki@samsung.com>
-Message-ID: <4258f14d-ee0e-48b5-9674-e8e93d2aff69@samsung.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 14 Mar 2018 11:16:32 +0100
+Subject: [PATCH] ARM: dts: sun8i-h3: Add Mali node
+In-Reply-To: <20180314080500.whywwskhp5546z7m@flea>
+References: <1520936205-64723-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180314080500.whywwskhp5546z7m@flea>
+Message-ID: <1269750b-5190-a167-8d34-91794e6d0a8c@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2018 06:12 PM, Sylwester Nawrocki wrote:
-> The #sound-dai-cells property may be required to reference the CPU DAI
-> properly. This change is required for Snow HDMI audio.
+Hi,
+
+Il 14/03/2018 09:05, Maxime Ripard ha scritto:
+> On Tue, Mar 13, 2018 at 11:16:45AM +0100, Giulio Benetti wrote:
+>> The H3 has an ARM Mali 400 GPU, so add binding to our DT.
+>>
+>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> How was this tested?
 
-There is
+I wanted you asked me about this to ask you:
+if I can't test it on HW, but others tested it all around,
+for example using this patch:
+https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/32-h3-DT-add-mali-node.patch
 
-Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Is it enough? Or do I have to test it directly?
+Or maybe I can invite those people to tag this patch as tested-by ?
 
-tag missing here.
-
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index ebc79114b0ce..45283a6c5eee 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -499,6 +499,7 @@
->  			pinctrl-0 = <&i2s0_bus>;
->  			power-domains = <&pd_mau>;
->  			#clock-cells = <1>;
-> +			#sound-dai-cells = <1>;
->  		};
->  
->  		i2s1: i2s at 12d60000 {
-> @@ -513,6 +514,7 @@
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&i2s1_bus>;
->  			power-domains = <&pd_mau>;
-> +			#sound-dai-cells = <1>;
->  		};
->  
->  		i2s2: i2s at 12d70000 {
-> @@ -527,6 +529,7 @@
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&i2s2_bus>;
->  			power-domains = <&pd_mau>;
-> +			#sound-dai-cells = <1>;
->  		};
->  
->  		usb_dwc3 {
+> Is there any specific reason not to share it with the H5?
+
+Yes, H5 has dual GPU but quad PP and on IRQ you can clearly see:
+- GPU_GP
+- GPU_GPMMU
+- GPU_PMU
+- GPU_PP
+- GPU_PP0
+- GPU_PPMMU0
+- GPU_PP1
+- GPU_PPMMU1
+- GPU_PP2
+- GPU_PPMMU2
+- GPU_PP3
+- GPU_PPMMU3
+
+So I think they should be placed in specific dts files.
+What do you think?
+
+Thanks
+
+> 
+> Maxime
 > 
 
 
 -- 
-Sylwester Nawrocki
-Samsung R&D Institute Poland
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
