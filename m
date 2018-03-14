@@ -1,217 +1,173 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:39 +0000
-Subject: [PATCH v6 16/26] arm64: KVM: Introduce EL2 VA randomisation
+Date: Wed, 14 Mar 2018 16:50:46 +0000
+Subject: [PATCH v6 23/26] arm/arm64: KVM: Introduce EL2-specific executable
+ mappings
 In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
 References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-17-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main idea behind randomising the EL2 VA is that we usually have
-a few spare bits between the most significant bit of the VA mask
-and the most significant bit of the linear mapping.
+Until now, all EL2 executable mappings were derived from their
+EL1 VA. Since we want to decouple the vectors mapping from
+the rest of the hypervisor, we need to be able to map some
+text somewhere else.
 
-Those bits could be a bunch of zeroes, and could be useful
-to move things around a bit. Of course, the more memory you have,
-the less randomisation you get...
+The "idmap" region (for lack of a better name) is ideally suited
+for this, as we have a huge range that hardly has anything in it.
 
-Alternatively, these bits could be the result of KASLR, in which
-case they are already random. But it would be nice to have a
-*different* randomization, just to make the job of a potential
-attacker a bit more difficult.
+Let's extend the IO allocator to also deal with executable mappings,
+thus providing the required feature.
 
-Inserting these random bits is a bit involved. We don't have a spare
-register (short of rewriting all the kern_hyp_va call sites), and
-the immediate we want to insert is too random to be used with the
-ORR instruction. The best option I could come up with is the following
-sequence:
-
-	and x0, x0, #va_mask
-	ror x0, x0, #first_random_bit
-	add x0, x0, #(random & 0xfff)
-	add x0, x0, #(random >> 12), lsl #12
-	ror x0, x0, #(63 - first_random_bit)
-
-making it a fairly long sequence, but one that a decent CPU should
-be able to execute without breaking a sweat. It is of course NOPed
-out on VHE. The last 4 instructions can also be turned into NOPs
-if it appears that there is no free bits to use.
-
-Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 12 +++++--
- arch/arm64/kvm/va_layout.c       | 76 +++++++++++++++++++++++++++++++++++++---
- virt/kvm/arm/mmu.c               |  2 +-
- 3 files changed, 82 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  2 +
+ arch/arm64/include/asm/kvm_mmu.h |  2 +
+ virt/kvm/arm/mmu.c               | 80 +++++++++++++++++++++++++++++-----------
+ 3 files changed, 63 insertions(+), 21 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 26eb6b1cec9b..1b7f592eae57 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -56,6 +56,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr);
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr);
+ void free_hyp_pgds(void);
+ 
+ void stage2_unmap_vm(struct kvm *kvm);
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index c4934470403b..a5e0fc900de8 100644
+index c2beb2d25170..97af11065bbd 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -85,7 +85,11 @@
-  */
- .macro kern_hyp_va	reg
- alternative_cb kvm_update_va_mask
--	and     \reg, \reg, #1
-+	and     \reg, \reg, #1		/* mask with va_mask */
-+	ror	\reg, \reg, #1		/* rotate to the first tag bit */
-+	add	\reg, \reg, #0		/* insert the low 12 bits of the tag */
-+	add	\reg, \reg, #0, lsl 12	/* insert the top 12 bits of the tag */
-+	ror	\reg, \reg, #63		/* rotate back */
- alternative_cb_end
- .endm
+@@ -151,6 +151,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr);
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr);
+ void free_hyp_pgds(void);
  
-@@ -102,7 +106,11 @@ void kvm_update_va_mask(struct alt_instr *alt,
- 
- static inline unsigned long __kern_hyp_va(unsigned long v)
- {
--	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
-+	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
-+				    "ror %0, %0, #1\n"
-+				    "add %0, %0, #0\n"
-+				    "add %0, %0, #0, lsl 12\n"
-+				    "ror %0, %0, #63\n",
- 				    kvm_update_va_mask)
- 		     : "+r" (v));
- 	return v;
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-index 2bcbc1d33b64..8b23f6cdb0d6 100644
---- a/arch/arm64/kvm/va_layout.c
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -16,24 +16,60 @@
-  */
- 
- #include <linux/kvm_host.h>
-+#include <linux/random.h>
-+#include <linux/memblock.h>
- #include <asm/alternative.h>
- #include <asm/debug-monitors.h>
- #include <asm/insn.h>
- #include <asm/kvm_mmu.h>
- 
-+/*
-+ * The LSB of the random hyp VA tag or 0 if no randomization is used.
-+ */
-+static u8 tag_lsb;
-+/*
-+ * The random hyp VA tag value with the region bit if hyp randomization is used
-+ */
-+static u64 tag_val;
- static u64 va_mask;
- 
- static void compute_layout(void)
- {
- 	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
- 	u64 hyp_va_msb;
-+	int kva_msb;
- 
- 	/* Where is my RAM region? */
- 	hyp_va_msb  = idmap_addr & BIT(VA_BITS - 1);
- 	hyp_va_msb ^= BIT(VA_BITS - 1);
- 
--	va_mask  = GENMASK_ULL(VA_BITS - 2, 0);
--	va_mask |= hyp_va_msb;
-+	kva_msb = fls64((u64)phys_to_virt(memblock_start_of_DRAM()) ^
-+			(u64)(high_memory - 1));
-+
-+	if (kva_msb == (VA_BITS - 1)) {
-+		/*
-+		 * No space in the address, let's compute the mask so
-+		 * that it covers (VA_BITS - 1) bits, and the region
-+		 * bit. The tag stays set to zero.
-+		 */
-+		va_mask  = BIT(VA_BITS - 1) - 1;
-+		va_mask |= hyp_va_msb;
-+	} else {
-+		/*
-+		 * We do have some free bits to insert a random tag.
-+		 * Hyp VAs are now created from kernel linear map VAs
-+		 * using the following formula (with V == VA_BITS):
-+		 *
-+		 *  63 ... V |     V-1    | V-2 .. tag_lsb | tag_lsb - 1 .. 0
-+		 *  ---------------------------------------------------------
-+		 * | 0000000 | hyp_va_msb |    random tag  |  kern linear VA |
-+		 */
-+		tag_lsb = kva_msb;
-+		va_mask = GENMASK_ULL(tag_lsb - 1, 0);
-+		tag_val = get_random_long() & GENMASK_ULL(VA_BITS - 2, tag_lsb);
-+		tag_val |= hyp_va_msb;
-+		tag_val >>= tag_lsb;
-+	}
- }
- 
- static u32 compute_instruction(int n, u32 rd, u32 rn)
-@@ -46,6 +82,33 @@ static u32 compute_instruction(int n, u32 rd, u32 rn)
- 							  AARCH64_INSN_VARIANT_64BIT,
- 							  rn, rd, va_mask);
- 		break;
-+
-+	case 1:
-+		/* ROR is a variant of EXTR with Rm = Rn */
-+		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
-+					     rn, rn, rd,
-+					     tag_lsb);
-+		break;
-+
-+	case 2:
-+		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
-+						    tag_val & GENMASK(11, 0),
-+						    AARCH64_INSN_VARIANT_64BIT,
-+						    AARCH64_INSN_ADSB_ADD);
-+		break;
-+
-+	case 3:
-+		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
-+						    tag_val & GENMASK(23, 12),
-+						    AARCH64_INSN_VARIANT_64BIT,
-+						    AARCH64_INSN_ADSB_ADD);
-+		break;
-+
-+	case 4:
-+		/* ROR is a variant of EXTR with Rm = Rn */
-+		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
-+					     rn, rn, rd, 64 - tag_lsb);
-+		break;
- 	}
- 
- 	return insn;
-@@ -56,8 +119,7 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
- {
- 	int i;
- 
--	/* We only expect a single instruction in the alternative sequence */
--	BUG_ON(nr_inst != 1);
-+	BUG_ON(nr_inst != 5);
- 
- 	if (!has_vhe() && !va_mask)
- 		compute_layout();
-@@ -68,8 +130,12 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
- 		/*
- 		 * VHE doesn't need any address translation, let's NOP
- 		 * everything.
-+		 *
-+		 * Alternatively, if we don't have any spare bits in
-+		 * the address, NOP everything after masking that
-+		 * kernel VA.
- 		 */
--		if (has_vhe()) {
-+		if (has_vhe() || (!tag_lsb && i > 0)) {
- 			updptr[i] = aarch64_insn_gen_nop();
- 			continue;
- 		}
+ void stage2_unmap_vm(struct kvm *kvm);
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index a9577ecc3e6a..b4d1948c8dd6 100644
+index b4d1948c8dd6..554ad5493e7d 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1893,7 +1893,7 @@ int kvm_mmu_init(void)
- 		  kern_hyp_va((unsigned long)high_memory - 1));
+@@ -737,30 +737,13 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+ 	return 0;
+ }
  
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
--	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
-+	    hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
- 	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
- 		/*
- 		 * The idmap page is intersecting with the VA space,
+-/**
+- * create_hyp_io_mappings - Map IO into both kernel and HYP
+- * @phys_addr:	The physical start address which gets mapped
+- * @size:	Size of the region being mapped
+- * @kaddr:	Kernel VA for this mapping
+- * @haddr:	HYP VA for this mapping
+- */
+-int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-			   void __iomem **kaddr,
+-			   void __iomem **haddr)
++static int __create_hyp_private_mapping(phys_addr_t phys_addr, size_t size,
++					unsigned long *haddr, pgprot_t prot)
+ {
+ 	pgd_t *pgd = hyp_pgd;
+ 	unsigned long base;
+ 	int ret;
+ 
+-	*kaddr = ioremap(phys_addr, size);
+-	if (!*kaddr)
+-		return -ENOMEM;
+-
+-	if (is_kernel_in_hyp_mode()) {
+-		*haddr = *kaddr;
+-		return 0;
+-	}
+-
+ 	mutex_lock(&io_map_lock);
+ 
+ 	/*
+@@ -789,22 +772,77 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 
+ 	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
+ 				    base, base + size,
+-				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
++				    __phys_to_pfn(phys_addr), prot);
+ 	if (ret)
+ 		goto out;
+ 
+-	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
++	*haddr = base + offset_in_page(phys_addr);
+ 	io_map_base = base;
+ 
+ out:
+ 	mutex_unlock(&io_map_lock);
+ 
++	return ret;
++}
++
++/**
++ * create_hyp_io_mappings - Map IO into both kernel and HYP
++ * @phys_addr:	The physical start address which gets mapped
++ * @size:	Size of the region being mapped
++ * @kaddr:	Kernel VA for this mapping
++ * @haddr:	HYP VA for this mapping
++ */
++int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
++			   void __iomem **kaddr,
++			   void __iomem **haddr)
++{
++	unsigned long addr;
++	int ret;
++
++	*kaddr = ioremap(phys_addr, size);
++	if (!*kaddr)
++		return -ENOMEM;
++
++	if (is_kernel_in_hyp_mode()) {
++		*haddr = *kaddr;
++		return 0;
++	}
++
++	ret = __create_hyp_private_mapping(phys_addr, size,
++					   &addr, PAGE_HYP_DEVICE);
+ 	if (ret) {
+ 		iounmap(*kaddr);
+ 		*kaddr = NULL;
++		*haddr = NULL;
++		return ret;
++	}
++
++	*haddr = (void __iomem *)addr;
++	return 0;
++}
++
++/**
++ * create_hyp_exec_mappings - Map an executable range into into HYP
++ * @phys_addr:	The physical start address which gets mapped
++ * @size:	Size of the region being mapped
++ * @haddr:	HYP VA for this mapping
++ */
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr)
++{
++	unsigned long addr;
++	int ret;
++
++	BUG_ON(is_kernel_in_hyp_mode());
++
++	ret = __create_hyp_private_mapping(phys_addr, size,
++					   &addr, PAGE_HYP_EXEC);
++	if (ret) {
++		*haddr = NULL;
+ 		return ret;
+ 	}
+ 
++	*haddr = (void *)addr;
+ 	return 0;
+ }
+ 
 -- 
 2.14.2
