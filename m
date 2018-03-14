@@ -1,72 +1,140 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 14 Mar 2018 09:42:26 +0000
-Subject: [PATCH 0/2] Introduce STM32MP1 Reset driver
-In-Reply-To: <1521018722.4490.1.camel@pengutronix.de>
-References: <1520958859-27911-1-git-send-email-gabriel.fernandez@st.com>
- <1521018722.4490.1.camel@pengutronix.de>
-Message-ID: <12ba9cee-f703-8fc7-75da-de213f5c8aa2@st.com>
+From: vkilari@codeaurora.org (vkilari at codeaurora.org)
+Date: Wed, 14 Mar 2018 15:27:35 +0530
+Subject: [PATCH v7 00/13] Support PPTT for ARM64
+In-Reply-To: <20180228220619.6992-1-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+Message-ID: <004d01d3bb7a$e5ec7700$b1c56500$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Jeremy,
 
-Okay, i too support the idea to add custom? reset driver.
+> -----Original Message-----
+> From: Jeremy Linton <jeremy.linton@arm.com>
+> Sent: Thursday, March 1, 2018 3:36 AM
+> To: linux-acpi at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; sudeep.holla at arm.com;
+> lorenzo.pieralisi at arm.com; hanjun.guo at linaro.org; rjw at rjwysocki.net;
+> will.deacon at arm.com; catalin.marinas at arm.com;
+> gregkh at linuxfoundation.org; mark.rutland at arm.com; linux-
+> kernel at vger.kernel.org; linux-riscv at lists.infradead.org;
+> wangxiongfeng2 at huawei.com; vkilari at codeaurora.org; ahs3 at redhat.com;
+> dietmar.eggemann at arm.com; morten.rasmussen at arm.com;
+> palmer at sifive.com; lenb at kernel.org; john.garry at huawei.com;
+> austinwc at codeaurora.org; tnowicki at caviumnetworks.com; Jeremy Linton
+> <jeremy.linton@arm.com>
+> Subject: [PATCH v7 00/13] Support PPTT for ARM64
+> 
+> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+used to
+> describe the processor and cache topology. Ideally it is used to
+extend/override
+> information provided by the hardware, but right now ARM64 is entirely
+> dependent on firmware provided tables.
+> 
+> This patch parses the table for the cache topology and CPU topology.
+> When we enable ACPI/PPTT for arm64 we map the physical_id to the PPTT
+> node flagged as the physical package by the firmware.
+> This results in topologies that match what the remainder of the system
+expects.
+> To avoid inverted scheduler domains we then set the MC domain equal to the
+> largest cache within the socket below the NUMA domain.
+> 
+> For example on juno:
+> [root at mammon-juno-rh topology]# lstopo-no-graphics
+>   Package L#0
+>     L2 L#0 (1024KB)
+>       L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>       L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>       L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>       L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>     L2 L#1 (2048KB)
+>       L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>       L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>   HostBridge L#0
+>     PCIBridge
+>       PCIBridge
+>         PCIBridge
+>           PCI 1095:3132
+>             Block(Disk) L#0 "sda"
+>         PCIBridge
+>           PCI 1002:68f9
+>             GPU L#1 "renderD128"
+>             GPU L#2 "card0"
+>             GPU L#3 "controlD64"
+>         PCIBridge
+>           PCI 11ab:4380
+>             Net L#4 "enp8s0"
+> 
+> Git tree at:
+> http://linux-arm.org/git?p=linux-jlinton.git
+> branch: pptt_v7
 
-Many Thanks Philipp.
+Tested this series and looks good
 
-Best regards
-
-Gabriel
-
-
-On 03/14/2018 10:12 AM, Philipp Zabel wrote:
-> Hi Gabriel,
->
-> On Tue, 2018-03-13 at 17:34 +0100, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> This patch-set enables the reset of STM32MP1.
->> It uses the reset simple driver by introducing the clear register offset
->> parameter.
->> STM32MP1 reset IP has a register to assert by writing '1' and another
->> register to de-assert by writing '1'.
->> The offset between this two registers is '0x4'.
-> I worry a bit about feature creep in the simple-reset driver.
-> Your patch on its own is simple enough, and I'm not opposed to add a
-> SET/CLR feature on principle, but there are a few issues:
->
-> The RESET_SIMPLE Kconfig description currently says:
->  ??"This enables a simple reset controller driver for reset lines that
->  ???that can be asserted and deasserted by toggling bits in a contiguous,
->  ???exclusive register space."
-> That would have to be extended to mention SET/CLR register pairs as an
-> alternative.
->
-> What about status (reset_simple_status)? Can current reset line status
-> be read back from the SET register, as is currently tried? If not, is
-> there a way to read current reset line status back at all?
->
-> The data->lock spinlock is only needed to protect the read-modify-write
-> cycle on a toggle register, for separate SET/CLR register access the
-> locking is not necessary.
->
-> At this point, it may or may not be easier to add a custom reset driver.
-> Either way you go, this is missing binding documentation for the
-> st,stm32mp1-rcc compatible in Documentation/devicetree/bindings/reset.
->
->> The patch 'dt-bindings: reset: add STM32MP1 resets' could be squashed
->> with the patch:
->> 'dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings'
->> commit 3830681d354f
->>
->> Gabriel Fernandez (2):
->>    dt-bindings: reset: add STM32MP1 resets
->>    reset: simple: Enable stm32mp1 reset driver
->>
->>   drivers/reset/reset-simple.c                |  27 +++++--
->>   drivers/reset/reset-simple.h                |   1 +
->>   include/dt-bindings/reset/stm32mp1-resets.h | 108 ++++++++++++++++++++++++++++
->>   3 files changed, 130 insertions(+), 6 deletions(-)
->>   create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
-> regards
-> Philipp
+Tested by: Vijaya Kumar K <vkilari@codeaurora.org>
+> 
+> v6->v7:
+> Add additional patch to use the last cache level within the NUMA
+>   or socket as the MC domain. This assures the MC domain is
+>   equal or smaller than the DIE.
+> 
+> Various formatting/etc review comments.
+> 
+> Rebase to 4.16rc2
+> 
+> v5->v6:
+> Add additional patches which re-factor how the initial DT code sets
+>   up the cacheinfo structure so that its not as dependent on the
+>   of_node stored in that tree. Once that is done we rename it
+>   for use with the ACPI code.
+> 
+> Additionally there were a fair number of minor name/location/etc
+>   tweaks scattered about made in response to review comments.
+> 
+> v4->v5:
+> Update the cache type from NOCACHE to UNIFIED when all the cache
+>   attributes we update are valid. This fixes a problem where caches
+>   which are entirely created by the PPTT don't show up in lstopo.
+> 
+> Give the PPTT its own firmware_node in the cache structure instead of
+>   sharing it with the of_node.
+> 
+> Move some pieces around between patches.
+> 
+> (see previous cover letters for futher changes)
+> 
+> Jeremy Linton (13):
+>   drivers: base: cacheinfo: move cache_setup_of_node()
+>   drivers: base: cacheinfo: setup DT cache properties early
+>   cacheinfo: rename of_node to fw_token
+>   arm64/acpi: Create arch specific cpu to acpi id helper
+>   ACPI/PPTT: Add Processor Properties Topology Table parsing
+>   ACPI: Enable PPTT support on ARM64
+>   drivers: base cacheinfo: Add support for ACPI based firmware tables
+>   arm64: Add support for ACPI based firmware tables
+>   ACPI/PPTT: Add topology parsing code
+>   arm64: topology: rename cluster_id
+>   arm64: topology: enable ACPI/PPTT based CPU topology
+>   ACPI: Add PPTT to injectable table list
+>   arm64: topology: divorce MC scheduling domain from core_siblings
+> 
+>  arch/arm64/Kconfig                |   1 +
+>  arch/arm64/include/asm/acpi.h     |   4 +
+>  arch/arm64/include/asm/topology.h |   9 +-
+>  arch/arm64/kernel/cacheinfo.c     |  15 +-
+>  arch/arm64/kernel/topology.c      | 132 +++++++-
+>  arch/riscv/kernel/cacheinfo.c     |   1 -
+>  drivers/acpi/Kconfig              |   3 +
+>  drivers/acpi/Makefile             |   1 +
+>  drivers/acpi/pptt.c               | 642
+> ++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/tables.c             |   2 +-
+>  drivers/base/cacheinfo.c          | 157 +++++-----
+>  include/linux/acpi.h              |   4 +
+>  include/linux/cacheinfo.h         |  17 +-
+>  13 files changed, 882 insertions(+), 106 deletions(-)  create mode 100644
+> drivers/acpi/pptt.c
+> 
+> --
+> 2.13.6
