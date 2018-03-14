@@ -1,134 +1,63 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 14 Mar 2018 16:04:17 +0900
-Subject: [PATCH] pinctrl: uniphier: divide I2S and S/PDIF audio out
- pin-mux group
-In-Reply-To: <20180314063535.13303-1-suzuki.katsuhiro@socionext.com>
-References: <20180314063535.13303-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNASJ49LeFSG_WYoF_LJBAzyb4JSp9DENdG9s2u9gY=5Nwg@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 14 Mar 2018 17:43:12 +1030
+Subject: [PATCH] ARM: dts: aspeed: Add default memory node
+Message-ID: <20180314071312.17492-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-14 15:35 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch divides large pin-mux group 'aio' of UniPhier LD11/LD20
-> to 2 groups as following:
->   aout1   : 8ch I2S output: AO1DACCK, AO1BCK, AO1LRCK, AO1D[0-2]
->   aoutiec1: S/PDIF output : AO1IEC, AO1ARC
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
+When we removed the inclusion of skeleton.dtsi from the device trees, we
+broke booting for systems with bootloaders that aren't device tre aware.
+This can be seen, for example, when appending the device tree blob to
+the kernel image.
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+The reason booting broke was that the kernel lacked the device_type
+label in the memory node. Add in a default memory node wth the
+device_type. It can contain the memory address as the location is fixed
+for each SoC generation, but the size needs to be added by the
+bootloader or the board specific dts.
 
+Fixes: 73102d6fdc32 ("ARM: dts: aspeed: Remove skeleton.dtsi")
+Cc: <stable@vger.kernel.org>
+Reported-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+Arnd, can you please merge this as a fix for 4.16?
 
+ arch/arm/boot/dts/aspeed-g4.dtsi | 5 +++++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 5 +++++
+ 2 files changed, 10 insertions(+)
 
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 15 ++++++++++-----
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 15 ++++++++++-----
->  2 files changed, 20 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> index 8a5ecd6277d8..5ec5afa70413 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> @@ -470,8 +470,10 @@ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
->                              166, UNIPHIER_PIN_PULL_DOWN),
->  };
->
-> -static const unsigned aout_pins[] = {135, 136, 137, 138, 139, 140, 141, 142};
-> -static const int aout_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned aout1_pins[] = {137, 138, 139, 140, 141, 142};
-> +static const int aout1_muxvals[] = {0, 0, 0, 0, 0, 0};
-> +static const unsigned aoutiec1_pins[] = {135, 136};
-> +static const int aoutiec1_muxvals[] = {0, 0};
->  static const unsigned int emmc_pins[] = {19, 20, 21, 22, 23, 24, 25};
->  static const int emmc_muxvals[] = {0, 0, 0, 0, 0, 0, 0};
->  static const unsigned emmc_dat8_pins[] = {26, 27, 28, 29};
-> @@ -547,7 +549,8 @@ static const unsigned int gpio_range5_pins[] = {
->  };
->
->  static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
-> -       UNIPHIER_PINCTRL_GROUP(aout),
-> +       UNIPHIER_PINCTRL_GROUP(aout1),
-> +       UNIPHIER_PINCTRL_GROUP(aoutiec1),
->         UNIPHIER_PINCTRL_GROUP(emmc),
->         UNIPHIER_PINCTRL_GROUP(emmc_dat8),
->         UNIPHIER_PINCTRL_GROUP(ether_rmii),
-> @@ -573,7 +576,8 @@ static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
->         UNIPHIER_PINCTRL_GROUP_GPIO(gpio_range5),
->  };
->
-> -static const char * const aout_groups[] = {"aout"};
-> +static const char * const aout1_groups[] = {"aout1"};
-> +static const char * const aoutiec1_groups[] = {"aoutiec1"};
->  static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
->  static const char * const ether_rmii_groups[] = {"ether_rmii"};
->  static const char * const i2c0_groups[] = {"i2c0"};
-> @@ -592,7 +596,8 @@ static const char * const usb1_groups[] = {"usb1"};
->  static const char * const usb2_groups[] = {"usb2"};
->
->  static const struct uniphier_pinmux_function uniphier_ld11_functions[] = {
-> -       UNIPHIER_PINMUX_FUNCTION(aout),
-> +       UNIPHIER_PINMUX_FUNCTION(aout1),
-> +       UNIPHIER_PINMUX_FUNCTION(aoutiec1),
->         UNIPHIER_PINMUX_FUNCTION(emmc),
->         UNIPHIER_PINMUX_FUNCTION(ether_rmii),
->         UNIPHIER_PINMUX_FUNCTION(i2c0),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> index 3be7967edae0..eb5d4cc6a3ba 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> @@ -551,8 +551,10 @@ static const struct pinctrl_pin_desc uniphier_ld20_pins[] = {
->                              175, UNIPHIER_PIN_PULL_DOWN),
->  };
->
-> -static const unsigned aout_pins[] = {135, 136, 137, 138, 139, 140, 141, 142};
-> -static const int aout_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned aout1_pins[] = {137, 138, 139, 140, 141, 142};
-> +static const int aout1_muxvals[] = {0, 0, 0, 0, 0, 0};
-> +static const unsigned aoutiec1_pins[] = {135, 136};
-> +static const int aoutiec1_muxvals[] = {0, 0};
->  static const unsigned int emmc_pins[] = {19, 20, 21, 22, 23, 24, 25};
->  static const int emmc_muxvals[] = {0, 0, 0, 0, 0, 0, 0};
->  static const unsigned emmc_dat8_pins[] = {26, 27, 28, 29};
-> @@ -631,7 +633,8 @@ static const unsigned int gpio_range2_pins[] = {
->  };
->
->  static const struct uniphier_pinctrl_group uniphier_ld20_groups[] = {
-> -       UNIPHIER_PINCTRL_GROUP(aout),
-> +       UNIPHIER_PINCTRL_GROUP(aout1),
-> +       UNIPHIER_PINCTRL_GROUP(aoutiec1),
->         UNIPHIER_PINCTRL_GROUP(emmc),
->         UNIPHIER_PINCTRL_GROUP(emmc_dat8),
->         UNIPHIER_PINCTRL_GROUP(ether_rgmii),
-> @@ -657,7 +660,8 @@ static const struct uniphier_pinctrl_group uniphier_ld20_groups[] = {
->         UNIPHIER_PINCTRL_GROUP_GPIO(gpio_range2),
->  };
->
-> -static const char * const aout_groups[] = {"aout"};
-> +static const char * const aout1_groups[] = {"aout1"};
-> +static const char * const aoutiec1_groups[] = {"aoutiec1"};
->  static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
->  static const char * const ether_rgmii_groups[] = {"ether_rgmii"};
->  static const char * const ether_rmii_groups[] = {"ether_rmii"};
-> @@ -679,7 +683,8 @@ static const char * const usb2_groups[] = {"usb2"};
->  static const char * const usb3_groups[] = {"usb3"};
->
->  static const struct uniphier_pinmux_function uniphier_ld20_functions[] = {
-> -       UNIPHIER_PINMUX_FUNCTION(aout),
-> +       UNIPHIER_PINMUX_FUNCTION(aout1),
-> +       UNIPHIER_PINMUX_FUNCTION(aoutiec1),
->         UNIPHIER_PINMUX_FUNCTION(emmc),
->         UNIPHIER_PINMUX_FUNCTION(ether_rgmii),
->         UNIPHIER_PINMUX_FUNCTION(ether_rmii),
-> --
-> 2.16.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 36ae23aa3b48..518d2bc7c7fc 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -42,6 +42,11 @@
+ 		};
+ 	};
+ 
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0x40000000 0>;
++	};
++
+ 	ahb {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 17ee0fa33a14..f9917717dd08 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -42,6 +42,11 @@
+ 		};
+ 	};
+ 
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x80000000 0>;
++	};
++
+ 	ahb {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-Best Regards
-Masahiro Yamada
+2.15.1
