@@ -1,263 +1,92 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 14 Mar 2018 14:02:36 +0800
-Subject: [PATCH] usb: misc: supports Apple Carplay driver
-In-Reply-To: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1521007356-12306-2-git-send-email-chunfeng.yun@mediatek.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 14 Mar 2018 11:33:05 +0530
+Subject: [PATCH v5 09/36] drm/bridge: analogix_dp: Don't use fast link
+ training when panel just powered up
+In-Reply-To: <20180309222327.18689-10-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-10-enric.balletbo@collabora.com>
+Message-ID: <b8d58bba-ac1d-f9b5-fb7f-70a529c9a918@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is used to support Apple carplay feature by a debugfs
-interface which can force the driver to send a USB Vendor Request
-of "Apple Device to Host Mode Switch" to switch Apple Device
-into host mode.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/misc/Kconfig   |    9 ++
- drivers/usb/misc/Makefile  |    1 +
- drivers/usb/misc/carplay.c |  205 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 215 insertions(+)
- create mode 100644 drivers/usb/misc/carplay.c
 
-diff --git a/drivers/usb/misc/Kconfig b/drivers/usb/misc/Kconfig
-index 68d2f2c..c010c95 100644
---- a/drivers/usb/misc/Kconfig
-+++ b/drivers/usb/misc/Kconfig
-@@ -275,3 +275,12 @@ config USB_CHAOSKEY
- 
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called chaoskey.
-+
-+config USB_CARPLAY
-+	tristate "USB carplay driver support"
-+	help
-+	  The driver is used to support Apple carplay feature.
-+	  It is realized by sending a USB Vendor Request of "Apple Device to
-+	  Host Mode Switch" to switch Apple Device into host mode.
-+	  When the users want to use carplay, they can force the driver to send
-+	  this Vendor Request by a debugfs interface.
-diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
-index 109f54f..94380e7 100644
---- a/drivers/usb/misc/Makefile
-+++ b/drivers/usb/misc/Makefile
-@@ -29,5 +29,6 @@ obj-$(CONFIG_USB_HSIC_USB3503)		+= usb3503.o
- obj-$(CONFIG_USB_HSIC_USB4604)		+= usb4604.o
- obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
- 
-+obj-$(CONFIG_USB_CARPLAY)		+= carplay.o
- obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
- obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
-diff --git a/drivers/usb/misc/carplay.c b/drivers/usb/misc/carplay.c
-new file mode 100644
-index 0000000..bfd41f3
---- /dev/null
-+++ b/drivers/usb/misc/carplay.c
-@@ -0,0 +1,205 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * carplay.c - carplay usb driver
-+ *
-+ * Copyright (C) 2018 MediaTek Inc.
-+ *
-+ * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
-+ *
-+ */
-+
-+#include <linux/debugfs.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/seq_file.h>
-+#include <linux/uaccess.h>
-+#include <linux/usb.h>
-+
-+/*
-+ * usage:
-+ * The requirement for the platform using Carplay feature is that support
-+ * the USB Dual Role Switch feature, and must have a USB-A receptacle
-+ * that is capable of functioning in both USB Host and USB Device roles.
-+ *
-+ * 1. Apple iphone is enumerated as a usb device
-+ * 2. switch Apple iphone to host mode, by, e.g.
-+ *    echo host > /sys/kernel/debug/usb/carplay.1-1/mode
-+ * 3. switch the platform to device mode, but meanwhile should keep vbus alive;
-+ * 4. use carplay feature after the platform is enumerated as a usb device;
-+ * 5. when unplug usb cable, switch the platform back to host mode.
-+ *
-+ * step 2 is supported by this driver;
-+ * step 1, 3, 4, 5 should be supported by the USB Dual-Role Controller Driver
-+ *    on the platform.
-+ *
-+ * For more detailed information, please refer to "Chapter 46. USB Role Switch"
-+ * in MFI Accessroy Interface Specification.pdf
-+ */
-+
-+#define CARPLAY_NAME "carplay"
-+#define VENDER_REQ_DEV_TO_HOST 0x51
-+
-+struct usb_carplay {
-+	struct usb_interface *intf;
-+	struct usb_device *udev;
-+	struct dentry *droot;
-+	struct device *idev;
-+	bool is_host;
-+};
-+
-+static int carplay_switch_to_host(struct usb_carplay *ucp)
-+{
-+	struct usb_device *udev = ucp->udev;
-+	int retval;
-+
-+	if (!ucp->udev)
-+		return -ENODEV;
-+
-+	retval = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
-+			VENDER_REQ_DEV_TO_HOST, USB_TYPE_VENDOR,
-+			1, 0, NULL, 0, USB_CTRL_GET_TIMEOUT);
-+
-+	dev_dbg(ucp->idev, "%s retval = %d\n", __func__, retval);
-+
-+	if (retval != 0) {
-+		dev_err(ucp->idev, "%s fail retval = %d\n", __func__, retval);
-+		return retval;
-+	}
-+	ucp->is_host = true;
-+
-+	return 0;
-+}
-+
-+static int carplay_mode_show(struct seq_file *sf, void *unused)
-+{
-+	struct usb_carplay *ucp = sf->private;
-+
-+	seq_printf(sf, "current mode: %s\n(usage: echo host > mode)\n",
-+		ucp->is_host ? "host" : "device");
-+
-+	return 0;
-+}
-+
-+static int carplay_mode_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, carplay_mode_show, inode->i_private);
-+}
-+
-+static ssize_t carplay_mode_write(struct file *file,
-+	const char __user *ubuf, size_t count, loff_t *ppos)
-+{
-+	struct seq_file *sf = file->private_data;
-+	struct usb_carplay *ucp = sf->private;
-+	char buf[16];
-+
-+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
-+		return -EFAULT;
-+
-+	if (!strncmp(buf, "host", 4) && !ucp->is_host) {
-+		carplay_switch_to_host(ucp);
-+	} else {
-+		dev_err(ucp->idev, "wrong setting\n");
-+		return -EINVAL;
-+	}
-+
-+	return count;
-+}
-+
-+static const struct file_operations carplay_mode_fops = {
-+	.open = carplay_mode_open,
-+	.write = carplay_mode_write,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static struct dentry *carplay_debugfs_init(struct usb_carplay *ucp)
-+{
-+	struct dentry *root;
-+	const char *udev_name = dev_name(&ucp->udev->dev);
-+	char name[16];
-+
-+	snprintf(name, sizeof(name), "%s.%s", CARPLAY_NAME, udev_name);
-+	root = debugfs_create_dir(name, usb_debug_root);
-+	if (!root) {
-+		dev_err(ucp->idev, "create debugfs root failed\n");
-+		return root;
-+	}
-+	ucp->droot = root;
-+
-+	return debugfs_create_file("mode", 0664, root, ucp,
-+			&carplay_mode_fops);
-+}
-+
-+static void carplay_debugfs_exit(struct usb_carplay *ucp)
-+{
-+	debugfs_remove_recursive(ucp->droot);
-+}
-+
-+static int carplay_probe(struct usb_interface *intf,
-+	const struct usb_device_id *id)
-+{
-+	struct usb_device *udev;
-+	struct usb_carplay *ucp;
-+	struct dentry *de;
-+
-+	udev = interface_to_usbdev(intf);
-+
-+	ucp = kzalloc(sizeof(*ucp), GFP_KERNEL);
-+	if (!ucp)
-+		return -ENOMEM;
-+
-+	ucp->udev = usb_get_dev(udev);
-+	ucp->intf = intf;
-+	ucp->idev = &intf->dev;
-+	usb_set_intfdata(intf, ucp);
-+	ucp->is_host = false;
-+
-+	de = carplay_debugfs_init(ucp);
-+	if (IS_ERR_OR_NULL(de)) {
-+		usb_set_intfdata(intf, NULL);
-+		usb_put_dev(ucp->udev);
-+		kfree(ucp);
-+		return -ENOMEM;
-+	}
-+
-+	dev_info(ucp->idev, "carplay attached\n");
-+	return 0;
-+}
-+
-+static void carplay_disconnect(struct usb_interface *intf)
-+{
-+	struct usb_carplay *ucp = usb_get_intfdata(intf);
-+
-+	usb_set_intfdata(intf, NULL);
-+	usb_put_dev(ucp->udev);
-+	carplay_debugfs_exit(ucp);
-+	kfree(ucp);
-+	dev_info(&intf->dev, "carplay disconnected\n");
-+}
-+
-+static const struct usb_device_id carplay_id_table[] = {
-+	/* generic EZ-USB FX2 controller (or development board) */
-+	{ USB_DEVICE(0x05ac, 0x12a8) },
-+	{}
-+};
-+
-+MODULE_DEVICE_TABLE(usb, carplay_id_table);
-+
-+static struct usb_driver carplay_driver = {
-+	.name = CARPLAY_NAME,
-+	.id_table = carplay_id_table,
-+	.probe = carplay_probe,
-+	.disconnect = carplay_disconnect,
-+};
-+
-+module_usb_driver(carplay_driver);
-+
-+MODULE_AUTHOR("Chunfeng Yun <chunfeng.yun@mediatek.com>");
-+MODULE_DESCRIPTION("USB Carplay Driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.9.5
+On Saturday 10 March 2018 03:53 AM, Enric Balletbo i Serra wrote:
+> From: zain wang <wzz@rock-chips.com>
+> 
+> Panel would reset its setting when it powers down. It would forget the last
+> succeeded link training setting. So we can't use the last successful link
+> training setting to do fast link training. Let's reset fast_train_enable in
+> analogix_dp_bridge_disable();
+> 
+
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
+
+Thanks,
+Archit
+
+> Cc: St?phane Marchesin <marcheu@chromium.org>
+> Signed-off-by: zain wang <wzz@rock-chips.com>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> 
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 9 +++++----
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 2 +-
+>   2 files changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index f9661b410cb9..ea7a80a989c6 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -579,14 +579,14 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
+>   		if (retval != 1) {
+>   			dev_err(dp->dev, "failed to read downspread %d\n",
+>   				retval);
+> -			dp->fast_train_support = false;
+> +			dp->fast_train_enable = false;
+>   		} else {
+> -			dp->fast_train_support =
+> +			dp->fast_train_enable =
+>   				(spread & DP_NO_AUX_HANDSHAKE_LINK_TRAINING) ?
+>   					true : false;
+>   		}
+>   		dev_dbg(dp->dev, "fast link training %s\n",
+> -			dp->fast_train_support ? "supported" : "unsupported");
+> +			dp->fast_train_enable ? "supported" : "unsupported");
+>   
+>   		/* set enhanced mode if available */
+>   		analogix_dp_set_enhanced_mode(dp);
+> @@ -793,7 +793,7 @@ static int analogix_dp_fast_link_train(struct analogix_dp_device *dp)
+>   
+>   static int analogix_dp_train_link(struct analogix_dp_device *dp)
+>   {
+> -	if (dp->fast_train_support)
+> +	if (dp->fast_train_enable)
+>   		return analogix_dp_fast_link_train(dp);
+>   
+>   	return analogix_dp_full_link_train(dp, dp->video_info.max_lane_count,
+> @@ -1197,6 +1197,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+>   		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+>   
+>   	dp->psr_enable = false;
+> +	dp->fast_train_enable = false;
+>   	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+>   }
+>   
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> index 6a96ef7e6934..403ff853464b 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> @@ -173,7 +173,7 @@ struct analogix_dp_device {
+>   	int			hpd_gpio;
+>   	bool                    force_hpd;
+>   	bool			psr_enable;
+> -	bool			fast_train_support;
+> +	bool			fast_train_enable;
+>   
+>   	struct mutex		panel_lock;
+>   	bool			panel_is_modeset;
+> 
