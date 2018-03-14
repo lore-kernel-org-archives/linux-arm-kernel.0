@@ -1,44 +1,33 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Wed, 14 Mar 2018 14:53:17 +0000
-Subject: [PATCH v4 3/3] ARM: dts: STi: Remove "console=ttyASN" from
- bootargs for STi boards
-In-Reply-To: <20180314135701.GA20286@kroah.com>
-References: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
- <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
- <20180314135701.GA20286@kroah.com>
-Message-ID: <55befee5-dd68-c175-6d20-29ccda6f323f@st.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 14 Mar 2018 15:54:50 +0100
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+Message-ID: <20180314145450.GI23100@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg
-
-On 03/14/2018 02:57 PM, Greg KH wrote:
-> On Wed, Mar 07, 2018 at 06:35:34PM +0100, patrice.chotard at st.com wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> As serial interface is already specified into stdout-path property,
->> "console=ttyASN,115200" from bootargs can be removed.
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> ---
->> v4: _ none
->> v3: _ remove "console=serialN,115200" from bootargs and use prefered
->>        stdout-path property
->> v2: _ none
->>
+On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+> > fix your issue? From the debugging info you provided it should because
+> > the patch prevents jumping backwards.
+> >
 > 
-> This patch does not apply at all, are you sure you made it correctly?
+> The patch does fix the boot hang.
 > 
-> Can you please fix it up and resend?
+> But I am concerned that we are papering over a fundamental flaw in
+> memblock_next_valid_pfn().
 
-No problem, the patch has just been sent.
-
-Thanks
-
-Patrice
-
-> 
-> thanks,
-> 
-> greg k-h
-> 
+It seems that memblock_next_valid_pfn is doing the right thing here. It
+is the alignment which moves the pfn back AFAICS. I am not really
+impressed about the original patch either, to be completely honest.
+It just looks awfully tricky. I still didn't manage to wrap my head
+around the original issue though so I do not have much better ideas to
+be honest.
+-- 
+Michal Hocko
+SUSE Labs
