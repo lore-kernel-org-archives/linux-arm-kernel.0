@@ -1,30 +1,104 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 14 Mar 2018 07:16:12 +0100
-Subject: [PATCH] usb: misc: supports Apple Carplay driver
-In-Reply-To: <1521007356-12306-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
- <1521007356-12306-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20180314061612.GA17263@kroah.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 14 Mar 2018 09:01:08 +0100
+Subject: [PATCH 3/5] arm64: dts: allwinner: a64: add simplefb for A64 SoC
+In-Reply-To: <E1evn97-0000U0-Fp@stardust.g4.wien.funkfeuer.at>
+References: <20180312161050.7647-1-harald@ccbib.org>
+ <20180312161050.7647-4-harald@ccbib.org>
+ <20180313082724.7optc2xwgqoiibtx@flea>
+ <E1evg4e-0000Qj-2w@stardust.g4.wien.funkfeuer.at>
+ <20180313153522.haeemlqbtuei5zb3@flea>
+ <E1evn97-0000U0-Fp@stardust.g4.wien.funkfeuer.at>
+Message-ID: <20180314080108.2ay6jslwmzp5fsf5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 02:02:36PM +0800, Chunfeng Yun wrote:
-> The driver is used to support Apple carplay feature by a debugfs
-> interface which can force the driver to send a USB Vendor Request
-> of "Apple Device to Host Mode Switch" to switch Apple Device
-> into host mode.
+On Tue, Mar 13, 2018 at 05:51:29PM +0100, Harald Geyer wrote:
+> Maxime Ripard writes:
+> > Hi,
+> > 
+> > On Tue, Mar 13, 2018 at 10:18:22AM +0100, Harald Geyer wrote:
+> >> Maxime Ripard writes:
+> >>> On Mon, Mar 12, 2018 at 04:10:48PM +0000, Harald Geyer wrote:
+> >>>> The A64 SoC features two display pipelines, one has a LCD output, the
+> >>>> other has a HDMI output.
+> >>>>
+> >>>> Add support for simplefb for the LCD output. Tested on Teres I.
+> >>>>
+> >>>> This patch was inspired by work of Icenowy Zheng.
+> >>>>
+> >>>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+> >>>> ---
+> >>>> arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 ++++++++++++++++++++
+> >>>> 1 file changed, 20 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>> b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>>> index ca1b365bc722..05d5e8def68a 100644
+> >>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>>> @@ -52,6 +52,26 @@
+> >>>> 	#address-cells = <1>;
+> >>>> 	#size-cells = <1>;
+> >>>>
+> >>>> +	chosen {
+> >>>> +		#address-cells = <1>;
+> >>>> +		#size-cells = <1>;
+> >>>> +		ranges;
+> >>>> +
+> >>>> +/*
+> >>>> + * The pipeline mixer0-lcd0 depends on clock CLK_MIXER0 from DE2 CCU.
+> >>>> + * However there is no support for this clock on A64 yet, so we depend
+> >>>> + * on the upstream clocks here to keep them (and thus CLK_MIXER0) up.
+> >>>> + */
+> >>> 
+> >>> There's definitely support for the CLK_MIXER0 clock in the DE2 CCU
+> >>> driver, so I guess this would need to be amended / fixed
+> >> 
+> >> AFAIK on the A64 a special sram quirk is necessary, that never got merged:
+> >> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574303.html
+> >> 
+> >> I asked Icenowy if I should resubmit her patch as part of this series,
+> >> but was told further discussion is necessary. I'm sure she can better
+> >> explain the details than me.
+> >> 
+> >> Actually if it wasn't for the sram quirk, there is a simplefb patch by
+> >> her, that could have been merged long ago:
+> >> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1574304.html
+> > 
+> > The issue with your patch is that, as soon as that clock is
+> > functional, the DT with the node you were introducing here will no
+> > longer be.
+> > 
+> > And since people use their firmware DT or put them in NOR these days,
+> > you can't really expect them to update them every release either.
+> 
+> How is this a problem? - The clock can't be functional without adding
+> a DT node for it's driver. So the breakage can only happen on DT update,
+> which means we can avoid it, by moving the clocks to the proper places
+> when we add the node actually using them for real.
 
-While I am all for crazy debugfs interfaces, I would _strongly_ suggest
-not doing that here for the main API to the device.  I know Android is
-trying to prevent any new devices from even enabling debugfs, and as the
-file system requires root permissions by default, you are forcing any
-user of your new api to run as root, which is not a good idea either.
+Ah, sorry I missed it. Yeah, that would work.
 
-Given that all you are doing here is a single usb control message, why
-does this even need to be a kernel driver at all?  Can't you do the same
-thing from userspace with a simple libusb/usbfs program?  Or even a
-simple script?
+> > I guess a proper solution would be to respin that patch.
+> 
+> Sure, but as mentioned above I offered to do that and was told not to.
+> 
+> As a compromise I could also move the simple framebuffer node from the
+> A64 dtsi to the teres-i dts, where we know that the DT can be updated
+> easily?
 
-thanks,
+That's a matter of usecase, not only hardware, so this wouldn't work.
 
-greg k-h
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180314/b8f8eb7d/attachment.sig>
