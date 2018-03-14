@@ -1,71 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:31 +0100
-Subject: [PATCH v6 21/25] drivers: firmware: psci: Try to attach CPU devices
- to their PM domains
-In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-22-git-send-email-ulf.hansson@linaro.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Mar 2018 17:59:31 +0100
+Subject: [PATCH 0/2] coresight: next v4.16-rc5
+In-Reply-To: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20180314165931.GA26516@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the OS initiated CPU suspend mode have been enabled, the PM domain
-topology for CPUs have earlier been created by PSCI. Let's use this
-information in psci_dt_cpu_init_idle() as a condition for when it makes
-sense to try to attach the CPU to its corresponding PM domain, via calling
-of_genpd_attach_cpu().
+On Tue, Mar 13, 2018 at 11:24:29AM -0600, Mathieu Poirier wrote:
+> Hi Greg,
+> 
+> These two patches came in last week and are confined to Coresight.  Given
+> the late(ish) time in the cycle I would have normally waited for the
+> next one but the changes are small and trivial.
+> 
+> Please consider - if you think it's too late they'll simply go in later.
 
-If the CPU is attached successfully to its PM domain, idle management is
-now fully prepared to be controlled through runtime PM for the CPU.
+They aren't bugfixes, I'll queue them up now for 4.17-rc1.
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/firmware/psci.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+thanks,
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 45d55fc..944d6f6 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -20,6 +20,7 @@
- #include <linux/linkage.h>
- #include <linux/of.h>
- #include <linux/pm.h>
-+#include <linux/pm_domain.h>
- #include <linux/printk.h>
- #include <linux/psci.h>
- #include <linux/reboot.h>
-@@ -91,6 +92,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 
- static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
-+static bool psci_osi_mode_enabled;
- 
- u32 psci_get_domain_state(void)
- {
-@@ -339,6 +341,14 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- 
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
-+
-+	/* If running OSI mode, attach the CPU device to its PM domain. */
-+	if (psci_osi_mode_enabled) {
-+		ret = of_genpd_attach_cpu(cpu);
-+		if (ret)
-+			goto free_mem;
-+	}
-+
- 	return 0;
- 
- free_mem:
-@@ -748,6 +758,7 @@ int __init psci_dt_topology_init(void)
- 		goto out;
- 	}
- 
-+	psci_osi_mode_enabled = true;
- 	pr_info("OSI mode enabled.\n");
- out:
- 	of_node_put(np);
--- 
-2.7.4
+greg k-h
