@@ -1,108 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Mar 2018 17:25:58 +0000
-Subject: [PATCH v6 15/25] drivers: firmware: psci: Simplify error path of
- psci_dt_init()
-In-Reply-To: <1521046715-30683-16-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <1521046715-30683-16-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20180314172558.akbzw6c7cwnah3sb@lakrids.cambridge.arm.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Wed, 14 Mar 2018 10:28:10 -0700 (PDT)
+Subject: [PATCH v3 3/5] arm: Convert to GENERIC_IRQ_MULTI_HANDLER
+In-Reply-To: <alpine.DEB.2.21.1803141806580.2481@nanos.tec.linutronix.de>
+Message-ID: <mhng-154bcacc-ddfa-4875-b5c5-e3efc72f3e42@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 05:58:25PM +0100, Ulf Hansson wrote:
-> Instead of having each psci init function taking care of the of_node_put(),
-> let's deal with that from psci_dt_init(), as this enables a bit simpler
-> error path for each psci init function.
-> 
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wed, 14 Mar 2018 10:07:35 PDT (-0700), tglx at linutronix.de wrote:
+> On Wed, 7 Mar 2018, Palmer Dabbelt wrote:
+>
+>> This converts the ARM port to use the recently added
+>> GENERIC_IRQ_MULTI_HANDLER, which is essentially just a copy of ARM's
+>> existhing MULTI_IRQ_HANDLER.  The only changes are:
+>>
+>> * handle_arch_irq is now defined in a generic C file instead of an
+>>   arm-specific assembly file.
+>> * handle_arch_irq is not marked as __ro_after_init.
+>
+> Why? What prevents the generic implementation from doing so?
 
-Nice cleanup!
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  drivers/firmware/psci.c | 23 ++++++++++-------------
->  1 file changed, 10 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 256b4ed..3888100 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
->  	int err;
->  
->  	err = get_set_conduit_method(np);
-> -
->  	if (err)
-> -		goto out_put_node;
-> +		return err;
-> +
->  	/*
->  	 * Starting with v0.2, the PSCI specification introduced a call
->  	 * (PSCI_VERSION) that allows probing the firmware version, so
-> @@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
->  	 * can be carried out according to the specific version reported
->  	 * by firmware
->  	 */
-> -	err = psci_probe();
-> -
-> -out_put_node:
-> -	of_node_put(np);
-> -	return err;
-> +	return psci_probe();
->  }
->  
->  /*
-> @@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
->  	int err;
->  
->  	err = get_set_conduit_method(np);
-> -
->  	if (err)
-> -		goto out_put_node;
-> +		return err;
->  
->  	pr_info("Using PSCI v0.1 Function IDs from DT\n");
->  
-> @@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
->  		psci_ops.migrate = psci_migrate;
->  	}
->  
-> -out_put_node:
-> -	of_node_put(np);
-> -	return err;
-> +	return 0;
->  }
->  
->  static const struct of_device_id psci_of_match[] __initconst = {
-> @@ -677,6 +670,7 @@ int __init psci_dt_init(void)
->  	struct device_node *np;
->  	const struct of_device_id *matched_np;
->  	psci_initcall_t init_fn;
-> +	int ret;
->  
->  	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
->  
-> @@ -684,7 +678,10 @@ int __init psci_dt_init(void)
->  		return -ENODEV;
->  
->  	init_fn = (psci_initcall_t)matched_np->data;
-> -	return init_fn(np);
-> +	ret = init_fn(np);
-> +
-> +	of_node_put(np);
-> +	return ret;
->  }
->  
->  #ifdef CONFIG_ACPI
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Sorry, I guess that should have said "handle_arch_irq was not marked as
+__ro_after_init".  The patch set has __ro_after_init for the generic
+implementation, which was not the case for the arm version.
