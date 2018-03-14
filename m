@@ -1,52 +1,89 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Tue, 13 Mar 2018 22:00:39 -0300
-Subject: [PATCH v2 2/7] kexec_file, x86,
- powerpc: factor out kexec_file_ops functions
-In-Reply-To: <20180308011303.GB2600@dhcp-128-65.nay.redhat.com>
-References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
- <20180306102303.9063-3-takahiro.akashi@linaro.org>
- <20180308011303.GB2600@dhcp-128-65.nay.redhat.com>
-Message-ID: <87zi3b8o94.fsf@morokweng.localdomain>
+From: jinb.park@samsung.com (Jinbum Park)
+Date: Wed, 14 Mar 2018 10:32:56 +0900
+Subject: [PATCH v2] arm: ubsan: select ARCH_HAS_UBSAN_SANITIZE_ALL
+References: <CGME20180314013256epcms1p47a97f32cdcb5a7eaa9303dc4b2cb0ea9@epcms1p4>
+Message-ID: <20180314013256epcms1p47a97f32cdcb5a7eaa9303dc4b2cb0ea9@epcms1p4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+To enable UBSAN on arm, ARCH_HAS_UBSAN_SANITIZE_ALL is needed to be selected.
 
-Dave Young <dyoung@redhat.com> writes:
+Basic test has passed on Raspberry Pi2, Raspbian jessi lite with
+CONFIG_UBSAN_SANITIZE_ALL, CONFIG_UBSAN_NULL.
 
-> On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
->> As arch_kexec_kernel_image_{probe,load}(),
->> arch_kimage_file_post_load_cleanup() and arch_kexec_kernel_verify_sig()
->> are almost duplicated among architectures, they can be commonalized with
->> an architecture-defined kexec_file_ops array. So let's factor them out.
->> 
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> Cc: Dave Young <dyoung@redhat.com>
->> Cc: Vivek Goyal <vgoyal@redhat.com>
->> Cc: Baoquan He <bhe@redhat.com>
->> Cc: Michael Ellerman <mpe@ellerman.id.au>
->> Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
->> ---
->>  arch/powerpc/include/asm/kexec.h            |  2 +-
->>  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
->>  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++-----------------
->>  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
->>  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
->>  arch/x86/kernel/machine_kexec_64.c          | 45 +---------------------
->>  include/linux/kexec.h                       | 13 +++----
->>  kernel/kexec_file.c                         | 60 +++++++++++++++++++++++++++--
->>  8 files changed, 71 insertions(+), 94 deletions(-)
->> 
->
-> For this patch it also needs some review from powerpc people. 
+Used compiler is gcc 5.5.0 in [2] (2017.10).
 
-FWIW:
+It would be a resend patch for [1] from Seung-Woo Kim.
+There was some problems when [1] submitted before.
 
-Reviewed-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+  P1) show -Warray-bounds that is not seen without UBSAN
+  P2) too large stack size in crypto/serpent_generic.c
+  P3) link error of ____ilog2_NaN, __aeabi_uldivmod
 
-Also, tested on a ppc64le KVM guest:
+I've tried to build locally with allmodconfig to ensure that above errors are fixed.
+The result is that P2), P3) have fixed, but P1) appears at diffent location.
+But, Since gcc closed P1) issue as won't fix [3],
+and It can be a helpful warning to user, we don't have to worry about P1).
 
-Tested-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+build-environment that I used is as belows.
 
+  - config: arm allmodconfig
+  - compiler: gcc 5.5.0 in [2] (2017.10)
+  - ubsan flag: UBSAN, UBSAN_SANITIZE_ALL, UBSAN_ALIGNMENT, UBSAN_NULL
+  - linux version: linux/arm 4.16.0-rc4
+  - CONFIG_FRAME_WARN: 1024 (default value)
+
+[1] https://patchwork.kernel.org/patch/9189575/
+[2] https://releases.linaro.org/components/toolchain/binaries/latest-5/arm-linux-gnueabi/
+[3] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=78678
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jinbum Park <jinb.park@samsung.com>
+Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+---
+v2: Add sign of Seung-Woo Kim.
+    Add commit message about history, build environment.
+---
+ arch/arm/Kconfig                  | 1 +
+ arch/arm/boot/compressed/Makefile | 1 +
+ arch/arm/vdso/Makefile            | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1878083..bdd1561 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -7,6 +7,7 @@ config ARM
+ 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
++	select ARCH_HAS_UBSAN_SANITIZE_ALL
+ 	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 45a6b9b..1b374ba 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -24,6 +24,7 @@ OBJS		+= hyp-stub.o
+ endif
+ 
+ GCOV_PROFILE		:= n
++UBSAN_SANITIZE		:= n
+ 
+ #
+ # Architecture dependencies
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index bb411821..05597f7 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -29,6 +29,7 @@ CFLAGS_vgettimeofday.o = -O2
+ 
+ # Disable gcov profiling for VDSO code
+ GCOV_PROFILE := n
++UBSAN_SANITIZE := n
+ 
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
 -- 
-Thiago Jung Bauermann
-IBM Linux Technology Center
+1.9.1
