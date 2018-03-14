@@ -1,35 +1,32 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Wed, 14 Mar 2018 08:37:27 -0500
-Subject: [PATCH 0/5] DPAA Ethernet fixes
-Message-ID: <20180314133732.24068-1-madalin.bucur@nxp.com>
+Date: Wed, 14 Mar 2018 08:37:30 -0500
+Subject: [PATCH 3/5] dpaa_eth: remove duplicate initialization
+In-Reply-To: <20180314133732.24068-1-madalin.bucur@nxp.com>
+References: <20180314133732.24068-1-madalin.bucur@nxp.com>
+Message-ID: <20180314133732.24068-4-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Camelia Groza <camelia.groza@nxp.com>
 
-This patch set is addressing several issues in the DPAA Ethernet
-driver suite:
+The fd_format has already been initialized at this point.
 
- - module unload crash caused by wrong reference to device being left
-   in the cleanup code after the DSA related changes
- - scheduling wile atomic bug in QMan code revealed during dpaa_eth
-   module unload
- - a couple of error counter fixes, a duplicated init in dpaa_eth.
+Signed-off-by: Camelia Groza <camelia.groza@nxp.com>
+---
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Madalin
-
-Camelia Groza (3):
-  dpaa_eth: remove duplicate initialization
-  dpaa_eth: increment the RX dropped counter when needed
-  dpaa_eth: remove duplicate increment of the tx_errors counter
-
-Madalin Bucur (2):
-  soc/fsl/qbman: fix issue in qman_delete_cgr_safe()
-  dpaa_eth: fix error in dpaa_remove()
-
- drivers/net/ethernet/freescale/dpaa/dpaa_eth.c |  8 ++++----
- drivers/soc/fsl/qbman/qman.c                   | 28 +++++---------------------
- 2 files changed, 9 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+index 128e0a4..3e83d79 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+@@ -2289,7 +2289,6 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
+ 	vaddr = phys_to_virt(addr);
+ 	prefetch(vaddr + qm_fd_get_offset(fd));
+ 
+-	fd_format = qm_fd_get_format(fd);
+ 	/* The only FD types that we may receive are contig and S/G */
+ 	WARN_ON((fd_format != qm_fd_contig) && (fd_format != qm_fd_sg));
+ 
 -- 
 2.1.0
