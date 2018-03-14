@@ -1,34 +1,33 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Wed, 14 Mar 2018 08:37:31 -0500
-Subject: [PATCH 4/5] dpaa_eth: increment the RX dropped counter when needed
+Date: Wed, 14 Mar 2018 08:37:29 -0500
+Subject: [PATCH 2/5] dpaa_eth: fix error in dpaa_remove()
 In-Reply-To: <20180314133732.24068-1-madalin.bucur@nxp.com>
 References: <20180314133732.24068-1-madalin.bucur@nxp.com>
-Message-ID: <20180314133732.24068-5-madalin.bucur@nxp.com>
+Message-ID: <20180314133732.24068-3-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Camelia Groza <camelia.groza@nxp.com>
+The recent changes that make the driver probing compatible with DSA
+were not propagated in the dpa_remove() function, breaking the
+module unload function. Using the proper device to address the issue.
 
-Signed-off-by: Camelia Groza <camelia.groza@nxp.com>
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-index 3e83d79..76b3c9e 100644
+index 159dc2d..128e0a4 100644
 --- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
 +++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-@@ -2321,8 +2321,10 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
+@@ -2871,7 +2871,7 @@ static int dpaa_remove(struct platform_device *pdev)
+ 	struct device *dev;
+ 	int err;
  
- 	skb_len = skb->len;
+-	dev = &pdev->dev;
++	dev = pdev->dev.parent;
+ 	net_dev = dev_get_drvdata(dev);
  
--	if (unlikely(netif_receive_skb(skb) == NET_RX_DROP))
-+	if (unlikely(netif_receive_skb(skb) == NET_RX_DROP)) {
-+		percpu_stats->rx_dropped++;
- 		return qman_cb_dqrr_consume;
-+	}
- 
- 	percpu_stats->rx_packets++;
- 	percpu_stats->rx_bytes += skb_len;
+ 	priv = netdev_priv(net_dev);
 -- 
 2.1.0
