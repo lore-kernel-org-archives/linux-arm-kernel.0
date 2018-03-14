@@ -1,78 +1,52 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 13 Mar 2018 19:50:01 -0500
-Subject: [PATCH] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
- before enabling
-Message-ID: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Tue, 13 Mar 2018 22:00:39 -0300
+Subject: [PATCH v2 2/7] kexec_file, x86,
+ powerpc: factor out kexec_file_ops functions
+In-Reply-To: <20180308011303.GB2600@dhcp-128-65.nay.redhat.com>
+References: <20180306102303.9063-1-takahiro.akashi@linaro.org>
+ <20180306102303.9063-3-takahiro.akashi@linaro.org>
+ <20180308011303.GB2600@dhcp-128-65.nay.redhat.com>
+Message-ID: <87zi3b8o94.fsf@morokweng.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of the GICR_CTLR.RWP control bit was expanded to indicate
-status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
-or completed. Software must observe GICR_CTLR.RWP==0 after clearing
-GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
-GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- drivers/irqchip/irq-gic-v3-its.c   | 30 +++++++++++++++++++++++-------
- include/linux/irqchip/arm-gic-v3.h |  1 +
- 2 files changed, 24 insertions(+), 7 deletions(-)
+Dave Young <dyoung@redhat.com> writes:
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 1d3056f..85cd158 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1875,15 +1875,31 @@ static void its_cpu_init_lpis(void)
- 		gic_data_rdist()->pend_page = pend_page;
- 	}
- 
--	/* Disable LPIs */
- 	val = readl_relaxed(rbase + GICR_CTLR);
--	val &= ~GICR_CTLR_ENABLE_LPIS;
--	writel_relaxed(val, rbase + GICR_CTLR);
- 
--	/*
--	 * Make sure any change to the table is observable by the GIC.
--	 */
--	dsb(sy);
-+	/* Make sure LPIs are disabled before programming PEND/PROP registers */
-+	if (val & GICR_CTLR_ENABLE_LPIS) {
-+		u32 count = 1000000; /* 1s! */
-+
-+		/* Disable LPIs */
-+		val &= ~GICR_CTLR_ENABLE_LPIS;
-+		writel_relaxed(val, rbase + GICR_CTLR);
-+
-+		/* Make sure any change to GICR_CTLR is observable by the GIC */
-+		dsb(sy);
-+
-+		/* Wait for GICR_CTLR.RWP==0 or timeout */
-+		while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
-+			if (!count) {
-+				pr_err("CPU%d: Failed to disable LPIs\n",
-+				       smp_processor_id());
-+				return;
-+			}
-+			cpu_relax();
-+			udelay(1);
-+			count--;
-+		};
-+	}
- 
- 	/* set PROPBASE */
- 	val = (page_to_phys(gic_rdists->prop_page) |
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index c00c4c33..4d5fb60 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -106,6 +106,7 @@
- #define GICR_PIDR2			GICD_PIDR2
- 
- #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
-+#define GICR_CTLR_RWP			(1UL << 3)
- 
- #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
- 
+> On 03/06/18 at 07:22pm, AKASHI Takahiro wrote:
+>> As arch_kexec_kernel_image_{probe,load}(),
+>> arch_kimage_file_post_load_cleanup() and arch_kexec_kernel_verify_sig()
+>> are almost duplicated among architectures, they can be commonalized with
+>> an architecture-defined kexec_file_ops array. So let's factor them out.
+>> 
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> Cc: Dave Young <dyoung@redhat.com>
+>> Cc: Vivek Goyal <vgoyal@redhat.com>
+>> Cc: Baoquan He <bhe@redhat.com>
+>> Cc: Michael Ellerman <mpe@ellerman.id.au>
+>> Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+>> ---
+>>  arch/powerpc/include/asm/kexec.h            |  2 +-
+>>  arch/powerpc/kernel/kexec_elf_64.c          |  2 +-
+>>  arch/powerpc/kernel/machine_kexec_file_64.c | 39 ++-----------------
+>>  arch/x86/include/asm/kexec-bzimage64.h      |  2 +-
+>>  arch/x86/kernel/kexec-bzimage64.c           |  2 +-
+>>  arch/x86/kernel/machine_kexec_64.c          | 45 +---------------------
+>>  include/linux/kexec.h                       | 13 +++----
+>>  kernel/kexec_file.c                         | 60 +++++++++++++++++++++++++++--
+>>  8 files changed, 71 insertions(+), 94 deletions(-)
+>> 
+>
+> For this patch it also needs some review from powerpc people. 
+
+FWIW:
+
+Reviewed-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+
+Also, tested on a ppc64le KVM guest:
+
+Tested-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thiago Jung Bauermann
+IBM Linux Technology Center
