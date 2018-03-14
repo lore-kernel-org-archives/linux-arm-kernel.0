@@ -1,32 +1,45 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 14 Mar 2018 08:17:51 +0100
-Subject: [PATCH 18/31] perf vendor events arm64: Add armv8-recommended.json
-In-Reply-To: <20180314015417.GB19781@kernel.org>
-References: <20180313120508.29327-1-acme@kernel.org>
- <20180313120508.29327-19-acme@kernel.org>
- <20180313142618.36je6syqg6ppwhbp@gmail.com>
- <20180313182730.GA7987@kernel.org>
- <20180314015417.GB19781@kernel.org>
-Message-ID: <20180314071751.aglkde77apjjffku@gmail.com>
+From: amonakov@ispras.ru (Alexander Monakov)
+Date: Wed, 14 Mar 2018 10:22:11 +0300 (MSK)
+Subject: [PATCH 8/8] ARM: dts: berlin2cd: add Valve Steam Link board
+In-Reply-To: <20180314142326.572642c3@xhacker.debian>
+References: <20180311160008.22928-1-amonakov@ispras.ru>
+ <20180311160008.22928-9-amonakov@ispras.ru>
+ <20180314142326.572642c3@xhacker.debian>
+Message-ID: <alpine.LNX.2.20.13.1803141013040.21514@monopod.intra.ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 14 Mar 2018, Jisheng Zhang wrote:
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-
-> Em Tue, Mar 13, 2018 at 03:27:30PM -0300, Arnaldo Carvalho de Melo escreveu:
-> > Em Tue, Mar 13, 2018 at 03:26:18PM +0100, Ingo Molnar escreveu:
-> > > That's not a valid SOB chain, author != first-Signed-off-by.
->  
-> > I removed that cset for now, can you please check if the
-> > perf-core-for-mingo-4.17-20180313-2 tag is allright?
+> > +/*
+> > + * Copyright 2018 Alexander Monakov <amonakov@gmail.com>
+> > + *
+> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
 > 
-> So, since there is this problem with powerpc and jevents, Ingo, please
-> hold on a bit more... Hopefully tomorrow things will be in a better
-> shape.
+> Mind to license it under GPL2 or X11?
 
-Sure, no problem!
+MIT is the same as X11 but without the references to the X Consortium that
+do not make sense in the kernel context: please see [1] and [2]. The MIT
+license is present under LICENSES/preferred in the kernel tree, but not the
+X11 license.
 
-Thanks,
+The berlin2cd.dtsi file first says "the X11 license", but then the actual
+license text appearing in the file is the MIT license.
 
-	Ingo
+[1] https://spdx.org/licenses/MIT.html
+[2] https://spdx.org/licenses/X11.html
+
+> Other source usually tag as:
+> // SPDX-License-Identifier: (GPL-2.0 OR X11)
+> 
+> And the tag is put into the first line, could we keep the style?
+
+Right. With the clarification regarding X11/MIT above, I'll change to
+
+// SPDX-License-Identifier: GPL-2.0 OR MIT
+// Copyright 2018 Alexander Monakov <amonakov@gmail.com>
+
+Is that okay?
+
+Thanks.
+Alexander
