@@ -1,94 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:43 +0000
-Subject: [PATCH v6 20/26] arm64: KVM: Move BP hardening vectors into .hyp.text
- section
+Date: Wed, 14 Mar 2018 16:50:41 +0000
+Subject: [PATCH v6 18/26] arm64: KVM: Move vector offsetting from hyp-init.S
+ to kvm_get_hyp_vector
 In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
 References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-21-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no reason why the BP hardening vectors shouldn't be part
-of the HYP text at compile time, rather than being mapped at runtime.
+We currently provide the hyp-init code with a kernel VA, and expect
+it to turn it into a HYP va by itself. As we're about to provide
+the hypervisor with mappings that are not necessarily in the memory
+range, let's move the kern_hyp_va macro to kvm_get_hyp_vector.
 
-Also introduce a new config symbol that controls the compilation
-of bpi.S.
+No functionnal change.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 4 +---
- arch/arm64/kernel/Makefile       | 4 +---
- arch/arm64/kernel/bpi.S          | 6 ++++++
- arch/arm64/kvm/Kconfig           | 3 +++
- 4 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 3 ++-
+ arch/arm64/kvm/hyp-init.S        | 1 -
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index bfb81e73da06..c2beb2d25170 100644
+index a5e0fc900de8..bfb81e73da06 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -380,9 +380,7 @@ static inline void *kvm_get_hyp_vector(void)
+@@ -374,6 +374,7 @@ static inline void *kvm_get_hyp_vector(void)
+ 			vect = lm_alias(vect);
+ 	}
  
- static inline int kvm_map_vectors(void)
- {
--	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
--				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
--				   PAGE_HYP_EXEC);
-+	return 0;
++	vect = kern_hyp_va(vect);
+ 	return vect;
  }
  
+@@ -387,7 +388,7 @@ static inline int kvm_map_vectors(void)
  #else
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index b87541360f43..93bce17109a6 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -54,9 +54,7 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ static inline void *kvm_get_hyp_vector(void)
+ {
+-	return kvm_ksym_ref(__kvm_hyp_vector);
++	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
+ }
  
--ifeq ($(CONFIG_KVM),y)
--arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
--endif
-+arm64-obj-$(CONFIG_KVM_INDIRECT_VECTORS)+= bpi.o
+ static inline int kvm_map_vectors(void)
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 5aa9ccf6db99..6fd91b31a131 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -117,7 +117,6 @@ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
+ 	/* Set the stack and new vectors */
+ 	kern_hyp_va	x1
+ 	mov	sp, x1
+-	kern_hyp_va	x2
+ 	msr	vbar_el2, x2
  
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index e5de33513b5d..447188e2a664 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -48,6 +48,10 @@
- 	ventry \target + 0x780
- .endm
- 
-+
-+	.text
-+	.pushsection	.hyp.text, "ax"
-+
- 	.align	11
- ENTRY(__bp_harden_hyp_vecs_start)
- 	.rept 4
-@@ -55,6 +59,8 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
- 
-+	.popsection
-+
- ENTRY(__qcom_hyp_sanitize_link_stack_start)
- 	stp     x29, x30, [sp, #-16]!
- 	.rept	16
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 2257dfcc44cc..bd8cc03d7522 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -57,6 +57,9 @@ config KVM_ARM_PMU
- 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
- 	  virtual machines.
- 
-+config KVM_INDIRECT_VECTORS
-+       def_bool KVM && HARDEN_BRANCH_PREDICTOR
-+
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
+ 	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
 -- 
 2.14.2
