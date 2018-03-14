@@ -1,76 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 10:35:55 +0000
-Subject: [PATCH v1 3/4] arm64: Fix the page leak in pud/pmd_set_huge
-In-Reply-To: <1521017305-28518-4-git-send-email-cpandya@codeaurora.org>
-References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
- <1521017305-28518-4-git-send-email-cpandya@codeaurora.org>
-Message-ID: <4b955357-23a0-c0ac-4407-79a1198e1913@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Mar 2018 10:38:23 +0000
+Subject: [PATCH] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
+ before enabling
+In-Reply-To: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
+References: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20180314103823.roo7qt7htcr27dkt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/18 08:48, Chintan Pandya wrote:
-> While setting huge page, we need to take care of
-> previously existing next level mapping. Since,
-> we are going to overrite previous mapping, the
-> only reference to next level page table will get
-> lost and the next level page table will be zombie,
-> occupying space forever. So, free it before
-> overriding.
-> 
-> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
-> ---
->  arch/arm64/mm/mmu.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 8c704f1..c0df264 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -32,7 +32,7 @@
->  #include <linux/io.h>
->  #include <linux/mm.h>
->  #include <linux/vmalloc.h>
-> -
-> +#include <linux/hugetlb.h>
->  #include <asm/barrier.h>
->  #include <asm/cputype.h>
->  #include <asm/fixmap.h>
-> @@ -45,6 +45,7 @@
->  #include <asm/memblock.h>
->  #include <asm/mmu_context.h>
->  #include <asm/ptdump.h>
-> +#include <asm/page.h>
->  
->  #define NO_BLOCK_MAPPINGS	BIT(0)
->  #define NO_CONT_MAPPINGS	BIT(1)
-> @@ -939,6 +940,9 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
->  		return 0;
->  
->  	BUG_ON(phys & ~PUD_MASK);
-> +	if (pud_val(*pud) && !pud_huge(*pud))
-> +		free_page((unsigned long)__va(pud_val(*pud)));
-> +
+On Tue, Mar 13, 2018 at 07:50:01PM -0500, Shanker Donthineni wrote:
+> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
 
-This is absolutely scary. Isn't this page still referenced in the page
-tables (assuming patch 4 has been applied too)?
+> +	/* Make sure LPIs are disabled before programming PEND/PROP registers */
+> +	if (val & GICR_CTLR_ENABLE_LPIS) {
+> +		u32 count = 1000000; /* 1s! */
 
->  	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
->  	return 1;
->  }
-> @@ -953,6 +957,9 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
->  		return 0;
->  
->  	BUG_ON(phys & ~PMD_MASK);
-> +	if (pmd_val(*pmd) && !pmd_huge(*pmd))
-> +		free_page((unsigned long)__va(pmd_val(*pmd)));
-> +
->  	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
->  	return 1;
->  }
-> 
+Please use USEC_PER_SEC from <linux/time64.h>.
+
+> +		/* Wait for GICR_CTLR.RWP==0 or timeout */
+> +		while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
+> +			if (!count) {
+> +				pr_err("CPU%d: Failed to disable LPIs\n",
+> +				       smp_processor_id());
+> +				return;
+> +			}
+> +			cpu_relax();
+> +			udelay(1);
+> +			count--;
+> +		};
+
+Please use readl_relaxed_poll_timeout() from <linux/iopoll.h>.
+
+	/* Wait for GICR_CTLR.RWP==0 or timeout */
+	ret = readl_relaxed_poll_timeout(rbase + GICR_CTLR, reg,
+					 !(reg & GICR_CTLR_RWP), 1,
+					 USEC_PER_SEC);
+	if (ret) {
+		pr_err("CPU%d: Failed to disable LPIs\n",
+			smp_processor_id());
+		return;
+	}
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
