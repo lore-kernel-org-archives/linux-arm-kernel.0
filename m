@@ -1,182 +1,151 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 14 Mar 2018 14:26:58 +0900
-Subject: [PATCH] ARM: dts: uniphier: add sound node for UniPhier PXs2
-Message-ID: <20180314052658.6244-1-suzuki.katsuhiro@socionext.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 14 Mar 2018 10:59:27 +0530
+Subject: [PATCH v5 01/36] drm/bridge: analogix_dp: detect Sink PSR state
+ after configuring the PSR
+In-Reply-To: <20180309222327.18689-2-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-2-enric.balletbo@collabora.com>
+Message-ID: <c2a7ac1d-5021-508a-18bc-cf61ca676688@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds audio controller, external codec and simple card node
-of UniPhier AIO sound system for PXs2 SoCs.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 24 +++++++++++++
- arch/arm/boot/dts/uniphier-pxs2-vodka.dts  | 37 ++++++++++++++++++++
- arch/arm/boot/dts/uniphier-pxs2.dtsi       | 54 ++++++++++++++++++++++++++++++
- 3 files changed, 115 insertions(+)
 
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-index d09acb8e59a1..782962749bbf 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-@@ -34,6 +34,12 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x80000000>;
- 	};
-+
-+	sound {
-+		compatible = "audio-graph-card";
-+		label = "UniPhier PXs2";
-+		dais = <&i2s_port2>;
-+	};
- };
- 
- &serial2 {
-@@ -52,6 +58,19 @@
- 
- &i2c2 {
- 	status = "okay";
-+
-+	wm8960 at 1a {
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+		#sound-dai-cells = <0>;
-+
-+		port at 0 {
-+			wm_speaker: endpoint {
-+				dai-format = "i2s";
-+				remote-endpoint = <&i2s_aux>;
-+			};
-+		};
-+	};
- };
- 
- &eth {
-@@ -64,3 +83,8 @@
- 		reg = <1>;
- 	};
- };
-+
-+&i2s_aux {
-+	dai-format = "i2s";
-+	remote-endpoint = <&wm_speaker>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-index 6f13a25b935f..33bcd98c8653 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-@@ -32,6 +32,35 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x80000000>;
- 	};
-+
-+	sound {
-+		compatible = "audio-graph-card";
-+		label = "UniPhier PXs2";
-+		dais = <&spdif_port0
-+			&comp_spdif_port0>;
-+	};
-+
-+	spdif-out {
-+		compatible = "linux,spdif-dit";
-+		#sound-dai-cells = <0>;
-+
-+		port at 0 {
-+			spdif_tx: endpoint {
-+				remote-endpoint = <&spdif_hiecout1>;
-+			};
-+		};
-+	};
-+
-+	comp-spdif-out {
-+		compatible = "linux,spdif-dit";
-+		#sound-dai-cells = <0>;
-+
-+		port at 0 {
-+			comp_spdif_tx: endpoint {
-+				remote-endpoint = <&comp_spdif_hiecout1>;
-+			};
-+		};
-+	};
- };
- 
- &serial2 {
-@@ -52,3 +81,11 @@
- 		reg = <1>;
- 	};
- };
-+
-+&spdif_hiecout1 {
-+	remote-endpoint = <&spdif_tx>;
-+};
-+
-+&comp_spdif_hiecout1 {
-+	remote-endpoint = <&comp_spdif_tx>;
-+};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 18f336e64036..d64ca9d0aef1 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -227,6 +227,60 @@
- 						     <21 217 3>;
- 		};
- 
-+		audio at 56000000 {
-+			compatible = "socionext,uniphier-pxs2-aio";
-+			reg = <0x56000000 0x80000>;
-+			interrupts = <0 144 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_ain1>,
-+				    <&pinctrl_ain2>,
-+				    <&pinctrl_ainiec1>,
-+				    <&pinctrl_aout2>,
-+				    <&pinctrl_aout3>,
-+				    <&pinctrl_aoutiec1>,
-+				    <&pinctrl_aoutiec2>;
-+			clock-names = "aio";
-+			clocks = <&sys_clk 40>;
-+			reset-names = "aio";
-+			resets = <&sys_rst 40>;
-+			#sound-dai-cells = <1>;
-+
-+			i2s_port0: port at 0 {
-+				i2s_hdmi: endpoint {
-+				};
-+			};
-+
-+			i2s_port1: port at 1 {
-+				i2s_line: endpoint {
-+				};
-+			};
-+
-+			i2s_port2: port at 2 {
-+				i2s_aux: endpoint {
-+				};
-+			};
-+
-+			spdif_port0: port at 3 {
-+				spdif_hiecout1: endpoint {
-+				};
-+			};
-+
-+			spdif_port1: port at 4 {
-+				spdif_iecout1: endpoint {
-+				};
-+			};
-+
-+			comp_spdif_port0: port at 5 {
-+				comp_spdif_hiecout1: endpoint {
-+				};
-+			};
-+
-+			comp_spdif_port1: port at 6 {
-+				comp_spdif_iecout1: endpoint {
-+				};
-+			};
-+		};
-+
- 		i2c0: i2c at 58780000 {
- 			compatible = "socionext,uniphier-fi2c";
- 			status = "disabled";
--- 
-2.16.1
+On Saturday 10 March 2018 03:52 AM, Enric Balletbo i Serra wrote:
+> From: Yakir Yang <ykk@rock-chips.com>
+> 
+> Make sure the request PSR state takes effect in analogix_dp_send_psr_spd()
+> function, or print the sink PSR error state if we failed to apply the
+> requested PSR setting.
+
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
+
+> 
+> Cc: ?? ? <wzz@rock-chips.com>
+> Cc: St?phane Marchesin <marcheu@chromium.org>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> [seanpaul changed timeout loop to a readx poll]
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> 
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  6 ++--
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  6 ++--
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 35 +++++++++++++++++++---
+>   3 files changed, 37 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index a693ab3078f0..e738aa6de1af 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -122,8 +122,7 @@ int analogix_dp_enable_psr(struct analogix_dp_device *dp)
+>   	psr_vsc.DB0 = 0;
+>   	psr_vsc.DB1 = EDP_VSC_PSR_STATE_ACTIVE | EDP_VSC_PSR_CRC_VALUES_VALID;
+>   
+> -	analogix_dp_send_psr_spd(dp, &psr_vsc);
+> -	return 0;
+> +	return analogix_dp_send_psr_spd(dp, &psr_vsc);
+>   }
+>   EXPORT_SYMBOL_GPL(analogix_dp_enable_psr);
+>   
+> @@ -149,8 +148,7 @@ int analogix_dp_disable_psr(struct analogix_dp_device *dp)
+>   	if (ret != 1)
+>   		dev_err(dp->dev, "Failed to set DP Power0 %d\n", ret);
+>   
+> -	analogix_dp_send_psr_spd(dp, &psr_vsc);
+> -	return 0;
+> +	return analogix_dp_send_psr_spd(dp, &psr_vsc);
+>   }
+>   EXPORT_SYMBOL_GPL(analogix_dp_disable_psr);
+>   
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> index 5c6a28806129..b039b28d8fcc 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> @@ -20,6 +20,8 @@
+>   #define MAX_CR_LOOP 5
+>   #define MAX_EQ_LOOP 5
+>   
+> +#define DP_TIMEOUT_PSR_LOOP_MS			300
+> +
+>   /* DP_MAX_LANE_COUNT */
+>   #define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
+>   #define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
+> @@ -247,8 +249,8 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp);
+>   void analogix_dp_enable_scrambling(struct analogix_dp_device *dp);
+>   void analogix_dp_disable_scrambling(struct analogix_dp_device *dp);
+>   void analogix_dp_enable_psr_crc(struct analogix_dp_device *dp);
+> -void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+> -			      struct edp_vsc_psr *vsc);
+> +int analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+> +			     struct edp_vsc_psr *vsc);
+>   ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   			     struct drm_dp_aux_msg *msg);
+>   
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> index 303083ad28e3..005a3f7005d2 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> @@ -10,10 +10,11 @@
+>    * option) any later version.
+>    */
+>   
+> -#include <linux/device.h>
+> -#include <linux/io.h>
+>   #include <linux/delay.h>
+> +#include <linux/device.h>
+>   #include <linux/gpio.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+>   
+>   #include <drm/bridge/analogix_dp.h>
+>   
+> @@ -992,10 +993,25 @@ void analogix_dp_enable_psr_crc(struct analogix_dp_device *dp)
+>   	writel(PSR_VID_CRC_ENABLE, dp->reg_base + ANALOGIX_DP_CRC_CON);
+>   }
+>   
+> -void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+> -			      struct edp_vsc_psr *vsc)
+> +static ssize_t analogix_dp_get_psr_status(struct analogix_dp_device *dp)
+> +{
+> +	ssize_t val;
+> +	u8 status;
+> +
+> +	val = drm_dp_dpcd_readb(&dp->aux, DP_PSR_STATUS, &status);
+> +	if (val < 0) {
+> +		dev_err(dp->dev, "PSR_STATUS read failed ret=%zd", val);
+> +		return val;
+> +	}
+> +	return status;
+> +}
+> +
+> +int analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+> +			     struct edp_vsc_psr *vsc)
+>   {
+>   	unsigned int val;
+> +	int ret;
+> +	ssize_t psr_status;
+>   
+>   	/* don't send info frame */
+>   	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+> @@ -1036,6 +1052,17 @@ void analogix_dp_send_psr_spd(struct analogix_dp_device *dp,
+>   	val = readl(dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+>   	val |= IF_EN;
+>   	writel(val, dp->reg_base + ANALOGIX_DP_PKT_SEND_CTL);
+> +
+> +	ret = readx_poll_timeout(analogix_dp_get_psr_status, dp, psr_status,
+> +		psr_status >= 0 &&
+> +		((vsc->DB1 && psr_status == DP_PSR_SINK_ACTIVE_RFB) ||
+> +		(!vsc->DB1 && psr_status == DP_PSR_SINK_INACTIVE)), 1500,
+> +		DP_TIMEOUT_PSR_LOOP_MS * 1000);
+> +	if (ret) {
+> +		dev_warn(dp->dev, "Failed to apply PSR %d\n", ret);
+> +		return ret;
+> +	}
+> +	return 0;
+>   }
+>   
+>   ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+> 
