@@ -1,32 +1,29 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 Mar 2018 14:57:01 +0100
-Subject: [PATCH v4 3/3] ARM: dts: STi: Remove "console=ttyASN" from
- bootargs for STi boards
-In-Reply-To: <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
-References: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
- <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
-Message-ID: <20180314135701.GA20286@kroah.com>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Wed, 14 Mar 2018 19:42:01 +0530
+Subject: [alsa-devel] [PATCH v4 02/24] soc: qcom: Add APR bus driver
+In-Reply-To: <20180310022456.26739-3-srinivas.kandagatla@linaro.org>
+References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
+ <20180310022456.26739-3-srinivas.kandagatla@linaro.org>
+Message-ID: <d9e92aeb-8d74-554e-4390-4117571806a9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 06:35:34PM +0100, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> As serial interface is already specified into stdout-path property,
-> "console=ttyASN,115200" from bootargs can be removed.
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
-> v4: _ none
-> v3: _ remove "console=serialN,115200" from bootargs and use prefered 
->       stdout-path property
-> v2: _ none
-> 
 
-This patch does not apply at all, are you sure you made it correctly?
 
-Can you please fix it up and resend?
+On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+[..]
+> +struct bus_type aprbus_type = {
+> +	.name		= "aprbus",
+> +	.match		= apr_device_match,
+> +	.probe		= apr_device_probe,
+> +	.remove		= apr_device_remove,
+> +	.force_dma	= true,
 
-thanks,
-
-greg k-h
+There is no need of force_dma now as machine driver is not child of apr. 
+Please remove it.
+> +};
+> +EXPORT_SYMBOL_GPL(aprbus_type);
+> +
+>
