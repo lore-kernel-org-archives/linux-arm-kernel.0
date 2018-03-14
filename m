@@ -1,50 +1,93 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:32 +0100
-Subject: [PATCH v6 22/25] drivers: firmware: psci: Deal with CPU hotplug when
- using OSI mode
+Date: Wed, 14 Mar 2018 17:58:28 +0100
+Subject: [PATCH v6 18/25] drivers: firmware: psci: Share a few internal PSCI
+ functions
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-23-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-19-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To deal with CPU hotplug when OSI mode is used, the CPU device needs to be
-detached from its PM domain (genpd) when putting it offline, otherwise the
-CPU becomes considered as being in use from genpd and runtime PM point of
-view. Obviously, then we also need to re-attach the CPU device when bring
-the CPU back online, so let's do this.
+Following changes needs to be able to call psci_get|set_domain_state() and
+psci_dt_parse_state_node(), but from a separate file. Let's make that
+possible by sharing them via a new internal PSCI header file.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/firmware/psci.c | 14 ++++++++------
+ drivers/firmware/psci.h | 13 +++++++++++++
+ 2 files changed, 21 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/firmware/psci.h
 
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 944d6f6..06f3916 100644
+index 40b2b89..463f78c 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
-@@ -190,6 +190,10 @@ static int psci_cpu_off(u32 state)
- 	int err;
- 	u32 fn;
+@@ -34,6 +34,8 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
  
-+	/* If running OSI mode, detach the CPU device from its PM domain. */
-+	if (psci_osi_mode_enabled)
-+		of_genpd_detach_cpu(smp_processor_id());
++#include "psci.h"
 +
- 	fn = psci_function_id[PSCI_FN_CPU_OFF];
- 	err = invoke_psci_fn(fn, state, 0, 0);
- 	return psci_to_linux_errno(err);
-@@ -204,6 +208,10 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
- 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
- 	/* Clear the domain state to start fresh. */
- 	psci_set_domain_state(0);
-+
-+	if (!err && psci_osi_mode_enabled)
-+		of_genpd_attach_cpu(cpuid);
-+
- 	return psci_to_linux_errno(err);
+ /*
+  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+  * calls it is necessary to use SMC64 to pass or return 64-bit values.
+@@ -90,12 +92,12 @@ static u32 psci_function_id[PSCI_FN_MAX];
+ static DEFINE_PER_CPU(u32, domain_state);
+ static u32 psci_cpu_suspend_feature;
+ 
+-static inline u32 psci_get_domain_state(void)
++u32 psci_get_domain_state(void)
+ {
+ 	return this_cpu_read(domain_state);
  }
  
+-static inline void psci_set_domain_state(u32 state)
++void psci_set_domain_state(u32 state)
+ {
+ 	this_cpu_write(domain_state, state);
+ }
+@@ -285,10 +287,7 @@ static int __init psci_features(u32 psci_func_id)
+ 			      psci_func_id, 0, 0);
+ }
+ 
+-#ifdef CONFIG_CPU_IDLE
+-static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+-
+-static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
++int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+ {
+ 	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
+ 
+@@ -305,6 +304,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_CPU_IDLE
++static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+ 	int i, ret = 0, count = 0;
+diff --git a/drivers/firmware/psci.h b/drivers/firmware/psci.h
+new file mode 100644
+index 0000000..a2b4be5
+--- /dev/null
++++ b/drivers/firmware/psci.h
+@@ -0,0 +1,13 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#ifndef __PSCI_H
++#define __PSCI_H
++
++struct device_node;
++
++u32 psci_get_domain_state(void);
++void psci_set_domain_state(u32 state);
++
++int psci_dt_parse_state_node(struct device_node *np, u32 *state);
++
++#endif /* __PSCI_H */
 -- 
 2.7.4
