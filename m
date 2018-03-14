@@ -1,93 +1,52 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:28 +0100
-Subject: [PATCH v6 18/25] drivers: firmware: psci: Share a few internal PSCI
- functions
+Date: Wed, 14 Mar 2018 17:58:24 +0100
+Subject: [PATCH v6 14/25] drivers: firmware: psci: Support hierarchical CPU
+ idle states
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-19-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-15-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following changes needs to be able to call psci_get|set_domain_state() and
-psci_dt_parse_state_node(), but from a separate file. Let's make that
-possible by sharing them via a new internal PSCI header file.
+From: Lina Iyer <lina.iyer@linaro.org>
+
+Currently CPU's idle states are represented in a flattened model, via the
+"cpu-idle-states" binding from within the CPU's device nodes.
+
+Support the hierarchical layout, simply by converting to calling the new OF
+helper, of_get_cpu_state_node().
 
 Cc: Lina Iyer <ilina@codeaurora.org>
+Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci.c | 14 ++++++++------
- drivers/firmware/psci.h | 13 +++++++++++++
- 2 files changed, 21 insertions(+), 6 deletions(-)
- create mode 100644 drivers/firmware/psci.h
+ drivers/firmware/psci.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 40b2b89..463f78c 100644
+index 9788bfc..256b4ed 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
-@@ -34,6 +34,8 @@
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
+@@ -294,8 +294,7 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 	struct device_node *state_node;
  
-+#include "psci.h"
-+
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-  * calls it is necessary to use SMC64 to pass or return 64-bit values.
-@@ -90,12 +92,12 @@ static u32 psci_function_id[PSCI_FN_MAX];
- static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
+ 	/* Count idle states */
+-	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+-					      count))) {
++	while ((state_node = of_get_cpu_state_node(cpu_node, count))) {
+ 		count++;
+ 		of_node_put(state_node);
+ 	}
+@@ -308,7 +307,7 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 		return -ENOMEM;
  
--static inline u32 psci_get_domain_state(void)
-+u32 psci_get_domain_state(void)
- {
- 	return this_cpu_read(domain_state);
- }
+ 	for (i = 0; i < count; i++) {
+-		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		state_node = of_get_cpu_state_node(cpu_node, i);
+ 		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
+ 		of_node_put(state_node);
  
--static inline void psci_set_domain_state(u32 state)
-+void psci_set_domain_state(u32 state)
- {
- 	this_cpu_write(domain_state, state);
- }
-@@ -285,10 +287,7 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
--#ifdef CONFIG_CPU_IDLE
--static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
--
--static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state)
- {
- 	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
- 
-@@ -305,6 +304,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
- 	return 0;
- }
- 
-+#ifdef CONFIG_CPU_IDLE
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+
- static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- {
- 	int i, ret = 0, count = 0;
-diff --git a/drivers/firmware/psci.h b/drivers/firmware/psci.h
-new file mode 100644
-index 0000000..a2b4be5
---- /dev/null
-+++ b/drivers/firmware/psci.h
-@@ -0,0 +1,13 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
-+#ifndef __PSCI_H
-+#define __PSCI_H
-+
-+struct device_node;
-+
-+u32 psci_get_domain_state(void);
-+void psci_set_domain_state(u32 state);
-+
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state);
-+
-+#endif /* __PSCI_H */
 -- 
 2.7.4
