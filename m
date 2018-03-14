@@ -1,58 +1,19 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Wed, 14 Mar 2018 14:49:00 -0700
-Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
-References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
- <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
- <12150aa0-77ba-878e-31f4-d4f8d6a28ccb@codeaurora.org>
- <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
-Message-ID: <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 14 Mar 2018 15:13:12 -0700
+Subject: [GIT PULL] i.MX new clock additions for 4.17
+In-Reply-To: <20180313013905.GF26859@dragon>
+References: <20180313013905.GF26859@dragon>
+Message-ID: <152106559213.179530.9781447944833791922@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 5:13 AM,  <okaya@codeaurora.org> wrote:
-> On 2018-03-14 01:08, Timur Tabi wrote:
->>
->> On 3/13/18 10:20 PM, Sinan Kaya wrote:
->>>
->>> +/* Assumes caller has executed a write barrier to order memory and
->>> device
->>> + * requests.
->>> + */
->>>   static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32
->>> value)
->>>   {
->>> -       writel(value, ring->tail);
->>> +       writel_relaxed(value, ring->tail);
->>>   }
->>
->>
->> Why not put the wmb() in this function, or just get rid of the wmb()
->> in the rest of the file and keep this as writel?  That way, you can
->> avoid the comment and the risk that comes with it.
->
->
->
-> Sure, both solutions will work. I want to see what the maintainer prefers. I
-> can repost accordingly.
+Quoting Shawn Guo (2018-03-12 18:39:06)
+> Hi Stephen, Mike,
+> 
+> This pull request includes a few new clock additions for i.MX7D clock
+> driver.  Please consider to pull it for 4.17.  As I have a DT branch
+> built on top of this pull request to resolve the dependency on these new
+> clock IDs, please keep the tag stable.  Thanks.
+> 
 
-Actually I would argue this whole patch set is pointless. For starters
-why is it we are only updating the Intel Ethernet drivers here? This
-seems like something that is going to impact the whole kernel tree
-since many of us have been writing drivers for some time assuming x86
-style behavior.
-
-It doesn't make sense to be optimizing the drivers for one subset of
-architectures. The scope of the work needed to update the drivers for
-this would be ridiculous. Also I don't see how this could be expected
-to work on any other architecture when we pretty much need to have a
-wmb() before calling the writel on x86 to deal with accesses between
-coherent and non-coherent memory. It seems to me more like somebody
-added what they considered to be an optimization somewhere that is a
-workaround for a poorly written driver. Either that or the barrier is
-serving a different purpose then the one we were using.
-
-It would make more sense to put in the effort making writel and
-writel_relaxed consistent between architectures before we go through
-and start modifying driver code to support different architectures.
+Thanks. Pulled into clk-next.
