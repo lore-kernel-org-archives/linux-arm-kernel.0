@@ -1,141 +1,112 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 14 Mar 2018 14:23:26 +0800
-Subject: [PATCH 8/8] ARM: dts: berlin2cd: add Valve Steam Link board
-In-Reply-To: <20180311160008.22928-9-amonakov@ispras.ru>
-References: <20180311160008.22928-1-amonakov@ispras.ru>
- <20180311160008.22928-9-amonakov@ispras.ru>
-Message-ID: <20180314142326.572642c3@xhacker.debian>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 14 Mar 2018 12:00:51 +0530
+Subject: [PATCH v5 18/36] drm/bridge: analogix_dp: Reset aux channel if an
+ error occurred
+In-Reply-To: <20180309222327.18689-19-enric.balletbo@collabora.com>
+References: <20180309222327.18689-1-enric.balletbo@collabora.com>
+ <20180309222327.18689-19-enric.balletbo@collabora.com>
+Message-ID: <f878c57e-5a72-5d09-6935-db255502e006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Sun, 11 Mar 2018 19:00:08 +0300 Alexander Monakov wrote:
 
-> Valve Steam Link is a consumer device built around the Marvell BG2CD SoC.
-> This board file enables the UART, USB and Ethernet interfaces as well as
-> internal I2C and SDIO, and adds SoC voltage regulator and board-specific
-> GPIO restart method info.
+On Saturday 10 March 2018 03:53 AM, Enric Balletbo i Serra wrote:
+> From: Lin Huang <hl@rock-chips.com>
 > 
-> Cc: Sam Lantinga <saml@valvesoftware.com>
-> Signed-off-by: Alexander Monakov <amonakov@ispras.ru>
+> AUX errors are caused by many different reasons. We may not know what
+> happened in aux channel on failure, so let's reset aux channel if some
+> errors occurred.
+> 
+> Cc: ?? ? <wzz@rock-chips.com>
+> Cc: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 > ---
-> At this point, major missing user-facing features are audio/video and
-> power management (cpufreq, cpuidle, and/or suspend).
 > 
-> It's easy to wire up the Vivante 3D graphics core, but without scanout
-> it's not useful.
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 18 ++++++++++++++----
+>   1 file changed, 14 insertions(+), 4 deletions(-)
 > 
-> For avoidance of doubt, I am not affiliated with Valve.
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> index dee1ba109b5f..7b7fd227e1f9 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> @@ -466,6 +466,10 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
+>   	reg = RPLY_RECEIV | AUX_ERR;
+>   	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA);
+>   
+> +	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, true);
+> +	usleep_range(10, 11);
+> +	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, false);
+> +
+
+Is this additional power on/off the analog power to the AUX block
+required to reset it correctly? If so, could you mention that in the
+commit message?
+
+>   	analogix_dp_reset_aux(dp);
+>   
+>   	/* Disable AUX transaction H/W retry */
+> @@ -1159,7 +1163,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   				 reg, !(reg & AUX_EN), 25, 500 * 1000);
+>   	if (ret) {
+>   		dev_err(dp->dev, "AUX CH enable timeout!\n");
+> -		return -ETIMEDOUT;
+> +		goto aux_error;
+>   	}
+>   
+>   	/* TODO: Wait for an interrupt instead of looping? */
+> @@ -1168,7 +1172,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   				 reg, reg & RPLY_RECEIV, 10, 20 * 1000);
+>   	if (ret) {
+>   		dev_err(dp->dev, "AUX CH cmd reply timeout!\n");
+> -		return -ETIMEDOUT;
+> +		goto aux_error;
+>   	}
+>   
+>   	/* Clear interrupt source for AUX CH command reply */
+> @@ -1178,7 +1182,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+>   	if (reg & AUX_ERR) {
+>   		writel(AUX_ERR, dp->reg_base + ANALOGIX_DP_INT_STA);
+> -		return -EREMOTEIO;
+> +		goto aux_error;
+>   	}
+>   
+>   	/* Check AUX CH error access status */
+> @@ -1186,7 +1190,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   	if ((reg & AUX_STATUS_MASK)) {
+>   		dev_err(dp->dev, "AUX CH error happened: %d\n\n",
+>   			reg & AUX_STATUS_MASK);
+> -		return -EREMOTEIO;
+> +		goto aux_error;
+>   	}
+>   
+>   	if (msg->request & DP_AUX_I2C_READ) {
+> @@ -1212,4 +1216,10 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+>   		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+>   
+>   	return num_transferred > 0 ? num_transferred : -EBUSY;
+> +
+> +aux_error:
+> +	/* if aux err happen, reset aux */
+> +	analogix_dp_init_aux(dp);
+> +
+> +	return -EREMOTEIO;
+
+A couple of ETIMEDOUTs have been replaced with EREMOTEIOs after this
+change. Maybe we set it the error no in ret and return ret?
+
+With those changes,
+
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
+
+Thanks,
+Archit
+
+>   }
 > 
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/berlin2cd-valve-steamlink.dts | 80 +++++++++++++++++++++++++
->  2 files changed, 81 insertions(+)
->  create mode 100644 arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d0381e9caf21..e52fa7168dd8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -140,6 +140,7 @@ dtb-$(CONFIG_ARCH_BCM_NSP) += \
->  dtb-$(CONFIG_ARCH_BERLIN) += \
->  	berlin2-sony-nsz-gs7.dtb \
->  	berlin2cd-google-chromecast.dtb \
-> +	berlin2cd-valve-steamlink.dtb \
->  	berlin2q-marvell-dmp.dtb
->  dtb-$(CONFIG_ARCH_BRCMSTB) += \
->  	bcm7445-bcm97445svmb.dtb
-> diff --git a/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts b/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
-> new file mode 100644
-> index 000000000000..3161ada6eb34
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/berlin2cd-valve-steamlink.dts
-> @@ -0,0 +1,80 @@
-> +/*
-> + * Copyright 2018 Alexander Monakov <amonakov@gmail.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-
-Mind to license it under GPL2 or X11?
-
-Other source usually tag as:
-// SPDX-License-Identifier: (GPL-2.0 OR X11)
-
-And the tag is put into the first line, could we keep the style?
-
-> + */
-> +/dts-v1/;
-> +
-> +#include "berlin2cd.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "Valve Steam Link";
-> +	compatible = "valve,steamlink", "marvell,berlin2cd", "marvell,berlin";
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	gpio-restart {
-> +		compatible = "gpio-restart";
-> +		gpios = <&porta 6 GPIO_ACTIVE_HIGH>;
-> +		active-delay = <100>;
-> +		inactive-delay = <10>;
-> +		wait-delay = <100>;
-> +		priority = <200>;
-> +	};
-> +};
-> +
-> +&cpu {
-> +	cpu-supply = <&vcpu>;
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		1000000 1325000
-> +	>;
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +
-> +	/* There are two regulators on the board. One is accessible via I2C,
-> +	 * with buck1 providing SoC power (set up by bootloader to 1.325V or
-> +	 * less depending on leakage value in OTP), and buck2 likely used for
-> +	 * DRAM (providing 1.35V). The other regulator on the opposite side
-> +	 * of the board is probably supplying SDIO and NAND fixed voltages. */
-> +	regulator at 19 {
-> +		compatible = "marvell,88pg868";
-> +		reg = <0x19>;
-> +
-> +		vcpu: buck1 {
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +			regulator-min-microvolt = <1000000>;
-> +			regulator-max-microvolt = <1325000>;
-> +		};
-> +	};
-> +};
-> +
-> +/* Fixed interface to on-board Marvell 8897 Wi-Fi/Bluetooth/NFC chip. */
-> +&sdhci0 {
-> +	keep-power-in-suspend;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	/* RX/TX are routed to TP50/TP51 on the board. */
-> +	status = "okay";
-> +};
-> +
-> +/* The SoC is connected to on-board USB hub that in turn has one downstream
-> + * port wired to the on-board Steam Controller wireless receiver chip. */
-> +&usb_phy1 { status = "okay"; };
-> +
-> +&usb1 {
-> +	dr_mode = "host";
-> +	status = "okay";
-> +};
-> +
-> +&eth1 { status = "okay"; };
