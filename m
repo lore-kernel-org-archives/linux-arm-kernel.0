@@ -1,38 +1,32 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Mar 2018 15:53:15 +0200
-Subject: [PATCH v2 6/6] ARM: dts: omap5-board-common: Add phandle for mclk
- clock for twl6040
-In-Reply-To: <20180314135315.11215-1-peter.ujfalusi@ti.com>
-References: <20180314135315.11215-1-peter.ujfalusi@ti.com>
-Message-ID: <20180314135315.11215-7-peter.ujfalusi@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Mar 2018 14:57:01 +0100
+Subject: [PATCH v4 3/3] ARM: dts: STi: Remove "console=ttyASN" from
+ bootargs for STi boards
+In-Reply-To: <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
+References: <1520444134-30144-1-git-send-email-patrice.chotard@st.com>
+ <1520444134-30144-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <20180314135701.GA20286@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xref_xtal clock is used by twl6040 as mclk. It is needed for the HPPLL
-internally.
+On Wed, Mar 07, 2018 at 06:35:34PM +0100, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+> 
+> As serial interface is already specified into stdout-path property,
+> "console=ttyASN,115200" from bootargs can be removed.
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+> v4: _ none
+> v3: _ remove "console=serialN,115200" from bootargs and use prefered 
+>       stdout-path property
+> v2: _ none
+> 
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/omap5-board-common.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This patch does not apply at all, are you sure you made it correctly?
 
-diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
-index 1b20838bb9a4..3b2244560c28 100644
---- a/arch/arm/boot/dts/omap5-board-common.dtsi
-+++ b/arch/arm/boot/dts/omap5-board-common.dtsi
-@@ -659,8 +659,8 @@
- 		v2v1-supply = <&smps9_reg>;
- 		enable-active-high;
- 
--		clocks = <&clk32kgaudio>;
--		clock-names = "clk32k";
-+		clocks = <&clk32kgaudio>, <&fref_xtal_ck>;
-+		clock-names = "clk32k", "mclk";
- 	};
- };
- 
--- 
-Peter
+Can you please fix it up and resend?
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+thanks,
+
+greg k-h
