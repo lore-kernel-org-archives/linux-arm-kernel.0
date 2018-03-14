@@ -1,58 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:41 +0000
-Subject: [PATCH v6 18/26] arm64: KVM: Move vector offsetting from hyp-init.S
- to kvm_get_hyp_vector
+Date: Wed, 14 Mar 2018 16:50:44 +0000
+Subject: [PATCH v6 21/26] arm64: KVM: Reserve 4 additional instructions in the
+ BPI template
 In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
 References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-19-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently provide the hyp-init code with a kernel VA, and expect
-it to turn it into a HYP va by itself. As we're about to provide
-the hypervisor with mappings that are not necessarily in the memory
-range, let's move the kern_hyp_va macro to kvm_get_hyp_vector.
+So far, we only reserve a single instruction in the BPI template in
+order to branch to the vectors. As we're going to stuff a few more
+instructions there, let's reserve a total of 5 instructions, which
+we're going to patch later on as required.
 
-No functionnal change.
+We also introduce a small refactor of the vectors themselves, so that
+we stop carrying the target branch around.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 3 ++-
- arch/arm64/kvm/hyp-init.S        | 1 -
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/bpi.S | 39 +++++++++++++++------------------------
+ 1 file changed, 15 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index a5e0fc900de8..bfb81e73da06 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -374,6 +374,7 @@ static inline void *kvm_get_hyp_vector(void)
- 			vect = lm_alias(vect);
- 	}
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index 447188e2a664..ce1cfe3b24e6 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -19,33 +19,24 @@
+ #include <linux/linkage.h>
+ #include <linux/arm-smccc.h>
  
-+	vect = kern_hyp_va(vect);
- 	return vect;
- }
+-.macro ventry target
+-	.rept 31
++.macro hyp_ventry
++	.align 7
++1:	.rept 27
+ 	nop
+ 	.endr
+-	b	\target
++	b	__kvm_hyp_vector + (1b - 0b)
++	nop
++	nop
++	nop
++	nop
+ .endm
  
-@@ -387,7 +388,7 @@ static inline int kvm_map_vectors(void)
- #else
- static inline void *kvm_get_hyp_vector(void)
- {
--	return kvm_ksym_ref(__kvm_hyp_vector);
-+	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
- }
+-.macro vectors target
+-	ventry \target + 0x000
+-	ventry \target + 0x080
+-	ventry \target + 0x100
+-	ventry \target + 0x180
+-
+-	ventry \target + 0x200
+-	ventry \target + 0x280
+-	ventry \target + 0x300
+-	ventry \target + 0x380
+-
+-	ventry \target + 0x400
+-	ventry \target + 0x480
+-	ventry \target + 0x500
+-	ventry \target + 0x580
+-
+-	ventry \target + 0x600
+-	ventry \target + 0x680
+-	ventry \target + 0x700
+-	ventry \target + 0x780
++.macro generate_vectors
++0:
++	.rept 16
++	hyp_ventry
++	.endr
++	.org 0b + SZ_2K		// Safety measure
+ .endm
  
- static inline int kvm_map_vectors(void)
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5aa9ccf6db99..6fd91b31a131 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -117,7 +117,6 @@ CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
- 	/* Set the stack and new vectors */
- 	kern_hyp_va	x1
- 	mov	sp, x1
--	kern_hyp_va	x2
- 	msr	vbar_el2, x2
  
- 	/* copy tpidr_el1 into tpidr_el2 for use by HYP */
+@@ -55,7 +46,7 @@
+ 	.align	11
+ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.rept 4
+-	vectors __kvm_hyp_vector
++	generate_vectors
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+ 
 -- 
 2.14.2
