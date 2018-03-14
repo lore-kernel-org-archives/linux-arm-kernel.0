@@ -1,98 +1,140 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:27 +0100
-Subject: [PATCH v6 17/25] drivers: firmware: psci: Prepare to use OS initiated
- suspend mode
+Date: Wed, 14 Mar 2018 17:58:17 +0100
+Subject: [PATCH v6 07/25] PM / Domains: Add genpd governor for CPUs
 In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
 References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-18-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the OS initiated mode, the CPU topology needs to be described
-using the hierarchical model in DT. When used, the idle state bits for the
-CPU needs to be created by ORing the bits for CPU's selected idle state
-with the bits for CPU's PM domain (CPU's cluster) idle state.
+As it's now perfectly possible that a PM domain managed by genpd contains
+devices belonging to CPUs, we should start to take into account the
+residency values for the idle states during the state selection process.
+The residency value specifies the minimum duration of time, the CPU or a
+group of CPUs, needs to spend in an idle state to not waste energy entering
+it.
 
-Let's prepare the PSCI driver to deal with this, via introducing a per CPU
-variable called domain_state and by adding internal helpers to read/write
-the value of variable.
+To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
+may be used for a PM domain that have CPU devices attached or if the CPUs
+are attached through subdomains.
 
+The new governor computes the minimum expected idle duration time for the
+online CPUs being attached to the PM domain and its subdomains. Then in the
+state selection process, trying the deepest state first, it verifies that
+the idle duration time satisfies the state's residency value.
+
+It should be noted that, when computing the minimum expected idle duration
+time, we use the information from tick_nohz_get_next_wakeup(), to find the
+next wakeup for the related CPUs. Future wise, this may deserve to be
+improved, as there are more reasons to why a CPU may be woken up from idle.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lina Iyer <ilina@codeaurora.org>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+ drivers/base/power/domain_governor.c | 56 ++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h            |  2 ++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index e8f4f84..40b2b89 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -87,8 +87,19 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 				(PSCI_1_0_EXT_POWER_STATE_ID_MASK | \
- 				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
+diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
+index 99896fb..70565a8 100644
+--- a/drivers/base/power/domain_governor.c
++++ b/drivers/base/power/domain_governor.c
+@@ -10,6 +10,9 @@
+ #include <linux/pm_domain.h>
+ #include <linux/pm_qos.h>
+ #include <linux/hrtimer.h>
++#include <linux/cpumask.h>
++#include <linux/ktime.h>
++#include <linux/tick.h>
  
-+static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
+ static int dev_update_qos_constraint(struct device *dev, void *data)
+ {
+@@ -245,6 +248,54 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
+ 	return false;
+ }
  
-+static inline u32 psci_get_domain_state(void)
++static bool cpu_power_down_ok(struct dev_pm_domain *pd)
 +{
-+	return this_cpu_read(domain_state);
++	struct generic_pm_domain *genpd = pd_to_genpd(pd);
++	ktime_t domain_wakeup, cpu_wakeup;
++	s64 idle_duration_ns;
++	int cpu, i;
++
++	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
++		return true;
++
++	/*
++	 * Find the next wakeup for any of the online CPUs within the PM domain
++	 * and its subdomains. Note, we only need the genpd->cpus, as it already
++	 * contains a mask of all CPUs from subdomains.
++	 */
++	domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
++	for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
++		cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
++		if (ktime_before(cpu_wakeup, domain_wakeup))
++			domain_wakeup = cpu_wakeup;
++	}
++
++	/* The minimum idle duration is from now - until the next wakeup. */
++	idle_duration_ns = ktime_to_ns(ktime_sub(domain_wakeup, ktime_get()));
++
++	/*
++	 * Find the deepest idle state, that has its residency value satisfied.
++	 * Start at the deepest supported state.
++	 */
++	i = genpd->state_count - 1;
++	do {
++		if (!genpd->states[i].residency_ns)
++			break;
++
++		/* Check idle_duration_ns >= 0 to compare signed/unsigned. */
++		if (idle_duration_ns >= 0 &&
++		    idle_duration_ns >= genpd->states[i].residency_ns)
++			break;
++		i--;
++	} while (i >= 0);
++
++	if (i < 0)
++		return false;
++
++	genpd->state_idx = i;
++	return true;
 +}
 +
-+static inline void psci_set_domain_state(u32 state)
-+{
-+	this_cpu_write(domain_state, state);
-+}
+ struct dev_power_governor simple_qos_governor = {
+ 	.suspend_ok = default_suspend_ok,
+ 	.power_down_ok = default_power_down_ok,
+@@ -257,3 +308,8 @@ struct dev_power_governor pm_domain_always_on_gov = {
+ 	.power_down_ok = always_on_power_down_ok,
+ 	.suspend_ok = default_suspend_ok,
+ };
 +
- static inline bool psci_has_ext_power_state(void)
- {
- 	return psci_cpu_suspend_feature &
-@@ -187,6 +198,8 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
++struct dev_power_governor pm_domain_cpu_gov = {
++	.suspend_ok = NULL,
++	.power_down_ok = cpu_power_down_ok,
++};
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index ccd7c94..8f60181 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -161,6 +161,7 @@ extern int dev_pm_genpd_set_performance_state(struct device *dev,
  
- 	fn = psci_function_id[PSCI_FN_CPU_ON];
- 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-+	/* Clear the domain state to start fresh. */
-+	psci_set_domain_state(0);
- 	return psci_to_linux_errno(err);
- }
+ extern struct dev_power_governor simple_qos_governor;
+ extern struct dev_power_governor pm_domain_always_on_gov;
++extern struct dev_power_governor pm_domain_cpu_gov;
+ #else
  
-@@ -408,15 +421,17 @@ int psci_cpu_init_idle(unsigned int cpu)
- static int psci_suspend_finisher(unsigned long index)
- {
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 composite_state = state[index - 1] | psci_get_domain_state();
+ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+@@ -206,6 +207,7 @@ static inline int dev_pm_genpd_set_performance_state(struct device *dev,
  
--	return psci_ops.cpu_suspend(state[index - 1],
--				    __pa_symbol(cpu_resume));
-+	return psci_ops.cpu_suspend(composite_state, __pa_symbol(cpu_resume));
- }
+ #define simple_qos_governor		(*(struct dev_power_governor *)(NULL))
+ #define pm_domain_always_on_gov		(*(struct dev_power_governor *)(NULL))
++#define pm_domain_cpu_gov		(*(struct dev_power_governor *)(NULL))
+ #endif
  
- int psci_cpu_suspend_enter(unsigned long index)
- {
- 	int ret;
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 composite_state = state[index - 1] | psci_get_domain_state();
-+
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -424,11 +439,14 @@ int psci_cpu_suspend_enter(unsigned long index)
- 	if (WARN_ON_ONCE(!index))
- 		return -EINVAL;
- 
--	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+	if (!psci_power_state_loses_context(composite_state))
-+		ret = psci_ops.cpu_suspend(composite_state, 0);
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
- 
-+	/* Clear the domain state to start fresh when back from idle. */
-+	psci_set_domain_state(0);
-+
- 	return ret;
- }
- 
+ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
 -- 
 2.7.4
