@@ -1,93 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Mar 2018 15:54:16 +0000
-Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180314145450.GI23100@dhcp22.suse.cz>
-References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
- <20180314141323.GD23100@dhcp22.suse.cz>
- <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
- <20180314145450.GI23100@dhcp22.suse.cz>
-Message-ID: <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 14 Mar 2018 16:56:51 +0100
+Subject: [PATCH 2/2] usb: host: xhci-plat: Fix clock resource by adding a
+ register clock
+In-Reply-To: <0643f36a-cee7-8e4a-77c3-c60672ca385f@intel.com> (Mathias Nyman's
+ message of "Wed, 28 Feb 2018 18:05:20 +0200")
+References: <20180214161620.4401-1-gregory.clement@bootlin.com>
+ <20180214161620.4401-3-gregory.clement@bootlin.com>
+ <0643f36a-cee7-8e4a-77c3-c60672ca385f@intel.com>
+Message-ID: <877eqe1who.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
-> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
->> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
->> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
->> > fix your issue? From the debugging info you provided it should because
->> > the patch prevents jumping backwards.
->> >
+Hi Rob,
+
+(resent because of malformed cc list)
+ 
+ On mer., f?vr. 28 2018, Mathias Nyman <mathias.nyman@intel.com> wrote:
+
+> On 14.02.2018 18:16, Gregory CLEMENT wrote:
+>> On Armada 7K/8K we need to explicitly enable the register clock. This
+>> clock is optional because not all the SoCs using this IP need it but at
+>> least for Armada 7K/8K it is actually mandatory.
 >>
->> The patch does fix the boot hang.
+>> The change was done at xhci-plat level and not at a xhci-mvebu.c because,
+>> it is expected that other SoC would have this kind of constraint.
 >>
->> But I am concerned that we are papering over a fundamental flaw in
->> memblock_next_valid_pfn().
+>> The binding documentation is updating accordingly.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> ---
+>>   Documentation/devicetree/bindings/usb/usb-xhci.txt |  5 +++-
+>>   drivers/usb/host/xhci-plat.c                       | 33 ++++++++++++++++++----
+>>   drivers/usb/host/xhci.h                            |  3 +-
+>>   3 files changed, 33 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> index e2ea59bbca93..e4b14511f4f8 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> @@ -27,7 +27,10 @@ Required properties:
+>>     - interrupts: one XHCI interrupt should be described here.
+>>     Optional properties:
+>> -  - clocks: reference to a clock
+>> +  - clocks: reference to the clocks
+>> +  - clock-names: mandatory if there is a second clock, in this case
+>> +    the name must be "core" for the first clock and "reg" for the
+>> +    second one
+>>     - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>>     - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>>     - quirk-broken-port-ped: set if the controller has broken port disable mechanism
 >
-> It seems that memblock_next_valid_pfn is doing the right thing here. It
-> is the alignment which moves the pfn back AFAICS. I am not really
-> impressed about the original patch either, to be completely honest.
-> It just looks awfully tricky. I still didn't manage to wrap my head
-> around the original issue though so I do not have much better ideas to
-> be honest.
+> Would be good to get a Ack or review by Rob Herring for the above
 
-So first of all, memblock_next_valid_pfn() never refers to its max_pfn
-argument, which is odd nut easily fixed.
-Then, the whole idea of substracting one so that the pfn++ will
-produce the expected value is rather hacky,
+Would you mind to have a look on this binding update ?
 
-But the real problem is that rounding down pfn for the next iteration
-is dodgy, because early_pfn_valid() isn't guaranteed to return true
-for the rounded down value. I know it is probably fine in reality, but
-dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
+Initially I didn't copy you trying to not overflow you because this
+change is only about adding a new clock, which is pretty common. But I
+think Mathias would be more confident with a Ack or review by you.
 
-So how about something like this (apologies on Gmail's behalf for the
-whitespace damage, I can resend it as a proper patch)
+Thanks,
 
+Gregory
 
----------8<-----------
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 3d974cb2a1a1..b89ca999ee3b 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -5352,28 +5352,29 @@
-                 * function.  They do not exist on hotplugged memory.
-                 */
-                if (context != MEMMAP_EARLY)
-                        goto not_early;
-
--               if (!early_pfn_valid(pfn)) {
-+               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
- #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
-                        /*
-                         * Skip to the pfn preceding the next valid one (or
-                         * end_pfn), such that we hit a valid pfn (or end_pfn)
-                         * on our next iteration of the loop. Note that it needs
-                         * to be pageblock aligned even when the region itself
-                         * is not. move_freepages_block() can shift ahead of
-                         * the valid region but still depends on correct page
-                         * metadata.
-                         */
--                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
--                                       ~(pageblock_nr_pages-1)) - 1;
--#endif
-+                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
-+                       if (pfn >= end_pfn)
-+                               break;
-+                       pfn &= ~(pageblock_nr_pages - 1);
-+#else
-                        continue;
-+#endif
-                }
--               if (!early_pfn_in_nid(pfn, nid))
--                       continue;
-                if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
-                        break;
-
- #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
-                /*
----------8<-----------
-
-This ensures that we enter the remainder of the loop with a properly
-aligned pfn, rather than tweaking the value of pfn so it assumes the
-expected value after 'pfn++'
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
