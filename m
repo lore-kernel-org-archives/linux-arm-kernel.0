@@ -1,179 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2018 16:50:35 +0000
-Subject: [PATCH v6 12/26] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+Date: Wed, 14 Mar 2018 16:50:43 +0000
+Subject: [PATCH v6 20/26] arm64: KVM: Move BP hardening vectors into .hyp.text
+ section
 In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
 References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180314165049.30105-13-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-21-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We so far mapped our HYP IO (which is essentially the GICv2 control
-registers) using the same method as for memory. It recently appeared
-that is a bit unsafe:
+There is no reason why the BP hardening vectors shouldn't be part
+of the HYP text at compile time, rather than being mapped at runtime.
 
-We compute the HYP VA using the kern_hyp_va helper, but that helper
-is only designed to deal with kernel VAs coming from the linear map,
-and not from the vmalloc region... This could in turn cause some bad
-aliasing between the two, amplified by the upcoming VA randomisation.
-
-A solution is to come up with our very own basic VA allocator for
-MMIO. Since half of the HYP address space only contains a single
-page (the idmap), we have plenty to borrow from. Let's use the idmap
-as a base, and allocate downwards from it. GICv2 now lives on the
-other side of the great VA barrier.
+Also introduce a new config symbol that controls the compilation
+of bpi.S.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h |  3 ++
- virt/kvm/arm/mmu.c             | 72 ++++++++++++++++++++++++++++++++++--------
- 2 files changed, 62 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 4 +---
+ arch/arm64/kernel/Makefile       | 4 +---
+ arch/arm64/kernel/bpi.S          | 6 ++++++
+ arch/arm64/kvm/Kconfig           | 3 +++
+ 4 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5b12a3d2755e..26eb6b1cec9b 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -49,6 +49,9 @@
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index bfb81e73da06..c2beb2d25170 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -380,9 +380,7 @@ static inline void *kvm_get_hyp_vector(void)
  
-+/* Ensure compatibility with arm64 */
-+#define VA_BITS			32
-+
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 9946f8a38b26..a9577ecc3e6a 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
- static unsigned long hyp_idmap_end;
- static phys_addr_t hyp_idmap_vector;
- 
-+static DEFINE_MUTEX(io_map_lock);
-+static unsigned long io_map_base;
-+
- #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
- #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
- 
-@@ -518,27 +521,37 @@ static void unmap_hyp_idmap_range(pgd_t *pgdp, phys_addr_t start, u64 size)
-  *
-  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
-  * therefore contains either mappings in the kernel memory area (above
-- * PAGE_OFFSET), or device mappings in the vmalloc range (from
-- * VMALLOC_START to VMALLOC_END).
-+ * PAGE_OFFSET), or device mappings in the idmap range.
-  *
-- * boot_hyp_pgd should only map two pages for the init code.
-+ * boot_hyp_pgd should only map the idmap range, and is only used in
-+ * the extended idmap case.
-  */
- void free_hyp_pgds(void)
+ static inline int kvm_map_vectors(void)
  {
-+	pgd_t *id_pgd;
-+
- 	mutex_lock(&kvm_hyp_pgd_mutex);
- 
-+	id_pgd = boot_hyp_pgd ? boot_hyp_pgd : hyp_pgd;
-+
-+	if (id_pgd) {
-+		mutex_lock(&io_map_lock);
-+		/* In case we never called hyp_mmu_init() */
-+		if (!io_map_base)
-+			io_map_base = hyp_idmap_start;
-+		unmap_hyp_idmap_range(id_pgd, io_map_base,
-+				      hyp_idmap_start + PAGE_SIZE - io_map_base);
-+		mutex_unlock(&io_map_lock);
-+	}
-+
- 	if (boot_hyp_pgd) {
--		unmap_hyp_idmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
- 		boot_hyp_pgd = NULL;
- 	}
- 
- 	if (hyp_pgd) {
--		unmap_hyp_idmap_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
- 				(uintptr_t)high_memory - PAGE_OFFSET);
--		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
--				VMALLOC_END - VMALLOC_START);
- 
- 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
- 		hyp_pgd = NULL;
-@@ -735,7 +748,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
- 			   void __iomem **haddr)
- {
--	unsigned long start, end;
-+	pgd_t *pgd = hyp_pgd;
-+	unsigned long base;
- 	int ret;
- 
- 	*kaddr = ioremap(phys_addr, size);
-@@ -747,11 +761,43 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 		return 0;
- 	}
- 
-+	mutex_lock(&io_map_lock);
- 
--	start = kern_hyp_va((unsigned long)*kaddr);
--	end = kern_hyp_va((unsigned long)*kaddr + size);
--	ret = __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD, start, end,
--				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+	/*
-+	 * This assumes that we we have enough space below the idmap
-+	 * page to allocate our VAs. If not, the check below will
-+	 * kick. A potential alternative would be to detect that
-+	 * overflow and switch to an allocation above the idmap.
-+	 *
-+	 * The allocated size is always a multiple of PAGE_SIZE.
-+	 */
-+	size = PAGE_ALIGN(size + offset_in_page(phys_addr));
-+	base = io_map_base - size;
-+
-+	/*
-+	 * Verify that BIT(VA_BITS - 1) hasn't been flipped by
-+	 * allocating the new area, as it would indicate we've
-+	 * overflowed the idmap/IO address range.
-+	 */
-+	if ((base ^ io_map_base) & BIT(VA_BITS - 1)) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	if (__kvm_cpu_uses_extended_idmap())
-+		pgd = boot_hyp_pgd;
-+
-+	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
-+				    base, base + size,
-+				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+	if (ret)
-+		goto out;
-+
-+	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
-+	io_map_base = base;
-+
-+out:
-+	mutex_unlock(&io_map_lock);
- 
- 	if (ret) {
- 		iounmap(*kaddr);
-@@ -759,7 +805,6 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 		return ret;
- 	}
- 
--	*haddr = (void __iomem *)start;
- 	return 0;
+-	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
+-				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
+-				   PAGE_HYP_EXEC);
++	return 0;
  }
  
-@@ -1892,6 +1937,7 @@ int kvm_mmu_init(void)
- 			goto out;
- 	}
+ #else
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index b87541360f43..93bce17109a6 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -54,9 +54,7 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
  
-+	io_map_base = hyp_idmap_start;
- 	return 0;
- out:
- 	free_hyp_pgds();
+-ifeq ($(CONFIG_KVM),y)
+-arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
+-endif
++arm64-obj-$(CONFIG_KVM_INDIRECT_VECTORS)+= bpi.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index e5de33513b5d..447188e2a664 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -48,6 +48,10 @@
+ 	ventry \target + 0x780
+ .endm
+ 
++
++	.text
++	.pushsection	.hyp.text, "ax"
++
+ 	.align	11
+ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.rept 4
+@@ -55,6 +59,8 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+ 
++	.popsection
++
+ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+ 	stp     x29, x30, [sp, #-16]!
+ 	.rept	16
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 2257dfcc44cc..bd8cc03d7522 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -57,6 +57,9 @@ config KVM_ARM_PMU
+ 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+ 	  virtual machines.
+ 
++config KVM_INDIRECT_VECTORS
++       def_bool KVM && HARDEN_BRANCH_PREDICTOR
++
+ source drivers/vhost/Kconfig
+ 
+ endif # VIRTUALIZATION
 -- 
 2.14.2
