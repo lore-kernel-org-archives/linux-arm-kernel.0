@@ -1,31 +1,219 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 14 Mar 2018 09:05:00 +0100
-Subject: [PATCH] ARM: dts: sun8i-h3: Add Mali node
-In-Reply-To: <1520936205-64723-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1520936205-64723-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20180314080500.whywwskhp5546z7m@flea>
+From: ysato@users.sourceforge.jp (Yoshinori Sato)
+Date: Wed, 14 Mar 2018 17:10:40 +0900
+Subject: [PATCH V2] ZBOOT: fix stack protector in compressed boot phase
+In-Reply-To: <CAAhV-H4zFAMjg9W2f1VfYrgLnDfNDPaUHUechGDT+v3o_8WNTg@mail.gmail.com>
+References: <1520820258-19225-1-git-send-email-chenhc@lemote.com>
+ <CAAhV-H4zFAMjg9W2f1VfYrgLnDfNDPaUHUechGDT+v3o_8WNTg@mail.gmail.com>
+Message-ID: <87po47axhb.wl-ysato@users.sourceforge.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 11:16:45AM +0100, Giulio Benetti wrote:
-> The H3 has an ARM Mali 400 GPU, so add binding to our DT.
+On Tue, 13 Mar 2018 17:55:53 +0900,
+Huacai Chen wrote:
 > 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> Hi, Yoshinori, Rich and SuperH developers,
+> 
+> I'm not familiar with SuperH assembly, but SuperH has the same bug
+> obviously. Could you please fix that?
+> 
+> Huacai
+>
 
-How was this tested?
+Sorry. Previous mail bounced. It resend.
 
-Is there any specific reason not to share it with the H5?
+OK. Apply this fix.
+SuperH can not handle long int directly.
 
-Maxime
+diff --git a/arch/sh/boot/compressed/head_32.S b/arch/sh/boot/compressed/head_32.S
+index a3fdb053f351..7411fcb5764a 100644
+--- a/arch/sh/boot/compressed/head_32.S
++++ b/arch/sh/boot/compressed/head_32.S
+@@ -76,8 +76,8 @@ l1:
+ 	mov.l	init_stack_addr, r0
+ 	mov.l	@r0, r15
+ 
+-	mov.l	__stack_chk_guard, r0
+-	mov	#0x000a0dff, r1
++	mov.l	__stack_chk_guard_ptr, r0
++	mov.l	__stack_chk_val, r1
+ 	mov.l	r1, @r0
+ 
+ 	/* Decompress the kernel */
+@@ -109,6 +109,10 @@ kernel_start_addr:
+ #else
+ 	.long	_text+PAGE_SIZE
+ #endif
++__stack_chk_guard_ptr:
++	.long	__stack_chk_guard
++__stack_chk_val:
++	.long	0x000a0dff
+ 
+ 	.align	9
+ fake_headers_as_bzImage:
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180314/8ef1b1bf/attachment.sig>
+> On Mon, Mar 12, 2018 at 10:04 AM, Huacai Chen <chenhc@lemote.com> wrote:
+> > Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+> > stack checking always fails for decompress_kernel() itself. So remove
+> > __stack_chk_guard_setup() and initialize __stack_chk_guard before we
+> > call decompress_kernel().
+> >
+> > Original code comes from ARM but also used for MIPS and SH, so fix them
+> > together. If without this fix, compressed booting of these archs will
+> > fail because stack checking is enabled by default (>=4.16).
+> >
+> > V2: Fix build on ARM.
+> >
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Huacai Chen <chenhc@lemote.com>
+> > ---
+> >  arch/arm/boot/compressed/head.S        | 4 ++++
+> >  arch/arm/boot/compressed/misc.c        | 7 -------
+> >  arch/mips/boot/compressed/decompress.c | 7 -------
+> >  arch/mips/boot/compressed/head.S       | 4 ++++
+> >  arch/sh/boot/compressed/head_32.S      | 4 ++++
+> >  arch/sh/boot/compressed/head_64.S      | 4 ++++
+> >  arch/sh/boot/compressed/misc.c         | 7 -------
+> >  7 files changed, 16 insertions(+), 21 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> > index 45c8823..bae1fc6 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -547,6 +547,10 @@ not_relocated:     mov     r0, #0
+> >                 bic     r4, r4, #1
+> >                 blne    cache_on
+> >
+> > +               ldr     r0, =__stack_chk_guard
+> > +               ldr     r1, =0x000a0dff
+> > +               str     r1, [r0]
+> > +
+> >  /*
+> >   * The C runtime environment should now be setup sufficiently.
+> >   * Set up some pointers, and start decompressing.
+> > diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> > index 16a8a80..e518ef5 100644
+> > --- a/arch/arm/boot/compressed/misc.c
+> > +++ b/arch/arm/boot/compressed/misc.c
+> > @@ -130,11 +130,6 @@ asmlinkage void __div0(void)
+> >
+> >  unsigned long __stack_chk_guard;
+> >
+> > -void __stack_chk_guard_setup(void)
+> > -{
+> > -       __stack_chk_guard = 0x000a0dff;
+> > -}
+> > -
+> >  void __stack_chk_fail(void)
+> >  {
+> >         error("stack-protector: Kernel stack is corrupted\n");
+> > @@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+> >  {
+> >         int ret;
+> >
+> > -       __stack_chk_guard_setup();
+> > -
+> >         output_data             = (unsigned char *)output_start;
+> >         free_mem_ptr            = free_mem_ptr_p;
+> >         free_mem_end_ptr        = free_mem_ptr_end_p;
+> > diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+> > index fdf99e9..5ba431c 100644
+> > --- a/arch/mips/boot/compressed/decompress.c
+> > +++ b/arch/mips/boot/compressed/decompress.c
+> > @@ -78,11 +78,6 @@ void error(char *x)
+> >
+> >  unsigned long __stack_chk_guard;
+> >
+> > -void __stack_chk_guard_setup(void)
+> > -{
+> > -       __stack_chk_guard = 0x000a0dff;
+> > -}
+> > -
+> >  void __stack_chk_fail(void)
+> >  {
+> >         error("stack-protector: Kernel stack is corrupted\n");
+> > @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+> >  {
+> >         unsigned long zimage_start, zimage_size;
+> >
+> > -       __stack_chk_guard_setup();
+> > -
+> >         zimage_start = (unsigned long)(&__image_begin);
+> >         zimage_size = (unsigned long)(&__image_end) -
+> >             (unsigned long)(&__image_begin);
+> > diff --git a/arch/mips/boot/compressed/head.S b/arch/mips/boot/compressed/head.S
+> > index 409cb48..00d0ee0 100644
+> > --- a/arch/mips/boot/compressed/head.S
+> > +++ b/arch/mips/boot/compressed/head.S
+> > @@ -32,6 +32,10 @@ start:
+> >         bne     a2, a0, 1b
+> >          addiu  a0, a0, 4
+> >
+> > +       PTR_LA  a0, __stack_chk_guard
+> > +       PTR_LI  a1, 0x000a0dff
+> > +       sw      a1, 0(a0)
+> > +
+> >         PTR_LA  a0, (.heap)          /* heap address */
+> >         PTR_LA  sp, (.stack + 8192)  /* stack address */
+> >
+> > diff --git a/arch/sh/boot/compressed/head_32.S b/arch/sh/boot/compressed/head_32.S
+> > index 7bb1681..a3fdb05 100644
+> > --- a/arch/sh/boot/compressed/head_32.S
+> > +++ b/arch/sh/boot/compressed/head_32.S
+> > @@ -76,6 +76,10 @@ l1:
+> >         mov.l   init_stack_addr, r0
+> >         mov.l   @r0, r15
+> >
+> > +       mov.l   __stack_chk_guard, r0
+> > +       mov     #0x000a0dff, r1
+> > +       mov.l   r1, @r0
+> > +
+> >         /* Decompress the kernel */
+> >         mov.l   decompress_kernel_addr, r0
+> >         jsr     @r0
+> > diff --git a/arch/sh/boot/compressed/head_64.S b/arch/sh/boot/compressed/head_64.S
+> > index 9993113..8b4d540 100644
+> > --- a/arch/sh/boot/compressed/head_64.S
+> > +++ b/arch/sh/boot/compressed/head_64.S
+> > @@ -132,6 +132,10 @@ startup:
+> >         addi    r22, 4, r22
+> >         bne     r22, r23, tr1
+> >
+> > +       movi    datalabel __stack_chk_guard, r0
+> > +       movi    0x000a0dff, r1
+> > +       st.l    r0, 0, r1
+> > +
+> >         /*
+> >          * Decompress the kernel.
+> >          */
+> > diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+> > index 627ce8e..fe4c079 100644
+> > --- a/arch/sh/boot/compressed/misc.c
+> > +++ b/arch/sh/boot/compressed/misc.c
+> > @@ -106,11 +106,6 @@ static void error(char *x)
+> >
+> >  unsigned long __stack_chk_guard;
+> >
+> > -void __stack_chk_guard_setup(void)
+> > -{
+> > -       __stack_chk_guard = 0x000a0dff;
+> > -}
+> > -
+> >  void __stack_chk_fail(void)
+> >  {
+> >         error("stack-protector: Kernel stack is corrupted\n");
+> > @@ -130,8 +125,6 @@ void decompress_kernel(void)
+> >  {
+> >         unsigned long output_addr;
+> >
+> > -       __stack_chk_guard_setup();
+> > -
+> >  #ifdef CONFIG_SUPERH64
+> >         output_addr = (CONFIG_MEMORY_START + 0x2000);
+> >  #else
+> > --
+> > 2.7.0
+> >
+
+--
+Yoshinori Sato
+<ysato@users.sourceforge.jp>
