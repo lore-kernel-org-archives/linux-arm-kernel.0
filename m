@@ -1,20 +1,34 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 14 Mar 2018 16:34:31 -0700
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
-Message-ID: <CA+55aFzgOZdW0c=L9MWGqUt1htiXZ2E2UVmc8HOrvGr3kqr4OQ@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 14 Mar 2018 16:42:31 -0700
+Subject: [PATCH 00/12] thermal: exynos: sanitize DeviceTree support
+In-Reply-To: <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
+References: <CGME20180306144427epcas1p3bd260e382c61ab5176a50aa95084b542@epcas1p3.samsung.com>
+ <1520347435-22970-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20180314234230.GA9784@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 12:29 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
+Hello,
 
-Applied directly, since we already had two confirmations of it fixing
-things for people.
+On Tue, Mar 06, 2018 at 03:43:43PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+> 
+> Values passed through DT properties specific to Exynos thermal
+> driver ("samsung,*") are SoC (not platform) specific so just
+> define them in struct exynos_tmu_data instance (or just use
+> constants where values are identical for all SoCs) and remove
+> "samsung," DT properties altogether.
+> 
+> The patchset should not cause any functionality changes.  This
+> means that unless there are some bugs in the patches itself there
+> should be no behavior changes for the driver (this also includes
+> lack of changes in the way hardware is accessed by the driver).
+> 
+> Tested on Exynos5422 based Odroid-XU3 Lite board.
 
-Thanks,
+applied this series. except for patch 10, which should go through your
+arch tree.
 
-                Linus
+Thanks.
+
+> 1.9.1
