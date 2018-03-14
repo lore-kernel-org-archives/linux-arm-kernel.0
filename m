@@ -1,44 +1,42 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 14 Mar 2018 12:43:02 +0000
-Subject: [PATCH v7 13/13] arm64: topology: divorce MC scheduling domain
- from core_siblings
-In-Reply-To: <d6497158-c58f-4fd4-4613-699fb2af7a61@gmail.com>
-References: <20180228220619.6992-1-jeremy.linton@arm.com>
- <20180228220619.6992-14-jeremy.linton@arm.com>
- <20180301155216.GI4589@e105550-lin.cambridge.arm.com>
- <5d6bf4cf-2f6d-d123-f17f-d47d8e74c16c@arm.com>
- <20180306160721.GJ4589@e105550-lin.cambridge.arm.com>
- <8ac3567c-9fd8-4b0c-121c-287a027b5156@arm.com>
- <20180307130623.GK4589@e105550-lin.cambridge.arm.com>
- <d6497158-c58f-4fd4-4613-699fb2af7a61@gmail.com>
-Message-ID: <20180314124302.GL4589@e105550-lin.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 Mar 2018 13:43:30 +0100
+Subject: [PATCH v7] ARM: shmobile: Add watchdog support
+In-Reply-To: <1521026033-8494-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <CAMuHMdVRxTCG0vCEEmhHm4XsZeJaPM1b_LOeZxqNdhRqsH0oZw@mail.gmail.com>
+ <1521026033-8494-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180314124330.75xbinatpekhm576@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2018 at 09:41:17PM +0100, Brice Goglin wrote:
+On Wed, Mar 14, 2018 at 11:13:53AM +0000, Fabrizio Castro wrote:
+> On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+> boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+> The value contained in the SBAR registers is not initialized by a WDT
+> triggered reset, which means that after a WDT triggered reset we jump
+> to the SMP bring up routine, preventing the system from executing the
+> bootrom code.
 > 
-> > Is there a good reason for diverging instead of adjusting the
-> > core_sibling mask? On x86 the core_siblings mask is defined by the last
-> > level cache span so they don't have this issue. 
+> The purpose of this patch is to jump to the bootrom code in case of a
+> WDT triggered reset, and keep the SMP functionality untouched.
+> In order to tell if the code had been called due to the WDT overflowing
+> we are testing WOVF from register RWTCSRA.
 > 
-> No. core_siblings is defined as the list of cores that have the same
-> physical_package_id (see the doc of sysfs topology files), and LLC can
-> be smaller than that.
-> Example with E5v3 with cluster-on-die (two L3 per package, core_siblings
-> is twice larger than L3 cpumap):
-> https://www.open-mpi.org/projects/hwloc/lstopo/images/2XeonE5v3.v1.11.png
-> On AMD EPYC, you even have up to 8 LLC per package.
+> The new function shmobile_boot_vector_gen2 isn't replacing
+> shmobile_boot_vector for backward compatibility reasons. The kernel
+> will install the best option (either shmobile_boot_vector or
+> shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree,
+> according to the amount of memory available.
+> 
+> Since shmobile_boot_vector has become bigger, "reg" property of nodes
+> compatible with "renesas,smp-sram" now need to be set to a value
+> greater or equal to "<0 0x60>".
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v6->v7:
+> * restored ifdef within arch/arm/mach-shmobile/headsmp.S
 
-Right, I missed the fact that x86 reports a different cpumask for
-topology_core_cpumask() which defines the core_siblings exported through
-sysfs than the mask used to define MC level in the scheduler topology.
-The sysfs core_siblings is defined by the package_id, while the MC level
-is defined by the LLC.
-
-Thanks for pointing this out.
-
-On arm64 MC level and sysfs core_siblings are currently defined using
-the same mask, but we can't break sysfs, so using different masks is the
-only option.
-
-Morten 
+Thanks. I believe that this is the same as the hand modified
+version of v5 that I applied yesterday.
