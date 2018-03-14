@@ -1,89 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Mar 2018 17:58:23 +0100
-Subject: [PATCH v6 13/25] drivers: firmware: psci: Split
- psci_dt_cpu_init_idle()
-In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1521046715-30683-14-git-send-email-ulf.hansson@linaro.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 14 Mar 2018 18:03:40 +0100
+Subject: [PATCH] i2c: mv64xxx: Apply errata delay only in standard mode
+Message-ID: <20180314170340.11951-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's split psci_dt_cpu_init_idle() function into two functions, as to
-allow following changes to re-use some of the code.
+The errata FE-8471889 description has been updated. There is still a
+timing violation for repeated start. But the errata now states that it
+was only the case for the Standard mode (100 kHz), in Fast mode (400 kHz)
+there is no issue.
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+This patch limit the errata fix to the Standard mode.
+
+It has been tesed successfully on the clearfog (Aramda 388 based board).
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/firmware/psci.c | 42 +++++++++++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 19 deletions(-)
+ drivers/i2c/busses/i2c-mv64xxx.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index c80ec1d..9788bfc 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -270,9 +270,26 @@ static int __init psci_features(u32 psci_func_id)
- #ifdef CONFIG_CPU_IDLE
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
- 
-+static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
-+{
-+	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
-+
-+	if (err) {
-+		pr_warn("%pOF missing arm,psci-suspend-param property\n", np);
-+		return err;
-+	}
-+
-+	if (!psci_power_state_is_valid(*state)) {
-+		pr_warn("Invalid PSCI power state %#x\n", *state);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- {
--	int i, ret, count = 0;
-+	int i, ret = 0, count = 0;
- 	u32 *psci_states;
- 	struct device_node *state_node;
- 
-@@ -291,29 +308,16 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- 		return -ENOMEM;
- 
- 	for (i = 0; i < count; i++) {
--		u32 state;
--
- 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
-+		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
-+		of_node_put(state_node);
- 
--		ret = of_property_read_u32(state_node,
--					   "arm,psci-suspend-param",
--					   &state);
--		if (ret) {
--			pr_warn(" * %pOF missing arm,psci-suspend-param property\n",
--				state_node);
--			of_node_put(state_node);
-+		if (ret)
- 			goto free_mem;
--		}
- 
--		of_node_put(state_node);
--		pr_debug("psci-power-state %#x index %d\n", state, i);
--		if (!psci_power_state_is_valid(state)) {
--			pr_warn("Invalid PSCI power state %#x\n", state);
--			ret = -EINVAL;
--			goto free_mem;
--		}
--		psci_states[i] = state;
-+		pr_debug("psci-power-state %#x index %d\n", psci_states[i], i);
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 440fe4a96e68..a5a95ea5b81a 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -845,12 +845,16 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 	 */
+ 	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
+ 		drv_data->offload_enabled = true;
+-		drv_data->errata_delay = true;
++		/* The delay is only needed in standard mode (100kHz) */
++		if (bus_freq <= 100000)
++			drv_data->errata_delay = true;
  	}
-+
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
- 	return 0;
+ 
+ 	if (of_device_is_compatible(np, "marvell,mv78230-a0-i2c")) {
+ 		drv_data->offload_enabled = false;
+-		drv_data->errata_delay = true;
++		/* The delay is only needed in standard mode (100kHz) */
++		if (bus_freq <= 100000)
++			drv_data->errata_delay = true;
+ 	}
+ 
+ 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-i2c"))
 -- 
-2.7.4
+2.16.1
