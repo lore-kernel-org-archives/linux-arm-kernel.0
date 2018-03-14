@@ -1,62 +1,73 @@
 From: toshi.kani@hpe.com (Toshi Kani)
-Date: Wed, 14 Mar 2018 12:01:53 -0600
-Subject: [PATCH v2 0/2] fix memory leak / panic in ioremap huge pages
-Message-ID: <20180314180155.19492-1-toshi.kani@hpe.com>
+Date: Wed, 14 Mar 2018 12:01:55 -0600
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <20180314180155.19492-1-toshi.kani@hpe.com>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+Message-ID: <20180314180155.19492-3-toshi.kani@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On architectures with CONFIG_HAVE_ARCH_HUGE_VMAP set, ioremap()
-may create pud/pmd mappings.  Kernel panic was observed on arm64
-systems with Cortex-A75 in the following steps as described by
-Hanjun Guo. [1]
+Implement pud_free_pmd_page() and pmd_free_pte_page() on x86, which
+clear a given pud/pmd entry and free up lower level page table(s).
+Address range associated with the pud/pmd entry must have been purged
+by INVLPG.
 
- 1. ioremap a 4K size, valid page table will build,
- 2. iounmap it, pte0 will set to 0;
- 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
-    then set the a new value for pmd;
- 4. pte0 is leaked;
- 5. CPU may meet exception because the old pmd is still in TLB,
-    which will lead to kernel panic.
-
-This panic is not reproducible on x86.  INVLPG, called from iounmap,
-purges all levels of entries associated with purged address on x86.
-x86 still has memory leak.
-
-The patch changes the ioremap path to free unmapped page table(s) since
-doing so in the unmap path has the following issues:
-
- - The iounmap() path is shared with vunmap().  Since vmap() only
-   supports pte mappings, making vunmap() to free a pte page is an
-   overhead for regular vmap users as they do not need a pte page
-   freed up.
- - Checking if all entries in a pte page are cleared in the unmap path
-   is racy, and serializing this check is expensive.
- - The unmap path calls free_vmap_area_noflush() to do lazy TLB purges.
-   Clearing a pud/pmd entry before the lazy TLB purges needs extra TLB
-   purge.
-
-Patch 01 adds new interfaces as stubs, which work as workaround of
-this issue.  This patch 01 was leveraged from Hanjun's patch. [1]
-
-Patch 02 fixes the issue on x86 by implementing the interfaces.
-A separate patch (not included in this series) is necessary for arm64.
-
-[1] https://patchwork.kernel.org/patch/10134581/
-
+fixes: e61ce6ade404e ("mm: change ioremap to set up huge I/O mappings")
+Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Borislav Petkov <bp@suse.de>
+Cc: Matthew Wilcox <willy@infradead.org>
+Cc: <stable@vger.kernel.org>
 ---
-v2
- - Added cc to stable (Andrew Morton)
- - Added proper function headers (Matthew Wilcox)
- - Added descriptions why fixing in the ioremap path. (Will Deacon)
+ arch/x86/mm/pgtable.c |   28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
 
----
-Toshi Kani (2):
- 1/2 mm/vmalloc: Add interfaces to free unmapped page table
- 2/2 x86/mm: implement free pmd/pte page interfaces
-
----
- arch/arm64/mm/mmu.c           | 10 ++++++++++
- arch/x86/mm/pgtable.c         | 44 +++++++++++++++++++++++++++++++++++++++++++
- include/asm-generic/pgtable.h | 10 ++++++++++
- lib/ioremap.c                 |  6 ++++--
- 4 files changed, 68 insertions(+), 2 deletions(-)
+diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
+index 1eed7ed518e6..34cda7e0551b 100644
+--- a/arch/x86/mm/pgtable.c
++++ b/arch/x86/mm/pgtable.c
+@@ -712,7 +712,22 @@ int pmd_clear_huge(pmd_t *pmd)
+  */
+ int pud_free_pmd_page(pud_t *pud)
+ {
+-	return pud_none(*pud);
++	pmd_t *pmd;
++	int i;
++
++	if (pud_none(*pud))
++		return 1;
++
++	pmd = (pmd_t *)pud_page_vaddr(*pud);
++
++	for (i = 0; i < PTRS_PER_PMD; i++)
++		if (!pmd_free_pte_page(&pmd[i]))
++			return 0;
++
++	pud_clear(pud);
++	free_page((unsigned long)pmd);
++
++	return 1;
+ }
+ 
+ /**
+@@ -724,6 +739,15 @@ int pud_free_pmd_page(pud_t *pud)
+  */
+ int pmd_free_pte_page(pmd_t *pmd)
+ {
+-	return pmd_none(*pmd);
++	pte_t *pte;
++
++	if (pmd_none(*pmd))
++		return 1;
++
++	pte = (pte_t *)pmd_page_vaddr(*pmd);
++	pmd_clear(pmd);
++	free_page((unsigned long)pte);
++
++	return 1;
+ }
+ #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
