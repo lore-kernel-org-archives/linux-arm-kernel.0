@@ -1,253 +1,116 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 Mar 2018 14:22:03 +0100
-Subject: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <1519154467-2896-3-git-send-email-jollys@xilinx.com>
-References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-3-git-send-email-jollys@xilinx.com>
-Message-ID: <20180314132203.GB17229@kroah.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 14 Mar 2018 18:55:06 +0530
+Subject: [PATCH v2 09/16] mmc: sdhci: Add quirk to disable HW timeout
+In-Reply-To: <18a7cff5-5cc5-4eb1-17c8-033bd5ddf6c1@intel.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+ <20180205125029.21570-10-kishon@ti.com>
+ <cda22332-ed17-9309-4989-19765744879b@intel.com>
+ <a7ba98cd-7a3c-00f9-bfaa-a982126c9185@ti.com>
+ <18a7cff5-5cc5-4eb1-17c8-033bd5ddf6c1@intel.com>
+Message-ID: <ccca4747-198d-b43f-57d3-b9dcebeaf460@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 20, 2018 at 11:21:05AM -0800, Jolly Shah wrote:
-> This patch is adding communication layer with firmware.
-> Firmware driver provides an interface to firmware APIs.
-> Interface APIs can be used by any driver to communicate to
-> PMUFW(Platform Management Unit). All requests go through ATF.
+
+
+On Monday 05 March 2018 03:08 PM, Adrian Hunter wrote:
+> On 05/03/18 11:30, Kishon Vijay Abraham I wrote:
+>> Hi Adrian,
+>>
+>> On Monday 19 February 2018 02:21 PM, Adrian Hunter wrote:
+>>> On 05/02/18 14:50, Kishon Vijay Abraham I wrote:
+>>>> Add quirk to disable HW timeout if the requested timeout is more than
+>>>> the maximum obtainable timeout.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>>  drivers/mmc/host/sdhci.c | 12 ++++++++++++
+>>>>  drivers/mmc/host/sdhci.h |  7 +++++++
+>>>>  2 files changed, 19 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>>>> index 070aff9c108f..1aa74b4682f3 100644
+>>>> --- a/drivers/mmc/host/sdhci.c
+>>>> +++ b/drivers/mmc/host/sdhci.c
+>>>> @@ -735,6 +735,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>>>>  		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+>>>>  		    count, cmd->opcode);
+>>>>  		count = 0xE;
+>>>> +		if (host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
+>>>> +			host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+>>>> +			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>>> +			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>>> +			host->hw_timeout_disabled = true;
+>>>> +		}
+>>>
+>>> sdhci_calc_timeout() is really for calculations so please do this in
+>>> sdhci_set_timeout() instead (i.e. change sdhci_calc_timeout() to return
+>>> whether the timeout is too big).  Note that you need to cater for the "/*
+>>> Unspecified timeout, assume max */" case and the
+>>> SDHCI_QUIRK_BROKEN_TIMEOUT_VAL case.
+>>>
+>>> Also if SDHCI_INT_DATA_TIMEOUT is not being disabled, check here to
+>>> re-enable it and leave sdhci_request_done() alone. i.e.
+>>>
+>>> 	else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
+>>> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>>> 		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>> 		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>> 	}
+>>>
+>>> Maybe make a separate subroutine for the update:
+>>>
+>>> void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
+>>> {
+>>> 	if (enable)
+>>> 		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>>> 	else
+>>> 		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+>>> 	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>> 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>> }
+>>>
+>>>
+>>>>  	}
+>>>>  
+>>>>  	return count;
+>>>> @@ -2349,6 +2355,12 @@ static bool sdhci_request_done(struct sdhci_host *host)
+>>>>  	}
+>>>>  
+>>>>  	sdhci_del_timer(host, mrq);
+>>>> +	if (sdhci_data_line_cmd(mrq->cmd) && host->hw_timeout_disabled) {
+>>>> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+>>>> +		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>>>> +		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>>>> +		host->hw_timeout_disabled = false;
+>>>> +	}
+>>>>  
+>>>>  	/*
+>>>>  	 * Always unmap the data buffers if they were mapped by
+>>>> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+>>>> index afab26fd70e6..3a967a56fcc3 100644
+>>>> --- a/drivers/mmc/host/sdhci.h
+>>>> +++ b/drivers/mmc/host/sdhci.h
+>>>> @@ -437,6 +437,11 @@ struct sdhci_host {
+>>>>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+>>>>  /* Controller has CRC in 136 bit Command Response */
+>>>>  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+>>>> +/*
+>>>> + * Disable HW timeout if the requested timeout is more than the maximum
+>>>> + * obtainable timeout
+>>>> + */
+>>>> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
+>>
+>> Are you okay with the definition of this quirk? i.e this quirk is applied only
+>> when the requested timeout is "more" than the maximum obtainable timeout.
+>>
+>> By this way platforms can continue to use hardware timeout for smaller timeout
+>> value.
 > 
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> ---
->  arch/arm64/Kconfig.platforms                    |    1 +
->  drivers/firmware/Kconfig                        |    1 +
->  drivers/firmware/Makefile                       |    1 +
->  drivers/firmware/xilinx/Kconfig                 |    4 +
->  drivers/firmware/xilinx/Makefile                |    4 +
->  drivers/firmware/xilinx/zynqmp/Kconfig          |   16 +
->  drivers/firmware/xilinx/zynqmp/Makefile         |    4 +
->  drivers/firmware/xilinx/zynqmp/firmware.c       | 1051 +++++++++++++++++++++++
-
-Why are you 2 levels deep?  Why not just drivers/firmware/zynqmp.c?  Or
-at the worst:
-	drivers/firmware/xilinx/zynqmp.c
-Don't over do it, if we really get too many firmware drivers, we can
-always move things around in the future.
-
->  include/linux/firmware/xilinx/zynqmp/firmware.h |  590 +++++++++++++
-
-I still think this include directly depth is crazy.  What's wrong with:
-	include/linux/firmware/zynqmp.h
-?
-
-
-
->  9 files changed, 1672 insertions(+)
->  create mode 100644 drivers/firmware/xilinx/Kconfig
->  create mode 100644 drivers/firmware/xilinx/Makefile
->  create mode 100644 drivers/firmware/xilinx/zynqmp/Kconfig
->  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
->  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
->  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
+> It is fine to me.
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index fbedbd8..6454458 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -274,6 +274,7 @@ config ARCH_ZX
->  
->  config ARCH_ZYNQMP
->  	bool "Xilinx ZynqMP Family"
-> +	select ZYNQMP_FIRMWARE
+Okay thanks. I've posted v3 sometime last week. I'm trying to get this in for
+4.17? Can you review the new revision please?
 
-Select and not depends?
-
->  	help
->  	  This enables support for Xilinx ZynqMP Family
->  
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index b7c7482..f41eb0d 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -257,5 +257,6 @@ source "drivers/firmware/google/Kconfig"
->  source "drivers/firmware/efi/Kconfig"
->  source "drivers/firmware/meson/Kconfig"
->  source "drivers/firmware/tegra/Kconfig"
-> +source "drivers/firmware/xilinx/Kconfig"
->  
->  endmenu
-> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-> index b248238..f90363e 100644
-> --- a/drivers/firmware/Makefile
-> +++ b/drivers/firmware/Makefile
-> @@ -31,3 +31,4 @@ obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
->  obj-$(CONFIG_EFI)		+= efi/
->  obj-$(CONFIG_UEFI_CPER)		+= efi/
->  obj-y				+= tegra/
-> +obj-y				+= xilinx/
-> diff --git a/drivers/firmware/xilinx/Kconfig b/drivers/firmware/xilinx/Kconfig
-> new file mode 100644
-> index 0000000..eb4cdcf
-> --- /dev/null
-> +++ b/drivers/firmware/xilinx/Kconfig
-> @@ -0,0 +1,4 @@
-> +# SPDX-License-Identifier: GPL-2.0+
-
-2+ for a Kconfig file?
-
-> +# Kconfig for Xilinx firmwares
-> +
-> +source "drivers/firmware/xilinx/zynqmp/Kconfig"
-> diff --git a/drivers/firmware/xilinx/Makefile b/drivers/firmware/xilinx/Makefile
-> new file mode 100644
-> index 0000000..beff5dc
-> --- /dev/null
-> +++ b/drivers/firmware/xilinx/Makefile
-> @@ -0,0 +1,4 @@
-> +# SPDX-License-Identifier: GPL-2.0+
-
-2+ for a Makefile?
-
-> +# Makefile for Xilinx firmwares
-> +
-> +obj-$(CONFIG_ARCH_ZYNQMP) += zynqmp/
-> diff --git a/drivers/firmware/xilinx/zynqmp/Kconfig b/drivers/firmware/xilinx/zynqmp/Kconfig
-> new file mode 100644
-> index 0000000..5054b80
-> --- /dev/null
-> +++ b/drivers/firmware/xilinx/zynqmp/Kconfig
-> @@ -0,0 +1,16 @@
-> +# SPDX-License-Identifier: GPL-2.0+
-
-Again...
-
-> +# Kconfig for Xilinx ZynqMP firmware
-> +
-> +menu "Zynq MPSoC Firmware Drivers"
-> +	depends on ARCH_ZYNQMP
-> +
-> +config ZYNQMP_FIRMWARE
-> +	bool "Enable Xilinx Zynq MPSoC firmware interface"
-> +	help
-> +	  Firmware interface driver is used by different to
-> +	  communicate with the firmware for various platform
-> +	  management services.
-> +	  Say yes to enable ZynqMP firmware interface driver.
-> +	  In doubt, say N
-> +
-> +endmenu
-> diff --git a/drivers/firmware/xilinx/zynqmp/Makefile b/drivers/firmware/xilinx/zynqmp/Makefile
-> new file mode 100644
-> index 0000000..c3ec669
-> --- /dev/null
-> +++ b/drivers/firmware/xilinx/zynqmp/Makefile
-> @@ -0,0 +1,4 @@
-> +# SPDX-License-Identifier: GPL-2.0+
-
-And again?
-
-> +# Makefile for Xilinx firmwares
-> +
-> +obj-$(CONFIG_ZYNQMP_FIRMWARE) += firmware.o
-> diff --git a/drivers/firmware/xilinx/zynqmp/firmware.c b/drivers/firmware/xilinx/zynqmp/firmware.c
-> new file mode 100644
-> index 0000000..6979f4b
-> --- /dev/null
-> +++ b/drivers/firmware/xilinx/zynqmp/firmware.c
-> @@ -0,0 +1,1051 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-
-And I have to ask, you really mean "any future version"?
-
-> +/*
-> + * Xilinx Zynq MPSoC Firmware layer
-> + *
-> + *  Copyright (C) 2014-2018 Xilinx, Inc.
-> + *
-> + *  Michal Simek <michal.simek@xilinx.com>
-> + *  Davorin Mista <davorin.mista@aggios.com>
-> + *  Jolly Shah <jollys@xilinx.com>
-> + *  Rajan Vaja <rajanv@xilinx.com>
-> + */
-> +
-> +#include <linux/arm-smccc.h>
-> +#include <linux/compiler.h>
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#include <linux/uaccess.h>
-> +
-> +#include <linux/firmware/xilinx/zynqmp/firmware.h>
-
-Why do you need a file in linux/firmware anyway?
-
-> +struct zynqmp_eemi_ops {
-> +	int (*get_api_version)(u32 *version);
-> +	int (*get_chipid)(u32 *idcode, u32 *version);
-> +	int (*reset_assert)(const enum zynqmp_pm_reset reset,
-> +			    const enum zynqmp_pm_reset_action assert_flag);
-> +	int (*reset_get_status)(const enum zynqmp_pm_reset reset, u32 *status);
-> +	int (*fpga_load)(const u64 address, const u32 size, const u32 flags);
-> +	int (*fpga_get_status)(u32 *value);
-> +	int (*sha_hash)(const u64 address, const u32 size, const u32 flags);
-> +	int (*rsa)(const u64 address, const u32 size, const u32 flags);
-> +	int (*request_suspend)(const u32 node,
-> +			       const enum zynqmp_pm_request_ack ack,
-> +			       const u32 latency,
-> +			       const u32 state);
-> +	int (*force_powerdown)(const u32 target,
-> +			       const enum zynqmp_pm_request_ack ack);
-> +	int (*request_wakeup)(const u32 node,
-> +			      const bool set_addr,
-> +			      const u64 address,
-> +			      const enum zynqmp_pm_request_ack ack);
-> +	int (*set_wakeup_source)(const u32 target,
-> +				 const u32 wakeup_node,
-> +				 const u32 enable);
-> +	int (*system_shutdown)(const u32 type, const u32 subtype);
-> +	int (*request_node)(const u32 node,
-> +			    const u32 capabilities,
-> +			    const u32 qos,
-> +			    const enum zynqmp_pm_request_ack ack);
-> +	int (*release_node)(const u32 node);
-> +	int (*set_requirement)(const u32 node,
-> +			       const u32 capabilities,
-> +			       const u32 qos,
-> +			       const enum zynqmp_pm_request_ack ack);
-> +	int (*set_max_latency)(const u32 node, const u32 latency);
-> +	int (*set_configuration)(const u32 physical_addr);
-> +	int (*get_node_status)(const u32 node, u32 *const status,
-> +			       u32 *const requirements, u32 *const usage);
-> +	int (*get_operating_characteristic)(const u32 node,
-> +					    const enum zynqmp_pm_opchar_type
-> +					    type, u32 *const result);
-> +	int (*init_finalize)(void);
-> +	int (*set_suspend_mode)(u32 mode);
-> +	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
-> +	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
-> +	int (*pinctrl_request)(const u32 pin);
-> +	int (*pinctrl_release)(const u32 pin);
-> +	int (*pinctrl_get_function)(const u32 pin, u32 *id);
-> +	int (*pinctrl_set_function)(const u32 pin, const u32 id);
-> +	int (*pinctrl_get_config)(const u32 pin, const u32 param, u32 *value);
-> +	int (*pinctrl_set_config)(const u32 pin, const u32 param, u32 value);
-> +	int (*clock_enable)(u32 clock_id);
-> +	int (*clock_disable)(u32 clock_id);
-> +	int (*clock_getstate)(u32 clock_id, u32 *state);
-> +	int (*clock_setdivider)(u32 clock_id, u32 divider);
-> +	int (*clock_getdivider)(u32 clock_id, u32 *divider);
-> +	int (*clock_setrate)(u32 clock_id, u64 rate);
-> +	int (*clock_getrate)(u32 clock_id, u64 *rate);
-> +	int (*clock_setparent)(u32 clock_id, u32 parent_id);
-> +	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
-> +};
-
-Why do you need this huge structure of pointers to functions, when you
-only ever set them to 1 value, and no one even calls them?
-
-Why not just export the needed symbols and call them directly?  What is
-the indirection getting you here?
-
-thanks,
-
-greg k-h
+Thanks
+Kishon
