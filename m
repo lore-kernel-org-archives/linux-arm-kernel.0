@@ -1,83 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Mar 2018 16:39:49 +0000 (GMT)
-Subject: Applied "ASoC: uniphier: evea: add switch for changing source of
- line-in" to the asoc tree
-In-Reply-To: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180314163950.001CB44007C@finisterre.ee.mobilebroadband>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Mar 2018 16:50:25 +0000
+Subject: [PATCH v6 02/26] arm64: insn: Add N immediate encoding
+In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+Message-ID: <20180314165049.30105-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+We're missing the a way to generate the encoding of the N immediate,
+which is only a single bit used in a number of instruction that take
+an immediate.
 
-   ASoC: uniphier: evea: add switch for changing source of line-in
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 90e0fb05e5c1b1cf6a59c4f888f500e2b1feffc4 Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Wed, 14 Mar 2018 21:39:00 +0900
-Subject: [PATCH] ASoC: uniphier: evea: add switch for changing source of
- line-in
-
-This patch adds mixer switch for changing audio source of line-in.
-We can choose one of LIN1, 2, 3, default is LIN1.
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- sound/soc/uniphier/evea.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/include/asm/insn.h | 1 +
+ arch/arm64/kernel/insn.c      | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
-index 439f14f91b23..73fd6730095c 100644
---- a/sound/soc/uniphier/evea.c
-+++ b/sound/soc/uniphier/evea.c
-@@ -18,6 +18,8 @@
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 4214c38d016b..21fffdd290a3 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -70,6 +70,7 @@ enum aarch64_insn_imm_type {
+ 	AARCH64_INSN_IMM_6,
+ 	AARCH64_INSN_IMM_S,
+ 	AARCH64_INSN_IMM_R,
++	AARCH64_INSN_IMM_N,
+ 	AARCH64_INSN_IMM_MAX
+ };
  
- #define AADCPOW(n)                           (0x0078 + 0x04 * (n))
- #define   AADCPOW_AADC_POWD                   BIT(0)
-+#define ALINSW1                              0x0088
-+#define   ALINSW1_SEL1_SHIFT                  3
- #define AHPOUTPOW                            0x0098
- #define   AHPOUTPOW_HP_ON                     BIT(4)
- #define ALINEPOW                             0x009c
-@@ -278,7 +280,16 @@ static int evea_set_switch_hp(struct snd_kcontrol *kcontrol,
- 	return evea_update_switch_hp(evea);
- }
- 
-+static const char * const linsw1_sel1_text[] = {
-+	"LIN1", "LIN2", "LIN3"
-+};
-+
-+static SOC_ENUM_SINGLE_DECL(linsw1_sel1_enum,
-+	ALINSW1, ALINSW1_SEL1_SHIFT,
-+	linsw1_sel1_text);
-+
- static const struct snd_kcontrol_new evea_controls[] = {
-+	SOC_ENUM("Line Capture Source", linsw1_sel1_enum),
- 	SOC_SINGLE_BOOL_EXT("Line Capture Switch", 0,
- 			    evea_get_switch_lin, evea_set_switch_lin),
- 	SOC_SINGLE_BOOL_EXT("Line Playback Switch", 0,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 2718a77da165..7e432662d454 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -343,6 +343,10 @@ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
+ 		mask = BIT(6) - 1;
+ 		shift = 16;
+ 		break;
++	case AARCH64_INSN_IMM_N:
++		mask = 1;
++		shift = 22;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
-2.16.2
+2.14.2
