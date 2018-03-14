@@ -1,35 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 14 Mar 2018 11:39:11 +0100
-Subject: [PATCH v5 05/36] drm/bridge: analogix_dp: add fast link train for
- eDP
-In-Reply-To: <20180309222327.18689-6-enric.balletbo@collabora.com>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-6-enric.balletbo@collabora.com>
-Message-ID: <6139185.TexXAUNAzh@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Mar 2018 10:46:04 +0000
+Subject: [PATCH v1 4/4] Revert "arm64: Enforce BBM for huge IO/VMAP
+ mappings"
+In-Reply-To: <1521017305-28518-5-git-send-email-cpandya@codeaurora.org>
+References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
+ <1521017305-28518-5-git-send-email-cpandya@codeaurora.org>
+Message-ID: <bdcc02a1-cf1b-4887-06e9-4867415ca214@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. M?rz 2018, 23:22:56 CET schrieb Enric Balletbo i Serra:
-> From: zain wang <wzz@rock-chips.com>
+On 14/03/18 08:48, Chintan Pandya wrote:
+> This commit 15122ee2c515a ("arm64: Enforce BBM for huge
+> IO/VMAP mappings") is a temporary work-around until the
+> issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
 > 
-> We would meet a short black screen when exit PSR with the full link
-> training, In this case, we should use fast link train instead of full
-> link training.
+> Revert this change as we have fixes for the issue.
 > 
-> Signed-off-by: zain wang <wzz@rock-chips.com>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+> ---
+>  arch/arm64/mm/mmu.c | 8 --------
+>  1 file changed, 8 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c0df264..19116c6 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
+>  	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
+>  					pgprot_val(mk_sect_prot(prot)));
+>  
+> -	/* ioremap_page_range doesn't honour BBM */
+> -	if (pud_present(READ_ONCE(*pudp)))
+> -		return 0;
+> -
+>  	BUG_ON(phys & ~PUD_MASK);
+>  	if (pud_val(*pud) && !pud_huge(*pud))
+>  		free_page((unsigned long)__va(pud_val(*pud)));
+> @@ -952,10 +948,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
+>  	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
+>  					pgprot_val(mk_sect_prot(prot)));
+>  
+> -	/* ioremap_page_range doesn't honour BBM */
+> -	if (pmd_present(READ_ONCE(*pmdp)))
+> -		return 0;
+> -
+>  	BUG_ON(phys & ~PMD_MASK);
+>  	if (pmd_val(*pmd) && !pmd_huge(*pmd))
+>  		free_page((unsigned long)__va(pmd_val(*pmd)));
+> 
 
-applied to drm-misc-next
+But you're still not doing a BBM, right? What prevents a speculative
+access from using the (now freed) entry? The TLB invalidation you've
+introduce just narrows the window where bad things can happen.
 
-Checking the whole series, there is nothing else that touches the
-reordered headers, so I've dropped that change, leaving only the
-newly added iopoll.h inclusion in [0].
+My gut feeling is that this series introduces more bugs than it fixes...
+If you're going to fix it, please fix it by correctly implementing BBM
+for huge mappings.
 
-Thanks
-Heiko
+Or am I missing something terribly obvious?
 
-
-[0] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=f9d5680596f2dac390918e6aec3e174db03633a3
+	M.
+-- 
+Jazz is not dead. It just smells funny...
