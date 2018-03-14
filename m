@@ -1,88 +1,65 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Wed, 14 Mar 2018 23:25:30 +0100
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180314222530.GA6300@wintermute>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 14 Mar 2018 15:38:35 -0700
+Subject: [PATCH v2 1/2] mm/vmalloc: Add interfaces to free unmapped page
+ table
+In-Reply-To: <20180314180155.19492-2-toshi.kani@hpe.com>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-2-toshi.kani@hpe.com>
+Message-ID: <20180314153835.68e75da3fdc18b27ad0e290c@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 07:29:37PM +0000, Ard Biesheuvel wrote:
-> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
+On Wed, 14 Mar 2018 12:01:54 -0600 Toshi Kani <toshi.kani@hpe.com> wrote:
 
-FWIW, the revert fixes the boot hang I'm seeing on ThunderX1.
+> On architectures with CONFIG_HAVE_ARCH_HUGE_VMAP set, ioremap()
+> may create pud/pmd mappings.  Kernel panic was observed on arm64
+> systems with Cortex-A75 in the following steps as described by
+> Hanjun Guo.
+> 
+>  1. ioremap a 4K size, valid page table will build,
+>  2. iounmap it, pte0 will set to 0;
+>  3. ioremap the same address with 2M size, pgd/pmd is unchanged,
+>     then set the a new value for pmd;
+>  4. pte0 is leaked;
+>  5. CPU may meet exception because the old pmd is still in TLB,
+>     which will lead to kernel panic.
+> 
+> This panic is not reproducible on x86.  INVLPG, called from iounmap,
+> purges all levels of entries associated with purged address on x86.
+> x86 still has memory leak.
+> 
+> The patch changes the ioremap path to free unmapped page table(s) since
+> doing so in the unmap path has the following issues:
+> 
+>  - The iounmap() path is shared with vunmap().  Since vmap() only
+>    supports pte mappings, making vunmap() to free a pte page is an
+>    overhead for regular vmap users as they do not need a pte page
+>    freed up.
+>  - Checking if all entries in a pte page are cleared in the unmap path
+>    is racy, and serializing this check is expensive.
+>  - The unmap path calls free_vmap_area_noflush() to do lazy TLB purges.
+>    Clearing a pud/pmd entry before the lazy TLB purges needs extra TLB
+>    purge.
+> 
+> Add two interfaces, pud_free_pmd_page() and pmd_free_pte_page(),
+> which clear a given pud/pmd entry and free up a page for the lower
+> level entries.
+> 
+> This patch implements their stub functions on x86 and arm64, which
+> work as workaround.
+> 
 
---Jan
+whoops.
 
-> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
-> alignment") modified the logic in memmap_init_zone() to initialize
-> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
-> in move_freepages(), which is redundant by its own admission, and
-> dereferences struct page fields to obtain the zone without checking
-> whether the struct pages in question are valid to begin with.
-> 
-> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
-> may cause pfn assume the same value it had in a prior iteration of
-> the loop, resulting in an infinite loop and a hang very early in the
-> boot. Also, since it doesn't perform the same rounding on start_pfn
-> itself but only on intermediate values following an invalid PFN, we
-> may still hit the same VM_BUG_ON() as before.
-> 
-> So instead, let's fix this at the core, and ensure that the BUG
-> check doesn't dereference struct page fields of invalid pages.
-> 
-> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
-> Cc: Daniel Vacek <neelx@redhat.com>
-> Cc: Mel Gorman <mgorman@techsingularity.net>
-> Cc: Michal Hocko <mhocko@suse.com>
-> Cc: Paul Burton <paul.burton@imgtec.com>
-> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Cc: Vlastimil Babka <vbabka@suse.cz>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  mm/page_alloc.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 3d974cb2a1a1..635d7dd29d7f 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->  	 * Remove at a later date when no bug reports exist related to
->  	 * grouping pages by mobility
->  	 */
-> -	VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
-> +	VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
-> +	          pfn_valid(page_to_pfn(end_page)) &&
-> +	          page_zone(start_page) != page_zone(end_page));
->  #endif
->  
->  	if (num_movable)
-> @@ -5359,14 +5361,9 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
->  			/*
->  			 * Skip to the pfn preceding the next valid one (or
->  			 * end_pfn), such that we hit a valid pfn (or end_pfn)
-> -			 * on our next iteration of the loop. Note that it needs
-> -			 * to be pageblock aligned even when the region itself
-> -			 * is not. move_freepages_block() can shift ahead of
-> -			 * the valid region but still depends on correct page
-> -			 * metadata.
-> +			 * on our next iteration of the loop.
->  			 */
-> -			pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
-> -					~(pageblock_nr_pages-1)) - 1;
-> +			pfn = memblock_next_valid_pfn(pfn, end_pfn) - 1;
->  #endif
->  			continue;
->  		}
-> -- 
-> 2.15.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+--- a/include/asm-generic/pgtable.h~mm-vmalloc-add-interfaces-to-free-unmapped-page-table-fix
++++ a/include/asm-generic/pgtable.h
+@@ -1014,7 +1014,7 @@ static inline int pud_free_pmd_page(pud_
+ {
+ 	return 0;
+ }
+-static inline int pmd_free_pte_page(pud_t *pmd)
++static inline int pmd_free_pte_page(pmd_t *pmd)
+ {
+ 	return 0;
+ }
+_
